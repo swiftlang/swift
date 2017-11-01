@@ -29,7 +29,7 @@ bb0(%0 : $Int):
   return %3 : $Int
 }
 
-sil [transparent] [thunk] @int_kind_getter_witness : $@convention(witness_method) (@in_guaranteed Int) -> Int {
+sil [transparent] [thunk] @int_kind_getter_witness : $@convention(witness_method: Kindable) (@in_guaranteed Int) -> Int {
 bb0(%0 : $*Int):
   %1 = load %0 : $*Int
   %2 = function_ref @int_kind_getter : $@convention(method) (Int) -> Int
@@ -44,7 +44,7 @@ bb0(%0 : $Float):
   return %3 : $Int
 }
 
-sil [transparent] [thunk] @float_kind_getter_witness : $@convention(witness_method) (@in_guaranteed Float) -> Int {
+sil [transparent] [thunk] @float_kind_getter_witness : $@convention(witness_method: Kindable) (@in_guaranteed Float) -> Int {
 bb0(%0 : $*Float):
   %1 = load %0 : $*Float
   %2 = function_ref @float_kind_getter : $@convention(method) (Float) -> Int

@@ -353,7 +353,7 @@ bb0(%0 : $private_proto_private_class):
 }
 
 
-sil private [transparent] [thunk] @private_proto_1_private_class_witness : $@convention(witness_method) (@in_guaranteed private_proto_private_class) -> () {
+sil private [transparent] [thunk] @private_proto_1_private_class_witness : $@convention(witness_method: private_proto_1) (@in_guaranteed private_proto_private_class) -> () {
 bb0(%0 : $*private_proto_private_class):
   %1 = load %0 : $*private_proto_private_class
   strong_retain %1 : $private_proto_private_class
@@ -366,8 +366,8 @@ bb0(%0 : $*private_proto_private_class):
 sil private @call_through_private_proto_1 : $@convention(thin) <T where T : private_proto_1> (@in T) -> () {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T
-  %2 = witness_method $T, #private_proto_1.theMethod!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
-  %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
+  %2 = witness_method $T, #private_proto_1.theMethod!1 : $@convention(witness_method: private_proto_1) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_1) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T
   %5 = tuple ()
   return %5 : $()
@@ -380,7 +380,7 @@ bb0(%0 : $private_proto_internal_class):
   return %2 : $()
 }
 
-sil private [transparent] [thunk] @private_proto_2_internal_class_witness : $@convention(witness_method) (@in_guaranteed private_proto_internal_class) -> () {
+sil private [transparent] [thunk] @private_proto_2_internal_class_witness : $@convention(witness_method: private_proto_2) (@in_guaranteed private_proto_internal_class) -> () {
 bb0(%0 : $*private_proto_internal_class):
   %1 = load %0 : $*private_proto_internal_class
   strong_retain %1 : $private_proto_internal_class
@@ -394,8 +394,8 @@ bb0(%0 : $*private_proto_internal_class):
 sil private @call_through_private_proto_2 : $@convention(thin) <T where T : private_proto_2> (@in T) -> () {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T
-  %2 = witness_method $T, #private_proto_2.theMethod!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
-  %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
+  %2 = witness_method $T, #private_proto_2.theMethod!1 : $@convention(witness_method: private_proto_2) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_2) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T
   %5 = tuple ()
   return %5 : $()
@@ -410,7 +410,7 @@ bb0(%0 : $private_proto_public_class):
 
 
 
-sil private [transparent] [thunk] @private_proto_3_public_class_witness : $@convention(witness_method) (@in_guaranteed private_proto_public_class) -> () {
+sil private [transparent] [thunk] @private_proto_3_public_class_witness : $@convention(witness_method: private_proto_3) (@in_guaranteed private_proto_public_class) -> () {
 bb0(%0 : $*private_proto_public_class):
   %1 = load %0 : $*private_proto_public_class
   strong_retain %1 : $private_proto_public_class
@@ -424,8 +424,8 @@ bb0(%0 : $*private_proto_public_class):
 sil private @call_through_private_proto_3 : $@convention(thin) <T where T : private_proto_3> (@in T) -> () {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T
-  %2 = witness_method $T, #private_proto_3.theMethod!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
-  %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
+  %2 = witness_method $T, #private_proto_3.theMethod!1 : $@convention(witness_method: private_proto_3) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_3) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T
   %5 = tuple ()
   return %5 : $()
@@ -438,7 +438,7 @@ bb0(%0 : $private_proto_public_class_private_method):
   return %2 : $()
 }
 
-sil private [transparent] [thunk] @private_proto_4_public_class_private_method_witness : $@convention(witness_method) (@in_guaranteed private_proto_public_class_private_method) -> () {
+sil private [transparent] [thunk] @private_proto_4_public_class_private_method_witness : $@convention(witness_method: private_proto_4) (@in_guaranteed private_proto_public_class_private_method) -> () {
 bb0(%0 : $*private_proto_public_class_private_method):
   %1 = load %0 : $*private_proto_public_class_private_method
   strong_retain %1 : $private_proto_public_class_private_method
@@ -452,8 +452,8 @@ bb0(%0 : $*private_proto_public_class_private_method):
 sil private @call_through_private_proto_4 : $@convention(thin) <T where T : private_proto_4> (@in T) -> () {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T
-  %2 = witness_method $T, #private_proto_4.theMethod!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
-  %3 = apply %2<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
+  %2 = witness_method $T, #private_proto_4.theMethod!1 : $@convention(witness_method: private_proto_4) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_4) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T
   %5 = tuple ()
   return %5 : $()

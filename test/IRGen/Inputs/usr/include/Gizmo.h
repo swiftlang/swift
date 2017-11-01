@@ -142,5 +142,5 @@ struct StructOfNSStrings useStructOfNSStringsInObjC(struct StructOfNSStrings);
 @end
 
 __attribute__((swift_name("OuterType.InnerType")))
-@interface OuterTypeInnerType : NSObject
+@interface OuterTypeInnerType : NSObject<NSRuncing>
 @end

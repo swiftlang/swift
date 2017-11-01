@@ -3565,6 +3565,10 @@ void Serializer::writeType(Type ty) {
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumResults(), variableData);
+
+    if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
+      writeConformance(*conformance, DeclTypeAbbrCodes);
+
     if (sig)
       writeGenericRequirements(sig->getRequirements(),
                                DeclTypeAbbrCodes);

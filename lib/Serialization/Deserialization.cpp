@@ -4444,6 +4444,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                   cast<GenericTypeParamType>(getType(id)->getCanonicalType()));
     }
 
+    Optional<ProtocolConformanceRef> witnessMethodConformance;
+    if (*representation == SILFunctionTypeRepresentation::WitnessMethod) {
+      witnessMethodConformance = readConformance(DeclTypeCursor);
+    }
+
     // Read the generic requirements, if any.
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements, DeclTypeCursor);
@@ -4453,10 +4458,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       genericSig = GenericSignature::get(genericParamTypes, requirements,
                                          /*isKnownCanonical=*/true);
 
-    typeOrOffset = SILFunctionType::get(genericSig, extInfo,
-                                        calleeConvention.getValue(),
-                                        allParams, allResults, errorResult,
-                                        ctx);
+    typeOrOffset = SILFunctionType::get(
+        genericSig, extInfo, calleeConvention.getValue(), allParams, allResults,
+        errorResult, ctx, witnessMethodConformance);
     break;
   }
 

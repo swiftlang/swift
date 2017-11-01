@@ -115,8 +115,8 @@ bb0(%0 : $T):
 
 sil @doWithS : $@convention(method) (S) -> ()
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @parse_mutating : $@convention(witness_method) (@in_guaranteed S) -> () {
-sil hidden [transparent] [thunk] @parse_mutating : $@convention(witness_method) (@in_guaranteed S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @parse_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
+sil hidden [transparent] [thunk] @parse_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
 // CHECK: bb0(%0 : $S):
 bb0(%0 : $S):
   %f = function_ref @doWithS : $@convention(method) (S) -> ()

@@ -262,8 +262,9 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
                               IsSerialized_t Serialized) {
   // The reference to the thunk is likely @noescape, but declarations are always
   // escaping.
-  auto thunkDeclType = adjustFunctionType(
-      thunkType, thunkType->getExtInfo().withNoEscape(false));
+  auto thunkDeclType =
+      adjustFunctionType(thunkType, thunkType->getExtInfo().withNoEscape(false),
+                         thunkType->getWitnessMethodConformanceOrNone());
 
   // Mangle the reabstraction thunk.
   // Substitute context parameters out of the "from" and "to" types.

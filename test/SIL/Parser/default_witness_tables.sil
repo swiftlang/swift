@@ -14,16 +14,16 @@ public protocol ResilientProtocol {
   func defaultE()
 }
 
-// CHECK-LABEL: sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
-sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+// CHECK-LABEL: sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
   return %result : $()
 }
 
 
-// CHECK-LABEL: sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
-sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+// CHECK-LABEL: sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
   return %result : $()
@@ -31,7 +31,7 @@ bb0(%0 : $*Self):
 
 
 // CHECK-LABEL: sil @defaultE
-sil public_external @defaultE : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+sil public_external @defaultE : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
 
 protocol InternalProtocol {
@@ -39,7 +39,7 @@ protocol InternalProtocol {
 }
 
 // CHECK-LABEL: sil hidden @defaultF
-sil hidden @defaultF : $@convention(witness_method) <Self where Self : InternalProtocol> (@in_guaranteed Self) -> () {
+sil hidden @defaultF : $@convention(witness_method: InternalProtocol) <Self where Self : InternalProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
   return %result : $()

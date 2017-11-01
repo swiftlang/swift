@@ -74,9 +74,9 @@ public func nonvoidReturn<T>(t: T) -> Int64
 // G.getContainer(A.Elt) -> A
 sil @_T016eager_specialize1GV12getContainerx3EltQzF : $@convention(method) <Container where Container : HasElt> (@in Container.Elt, G<Container>) -> @out Container {
 bb0(%0 : $*Container, %1 : $*Container.Elt, %2 : $G<Container>):
-  %4 = witness_method $Container, #HasElt.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
+  %4 = witness_method $Container, #HasElt.init!allocator.1 : $@convention(witness_method: HasElt) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
   %5 = metatype $@thick Container.Type
-  %6 = apply %4<Container>(%0, %1, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
+  %6 = apply %4<Container>(%0, %1, %5) : $@convention(witness_method: HasElt) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
   %7 = tuple ()
   return %7 : $()
 }
@@ -137,9 +137,9 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // static != infix<A where ...> (A, A) -> Bool
 sil public_external [serialized] @_T0s2neoiSbx_xts9EquatableRzlFZ : $@convention(thin) <T where T : Equatable> (@in T, @in T) -> Bool {
 bb0(%0 : $*T, %1 : $*T):
-  %4 = witness_method $T, #Equatable."=="!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %4 = witness_method $T, #Equatable."=="!1 : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %5 = metatype $@thick T.Type
-  %6 = apply %4<T>(%0, %1, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
+  %6 = apply %4<T>(%0, %1, %5) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %7 = struct_extract %6 : $Bool, #Bool._value
   %8 = integer_literal $Builtin.Int1, -1
   %9 = builtin "xor_Int1"(%7 : $Builtin.Int1, %8 : $Builtin.Int1) : $Builtin.Int1
@@ -154,11 +154,11 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %5 = function_ref @_T0s2neoiSbx_xts9EquatableRzlFZ : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
   %6 = alloc_stack $T
   copy_addr %2 to [initialization] %6 : $*T
-  %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+  %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
   %9 = metatype $@thick T.Type
   %10 = integer_literal $Builtin.Int2048, 0
   %11 = alloc_stack $T
-  %12 = apply %8<T>(%11, %10, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+  %12 = apply %8<T>(%11, %10, %9) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
   %13 = apply %5<T>(%6, %11) : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
   %14 = struct_extract %13 : $Bool, #Bool._value
   dealloc_stack %11 : $*T
@@ -175,8 +175,8 @@ bb1:
   throw %24 : $Error
 
 bb2:
-  %18 = witness_method $T, #BinaryInteger."/"!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-  %19 = apply %18<T>(%0, %1, %2, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %18 = witness_method $T, #BinaryInteger."/"!1 : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+  %19 = apply %18<T>(%0, %1, %2, %9) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
   %20 = tuple ()
   return %20 : $()
 }
@@ -209,8 +209,8 @@ bb2:
 // CHECK:   throw %{{.*}} : $Error
 
 // CHECK: bb4:
-// CHECK:   %{{.*}} = witness_method $T, #BinaryInteger."/"!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-// CHECK:   apply %{{.*}}<T>({{.*}}) : $@convention(witness_method) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %{{.*}} = witness_method $T, #BinaryInteger."/"!1 : {{.*}} : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   apply %{{.*}}<T>({{.*}}) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   br bb5
 
 // CHECK: bb5:
@@ -769,7 +769,7 @@ class ClassUsingThrowingP {
 sil @_T0s5Int64V34eager_specialize_throwing_functionE6actionAByKF : $@convention(method) (Int64) -> (Int64, @error Error)
 
 // protocol witness for ThrowingP.action() in conformance Int64
-sil @_T0s5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW : $@convention(witness_method) (@in_guaranteed Int64) -> (Int64, @error Error)
+sil @_T0s5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW : $@convention(witness_method: ThrowingP) (@in_guaranteed Int64) -> (Int64, @error Error)
 
 sil @_T034eager_specialize_throwing_function19ClassUsingThrowingPCACycfc : $@convention(method) (@owned ClassUsingThrowingP) -> @owned ClassUsingThrowingP
 
@@ -817,8 +817,8 @@ bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
 // static ClassUsingThrowingP.g<A>(_:)
 sil [_specialize exported: false, kind: full, where T == Int64] @_T034eager_specialize_throwing_function19ClassUsingThrowingPC1gs5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error) {
 bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
-  %5 = witness_method $T, #ThrowingP.action!1 : <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error)
-  try_apply %5<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error), normal bb1, error bb2
+  %5 = witness_method $T, #ThrowingP.action!1 : <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error)
+  try_apply %5<T>(%0) : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error), normal bb1, error bb2
 
 bb1(%7 : $Int64):                                 // Preds: bb0
   destroy_addr %0 : $*T

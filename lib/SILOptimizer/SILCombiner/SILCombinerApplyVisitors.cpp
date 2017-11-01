@@ -384,7 +384,7 @@ SILInstruction *PartialApplyCombiner::combine() {
       auto ConvertCalleeTy = CFI->getType().castTo<SILFunctionType>();
       auto EscapingCalleeTy = Lowering::adjustFunctionType(
           ConvertCalleeTy, ConvertCalleeTy->getExtInfo().withNoEscape(false),
-          ConvertCalleeTy->getCalleeConvention());
+          ConvertCalleeTy->getWitnessMethodConformanceOrNone());
       if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
         Uses.append(CFI->getUses().begin(), CFI->getUses().end());
 

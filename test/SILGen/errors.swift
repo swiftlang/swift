@@ -230,7 +230,7 @@ protocol Doomed {
   func check() throws
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors12DoomedStructVAA0B0A2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors12DoomedStructVAA0B0A2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed DoomedStruct) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [trivial] [[TEMP]] : $*DoomedStruct
@@ -248,7 +248,7 @@ struct DoomedStruct : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors11DoomedClassCAA0B0A2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error Error {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors11DoomedClassCAA0B0A2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed DoomedClass) -> @error Error {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*DoomedClass
@@ -271,7 +271,7 @@ class DoomedClass : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors11HappyStructVAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors11HappyStructVAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed HappyStruct) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [trivial] [[TEMP]] : $*HappyStruct
@@ -284,7 +284,7 @@ struct HappyStruct : Doomed {
   func check() {}
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors10HappyClassCAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors10HappyClassCAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method: Doomed) (@in_guaranteed HappyClass) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*HappyClass

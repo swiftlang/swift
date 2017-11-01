@@ -19,13 +19,14 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Ownership.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
-#include "swift/AST/Identifier.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -3347,6 +3348,7 @@ private:
   //   CanType?                       // if NumResults > 1, all result cache
 
   CanGenericSignature GenericSig;
+  Optional<ProtocolConformanceRef> WitnessMethodConformance;
 
   MutableArrayRef<SILParameterInfo> getMutableParameters() {
     return {getTrailingObjects<SILParameterInfo>(), NumParameters};
@@ -3380,21 +3382,22 @@ private:
     return *(reinterpret_cast<CanType *>(ptr) + 1);
   }
 
-  SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
-                  ParameterConvention calleeConvention,
-                  ArrayRef<SILParameterInfo> params,
-                  ArrayRef<SILResultInfo> normalResults,
-                  Optional<SILResultInfo> errorResult, const ASTContext &ctx,
-                  RecursiveTypeProperties properties);
+  SILFunctionType(
+      GenericSignature *genericSig, ExtInfo ext,
+      ParameterConvention calleeConvention, ArrayRef<SILParameterInfo> params,
+      ArrayRef<SILResultInfo> normalResults,
+      Optional<SILResultInfo> errorResult, const ASTContext &ctx,
+      RecursiveTypeProperties properties,
+      Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
 public:
-  static CanSILFunctionType get(GenericSignature *genericSig,
-                                ExtInfo ext,
-                                ParameterConvention calleeConvention,
-                                ArrayRef<SILParameterInfo> interfaceParams,
-                                ArrayRef<SILResultInfo> interfaceResults,
-                                Optional<SILResultInfo> interfaceErrorResult,
-                                const ASTContext &ctx);
+  static CanSILFunctionType
+  get(GenericSignature *genericSig, ExtInfo ext,
+      ParameterConvention calleeConvention,
+      ArrayRef<SILParameterInfo> interfaceParams,
+      ArrayRef<SILResultInfo> interfaceResults,
+      Optional<SILResultInfo> interfaceErrorResult, const ASTContext &ctx,
+      Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
   /// Given that this function type uses a C-language convention, return its
   /// formal semantic result type.
@@ -3550,6 +3553,20 @@ public:
   /// constrained self parameter, return the class constraint for the
   /// Self type.
   ClassDecl *getWitnessMethodClass(ModuleDecl &M) const;
+
+  /// If this is a @convention(witness_method) function, return the conformance
+  /// for which the method is a witness.
+  ProtocolConformanceRef getWitnessMethodConformance() const {
+    assert(getRepresentation() == Representation::WitnessMethod);
+    return *WitnessMethodConformance;
+  }
+
+  /// If this is a @convention(witness_method) function, return the conformance
+  /// for which the method is a witness, if it isn't that convention, return
+  /// None.
+  Optional<ProtocolConformanceRef> getWitnessMethodConformanceOrNone() const {
+    return WitnessMethodConformance;
+  }
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
 

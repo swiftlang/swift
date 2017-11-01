@@ -306,7 +306,7 @@ static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
     auto ToCalleeTy = CFI->getType().castTo<SILFunctionType>();
     auto EscapingCalleeTy = Lowering::adjustFunctionType(
         ToCalleeTy, ToCalleeTy->getExtInfo().withNoEscape(false),
-        ToCalleeTy->getCalleeConvention());
+        ToCalleeTy->getWitnessMethodConformanceOrNone());
     if (FromCalleeTy != EscapingCalleeTy)
       return CalleeValue;
 

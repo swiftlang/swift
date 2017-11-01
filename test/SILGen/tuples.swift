@@ -152,7 +152,7 @@ extension P {
   // CHECK:   [[ZERO_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 0
   // CHECK:   [[LOADED_CLASS:%.*]] = load_borrow [[ZERO_ADDR]]
   // CHECK:   [[ONE_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 1
-  // CHECK:   apply {{.*}}([[ONE_ADDR]]) : $@convention(witness_method)
+  // CHECK:   apply {{.*}}([[ONE_ADDR]]) : $@convention(witness_method: P)
   // CHECK:   end_borrow [[LOADED_CLASS]] from [[ZERO_ADDR]]
   // CHECK:   destroy_addr [[RVALUE]]
   // CHECK:   dealloc_stack [[RVALUE]]

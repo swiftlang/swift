@@ -723,7 +723,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   auto NewFnTy = SILFunctionType::get(
       CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCalleeConvention(),
       FnTy->getParameters(), FnTy->getResults(), FnTy->getOptionalErrorResult(),
-      M.getASTContext());
+      M.getASTContext(), FnTy->getWitnessMethodConformanceOrNone());
 
   // This is an interface type. It should not have any archetypes.
   assert(!NewFnTy->hasArchetype());
@@ -769,12 +769,11 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
       SpecializedParams.push_back(PI);
     }
   }
-  return
-    SILFunctionType::get(SubstFTy->getGenericSignature(),
-                         SubstFTy->getExtInfo(),
-                         SubstFTy->getCalleeConvention(), SpecializedParams,
-                         SpecializedResults, SubstFTy->getOptionalErrorResult(),
-                         M.getASTContext());
+  return SILFunctionType::get(
+      SubstFTy->getGenericSignature(), SubstFTy->getExtInfo(),
+      SubstFTy->getCalleeConvention(), SpecializedParams, SpecializedResults,
+      SubstFTy->getOptionalErrorResult(), M.getASTContext(),
+      SubstFTy->getWitnessMethodConformanceOrNone());
 }
 
 /// Create a new generic signature from an existing one by adding

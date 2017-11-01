@@ -8,7 +8,7 @@ protocol Runcible {
 // CHECK-LABEL: sil hidden @_T015generic_witness3foo{{[_0-9a-zA-Z]*}}F : $@convention(thin) <B where B : Runcible> (@in B) -> () {
 
 func foo<B : Runcible>(_ x: B) {
-  // CHECK: [[METHOD:%.*]] = witness_method $B, #Runcible.runce!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : Runcible><τ_1_0> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  // CHECK: [[METHOD:%.*]] = witness_method $B, #Runcible.runce!1 : {{.*}} : $@convention(witness_method: Runcible) <τ_0_0 where τ_0_0 : Runcible><τ_1_0> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
   // CHECK: apply [[METHOD]]<B, Int>
   x.runce(5)
 }
@@ -50,7 +50,7 @@ struct Canvas<I : Ink> where I.Paint : Pen {
 
 extension Canvas : Medium {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T015generic_witness6CanvasVyxGAA6MediumA2aEP4drawy6StrokeQyd__5paint_qd__6penciltAA6PencilRd__7Texture_5PaintQZAIRSlFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in τ_0_0.Paint, @in τ_1_0, @in_guaranteed Canvas<τ_0_0>) -> () {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T015generic_witness6CanvasVyxGAA6MediumA2aEP4drawy6StrokeQyd__5paint_qd__6penciltAA6PencilRd__7Texture_5PaintQZAIRSlFTW : $@convention(witness_method: Medium) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in τ_0_0.Paint, @in τ_1_0, @in_guaranteed Canvas<τ_0_0>) -> () {
 // CHECK: [[FN:%.*]] = function_ref @_T015generic_witness6CanvasV4drawy5PaintQz5paint_qd__6penciltAA6PencilRd__6StrokeQyd__AFRSlF : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
 // CHECK: apply [[FN]]<τ_0_0, τ_1_0>({{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Ink><τ_1_0 where τ_1_0 : Pencil, τ_0_0.Paint == τ_1_0.Stroke> (@in τ_0_0.Paint, @in τ_1_0, Canvas<τ_0_0>) -> ()
 // CHECK: }

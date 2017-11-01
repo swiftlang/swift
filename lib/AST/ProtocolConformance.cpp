@@ -86,9 +86,18 @@ ProtocolConformanceRef::subst(Type origType,
 
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
-  if (isConcrete())
+  if (isConcrete()) {
+    auto concrete = getConcrete();
+    if (auto classDecl = concrete->getType()->getClassOrBoundGenericClass()) {
+      // If this is a class, we need to traffic in the actual type that
+      // implements the protocol, not 'Self' and not any subclasses (with their
+      // inherited conformances).
+      substType =
+          substType->eraseDynamicSelfType()->getSuperclassForDecl(classDecl);
+    }
     return ProtocolConformanceRef(
       getConcrete()->subst(substType, subs, conformances));
+  }
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.

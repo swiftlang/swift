@@ -77,6 +77,6 @@ func getNonCanonicalSelfFunc<T : Foo, U : Panda>(t: T.Type) -> (T) -> (U) -> () 
 
 // curry thunk of Foo.makesSelfNonCanonical<A where ...> (A1) -> ()
 // CHECK-LABEL: sil shared [thunk] @_T021partial_apply_generic3FooP21makesSelfNonCanonicalyqd__7CuddlesQyd__RszAA5PandaRd__lFTc : $@convention(thin) <Self><T where Self == T.Cuddles, T : Panda> (@in Self) -> @owned @callee_owned (@in T) -> () {
-// CHECK: [[REF:%.*]] = witness_method $Self, #Foo.makesSelfNonCanonical!1 : <Self><T where Self == T.Cuddles, T : Panda> (Self) -> (T) -> () : $@convention(witness_method) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+// CHECK: [[REF:%.*]] = witness_method $Self, #Foo.makesSelfNonCanonical!1 : <Self><T where Self == T.Cuddles, T : Panda> (Self) -> (T) -> () : $@convention(witness_method: Foo) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
 // CHECK-NEXT: [[CLOSURE:%.*]] = partial_apply [[REF]]<Self, T>(%0)
 // CHECK-NEXT: return [[CLOSURE]]

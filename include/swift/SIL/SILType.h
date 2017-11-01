@@ -572,10 +572,10 @@ NON_SIL_TYPE(AnyFunction)
 NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
 
-CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                        Lowering::AbstractionPattern origType,
-                        CanAnyFunctionType substType,
-                        Optional<SILDeclRef> constant = None);
+CanSILFunctionType getNativeSILFunctionType(
+    SILModule &M, Lowering::AbstractionPattern origType,
+    CanAnyFunctionType substType, Optional<SILDeclRef> constant = None,
+    Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

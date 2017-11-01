@@ -611,8 +611,10 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
 
   // Don't use a method representation if we modified self.
   auto ExtInfo = FTy->getExtInfo();
+  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrNone();
   if (shouldModifySelfArgument) {
     ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+    witnessMethodConformance = None;
   }
 
   Optional<SILResultInfo> InterfaceErrorResult;
@@ -627,10 +629,10 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
   GenericSignature *GenericSig =
       UsesGenerics ? FTy->getGenericSignature() : nullptr;
 
-  return SILFunctionType::get(GenericSig, ExtInfo,
-                              FTy->getCalleeConvention(), InterfaceParams,
-                              InterfaceResults, InterfaceErrorResult,
-                              F->getModule().getASTContext());
+  return SILFunctionType::get(
+      GenericSig, ExtInfo, FTy->getCalleeConvention(), InterfaceParams,
+      InterfaceResults, InterfaceErrorResult, F->getModule().getASTContext(),
+      witnessMethodConformance);
 }
 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {

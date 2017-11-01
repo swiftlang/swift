@@ -67,7 +67,7 @@ protocol InternalProtocol {
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
-sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   // CHECK-NEXT: ret void
   %result = tuple ()
@@ -78,14 +78,14 @@ bb0(%0 : $*Self):
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @defaultD(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
-sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
 
   // Make sure we can emit direct references to other default implementations
 
   // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
-  %fn1 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
-  %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
   // Make sure we can do dynamic dispatch to other protocol requirements
   // from a default implementation
@@ -94,8 +94,8 @@ bb0(%0 : $*Self):
   // CHECK-NEXT: [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
   // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.type*, i8**)*
   // CHECK-NEXT: call swiftcc void [[WITNESS]](%swift.opaque* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
-  %fn2 = witness_method $Self, #ResilientProtocol.defaultC!1 : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
-  %ignore2 = apply %fn2<Self>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %fn2 = witness_method $Self, #ResilientProtocol.defaultC!1 : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore2 = apply %fn2<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
   // Make sure we can partially apply a static reference to a default
   // implementation
@@ -106,8 +106,8 @@ bb0(%0 : $*Self):
   // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], i8* }>, <{ %swift.refcounted, [{{4|8}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
   // CHECK-NEXT: store i8* [[WTABLE]], i8** [[WTABLE_ADDR]]
 
-  %fn3 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
-  %ignore3 = partial_apply %fn3<Self>() : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %fn3 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore3 = partial_apply %fn3<Self>() : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
   // CHECK-NEXT: ret void
   %result = tuple ()
@@ -118,14 +118,14 @@ bb0(%0 : $*Self):
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @defaultE(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
-sil @defaultE : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
+sil @defaultE : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
 bb0(%0 : $@thick Self.Type):
 
   // Make sure we can emit direct references to other default implementations
 
   // CHECK-NEXT: call swiftcc void @defaultF(%swift.type* swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
-  %fn1 = function_ref @defaultF : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
-  %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %fn1 = function_ref @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
 
   // Make sure we can do dynamic dispatch to other protocol requirements
   // from a default implementation
@@ -134,8 +134,8 @@ bb0(%0 : $@thick Self.Type):
   // CHECK-NEXT: [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
   // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.type*, %swift.type*, i8**)*
   // CHECK-NEXT: call swiftcc void [[WITNESS]](%swift.type*  swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
-  %fn2 = witness_method $Self, #ResilientProtocol.defaultF!1 : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
-  %ignore2 = apply %fn2<Self>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %fn2 = witness_method $Self, #ResilientProtocol.defaultF!1 : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %ignore2 = apply %fn2<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
 
   // Make sure we can partially apply a static reference to a default
   // implementation
@@ -146,8 +146,8 @@ bb0(%0 : $@thick Self.Type):
   // CHECK:      [[WTABLE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{4|8}} x i8], i8* }>, <{ %swift.refcounted, [{{4|8}} x i8], i8* }>* [[LAYOUT]], i32 0, i32 2
   // CHECK-NEXT: store i8* [[WTABLE]], i8** [[WTABLE_ADDR]]
 
-  %fn3 = function_ref @defaultF : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
-  %ignore3 = partial_apply %fn3<Self>() : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %fn3 = function_ref @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
+  %ignore3 = partial_apply %fn3<Self>() : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
 
   // CHECK-NEXT: ret void
   %result = tuple ()
@@ -158,7 +158,7 @@ bb0(%0 : $@thick Self.Type):
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @defaultF(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
-sil @defaultF : $@convention(witness_method) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
+sil @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
 bb0(%0 : $@thick Self.Type):
 
   // CHECK-NEXT: ret void
@@ -196,7 +196,7 @@ struct ConformingStruct : ResilientProtocol {
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @noDefaultA(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
-sil @noDefaultA : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
+sil @noDefaultA : $@convention(witness_method: ResilientProtocol) (@in_guaranteed ConformingStruct) -> () {
 bb0(%0 : $*ConformingStruct):
 
   // Make sure we can emit direct references to default implementations with a
@@ -204,8 +204,8 @@ bb0(%0 : $*ConformingStruct):
 
   // CHECK-NEXT: [[SELF:%.*]] = bitcast %T19protocol_resilience16ConformingStructV* %0 to %swift.opaque*
   // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** getelementptr inbounds ([8 x i8*], [8 x i8*]* @_T019protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP, i32 0, i32 0))
-  %fn1 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
-  %ignore1 = apply %fn1<ConformingStruct>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore1 = apply %fn1<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
   // CHECK-NEXT: ret void
   %result = tuple ()
@@ -216,7 +216,7 @@ bb0(%0 : $*ConformingStruct):
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @noDefaultB(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
-sil @noDefaultB : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
+sil @noDefaultB : $@convention(witness_method: ResilientProtocol) (@in_guaranteed ConformingStruct) -> () {
 bb0(%0 : $*ConformingStruct):
 
   // Make sure we can partially apply direct references to default implementations
@@ -226,8 +226,8 @@ bb0(%0 : $*ConformingStruct):
   // CHECK-NEXT: [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
   // CHECK-NEXT: store i8* bitcast ([8 x i8*]* @_T019protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP to i8*), i8** [[WTABLE]]
 
-  %fn1 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
-  %ignore1 = partial_apply %fn1<ConformingStruct>() : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+  %ignore1 = partial_apply %fn1<ConformingStruct>() : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
   // CHECK-NEXT: ret void
   %result = tuple ()

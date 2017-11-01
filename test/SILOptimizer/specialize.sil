@@ -270,7 +270,7 @@ bb0(%0 : $@thin C.Type):
 }
 
 // protocol witness for test4.P.get <A : test4.P>(test4.P.Self)() -> Swift.Int32 in conformance test4.C : test4.P in test4
-sil hidden [transparent] [thunk] @test4_P_get_witness_C : $@convention(witness_method) (@in_guaranteed C) -> Int32 {
+sil hidden [transparent] [thunk] @test4_P_get_witness_C : $@convention(witness_method: P) (@in_guaranteed C) -> Int32 {
 bb0(%0 : $*C):
   %1 = load %0 : $*C                              // user: %3
   // function_ref test4.C.get (test4.C)() -> Swift.Int32
@@ -299,8 +299,8 @@ bb0(%0 : $Int32, %1 : $*T, %2 : $<τ_0_0> { var τ_0_0 } <U>):
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <U>, 0
   debug_value %0 : $Int32, let, name "x" // id: %4
   debug_value_addr %1 : $*T, let, name "z" // id: %5
-  %6 = witness_method $U, #P.get!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %7
-  %7 = apply %6<U>(%3) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %8
+  %6 = witness_method $U, #P.get!1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %7
+  %7 = apply %6<U>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %8
   %8 = struct_extract %7 : $Int32, #Int32._value   // user: %11
   %9 = struct_extract %0 : $Int32, #Int32._value   // user: %11
   %10 = integer_literal $Builtin.Int1, -1         // user: %11
@@ -376,8 +376,8 @@ sil shared [noinline] @gen1_closure : $@convention(thin) <T where T : P> (Int32,
 bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
   debug_value %0 : $Int32 , let, name "$0"              // id: %3
-  %4 = witness_method $T, #P.get!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %5
-  %5 = apply %4<T>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %6
+  %4 = witness_method $T, #P.get!1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %5
+  %5 = apply %4<T>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %6
   %6 = struct_extract %5 : $Int32, #Int32._value   // user: %9
   %7 = struct_extract %0 : $Int32, #Int32._value   // user: %9
   %8 = integer_literal $Builtin.Int1, -1          // user: %9
