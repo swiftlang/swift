@@ -514,7 +514,7 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
 // CHECK: } // end sil function '_T013objc_bridging16applyStringBlockS3SXB_SS1xtF'
 
 // CHECK-LABEL: sil hidden @_T013objc_bridging15bridgeCFunction{{.*}}F
-func bridgeCFunction() -> (String!) -> (String!) {
+func bridgeCFunction() -> (String?) -> (String?) {
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC18NSStringFromStringSQySSGABFTO : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String>
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
   // CHECK: return [[THICK]]

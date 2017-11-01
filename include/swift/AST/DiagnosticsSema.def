@@ -3103,12 +3103,6 @@ ERROR(tuple_single_element,none,
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
 
-WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated", ())
-
-WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
-
 ERROR(implicitly_unwrapped_optional_spelling_error,none,
         "the spelling 'ImplicitlyUnwrappedOptional' in unsupported; use an explicit type followed by '!'", ())
 
