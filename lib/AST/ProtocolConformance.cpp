@@ -538,17 +538,23 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   return false;
 }
 
-std::pair<Type, TypeDecl *>
+using TypeWitnessAndDecl = std::pair<Type, TypeDecl *>;
+TypeWitnessAndDecl
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                  LazyResolver *resolver,
                                                  SubstOptions options) const {
+  auto toInterfaceType = [&] (TypeWitnessAndDecl ret) -> TypeWitnessAndDecl {
+    assert(!ret.first->hasArchetype());
+    return { ret.first, //getDeclContext()->mapTypeOutOfContext(ret.first),
+             ret.second };
+  };
   if (Loader)
     resolveLazyInfo();
 
   // Check whether we already have a type witness.
   auto known = TypeWitnesses.find(assocType);
   if (known != TypeWitnesses.end())
-    return known->second;
+    return toInterfaceType(known->second);
 
   // If this conformance is in a state where it is inferring type witnesses,
   // check tentative witnesses.
@@ -557,7 +563,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
     if (options.getTentativeTypeWitness) {
      if (Type witnessType =
            Type(options.getTentativeTypeWitness(this, assocType)))
-        return { witnessType, nullptr };
+       return toInterfaceType({ witnessType, nullptr });
     }
 
     // Otherwise, we fail; this is the only case in which we can return a
@@ -572,7 +578,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
   known = TypeWitnesses.find(assocType);
   assert(known != TypeWitnesses.end() && "Didn't resolve witness?");
-  return known->second;
+  return toInterfaceType(known->second);
 }
 
 void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
@@ -582,6 +588,7 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
          "associated type in wrong protocol");
   assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
+  assert(!type->hasArchetype() && "type witnesses must be interface types");
   TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
 }
 

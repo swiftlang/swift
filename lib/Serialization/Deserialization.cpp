@@ -625,7 +625,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   ASTContext &ctx = getContext();
   DeclContext *dc = getDeclContext(contextID);
-  Type conformingType = dc->getDeclaredTypeInContext();
+  Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
@@ -4998,6 +4998,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
   TypeWitnessMap typeWitnesses;
+  auto DC = conformance->getDeclContext();
   while (typeCount--) {
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
@@ -5015,7 +5016,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // rest of the compiler.
       third = nullptr;
     }
-    typeWitnesses[first] = std::make_pair(second, third);
+    typeWitnesses[first] = std::make_pair(DC->mapTypeOutOfContext(second),
+                                          third);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

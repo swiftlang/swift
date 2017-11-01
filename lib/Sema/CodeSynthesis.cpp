@@ -1798,7 +1798,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       // property is in a non-type context.
       Type behaviorSelf;
       if (dc->isTypeContext()) {
-        behaviorSelf = dc->getSelfTypeInContext();
+        behaviorSelf = dc->getSelfInterfaceType();
         assert(behaviorSelf && "type context doesn't have self type?!");
         if (var->isStatic())
           behaviorSelf = MetatypeType::get(behaviorSelf);
