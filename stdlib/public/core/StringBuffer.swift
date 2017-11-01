@@ -80,18 +80,13 @@ public struct _StringBuffer {
     // elementWidth is known to be 1 or 2.
     let elementShift = elementWidth &- 1
 
-    // We need at least 1 extra byte if we're storing 8-bit elements,
-    // because indexing will always grab 2 consecutive bytes at a
-    // time.
-    let capacityBump = 1 &- elementShift
-
     // Used to round capacity up to nearest multiple of 16 bits, the
     // element size of our storage.
     let divRound = 1 &- elementShift
     _storage = _Storage(
       HeapBufferStorage.self,
       _StringBufferIVars(_elementWidth: elementWidth),
-      (capacity + capacityBump + divRound) &>> divRound
+      (capacity + divRound) &>> divRound
     )
     // This conditional branch should fold away during code gen.
     if elementShift == 0 {
@@ -103,7 +98,7 @@ public struct _StringBuffer {
 
     self.usedEnd = start + (initialSize &<< elementShift)
     _storage.value.capacityAndElementShift
-      = ((_storage.capacity - capacityBump) &<< 1) + elementShift
+      = (_storage.capacity &<< 1) + elementShift
   }
 
   @_inlineable // FIXME(sil-serialize-all)
