@@ -160,9 +160,14 @@ private:
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
 
-  /// This flag indicates if a function can be eliminated by dead function
-  /// elimination. If it is unset, DFE will preserve the function and make
-  /// it public.
+  /// Set if the function may be referenced from C code and should thus be
+  /// preserved and exported more widely than its Swift linkage and usage
+  /// would indicate.
+  unsigned HasCReferences : 1;
+
+  /// Set if the function should be preserved and changed to public linkage
+  /// during dead function elimination. This is used for some generic
+  /// pre-specialization.
   unsigned KeepAsPublic : 1;
 
   /// This is the number of uses of this SILFunction inside the SIL.
@@ -401,7 +406,7 @@ public:
   }
 
   /// Helper method which returns true if the linkage of the SILFunction
-  /// indicates that the objects definition might be required outside the
+  /// indicates that the object's definition might be required outside the
   /// current SILModule.
   bool isPossiblyUsedExternally() const;
 
@@ -409,6 +414,10 @@ public:
   /// is a (private or internal) vtable method which can be referenced by
   /// vtables of derived classes outside the compilation unit.
   bool isExternallyUsedSymbol() const;
+
+  /// Return whether this function may be referenced by C code.
+  bool hasCReferences() const { return HasCReferences; }
+  void setHasCReferences(bool value) { HasCReferences = value; }
 
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const {
