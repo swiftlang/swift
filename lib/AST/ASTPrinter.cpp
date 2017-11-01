@@ -3500,7 +3500,9 @@ public:
     }
   }
 
-  void printFunctionExtInfo(SILFunctionType::ExtInfo info) {
+  void printFunctionExtInfo(
+      SILFunctionType::ExtInfo info,
+      Optional<ProtocolConformanceRef> witnessMethodConformance) {
     if (Options.SkipAttributes)
       return;
 
@@ -3529,7 +3531,9 @@ public:
         Printer << "objc_method";
         break;
       case SILFunctionType::Representation::WitnessMethod:
-        Printer << "witness_method";
+        Printer << "witness_method: ";
+        printTypeDeclName(
+            witnessMethodConformance->getRequirement()->getDeclaredType());
         break;
       case SILFunctionType::Representation::Closure:
         Printer << "closure";
@@ -3647,7 +3651,8 @@ public:
   }
 
   void visitSILFunctionType(SILFunctionType *T) {
-    printFunctionExtInfo(T->getExtInfo());
+    printFunctionExtInfo(T->getExtInfo(),
+                         T->getWitnessMethodConformanceOrNone());
     printCalleeConvention(T->getCalleeConvention());
     if (auto sig = T->getGenericSignature()) {
       printGenericSignature(sig,

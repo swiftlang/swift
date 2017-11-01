@@ -1702,12 +1702,11 @@ namespace {
                                 TypeResolutionOptions options,
                                 FunctionType::ExtInfo extInfo
                                   = FunctionType::ExtInfo());
-    Type resolveSILFunctionType(FunctionTypeRepr *repr,
-                                TypeResolutionOptions options,
-                                SILFunctionType::ExtInfo extInfo
-                                  = SILFunctionType::ExtInfo(),
-                                ParameterConvention calleeConvention
-                                  = DefaultParameterConvention);
+    Type resolveSILFunctionType(
+        FunctionTypeRepr *repr, TypeResolutionOptions options,
+        SILFunctionType::ExtInfo extInfo = SILFunctionType::ExtInfo(),
+        ParameterConvention calleeConvention = DefaultParameterConvention,
+        TypeRepr *witnessmethodProtocol = nullptr);
     SILParameterInfo resolveSILParameter(TypeRepr *repr,
                                          TypeResolutionOptions options);
     bool resolveSILResults(TypeRepr *repr, TypeResolutionOptions options,
@@ -2017,6 +2016,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     // Fall through to diagnose below.
   } else if (hasFunctionAttr && (options & TR_SILType)) {
     SILFunctionType::Representation rep;
+    TypeRepr *witnessMethodProtocol = nullptr;
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
@@ -2032,18 +2032,20 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (!attrs.hasConvention()) {
       rep = SILFunctionType::Representation::Thick;
     } else {
+      auto convention = attrs.getConvention();
       // SIL exposes a greater number of conventions than Swift source.
       auto parsedRep =
-      llvm::StringSwitch<Optional<SILFunctionType::Representation>>
-      (attrs.getConvention())
-      .Case("thick", SILFunctionType::Representation::Thick)
-      .Case("block", SILFunctionType::Representation::Block)
-      .Case("thin", SILFunctionType::Representation::Thin)
-      .Case("c", SILFunctionType::Representation::CFunctionPointer)
-      .Case("method", SILFunctionType::Representation::Method)
-      .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
-      .Case("witness_method", SILFunctionType::Representation::WitnessMethod)
-      .Default(None);
+          llvm::StringSwitch<Optional<SILFunctionType::Representation>>(
+              convention)
+              .Case("thick", SILFunctionType::Representation::Thick)
+              .Case("block", SILFunctionType::Representation::Block)
+              .Case("thin", SILFunctionType::Representation::Thin)
+              .Case("c", SILFunctionType::Representation::CFunctionPointer)
+              .Case("method", SILFunctionType::Representation::Method)
+              .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
+              .Case("witness_method",
+                    SILFunctionType::Representation::WitnessMethod)
+              .Default(None);
       if (!parsedRep) {
         TC.diagnose(attrs.getLoc(TAK_convention),
                     diag::unsupported_sil_convention, attrs.getConvention());
@@ -2051,13 +2053,20 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       } else {
         rep = *parsedRep;
       }
+
+      if (rep == SILFunctionType::Representation::WitnessMethod) {
+        auto protocolName = *attrs.conventionWitnessMethodProtocol;
+        witnessMethodProtocol = new (TC.Context) SimpleIdentTypeRepr(
+            SourceLoc(), TC.Context.getIdentifier(protocolName));
+      }
     }
 
     // Resolve the function type directly with these attributes.
     SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                      attrs.has(TAK_noescape));
 
-    ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
+    ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention,
+                                witnessMethodProtocol);
     if (!ty || ty->hasError()) return ty;
   } else if (hasFunctionAttr) {
     FunctionType::Representation rep = FunctionType::Representation::Swift;
@@ -2416,7 +2425,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           SILFunctionType::ExtInfo extInfo,
-                                          ParameterConvention callee) {
+                                          ParameterConvention callee,
+                                          TypeRepr *witnessMethodProtocol) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_TypeAliasUnderlyingType;
@@ -2515,11 +2525,36 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
-  return SILFunctionType::get(genericSig, extInfo,
-                              callee,
-                              interfaceParams, interfaceResults,
-                              interfaceErrorResult,
-                              Context);
+  Optional<ProtocolConformanceRef> witnessMethodConformance;
+  if (witnessMethodProtocol) {
+    auto resolved = resolveType(witnessMethodProtocol, options);
+    if (resolved->hasError())
+      return resolved;
+
+    auto protocolType = resolved->getAs<ProtocolType>();
+    if (!protocolType)
+      return ErrorType::get(Context);
+
+    Type selfType = params.back().getType();
+    // The Self type can be nested in a few layers of metatypes (etc.), e.g. for
+    // a mutable static variable the materializeForSet currently has its last
+    // argument as a Self.Type.Type metatype.
+    while (1) {
+      auto next = selfType->getRValueInstanceType();
+      if (next->isEqual(selfType))
+        break;
+      selfType = next;
+    }
+
+    witnessMethodConformance = TC.conformsToProtocol(
+        selfType, protocolType->getDecl(), DC, ConformanceCheckOptions());
+    assert(witnessMethodConformance &&
+           "found witness_method without matching conformance");
+  }
+
+  return SILFunctionType::get(genericSig, extInfo, callee, interfaceParams,
+                              interfaceResults, interfaceErrorResult, Context,
+                              witnessMethodConformance);
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(

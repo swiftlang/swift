@@ -180,7 +180,8 @@ getNewSILFunctionTypePtr(GenericEnvironment *GenericEnv,
       currSILFunctionType->getCalleeConvention(), newArgTys,
       getNewResults(GenericEnv, currSILFunctionType, Mod),
       currSILFunctionType->getOptionalErrorResult(),
-      currSILFunctionType->getASTContext());
+      currSILFunctionType->getASTContext(),
+      currSILFunctionType->getWitnessMethodConformanceOrNone());
   return newSILFunctionType;
 }
 
@@ -2105,7 +2106,8 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
         loweredTy->getGenericSignature(), loweredTy->getExtInfo(),
         loweredTy->getCalleeConvention(), loweredTy->getParameters(),
         newSILResultInfo, loweredTy->getOptionalErrorResult(),
-        F->getModule().getASTContext());
+        F->getModule().getASTContext(),
+        loweredTy->getWitnessMethodConformanceOrNone());
     F->rewriteLoweredTypeUnsafe(NewTy);
     return true;
   } else if (isLargeLoadableType(genEnv, resultTy, pass.Mod)) {

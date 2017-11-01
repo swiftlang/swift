@@ -1339,6 +1339,10 @@ ERROR(convention_attribute_expected_name,none,
       "expected convention name identifier in 'convention' attribute", ())
 ERROR(convention_attribute_expected_rparen,none,
       "expected ')' after convention name for 'convention' attribute", ())
+ERROR(convention_attribute_witness_method_expected_colon,none,
+      "expected ':' after 'witness_method' for 'convention' attribute", ())
+ERROR(convention_attribute_witness_method_expected_protocol,none,
+      "expected protocol name in 'witness_method' 'convention' attribute", ())
 
 // objc
 ERROR(attr_objc_missing_colon,none,

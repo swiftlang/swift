@@ -57,6 +57,7 @@ public:
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
   Optional<StringRef> convention = None;
+  Optional<StringRef> conventionWitnessMethodProtocol = None;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;

@@ -3583,13 +3583,11 @@ case TypeKind::Id:
 
     if (!changed) return *this;
 
-    return SILFunctionType::get(fnTy->getGenericSignature(),
-                                fnTy->getExtInfo(),
+    return SILFunctionType::get(fnTy->getGenericSignature(), fnTy->getExtInfo(),
                                 fnTy->getCalleeConvention(),
-                                transInterfaceParams,
-                                transInterfaceResults,
-                                transErrorResult,
-                                Ptr->getASTContext());
+                                transInterfaceParams, transInterfaceResults,
+                                transErrorResult, Ptr->getASTContext(),
+                                fnTy->getWitnessMethodConformanceOrNone());
   }
 
   case TypeKind::UnownedStorage:

@@ -2573,8 +2573,8 @@ bb0(%0 : $*T):
   copy_addr %0 to [initialization] %4 : $*T       // id: %5
   destroy_addr %0 : $*T                           // id: %6
   %7 = open_existential_addr immutable_access %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol // users: %8, %9
-  %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter.1, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
-  %9 = apply %8<@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol>(%7) : $@convention(witness_method) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int
+  %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter.1, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
+  %9 = apply %8<@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol>(%7) : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %3 : $*someProtocol              // id: %13
   dealloc_stack %3 : $*someProtocol // id: %15
   %16 = tuple ()                                  // user: %17
@@ -3010,8 +3010,8 @@ bb0(%0 : $*T, %1 : $*T):
 sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
 bb0(%0: $*FakeProtocol):
   %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
-  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
-  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
   %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
 
   %r = tuple ()
@@ -3130,8 +3130,8 @@ bb0:
   %0 = metatype $@thick ClientSocket.Type
   %1 = init_existential_metatype %0 : $@thick ClientSocket.Type, $@thick Socket.Type
   %2 = open_existential_metatype %1 : $@thick Socket.Type to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type
-  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket, #Socket.newWithConfig!1, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
-  try_apply %3<@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
+  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket, #Socket.newWithConfig!1, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket).Type : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  try_apply %3<@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913") Socket>(%2) : $@convention(witness_method: Socket) <τ_0_0 where τ_0_0 : Socket> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
 
 bb1(%4 : $Builtin.Int32):
   return %4 : $Builtin.Int32
@@ -3411,8 +3411,8 @@ sil @getMetaType : $@convention(thin) () -> @thick Prot2.Type
 // CHECK:bb0:
 // CHECK:  [[APPLY:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @thick Prot2.Type
 // CHECK:  [[OE:%.*]] = open_existential_metatype [[APPLY]] : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
-// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1, #Prot1.newWithConfig!1 : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
-// CHECK:  try_apply [[WM]]<@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1>([[OE]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+// CHECK:  [[WM:%.*]] = witness_method $@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1, #Prot1.newWithConfig!1 : <Self where Self : Prot1> (Self.Type) -> () throws -> Builtin.Int32, [[OE]] : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+// CHECK:  try_apply [[WM]]<@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1>([[OE]]) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
 sil @meta_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
 bb0:
   %fref = function_ref @getMetaType : $@convention(thin) () -> @thick Prot2.Type
@@ -3420,8 +3420,8 @@ bb0:
   %open = open_existential_metatype %apply : $@thick Prot2.Type to $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type
   %1 = init_existential_metatype %open : $@thick (@opened("690DA5F6-B5EA-11E7-B144-685B3593C496") Prot1).Type, $@thick Prot1.Type
   %2 = open_existential_metatype %1 : $@thick Prot1.Type to $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type
-  %3 = witness_method $@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1, #Prot1.newWithConfig!1, %2 : $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
-  try_apply %3<@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
+  %3 = witness_method $@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1, #Prot1.newWithConfig!1, %2 : $@thick (@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1).Type : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType)
+  try_apply %3<@opened("92105EE0-DCB0-11E5-865D-C8E0EB309913") Prot1>(%2) : $@convention(witness_method: Prot1) <τ_0_0 where τ_0_0 : Prot1> (@thick τ_0_0.Type) -> (Builtin.Int32, @error MyErrorType), normal bb1, error bb2
 
 bb1(%4 : $Builtin.Int32):
   return %4 : $Builtin.Int32

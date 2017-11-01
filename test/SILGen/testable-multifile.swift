@@ -20,11 +20,11 @@ public protocol Fooable {
 struct FooImpl: Fooable, HasDefaultFoo {}
 public struct PublicFooImpl: Fooable, HasDefaultFoo {}
 
-// CHECK-LABEL: sil{{.*}} @_T04main7FooImplVAA7FooableA2aDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed FooImpl) -> () {
+// CHECK-LABEL: sil{{.*}} @_T04main7FooImplVAA7FooableA2aDP3fooyyFTW : $@convention(witness_method: Fooable) (@in_guaranteed FooImpl) -> () {
 // CHECK: function_ref @_T023TestableMultifileHelper13HasDefaultFooPAAE3fooyyF
 // CHECK: } // end sil function '_T04main7FooImplVAA7FooableA2aDP3fooyyFTW'
 
-// CHECK-LABEL: sil{{.*}} @_T04main13PublicFooImplVAA7FooableA2aDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed PublicFooImpl) -> () {
+// CHECK-LABEL: sil{{.*}} @_T04main13PublicFooImplVAA7FooableA2aDP3fooyyFTW : $@convention(witness_method: Fooable) (@in_guaranteed PublicFooImpl) -> () {
 // CHECK: function_ref @_T023TestableMultifileHelper13HasDefaultFooPAAE3fooyyF
 // CHECK: } // end sil function '_T04main13PublicFooImplVAA7FooableA2aDP3fooyyFTW'
 

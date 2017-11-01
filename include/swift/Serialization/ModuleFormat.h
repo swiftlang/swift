@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 376; // Last change: Outlined CopyAddr
+const uint16_t VERSION_MINOR = 377; // Last change: SILFunctionType witness_method conformances
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -742,6 +742,7 @@ namespace decls_block {
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
                            // followed by generic parameter types
+    // Optionally a protocol conformance (for witness_methods)
     // Trailed by its generic requirements, if any.
   >;
   

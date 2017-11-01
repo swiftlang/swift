@@ -177,7 +177,7 @@ using namespace swift;
 using namespace Lowering;
 
 static std::string
-getMaterializeForSetCallbackName(ProtocolConformance *conformance,
+getMaterializeForSetCallbackName(Optional<ProtocolConformanceRef> conformance,
                                  FuncDecl *requirement) {
 
   DeclContext *dc = requirement;
@@ -193,12 +193,13 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
 
   Mangle::ASTMangler Mangler;
   std::string New;
-  if (conformance) {
+  if (conformance && conformance->isConcrete()) {
     // Concrete witness thunk for a conformance:
     //
     // Mangle this as if it were a conformance thunk for a closure
     // within the requirement.
-    return Mangler.mangleClosureWitnessThunk(conformance, &closure);
+    return Mangler.mangleClosureWitnessThunk(conformance->getConcrete(),
+                                             &closure);
   }
   // Default witness thunk or concrete implementation:
   //
@@ -255,28 +256,25 @@ struct MaterializeForSetEmitter {
   SILType WitnessStorageType;
 
   SILFunctionTypeRepresentation CallbackRepresentation;
+  Optional<ProtocolConformanceRef> WitnessMethodConformance;
 
 private:
-
-  MaterializeForSetEmitter(SILGenModule &SGM, SILLinkage linkage,
-                           FuncDecl *witness, SubstitutionList subs,
-                           GenericEnvironment *genericEnv,
-                           Type selfInterfaceType, Type selfType,
-                           SILFunctionTypeRepresentation callbackRepresentation)
-    : SGM(SGM),
-      Linkage(linkage),
-      RequirementStorage(nullptr),
-      RequirementStoragePattern(AbstractionPattern::getInvalid()),
-      Witness(witness),
-      WitnessStorage(witness->getAccessorStorageDecl()),
-      WitnessStoragePattern(AbstractionPattern::getInvalid()),
-      WitnessSubs(subs),
-      GenericEnv(genericEnv),
-      SelfInterfaceType(selfInterfaceType->getCanonicalType()),
-      SubstSelfType(selfType->getCanonicalType()),
-      TheAccessSemantics(AccessSemantics::Ordinary),
-      IsSuper(false),
-      CallbackRepresentation(callbackRepresentation) {
+  MaterializeForSetEmitter(
+      SILGenModule &SGM, SILLinkage linkage, FuncDecl *witness,
+      SubstitutionList subs, GenericEnvironment *genericEnv,
+      Type selfInterfaceType, Type selfType,
+      SILFunctionTypeRepresentation callbackRepresentation,
+      Optional<ProtocolConformanceRef> witnessMethodConformance)
+      : SGM(SGM), Linkage(linkage), RequirementStorage(nullptr),
+        RequirementStoragePattern(AbstractionPattern::getInvalid()),
+        Witness(witness), WitnessStorage(witness->getAccessorStorageDecl()),
+        WitnessStoragePattern(AbstractionPattern::getInvalid()),
+        WitnessSubs(subs), GenericEnv(genericEnv),
+        SelfInterfaceType(selfInterfaceType->getCanonicalType()),
+        SubstSelfType(selfType->getCanonicalType()),
+        TheAccessSemantics(AccessSemantics::Ordinary), IsSuper(false),
+        CallbackRepresentation(callbackRepresentation),
+        WitnessMethodConformance(witnessMethodConformance) {
 
     // Determine the formal type of the 'self' parameter.
     if (WitnessStorage->isStatic()) {
@@ -304,17 +302,14 @@ private:
   }
 
 public:
-
   static MaterializeForSetEmitter
-  forWitnessThunk(SILGenModule &SGM,
-                  ProtocolConformance *conformance, SILLinkage linkage,
-                  Type selfInterfaceType, Type selfType,
-                  GenericEnvironment *genericEnv,
-                  FuncDecl *requirement, FuncDecl *witness,
-                  SubstitutionList witnessSubs) {
-    MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
-                                     genericEnv, selfInterfaceType, selfType,
-                                     SILFunctionTypeRepresentation::WitnessMethod);
+  forWitnessThunk(SILGenModule &SGM, ProtocolConformanceRef conformance,
+                  SILLinkage linkage, Type selfInterfaceType, Type selfType,
+                  GenericEnvironment *genericEnv, FuncDecl *requirement,
+                  FuncDecl *witness, SubstitutionList witnessSubs) {
+    MaterializeForSetEmitter emitter(
+        SGM, linkage, witness, witnessSubs, genericEnv, selfInterfaceType,
+        selfType, SILFunctionTypeRepresentation::WitnessMethod, conformance);
     emitter.RequirementStorage = requirement->getAccessorStorageDecl();
 
     // Determine the desired abstraction pattern of the storage type
@@ -341,11 +336,10 @@ public:
     Type selfType = witness->mapTypeIntoContext(selfInterfaceType);
 
     SILDeclRef constant(witness);
-    MaterializeForSetEmitter emitter(SGM, constant.getLinkage(ForDefinition),
-                                     witness, witnessSubs,
-                                     witness->getGenericEnvironment(),
-                                     selfInterfaceType, selfType,
-                                     SILFunctionTypeRepresentation::Method);
+    MaterializeForSetEmitter emitter(
+        SGM, constant.getLinkage(ForDefinition), witness, witnessSubs,
+        witness->getGenericEnvironment(), selfInterfaceType, selfType,
+        SILFunctionTypeRepresentation::Method, None);
 
     emitter.RequirementStorage = emitter.WitnessStorage;
     emitter.RequirementStoragePattern = emitter.WitnessStoragePattern;
@@ -365,7 +359,7 @@ public:
       emitter.TheAccessSemantics = AccessSemantics::DirectToAccessor;
 
     emitter.CallbackName = getMaterializeForSetCallbackName(
-        /*conformance=*/nullptr, witness);
+        /*conformance=*/None, witness);
     return emitter;
   }
 
@@ -676,11 +670,9 @@ collectIndicesFromParameters(SILGenFunction &SGF, SILLocation loc,
 
 SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
                                                       GeneratorFn generator) {
-  auto callbackType =
-      SGM.Types.getMaterializeForSetCallbackType(WitnessStorage,
-                                                 GenericSig,
-                                                 SelfInterfaceType,
-                                                 CallbackRepresentation);
+  auto callbackType = SGM.Types.getMaterializeForSetCallbackType(
+      WitnessStorage, GenericSig, SelfInterfaceType, CallbackRepresentation,
+      WitnessMethodConformance);
 
   auto *genericEnv = GenericEnv;
   if (GenericEnv && GenericEnv->getGenericSignature()->areAllParamsConcrete())
@@ -1009,15 +1001,10 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
 ///   reabstracted value instead of modifying it in-place).
 ///
 /// \return true if special code was emitted
-bool SILGenFunction::
-maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
-                                SILLinkage linkage,
-                                Type selfInterfaceType,
-                                Type selfType,
-                                GenericEnvironment *genericEnv,
-                                FuncDecl *requirement,
-                                FuncDecl *witness,
-                                SubstitutionList witnessSubs) {
+bool SILGenFunction::maybeEmitMaterializeForSetThunk(
+    ProtocolConformanceRef conformance, SILLinkage linkage,
+    Type selfInterfaceType, Type selfType, GenericEnvironment *genericEnv,
+    FuncDecl *requirement, FuncDecl *witness, SubstitutionList witnessSubs) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forWitnessThunk(

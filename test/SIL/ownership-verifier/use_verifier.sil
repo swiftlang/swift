@@ -959,8 +959,8 @@ bb0(%0 : @owned $SwiftKlassP):
   %1 = begin_borrow %0 : $SwiftKlassP
   %2 = open_existential_ref %1 : $SwiftKlassP to $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP
   %cast = unchecked_ref_cast %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP to $Builtin.NativeObject
-  %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP, #SwiftKlassP.foo!1, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
-  apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP, #SwiftKlassP.foo!1, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
+  apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP>(%2) : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
   end_borrow %1 from %0 : $SwiftKlassP, $SwiftKlassP
   destroy_value %0 : $SwiftKlassP
   %9999 = tuple()

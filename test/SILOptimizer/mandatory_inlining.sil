@@ -995,8 +995,8 @@ sil [transparent] @P2_s : $@convention(method) <Self where Self : P2> (@in_guara
 bb0(%0 : $*Self):
   %2 = alloc_stack $Self
   copy_addr %0 to [initialization] %2 : $*Self
-  %4 = witness_method $Self, #P2.c!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
-  %5 = apply %4<Self>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %4 = witness_method $Self, #P2.c!getter.1 : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %5 = apply %4<Self>(%2) : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %2 : $*Self
   %7 = integer_literal $Builtin.Int32, 1
   %8 = struct_extract %5 : $Int32, #Int32._value

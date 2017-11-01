@@ -15,6 +15,7 @@ import SwiftShims
 // Concrete caller and callee -- nothing interesting going on
 
 protocol P {}
+extension Int: P {}
 
 sil @concrete_callee1 : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> () {
 bb0(%i: $Int, %b: $<τ_0_0> { var τ_0_0 } <Int>, %m: $@thin Int.Type, %p: $@thick P.Type):
@@ -222,16 +223,16 @@ bb0(%a: $A, %b: $B):
 
 // Capturing lowered function types
 
-sil @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> () {
-bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method) () -> ()):
+sil @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> () {
+bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method: P) (Int) -> ()):
   %12 = tuple ()
   return %12 : $()
 }
 
-sil @function_caller : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> @owned @callee_owned () -> () {
-bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method) () -> ()):
-  %f = function_ref @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> ()
-  %result = partial_apply %f(%thin, %c, %block, %thick, %method, %witness_method) : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method) () -> ()) -> ()
+sil @function_caller : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> @owned @callee_owned () -> () {
+bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method: P) (Int) -> ()):
+  %f = function_ref @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> ()
+  %result = partial_apply %f(%thin, %c, %block, %thick, %method, %witness_method) : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> ()
   return %result : $@callee_owned () -> ()
 }
 
