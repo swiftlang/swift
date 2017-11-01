@@ -712,9 +712,35 @@ public:
   llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
                                              llvm::Type *llvmType);
 
+  typedef llvm::Constant *(IRGenModule::*OutlinedCopyAddrFunction)(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+
+  void
+  generateCallToOutlinedCopyAddr(IRGenFunction &IGF, const TypeInfo &objectTI,
+                                 Address dest, Address src, SILType T,
+                                 const OutlinedCopyAddrFunction MethodToCall);
+
+  llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+
+  llvm::Constant *getOrCreateOutlinedInitializeWithCopyFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+
+  llvm::Constant *getOrCreateOutlinedAssignWithTakeFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+
+  llvm::Constant *getOrCreateOutlinedAssignWithCopyFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
+  llvm::Constant *getOrCreateOutlinedCopyAddrHelperFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      std::string funcName,
+      llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
+                              Address dest, Address src, SILType T)>
+          Generate);
 
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;

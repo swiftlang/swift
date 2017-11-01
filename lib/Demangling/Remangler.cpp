@@ -1747,6 +1747,26 @@ void Remangler::mangleOutlinedRelease(Node *node) {
   Buffer << "Ws";
 }
 
+void Remangler::mangleOutlinedInitializeWithTake(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wb";
+}
+
+void Remangler::mangleOutlinedInitializeWithCopy(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wc";
+}
+
+void Remangler::mangleOutlinedAssignWithTake(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wd";
+}
+
+void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wf";
+}
+
 void Remangler::mangleOutlinedVariable(Node *node) {
   Buffer << "Tv";
   mangleIndex(node->getIndex());

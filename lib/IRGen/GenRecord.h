@@ -173,7 +173,8 @@ public:
 
     auto offsets = asImpl().getNonFixedOffsets(IGF, T);
     for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+      if (field.isEmpty())
+        continue;
 
       Address destField = field.projectAddress(IGF, dest, offsets);
       Address srcField = field.projectAddress(IGF, src, offsets);

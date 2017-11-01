@@ -420,6 +420,10 @@ private:
     case Node::Kind::OutlinedConsume:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
+    case Node::Kind::OutlinedInitializeWithTake:
+    case Node::Kind::OutlinedInitializeWithCopy:
+    case Node::Kind::OutlinedAssignWithTake:
+    case Node::Kind::OutlinedAssignWithCopy:
     case Node::Kind::OutlinedVariable:
     case Node::Kind::AssocTypePath:
       return false;
@@ -811,6 +815,22 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::OutlinedRelease:
     Printer << "outlined release of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedInitializeWithTake:
+    Printer << "outlined init with take of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedInitializeWithCopy:
+    Printer << "outlined init with copy of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedAssignWithTake:
+    Printer << "outlined assign with take of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedAssignWithCopy:
+    Printer << "outlined assign with copy of ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedVariable:

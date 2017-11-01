@@ -5021,7 +5021,6 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   auto &loweredDest = getLoweredValue(i->getDest());
   assert(!loweredDest.isUnallocatedAddressInBuffer());
   Address dest = loweredDest.getAnyAddress();
-
   if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {
       addrTI.initializeWithTake(*this, dest, src, addrTy);

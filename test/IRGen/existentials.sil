@@ -67,40 +67,16 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[DEST_WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]]
   %c = load_weak        %w : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_weakTakeInit(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T012existentials2CP_pSgXwWb({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to [initialization] %v : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_weakTakeAssign(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T012existentials2CP_pSgXwWd({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to                  %v : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_weakCopyInit(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T012existentials2CP_pSgXwWc({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr        %w to [initialization] %v : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_weakCopyAssign(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T012existentials2CP_pSgXwWf({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr        %w to                  %v : $*@sil_weak CP?
 
   // CHECK: [[REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
