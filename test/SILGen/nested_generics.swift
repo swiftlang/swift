@@ -249,11 +249,11 @@ class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
 // CHECK: }
 
 // CHECK: sil_witness_table hidden <Spices> Pizzas<Spices>.NewYork: Pizza module nested_generics {
-// CHECK:   associated_type Topping: Deli<Spices>.Pepperoni
+// CHECK:   associated_type Topping: Deli<τ_0_0>.Pepperoni
 // CHECK: }
 
 // CHECK: sil_witness_table hidden <Spices> Pizzas<Spices>.DeepDish: Pizza module nested_generics {
-// CHECK:   associated_type Topping: Deli<Spices>.Sausage
+// CHECK:   associated_type Topping: Deli<τ_0_0>.Sausage
 // CHECK: }
 
 // CHECK: sil_witness_table hidden HotDogs.Bratwurst: HotDog module nested_generics {

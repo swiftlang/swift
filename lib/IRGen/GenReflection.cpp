@@ -879,12 +879,9 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
   auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
                                 Type Replacement,
                                 const TypeDecl *TD) -> bool {
-
-    auto Subst = Replacement->mapTypeOutOfContext();
-
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),
-      Subst->getCanonicalType()
+      Replacement->getCanonicalType()
     });
     return false;
   };
