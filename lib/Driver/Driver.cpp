@@ -1414,8 +1414,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
-        if (OI.ShouldGenerateModule) {
-          // When generating a .swiftmodule, treat .swiftmodule files as
+        if (OI.ShouldGenerateModule && !OI.shouldLink()) {
+          // When generating a .swiftmodule as a top-level output (as opposed
+          // to, for example, linking an image), treat .swiftmodule files as
           // inputs to a MergeModule action.
           AllModuleInputs.push_back(Current);
           break;
