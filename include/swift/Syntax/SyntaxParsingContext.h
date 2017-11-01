@@ -27,9 +27,15 @@ namespace swift {
 
 namespace syntax {
 
+/// The handler for parser to generate libSyntax entities.
 struct RawSyntaxInfo {
+  /// Start location of this syntax node.
   SourceLoc StartLoc;
+
+  /// The number of tokens belong to the syntax node.
   unsigned TokCount;
+
+  /// The raw node.
   RC<RawSyntax> RawNode;
   RawSyntaxInfo(SourceLoc StartLoc, RC<RawSyntax> RawNode):
     RawSyntaxInfo(StartLoc, 1, RawNode) {}

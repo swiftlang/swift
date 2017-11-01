@@ -130,21 +130,24 @@ SyntaxParsingContext::ContextInfo::collectAllSyntax() {
   for (auto It = Tokens.begin(); It != Tokens.end();) {
     auto Tok = *It;
     if (CurSyntax == PendingSyntax.end()) {
+      // If no remaining syntax nodes, add the token.
       Results.emplace_back(Tok);
       It ++;
     } else if (CurSyntax->StartLoc == Tok.StartLoc) {
-      auto Cur = *CurSyntax;
+      // Prefer syntax nodes to tokens.
       Results.emplace_back(*CurSyntax);
       It += CurSyntax->TokCount;
       CurSyntax ++;
     } else {
-      auto Cur = *CurSyntax;
+      // We have to add token in this case since the next syntax node has not
+      // started.
       assert(Tok.StartLoc.getOpaquePointerValue() <
              CurSyntax->StartLoc.getOpaquePointerValue());
       Results.push_back(Tok);
       It ++;
     }
   }
+  // Add the remaining syntax nodes.
   for (;CurSyntax != PendingSyntax.end(); CurSyntax ++) {
     Results.emplace_back(*CurSyntax);
   }
@@ -222,6 +225,7 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
 
   File.setSyntaxRoot(
     SyntaxFactory::makeSourceFile(SyntaxFactory::makeDeclList(AllTopLevel),
+    // The last node must be eof.
     ContextData.allTokens().back().makeSyntax<TokenSyntax>()));
 }
 
@@ -278,6 +282,8 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   };
   if (!ContextData.Enabled)
     return;
+
+  // Set the end of the context.
   ContextData.setContextEnd(Tok.getLoc());
   auto AllNodes = ContextData.collectAllSyntax();
   assert(countTokens(AllNodes) == ContextData.allTokens().size());
@@ -294,14 +300,16 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   std::vector<Syntax> SyntaxNodes = getSyntaxNodes(AllNodes);
   SourceLoc Start = AllNodes.front().StartLoc;
   unsigned TokCount = countTokens(AllNodes);
+  SyntaxKind UnknownKind;
   switch (Kind) {
     case SyntaxContextKind::Expr:
-      Parent->ContextData.addPendingSyntax({Start, TokCount,
-        makeUnknownSyntax(SyntaxKind::UnknownExpr, SyntaxNodes).getRaw()});
+      UnknownKind = SyntaxKind::UnknownExpr;
       return;
     case SyntaxContextKind::Decl:
-      Parent->ContextData.addPendingSyntax({Start, TokCount,
-        makeUnknownSyntax(SyntaxKind::UnknownDecl, SyntaxNodes).getRaw()});
+      UnknownKind = SyntaxKind::UnknownDecl;
       return;
   }
+  // Create an unknown node and give it to the parent context.
+  Parent->ContextData.addPendingSyntax({Start, TokCount,
+    makeUnknownSyntax(UnknownKind, SyntaxNodes).getRaw()});
 }
