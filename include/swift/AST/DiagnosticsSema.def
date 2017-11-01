@@ -3668,6 +3668,9 @@ ERROR(versioned_attr_with_explicit_access,
 ERROR(versioned_attr_in_protocol,none,
       "'@_versioned' attribute cannot be used in protocols", ())
 
+ERROR(versioned_dynamic_not_supported,none,
+      "'@_versioned' attribute cannot be applied to 'dynamic' declarations", ())
+
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
@@ -3707,6 +3710,9 @@ ERROR(class_designated_init_inlineable_resilient,none,
 
 ERROR(inlineable_stored_property,
       none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+
+ERROR(inlineable_dynamic_not_supported,
+      none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())
 
 ERROR(inlineable_decl_not_public,
       none, "'@_inlineable' attribute can only be applied to public declarations, "

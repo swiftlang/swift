@@ -67,14 +67,10 @@ internal class _SwiftNativeNSArrayWithContiguousStorage
 
 // Implement the APIs required by NSArray 
 extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
-  @_inlineable
-  @_versioned
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
 
-  @_inlineable
-  @_versioned
   @objc(objectAtIndex:)
   internal func objectAt(_ index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
@@ -86,8 +82,6 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     }
   }
 
-  @_inlineable
-  @_versioned
   @objc internal func getObjects(
     _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
@@ -113,8 +107,6 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     }
   }
 
-  @_inlineable
-  @_versioned
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -137,8 +129,6 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     }
   }
 
-  @_inlineable
-  @_versioned
   @objc(copyWithZone:)
   internal func copy(with _: _SwiftNSZone?) -> AnyObject {
     return self
@@ -258,8 +248,6 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   ///
   /// This override allows the count to be read without triggering
   /// bridging of array elements.
-  @_inlineable
-  @_versioned
   @objc
   internal override var count: Int {
     if let bridgedStorage = _heapBufferBridged {
