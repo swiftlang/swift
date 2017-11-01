@@ -219,9 +219,9 @@ public:
 class StructLayoutBuilder {
 protected:
   IRGenModule &IGM;
-private:
   SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
+private:
   Alignment CurAlignment = Alignment(1);
   SpareBitVector CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
