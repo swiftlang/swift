@@ -16,7 +16,7 @@ _ = atan2test(0.0, 0.0)
 public   func PlainPublic()   { }
 internal func PlainInternal() { }
 private  func PlainPrivate()  { }
-// CHECK: define{{( protected|)}} swiftcc void @_T07asmname11PlainPublic
+// CHECK: define{{( protected)?}} swiftcc void @_T07asmname11PlainPublic
 // CHECK-NOT: PlainInternal
 // CHECK-NOT: PlainPrivate
 
@@ -29,7 +29,7 @@ private  func PlainPrivate()  { }
 @_silgen_name("silgen_name_public")   public   func SilgenNamePublic()   { }
 @_silgen_name("silgen_name_internal") internal func SilgenNameInternal() { }
 @_silgen_name("silgen_name_private")  private  func SilgenNamePrivate()  { }
-// CHECK: define{{( protected|)}} swiftcc void @silgen_name_public
+// CHECK: define{{( protected)?}} swiftcc void @silgen_name_public
 // CHECK: define hidden swiftcc void @silgen_name_internal
 // CHECK-NOT: silgen_name_private
 // CHECK-NOT: SilgenName
@@ -43,8 +43,8 @@ private  func PlainPrivate()  { }
 @_cdecl("cdecl_public")   public   func CDeclPublic()   { }
 @_cdecl("cdecl_internal") internal func CDeclInternal() { }
 @_cdecl("cdecl_private")  private  func CDeclPrivate()  { }
-// CHECK: define{{( protected|)}} void @cdecl_public
-// CHECK: define{{( protected|)}} swiftcc void @_T07asmname11CDeclPublic
+// CHECK: define{{( protected)?}} void @cdecl_public
+// CHECK: define{{( protected)?}} swiftcc void @_T07asmname11CDeclPublic
 // CHECK: define hidden void @cdecl_internal
 // CHECK: define hidden swiftcc void @_T07asmname13CDeclInternal
 // CHECK-NOT: cdecl_private
