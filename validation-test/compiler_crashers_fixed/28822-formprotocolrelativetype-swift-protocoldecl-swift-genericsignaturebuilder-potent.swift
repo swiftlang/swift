@@ -5,12 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-func a<a{
-extension{{}
-{
-}
-class a<a{
-class a{protocol
-protocol{protocol A typealias e:A
+// RUN: not %target-swift-frontend %s -emit-ir
+extension CountableRange{{}func a<a:A
+protocol A{typealias e:a{}class a
