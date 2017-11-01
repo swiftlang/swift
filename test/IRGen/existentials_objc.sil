@@ -39,12 +39,16 @@ bb0(%0 : $*Any, %1 : $*Any):
 }
 
 // CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret, %Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
+// CHECK: call %Any* @_T0ypWb(%Any* %1, %Any* %0)
+// CHECK-NEXT:    ret void
+
+// CHECK-DAG:   define{{( protected)?}} linkonce_odr hidden %Any* @_T0ypWb([[ANY:%Any]]*, %Any*)
+// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%0]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%1]], i32 0, i32 1
 // CHECK-NEXT:    store %swift.type* [[TYPE]], %swift.type** [[T0]], align 8
-// CHECK-NEXT: [[FROM_BUFFER_ADDR:%.*]] = getelementptr inbounds %Any, %Any* %1, i32 0, i32 0
-// CHECK-NEXT: [[TO_BUFFER_ADDR:%.*]] = getelementptr inbounds %Any, %Any* %0, i32 0, i32 0
+// CHECK-NEXT: [[FROM_BUFFER_ADDR:%.*]] = getelementptr inbounds %Any, %Any* %0, i32 0, i32 0
+// CHECK-NEXT: [[TO_BUFFER_ADDR:%.*]] = getelementptr inbounds %Any, %Any* %1, i32 0, i32 0
 // CHECK-NEXT: [[CAST:%.*]] = bitcast %swift.type* [[TYPE]] to i8***
 // CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], i64 -1
 // CHECK-NEXT: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -52,7 +56,6 @@ bb0(%0 : $*Any, %1 : $*Any):
 // CHECK-NEXT: [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK-NEXT: [[INITWITHTAKEBUFFER:%.*]] = bitcast i8* [[VW]]
 // CHECK-NEXT: call %swift.opaque* [[INITWITHTAKEBUFFER]]({{.*}} [[TO_BUFFER_ADDR]], {{.*}} [[FROM_BUFFER_ADDR]], %swift.type* [[TYPE]])
-// CHECK-NEXT:    ret void
 
 // rdar://problem/19035529
 @objc protocol OP {}
@@ -135,40 +138,16 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[DEST_WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]]
   %c = load_weak        %w : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_unknownWeakTakeInit(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T017existentials_objc2CP_pSgXwWb({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to [initialization] %v : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_unknownWeakTakeAssign(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T017existentials_objc2CP_pSgXwWd({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to                  %v : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_unknownWeakCopyInit(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T017existentials_objc2CP_pSgXwWc({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr        %w to [initialization] %v : $*@sil_weak CP?
 
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-  // CHECK: call %swift.weak* @swift_unknownWeakCopyAssign(%swift.weak* returned [[DEST_REF_ADDR]], %swift.weak* [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
-  // CHECK: [[WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]], align 8
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 1
-  // CHECK: store i8** [[WITNESS]], i8*** [[DEST_WITNESS_ADDR]], align 8
+  // CHECK: call { %swift.weak, i8** }* @_T017existentials_objc2CP_pSgXwWf({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr        %w to                  %v : $*@sil_weak CP?
 
   // CHECK: [[REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* [[V]], i32 0, i32 0
