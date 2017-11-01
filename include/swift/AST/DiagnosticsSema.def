@@ -1543,7 +1543,7 @@ NOTE(bad_associated_type_deduction,none,
 NOTE(associated_type_deduction_witness_failed,none,
      "inferred type %1 (by matching requirement %0) is invalid: "
      "does not %select{inherit from|conform to}3 %2",
-     (DeclName, Type, DeclName, bool))
+     (DeclName, Type, Type, bool))
 NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
