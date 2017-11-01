@@ -896,7 +896,7 @@ extension String {
   /// - Parameter other: Another string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
-    _core.append(other._core)
+    _guts.append(other._guts)
   }
 
   /// Appends the given Unicode scalar to the string.
