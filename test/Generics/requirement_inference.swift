@@ -299,7 +299,7 @@ struct X22<T, U> {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X20<τ_0_0.B>, τ_0_0.B : P20>
 protocol P22 {
   associatedtype A
-  associatedtype B where A == X20<B>
+  associatedtype B: P20 where A == X20<B>
 }
 
 // CHECK: Generic signature: <Self where Self : P23>
@@ -327,7 +327,7 @@ struct X24<T: P20> : P24 {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X24<τ_0_0.B>, τ_0_0.B : P20>
 protocol P25a {
   associatedtype A: P24 // expected-warning{{redundant conformance constraint 'Self.A': 'P24'}}
-  associatedtype B where A == X24<B> // expected-note{{conformance constraint 'Self.A': 'P24' implied here}}
+  associatedtype B: P20 where A == X24<B> // expected-note{{conformance constraint 'Self.A': 'P24' implied here}}
 }
 
 // CHECK-LABEL: .P25b@
@@ -335,12 +335,17 @@ protocol P25a {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X24<τ_0_0.B>, τ_0_0.B : P20>
 protocol P25b {
   associatedtype A
-  associatedtype B where A == X24<B>
+  associatedtype B: P20 where A == X24<B>
 }
 
 protocol P25c {
   associatedtype A: P24
   associatedtype B where A == X<B> // expected-error{{use of undeclared type 'X'}}
+}
+
+protocol P25d {
+  associatedtype A
+  associatedtype B where A == X24<B> // expected-error{{type 'Self.B' does not conform to protocol 'P20'}}
 }
 
 // Similar to the above, but with superclass constraints.
@@ -357,7 +362,7 @@ struct X26<T: X3> : P26 {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X26<τ_0_0.B>, τ_0_0.B : X3>
 protocol P27a {
   associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A': 'P26'}}
-  associatedtype B where A == X26<B> // expected-note{{conformance constraint 'Self.A': 'P26' implied here}}
+  associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A': 'P26' implied here}}
 }
 
 // CHECK-LABEL: .P27b@
@@ -365,7 +370,7 @@ protocol P27a {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X26<τ_0_0.B>, τ_0_0.B : X3>
 protocol P27b {
   associatedtype A
-  associatedtype B where A == X26<B>
+  associatedtype B: X3 where A == X26<B>
 }
 
 // ----------------------------------------------------------------------------
