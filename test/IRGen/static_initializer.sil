@@ -26,6 +26,7 @@ public struct S2 {
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems0 = type <{ %swift.refcounted, %Ts5Int32V, [4 x i8], %Ts5Int64V, %Ts5Int64V }>
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems1c = type { [2 x i64], %T18static_initializer16TestArrayStorageC_tailelems1 }
 // CHECK: %T18static_initializer16TestArrayStorageC_tailelems1 = type <{ %swift.refcounted, %Ts5Int32V, [12 x i8], %Ts7Float80V }>
+// CHECK: %T18static_initializer16TestArrayStorageC_tailelems3 = type <{ %swift.refcounted, %Ts5Int32V, [1 x i8], [1 x i8] }>
 
 sil_global @_T02ch1xSiv : $Int32 = {
   %1 = integer_literal $Builtin.Int32, 2
@@ -91,6 +92,16 @@ sil_global @static_class_with_empty_field : $ClassWithEmptyField = {
   %initval = object $ClassWithEmptyField (%3 : $Int32, %5 : $())
 }
 // CHECK: @static_class_with_empty_field = {{(protected )?}}global %T18static_initializer19ClassWithEmptyFieldC_tailelems2c { [1 x i64] zeroinitializer, %T18static_initializer19ClassWithEmptyFieldC_tailelems2 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }> }> }, align 8
+
+struct Empty { }
+
+sil_global @static_array_with_empty_element : $TestArrayStorage = {
+  %0 = struct $Empty ()                           // users: %7, %7
+  %1 = integer_literal $Builtin.Int32, 2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %initval = object $TestArrayStorage (%2 : $Int32, [tail_elems] %0 : $Empty, %0 : $Empty)
+}
+// CHECK: @static_array_with_empty_element = {{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems3c { [1 x i64] zeroinitializer, %T18static_initializer16TestArrayStorageC_tailelems3 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [1 x i8] undef, [1 x i8] undef }> }, align 8
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF2cha1xSi() {{.*}} {
 // CHECK-NEXT: entry:
