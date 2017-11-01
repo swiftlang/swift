@@ -162,18 +162,7 @@ namespace {
     }
 
     void collect(IRGenFunction &IGF, CanType type) {
-      NominalTypeDecl *decl;
-      CanType parentType;
-
-      if (auto nominalType = dyn_cast<NominalType>(type)) {
-        decl = nominalType->getDecl();
-        parentType = nominalType.getParent();
-      } else {
-        auto boundType = cast<BoundGenericType>(type);
-        decl = boundType->getDecl();
-        parentType = boundType.getParent();
-      }
-
+      auto *decl = type.getNominalOrBoundGenericNominal();
       GenericTypeRequirements requirements(IGF.IGM, decl);
 
       auto subs =
