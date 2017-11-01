@@ -613,21 +613,19 @@ internal class _stdlib_ReturnAutoreleasedDummy {
   @_versioned // FIXME(sil-serialize-all)
   @objc
   internal init() {}
+
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   deinit {}
+
   // Use 'dynamic' to force Objective-C dispatch, which uses the
   // return-autoreleased call sequence.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   @objc
   internal dynamic func returnsAutoreleased(_ x: AnyObject) -> AnyObject {
     return x
   }
 
   // Use 'dynamic' to prevent this call to be duplicated into other modules.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   @objc
   internal dynamic func initializeReturnAutoreleased() {
     // On x86_64 it is sufficient to perform one cycle of return-autoreleased
