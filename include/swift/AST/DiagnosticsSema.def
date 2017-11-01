@@ -2233,6 +2233,11 @@ ERROR(autoclosure_function_type,none,
 ERROR(autoclosure_function_input_nonunit,none,
       "argument type of @autoclosure parameter must be '()'", ())
 
+// FIXME: drop these when we drop @noescape
+ERROR(noescape_implied_by_autoclosure,none,
+      "@noescape is implied by @autoclosure and should not be "
+      "redundantly specified", ())
+
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
