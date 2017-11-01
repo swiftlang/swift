@@ -5,5 +5,5 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false %t.sil > /dev/null
 // REQUIRES: long_test
 // REQUIRES: nonexecutable_test
-// FIXME: Re-enable on Linux when we're no long running out of memory.
-// REQUIRES: OS=macosx
+// FIXME: Re-enable when it works :)
+// REQUIRES: rdar34771322
