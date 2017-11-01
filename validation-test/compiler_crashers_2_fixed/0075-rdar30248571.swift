@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -typecheck
-// FIXME: %target-swift-frontend %s -emit-ir -- see https://github.com/apple/swift/pull/7414
+// RUN: %target-swift-frontend %s -emit-ir -o /dev/null
 
 protocol P {
   associatedtype A

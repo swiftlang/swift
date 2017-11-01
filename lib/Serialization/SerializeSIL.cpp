@@ -1063,6 +1063,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::RetainValueAddrInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
   case SILInstructionKind::EndBorrowArgumentInst:
@@ -2295,7 +2297,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if (wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
+    if ((ShouldSerializeAll || wt.isSerialized()) &&
+        wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
   }
 

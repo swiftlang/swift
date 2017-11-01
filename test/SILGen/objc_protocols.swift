@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -25,7 +25,7 @@ protocol Ansible {
 }
 
 // CHECK-LABEL: sil hidden @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[THIS:%.*]] : $T):
+// CHECK: bb0([[THIS:%.*]] : @owned $T):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
 // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
@@ -46,7 +46,7 @@ func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
 
 // CHECK-LABEL: sil hidden @_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@owned T) -> () {
 func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
-  // CHECK: bb0([[ARG:%.*]] : $T):
+  // CHECK: bb0([[ARG:%.*]] : @owned $T):
   // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO]] :
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
@@ -70,14 +70,14 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK1]] :
-// CHECK: bb0([[SELF:%.*]] : $Self):
+// CHECK: bb0([[SELF:%.*]] : @owned $Self):
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
 // CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<Self>([[SELF]])
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK1]]'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK1_THUNK]]
-// CHECK: bb0([[SELF:%.*]] : $Self):
+// CHECK: bb0([[SELF:%.*]] : @guaranteed $Self):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:   [[FN:%.*]] = witness_method $Self, #NSRuncing.runce!1.foreign
 // CHECK:   [[RESULT:%.*]] = apply [[FN]]<Self>([[SELF_COPY]])
@@ -98,7 +98,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '[[THUNK2_THUNK]]'
 
 // CHECK-LABEL: sil hidden @_T014objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[THIS:%.*]] : $NSRuncing):
+// CHECK: bb0([[THIS:%.*]] : @owned $NSRuncing):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[BORROWED_THIS_1:%.*]] = begin_borrow [[THIS]]
 // CHECK: [[THIS1:%.*]] = open_existential_ref [[BORROWED_THIS_1]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
@@ -121,7 +121,7 @@ func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
 
 // CHECK-LABEL: sil hidden @_T014objc_protocols0A23_protocol_partial_applyyAA9NSRuncing_pF : $@convention(thin) (@owned NSRuncing) -> () {
 func objc_protocol_partial_apply(_ x: NSRuncing) {
-  // CHECK: bb0([[ARG:%.*]] : $NSRuncing):
+  // CHECK: bb0([[ARG:%.*]] : @owned $NSRuncing):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[OPENED_ARG:%.*]] = open_existential_ref [[BORROWED_ARG]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
   // CHECK:   [[FN:%.*]] = function_ref @_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO
@@ -260,7 +260,7 @@ extension InformallyFunging: NSFunging { }
 
 // CHECK-LABEL: sil hidden @_T014objc_protocols28testInitializableExistentialAA0D0_pAaC_pXp_Si1itF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
-  // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
+  // CHECK: bb0([[META:%[0-9]+]] : @trivial $@thick Initializable.Type, [[I:%[0-9]+]] : @trivial $Int):
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
   // CHECK:   [[PB:%.*]] = project_box [[I2_BOX]]
   // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type

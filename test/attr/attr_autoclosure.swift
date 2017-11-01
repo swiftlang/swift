@@ -42,10 +42,10 @@ class DerivedClass {
 }
 
 protocol P1 {
-  associatedtype Element // expected-note{{declared here}}
+  associatedtype Element
 }
 protocol P2 : P1 {
-  associatedtype Element // expected-warning{{redeclaration of associated type 'Element'}}
+  associatedtype Element
 }
 
 func overloadedEach<O: P1>(_ source: O, _ closure: @escaping () -> ()) {

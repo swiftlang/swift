@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 struct Foo {
   mutating           // used to test writeback.

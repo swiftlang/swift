@@ -1321,8 +1321,9 @@ recur:
       }
       // Otherwise, if the type is an unbound generic of the context type, use
       // the context type to resolve the parameters.
-      else if (parentTy->is<UnboundGenericType>()) {
-        if (parentTy->getAnyNominal() == type->getAnyNominal()) {
+      else if (parentTy->hasUnboundGenericType()) {
+        if (parentTy->is<UnboundGenericType>() &&
+            parentTy->getAnyNominal() == type->getAnyNominal()) {
           enumTy = type;
         } else {
           diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,

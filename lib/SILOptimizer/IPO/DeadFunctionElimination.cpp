@@ -223,15 +223,22 @@ protected:
         auto id = component.getComputedPropertyId();
         switch (id.getKind()) {
         case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
-          auto decl = cast<AbstractFunctionDecl>(id.getDeclRef().getDecl());
-          if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-            ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
-                                   dyn_cast<FuncDecl>(decl),
-                                   clas);
-          } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
-            ensureAliveProtocolMethod(getMethodInfo(decl, /*witness*/ true));
+          auto declRef = id.getDeclRef();
+          if (declRef.isForeign) {
+            // Nothing to do here: foreign functions aren't ours to be deleting.
+            // (And even if they were, they're ObjC-dispatched and thus anchored
+            // already: see isAnchorFunction)
           } else {
-            llvm_unreachable("key path keyed by a non-class, non-protocol method");
+            auto decl = cast<AbstractFunctionDecl>(declRef.getDecl());
+            if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+              ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
+                                     dyn_cast<FuncDecl>(decl),
+                                     clas);
+            } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
+              ensureAliveProtocolMethod(getMethodInfo(decl, /*witness*/ true));
+            } else {
+              llvm_unreachable("key path keyed by a non-class, non-protocol method");
+            }
           }
           break;
         }

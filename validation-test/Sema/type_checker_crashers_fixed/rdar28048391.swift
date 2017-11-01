@@ -12,3 +12,4 @@ extension rdar28048391 {
 }
 
 extension ImplicitlyUnwrappedOptional : rdar28048391 { }
+// expected-warning@-1 {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated}}

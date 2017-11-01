@@ -138,8 +138,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (witnessConv.isSILIndirect(witnessConv.getParameters()[0])
       && !swiftValue.getType().isAddress()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, swiftValue.getType());
-    SGF.B.emitStoreValueOperation(loc, swiftValue.getValue(), tmp,
-                                  StoreOwnershipQualifier::Init);
+    SGF.B.createStoreBorrowOrTrivial(loc, swiftValue.borrow(SGF, loc), tmp);
     swiftValue = ManagedValue::forUnmanaged(tmp);
   }
 

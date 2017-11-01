@@ -272,8 +272,7 @@ public:
                            IsSerialized_t isSerialized);
 
   // Whether a conformance should be serialized.
-  static bool conformanceIsSerialized(ProtocolConformance *conformance,
-                                      ResilienceStrategy strategy);
+  static bool conformanceIsSerialized(ProtocolConformance *conformance);
 
   /// Print the witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;

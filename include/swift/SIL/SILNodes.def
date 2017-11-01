@@ -38,6 +38,25 @@
 #endif
 #endif
 
+/// MULTIPLE_VALUE_INST(Id, TextualName, Parent, MemBehavior, MayRelease)
+///
+///   A concrete subclass of MultipleValueInstruction. ID is a member of
+///   SILInstructionKind. The Node's class name is ID and the name of the base
+///   class in the heirarchy is PARENT.
+#ifndef MULTIPLE_VALUE_INST
+#define MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+
+/// MULTIPLE_VALUE_INST_RESULT(ID, PARENT)
+///
+///   A concrete subclass of MultipleValueInstructionResult. ID is a member of
+///   ValueKind. The Node's class name is ID and the name of the base class in
+///   the heirarchy is PARENT.
+#ifndef MULTIPLE_VALUE_INST_RESULT
+#define MULTIPLE_VALUE_INST_RESULT(ID, PARENT) VALUE(ID, PARENT)
+#endif
+
 /// VALUE(ID, PARENT)
 ///
 ///   A concrete subclass of ValueBase.  ID is a member of ValueKind.
@@ -194,6 +213,11 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
   ARGUMENT(SILPHIArgument, SILArgument)
   ARGUMENT(SILFunctionArgument, SILArgument)
   VALUE_RANGE(SILArgument, SILPHIArgument, SILFunctionArgument)
+
+ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
+  MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
+  MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
+  VALUE_RANGE(MultipleValueInstructionResult, DestructureStructResult, DestructureTupleResult)
 
 VALUE(SILUndef, ValueBase)
 
@@ -612,8 +636,15 @@ NON_VALUE_INST(CondFailInst, cond_fail,
 
 NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 
-NODE_RANGE(SILInstruction, AllocStackInst, CondFailInst)
-NODE_RANGE(SILNode, SILPHIArgument, CondFailInst)
+ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
+MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
+                    SILInstruction, None, DoesNotRelease)
+MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
+                    SILInstruction, None, DoesNotRelease)
+INST_RANGE(MultipleValueInstruction, DestructureStructInst, DestructureTupleInst)
+
+NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
+NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE
@@ -626,6 +657,8 @@ NODE_RANGE(SILNode, SILPHIArgument, CondFailInst)
 #undef ABSTRACT_VALUE_AND_INST
 #undef TERMINATOR
 #undef NON_VALUE_INST
+#undef MULTIPLE_VALUE_INST_RESULT
+#undef MULTIPLE_VALUE_INST
 #undef SINGLE_VALUE_INST
 #undef FULL_INST
 #undef INST

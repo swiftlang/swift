@@ -348,15 +348,14 @@ func intracomponent<T: P11>(_: T) // expected-note{{previous same-type constrain
 
 func intercomponentSameComponents<T: P10>(_: T)
   where T.A == T.B, // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
-        T.B == T.A { } // expected-note{{previous same-type constraint 'T.A' == 'T.B' written here}}
-                       // FIXME: directionality of constraint above is weird
+        T.B == T.A { } // expected-note{{previous same-type constraint 'T.B' == 'T.A' written here}}
 
 func intercomponentMoreThanSpanningTree<T: P10>(_: T)
   where T.A == T.B,
         T.B == T.C,
         T.D == T.E, // expected-note{{previous same-type constraint 'T.D' == 'T.E' written here}}
         T.D == T.B,
-        T.E == T.B  // expected-warning{{redundant same-type constraint 'T.B' == 'T.E'}}
+        T.E == T.B  // expected-warning{{redundant same-type constraint 'T.E' == 'T.B'}}
         { }
 
 func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.A'}}

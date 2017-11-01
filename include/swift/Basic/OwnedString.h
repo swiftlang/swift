@@ -42,12 +42,17 @@ enum class StringOwnership {
 class OwnedString {
   const char *Data;
   size_t Length;
-  StringOwnership Ownership;
+  StringOwnership Ownership = StringOwnership::Unowned;
 
-  OwnedString(const char* Data, size_t Length, StringOwnership Ownership)
-      : Length(Length), Ownership(Ownership) {
+  void release() {
+    if (Ownership == StringOwnership::Copied)
+      free(const_cast<char *>(Data));
+  }
+
+  void initialize(const char* Data, size_t Length, StringOwnership Ownership) {
+    this->Length = Length;
+    this->Ownership = Ownership;
     assert(Length >= 0 && "expected length to be non-negative");
-
     if (Ownership == StringOwnership::Copied && Data) {
       char *substring = static_cast<char *>(malloc(Length + 1));
       assert(substring && "expected successful malloc of copy");
@@ -60,20 +65,48 @@ class OwnedString {
     else
       this->Data = Data;
   }
-
+  OwnedString(const char* Data, size_t Length, StringOwnership Ownership) {
+    initialize(Data, Length, Ownership);
+  }
 public:
-  OwnedString() : OwnedString(nullptr, 0, StringOwnership::Unowned) {}
+  OwnedString(): OwnedString(nullptr, 0, StringOwnership::Unowned) {}
 
-  OwnedString(const char *Data, size_t Length)
-    : OwnedString(Data, Length, StringOwnership::Unowned) {}
+  OwnedString(const char *Data, size_t Length):
+    OwnedString(Data, Length, StringOwnership::Unowned) {}
 
   OwnedString(StringRef Str) : OwnedString(Str.data(), Str.size()) {}
 
   OwnedString(const char *Data) : OwnedString(StringRef(Data)) {}
 
-  OwnedString(const OwnedString &Other)
-      : OwnedString(Other.Data, Other.Length, Other.Ownership) {}
-  
+  OwnedString(const OwnedString &Other):
+    OwnedString(Other.Data, Other.Length, Other.Ownership) {}
+
+  OwnedString(OwnedString &&Other): Data(Other.Data), Length(Other.Length),
+      Ownership(Other.Ownership) {
+    Other.Data = nullptr;
+    Other.Ownership = StringOwnership::Unowned;
+  }
+
+  OwnedString& operator=(const OwnedString &Other) {
+    if (&Other != this) {
+      release();
+      initialize(Other.Data, Other.Length, Other.Ownership);
+    }
+    return *this;
+  }
+
+  OwnedString& operator=(OwnedString &&Other) {
+    if (&Other != this) {
+      release();
+      this->Data = Other.Data;
+      this->Length = Other.Length;
+      this->Ownership = Other.Ownership;
+      Other.Ownership = StringOwnership::Unowned;
+      Other.Data = nullptr;
+    }
+    return *this;
+  }
+
   OwnedString copy() {
     return OwnedString(Data, Length, StringOwnership::Copied);
   }
@@ -99,8 +132,7 @@ public:
   }
 
   ~OwnedString() {
-    if (Ownership == StringOwnership::Copied)
-      free(const_cast<char *>(Data));
+    release();
   }
 };
 

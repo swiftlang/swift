@@ -69,52 +69,53 @@ using RuntimeFunctionCountersUpdateHandler =
 
 /// Get the runtime object state associated with an object and store it
 /// into the result.
-SWIFT_RT_ENTRY_VISIBILITY void
-getObjectRuntimeFunctionCounters(HeapObject *object,
-                                 RuntimeFunctionCountersState *result);
+SWIFT_RUNTIME_EXPORT void
+_swift_getObjectRuntimeFunctionCounters(HeapObject *object,
+                                        RuntimeFunctionCountersState *result);
 
 /// Get the global runtime state containing the total numbers of invocations for
 /// each runtime function of interest and store it into the result.
-SWIFT_RT_ENTRY_VISIBILITY void
-getGlobalRuntimeFunctionCounters(swift::RuntimeFunctionCountersState *result);
+SWIFT_RUNTIME_EXPORT void _swift_getGlobalRuntimeFunctionCounters(
+    swift::RuntimeFunctionCountersState *result);
 
 /// Return the names of the runtime functions being tracked.
 /// Their order is the same as the order of the counters in the
 /// RuntimeObjectState structure.
-SWIFT_RT_ENTRY_VISIBILITY const char **getRuntimeFunctionNames();
+SWIFT_RUNTIME_EXPORT const char **_swift_getRuntimeFunctionNames();
 
 /// Return the offsets of the runtime function counters being tracked.
 /// Their order is the same as the order of the counters in the
 /// RuntimeFunctionCountersState structure.
-SWIFT_RT_ENTRY_VISIBILITY const uint16_t *getRuntimeFunctionCountersOffsets();
+SWIFT_RUNTIME_EXPORT const uint16_t *_swift_getRuntimeFunctionCountersOffsets();
 
 /// Return the number of runtime functions being tracked.
-SWIFT_RT_ENTRY_VISIBILITY uint64_t getNumRuntimeFunctionCounters();
+SWIFT_RUNTIME_EXPORT uint64_t _swift_getNumRuntimeFunctionCounters();
 
 /// Dump all per-object runtime function pointers.
-SWIFT_RT_ENTRY_VISIBILITY void dumpObjectsRuntimeFunctionPointers();
+SWIFT_RUNTIME_EXPORT void _swift_dumpObjectsRuntimeFunctionPointers();
 
 /// Set mode for global runtime function counters.
 /// Return the old value of this flag.
-SWIFT_RT_ENTRY_VISIBILITY int setPerObjectRuntimeFunctionCountersMode(int mode);
+SWIFT_RUNTIME_EXPORT int
+_swift_setPerObjectRuntimeFunctionCountersMode(int mode);
 
 /// Set mode for per object runtime function counters.
 /// Return the old value of this flag.
-SWIFT_RT_ENTRY_VISIBILITY int setGlobalRuntimeFunctionCountersMode(int mode);
+SWIFT_RUNTIME_EXPORT int _swift_setGlobalRuntimeFunctionCountersMode(int mode);
 
 /// Set the global runtime state of function pointers from a provided state.
-SWIFT_RT_ENTRY_VISIBILITY void
-setGlobalRuntimeFunctionCounters(swift::RuntimeFunctionCountersState *state);
+SWIFT_RUNTIME_EXPORT void _swift_setGlobalRuntimeFunctionCounters(
+    swift::RuntimeFunctionCountersState *state);
 
 /// Set the runtime object state associated with an object from a provided
 /// state.
-SWIFT_RT_ENTRY_VISIBILITY void
-setObjectRuntimeFunctionCounters(HeapObject *object,
-                                 RuntimeFunctionCountersState *state);
+SWIFT_RUNTIME_EXPORT void
+_swift_setObjectRuntimeFunctionCounters(HeapObject *object,
+                                        RuntimeFunctionCountersState *state);
 
 /// Set the global runtime function counters update handler.
-SWIFT_RT_ENTRY_VISIBILITY RuntimeFunctionCountersUpdateHandler
-setGlobalRuntimeFunctionCountersUpdateHandler(
+SWIFT_RUNTIME_EXPORT RuntimeFunctionCountersUpdateHandler
+_swift_setGlobalRuntimeFunctionCountersUpdateHandler(
     RuntimeFunctionCountersUpdateHandler handler);
 
 #endif

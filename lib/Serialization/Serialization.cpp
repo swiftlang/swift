@@ -2991,6 +2991,7 @@ void Serializer::writeDecl(const Decl *D) {
                            uint8_t(
                              getStableSelfAccessKind(fn->getSelfAccessKind())),
                            fn->hasDynamicSelf(),
+                           fn->hasForcedStaticDispatch(),
                            fn->hasThrows(),
                            fn->getParameterLists().size(),
                            addGenericEnvironmentRef(

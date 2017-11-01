@@ -1,0 +1,30 @@
+[
+  {
+    "key.name": "Layer",
+    "key.newname": "NewLayer",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 77,
+        "key.column": 10,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 80,
+        "key.column": 27,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 80,
+        "key.column": 37,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 80,
+        "key.column": 45,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  }
+]

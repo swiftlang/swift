@@ -336,3 +336,19 @@ func rdar32241441() {
     break;
   }
 }
+
+
+// SR-6100
+struct One<Two> {
+    public enum E: Error {
+        // if you remove associated value, everything works
+        case SomeError(String)
+    }
+}
+
+func testOne() {
+  do {
+  } catch let error { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
+    if case One.E.SomeError = error {} // expected-error{{generic enum type 'One.E' is ambiguous without explicit generic parameters when matching value of type 'Error'}}
+  }
+}

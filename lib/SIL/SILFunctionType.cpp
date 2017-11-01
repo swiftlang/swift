@@ -950,7 +950,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
   bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
 
-  // Always strip the auto-closure and no-escape bit.
+  // NOTE: SILFunctionType::ExtInfo doesn't track everything that
+  // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
     .withIsPseudogeneric(pseudogeneric)
@@ -1923,7 +1924,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
 const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
   auto found = ConstantTypes.find(constant);
   if (found != ConstantTypes.end())
-    return found->second;
+    return *found->second;
 
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
@@ -1955,14 +1956,17 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
         silFnType.print(llvm::dbgs());
         llvm::dbgs() << "\n");
 
-  auto result = ConstantTypes.try_emplace(constant,
-                                          formalInterfaceType,
-                                          bridgedTypes.Pattern,
-                                          loweredInterfaceType,
-                                          silFnType,
-                                          genericEnv);
-  assert(result.second);
-  return result.first->second;
+  auto resultBuf = M.allocate(sizeof(SILConstantInfo),
+                              alignof(SILConstantInfo));
+
+  auto result = ::new (resultBuf) SILConstantInfo{formalInterfaceType,
+                                                  bridgedTypes.Pattern,
+                                                  loweredInterfaceType,
+                                                  silFnType,
+                                                  genericEnv};
+  auto inserted = ConstantTypes.insert({constant, result});
+  assert(inserted.second);
+  return *result;
 }
 
 /// Returns the SILParameterInfo for the given declaration's `self` parameter.
@@ -2091,7 +2095,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
 
   auto found = ConstantOverrideTypes.find({derived, base});
   if (found != ConstantOverrideTypes.end())
-    return found->second;
+    return *found->second;
 
   assert(requiresNewVTableEntry(base) && "base must not be an override");
 
@@ -2145,14 +2149,18 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
                                                derived);
 
   // Build the SILConstantInfo and cache it.
-  auto result = ConstantOverrideTypes.try_emplace({derived, base},
+  auto resultBuf = M.allocate(sizeof(SILConstantInfo),
+                              alignof(SILConstantInfo));
+  auto result = ::new (resultBuf) SILConstantInfo{
     derivedInterfaceTy,
     bridgedTypes.Pattern,
     overrideLoweredInterfaceTy,
     fnTy,
-    derivedInfo.GenericEnv);
-  assert(result.second);
-  return result.first->second;
+    derivedInfo.GenericEnv};
+  
+  auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
+  assert(inserted.second);
+  return *result;
 }
 
 namespace {

@@ -27,6 +27,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/YAMLTraits.h"
 #include <functional>
 using namespace swift;
 using namespace Lowering;
@@ -781,3 +782,9 @@ void SILModule::serialize() {
   setSerialized();
 }
 
+void SILModule::setOptRecordStream(
+    std::unique_ptr<llvm::yaml::Output> &&Stream,
+    std::unique_ptr<llvm::raw_ostream> &&RawStream) {
+  OptRecordStream = std::move(Stream);
+  OptRecordRawStream = std::move(RawStream);
+}

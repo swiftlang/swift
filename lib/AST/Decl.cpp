@@ -3401,7 +3401,7 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 }
 
 GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
-  auto *outerGenericParams = dc->getParent()->getGenericParamsOfContext();
+  auto *outerGenericParams = getParent()->getGenericParamsOfContext();
 
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();

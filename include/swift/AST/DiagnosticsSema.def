@@ -1635,17 +1635,18 @@ NOTE(redundant_conformance_witness_ignored,none,
      (DescriptiveDeclKind, DeclName, DeclName))
 
 // "Near matches"
-WARNING(optional_req_near_match,none,
-        "%0 %1 nearly matches optional requirement %2 of protocol %3",
-        (DescriptiveDeclKind, DeclName, DeclName, DeclName))
+WARNING(req_near_match,none,
+        "%0 %1 nearly matches %select{defaulted|optional}2 requirement %3 "
+        "of protocol %4",
+        (DescriptiveDeclKind, DeclName, bool, DeclName, DeclName))
 NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_near_match_move,none,
+NOTE(req_near_match_move,none,
      "move %0 to %select{an|another}1 extension to silence this warning",
      (DeclName, unsigned))
-NOTE(optional_req_near_match_nonobjc,none,
+NOTE(req_near_match_nonobjc,none,
      "add '@nonobjc' to silence this %select{warning|error}0", (bool))
-NOTE(optional_req_near_match_access,none,
+NOTE(req_near_match_access,none,
      "make %0 %select{ERROR|private|private|non-public|non-public}1 to silence this "
      "warning", (DeclName, AccessLevel))
 
@@ -1923,10 +1924,6 @@ NOTE(override_unnecessary_IUO_use_strict,none,
      "use '?' to make the result optional", ())
 NOTE(override_unnecessary_IUO_silence,none,
      "add parentheses to silence this warning", ())
-
-ERROR(iuo_in_illegal_position,none,
-      "implicitly unwrapped optionals are only allowed at top level and as "
-      "function results", ())
 
 ERROR(override_mutable_covariant_property,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
@@ -3110,6 +3107,22 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+
+WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated", ())
+
+WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' in unsupported; use an explicit type followed by '!'", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error_with_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use '!' after the type name", ())
+
+ERROR(iuo_in_illegal_position,none,
+      "implicitly unwrapped optionals are only allowed at top level and as "
+      "function results", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,

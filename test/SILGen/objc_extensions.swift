@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -16,7 +16,7 @@ extension Sub {
     // Make sure that we are generating the @objc thunk and are calling the actual method.
     //
     // CHECK-LABEL: sil hidden [thunk] @_T015objc_extensions3SubC4propSQySSGvgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
-    // CHECK: bb0([[SELF:%.*]] : $Sub):
+    // CHECK: bb0([[SELF:%.*]] : @unowned $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK: [[GETTER_FUNC:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGvg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String>
@@ -27,7 +27,7 @@ extension Sub {
 
     // Then check the body of the getter calls the super_method.
     // CHECK-LABEL: sil hidden @_T015objc_extensions3SubC4propSQySSGvg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String> {
-    // CHECK: bb0([[SELF:%.*]] : $Sub):
+    // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[SELF_COPY_CAST:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK: [[BORROWED_SELF_COPY_CAST:%.*]] = begin_borrow [[SELF_COPY_CAST]]
@@ -42,13 +42,13 @@ extension Sub {
     // Then check the setter @objc thunk.
     //
     // CHECK-LABEL: sil hidden [thunk] @_T015objc_extensions3SubC4propSQySSGvsTo : $@convention(objc_method) (Optional<NSString>, Sub) -> () {
-    // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<NSString>, [[SELF:%.*]] : $Sub):
+    // CHECK: bb0([[NEW_VALUE:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Sub):
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[NEW_VALUE]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Sub
     // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SUCC_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB:bb[0-9]+]]
-    // CHECK: [[SUCC_BB]]([[STR:%.*]] : $NSString):
+    // CHECK: [[SUCC_BB]]([[STR:%.*]] : @owned $NSString):
     // CHECK: [[FAIL_BB]]:
-    // CHECK: bb3([[BRIDGED_NEW_VALUE:%.*]] : $Optional<String>):
+    // CHECK: bb3([[BRIDGED_NEW_VALUE:%.*]] : @owned $Optional<String>):
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[NORMAL_FUNC:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGvs : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
     // CHECK:   apply [[NORMAL_FUNC]]([[BRIDGED_NEW_VALUE]], [[BORROWED_SELF_COPY]])
@@ -61,7 +61,7 @@ extension Sub {
     // CHECK-LABEL: sil hidden @_T015objc_extensions3SubC4propSQySSGvs : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> () {
 
     // First we get the old value.
-    // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<String>, [[SELF:%.*]] : $Sub):
+    // CHECK: bb0([[NEW_VALUE:%.*]] : @owned $Optional<String>, [[SELF:%.*]] : @guaranteed $Sub):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
     // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
@@ -70,7 +70,7 @@ extension Sub {
     // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY]] from [[UPCAST_SELF_COPY]]
     // CHECK:   [[OLD_NSSTRING:%.*]] = apply [[GET_SUPER_METHOD]]([[UPCAST_SELF_COPY]])
 
-    // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : $Optional<String>):
+    // CHECK: bb3([[OLD_NSSTRING_BRIDGED:%.*]] : @owned $Optional<String>):
     // This next line is completely not needed. But we are emitting it now.
     // CHECK:   destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -83,8 +83,8 @@ extension Sub {
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
     // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
     //
-    // CHECK: bb4([[OLD_STRING:%.*]] : $String):
-    // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : $Optional<NSString>):
+    // CHECK: bb4([[OLD_STRING:%.*]] : @owned $String):
+    // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : @owned $Optional<NSString>):
     // CHECK:    end_borrow [[BORROWED_NEW_VALUE]]
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
@@ -109,7 +109,7 @@ extension Sub {
 
 // CHECK-LABEL: sil hidden @_T015objc_extensions20testOverridePropertyyAA3SubCF
 func testOverrideProperty(_ obj: Sub) {
-  // CHECK: bb0([[ARG:%.*]] : $Sub):
+  // CHECK: bb0([[ARG:%.*]] : @owned $Sub):
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: = objc_method [[BORROWED_ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String!) -> ()
   obj.prop = "abc"
@@ -121,7 +121,7 @@ testOverrideProperty(Sub())
 // CHECK:         function_ref @_T015objc_extensions3SubC3fooyyFTD
 // CHECK: } // end sil function '_T015objc_extensions3SubC3fooyyFTc'
 // CHECK:       sil shared [transparent] [serializable] [thunk] @_T015objc_extensions3SubC3fooyyFTD
-// CHECK:       bb0([[SELF:%.*]] : $Sub):
+// CHECK:       bb0([[SELF:%.*]] : @guaranteed $Sub):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:         objc_method [[SELF_COPY]] : $Sub, #Sub.foo!1.foreign
 // CHECK: } // end sil function '_T015objc_extensions3SubC3fooyyFTD'
@@ -137,8 +137,8 @@ extension Sub {
 }
 
 class SubSub : Sub {
-  // CHECK-LABEL: sil hidden @_T015objc_extensions03SubC0C14objCBaseMethodyyF
-  // CHECK: bb0([[SELF:%.*]] : $SubSub):
+  // CHECK-LABEL: sil hidden @_T015objc_extensions03SubC0C14objCBaseMethodyyF :
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $SubSub):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $SubSub to $Sub
   // CHECK:   [[BORROWED_UPCAST_SELF_COPY:%.*]] = begin_borrow [[UPCAST_SELF_COPY]]
@@ -153,7 +153,7 @@ class SubSub : Sub {
 
 extension SubSub {
   // CHECK-LABEL: sil hidden @_T015objc_extensions03SubC0C9otherPropSSvs
-  // CHECK: bb0([[NEW_VALUE:%.*]] : $String, [[SELF:%.*]] : $SubSub):
+  // CHECK: bb0([[NEW_VALUE:%.*]] : @owned $String, [[SELF:%.*]] : @guaranteed $SubSub):
   // CHECK:   [[SELF_COPY_1:%.*]] = copy_value [[SELF]]
   // CHECK:   [[UPCAST_SELF_COPY_1:%.*]] = upcast [[SELF_COPY_1]] : $SubSub to $Sub
   // CHECK:   [[BORROWED_UPCAST_SELF_COPY_1:%.*]] = begin_borrow [[UPCAST_SELF_COPY_1]]

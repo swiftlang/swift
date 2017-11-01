@@ -34,6 +34,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 #include "clang/Basic/Module.h"
@@ -1363,6 +1364,20 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
 }
 
 SourceFile::~SourceFile() { delete &SyntaxInfo; }
+
+std::vector<Token> &SourceFile::getTokenVector() {
+  assert(shouldKeepTokens() && "Disabled");
+  return *AllCorrectedTokens;
+}
+
+ArrayRef<Token> SourceFile::getAllTokens() const {
+  assert(shouldKeepTokens() && "Disabled");
+  return *AllCorrectedTokens;
+}
+
+bool SourceFile::shouldKeepTokens() const {
+  return (bool)AllCorrectedTokens;
+}
 
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;

@@ -252,6 +252,16 @@ ValueOwnershipKindClassifier::visitSILPHIArgument(SILPHIArgument *Arg) {
   return Arg->getOwnershipKind();
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
+    DestructureStructResult *Result) {
+  return Result->getOwnershipKind();
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
+    DestructureTupleResult *Result) {
+  return Result->getOwnershipKind();
+}
+
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
     SILFunctionArgument *Arg) {
   return Arg->getOwnershipKind();

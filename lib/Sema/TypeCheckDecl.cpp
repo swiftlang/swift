@@ -1118,6 +1118,8 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // top-level variables in a script file are accessible from other files,
   // even though the PBD is inside a TopLevelCodeDecl.
   TypeResolutionOptions options = TR_InExpression;
+
+  options |= TR_AllowIUO;
   if (binding->getInit(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
     options |= TR_AllowUnspecifiedTypes;
@@ -2717,7 +2719,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 
       // Suggest '@nonobjc' to suppress this error, and not try to
       // infer @objc for anything.
-      tc.diagnose(decl, diag::optional_req_near_match_nonobjc, true)
+      tc.diagnose(decl, diag::req_near_match_nonobjc, true)
         .fixItInsert(decl->getAttributeInsertionLoc(false), "@nonobjc ");
       break;
     }
@@ -4246,10 +4248,14 @@ public:
     GenericTypeToArchetypeResolver resolver(SD);
 
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), SD,
-                                     TypeResolutionOptions(),
+                                     TR_AllowIUO,
                                      &resolver);
+    TypeResolutionOptions options;
+    options |= TR_SubscriptParameters;
+    options |= TR_AllowIUO;
+
     isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
-                                           TR_SubscriptParameters,
+                                           options,
                                            resolver);
 
     if (isInvalid || SD->isInvalid()) {
@@ -4786,9 +4792,8 @@ public:
                              GenericTypeResolver &resolver) {
     bool hadError = false;
     for (auto paramList : fd->getParameterLists()) {
-      hadError |= TC.typeCheckParameterList(paramList, fd,
-                                            TypeResolutionOptions(),
-                                            resolver);
+      hadError |=
+          TC.typeCheckParameterList(paramList, fd, TR_AllowIUO, resolver);
     }
 
     return hadError;
@@ -4799,9 +4804,10 @@ public:
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
-      TypeResolutionOptions options;
+      TypeResolutionOptions options = TR_AllowIUO;
       if (FD->hasDynamicSelf())
         options |= TR_DynamicSelfResult;
+
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD, options,
                           &resolver)) {
         badType = true;
@@ -6705,6 +6711,13 @@ public:
             !baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
           return;
 
+        // A materializeForSet for an override of storage with a
+        // forced static dispatch materializeForSet is not itself an
+        // override.
+        if (kind == AccessorKind::IsMaterializeForSet &&
+            baseAccessor->hasForcedStaticDispatch())
+          return;
+
         // FIXME: Egregious hack to set an 'override' attribute.
         if (!overridingAccessor->getAttrs().hasAttribute<OverrideAttr>()) {
           auto loc = overridingASD->getOverrideLoc();
@@ -8154,6 +8167,14 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     ext->getExtendedTypeLoc().setType(extendedType);
     ext->setGenericEnvironment(env);
+    return;
+  }
+
+  // If the nominal type has a generic signature that we didn't otherwise
+  // handle yet, use it directly.
+  if (auto genericSig = nominal->getGenericSignature()) {
+    auto genericEnv = genericSig->createGenericEnvironment();
+    ext->setGenericEnvironment(genericEnv);
     return;
   }
 

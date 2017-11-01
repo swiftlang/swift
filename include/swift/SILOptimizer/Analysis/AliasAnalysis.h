@@ -139,7 +139,7 @@ private:
   bool typesMayAlias(SILType T1, SILType T2);
 
   virtual void handleDeleteNotification(SILNode *node) override {
-    assert(node->isCanonicalSILNodeInObject());
+    assert(node->isRepresentativeSILNodeInObject());
 
     // The pointer 'node' is going away.  We can't scan the whole cache
     // and remove all of the occurrences of the pointer. Instead we remove

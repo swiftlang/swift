@@ -256,7 +256,9 @@ bool SILPerformanceInliner::isProfitableToInline(
         return false;
     }
 
-    BaseBenefit = BaseBenefit / 2;
+    // Use command line option to control inlining in Osize mode.
+    const uint64_t CallerBaseBenefitReductionFactor = AI.getFunction()->getModule().getOptions().CallerBaseBenefitReductionFactor;
+    BaseBenefit = BaseBenefit / CallerBaseBenefitReductionFactor;
   }
 
   // It is always OK to inline a simple call.
@@ -897,8 +899,7 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-    OptRemark::Emitter ORE(DEBUG_TYPE,
-                           getFunction()->getModule().getASTContext());
+    OptRemark::Emitter ORE(DEBUG_TYPE, getFunction()->getModule());
 
     if (getOptions().InlineThreshold == 0) {
       return;

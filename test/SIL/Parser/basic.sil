@@ -20,6 +20,12 @@ struct TestArray {
   var storage : TestArrayStorage
 }
 
+struct TestArray2 {
+  var storage : TestArrayStorage
+  var someValue : Int32
+  var storage2 : TestArrayStorage
+}
+
 // CHECK-LABEL: sil_global @static_array : $TestArrayStorage = {
 // CHECK:         %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
 // CHECK-NEXT:  }
@@ -1618,6 +1624,25 @@ sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Built
 bb0(%0 : $Builtin.NativeObject):
   %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
   return undef : $()
+}
+
+sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
+bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
+  (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%4, %5, %6) = destructure_struct %1 : $TestArray2
+  %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
+  return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+struct EmptyStruct {}
+
+sil @test_empty_destructure : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $EmptyStruct()
+  () = destructure_struct %0 : $EmptyStruct
+  %1 = tuple()
+  () = destructure_tuple %1 : $()
+  return %1 : $()
 }
 
 // CHECK-LABEL: sil_vtable Foo {

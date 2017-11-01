@@ -617,8 +617,8 @@ var _testSuiteNameToIndex: [String : Int] = [:]
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
 let _crashedPrefix = "CRASHED:"
 
-@_silgen_name("swift_stdlib_installTrapInterceptor")
-func _stdlib_installTrapInterceptor()
+@_silgen_name("installTrapInterceptor")
+func _installTrapInterceptor()
 
 #if _runtime(_ObjC)
 @objc protocol _StdlibUnittestNSException {
@@ -629,7 +629,7 @@ func _stdlib_installTrapInterceptor()
 // Avoid serializing references to objc_setUncaughtExceptionHandler in SIL.
 @inline(never)
 func _childProcess() {
-  _stdlib_installTrapInterceptor()
+  _installTrapInterceptor()
 
 #if _runtime(_ObjC)
   objc_setUncaughtExceptionHandler {
@@ -1192,9 +1192,9 @@ public func runAllTests() {
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
-@_silgen_name("swift_leaks_startTrackingObjects")
+@_silgen_name("_swift_leaks_startTrackingObjects")
 func startTrackingObjects(_: UnsafePointer<CChar>)
-@_silgen_name("swift_leaks_stopTrackingObjects")
+@_silgen_name("_swift_leaks_stopTrackingObjects")
 func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 
 #endif
@@ -1408,12 +1408,12 @@ public final class TestSuite {
 }
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
-@_silgen_name("swift_stdlib_getSystemVersionPlistProperty")
-func _stdlib_getSystemVersionPlistPropertyImpl(
+@_silgen_name("getSystemVersionPlistProperty")
+func _getSystemVersionPlistPropertyImpl(
   _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
 
-func _stdlib_getSystemVersionPlistProperty(_ propertyName: String) -> String? {
-  let cs = _stdlib_getSystemVersionPlistPropertyImpl(propertyName)
+func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
+  let cs = _getSystemVersionPlistPropertyImpl(propertyName)
   return cs.map(String.init(cString:))
 }
 #endif
@@ -1509,7 +1509,7 @@ func _getOSVersion() -> OSVersion {
 #elseif os(Haiku)
   return .haiku
 #else
-  let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!
+  let productVersion = _getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
   #if os(OSX)
   return .osx(major: major, minor: minor, bugFix: bugFix)

@@ -11,28 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-remove-pins"
-
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "llvm/ADT/DepthFirstIterator.h"
-#include "llvm/ADT/SmallPtrSet.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
-
 STATISTIC(NumPinPairsRemoved, "Number of pin pairs removed");
 
 using namespace swift;

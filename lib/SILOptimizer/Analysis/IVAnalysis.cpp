@@ -20,9 +20,9 @@ using namespace swift::PatternMatch;
 
 #if !defined(NDEBUG)
 static bool inSCC(ValueBase *value, IVInfo::SCCType &SCC) {
-  SILNode *valueNode = value->getCanonicalSILNodeInObject();
+  SILNode *valueNode = value->getRepresentativeSILNodeInObject();
   for (SILNode *node : SCC) {
-    if (node->getCanonicalSILNodeInObject() == valueNode)
+    if (node->getRepresentativeSILNodeInObject() == valueNode)
       return true;
   }
   return false;

@@ -1805,8 +1805,12 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
   return false;
 }
 
-/// sil-instruction-def ::= (sil-value-name '=')? sil-instruction
-///                         (',' sil-scope-ref)? (',' sil-loc)?
+/// sil-instruction-result ::= sil-value-name '='
+/// sil-instruction-result ::= '(' sil-value-name? ')'
+/// sil-instruction-result ::= '(' sil-value-name (',' sil-value-name)* ')'
+/// sil-instruction-source-info ::= (',' sil-scope-ref)? (',' sil-loc)?
+/// sil-instruction-def ::=
+///   (sil-instruction-result '=')? sil-instruction sil-instruction-source-info
 bool SILParser::parseSILInstruction(SILBuilder &B) {
   // We require SIL instructions to be at the start of a line to assist
   // recovery.
@@ -2311,6 +2315,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
     UNARY_INSTRUCTION(EndBorrowArgument)
+    UNARY_INSTRUCTION(DestructureStruct)
+    UNARY_INSTRUCTION(DestructureTuple)
     REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
     REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
     REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)
@@ -4772,14 +4778,19 @@ bool SILParser::parseSILFunctionRef(SILLocation InstLoc,
 }
 
 /// True if the current token sequence looks like the start of a SIL
-/// instruction, either:
-///   %name
-/// or:
-///   identifier | keyword
+/// instruction. This can be one of:
+///
+/// 1. %name
+/// 2. ()
+/// 3. (%name1
+/// 4. identifier | keyword
 /// where identifier is not followed by a '(' or ':', which would indicate
 /// a basic block.
 bool SILParser::isStartOfSILInstruction() {
   if (P.Tok.is(tok::sil_local_name))
+    return true;
+  if (P.Tok.is(tok::l_paren) &&
+      (P.peekToken().is(tok::sil_local_name) || P.peekToken().is(tok::r_paren)))
     return true;
   if (P.Tok.is(tok::identifier) || P.Tok.isKeyword()) {
     auto &peek = P.peekToken();

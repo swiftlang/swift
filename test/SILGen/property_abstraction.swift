@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}
@@ -11,7 +11,7 @@ struct Foo<T, U> {
 }
 
 // CHECK-LABEL: sil hidden @_T020property_abstraction4getF{{[_0-9a-zA-Z]*}}Foo{{.*}}F : $@convention(thin) (@owned Foo<Int, Int>) -> @owned @callee_owned (Int) -> Int {
-// CHECK:       bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
+// CHECK:       bb0([[X_ORIG:%.*]] : @owned $Foo<Int, Int>):
 // CHECK:         [[BORROWED_X_ORIG:%.*]] = begin_borrow [[X_ORIG]] : $Foo<Int, Int>
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[BORROWED_X_ORIG]] : $Foo<Int, Int>, #Foo.f
 // CHECK:         [[F_ORIG_COPY:%.*]] = copy_value [[F_ORIG]]
@@ -37,7 +37,7 @@ func setF(_ x: inout Foo<Int, Int>, f: @escaping (Int) -> Int) {
 func inOutFunc(_ f: inout ((Int) -> Int)) { }
 
 // CHECK-LABEL: sil hidden @_T020property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F : 
-// CHECK: bb0([[ARG:%.*]] : $Foo<Int, Int>):
+// CHECK: bb0([[ARG:%.*]] : @owned $Foo<Int, Int>):
 // CHECK:   [[XBOX:%.*]] = alloc_box ${ var Foo<Int, Int> }, var, name "x"
 // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : ${ var Foo<Int, Int> }, 0
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -83,7 +83,7 @@ struct AddressOnlyLet<T> {
 }
 
 // CHECK-LABEL: sil hidden @_T020property_abstraction34getAddressOnlyReabstractedProperty{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@in AddressOnlyLet<Int>) -> @owned @callee_owned (Int) -> Int
-// CHECK: bb0([[ARG:%.*]] : $*AddressOnlyLet<Int>):
+// CHECK: bb0([[ARG:%.*]] : @trivial $*AddressOnlyLet<Int>):
 // CHECK:   [[CLOSURE_ADDR:%.*]] = struct_element_addr {{%.*}} : $*AddressOnlyLet<Int>, #AddressOnlyLet.f
 // CHECK:   [[CLOSURE_ORIG:%.*]] = load [copy] [[CLOSURE_ADDR]]
 // CHECK:   [[REABSTRACT:%.*]] = function_ref
@@ -139,7 +139,7 @@ func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
   factory.builder = { return MyClass() }
 }
 // CHECK: sil hidden @_T020property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
-// CHECK: bb0(%0 : $*F):
+// CHECK: bb0(%0 : @trivial $*F):
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   [[F0:%.*]] = function_ref @_T020property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} : $@convention(thin) () -> @owned MyClass
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]

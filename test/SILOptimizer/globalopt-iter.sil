@@ -1,0 +1,22 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -global-opt | %FileCheck %s
+
+
+import Builtin
+import Swift
+class B { }
+class E : B { }
+
+// CHECK: sil @patatino : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:  %0 = global_value @patatinoTv_ : $B             // user: %1
+// CHECK:  strong_retain %0 : $B                           // id: %1
+// CHECK: %2 = tuple ()                                   // user: %3
+// CHECK: return %2 : $()                                 // id: %3
+// CHECK: }
+
+sil @patatino : $@convention(thin) () -> () {
+  %1 = alloc_ref [stack] $B
+  dealloc_ref [stack] %1 : $B
+  %45 = tuple ()
+  return %45 : $()
+}

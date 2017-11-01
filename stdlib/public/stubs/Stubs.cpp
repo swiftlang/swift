@@ -43,7 +43,6 @@
 #if defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
 #include <sstream>
 #include <cmath>
-#define fmodl(lhs, rhs) std::fmod(lhs, rhs)
 #elif defined(__ANDROID__)
 // Android's libc implementation Bionic currently only supports the "C" locale
 // (https://android.googlesource.com/platform/bionic/+/ndk-r11c/libc/bionic/locale.cpp#40).
@@ -319,21 +318,6 @@ swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
   size_t Capacity = 0;
   return getline((char **)LinePtr, &Capacity, stdin);
 #endif
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-float _swift_fmodf(float lhs, float rhs) {
-    return fmodf(lhs, rhs);
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-double _swift_fmod(double lhs, double rhs) {
-    return fmod(lhs, rhs);
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-long double _swift_fmodl(long double lhs, long double rhs) {
-    return fmodl(lhs, rhs);
 }
 
 

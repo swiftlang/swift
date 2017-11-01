@@ -22,6 +22,54 @@ CHANGELOG
 Swift 4.1
 ---------
 
+* [SE-0157][] is implemented. Associated types can now declare "recursive"
+	constraints, which require that the associated type conform to the enclosing
+	protocol. The standard library protocols have been updated to make use of
+	recursive constraints. For example, the `SubSequence` associated type of
+	follows the enclosing protocol:
+
+        protocol Sequence {
+          associatedtype Element
+          associatedtype SubSequence: Sequence
+            where SubSequence.Element == Element,
+                  SubSequence.SubSequence == SubSequence
+          // ...
+        }
+
+        protocol Collection: Sequence where Self.SubSequence: Collection {
+          // ...
+        }
+
+  As a result, a number of new constraints have been introduced into the
+	standard library protocols:
+
+	* Make the `Indices` associated type have the same traversal requirements as
+	its enclosing protocol, e.g., `Collection.Indices` conforms to
+	`Collection`, `BidirectionalCollection.Indices` conforms to
+	`BidirectionalCollection`, and so on
+	* Make `Numeric.Magnitude` conform to `Numeric`
+	* Use more efficient `SubSequence` types for lazy filter and map
+	* Eliminate the `*Indexable` protocols
+
+
+* [SE-0161][] is fully implemented. KeyPaths now support subscript, optional
+  chaining, and optional force-unwrapping components.
+
+* [SE-0186][]
+
+  It is no longer valid to use the ownership keywords `weak` and `unowned` for property declarations in protocols. These keywords are meaningless and misleading when used in a protocol as they don't have any effect.
+
+  In Swift 3 and 4 mode the following example will produce a warning with a fix-it to remove the keyword. In Swift 5 mode and above an error will be produced.
+
+  ```swift
+  class A {}
+
+  protocol P {
+      weak var weakVar: A? { get set }
+      unowned var unownedVar: A { get set }
+  }
+  ```
+
 * [SE-0185][]
 
   Structs and enums that declare a conformance to `Equatable`/`Hashable` now get an automatically synthesized implementation of `==`/`hashValue`. For structs, all stored properties must be `Equatable`/`Hashable`. For enums, all enum cases with associated values must be `Equatable`/`Hashable`.
@@ -6754,3 +6802,4 @@ Swift 1.0
 [SE-0183]: <https://github.com/apple/swift-evolution/blob/master/proposals/0183-substring-affordances.md>
 [SE-0184]: <https://github.com/apple/swift-evolution/blob/master/proposals/0184-unsafe-pointers-add-missing.md>
 [SE-0185]: <https://github.com/apple/swift-evolution/blob/master/proposals/0185-synthesize-equatable-hashable.md>
+[SE-0186]: <https://github.com/apple/swift-evolution/blob/master/proposals/0186-remove-ownership-keyword-support-in-protocols.md>

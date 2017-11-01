@@ -1122,6 +1122,9 @@ public:
   virtual void
   loadAllMembers(Decl *D, uint64_t unused) override;
 
+  virtual Optional<TinyPtrVector<ValueDecl *>>
+  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData) override;
+
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,

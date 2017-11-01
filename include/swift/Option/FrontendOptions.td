@@ -156,6 +156,9 @@ def propagate_constraints : Flag<["-"], "propagate-constraints">,
 def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
   HelpText<"Enable the iterative type checker">;
 
+def enable_named_lazy_member_loading : Flag<["-"], "enable-named-lazy-member-loading">,
+  HelpText<"Enable per-name lazy member loading">;
+
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 
@@ -365,6 +368,16 @@ def use_jit : Flag<["-"], "use-jit">,
 def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
   MetaVarName<"<50>">,
   HelpText<"Controls the aggressiveness of performance inlining">;
+
+def sil_inline_caller_benefit_reduction_factor : Separate<["-"], "sil-inline-caller-benefit-reduction-factor">,
+  MetaVarName<"<2>">,
+  HelpText<"Controls the aggressiveness of performance inlining in -Osize "
+          "mode by reducing the base benefits of a caller (lower value "
+          "permits more inlining!)">;
+
+def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
+  MetaVarName<"<250>">,
+  HelpText<"Controls the aggressiveness of loop unrolling">;
 
 def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
   HelpText<"Merge SIL from all partial swiftmodules into the final module">;

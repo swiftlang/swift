@@ -33,8 +33,8 @@ static void CrashCatcher(int Sig) {
   _exit(0);
 }
 
-SWIFT_CC(swift)
-extern "C" void swift_stdlib_installTrapInterceptor() {
+SWIFT_CC(swift) LLVM_LIBRARY_VISIBILITY extern "C"
+void installTrapInterceptor() {
   // Disable buffering on stdout so that everything is printed before crashing.
   setbuf(stdout, 0);
 

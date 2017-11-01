@@ -467,7 +467,7 @@ public struct Unsafe${Mutable}RawBufferPointer
       _debugPrecondition(bounds.upperBound <= endIndex)
       _debugPrecondition(bounds.count == newValue.count)
 
-      if newValue.count > 0 {
+      if !newValue.isEmpty {
         (baseAddress! + bounds.lowerBound).copyBytes(
           from: newValue.base.baseAddress! + newValue.startIndex,
           count: newValue.count)

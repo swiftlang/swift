@@ -857,6 +857,7 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
     // materializeForSet either.
     auto *baseMFS = baseASD->getMaterializeForSetFunc();
     if (baseMFS != nullptr &&
+        !baseMFS->hasForcedStaticDispatch() &&
         baseASD->isSetterAccessibleFrom(storage->getDeclContext())) {
       materializeForSet->setOverriddenDecl(baseMFS);
     }

@@ -182,15 +182,18 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     
     // ('inout' | 'let' | 'var' | '__shared' | '__owned')?
     bool hasSpecifier = false;
-    while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var,
-                     tok::kw___shared, tok::kw___owned)) {
+    while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var) ||
+           (Tok.is(tok::identifier) &&
+            (Tok.getRawText().equals("__shared") ||
+             Tok.getRawText().equals("__owned")))) {
       if (!hasSpecifier) {
         if (Tok.is(tok::kw_inout)) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = VarDecl::Specifier::InOut;
           param.SpecifierLoc = consumeToken();
-        } else if (Tok.is(tok::kw___shared)) {
+        } else if (Tok.is(tok::identifier) &&
+                   Tok.getRawText().equals("__shared")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = VarDecl::Specifier::Shared;

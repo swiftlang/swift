@@ -175,13 +175,16 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   if (Tok.is(tok::kw_inout)) {
     SpecifierLoc = consumeToken();
     TypeSpecifier = VarDecl::Specifier::InOut;
-  } else if (Tok.is(tok::kw___shared)) {
-    SpecifierLoc = consumeToken();
-    TypeSpecifier = VarDecl::Specifier::Shared;
-  } else if (Tok.is(tok::kw___owned)) {
-    SpecifierLoc = consumeToken();
-    TypeSpecifier = VarDecl::Specifier::Owned;
-
+  } else if (Tok.is(tok::identifier)) {
+    if (Tok.getRawText().equals("__shared")) {
+      assert(false);
+      SpecifierLoc = consumeToken();
+      TypeSpecifier = VarDecl::Specifier::Shared;
+    } else if (Tok.getRawText().equals("__owned")) {
+      assert(false);
+      SpecifierLoc = consumeToken();
+      TypeSpecifier = VarDecl::Specifier::Owned;
+    }
   }
 
   switch (Tok.getKind()) {

@@ -75,6 +75,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Target/TargetMachine.h"
 
 #include <memory>
@@ -507,6 +508,21 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
   C.NumSILOptGlobalVariables = Module.getSILGlobalList().size();
 }
 
+static std::unique_ptr<llvm::raw_fd_ostream>
+createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
+  if (Filename.empty())
+    return nullptr;
+
+  std::error_code EC;
+  auto File = llvm::make_unique<llvm::raw_fd_ostream>(Filename, EC,
+                                                      llvm::sys::fs::F_None);
+  if (EC) {
+    DE.diagnose(SourceLoc(), diag::cannot_open_file, Filename, EC.message());
+    return nullptr;
+  }
+  return File;
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
@@ -748,9 +764,9 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
+  const auto &SILOpts = Invocation.getSILOptions();
   if (!opts.TBDPath.empty()) {
-    const auto &silOpts = Invocation.getSILOptions();
-    auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
+    auto hasMultipleIRGenThreads = SILOpts.NumThreads > 1;
     auto installName = opts.TBDInstallName.empty()
                            ? "lib" + Invocation.getModuleName().str() + ".dylib"
                            : opts.TBDInstallName;
@@ -824,6 +840,13 @@ static bool performCompile(CompilerInstance &Instance,
     }
     return Context.hadError();
   }
+
+  std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile =
+      createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
+  if (OptRecordFile)
+    SM->setOptRecordStream(llvm::make_unique<llvm::yaml::Output>(
+                               *OptRecordFile, &Instance.getSourceMgr()),
+                           std::move(OptRecordFile));
 
   // Perform "stable" optimizations that are invariant across compiler versions.
   if (Action == FrontendOptions::MergeModules) {
@@ -1059,8 +1082,8 @@ static bool performCompile(CompilerInstance &Instance,
         !astGuaranteedToCorrespondToSIL)
       break;
 
-    const auto &silOpts = Invocation.getSILOptions();
-    auto hasMultipleIRGenThreads = silOpts.NumThreads > 1;
+    const auto &SILOpts = Invocation.getSILOptions();
+    auto hasMultipleIRGenThreads = SILOpts.NumThreads > 1;
     bool error;
     if (PrimarySourceFile)
       error = validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads,

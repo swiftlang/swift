@@ -110,7 +110,7 @@ struct _RuntimeFunctionCounters {
 
   /// Get the names of all runtime functions whose calls are being
   /// tracked.
-  @_silgen_name("getRuntimeFunctionNames")
+  @_silgen_name("_swift_getRuntimeFunctionNames")
   static public func _getRuntimeFunctionNames() ->
     UnsafePointer<UnsafePointer<CChar>>
 
@@ -129,21 +129,21 @@ struct _RuntimeFunctionCounters {
 
   /// Get the offsets of the collected runtime function counters inside
   /// the state.
-  @_silgen_name("getRuntimeFunctionCountersOffsets")
+  @_silgen_name("_swift_getRuntimeFunctionCountersOffsets")
   static public func getRuntimeFunctionCountersOffsets() ->
     UnsafePointer<UInt16>
 
   /// Get the number of different runtime functions whose calls are being
   /// tracked.
-  @_silgen_name("getNumRuntimeFunctionCounters")
+  @_silgen_name("_swift_getNumRuntimeFunctionCounters")
   static public func getNumRuntimeFunctionCounters() -> Int
 
   /// Dump all per-object runtime function counters.
-  @_silgen_name("dumpObjectsRuntimeFunctionPointers")
+  @_silgen_name("_swift_dumpObjectsRuntimeFunctionPointers")
   static public func dumpObjectsRuntimeFunctionPointers()
 
   @discardableResult
-  @_silgen_name("setGlobalRuntimeFunctionCountersUpdateHandler")
+  @_silgen_name("_swift_setGlobalRuntimeFunctionCountersUpdateHandler")
   static public func setGlobalRuntimeFunctionCountersUpdateHandler(
     handler: RuntimeFunctionCountersUpdateHandler?
   ) -> RuntimeFunctionCountersUpdateHandler?
@@ -312,31 +312,31 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
 }
 
 extension _RuntimeFunctionCounters {
-  @_silgen_name("getObjectRuntimeFunctionCounters")
+  @_silgen_name("_swift_getObjectRuntimeFunctionCounters")
   static internal func getObjectRuntimeFunctionCounters(
     _ object: UnsafeRawPointer, _ result: inout _RuntimeFunctionCountersState)
 
-  @_silgen_name("getGlobalRuntimeFunctionCounters")
+  @_silgen_name("_swift_getGlobalRuntimeFunctionCounters")
   static internal func getGlobalRuntimeFunctionCounters(
     _ result: inout _RuntimeFunctionCountersState)
 
-  @_silgen_name("setGlobalRuntimeFunctionCounters")
+  @_silgen_name("_swift_setGlobalRuntimeFunctionCounters")
   static internal func setGlobalRuntimeFunctionCounters(
     _ state: inout _RuntimeFunctionCountersState)
 
-  @_silgen_name("setObjectRuntimeFunctionCounters")
+  @_silgen_name("_swift_setObjectRuntimeFunctionCounters")
   static internal func setObjectRuntimeFunctionCounters(
     _ object: UnsafeRawPointer,
     _ state: inout _RuntimeFunctionCountersState)
 
   @discardableResult
-  @_silgen_name("setGlobalRuntimeFunctionCountersMode")
+  @_silgen_name("_swift_setGlobalRuntimeFunctionCountersMode")
   static
   public // @testable
   func setGlobalRuntimeFunctionCountersMode(enable: Bool) -> Bool
 
   @discardableResult
-  @_silgen_name("setPerObjectRuntimeFunctionCountersMode")
+  @_silgen_name("_swift_setPerObjectRuntimeFunctionCountersMode")
   static
   public // @testable
   func setPerObjectRuntimeFunctionCountersMode(enable: Bool) -> Bool

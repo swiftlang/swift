@@ -312,9 +312,9 @@ func internalMedian(_ inputs: [UInt64]) -> UInt64 {
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
-@_silgen_name("swift_leaks_startTrackingObjects")
+@_silgen_name("_swift_leaks_startTrackingObjects")
 func startTrackingObjects(_: UnsafeMutableRawPointer) -> ()
-@_silgen_name("swift_leaks_stopTrackingObjects")
+@_silgen_name("_swift_leaks_stopTrackingObjects")
 func stopTrackingObjects(_: UnsafeMutableRawPointer) -> Int
 
 #endif

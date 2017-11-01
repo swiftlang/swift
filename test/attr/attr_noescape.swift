@@ -183,10 +183,10 @@ func redundant(_ fn : @noescape  // expected-error @+1 {{@noescape is implied by
 
 
 protocol P1 {
-  associatedtype Element // expected-note{{declared here}}
+  associatedtype Element
 }
 protocol P2 : P1 {
-  associatedtype Element // expected-warning{{redeclaration of associated type 'Element'}}
+  associatedtype Element
 }
 
 func overloadedEach<O: P1, T>(_ source: O, _ transform: @escaping (O.Element) -> (), _: T) {}

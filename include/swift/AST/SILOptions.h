@@ -32,6 +32,12 @@ public:
   /// Controls the aggressiveness of the performance inliner.
   int InlineThreshold = -1;
 
+  /// Controls the aggressiveness of the performance inliner for Osize.
+  int CallerBaseBenefitReductionFactor = 2;
+
+  /// Controls the aggressiveness of the loop unroller.
+  int UnrollThreshold = 250;
+
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
   
@@ -149,6 +155,10 @@ public:
 
   /// \brief Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
+
+  /// The name of the file to which the backend should save YAML optimization
+  /// records.
+  std::string OptRecordFile;
 
   SILOptions() {}
 

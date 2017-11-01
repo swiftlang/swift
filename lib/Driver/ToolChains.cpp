@@ -272,6 +272,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_SwiftDeps:
     case types::TY_ModuleTrace:
     case types::TY_TBD:
+    case types::TY_OptRecord:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -448,6 +449,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back(TBDPath.c_str());
   }
 
+  const std::string &OptRecordPath =
+      context.Output.getAdditionalOutputForType(types::TY_OptRecord);
+  if (!OptRecordPath.empty()) {
+    Arguments.push_back("-save-optimization-record-path");
+    Arguments.push_back(OptRecordPath.c_str());
+  }
+
   if (context.Args.hasArg(options::OPT_migrate_keep_objc_visibility)) {
     Arguments.push_back("-migrate-keep-objc-visibility");
   }
@@ -586,6 +594,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case types::TY_SwiftDeps:
     case types::TY_Remapping:
     case types::TY_ModuleTrace:
+    case types::TY_OptRecord:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");

@@ -80,8 +80,8 @@ public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
 }
 
 @_versioned
-@_silgen_name("swift_stdlib_NSArray_getObjects")
-internal func _stdlib_NSArray_getObjects(
+@_silgen_name("NSArray_getObjects")
+func NSArray_getObjects(
   nsArray: AnyObject,
   objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
   rangeLocation: Int,
@@ -92,7 +92,7 @@ extension NSArray {
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?, range: NSRange
   ) {
-    return _stdlib_NSArray_getObjects(
+    return NSArray_getObjects(
       nsArray: self,
       objects: objects,
       rangeLocation: range.location,
@@ -100,8 +100,8 @@ extension NSArray {
   }
 }
 
-@_silgen_name("swift_stdlib_NSDictionary_getObjects")
-func _stdlib_NSDictionary_getObjects(
+@_silgen_name("NSDictionary_getObjects")
+func NSDictionary_getObjects(
   nsDictionary: NSDictionary,
   objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
   andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
@@ -113,7 +113,7 @@ extension NSDictionary {
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
     andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
   ) {
-    return _stdlib_NSDictionary_getObjects(
+    return NSDictionary_getObjects(
       nsDictionary: self,
       objects: objects,
       andKeys: keys)

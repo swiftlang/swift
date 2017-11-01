@@ -74,6 +74,13 @@ struct Memberwise2 {
 
 _ = Memberwise2(m: Memberwise1(x: 1), n: Memberwise1.init(x: 2))
 
+protocol Layer {
+  associatedtype Content
+}
+struct MultiPaneLayout<A: Layer, B: Layer>: Layer where A.Content == B.Content{
+  typealias Content = Int
+}
+
 // RUN: rm -rf %t.result && mkdir -p %t.result
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
 // RUN: diff -u %S/syntactic-rename/x.expected %t.result/x.expected
@@ -94,6 +101,8 @@ _ = Memberwise2(m: Memberwise1(x: 1), n: Memberwise1.init(x: 2))
 // RUN: not %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/invalid.in.json %s
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-memberwise.in.json %s >> %t.result/rename-memberwise.expected
 // RUN: diff -u %S/syntactic-rename/rename-memberwise.expected %t.result/rename-memberwise.expected
+// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.result/rename-layer.expected
+// RUN: diff -u %S/syntactic-rename/rename-layer.expected %t.result/rename-layer.expected
 
 // RUN: rm -rf %t.ranges && mkdir -p %t.ranges
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/x.in.json %s >> %t.ranges/x.expected
@@ -112,3 +121,5 @@ _ = Memberwise2(m: Memberwise1(x: 1), n: Memberwise1.init(x: 2))
 // RUN: diff -u %S/syntactic-rename/enum_case.expected %t.result/enum_case.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-memberwise.in.json %s >> %t.ranges/rename-memberwise.expected
 // RUN: diff -u %S/find-rename-ranges/rename-memberwise.expected %t.ranges/rename-memberwise.expected
+// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.ranges/rename-layer.expected
+// RUN: diff -u %S/find-rename-ranges/rename-layer.expected %t.ranges/rename-layer.expected

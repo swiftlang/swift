@@ -158,8 +158,7 @@ Identifier SILWitnessTable::getIdentifier() const {
   return Mod.getASTContext().getIdentifier(Name);
 }
 
-bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance,
-                                              ResilienceStrategy strategy) {
+bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance) {
   // Serialize witness tables for conformances synthesized by
   // the ClangImporter.
   if (isa<ClangModuleUnit>(conformance->getDeclContext()->getModuleScopeContext()))

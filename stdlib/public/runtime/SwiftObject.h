@@ -34,6 +34,7 @@
 __attribute__((__objc_root_class__))
 #endif
 SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
+ @private
   Class isa;
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }

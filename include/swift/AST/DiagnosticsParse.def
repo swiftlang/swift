@@ -833,7 +833,7 @@ ERROR(expected_parameter_type,PointsToFirstBadToken,
 ERROR(expected_parameter_name,PointsToFirstBadToken,
       "expected parameter name followed by ':'", ())
 ERROR(expected_parameter_colon,PointsToFirstBadToken,
-      "expected ':' following argumant label and parameter name", ())
+      "expected ':' following argument label and parameter name", ())
 ERROR(missing_parameter_type,PointsToFirstBadToken,
       "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,

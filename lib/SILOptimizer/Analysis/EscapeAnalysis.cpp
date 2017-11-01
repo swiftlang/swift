@@ -548,7 +548,7 @@ bool EscapeAnalysis::ConnectionGraph::isUsePoint(SILNode *UsePoint,
                                                  CGNode *Node) {
   assert(Node->getEscapeState() < EscapeState::Global &&
          "Use points are only valid for non-escaping nodes");
-  UsePoint = UsePoint->getCanonicalSILNodeInObject();
+  UsePoint = UsePoint->getRepresentativeSILNodeInObject();
   auto Iter = UsePoints.find(UsePoint);
   if (Iter == UsePoints.end())
     return false;

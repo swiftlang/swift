@@ -111,7 +111,8 @@
                   'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "value_metatype"
-                    "existential_metatype" "init_existential_metatype")
+                    "existential_metatype" "init_existential_metatype"
+                    "objc_protocol")
                   'words) . font-lock-keyword-face)
    ;; Aggregate Types
    `(,(regexp-opt '("retain_value" "release_value_addr" "release_value"
@@ -121,7 +122,8 @@
                     "autorelease_value" "copy_value" "destroy_value"
                     "unmanaged_retain_value" "unmanaged_release_value"
                     "unmanaged_autorelease_value"
-                    "copy_unowned_value")
+                    "copy_unowned_value"
+                    "destructure_struct" "destructure_tuple")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.

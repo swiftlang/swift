@@ -17,11 +17,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/OptimizationRemark.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -57,25 +56,93 @@ template <typename DerivedT> std::string Remark<DerivedT>::getMsg() const {
   return OS.str();
 }
 
-Emitter::Emitter(StringRef PassName, ASTContext &Ctx)
-    : Ctx(Ctx), PassName(PassName),
+Emitter::Emitter(StringRef PassName, SILModule &M)
+    : Module(M), PassName(PassName),
       PassedEnabled(
-          Ctx.LangOpts.OptimizationRemarkPassedPattern &&
-          Ctx.LangOpts.OptimizationRemarkPassedPattern->match(PassName)),
+          M.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
+          M.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
+              PassName)),
       MissedEnabled(
-          Ctx.LangOpts.OptimizationRemarkMissedPattern &&
-          Ctx.LangOpts.OptimizationRemarkMissedPattern->match(PassName)) {}
+          M.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
+          M.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
+              PassName)) {}
 
 template <typename RemarkT, typename... ArgTypes>
-static void emitRemark(ASTContext &Ctx, const RemarkT &R,
-                       Diag<ArgTypes...> ID) {
-  Ctx.Diags.diagnose(R.getLocation(), ID, R.getMsg());
+static void emitRemark(SILModule &Module, const Remark<RemarkT> &R,
+                       Diag<ArgTypes...> ID, bool DiagEnabled) {
+  if (auto *Out = Module.getOptRecordStream())
+    // YAMLTraits takes a non-const reference even when outputting.
+    *Out << const_cast<Remark<RemarkT> &>(R);
+  if (DiagEnabled)
+    Module.getASTContext().Diags.diagnose(R.getLocation(), ID, R.getMsg());
 }
 
 void Emitter::emit(const RemarkPassed &R) {
-  emitRemark(Ctx, R, diag::opt_remark_passed);
+  emitRemark(Module, R, diag::opt_remark_passed, isEnabled<RemarkPassed>());
 }
 
 void Emitter::emit(const RemarkMissed &R) {
-  emitRemark(Ctx, R, diag::opt_remark_missed);
+  emitRemark(Module, R, diag::opt_remark_missed, isEnabled<RemarkMissed>());
 }
+
+namespace llvm {
+namespace yaml {
+
+template <typename KindT> struct MappingTraits<Remark<KindT>> {
+  static void mapping(llvm::yaml::IO &io, Remark<KindT> &R) {
+    assert(io.outputting() && "input not implemented");
+
+    if (io.mapTag("!Passed", std::is_same<KindT, RemarkPassed>::value))
+      ;
+    else if (io.mapTag("!Missed", std::is_same<KindT, RemarkMissed>::value))
+      ;
+    else
+      llvm_unreachable("Unknown remark type");
+
+    // The attributes are read-only for now since we're only support outputting
+    // them.
+    StringRef PassName = R.getPassName();
+    io.mapRequired("Pass", PassName);
+    StringRef Id = R.getIdentifier();
+    io.mapRequired("Name", Id);
+
+    SourceLoc Loc = R.getLocation();
+    if (!io.outputting() || Loc.isValid())
+      io.mapOptional("DebugLoc", Loc);
+
+    StringRef FN = R.getFunction()->getName();
+    io.mapRequired("Function", FN);
+    io.mapOptional("Args", R.getArgs());
+  }
+};
+
+template <> struct MappingTraits<SourceLoc> {
+  static void mapping(IO &io, SourceLoc &Loc) {
+    assert(io.outputting() && "input not yet implemented");
+
+    SourceManager *SM = static_cast<SourceManager *>(io.getContext());
+    unsigned BufferID = SM->findBufferContainingLoc(Loc);
+    StringRef File = SM->getIdentifierForBuffer(BufferID);
+    unsigned Line, Col;
+    std::tie(Line, Col) = SM->getLineAndColumn(Loc, BufferID);
+
+    io.mapRequired("File", File);
+    io.mapRequired("Line", Line);
+    io.mapRequired("Column", Col);
+  }
+};
+
+// Implement this as a mapping for now to get proper quotation for the value.
+template <> struct MappingTraits<OptRemark::Argument> {
+  static void mapping(IO &io, OptRemark::Argument &A) {
+    assert(io.outputting() && "input not yet implemented");
+    io.mapRequired(A.Key.data(), A.Val);
+    if (A.Loc.isValid())
+      io.mapOptional("DebugLoc", A.Loc);
+  }
+};
+
+} // end namespace yaml
+} // end namespace llvm
+
+LLVM_YAML_IS_SEQUENCE_VECTOR(OptRemark::Argument)

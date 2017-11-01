@@ -1180,6 +1180,63 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return ErrorType::get(TC.Context);
   }
 
+  // Emit a warning about directly spelling
+  // ImplicitlyUnwrappedOptional rather than using a trailing '!'.
+  auto *IUODecl = TC.Context.getImplicitlyUnwrappedOptionalDecl();
+  if (currentDecl == IUODecl) {
+    if (options.contains(TR_AllowIUO)) {
+      if (isa<GenericIdentTypeRepr>(comp)) {
+        auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
+        assert(genericTyR->getGenericArgs().size() == 1);
+        auto *genericArgTyR = genericTyR->getGenericArgs()[0];
+
+        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated_with_fixit;
+
+        // For Swift 5 and later, spelling the full name is an error.
+        if (TC.Context.isSwiftVersionAtLeast(5))
+          diag = diag::implicitly_unwrapped_optional_spelling_error_with_fixit;
+
+        TC.diagnose(comp->getStartLoc(), diag)
+          .fixItRemoveChars(
+              genericTyR->getStartLoc(),
+              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
+          .fixItInsertAfter(genericArgTyR->getEndLoc(), "!")
+          .fixItRemoveChars(
+              genericTyR->getAngleBrackets().End,
+              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
+      } else {
+        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated;
+
+        // For Swift 5 and later, spelling the full name is an error.
+        if (TC.Context.isSwiftVersionAtLeast(5))
+          diag = diag::implicitly_unwrapped_optional_spelling_error;
+
+        TC.diagnose(comp->getStartLoc(), diag);
+      }
+    } else if (TC.Context.isSwiftVersionAtLeast(5)) {
+      if (isa<GenericIdentTypeRepr>(comp)) {
+        auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
+        assert(genericTyR->getGenericArgs().size() == 1);
+        auto *genericArgTyR = genericTyR->getGenericArgs()[0];
+
+        TC.diagnose(comp->getStartLoc(), diag::iuo_in_illegal_position)
+          .fixItRemoveChars(
+              genericTyR->getStartLoc(),
+              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
+          .fixItInsertAfter(genericArgTyR->getEndLoc(), "?")
+          .fixItRemoveChars(
+              genericTyR->getAngleBrackets().End,
+              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
+      } else {
+        TC.diagnose(comp->getStartLoc(), diag::iuo_in_illegal_position);
+      }
+    } else {
+      // Pre-Swift-5 warning for spelling ImplicitlyUnwrappedOptional
+      // in places we shouldn't even allow it.
+      TC.diagnose(comp->getStartLoc(), diag::implicitly_unwrapped_optional_spelling_deprecated);
+    }
+  }
+
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
@@ -1582,8 +1639,12 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
   if (Loc.getType().isNull()) {
-    // Raise error if we parse an IUO type in an illegal position.
-    checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
+    // Swift version < 5? Use the old "illegal IUO" check for
+    // backwards compatibiliy.
+    if (!Context.isSwiftVersionAtLeast(5)) {
+      // Raise error if we parse an IUO type in an illegal position.
+      checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
+    }
 
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
@@ -2715,6 +2776,14 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        TypeResolutionOptions options) {
   auto elementOptions = withoutContext(options, true);
   elementOptions |= TR_ImmediateOptionalTypeArgument;
+
+  // Swift version >= 5? Use the newer check for IUOs appearing in
+  // illegal positions.
+  if (TC.Context.isSwiftVersionAtLeast(5) &&
+      !elementOptions.contains(TR_AllowIUO)) {
+    TC.diagnose(repr->getStartLoc(), diag::iuo_in_illegal_position)
+      .fixItReplace(repr->getExclamationLoc(), "?");
+  }
 
   // The T in T! is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!

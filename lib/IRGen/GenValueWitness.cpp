@@ -419,17 +419,14 @@ static Address getArgAsBuffer(IRGenFunction &IGF,
   return Address(arg, getFixedBufferAlignment(IGF.IGM));
 }
 
-/// Given an abstract type --- a type possibly expressed in terms of
-/// unbound generic types --- return the formal type within the type's
-/// primary defining context.
-static CanType getFormalTypeInContext(CanType abstractType) {
+static CanType getFormalTypeInContext(CanType abstractType, DeclContext *dc) {
   // Map the parent of any non-generic nominal type.
   if (auto nominalType = dyn_cast<NominalType>(abstractType)) {
     // If it doesn't have a parent, or the parent doesn't need remapping,
     // do nothing.
     auto abstractParentType = nominalType.getParent();
     if (!abstractParentType) return abstractType;
-    auto parentType = getFormalTypeInContext(abstractParentType);
+    auto parentType = getFormalTypeInContext(abstractParentType, dc);
     if (abstractParentType == parentType) return abstractType;
 
     // Otherwise, rebuild the type.
@@ -438,12 +435,22 @@ static CanType getFormalTypeInContext(CanType abstractType) {
 
   // Map unbound types into their defining context.
   } else if (auto ugt = dyn_cast<UnboundGenericType>(abstractType)) {
-    return ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
+    return dc->mapTypeIntoContext(ugt->getDecl()->getDeclaredInterfaceType())
+        ->getCanonicalType();
 
   // Everything else stays the same.
   } else {
     return abstractType;
   }
+}
+
+/// Given an abstract type --- a type possibly expressed in terms of
+/// unbound generic types --- return the formal type within the type's
+/// primary defining context.
+static CanType getFormalTypeInContext(CanType abstractType) {
+  if (auto nominal = abstractType.getAnyNominal())
+    return getFormalTypeInContext(abstractType, nominal);
+  return abstractType;
 }
 
 /// Get the next argument and use it as the 'self' type metadata.

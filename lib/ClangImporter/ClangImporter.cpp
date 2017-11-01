@@ -1064,9 +1064,21 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
     return true;
 
   auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
-  headerSearchInfo.AddSearchPath({entry, isSystem ?
-                                           clang::SrcMgr::C_System :
-                                           clang::SrcMgr::C_User, isFramework},
+  auto exists = std::any_of(headerSearchInfo.search_dir_begin(),
+                            headerSearchInfo.search_dir_end(),
+                            [&](const clang::DirectoryLookup &lookup) -> bool {
+    if (isFramework)
+      return lookup.getFrameworkDir() == entry;
+    return lookup.getDir() == entry;
+  });
+  if (exists) {
+    // Don't bother adding a search path that's already there. Clang would have
+    // removed it via deduplication at the time the search path info gets built.
+    return false;
+  }
+
+  auto kind = isSystem ? clang::SrcMgr::C_System : clang::SrcMgr::C_User;
+  headerSearchInfo.AddSearchPath({entry, kind, isFramework},
                                  /*isAngled=*/true);
 
   // In addition to changing the current preprocessor directly, we still need
@@ -3261,6 +3273,64 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
     lookupObjCMembers(table, baseName.toDeclBaseName(SwiftContext), consumer);
   }
 }
+
+Optional<TinyPtrVector<ValueDecl *>>
+ClangImporter::Implementation::loadNamedMembers(
+    const Decl *D, DeclName N, uint64_t contextData) {
+
+  auto *DC = cast<DeclContext>(D);
+
+  auto *CD = D->getClangDecl();
+  assert(CD && "loadNamedMembers on a Decl without a clangDecl");
+
+  // There are 3 cases:
+  //
+  //  - The decl is from a bridging header, CMO is Some(nullptr)
+  //    which denotes the __ObjC Swift module and its associated
+  //    BridgingHeaderLookupTable.
+  //
+  //  - The decl is from a clang module, CMO is Some(M) for non-null
+  //    M and we can use the table for that module.
+  //
+  //  - The decl is a forward declaration, CMO is None, which should
+  //    never be the case if we got here (someone is asking for members).
+  //
+  // findLookupTable, below, handles the first two cases; we assert on the
+  // third.
+
+  auto CMO = getClangSubmoduleForDecl(CD);
+  assert(CMO && "loadNamedMembers on a forward-declared Decl");
+
+  auto table = findLookupTable(*CMO);
+  assert(table && "clang module without lookup table");
+
+  clang::ASTContext &clangCtx = getClangASTContext();
+
+  TinyPtrVector<ValueDecl *> Members;
+  if (auto *CPD = dyn_cast<clang::ObjCProtocolDecl>(CD)) {
+    for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()), CPD)) {
+      if (!entry.is<clang::NamedDecl *>()) continue;
+      auto member = entry.get<clang::NamedDecl *>();
+      if (!isVisibleClangEntry(clangCtx, member)) continue;
+      SmallVector<Decl*, 4> tmp;
+      insertMembersAndAlternates(member, tmp);
+      for (auto *TD : tmp) {
+        if (auto *V = dyn_cast<ValueDecl>(TD)) {
+          // Skip ValueDecls if they import into different DeclContexts
+          // or under different names than the one we asked about.
+          if (V->getDeclContext() == DC &&
+              V->getFullName().matchesRef(N)) {
+            Members.push_back(V);
+          }
+        }
+      }
+    }
+    return Members;
+  }
+
+  return None;
+}
+
 
 EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     const NominalTypeDecl *nominal) {

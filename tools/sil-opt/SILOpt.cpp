@@ -40,6 +40,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/YAMLTraits.h"
 #include <cstdio>
 using namespace swift;
 
@@ -230,6 +231,11 @@ static cl::opt<std::string> PassRemarksMissed(
              "the given regular expression"),
     cl::Hidden);
 
+static cl::opt<std::string>
+    RemarksFilename("save-optimization-record-path",
+                    cl::desc("YAML output filename for pass remarks"),
+                    cl::value_desc("filename"));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   SILPassManager PM(Module, IRGenMod);
@@ -418,6 +424,21 @@ int main(int argc, char **argv) {
 
   if (CI.getSILModule())
     CI.getSILModule()->setSerializeSILAction([]{});
+
+  std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile;
+  if (RemarksFilename != "") {
+    std::error_code EC;
+    OptRecordFile = llvm::make_unique<llvm::raw_fd_ostream>(
+        RemarksFilename, EC, llvm::sys::fs::F_None);
+    if (EC) {
+      llvm::errs() << EC.message() << '\n';
+      return 1;
+    }
+    CI.getSILModule()->setOptRecordStream(
+        llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+                                              &CI.getSourceMgr()),
+        std::move(OptRecordFile));
+  }
 
   if (OptimizationGroup == OptGroup::Diagnostics) {
     runSILDiagnosticPasses(*CI.getSILModule());

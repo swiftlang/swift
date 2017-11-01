@@ -32,6 +32,7 @@ func _findStringSwitchCase(
   return -1
 }
 
+@_fixed_layout // needs known size for static allocation
 public // used by COMPILER_INTRINSIC
 struct _OpaqueStringSwitchCache {
   var a: Builtin.Word

@@ -760,6 +760,10 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
       break;
   }
 
+  // Don't create empty generic parameter lists.
+  if (params.empty())
+    return nullptr;
+
   auto paramList = GenericParamList::create(getContext(), SourceLoc(),
                                             params, SourceLoc(), { },
                                             SourceLoc());
@@ -2872,7 +2876,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind, rawMutModifier;
-    bool isObjC, hasDynamicSelf, throws;
+    bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
     unsigned numParamPatterns, numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
@@ -2885,7 +2889,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         isStatic, rawStaticSpelling, isObjC,
-                                        rawMutModifier, hasDynamicSelf, throws,
+                                        rawMutModifier, hasDynamicSelf,
+                                        hasForcedStaticDispatch, throws,
                                         numParamPatterns, genericEnvID,
                                         interfaceTypeID,
                                         associatedDeclID, overriddenID,
@@ -3030,6 +3035,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       fn->setImplicit();
     fn->setDynamicSelf(hasDynamicSelf);
+    fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
@@ -4676,6 +4682,13 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
     assert(!Err && "unable to read default witness table");
     (void)Err;
   }
+}
+
+Optional<TinyPtrVector<ValueDecl *>>
+ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
+                             uint64_t contextData) {
+  // Not presently supported.
+  return None;
 }
 
 void
