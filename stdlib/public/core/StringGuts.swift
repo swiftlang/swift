@@ -264,18 +264,27 @@ internal struct UnsafeString {
     capacityEnd: UnsafeMutableRawPointer,
     accomodatingElementWidth width: Int
   ) {
-    _sanityCheck(capacityEnd > dest + self.count)
+    _sanityCheck(width == 1 || width == 2)
+    let elementShift = width &- 1
+    _precondition(capacityEnd > dest + self.count &<< elementShift)
+ 
     if _fastPath(self.byteWidth == width) {
       _memcpy(
         dest: dest,
         src: self.baseAddress,
         size: UInt(self.sizeInBytes))
-    } else {
-      _sanityCheck(self.byteWidth == 1 && width == 2)
-      // TODO: performance
-      var dest = dest.assumingMemoryBound(to: UInt16.self)
+    } else if self.byteWidth == 1 && width == 2 {
+      var dest = dest.assumingMemoryBound(to: UTF16.CodeUnit.self)
       for byte in self.unsafeOneByteString! {
-        dest.pointee = UInt16(truncatingIfNeeded: byte)
+        dest.pointee = UTF16.CodeUnit(byte)
+        dest += 1
+      }
+    } else {
+      _sanityCheck(self.byteWidth == 2 && width == 1)
+      var dest = dest.assumingMemoryBound(to: UInt8.self)
+      for unit in self.unsafeUTF16String! {
+        _precondition(unit & ~0x7F == 0) // ASCII only
+        dest.pointee = UInt8(truncatingIfNeeded: unit)
         dest += 1
       }
     }
