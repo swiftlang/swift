@@ -163,6 +163,19 @@ public:
     llvm_unreachable("initializing value witness table for opaque type?!");
   }
 
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr,
+                                       SILType T) const override {
+    return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, enumAddr);
+  }
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T) const override {
+    emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, enumAddr);
+  }
+
 };
 
 }

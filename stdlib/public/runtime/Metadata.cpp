@@ -714,6 +714,37 @@ static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
+template <bool IsPOD, bool IsInline>
+static int tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
+                                         unsigned numEmptyCases,
+                                         const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto getExtraInhabitantIndex =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->getExtraInhabitantIndex);
+
+  return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
+                                     numExtraInhabitants,
+                                     getExtraInhabitantIndex);
+}
+
+template <bool IsPOD, bool IsInline>
+static void
+tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
+                                unsigned numEmptyCases, const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto storeExtraInhabitant =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->storeExtraInhabitant);
+
+  storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
+                                numExtraInhabitants, storeExtraInhabitant);
+}
+
 static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
                                        int index,
                                        const Metadata *_metatype) {
@@ -870,6 +901,18 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Witnesses.flags = layout.flags;
   Witnesses.stride = layout.stride;
 
+  // We have extra inhabitants if the first element does.
+  // FIXME: generalize this.
+  bool hasExtraInhabitants = false;
+  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                             key.Elements[0]->getValueWitnesses())) {
+    hasExtraInhabitants = true;
+    Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
+    Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
+    Witnesses.storeExtraInhabitant = tuple_storeExtraInhabitant;
+    Witnesses.getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
+  }
+
   // Copy the function witnesses in, either from the proposed
   // witnesses or from the standard table.
   if (!proposedWitnesses) {
@@ -882,13 +925,13 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
       // into something better).
     } else if (layout.flags.isInlineStorage()
                && layout.flags.isPOD()) {
-      if (layout.size == 8 && layout.flags.getAlignmentMask() == 7)
+      if (!hasExtraInhabitants && layout.size == 8 && layout.flags.getAlignmentMask() == 7)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi64_);
-      else if (layout.size == 4 && layout.flags.getAlignmentMask() == 3)
+      else if (!hasExtraInhabitants && layout.size == 4 && layout.flags.getAlignmentMask() == 3)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi32_);
-      else if (layout.size == 2 && layout.flags.getAlignmentMask() == 1)
+      else if (!hasExtraInhabitants && layout.size == 2 && layout.flags.getAlignmentMask() == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi16_);
-      else if (layout.size == 1)
+      else if (!hasExtraInhabitants && layout.size == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi8_);
       else
         proposedWitnesses = &tuple_witnesses_pod_inline;
@@ -909,16 +952,6 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Witnesses.LOWER_ID = proposedWitnesses->LOWER_ID;
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
-
-  // We have extra inhabitants if the first element does.
-  // FIXME: generalize this.
-  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
-                             key.Elements[0]->getValueWitnesses())) {
-    Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
-    Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
-    Witnesses.storeExtraInhabitant = tuple_storeExtraInhabitant;
-    Witnesses.getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
-  }
 }
 
 const TupleTypeMetadata *
@@ -1039,10 +1072,44 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
 #define pod_direct_assignWithTake pod_direct_initializeWithCopy
 #define pod_indirect_assignWithTake pod_direct_initializeWithCopy
 
+static int pod_direct_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
+                                              unsigned numEmptyCases,
+                                              const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto getExtraInhabitantIndex =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->getExtraInhabitantIndex);
+
+  return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
+                                     numExtraInhabitants,
+                                     getExtraInhabitantIndex);
+}
+
+static void pod_direct_storeEnumTagSinglePayload(OpaqueValue *enumAddr,
+                                                 int whichCase,
+                                                 unsigned numEmptyCases,
+                                                 const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto storeExtraInhabitant =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->storeExtraInhabitant);
+
+  storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
+                                numExtraInhabitants, storeExtraInhabitant);
+}
+
+#define pod_indirect_getEnumTagSinglePayload pod_direct_getEnumTagSinglePayload
+#define pod_indirect_storeEnumTagSinglePayload \
+  pod_direct_storeEnumTagSinglePayload
 
 static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
-                                                uint64_t alignmentMask) {
-  return (size << 16) | alignmentMask;
+                                                uint64_t alignmentMask,
+                                                uint64_t hasExtraInhabitants) {
+  return (hasExtraInhabitants << 48) | (size << 16) | alignmentMask;
 }
 
 void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
@@ -1052,7 +1119,9 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
     // If the value has a common size and alignment, use specialized value
     // witnesses we already have lying around for the builtin types.
     const ValueWitnessTable *commonVWT;
-    switch (sizeWithAlignmentMask(vwtable->size, vwtable->getAlignmentMask())) {
+    bool hasExtraInhabitants = flags.hasExtraInhabitants();
+    switch (sizeWithAlignmentMask(vwtable->size, vwtable->getAlignmentMask(),
+                                  hasExtraInhabitants)) {
     default:
       // For uncommon layouts, use value witnesses that work with an arbitrary
       // size and alignment.
@@ -1071,25 +1140,25 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       }
       return;
       
-    case sizeWithAlignmentMask(1, 0):
+    case sizeWithAlignmentMask(1, 0, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi8_);
       break;
-    case sizeWithAlignmentMask(2, 1):
+    case sizeWithAlignmentMask(2, 1, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi16_);
       break;
-    case sizeWithAlignmentMask(4, 3):
+    case sizeWithAlignmentMask(4, 3, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi32_);
       break;
-    case sizeWithAlignmentMask(8, 7):
+    case sizeWithAlignmentMask(8, 7, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi64_);
       break;
-    case sizeWithAlignmentMask(16, 15):
+    case sizeWithAlignmentMask(16, 15, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi128_);
       break;
-    case sizeWithAlignmentMask(32, 31):
+    case sizeWithAlignmentMask(32, 31, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi256_);
       break;
-    case sizeWithAlignmentMask(64, 63):
+    case sizeWithAlignmentMask(64, 63, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi512_);
       break;
     }
@@ -1146,9 +1215,6 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
   
-  // Substitute in better value witnesses if we have them.
-  installCommonValueWitnesses(vwtable);
-
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
   if (fieldTypes[0]->flags.hasExtraInhabitants()) {
@@ -1160,6 +1226,9 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
     assert(xiVWT->storeExtraInhabitant);
     assert(xiVWT->getExtraInhabitantIndex);
   }
+
+  // Substitute in better value witnesses if we have them.
+  installCommonValueWitnesses(vwtable);
 }
 
 /***************************************************************************/
