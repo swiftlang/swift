@@ -16,4 +16,16 @@ StrideTestSuite.test("through") {
   checkSequence(Array(0...5).reversed(), stride(from: 5, through: 0, by: -1))
 }
 
+StrideTestSuite.test("StrideToCollection/Int") {
+  let odds = stride(from: 1, to: 10, by: 2)
+  let expected = (1..<10).filter { $0 % 2 != 0 }
+  checkRandomAccessCollection(expected, odds)
+}
+
+StrideTestSuite.test("StrideThroughCollection/Int") {
+  let odds = stride(from: 1, through: 10, by: 2)
+  let expected = (1...10).filter { $0 % 2 != 0 }
+  checkRandomAccessCollection(expected, odds)
+}
+
 runAllTests()

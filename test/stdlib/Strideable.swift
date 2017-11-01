@@ -226,5 +226,143 @@ StrideTestSuite.test("StrideToIterator/past end/backward") {
   strideIteratorTest(stride(from: 3, to: 0, by: -1), nonNilResults: 3)
 }
 
+StrideTestSuite.test("StrideToCollection/Int/IterationAndArraySameSequence") {
+  do {
+    let odds = stride(from: -42, to: 42, by: 2)
+    expectEqualSequence(Array(odds), odds)
+  }
+  do {
+    let odds = stride(from: 42, to: -42, by: -2)
+    expectEqualSequence(Array(odds), odds)
+  }
+}
+
+StrideTestSuite.test("StrideToCollection/Int") {
+  func test(to end: Int) {
+    let odds = stride(from: 1, to: end, by: 2)
+    let expected = (1..<end).filter { $0 % 2 != 0 }
+    expectEqualSequence(expected, odds)
+  }
+  test(to: 41)
+  test(to: 42)
+}
+
+StrideTestSuite.test("StrideToCollection/Int/NegativeStride") {
+  let odds = stride(from: 41, to: 0, by: -2)
+  let expected = (0...41).reversed().filter { $0 % 2 != 0 }
+  expectEqualSequence(expected, odds)
+}
+
+StrideTestSuite.test("StrideToCollection/Int/NegativeValues") {
+  let odds = stride(from: -41, to: 0, by: 2)
+  let expected = (-41..<0).filter { $0 % 2 != 0 }
+  expectEqualSequence(expected, odds)
+}
+
+StrideTestSuite.test(
+  "StrideThroughCollection/Int/IterationAndArraySameSequence"
+) {
+  do {
+    let odds = stride(from: -42, through: 42, by: 2)
+    expectEqualSequence(Array(odds), odds)
+  }
+  do {
+    let odds = stride(from: 42, through: -42, by: -2)
+    expectEqualSequence(Array(odds), odds)
+  }
+}
+
+StrideTestSuite.test("StrideThroughCollection/Int") {
+  func test(through end: Int) {
+    let odds = stride(from: 1, through: end, by: 2)
+    let expected = (1...end).filter { $0 % 2 != 0 }
+    expectEqualSequence(expected, odds)
+  }
+  test(through: 41)
+  test(through: 42)
+}
+
+StrideTestSuite.test("StrideThroughCollection/Int/NegativeStride") {
+  let odds = stride(from: 41, through: 1, by: -2)
+  let expected = (0...41).reversed().filter { $0 % 2 != 0 }
+  expectEqualSequence(expected, odds)
+}
+
+StrideTestSuite.test("StrideThroughCollection/Int/NegativeValues") {
+  let odds = stride(from: -41, through: -1, by: 2)
+  let expected = (-41..<0).filter { $0 % 2 != 0 }
+  expectEqualSequence(expected, odds)
+}
+
+StrideTestSuite.test(
+  "StrideToCollection/Double/IterationAndArraySameSequence"
+) {
+  do {
+    let odds = stride(from: -42.0, to: 42, by: 2)
+    expectEqualSequence(Array(odds), odds)
+  }
+  do {
+    let odds = stride(from: 42.0, to: -42, by: -2)
+    expectEqualSequence(Array(odds), odds)
+  }
+}
+
+StrideTestSuite.test(
+  "StrideThroughCollection/Double/IterationAndArraySameSequence"
+) {
+  do {
+    let odds = stride(from: -42.0, through: 42, by: 2)
+    expectEqualSequence(Array(odds), odds)
+  }
+  do {
+    let odds = stride(from: 42.0, through: -42, by: -2)
+    expectEqualSequence(Array(odds), odds)
+  }
+}
+
+StrideTestSuite.test("StrideToCollection/Double") {
+  func test(to end: Int) {
+    let odds = stride(from: 1.0, to: Double(end), by: 2)
+    let expected = (1..<end).filter { $0 % 2 != 0 }.map { Double($0) }
+    expectEqualSequence(expected, odds)
+  }
+  test(to: 41)
+  test(to: 42)
+}
+
+StrideTestSuite.test("StrideToCollection/Double/NegativeStride") {
+  let odds = stride(from: 41.0, to: 0, by: -2)
+  let expected = (0...41).reversed().filter { $0 % 2 != 0 }.map { Double($0) }
+  expectEqualSequence(expected, odds)
+}
+
+StrideTestSuite.test("StrideToCollection/Double/NegativeValues") {
+  let odds = stride(from: -41.0, to: 0, by: 2)
+  let expected = (-41..<0).filter { $0 % 2 != 0 }.map { Double($0) }
+  expectEqualSequence(expected, odds)
+}
+
+StrideTestSuite.test("StrideThroughCollection/Double") {
+  func test(through end: Int) {
+    let odds = stride(from: 1.0, through: Double(end), by: 2)
+    let expected = (1...end).filter { $0 % 2 != 0 }.map { Double($0) }
+    expectEqualSequence(expected, odds)
+  }
+  test(through: 41)
+  test(through: 42)
+}
+
+StrideTestSuite.test("StrideThroughCollection/Double/NegativeStride") {
+  let odds = stride(from: 41.0, through: 1, by: -2)
+  let expected = (0...41).reversed().filter { $0 % 2 != 0 }.map { Double($0) }
+  expectEqualSequence(expected, odds)
+}
+
+StrideTestSuite.test("StrideThroughCollection/Double/NegativeValues") {
+  let odds = stride(from: -41.0, through: -1, by: 2)
+  let expected = (-41..<0).filter { $0 % 2 != 0 }.map { Double($0) }
+  expectEqualSequence(expected, odds)
+}
+
 runAllTests()
 
