@@ -557,6 +557,7 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   options -= TR_VariadicFunctionInput;
   options -= TR_EnumCase;
   options -= TR_ImmediateOptionalTypeArgument;
+  options -= TR_AllowIUO;
   if (!preserveSIL) options -= TR_SILType;
   return options;
 }

@@ -4252,7 +4252,6 @@ public:
                                      &resolver);
     TypeResolutionOptions options;
     options |= TR_SubscriptParameters;
-    options |= TR_AllowIUO;
 
     isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
                                            options,
@@ -4792,8 +4791,8 @@ public:
                              GenericTypeResolver &resolver) {
     bool hadError = false;
     for (auto paramList : fd->getParameterLists()) {
-      hadError |=
-          TC.typeCheckParameterList(paramList, fd, TR_AllowIUO, resolver);
+      hadError |= TC.typeCheckParameterList(paramList, fd,
+                                            TypeResolutionOptions(), resolver);
     }
 
     return hadError;
