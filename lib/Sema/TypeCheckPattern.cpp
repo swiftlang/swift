@@ -691,6 +691,9 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   auto elementOptions = (options |
                          (decl->isVariadic() ? TR_VariadicFunctionInput
                                              : TR_FunctionInput));
+  if (!decl->isVariadic())
+    elementOptions |= TR_AllowIUO;
+
   bool hadError = false;
 
   // We might have a null typeLoc if this is a closure parameter list,

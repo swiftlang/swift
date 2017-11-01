@@ -501,6 +501,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   options -= TR_FunctionInput;
   options -= TR_TypeAliasUnderlyingType;
   options -= TR_AllowUnavailableProtocol;
+  options -= TR_AllowIUO;
 
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
@@ -2774,16 +2775,17 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
-  auto elementOptions = withoutContext(options, true);
-  elementOptions |= TR_ImmediateOptionalTypeArgument;
 
   // Swift version >= 5? Use the newer check for IUOs appearing in
   // illegal positions.
-  if (TC.Context.isSwiftVersionAtLeast(5) &&
-      !elementOptions.contains(TR_AllowIUO)) {
+  if (TC.Context.isSwiftVersionAtLeast(5) && !options.contains(TR_AllowIUO)) {
     TC.diagnose(repr->getStartLoc(), diag::iuo_in_illegal_position)
       .fixItReplace(repr->getExclamationLoc(), "?");
+    return ErrorType::get(Context);
   }
+
+  auto elementOptions = withoutContext(options, true);
+  elementOptions |= TR_ImmediateOptionalTypeArgument;
 
   // The T in T! is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
