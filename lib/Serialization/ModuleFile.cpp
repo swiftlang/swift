@@ -775,6 +775,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
           subentry = DeclMemberTablesCursor.advance(
             llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
         } while (!DeclMemberTablesCursor.AtEndOfStream() &&
+                 subentry.Kind != llvm::BitstreamEntry::Record &&
                  subentry.Kind != llvm::BitstreamEntry::EndBlock);
       }
       if (cursor.SkipBlock())
