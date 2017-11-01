@@ -1845,6 +1845,67 @@ namespace {
     }
   };
 
+  /// Remap an lvalue referencing an imported global variable to the
+  /// corresponding Swift type.
+  class BridgeToNativeComponent : public TranslationPathComponent {
+    AbstractionPattern OrigType;
+
+  public:
+    BridgeToNativeComponent(AbstractionPattern origType,
+                            CanType substFormalType,
+                            SILType loweredSubstType)
+      : TranslationPathComponent({ AbstractionPattern(substFormalType),
+                                   substFormalType, loweredSubstType },
+                                 OrigToSubstKind),
+        OrigType(origType)
+    {}
+
+    RValue untranslate(SILGenFunction &SGF, SILLocation loc,
+                       RValue &&rv, SGFContext c) && override {
+      SILType originalLoweredType = SGF.getLoweredType(OrigType.getType());
+      auto bridging = Conversion::getBridging(Conversion::BridgeToObjC,
+                                              getSubstFormalType(),
+                                              OrigType.getType(),
+                                              originalLoweredType);
+      return RValue(SGF, loc, originalLoweredType.getSwiftRValueType(),
+                    SGF.emitConvertedRValue(loc, bridging, c,
+                                            [&](SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                SGFContext c) {
+        return std::move(rv).getScalarValue();
+      }));
+    }
+
+    RValue translate(SILGenFunction &SGF, SILLocation loc,
+                     RValue &&rv, SGFContext c) && override {
+      auto bridging = Conversion::getBridging(Conversion::BridgeFromObjC,
+                                              OrigType.getType(),
+                                              getSubstFormalType(),
+                                              getTypeOfRValue());
+      return RValue(SGF, loc, getSubstFormalType(),
+                    SGF.emitConvertedRValue(loc, bridging, c,
+                                            [&](SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                SGFContext c) {
+        return std::move(rv).getScalarValue();
+      }));
+    }
+
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &SGF, SILLocation loc) const override {
+      return llvm::make_unique<BridgeToNativeComponent>(OrigType,
+                                                        getSubstFormalType(),
+                                                        getTypeOfRValue());
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "BridgeToNativeComponent("
+                        << getOrigFormalType() << ", "
+                        << getSubstFormalType() << ", "
+                        << getTypeOfRValue() << ")\n";
+    }
+  };
+
   /// Remap a weak value to Optional<T>*, or unowned pointer to T*.
   class OwnershipComponent : public LogicalPathComponent {
   public:
@@ -2219,6 +2280,13 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
 
     if (address.getType().is<ReferenceStorageType>())
       lv.add<OwnershipComponent>(typeData);
+
+    AbstractionPattern pattern = SGF.SGM.Types.getAbstractionPattern(var);
+    if (pattern.isClangType() &&
+        lv.getTypeOfRValue().getSwiftRValueType() != formalRValueType) {
+      lv.add<BridgeToNativeComponent>(pattern, formalRValueType,
+                                      SGF.getLoweredType(formalRValueType));
+    }
     break;
   }
   
@@ -3213,9 +3281,6 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   // Any writebacks should be scoped to after the load.
   FormalEvaluationScope scope(*this);
 
-  // We shouldn't need to re-abstract here, but we might have to bridge.
-  // This should only happen if we have a global variable of NSString type.
-  auto origFormalType = src.getOrigFormalType();
   auto substFormalType = src.getSubstFormalType();
   auto &rvalueTL = getTypeLowering(src.getTypeOfRValue());
 
@@ -3229,7 +3294,6 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
              .offset(*this, loc, addr, AccessKind::Read);
     return RValue(*this, loc, substFormalType,
                   emitLoad(loc, addr.getValue(),
-                           origFormalType, substFormalType,
                            rvalueTL, C, IsNotTake,
                            isBaseGuaranteed));
   }
