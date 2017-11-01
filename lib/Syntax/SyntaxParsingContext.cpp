@@ -304,10 +304,10 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   switch (Kind) {
     case SyntaxContextKind::Expr:
       UnknownKind = SyntaxKind::UnknownExpr;
-      return;
+      break;
     case SyntaxContextKind::Decl:
       UnknownKind = SyntaxKind::UnknownDecl;
-      return;
+      break;
   }
   // Create an unknown node and give it to the parent context.
   Parent->ContextData.addPendingSyntax({Start, TokCount,
