@@ -3583,6 +3583,12 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
     }
   }
 
+  if (genericSig->requiresClass(depTy)) {
+    if (!type->isObjCExistentialType() &&
+        !type->mayHaveSuperclass())
+      return CheckTypeWitnessResult(tc.Context.getAnyObjectType());
+  }
+
   // Success!
   return CheckTypeWitnessResult();
 }
