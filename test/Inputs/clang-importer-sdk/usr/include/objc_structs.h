@@ -5,5 +5,5 @@ struct StructOfNSStrings {
 };
 
 struct StructOfBlocks {
-  void (^ __unsafe_unretained __nonnull block)(void);
+  void (^__unsafe_unretained _Nonnull block)(void);
 };

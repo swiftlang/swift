@@ -3,14 +3,14 @@
 @end
 
 @protocol A
-- (void) use: (nonnull void(^)(__nonnull id)) callback;
+- (void)use:(nonnull void (^)(_Nonnull id))callback;
 @end
 
 @protocol B<A>
 @end
 
 @protocol C<A>
-- (void) use: (nonnull void(^)(__nonnull id<Context>)) callback;
+- (void)use:(nonnull void (^)(_Nonnull id<Context>))callback;
 @end
 
 @protocol D<C, B>
