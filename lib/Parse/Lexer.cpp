@@ -745,7 +745,7 @@ syntax::RawSyntaxInfo Lexer::fullLex() {
   }
   auto Loc = NextToken.getLoc();
   auto Result = syntax::RawTokenSyntax::make(NextToken.getKind(),
-                                        OwnedString(NextToken.getText()),
+                                        OwnedString(NextToken.getText()).copy(),
                                         syntax::SourcePresence::Present,
                                         {LeadingTrivia}, {TrailingTrivia});
   LeadingTrivia.clear();
