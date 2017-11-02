@@ -238,7 +238,7 @@ static const WitnessTable *getNSErrorConformanceToError() {
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
-  auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT, "_"
+  auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
            MANGLE_AS_STRING(MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWP))));
   assert(TheWitnessTable &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
