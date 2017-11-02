@@ -477,6 +477,14 @@ public:
                                    Address src, llvm::Value *count,
                                    SILType T) const;
 
+  /// Outlining helper function: recursively traverse the SILType:
+  /// When encountering an Archetype - add it to a type-metadata vec.
+  virtual void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          &typeToMetadataVec,
+      SILType T) const;
+
   /// Get the native (abi) convention for a return value of this type.
   const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;
 
@@ -489,6 +497,7 @@ public:
                       llvm::Value *typeMetadata,
                       SILType T) const;
 };
+bool mightContainMetadata(const IRGenModule &IGM, const CanType type);
 
 } // end namespace irgen
 } // end namespace swift

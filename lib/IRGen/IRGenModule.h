@@ -717,34 +717,50 @@ public:
                                              llvm::Type *llvmType);
 
   typedef llvm::Constant *(IRGenModule::*OutlinedCopyAddrFunction)(
-      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          *typeToMetadataVec);
 
-  void
-  generateCallToOutlinedCopyAddr(IRGenFunction &IGF, const TypeInfo &objectTI,
-                                 Address dest, Address src, SILType T,
-                                 const OutlinedCopyAddrFunction MethodToCall);
+  void generateCallToOutlinedCopyAddr(
+      IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
+      SILType T, const OutlinedCopyAddrFunction MethodToCall,
+      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          *typeToMetadataVec = nullptr);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
-      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          *typeToMetadataVec = nullptr);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithCopyFunction(
-      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          *typeToMetadataVec = nullptr);
 
   llvm::Constant *getOrCreateOutlinedAssignWithTakeFunction(
-      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          *typeToMetadataVec = nullptr);
 
   llvm::Constant *getOrCreateOutlinedAssignWithCopyFunction(
-      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy);
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          *typeToMetadataVec = nullptr);
+
+  unsigned getCanTypeID(const CanType type);
 
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
+
   llvm::Constant *getOrCreateOutlinedCopyAddrHelperFunction(
       const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
       std::string funcName,
       llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
                               Address dest, Address src, SILType T)>
-          Generate);
+          Generate,
+      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          *typeToMetadataVec = nullptr);
 
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
@@ -828,6 +844,10 @@ private:
   /// A mapping from order numbers to the LLVM functions which we
   /// created for the SIL functions with those orders.
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
+
+  /// Mapping from archetype-containing CanType to UniqueID (for outline)
+  llvm::DenseMap<const swift::TypeBase *, unsigned> typeToUniqueID;
+  unsigned currUniqueID = 0;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
   void emitLazyObjCProtocolDefinitions();

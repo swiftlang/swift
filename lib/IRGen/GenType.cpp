@@ -1778,6 +1778,7 @@ namespace {
     bool visitAnyFunctionType(CanAnyFunctionType type) {
       return false;
     }
+    bool visitSILFunctionType(CanSILFunctionType type) { return false; }
 
     // The safe default for a dependent type is to assume that it
     // needs its own implementation.
@@ -1797,6 +1798,89 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
     auto enumDecl = cast<EnumDecl>(decl);
     return IsIRTypeDependent(IGM).visitEnumDecl(enumDecl);
   }
+}
+
+bool irgen::mightContainMetadata(const IRGenModule &IGM, const CanType type) {
+  IRGenModule &IGMCast = const_cast<IRGenModule &>(IGM);
+  auto runType = irgen::getRuntimeReifiedType(IGMCast, type);
+  if (!IsIRTypeDependent(IGMCast).visit(runType)) {
+    return false;
+  }
+  switch (runType->getKind()) {
+#define SUGARED_TYPE(ID, SUPER) case TypeKind::ID:
+#define UNCHECKED_TYPE(ID, SUPER) case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+    llvm_unreachable("kind is invalid for a canonical type");
+
+#define ARTIFICIAL_TYPE(ID, SUPER) case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+  case TypeKind::DynamicSelf:
+    return false;
+
+// Builtin types might contain metadata
+#define BUILTIN_TYPE(ID, SUPER) case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Module:
+    return true;
+
+  // Type parameters
+  case TypeKind::Archetype:
+  case TypeKind::GenericTypeParam:
+  case TypeKind::DependentMember:
+    return true;
+
+  case TypeKind::Tuple: {
+    auto genTuple = cast<TupleType>(runType);
+    for (auto elt : genTuple->getElements()) {
+      if (mightContainMetadata(IGM, elt.getType()->getCanonicalType())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Nominal types
+  case TypeKind::Class:
+  case TypeKind::Enum:
+  case TypeKind::Protocol:
+  case TypeKind::Struct:
+    return true;
+
+  case TypeKind::BoundGenericEnum: {
+    auto genEnum = cast<BoundGenericEnumType>(runType);
+    for (auto arg : genEnum->getGenericArgs()) {
+      if (mightContainMetadata(IGM, arg->getCanonicalType())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Bound generic types
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericStruct:
+    return true;
+
+  // Function types do not have metadata
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+    return false;
+
+  case TypeKind::ProtocolComposition:
+    return true;
+
+  // Metatypes
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    return true;
+  }
+  llvm_unreachable("bad type kind");
 }
 
 TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
