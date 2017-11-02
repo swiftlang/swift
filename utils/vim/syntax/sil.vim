@@ -32,6 +32,29 @@ syn match silFunctionType skipwhite
 syn match silMetatypeType skipwhite
       \ /@\(\<thick\>\|\<thin\>\|\<objc\>\)/
 
+" TODO: handle [tail_elems sil-type * sil-operand]
+syn region silAttribute contains=silAttributes
+      \ start="\[" end="\]"
+syn keyword silAttributes contained containedin=silAttribute
+      \ abort
+      \ deinit
+      \ delegatingself
+      \ derivedself
+      \ derivedselfonly
+      \ dynamic
+      \ exact
+      \ init
+      \ modify
+      \ objc
+      \ read
+      \ rootself
+      \ stack
+      \ static
+      \ strict
+      \ unknown
+      \ unsafe
+      \ var
+
 syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
@@ -132,5 +155,6 @@ hi def link silConventions Type
 hi def link silIdentifier Identifier
 hi def link silFunctionType Special
 hi def link silMetatypeType Special
+hi def link silAttribute PreProc
 
 let b:current_syntax = "sil"
