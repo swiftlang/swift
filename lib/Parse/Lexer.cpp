@@ -737,7 +737,7 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-syntax::RawTokenInfo Lexer::fullLex() {
+syntax::RawSyntaxInfo Lexer::fullLex() {
   if (NextToken.isEscapedIdentifier()) {
     LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
     TrailingTrivia.insert(TrailingTrivia.begin(),
