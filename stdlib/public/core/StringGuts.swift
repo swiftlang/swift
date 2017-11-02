@@ -298,7 +298,7 @@ internal struct UnsafeString {
   ) {
     _sanityCheck(width == 1 || width == 2)
     let elementShift = width &- 1
-    _precondition(capacityEnd > dest + self.count &<< elementShift)
+    _precondition(capacityEnd >= dest + self.count &<< elementShift)
  
     if _fastPath(self.byteWidth == width) {
       _memcpy(
@@ -391,7 +391,7 @@ internal struct UnsafeString {
   // FIXME: mutating
   func _appendInPlace(_ other: _StringGuts) {
     let otherCount = other.count
-    _sanityCheck(self.capacity > self.count + otherCount)
+    _sanityCheck(self.capacity >= self.count + otherCount)
 
     // TODO: Does this incur ref counting?
     var buffer = self.stringBuffer
@@ -818,23 +818,23 @@ extension _StringGuts {
   mutating func isUniqueNative() -> Bool {
     return _isNative && _isUnique(&_object)
   }
-  
-  // Convert ourselves (if needed) to a NativeString for appending purposes.
-  // After this call, self is ready to be memcpy-ed into. Adjusts the
-  // referenced StringBuffer usedCount.
+
   @_versioned
   internal
-  mutating func _formNative(forAppending other: _StringGuts) {
-    let extra = other.count
+  mutating func _ensureUniqueNative(
+    minimumCapacity: Int,
+    minimumByteWidth: Int
+  ) {
+    _sanityCheck(minimumByteWidth == 1 || minimumByteWidth == 2)
     let oldCapacity: Int
     let oldCount: Int
-    let newWidth = Swift.max(self.byteWidth, other.byteWidth)
+    let newWidth = Swift.max(self.byteWidth, minimumByteWidth)
     if _fastPath(self.byteWidth == newWidth && isUniqueNative()) {
       // TODO: width extension can be done in place if there's capacity
       var nativeBuffer = self._native._unsafelyUnwrappedUnchecked.stringBuffer
       oldCapacity = nativeBuffer.capacity
       oldCount = nativeBuffer.usedCount
-      if _fastPath(oldCapacity > oldCount + extra) {
+      if _fastPath(oldCapacity >= minimumCapacity) {
         return
       }
     } else {
@@ -844,8 +844,7 @@ extension _StringGuts {
 
     let newCapacity = Swift.max(
       _growArrayCapacity(oldCapacity),
-      oldCount + extra + 1 // reserve space for nul terminator (TODO)
-    ) 
+      minimumCapacity)
     let newBuffer = _StringBuffer(
       capacity: newCapacity,
       initialSize: oldCount,
@@ -861,6 +860,17 @@ extension _StringGuts {
     self = _StringGuts(NativeString(newBuffer))
   }
 
+  // Convert ourselves (if needed) to a NativeString for appending purposes.
+  // After this call, self is ready to be memcpy-ed into. Does not adjust the
+  // referenced StringBuffer's usedCount.
+  @_versioned
+  internal
+  mutating func _formNative(forAppending other: _StringGuts) {
+    _ensureUniqueNative(
+      minimumCapacity: self.count + other.count,
+      minimumByteWidth: other.byteWidth)
+  }
+
   // Copy in our elements to the new storage
   //
   @_versioned
@@ -870,7 +880,7 @@ extension _StringGuts {
     capacityEnd: UnsafeMutableRawPointer,
     accomodatingElementWidth width: Int
   ) {
-    _sanityCheck(capacityEnd > dest + self.count)
+    _sanityCheck(capacityEnd >= dest + self.count)
     let unmangedSelfOpt = self._unmangedContiguous
     if _fastPath(unmangedSelfOpt != nil) {
       unmangedSelfOpt._unsafelyUnwrappedUnchecked._copy(
@@ -880,7 +890,6 @@ extension _StringGuts {
     }
 
     fatalError("TODO: non-contig loop, use `_cocoaStringReadAll`")
-    return
   }
 
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
