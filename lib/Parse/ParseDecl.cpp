@@ -2148,7 +2148,7 @@ ParserResult<Decl>
 Parser::parseDecl(ParseDeclOptions Flags,
                   llvm::function_ref<void(Decl*)> Handler) {
   SyntaxParsingContextChild DeclParsingContext(SyntaxContext,
-                                               SyntaxContextKind::Decl, Tok);
+                                               SyntaxContextKind::Decl);
   if (Tok.is(tok::pound_if)) {
     auto IfConfigResult = parseIfConfig(
       [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {

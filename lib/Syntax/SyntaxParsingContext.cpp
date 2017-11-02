@@ -180,12 +180,13 @@ SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
   assert(Size - N + 1 == PendingSyntax.size());
 }
 
-SyntaxParsingContext::SyntaxParsingContext(SourceFile &SF, unsigned BufferID):
-  ContextData(*new ContextInfo(SF, BufferID)) {}
+SyntaxParsingContext::
+SyntaxParsingContext(SourceFile &SF, unsigned BufferID, Token &Tok):
+  ContextData(*new ContextInfo(SF, BufferID)), Tok(Tok) {}
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext &Another):
   ContextData(*new ContextInfo(Another.ContextData.allTokens(),
-                               Another.ContextData.Enabled)) {}
+                               Another.ContextData.Enabled)), Tok(Another.Tok) {}
 
 SyntaxParsingContext::~SyntaxParsingContext() { delete &ContextData; }
 
@@ -240,9 +241,9 @@ SyntaxParsingContextRoot &SyntaxParsingContextChild::getRoot() {
 
 SyntaxParsingContextChild::
 SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-                          SyntaxContextKind Kind, Token &Tok):
+                          SyntaxContextKind Kind):
     SyntaxParsingContext(*ContextHolder), Parent(ContextHolder),
-    ContextHolder(ContextHolder), Kind(Kind), Tok(Tok) {
+    ContextHolder(ContextHolder), Kind(Kind) {
   ContextHolder = this;
   if (ContextData.Enabled)
     ContextData.setContextStart(Tok.getLoc());
