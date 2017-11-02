@@ -3011,6 +3011,8 @@ void Serializer::writeDecl(const Decl *D) {
                                const_cast<ProtocolDecl *>(proto)
                                  ->requiresClass(),
                                proto->isObjC(),
+                               proto->existentialTypeSupported(
+                                 /*resolver=*/nullptr),
                                addGenericEnvironmentRef(
                                                 proto->getGenericEnvironment()),
                                rawAccessLevel,

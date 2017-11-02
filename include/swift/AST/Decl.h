@@ -3655,6 +3655,14 @@ public:
              ->existentialTypeSupportedSlow(resolver);
   }
 
+  /// Explicitly set the existentialTypeSupported flag, without computing
+  /// it from members. Only called from deserialization, where the flag
+  /// was stored in the serialized record.
+  void setExistentialTypeSupported(bool supported) {
+    ProtocolDeclBits.ExistentialTypeSupported = supported;
+    ProtocolDeclBits.ExistentialTypeSupportedValid = true;
+  }
+
   /// If this is known to be a compiler-known protocol, returns the kind.
   /// Otherwise returns None.
   ///
