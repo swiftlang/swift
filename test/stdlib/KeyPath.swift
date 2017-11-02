@@ -666,5 +666,25 @@ keyPath.test("subscripts") {
   expectEqual(base[keyPath: ints_be], (17 + 38).bigEndian)
 }
 
+// SR-6096
+
+protocol Protocol6096 {}
+struct Value6096<ValueType> {}
+extension Protocol6096 {
+    var asString: String? {
+        return self as? String
+    }
+}
+extension Value6096 where ValueType: Protocol6096 {
+    func doSomething() {
+        _ = \ValueType.asString?.endIndex
+    }
+}
+extension Int: Protocol6096 {}
+
+keyPath.test("optional chaining component that needs generic instantiation") {
+  Value6096<Int>().doSomething()
+}
+
 runAllTests()
 
