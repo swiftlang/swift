@@ -434,6 +434,7 @@ def evaluate(args):
         print(e)
         return 1
 
+
 # Evaluate a boolean expression in terms of deltas between the provided two
 # stats-dirs; works like evaluate() above but on absolute differences
 def evaluate_delta(args):
@@ -460,11 +461,13 @@ def evaluate_delta(args):
         if eval(args.evaluate_delta, env):
             return 0
         else:
-            print("evaluate-delta condition failed: '%s'" % args.evaluate_delta)
+            print("evaluate-delta condition failed: '%s'" %
+                  args.evaluate_delta)
             return 1
     except Exception as e:
         print(e)
         return 1
+
 
 def main():
     parser = argparse.ArgumentParser()
