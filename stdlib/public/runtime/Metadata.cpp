@@ -281,8 +281,6 @@ namespace {
 /// The uniquing structure for ObjC class-wrapper metadata.
 static SimpleGlobalCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
-#endif
-
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
   // Make calls resilient against receiving a null Objective-C class. This can
@@ -295,13 +293,23 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
     return theClass;
   }
 
-#if SWIFT_OBJC_INTEROP
   return &ObjCClassWrappers.getOrInsert(theClass).first->Data;
-#else
-  fatalError(/* flags = */ 0,
-             "swift_getObjCClassMetadata: no Objective-C interop");
-#endif
 }
+
+const ClassMetadata *
+swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
+  // Unwrap ObjC class wrappers.
+  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+    return wrapper->Class;
+  }
+
+  // Otherwise, the input should already be a Swift class object.
+  auto theClass = cast<ClassMetadata>(theMetadata);
+  assert(theClass->isTypeMetadata() && !theClass->isArtificialSubclass());
+  return theClass;
+}
+
+#endif
 
 /***************************************************************************/
 /*** Functions *************************************************************/
