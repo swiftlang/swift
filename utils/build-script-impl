@@ -2481,6 +2481,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
+                # FIXME: Always re-build foundation on non-darwin platforms.
+                # Remove this when products build in the CMake system.
+                echo "Cleaning the Foundation build directory"
+                call rm -r "${build_dir}"
+
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call env SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
                       SDKROOT="${SWIFT_BUILD_PATH}" BUILD_DIR="${build_dir}" DSTROOT="$(get_host_install_destdir ${host})" PREFIX="$(get_host_install_prefix ${host})" ./configure "${FOUNDATION_BUILD_TYPE}" ${FOUNDATION_BUILD_ARGS[@]} -DXCTEST_BUILD_DIR=${XCTEST_BUILD_DIR} $LIBDISPATCH_BUILD_ARGS
@@ -2526,6 +2531,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   else
                       echo "Skipping reconfiguration of libdispatch"
                   fi
+
                   with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                       call make
                   with_pushd "${LIBDISPATCH_BUILD_DIR}/tests" \
@@ -2535,6 +2541,11 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
+                  # FIXME: Always re-build libdispatch on non-darwin platforms.
+                  # Remove this when products build in the CMake system.
+                  echo "Cleaning the libdispatch build directory"
+                  call rm -r "${LIBDISPATCH_BUILD_DIR}"
+
                   cmake_options=(
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
