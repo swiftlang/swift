@@ -1,0 +1,9 @@
+// RUN: rm -f %t.*
+// FIXME: reenable -enable-sil-verify-all in the following two RUN lines.
+//        See <rdar://problem/24060338> Identify problems with textual SIL and fix them
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false -sil-disable-ast-dump %platform-module-dir/Swift.swiftmodule -module-name=Swift -o %t.sil
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false %t.sil > /dev/null
+// REQUIRES: long_test
+// REQUIRES: nonexecutable_test
+// FIXME: Re-enable when it works :)
+// REQUIRES: rdar34771322

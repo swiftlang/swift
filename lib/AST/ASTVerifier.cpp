@@ -3294,13 +3294,6 @@ void swift::verify(SourceFile &SF) {
 
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
-  unsigned ProcessCount = Context.LangOpts.ASTVerifierProcessCount;
-  unsigned ProcessId = Context.LangOpts.ASTVerifierProcessId;
-  if (ProcessCount == 1) {
-    // No parallelism, verify all declarations.
-    return true;
-  }
-
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return shouldVerify(ED->getExtendedType()->getAnyNominal(), Context);
   }
@@ -3311,8 +3304,7 @@ bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
     return true;
   }
 
-  size_t Hash = llvm::hash_value(VD->getBaseName().userFacingName());
-  return Hash % ProcessCount == ProcessId;
+  return true;
 #else
   return false;
 #endif
