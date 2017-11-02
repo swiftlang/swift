@@ -12,12 +12,9 @@
 
 import NamedLazyMembers
 
-public func foo(d: Doer) {
-  d.doSomeWork()
-  d.doSomeWork(withSpeed:10)
-  d.doVeryImportantWork(speed:10, thoroughness:12)
-  d.doSomeWorkWithSpeed(speed:10, levelOfAlacrity:12)
-
-  let _ = SimpleDoer()
-  let _ = SimpleDoer.ofNoWork()
+public func foo(d: SimpleDoer) {
+  let _ = d.simplyDoSomeWork()
+  let _ = d.simplyDoSomeWork(withSpeed:10)
+  let _ = d.simplyDoVeryImportantWork(speed:10, thoroughness:12)
+  let _ = d.simplyDoSomeWorkWithSpeed(speed:10, levelOfAlacrity:12)
 }

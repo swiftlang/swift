@@ -26,6 +26,7 @@ namespace swift {
 class AssociatedTypeDecl;
 class Decl;
 class DeclContext;
+class IterableDeclContext;
 class ExtensionDecl;
 class Identifier;
 class NominalTypeDecl;
@@ -224,13 +225,14 @@ public:
   virtual void
   loadAllMembers(Decl *D, uint64_t contextData) = 0;
 
-  /// Populates a vector with all members of \p D that have DeclName
+  /// Populates a vector with all members of \p IDC that have DeclName
   /// matching \p N.
   ///
   /// Returns None if an error occurred \em or named member-lookup
   /// was otherwise unsupported in this implementation or Decl.
   virtual Optional<TinyPtrVector<ValueDecl *>>
-  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData) = 0;
+  loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
+                   uint64_t contextData) = 0;
 
   /// Populates the given vector with all conformances for \p D.
   ///
