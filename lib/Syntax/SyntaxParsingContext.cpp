@@ -244,7 +244,8 @@ SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
     SyntaxParsingContext(*ContextHolder), Parent(ContextHolder),
     ContextHolder(ContextHolder), Kind(Kind), Tok(Tok) {
   ContextHolder = this;
-  ContextData.setContextStart(Tok.getLoc());
+  if (ContextData.Enabled)
+    ContextData.setContextStart(Tok.getLoc());
 }
 
 void SyntaxParsingContextChild::addTokenSyntax(SourceLoc Loc) {
