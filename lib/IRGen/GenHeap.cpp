@@ -1541,6 +1541,7 @@ public:
     auto size = layout.emitSize(IGF.IGM);
     auto alignMask = layout.emitAlignMask(IGF.IGM);
 
+    IGF.emitNativeSetDeallocating(box);
     emitDeallocateHeapObject(IGF, box, size, alignMask);
   }
 
