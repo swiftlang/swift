@@ -4985,7 +4985,14 @@ bool FuncDecl::isUnaryOperator() const {
     return false;
   
   auto *params = getParameterList(getDeclContext()->isTypeContext());
-  return params->size() == 1 && !params->get(0)->isVariadic();
+  bool unaryParametersMatch = params->size() >= 1 && !params->get(0)->isVariadic();
+    
+  bool supplementaryParametersMatch = true;
+  for (unsigned i = 1; i < params->size(); ++i) {
+      supplementaryParametersMatch &= params->get(i)->isDefaultArgument();
+  }
+  
+  return unaryParametersMatch && supplementaryParametersMatch;
 }
 
 bool FuncDecl::isBinaryOperator() const {
@@ -4993,9 +5000,16 @@ bool FuncDecl::isBinaryOperator() const {
     return false;
   
   auto *params = getParameterList(getDeclContext()->isTypeContext());
-  return params->size() == 2 &&
+  bool binaryParametersMatch = params->size() >= 2 &&
     !params->get(0)->isVariadic() &&
     !params->get(1)->isVariadic();
+    
+  bool supplementaryParametersMatch = true;
+  for (unsigned i = 2; i < params->size(); ++i) {
+    supplementaryParametersMatch &= params->get(i)->isDefaultArgument();
+  }
+    
+  return binaryParametersMatch && supplementaryParametersMatch;
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,

@@ -2,9 +2,11 @@
 
 infix operator %%%
 infix operator %%%%
+infix operator %%%%%
 
-func %%%() {} // expected-error {{operators must have one or two arguments}}
-func %%%%(a: Int, b: Int, c: Int) {} // expected-error {{operators must have one or two arguments}}
+func %%%() {} // expected-error {{operators must have one or two arguments, or all other arguments must have default values}}
+func %%%%(a: Int, b: Int, c: Int) {} // expected-error {{operators must have one or two arguments, or all other arguments must have default values}}
+func %%%%%(a: Int, b: Int, line: UInt = #line) {}
 
 struct X {}
 struct Y {}
@@ -41,7 +43,8 @@ infix operator ~~
 
 postfix func foo(_ x: Int) {} // expected-error {{'postfix' requires a function with an operator identifier}}
 postfix func ~~(x: Int) -> Float { return Float(x) }
-postfix func ~~(x: Int, y: Int) {} // expected-error {{'postfix' requires a function with one argument}}
+postfix func ~~(x: Int, y: Int) {} // expected-error {{'postfix' requires a function with one argument, or all other arguments must have default values}}
+postfix func ~~(x: Int, line: UInt = #line) {}
 prefix func ~~(x: Float) {}
 func test_postfix(_ x: Int) {
   ~~x~~
