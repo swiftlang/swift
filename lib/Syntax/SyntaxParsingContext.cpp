@@ -30,11 +30,11 @@ static Syntax makeUnknownSyntax(SyntaxKind Kind, ArrayRef<Syntax> SubExpr) {
   return make<Syntax>(RawSyntax::make(Kind, Layout, SourcePresence::Present));
 }
 
-static std::vector<Syntax> getSyntaxNodes(ArrayRef<RawSyntaxInfo> RawNodes) {
-  std::vector<Syntax> SyntaxParts;
-  std::transform(RawNodes.begin(), RawNodes.end(), std::back_inserter(SyntaxParts),
+static ArrayRef<Syntax> getSyntaxNodes(ArrayRef<RawSyntaxInfo> RawNodes,
+                                       std::vector<Syntax> &Scratch) {
+  std::transform(RawNodes.begin(), RawNodes.end(), std::back_inserter(Scratch),
     [](const RawSyntaxInfo &Info) { return Info.makeSyntax<Syntax>(); });
-  return SyntaxParts;
+  return Scratch;
 }
 
 static unsigned countTokens(ArrayRef<RawSyntaxInfo> AllNodes) {
@@ -157,11 +157,12 @@ SyntaxParsingContext::ContextInfo::collectAllSyntax() {
 void
 SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
   auto Size = PendingSyntax.size();
-  assert(Size >= N);
   if (!N)
     N = Size;
+  assert(Size >= N);
   auto Parts = llvm::makeArrayRef(PendingSyntax).slice(Size - N);
-  std::vector<Syntax> SyntaxParts = getSyntaxNodes(Parts);
+  std::vector<Syntax> Scratch;
+  auto SyntaxParts = getSyntaxNodes(Parts, Scratch);
 
   // Try to create the node of the given syntax.
   Optional<Syntax> Result = SyntaxFactory::createSyntax(Kind, SyntaxParts);
@@ -299,7 +300,8 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
     return;
   }
 
-  std::vector<Syntax> SyntaxNodes = getSyntaxNodes(AllNodes);
+  std::vector<Syntax> Scratch;
+  auto SyntaxNodes = getSyntaxNodes(AllNodes, Scratch);
   SourceLoc Start = AllNodes.front().StartLoc;
   unsigned TokCount = countTokens(AllNodes);
   SyntaxKind UnknownKind;
