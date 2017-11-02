@@ -2006,14 +2006,6 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   return false;
 }
 
-bool ValueDecl::wasDeserialized() const {
-  auto *DC = getDeclContext();
-  if (auto F = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
-    return F->getKind() == FileUnitKind::SerializedAST;
-  }
-  return false;
-}
-
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
   if (auto var = dyn_cast<VarDecl>(this)) {
     // [attrs] var ...

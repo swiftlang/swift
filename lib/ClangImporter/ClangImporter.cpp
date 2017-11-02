@@ -3276,10 +3276,10 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 
 Optional<TinyPtrVector<ValueDecl *>>
 ClangImporter::Implementation::loadNamedMembers(
-    const Decl *D, DeclName N, uint64_t contextData) {
+    const IterableDeclContext *IDC, DeclName N, uint64_t contextData) {
 
+  auto *D = IDC->getDecl();
   auto *DC = cast<DeclContext>(D);
-
   auto *CD = D->getClangDecl();
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 

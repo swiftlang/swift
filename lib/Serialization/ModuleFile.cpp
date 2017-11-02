@@ -1787,13 +1787,10 @@ void ModuleFile::loadObjCMethods(
 }
 
 Optional<TinyPtrVector<ValueDecl *>>
-ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
+ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
                              uint64_t contextData) {
 
-  auto VD = dyn_cast<ValueDecl>(D);
-  if (!VD)
-    return None;
-  assert(VD->wasDeserialized());
+  assert(IDC->wasDeserialized());
 
   if (!DeclMemberNames)
     return None;
@@ -1823,9 +1820,9 @@ ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
   }
 
   assert(subTable);
-  auto j = subTable->find(VD->getDeclID());
+  TinyPtrVector<ValueDecl *> results;
+  auto j = subTable->find(IDC->getDeclID());
   if (j != subTable->end()) {
-    TinyPtrVector<ValueDecl *> results;
     for (DeclID d : *j) {
       Expected<Decl *> mem = getDeclChecked(d);
       if (mem) {
@@ -1841,9 +1838,8 @@ ModuleFile::loadNamedMembers(const Decl *D, DeclName N,
         return None;
       }
     }
-    return results;
   }
-  return None;
+  return results;
 }
 
 void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,

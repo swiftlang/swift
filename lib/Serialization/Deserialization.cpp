@@ -2112,9 +2112,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
   Expected<Decl *> deserialized = getDeclCheckedImpl(DID, ForcedContext);
   if (deserialized && deserialized.get()) {
-    if (auto *VD = dyn_cast<ValueDecl>(deserialized.get())) {
-      if (VD->wasDeserialized()) {
-        VD->setDeclID(DID);
+    if (auto *IDC = dyn_cast<IterableDeclContext>(deserialized.get())) {
+      if (IDC->wasDeserialized()) {
+        IDC->setDeclID(DID);
       }
     }
   }

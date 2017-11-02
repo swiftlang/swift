@@ -34,7 +34,6 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -80,10 +79,6 @@ namespace swift {
   class UnboundGenericType;
   class ValueDecl;
   class VarDecl;
-
-namespace serialization {
-using DeclID = llvm::PointerEmbeddedInt<unsigned, 31>;
-}
 
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
@@ -2097,10 +2092,7 @@ public:
 /// have a type, etc.
 class ValueDecl : public Decl {
   DeclName Name;
-  union {
-    SourceLoc NameLoc;
-    serialization::DeclID SerialID;
-  };
+  SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
 
 protected:
@@ -2169,29 +2161,8 @@ public:
   /// Objective-C name, if used to satisfy the given requirement.
   bool canInferObjCFromRequirement(ValueDecl *requirement);
 
-  /// Get either NameLoc or an empty SourceLoc if wasDeserialized()
-  SourceLoc getNameLoc() const {
-    if (wasDeserialized())
-      return SourceLoc();
-    else
-      return NameLoc;
-  }
-  SourceLoc getLoc() const { return getNameLoc(); }
-
-  /// Determine whether this Decl was deserialized (and thus DeserializedID is
-  /// valid). If not, NameLoc is valid.
-  bool wasDeserialized() const;
-
-  /// Get the DeclID this Decl was deserialized from.
-  serialization::DeclID getDeclID() const {
-    assert(wasDeserialized());
-    return SerialID;
-  }
-  /// Set the DeclID this Decl was deserialized from.
-  void setDeclID(serialization::DeclID d) {
-    assert(wasDeserialized());
-    SerialID = d;
-  }
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
 
   bool hasAccess() const {
     return TypeAndAccess.getInt().hasValue();
