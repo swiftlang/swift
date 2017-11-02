@@ -2596,8 +2596,7 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake);
       } else {
         // Create an outlined function to avoid explosion
@@ -2610,8 +2609,7 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake);
       } else {
         // Create an outlined function to avoid explosion
@@ -2624,8 +2622,7 @@ namespace {
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
       } else {
         // Create an outlined function to avoid explosion
@@ -2638,8 +2635,7 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake);
       } else {
         // Create an outlined function to avoid explosion
@@ -4238,8 +4234,7 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake);
       } else {
         // Create an outlined function to avoid explosion
@@ -4252,8 +4247,7 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake);
       } else {
         // Create an outlined function to avoid explosion
@@ -4266,8 +4260,7 @@ namespace {
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
       } else {
         // Create an outlined function to avoid explosion
@@ -4280,8 +4273,7 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction() || T.hasArchetype()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake);
       } else {
         // Create an outlined function to avoid explosion
