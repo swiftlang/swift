@@ -17,17 +17,17 @@ import objc_extension_base
 // CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 
 // CHECK-LABEL: @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions" = private constant
-// CHECK:   i64 1,
-// CHECK:   @_PROTOCOL__TtP15objc_extensions11NewProtocol_
+// CHECK-SAME:   i64 1,
+// CHECK-SAME:   @_PROTOCOL__TtP15objc_extensions11NewProtocol_
 
 // CHECK-LABEL: @"_CATEGORY_Gizmo_$_objc_extensions" = private constant
-// CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK:   %objc_class* @"OBJC_CLASS_$_Gizmo",
-// CHECK:   @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions",
-// CHECK:   @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions",
-// CHECK:   @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions",
-// CHECK:   i8* null
-// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK-SAME:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
+// CHECK-SAME:   %objc_class* @"OBJC_CLASS_$_Gizmo",
+// CHECK-SAME:   @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions",
+// CHECK-SAME:   @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions",
+// CHECK-SAME:   @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions",
+// CHECK-SAME:   i8* null
+// CHECK-SAME: }, section "__DATA, __objc_const", align 8
 
 @objc protocol NewProtocol {
   func brandNewInstanceMethod()
@@ -149,6 +149,21 @@ extension NSObject {
   public func needMetadataOfSomeEnum() {
     print(NSObject.SomeEnum.X)
   }
+}
+
+
+// CHECK-LABEL: @"_CATEGORY__TtCC15objc_extensions5Outer5Inner_$_objc_extensions" = private constant
+// CHECK-SAME:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
+// CHECK-SAME:   @"_CATEGORY_INSTANCE_METHODS__TtCC15objc_extensions5Outer5Inner_$_objc_extensions",
+// CHECK-SAME:   i8* null
+// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+
+class Outer : NSObject {
+  class Inner : NSObject {}
+}
+
+extension Outer.Inner {
+  @objc func innerExtensionMethod() {}
 }
 
 
