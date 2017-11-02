@@ -54,9 +54,8 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 377; // Last change: SILFunctionType witness_method conformances
+const uint16_t VERSION_MINOR = 378; // Last change: DECL_MEMBER_NAMES
 
-using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
 
 // TypeID must be the same as DeclID because it is stored in the same way.
@@ -464,7 +463,12 @@ enum BlockID {
   /// The comment block, which contains documentation comments.
   ///
   /// \sa comment_block
-  COMMENT_BLOCK_ID
+  COMMENT_BLOCK_ID,
+
+  /// The declaration member-tables index block, a sub-blocb of the index block.
+  ///
+  /// \sa decl_member_tables_block
+  DECL_MEMBER_TABLES_BLOCK_ID
 };
 
 /// The record types within the control block.
@@ -1499,7 +1503,7 @@ namespace index_block {
     TOP_LEVEL_DECLS,
     OPERATORS,
     EXTENSIONS,
-    CLASS_MEMBERS,
+    CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP,
     OPERATOR_METHODS,
 
     /// The Objective-C method index, which contains a mapping from
@@ -1517,8 +1521,9 @@ namespace index_block {
 
     PRECEDENCE_GROUPS,
     NESTED_TYPE_DECLS,
+    DECL_MEMBER_NAMES,
 
-    LastRecordKind = PRECEDENCE_GROUPS,
+    LastRecordKind = DECL_MEMBER_NAMES,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;
@@ -1560,10 +1565,30 @@ namespace index_block {
     BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
+  using DeclMemberNamesLayout = BCRecordLayout<
+    DECL_MEMBER_NAMES, // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from member DeclBaseNames to offsets of DECL_MEMBERS records
+  >;
+
   using EntryPointLayout = BCRecordLayout<
     ENTRY_POINT,
     DeclIDField  // the ID of the main class; 0 if there was a main source file
   >;
+}
+
+/// \sa DECL_MEMBER_TABLES_BLOCK_ID
+namespace decl_member_tables_block {
+  enum RecordKind {
+    DECL_MEMBERS = 1,
+  };
+
+  using DeclMembersLayout = BCRecordLayout<
+    DECL_MEMBERS, // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // maps from DeclIDs to DeclID vectors
+  >;
+
 }
 
 /// \sa COMMENT_BLOCK_ID

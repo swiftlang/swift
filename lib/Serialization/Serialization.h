@@ -129,6 +129,17 @@ public:
   // hash table of all defined Objective-C methods.
   using NestedTypeDeclsTable = llvm::MapVector<Identifier, NestedTypeDeclsData>;
 
+  using DeclMembersData = SmallVector<DeclID, 2>;
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of all ValueDecl-members of a paticular DeclBaseName.
+  using DeclMembersTable = llvm::MapVector<uint32_t, DeclMembersData>;
+
+  using DeclMemberNamesData = std::pair<serialization::BitOffset,
+                                        std::unique_ptr<DeclMembersTable>>;
+  // In-memory representation of what will eventually be an on-disk
+  // hash table mapping DeclBaseNames to DeclMembersData tables.
+  using DeclMemberNamesTable = llvm::MapVector<DeclBaseName, DeclMemberNamesData>;
+
   using ExtensionTableData =
       SmallVector<std::pair<const NominalTypeDecl *, DeclID>, 4>;
   using ExtensionTable = llvm::MapVector<Identifier, ExtensionTableData>;
@@ -137,7 +148,12 @@ private:
   /// A map from identifiers to methods and properties with the given name.
   ///
   /// This is used for id-style lookup.
-  DeclTable ClassMembersByName;
+  DeclTable ClassMembersForDynamicLookup;
+
+  /// A map from DeclBaseNames of members to Decl->members sub-tables.
+  ///
+  /// This is for Named Lazy Member Loading.
+  DeclMemberNamesTable DeclMemberNames;
 
   /// The queue of types and decls that need to be serialized.
   ///
@@ -289,10 +305,11 @@ private:
 
   /// Writes an array of members for a decl context.
   ///
-  /// \param members The decls within the context
+  /// \param parentID The DeclID of the context.
+  /// \param members The decls within the context.
   /// \param isClass True if the context could be a class context (class,
   ///        class extension, or protocol).
-  void writeMembers(DeclRange members, bool isClass);
+  void writeMembers(DeclID parentID, DeclRange members, bool isClass);
 
   /// Write a default witness table for a protocol.
   ///
@@ -369,7 +386,9 @@ private:
   void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeAST(ModuleOrSourceFile DC, bool enableNestedTypeLookupTable);
+  void writeAST(ModuleOrSourceFile DC,
+                bool enableNestedTypeLookupTable,
+                bool enableDeclMemberNamesTable);
 
   void writeToStream(raw_ostream &os);
 

@@ -435,6 +435,40 @@ def evaluate(args):
         return 1
 
 
+# Evaluate a boolean expression in terms of deltas between the provided two
+# stats-dirs; works like evaluate() above but on absolute differences
+def evaluate_delta(args):
+    if len(args.remainder) != 2:
+        raise ValueError("Expected exactly 2 stats-dirs to evaluate-delta")
+
+    (old, new) = args.remainder
+    vargs = vars_of_args(args)
+    old_stats = merge_all_jobstats(load_stats_dir(old, **vargs), **vargs)
+    new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
+
+    env = {}
+    ident = re.compile('(\w+)$')
+    for r in compare_stats(args, old_stats.stats, new_stats.stats):
+        if r.name.startswith("time.") or '.time.' in r.name:
+            continue
+        m = re.search(ident, r.name)
+        if m:
+            i = m.groups()[0]
+            if args.verbose:
+                print("%s => %s" % (i, r.delta))
+            env[i] = r.delta
+    try:
+        if eval(args.evaluate_delta, env):
+            return 0
+        else:
+            print("evaluate-delta condition failed: '%s'" %
+                  args.evaluate_delta)
+            return 1
+    except Exception as e:
+        print(e)
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true",
@@ -528,6 +562,8 @@ def main():
                        help="Emit an LNT-compatible test summary")
     modes.add_argument("--evaluate", type=str, default=None,
                        help="evaluate an expression of stat-names")
+    modes.add_argument("--evaluate-delta", type=str, default=None,
+                       help="evaluate an expression of stat-deltas")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
@@ -552,6 +588,8 @@ def main():
         write_lnt_values(args)
     elif args.evaluate:
         return evaluate(args)
+    elif args.evaluate_delta:
+        return evaluate_delta(args)
     return None
 
 

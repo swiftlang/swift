@@ -1024,6 +1024,30 @@ public:
     return Lookup.find(name);
   }
 
+  /// \brief Add an empty entry to the lookup map for a given name if it does
+  /// not yet have one.
+  void addEmptyEntry(DeclName name) {
+    (void)Lookup[name];
+    if (!name.isSimpleName()) {
+      (void)Lookup[name.getBaseName()];
+    }
+  }
+
+  // \brief Mark all Decls in this table as not-resident in a table, drop
+  // references to them. Should only be called when this was not fully-populated
+  // from an IterableDeclContext.
+  void clear() {
+    // LastExtensionIncluded would only be non-null if this was populated from
+    // an IterableDeclContext (though it might still be null in that case).
+    assert(LastExtensionIncluded == nullptr);
+    for (auto const &i : Lookup) {
+      for (auto d : i.getSecond()) {
+        d->ValueDeclBits.AlreadyInLookupTable = false;
+      }
+    }
+    Lookup.clear();
+  }
+
   // Only allow allocation of member lookup tables using the allocator in
   // ASTContext or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -1163,12 +1187,76 @@ void ExtensionDecl::addedMember(Decl *member) {
   }
 }
 
+// For lack of anywhere more sensible to put it, here's a diagram of the pieces
+// involved in finding members and extensions of a NominalTypeDecl.
+//
+// ┌────────────────────────────┬─┐
+// │IterableDeclContext         │ │     ┌─────────────────────────────┐
+// │-------------------         │ │     │┌───────────────┬┐           ▼
+// │Decl *LastDecl   ───────────┼─┼─────┘│Decl           ││  ┌───────────────┬┐
+// │Decl *FirstDecl  ───────────┼─┼─────▶│----           ││  │Decl           ││
+// │                            │ │      │Decl  *NextDecl├┼─▶│----           ││
+// │bool HasLazyMembers         │ │      ├───────────────┘│  │Decl *NextDecl ││
+// │IterableDeclContextKind Kind│ │      │                │  ├───────────────┘│
+// │                            │ │      │ValueDecl       │  │                │
+// ├────────────────────────────┘ │      │---------       │  │ValueDecl       │
+// │                              │      │DeclName Name   │  │---------       │
+// │NominalTypeDecl               │      └────────────────┘  │DeclName Name   │
+// │---------------               │               ▲          └────────────────┘
+// │ExtensionDecl *FirstExtension─┼────────┐      │                   ▲
+// │ExtensionDecl *LastExtension ─┼───────┐│      │                   └───┐
+// │                              │       ││      └──────────────────────┐│
+// │MemberLookupTable *LookupTable├─┐     ││                             ││
+// │bool LookupTableComplete      │ │     ││     ┌─────────────────┐     ││
+// └──────────────────────────────┘ │     ││     │ExtensionDecl    │     ││
+//                                  │     ││     │-------------    │     ││
+//                    ┌─────────────┘     │└────▶│ExtensionDecl    │     ││
+//                    │                   │      │  *NextExtension ├──┐  ││
+//                    ▼                   │      └─────────────────┘  │  ││
+// ┌─────────────────────────────────────┐│      ┌─────────────────┐  │  ││
+// │MemberLookupTable                    ││      │ExtensionDecl    │  │  ││
+// │-----------------                    ││      │-------------    │  │  ││
+// │ExtensionDecl *LastExtensionIncluded ├┴─────▶│ExtensionDecl    │◀─┘  ││
+// │                                     │       │  *NextExtension │     ││
+// │┌───────────────────────────────────┐│       └─────────────────┘     ││
+// ││DenseMap<Declname, ...> LookupTable││                               ││
+// ││-----------------------------------││  ┌──────────────────────────┐ ││
+// ││[NameA] TinyPtrVector<ValueDecl *> ││  │TinyPtrVector<ValueDecl *>│ ││
+// ││[NameB] TinyPtrVector<ValueDecl *> ││  │--------------------------│ ││
+// ││[NameC] TinyPtrVector<ValueDecl *>─┼┼─▶│[0] ValueDecl *      ─────┼─┘│
+// │└───────────────────────────────────┘│  │[1] ValueDecl *      ─────┼──┘
+// └─────────────────────────────────────┘  └──────────────────────────┘
+//
+// The HasLazyMembers, Kind, and LookupTableComplete fields are packed into
+// PointerIntPairs so don't go grepping for them; but for purposes of
+// illustration they are effectively their own fields.
+//
+// MemberLookupTable is populated en-masse when the IterableDeclContext's
+// (IDC's) list of Decls is populated. But MemberLookupTable can also be
+// populated incrementally by one-name-at-a-time lookups by lookupDirect, in
+// which case those Decls are _not_ added to the IDC's list. They are cached in
+// the loader they come from, lifecycle-wise, and are added to the
+// MemberLookupTable to accelerate subsequent retrieval, but the IDC is not
+// considered populated until someone calls getMembers().
+//
+// If the IDC list is later populated and/or an extension is added _after_
+// MemberLookupTable is constructed (and possibly has entries in it),
+// MemberLookupTable is purged and reconstructed from IDC's list.
+//
+// In all lookup routines, the 'ignoreNewExtensions' flag means that
+// lookup should only use the set of extensions already observed.
+
 void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   // If we haven't allocated the lookup table yet, do so now.
   if (!LookupTable.getPointer()) {
     auto &ctx = getASTContext();
     LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
+
+  // If we're an IDC that has not yet loaded its full member set, we're doing
+  // NamedLazyMemberLoading, and we should not force getMembers().
+  if (hasLazyMembers())
+    return;
 
   // If we haven't walked the member list yet to update the lookup
   // table, do so now.
@@ -1195,6 +1283,33 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
   LookupTable.getPointer()->addMember(member);
 }
 
+static bool
+populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
+                                          MemberLookupTable &LookupTable,
+                                          DeclName name,
+                                          IterableDeclContext *IDC) {
+  auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
+                                                   /*lazyLoader=*/nullptr);
+  // Populate LookupTable with an empty vector before we call into our loader,
+  // so that any reentry of this routine will find the set-so-far, and not
+  // fall into infinite recursion.
+  LookupTable.addEmptyEntry(name);
+  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
+    if (auto s = ctx.Stats) {
+      ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
+    }
+    for (auto d : *res) {
+      LookupTable.addMember(d);
+    }
+    return false;
+  } else {
+    if (auto s = ctx.Stats) {
+      ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
+    }
+    return true;
+  }
+}
+
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
@@ -1211,55 +1326,77 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
         << ", hasLazyMembers()=" << hasLazyMembers()
         << "\n");
 
-  bool hasExtensionsToConsider = false;
-  if (!ignoreNewExtensions) {
-    auto E = getExtensions();
-    hasExtensionsToConsider = E.begin() != E.end();
-  }
+  // We only use NamedLazyMemberLoading when a user opts-in and we have
+  // not yet loaded all the members into the IDC list in the first place.
+  bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
+                                    hasLazyMembers());
 
-  if (!hasExtensionsToConsider &&
-      ctx.LangOpts.NamedLazyMemberLoading &&
-      !LookupTable.getInt() &&
-      hasLazyMembers()) {
-    // The lookup table (containing all loaded members) has not yet been built;
-    // we *might* be able to avoid loading all members, just focus on the ones
-    // matching the name we were asked for.
-    TinyPtrVector<ValueDecl *> results;
-    auto contextInfo =
-        ctx.getOrCreateLazyIterableContextData(this,
-                                               /*lazyLoader=*/nullptr);
-    if (auto results =
-        contextInfo->loader->loadNamedMembers(this, name,
-                                              contextInfo->memberData)) {
-      if (auto s = ctx.Stats) {
-        ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
+  // We check the LookupTable at most twice, possibly treating a miss in the
+  // first try as a cache-miss that we then do a cache-fill on, and retry.
+  for (int i = 0; i < 2; ++i) {
+
+    // First, if we're _not_ doing NamedLazyMemberLoading, we make sure we've
+    // populated the IDC and brought it up to date with any extensions. This
+    // will flip the hasLazyMembers() flag to false as well.
+    if (!useNamedLazyMemberLoading) {
+      // If we're about to load members here, purge the MemberLookupTable;
+      // it will be rebuilt in prepareLookup, below.
+      if (hasLazyMembers() && LookupTable.getPointer()) {
+        // We should not have scanned the IDC list yet. Double check.
+        assert(!LookupTable.getInt());
+        LookupTable.getPointer()->clear();
       }
-      return *results;
+
+      (void)getMembers();
+
+      // Make sure we have the complete list of members (in this nominal and in
+      // all extensions).
+      if (!ignoreNewExtensions) {
+        for (auto E : getExtensions())
+          (void)E->getMembers();
+      }
+    }
+
+    // Next, in all cases, prepare the lookup table for use, possibly
+    // repopulating it from the IDC if just did our initial IDC population
+    // above.
+    prepareLookupTable(ignoreNewExtensions);
+
+    // Look for a declaration with this name.
+    auto known = LookupTable.getPointer()->find(name);
+
+    // We found something; return it.
+    if (known != LookupTable.getPointer()->end())
+      return known->second;
+
+    // If we have no more second chances, stop now.
+    if (!useNamedLazyMemberLoading || i > 0)
+      break;
+
+    // If we get here, we had a cache-miss and _are_ using
+    // NamedLazyMemberLoading. Try to populate a _single_ entry in the
+    // MemberLookupTable from both this nominal and all of its extensions, and
+    // retry. Any failure to load here flips the useNamedLazyMemberLoading to
+    // false, and we fall back to loading all members during the retry.
+    auto &Table = *LookupTable.getPointer();
+    if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
+                                                  name, this)) {
+      useNamedLazyMemberLoading = false;
     } else {
-      if (auto s = ctx.Stats) {
-        ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
+      if (!ignoreNewExtensions) {
+        for (auto E : getExtensions()) {
+          if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
+                                                        name, E)) {
+            useNamedLazyMemberLoading = false;
+            break;
+          }
+        }
       }
     }
   }
 
-  (void)getMembers();
-
-  // Make sure we have the complete list of members (in this nominal and in all
-  // extensions).
-  if (!ignoreNewExtensions) {
-    for (auto E : getExtensions())
-      (void)E->getMembers();
-  }
-
-  prepareLookupTable(ignoreNewExtensions);
-
-  // Look for the declarations with this name.
-  auto known = LookupTable.getPointer()->find(name);
-  if (known == LookupTable.getPointer()->end())
-    return { };
-
-  // We found something; return it.
-  return known->second;
+  // None of our attempts found anything.
+  return { };
 }
 
 void ClassDecl::createObjCMethodLookup() {
