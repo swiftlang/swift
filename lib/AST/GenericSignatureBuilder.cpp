@@ -3735,26 +3735,7 @@ bool GenericSignatureBuilder::updateSuperclass(
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
     for (const auto &conforms : equivClass->conformsTo) {
-      auto proto = conforms.first;
-      if (auto superSource = resolveSuperConformance(type, proto)) {
-        for (auto assocType : proto->getAssociatedTypeMembers()) {
-          // Only do this for the anchor.
-          if (assocType != assocType->getAssociatedTypeAnchor())
-            continue;
-
-          // FIXME: More efficient way to extend resolved type?
-          Type nestedType =
-            DependentMemberType::get(type.getDependentType(*this), assocType);
-          if (auto nested =
-                maybeResolveEquivalenceClass(
-                                 nestedType,
-                                 ArchetypeResolutionKind::AlreadyKnown,
-                                 /*wantExactPotentialArchetype=*/true)) {
-            maybeAddSameTypeRequirementForNestedType(nested, superSource,
-                                                     *this);
-          }
-        }
-      }
+      (void)resolveSuperConformance(type, conforms.first);
     }
   };
 
