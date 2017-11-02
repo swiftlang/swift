@@ -36,11 +36,11 @@ SWIFT_PROTOCOL_NAMED("CustomNameType")
 
 SWIFT_CLASS_NAMED("CustomNameClass")
 __attribute__((objc_root_class))
-@interface SwiftClassWithCustomName <SwiftProtoWithCustomName>
+@interface SwiftClassWithCustomName<SwiftProtoWithCustomName>
 @end
 
-id <SwiftProtoWithCustomName> __nonnull convertToProto(SwiftClassWithCustomName * __nonnull obj);
-
+id<SwiftProtoWithCustomName> _Nonnull
+convertToProto(SwiftClassWithCustomName *_Nonnull obj);
 
 SWIFT_CLASS("BOGUS")
 @interface BogusClass

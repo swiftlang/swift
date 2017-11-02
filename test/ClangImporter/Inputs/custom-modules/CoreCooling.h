@@ -40,13 +40,18 @@ CCOpaqueTypeRef CCRetain(CCOpaqueTypeRef typeRef);
 void CCRelease(CCOpaqueTypeRef typeRef);
 
 // Nullability
-void CCRefrigeratorOpenDoSomething(__nonnull CCRefrigeratorRef fridge);
-void CCRefrigeratorOpenMaybeDoSomething(__nullable CCRefrigeratorRef fridge);
+void CCRefrigeratorOpenDoSomething(_Nonnull CCRefrigeratorRef fridge);
+void CCRefrigeratorOpenMaybeDoSomething(_Nullable CCRefrigeratorRef fridge);
 
 // Out parameters
-void CCRefrigeratorCreateIndirect(CCRefrigeratorRef * __nullable __attribute__((cf_returns_retained)) outFridge);
+void CCRefrigeratorCreateIndirect(CCRefrigeratorRef *_Nullable
+                                  __attribute__((cf_returns_retained))
+                                  outFridge);
 // Note that the fridge parameter is incorrectly annotated.
-void CCRefrigeratorGetPowerSupplyIndirect(CCRefrigeratorRef __attribute__((cf_returns_not_retained)) fridge, CCPowerSupplyRef * __nonnull __attribute__((cf_returns_not_retained)) outPower);
+void CCRefrigeratorGetPowerSupplyIndirect(
+    CCRefrigeratorRef __attribute__((cf_returns_not_retained)) fridge,
+    CCPowerSupplyRef *_Nonnull __attribute__((cf_returns_not_retained))
+    outPower);
 void CCRefrigeratorGetItemUnaudited(CCRefrigeratorRef fridge, unsigned index, CCItemRef *outItem);
 
 typedef void *CFNonConstVoidRef __attribute__((objc_bridge(id)));
