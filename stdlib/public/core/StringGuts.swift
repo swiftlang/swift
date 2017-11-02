@@ -133,6 +133,38 @@ extension _StringGuts {
     }
 
     _sanityCheck(_bitPattern(self._unflaggedObject) == _bitPattern(object))
+    _invariantCheck()
+  }
+
+  internal func _invariantCheck() {
+#if INTERNAL_CHECKS_ENABLED
+    if let native = self._native {
+      _sanityCheck(self.isSingleByte == native.isSingleByte)
+      _sanityCheck(!self.hasCocoaBuffer)
+      _sanityCheck(self.count == native.count)
+      _sanityCheck(self.capacity == native.capacity)
+      _sanityCheck(self.count >= 0)
+      _sanityCheck(self.capacity >= self.count)
+    } else if let unsafe = self._unsafeString {
+      _sanityCheck(self.isSingleByte == unsafe.isSingleByte)
+      _sanityCheck(self.hasCocoaBuffer == unsafe.hasCocoaBuffer)
+      _sanityCheck(self.count == unsafe.count)
+      _sanityCheck(self.count >= 0)
+      _sanityCheck(self.capacity == 0)
+    } else if let cocoa = self._cocoa {
+      _sanityCheck(!self.isSingleByte)
+      _sanityCheck(self.hasCocoaBuffer)
+      _sanityCheck(self.count >= 0)
+      _sanityCheck(self.capacity >= self.count)
+    } else if let _ = self._smallCocoa {
+      _sanityCheck(!self.isSingleByte)
+      _sanityCheck(!self.hasCocoaBuffer) // FIXME: Is this right?
+      _sanityCheck(self.count >= 0)
+      _sanityCheck(self.capacity == 0)
+    } else {
+      fatalError("Unimplemented string form")
+    }
+#endif
   }
 }
 
@@ -561,20 +593,23 @@ extension _StringGuts {
 // Internal hex dumping function. Useful because `print` is implemented in the
 // stdlib through a series of very high level String calls, resulting in
 // infinite recursion.
-internal func internalDumpHexImpl(_ x: UInt) {
-  _swift_stdlib_print_hex(x)
+internal func internalDumpHexImpl(_ x: UInt, newline: Bool) {
+  _swift_stdlib_print_hex(x, newline ? 1 : 0)
 }
-internal func internalDumpHex(_ x: UInt) {
-  internalDumpHexImpl(x)
+internal func internalDumpHex(_ x: UInt, newline: Bool = true) {
+  internalDumpHexImpl(x, newline: newline)
 }
-internal func internalDumpHex(_ x: AnyObject) {
-  internalDumpHexImpl(Builtin.reinterpretCast(x))
+internal func internalDumpHex(_ x: AnyObject, newline: Bool = true) {
+  internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
-internal func internalDumpHex(_ x: UnsafeMutableRawPointer?) {
-  internalDumpHexImpl(Builtin.reinterpretCast(x))
+internal func internalDumpHex(
+  _ x: UnsafeMutableRawPointer?,
+  newline: Bool = true
+) {
+  internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
-internal func internalDumpHex(_ x: Bool) {
-  internalDumpHexImpl(x ? 1 : 0)
+internal func internalDumpHex(_ x: Bool, newline: Bool = true) {
+  internalDumpHexImpl(x ? 1 : 0, newline: newline)
 }
 
 
@@ -697,6 +732,47 @@ extension _StringGuts {
   }
 }
 
+extension _StringGuts {
+  public func _dump() {
+    print("<", terminator: "")
+    internalDumpHex(_objectBitPattern, newline: false)
+    print(" ", terminator: "")
+    internalDumpHex(_otherBits, newline: false)
+    if let native = self._native {
+      print(" native ", terminator: "")
+      internalDumpHex(_nativeObject(toNative: native.owner), newline: false)
+      print(" @", terminator: "")
+      internalDumpHex(native.baseAddress, newline: false)
+      print(" ", terminator: "")
+      print(native.count, terminator: "")
+      print("/", terminator: "")
+      print(native.capacity, terminator: "")
+    } else if let cocoa = self._cocoa {
+      print(" cocoa ", terminator: "")
+      internalDumpHex(cocoa.owner, newline: false)
+    } else if let unsafeString  = self._unsafeString {
+      print(" unsafe ", terminator: "")
+      internalDumpHex(unsafeString.baseAddress, newline: false)
+      print(" ", terminator: "")
+      print(unsafeString.count, terminator: "")
+    } else if let smallCocoa = self._smallCocoa {
+      print(" smallCocoa", terminator: "")
+    } else {
+      print(" error", terminator: "")
+    }
+    if isSingleByte {
+      print(" ascii", terminator: "")
+    }
+    else {
+      print(" utf16", terminator: "")
+    }
+    if hasCocoaBuffer {
+      print(" hasCocoaBuffer", terminator: "")
+    }
+    print(">")
+  }
+}
+
 // TODO: We probably want to overhaul string storage, ala the "string-recore"
 // branch. In addition to efficiency, such an overhaul can also guarantee nul-
 // termination for all native strings. For now, this lets us bootstrap
@@ -706,6 +782,37 @@ extension _StringGuts {
 // String API helpers
 //
 extension _StringGuts {
+  // Return a _StringBuffer with the same contents as this string. Uses the
+  // existing buffer if possible; otherwise copies the string into a new buffer.
+  @_versioned
+  internal
+  func _extractStringBuffer() -> _StringBuffer {
+    if let native = self._native {
+      return native.stringBuffer
+    }
+    return _copyToStringBuffer(capacity: self.count, byteWidth: self.byteWidth)
+  }
+  
+  @_versioned
+  internal
+  func _copyToStringBuffer(capacity: Int, byteWidth: Int) -> _StringBuffer {
+    _sanityCheck(capacity >= self.count)
+    _sanityCheck(byteWidth == 1 || byteWidth == 2)
+
+    let buffer = _StringBuffer(
+      capacity: capacity,
+      initialSize: self.count,
+      elementWidth: byteWidth)
+    _sanityCheck(buffer.capacity >= capacity)
+
+    // Copy ourselves in
+    self._copy(
+      into: buffer.start,
+      capacityEnd: buffer.capacityEnd,
+      accomodatingElementWidth: byteWidth)
+    return buffer
+  }
+  
   @_versioned
   internal
   mutating func isUniqueNative() -> Bool {
@@ -856,6 +963,7 @@ extension _StringGuts {
 
     self._formNative(forAppending: other)
     self._native._unsafelyUnwrappedUnchecked._appendInPlace(other)
+    _invariantCheck()
   }
 }
 

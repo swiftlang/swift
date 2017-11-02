@@ -706,6 +706,12 @@ public struct String {
 }
 
 extension String {
+  public func _dump() { // FIXME: remove
+    self._guts._dump()
+  }
+}
+
+extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
