@@ -41,7 +41,7 @@ using namespace swift::syntax;
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   // Start a context for creating expression syntax.
   SyntaxParsingContextChild ExprParsingContext(SyntaxContext,
-                                               SyntaxContextKind::Expr);
+                                               SyntaxContextKind::Expr, Tok);
 
   // If we are parsing a refutable pattern, check to see if this is the start
   // of a let/var/is pattern.  If so, parse it to an UnresolvedPatternExpr and
@@ -1806,7 +1806,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   SyntaxContext->addTokenSyntax(Tok.getLoc());
   SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr);
   SyntaxParsingContextChild LocalContext(SyntaxContext,
-                                         SyntaxContextKind::Expr);
+                                         SyntaxContextKind::Expr, Tok);
 
   // FIXME: Avoid creating syntax nodes for string interpolation.
   LocalContext.disable();

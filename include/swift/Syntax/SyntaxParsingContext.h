@@ -58,12 +58,11 @@ enum class SyntaxParsingContextKind: uint8_t {
 /// create syntax nodes.
 class SyntaxParsingContext {
 protected:
-  SyntaxParsingContext(SourceFile &SF, unsigned BufferID, Token &Tok);
+  SyntaxParsingContext(SourceFile &SF, unsigned BufferID);
   SyntaxParsingContext(SyntaxParsingContext &Another);
 public:
   struct ContextInfo;
   ContextInfo &ContextData;
-  const Token &Tok;
 
   // Add a token syntax at the given source location to the context; this
   // token node can be used to build more complex syntax nodes in later call
@@ -87,8 +86,8 @@ public:
 class SyntaxParsingContextRoot: public SyntaxParsingContext {
   SourceFile &File;
 public:
-  SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID, Token &Tok):
-    SyntaxParsingContext(File, BufferID, Tok), File(File) {}
+  SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID):
+    SyntaxParsingContext(File, BufferID), File(File) {}
   ~SyntaxParsingContextRoot();
   void addTokenSyntax(SourceLoc Loc) override {};
   void makeNode(SyntaxKind Kind) override {};
@@ -110,9 +109,10 @@ class SyntaxParsingContextChild: public SyntaxParsingContext {
   SyntaxParsingContext *Parent;
   SyntaxParsingContext *&ContextHolder;
   const SyntaxContextKind Kind;
+  Token &Tok;
 public:
   SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-                            SyntaxContextKind Kind);
+                            SyntaxContextKind Kind, Token &Tok);
   ~SyntaxParsingContextChild();
   void makeNode(SyntaxKind Kind) override;
   void addTokenSyntax(SourceLoc Loc) override;
