@@ -204,6 +204,12 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 int _stdlib_thread_setspecific(__swift_thread_key_t key,
                                const void * _Nullable value);
 
+
+// FIXME remove
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_print_hex(__swift_uintptr_t value, int newline);
+
+
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
 static inline SWIFT_ALWAYS_INLINE
