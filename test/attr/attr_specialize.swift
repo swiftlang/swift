@@ -161,16 +161,16 @@ func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
 @_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject)
-// expected-error@-1{{generic parameter 'T' has conflicting layout constraints '_Trivial(64)' and '_Trivial(32)'}}
-// expected-error@-2{{generic parameter 'T' has conflicting layout constraints '_RefCountedObject' and '_Trivial(32)'}}
-// expected-warning@-3{{redundant layout constraint 'T' : '_Trivial'}}
-// expected-note@-4 3{{layout constraint constraint 'T' : '_Trivial(32)' written here}}
+// expected-error@-1{{generic parameter 'T' has conflicting constraints '_Trivial(64)' and '_Trivial(32)'}}
+// expected-error@-2{{generic parameter 'T' has conflicting constraints '_RefCountedObject' and '_Trivial(32)'}}
+// expected-warning@-3{{redundant constraint 'T' : '_Trivial'}}
+// expected-note@-4 3{{constraint 'T' : '_Trivial(32)' written here}}
 @_specialize(where T: _Trivial, T: _Trivial(64))
-// expected-warning@-1{{redundant layout constraint 'T' : '_Trivial'}}
-// expected-note@-2 1{{layout constraint constraint 'T' : '_Trivial(64)' written here}}
+// expected-warning@-1{{redundant constraint 'T' : '_Trivial'}}
+// expected-note@-2 1{{constraint 'T' : '_Trivial(64)' written here}}
 @_specialize(where T: _RefCountedObject, T: _NativeRefCountedObject)
-// expected-warning@-1{{redundant layout constraint 'T' : '_RefCountedObject'}}
-// expected-note@-2 1{{layout constraint constraint 'T' : '_NativeRefCountedObject' written here}}
+// expected-warning@-1{{redundant constraint 'T' : '_RefCountedObject'}}
+// expected-note@-2 1{{constraint 'T' : '_NativeRefCountedObject' written here}}
 @_specialize(where Array<T> == Int) // expected-error{{Only requirements on generic parameters are supported by '_specialize' attribute}}
 // expected-error@-1{{generic signature requires types 'Array<T>' and 'Int' to be the same}}
 @_specialize(where T.Element == Int) // expected-error{{Only requirements on generic parameters are supported by '_specialize' attribute}}
@@ -183,9 +183,9 @@ public protocol Proto: class {
 
 @_specialize(where T: _RefCountedObject)
 @_specialize(where T: _Trivial)
-// expected-error@-1{{generic parameter 'T' has conflicting layout constraints '_Trivial' and '_NativeClass'}}
+// expected-error@-1{{generic parameter 'T' has conflicting constraints '_Trivial' and '_NativeClass'}}
 @_specialize(where T: _Trivial(64))
-// expected-error@-1{{generic parameter 'T' has conflicting layout constraints '_Trivial(64)' and '_NativeClass'}}
+// expected-error@-1{{generic parameter 'T' has conflicting constraints '_Trivial(64)' and '_NativeClass'}}
 public func funcWithABaseClassRequirement<T>(t: T) -> Int where T: C1 {
   return 44444
 }
