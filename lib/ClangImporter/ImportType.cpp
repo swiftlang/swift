@@ -684,13 +684,18 @@ namespace {
         auto typedefBridgeability = getTypedefBridgeability(underlyingType);
 
         // Figure out the typedef we should actually use.
-        SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt, Bridging);
+        auto underlyingBridgeability =
+          (Bridging == Bridgeability::Full
+             ? typedefBridgeability : Bridgeability::None);
+        SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
+                                          underlyingBridgeability);
         auto underlyingResult = innerConverter.Visit(underlyingType);
 
         // If we used different bridgeability than this typedef normally
-        // would, and therefore the underlying type is different from the
-        // mapping of the typedef, use the underlying type.
-        if (Bridging != typedefBridgeability &&
+        // would because we're in a non-bridgeable context, and therefore
+        // the underlying type is different from the mapping of the typedef,
+        // use the underlying type.
+        if (underlyingBridgeability != typedefBridgeability &&
             !underlyingResult.AbstractType->isEqual(mappedType)) {
           return underlyingResult;
         }
