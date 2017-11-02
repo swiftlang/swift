@@ -1688,20 +1688,24 @@ NodePointer Demangler::demangleWitness() {
                              popNode(Node::Kind::Type));
     }
     case 'b': {
-      return createWithChild(Node::Kind::OutlinedInitializeWithTake,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedInitializeWithTake,
+                                popNode(Node::Kind::Type), IndexChild);
     }
     case 'c': {
-      return createWithChild(Node::Kind::OutlinedInitializeWithCopy,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedInitializeWithCopy,
+                                popNode(Node::Kind::Type), IndexChild);
     }
     case 'd': {
-      return createWithChild(Node::Kind::OutlinedAssignWithTake,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedAssignWithTake,
+                                popNode(Node::Kind::Type), IndexChild);
     }
     case 'f': {
-      return createWithChild(Node::Kind::OutlinedAssignWithCopy,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedAssignWithCopy,
+                                popNode(Node::Kind::Type), IndexChild);
     }
 
     default:

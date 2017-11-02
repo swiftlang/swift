@@ -1797,6 +1797,57 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   }
 }
 
+bool irgen::mightContainMetadata(const IRGenModule &IGM, const CanType type) {
+  IRGenModule &IGMCast = const_cast<IRGenModule &>(IGM);
+  auto runType = irgen::getRuntimeReifiedType(IGMCast, type);
+  if (isa<SILFunctionType>(runType)) {
+    return false;
+  }
+  if (!IsIRTypeDependent(IGMCast).visit(runType)) {
+    return false;
+  }
+  switch (runType->getKind()) {
+#define SUGARED_TYPE(ID, SUPER) case TypeKind::ID:
+#define UNCHECKED_TYPE(ID, SUPER) case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+    llvm_unreachable("kind is invalid for a canonical type");
+
+#define ARTIFICIAL_TYPE(ID, SUPER) case TypeKind::ID:
+#define TYPE(ID, SUPER)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::LValue:
+  case TypeKind::InOut:
+  case TypeKind::DynamicSelf:
+    return false;
+
+  case TypeKind::Tuple: {
+    auto genTuple = cast<TupleType>(runType);
+    for (auto elt : genTuple->getElements()) {
+      if (elt.getType()->getKind() == TypeKind::SILFunction) {
+        return false;
+      }
+    }
+    return true;
+  }
+  case TypeKind::BoundGenericEnum: {
+    auto genEnum = cast<BoundGenericEnumType>(runType);
+    for (auto arg : genEnum->getGenericArgs()) {
+      if (!arg->isCanonical()) {
+        continue;
+      }
+      if (mightContainMetadata(IGM, arg->getCanonicalType())) {
+        return true;
+      }
+    }
+    return false;
+  }
+  default:
+    return true;
+  }
+}
+
 TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
                                                     NominalTypeDecl *decl) {
   // By "any", we don't mean existentials.

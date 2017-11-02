@@ -560,6 +560,7 @@ public:
 public:
   bool isInOutlinedFunction();
   void setInOutlinedFunction();
+  void setNotInOutlinedFunction();
 
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();

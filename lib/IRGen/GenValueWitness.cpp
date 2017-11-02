@@ -34,6 +34,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
+#include "GenMeta.h"
 #include "GenOpaque.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -455,11 +456,8 @@ static CanType getFormalTypeInContext(CanType abstractType) {
   return abstractType;
 }
 
-/// Get the next argument and use it as the 'self' type metadata.
-static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
-                                          llvm::Function::arg_iterator &it,
+void irgen::getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
                                           CanType abstractType) {
-  llvm::Value *arg = &*it++;
   assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "Self argument is not a type?!");
 
@@ -467,6 +465,13 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg);
 }
 
+/// Get the next argument and use it as the 'self' type metadata.
+static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
+                                          llvm::Function::arg_iterator &it,
+                                          CanType abstractType) {
+  llvm::Value *arg = &*it++;
+  getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
+}
 
 /// Build a specific value-witness function.
 static void buildValueWitnessFunction(IRGenModule &IGM,
@@ -479,6 +484,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   assert(isValueWitnessFunction(index));
 
   IRGenFunction IGF(IGM, fn);
+  IGF.setInOutlinedFunction();
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
@@ -1385,4 +1391,16 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
   }
 
   emitAssignArrayWithTakeCall(IGF, T, dest, src, count);
+}
+
+void TypeInfo::collectArchetypeMetadata(
+    IRGenFunction &IGF,
+    llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> &typeToMetadataVec,
+    SILType T) const {
+  auto canType = T.getSwiftRValueType();
+  if (irgen::mightContainMetadata(IGF.IGM, canType)) {
+    auto *metadata = IGF.emitTypeMetadataRef(canType);
+    assert(metadata && "Expected Type Metadata Ref");
+    typeToMetadataVec.push_back(std::make_pair(canType, metadata));
+  }
 }

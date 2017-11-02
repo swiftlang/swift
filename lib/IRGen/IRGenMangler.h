@@ -13,7 +13,9 @@
 #ifndef SWIFT_IRGEN_IRGENMANGLER_H
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
+#include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
@@ -173,28 +175,66 @@ public:
     return finalize();
   }
 
-  std::string mangleOutlinedInitializeWithTakeFunction(const Type t) {
+  std::string
+  mangleOutlinedInitializeWithTakeFunction(const CanType t,
+                                           IRGenModule *mod = nullptr) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wb");
+    auto canType = getCanTypeInContext(t, mod);
+    if (!canType->hasArchetype()) {
+      appendType(canType);
+      appendOperator("Wb", Index(0));
+    } else {
+      auto *generic = canType->getAnyGeneric();
+      assert(generic);
+      appendAnyGenericType(generic);
+      appendOperator("Wb", Index(mod->getCanTypeID(canType)));
+    }
     return finalize();
   }
-  std::string mangleOutlinedInitializeWithCopyFunction(const Type t) {
+  std::string
+  mangleOutlinedInitializeWithCopyFunction(const CanType t,
+                                           IRGenModule *mod = nullptr) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wc");
+    auto canType = getCanTypeInContext(t, mod);
+    if (!canType->hasArchetype()) {
+      appendType(canType);
+      appendOperator("Wc", Index(0));
+    } else {
+      auto *generic = canType->getAnyGeneric();
+      assert(generic);
+      appendAnyGenericType(generic);
+      appendOperator("Wc", Index(mod->getCanTypeID(canType)));
+    }
     return finalize();
   }
-  std::string mangleOutlinedAssignWithTakeFunction(const Type t) {
+  std::string mangleOutlinedAssignWithTakeFunction(const CanType t,
+                                                   IRGenModule *mod = nullptr) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wd");
+    auto canType = getCanTypeInContext(t, mod);
+    if (!canType->hasArchetype()) {
+      appendType(canType);
+      appendOperator("Wd", Index(0));
+    } else {
+      auto *generic = canType->getAnyGeneric();
+      assert(generic);
+      appendAnyGenericType(generic);
+      appendOperator("Wd", Index(mod->getCanTypeID(canType)));
+    }
     return finalize();
   }
-  std::string mangleOutlinedAssignWithCopyFunction(const Type t) {
+  std::string mangleOutlinedAssignWithCopyFunction(const CanType t,
+                                                   IRGenModule *mod = nullptr) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wf");
+    auto canType = getCanTypeInContext(t, mod);
+    if (!canType->hasArchetype()) {
+      appendType(canType);
+      appendOperator("Wf", Index(0));
+    } else {
+      auto *generic = canType->getAnyGeneric();
+      assert(generic);
+      appendAnyGenericType(generic);
+      appendOperator("Wf", Index(mod->getCanTypeID(canType)));
+    }
     return finalize();
   }
 
@@ -244,6 +284,24 @@ protected:
     appendProtocolConformance(Conformance);
     appendOperator(Op);
     return finalize();
+  }
+
+  CanType getCanTypeInContext(const CanType type, IRGenModule *mod) {
+    if (!type->hasArchetype() || type->hasOpenedExistential()) {
+      return type;
+    }
+    assert(mod && "Expected IRGenModule");
+    auto *genEnv = mod->getGenericEnvironment();
+    assert(genEnv && "Expected a GenericEnvironment");
+    CanType canType = type;
+
+    auto *decl = canType->getAnyGeneric();
+    if (decl) {
+      canType = decl->mapTypeOutOfContext(canType->getRValueType())
+                    ->getCanonicalType();
+    }
+    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    return canType;
   }
 };
 

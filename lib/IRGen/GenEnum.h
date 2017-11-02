@@ -429,6 +429,12 @@ public:
   virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                          Address addr) const;
 
+  virtual void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          &typeToMetadataVec,
+      SILType T) const = 0;
+
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
   EnumImplStrategy &operator=(const EnumImplStrategy &) = delete;

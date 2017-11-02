@@ -307,6 +307,10 @@ namespace irgen {
   /// Get the runtime identifier for a special protocol, if any.
   SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);
 
+  /// Use the argument as the 'self' type metadata.
+  void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
+                                     CanType abstractType);
+
 } // end namespace irgen
 } // end namespace swift
 

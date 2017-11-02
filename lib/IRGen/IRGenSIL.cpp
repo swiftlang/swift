@@ -2314,14 +2314,13 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   Explosion llArgs;
 
-  {
-    // Lower the parameters in the callee's generic context.
-    GenericContextScope scope(IGM, i->getOrigCalleeType()->getGenericSignature());
-    for (auto index : indices(args)) {
-      assert(args[index]->getType() == IGM.silConv.getSILType(params[index]));
-      emitApplyArgument(*this, args[index],
-                        IGM.silConv.getSILType(params[index]), llArgs);
-    }
+  // Lower the parameters in the callee's generic context.
+  // Need to keep the scope alive until the end of the visit (for outlined init)
+  GenericContextScope scope(IGM, i->getOrigCalleeType()->getGenericSignature());
+  for (auto index : indices(args)) {
+    assert(args[index]->getType() == IGM.silConv.getSILType(params[index]));
+    emitApplyArgument(*this, args[index], IGM.silConv.getSILType(params[index]),
+                      llArgs);
   }
   
   auto &lv = getLoweredValue(i->getCallee());
@@ -5014,6 +5013,10 @@ void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
 }
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
+  CanSILFunctionType funcType = CurSILFn->getLoweredFunctionType();
+  Lowering::GenericContextScope GenericScope(getSILModule().Types,
+                                             funcType->getGenericSignature());
+
   SILType addrTy = i->getSrc()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   Address src = getLoweredAddress(i->getSrc());
