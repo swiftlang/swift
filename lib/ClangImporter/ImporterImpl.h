@@ -191,10 +191,13 @@ enum class Bridgeability {
   Full
 };
 
+/// Controls whether a typedef for \p type should name the fully-bridged Swift
+/// type or the original Clang type.
+///
+/// In either case we end up losing sugar at some uses sites, so this is more
+/// about what the right default is.
 static inline Bridgeability getTypedefBridgeability(clang::QualType type) {
-  return (type->isBlockPointerType() || type->isFunctionType())
-            ? Bridgeability::Full
-            : Bridgeability::None;
+  return type->isBlockPointerType() ? Bridgeability::Full : Bridgeability::None;
 }
 
 /// \brief Describes the kind of the C type that can be mapped to a stdlib
