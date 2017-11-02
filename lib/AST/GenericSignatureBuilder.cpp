@@ -1639,13 +1639,6 @@ bool EquivalenceClass::recordConformanceConstraint(
       // superclass conforms to this protocol.
       (void)builder.resolveSuperConformance(type, proto);
     }
-
-    // Resolve any associated type members.
-    for (auto assocType : proto->getAssociatedTypeMembers()) {
-      type.realizePotentialArchetype(builder)->updateNestedTypeForConformance(
-                                        builder, assocType,
-                                        ArchetypeResolutionKind::AlreadyKnown);
-    }
   }
 
   // Record this conformance source.
