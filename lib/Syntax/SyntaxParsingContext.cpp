@@ -157,10 +157,10 @@ SyntaxParsingContext::ContextInfo::collectAllSyntax() {
 void
 SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
   auto Size = PendingSyntax.size();
-  assert(Size >= N);
   if (!N)
     N = Size;
-  auto Parts = llvm::makeArrayRef(PendingSyntax).slice(Size - N);
+  assert(Size >= N);
+  auto Parts = llvm::makeArrayRef(PendingSyntax.data() + Size - N, N);
   std::vector<Syntax> SyntaxParts = getSyntaxNodes(Parts);
 
   // Try to create the node of the given syntax.
