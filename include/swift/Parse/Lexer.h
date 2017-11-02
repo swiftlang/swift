@@ -246,7 +246,7 @@ public:
   }
 
   /// Lex a full token including leading and trailing trivia.
-  syntax::RawTokenInfo fullLex();
+  syntax::RawSyntaxInfo fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
