@@ -396,6 +396,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
       auto addr = SGF.emitTemporaryAllocation(VD, ty);
+      if (SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts)
+        val = SGF.B.createCopyValue(Loc, val);
       lowering.emitStore(SGF.B, VD, val, addr, StoreOwnershipQualifier::Init);
       val = addr;
     }
