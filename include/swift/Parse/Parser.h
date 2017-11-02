@@ -1429,7 +1429,7 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
 void populateTokenSyntaxMap(const LangOptions &LangOpts,
                             const SourceManager &SM,
                             unsigned BufferID,
-                            std::vector<syntax::RawSyntaxInfo> &Result);
+                            std::vector<syntax::RawTokenInfo> &Result);
 } // end namespace swift
 
 #endif
