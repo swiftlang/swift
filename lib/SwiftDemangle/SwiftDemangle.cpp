@@ -17,6 +17,9 @@
 
 #include "swift/Demangling/Demangle.h"
 #include "swift/SwiftDemangle/SwiftDemangle.h"
+#if defined(__linux__) || defined(_WIN32)
+#include <bsd/string.h>
+#endif
 
 static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
     char *OutputBuffer, size_t Length,
