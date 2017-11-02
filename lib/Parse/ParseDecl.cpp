@@ -37,7 +37,6 @@
 #include <algorithm>
 
 using namespace swift;
-using namespace syntax;
 
 namespace {
   /// A RAII object for deciding whether this DeclKind needs special
@@ -2147,8 +2146,7 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 ParserResult<Decl>
 Parser::parseDecl(ParseDeclOptions Flags,
                   llvm::function_ref<void(Decl*)> Handler) {
-  SyntaxParsingContextChild DeclParsingContext(SyntaxContext,
-                                               SyntaxContextKind::Decl);
+
   if (Tok.is(tok::pound_if)) {
     auto IfConfigResult = parseIfConfig(
       [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {

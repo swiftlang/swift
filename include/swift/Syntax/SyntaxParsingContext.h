@@ -23,30 +23,12 @@
 
 namespace swift {
   class SourceFile;
-  class Token;
 
 namespace syntax {
 
-/// The handler for parser to generate libSyntax entities.
-struct RawSyntaxInfo {
-  /// Start location of this syntax node.
-  SourceLoc StartLoc;
-
-  /// The number of tokens belong to the syntax node.
-  unsigned TokCount;
-
-  /// The raw node.
-  RC<RawSyntax> RawNode;
-  RawSyntaxInfo(SourceLoc StartLoc, RC<RawSyntax> RawNode):
-    RawSyntaxInfo(StartLoc, 1, RawNode) {}
-  RawSyntaxInfo(SourceLoc StartLoc, unsigned TokCount, RC<RawSyntax> RawNode);
-  template <typename SyntaxNode>
-  SyntaxNode makeSyntax() const { return make<SyntaxNode>(RawNode); }
-
-  template <typename RawSyntaxNode>
-  RC<RawSyntaxNode> getRaw() const {
-    return RC<RawSyntaxNode>(cast<RawSyntaxNode>(RawNode));
-  }
+struct RawTokenInfo {
+  SourceLoc Loc;
+  RC<RawTokenSyntax> Token;
 };
 
 enum class SyntaxParsingContextKind: uint8_t {
@@ -58,12 +40,11 @@ enum class SyntaxParsingContextKind: uint8_t {
 /// create syntax nodes.
 class SyntaxParsingContext {
 protected:
-  SyntaxParsingContext(SourceFile &SF, unsigned BufferID, Token &Tok);
+  SyntaxParsingContext(bool Enabled);
   SyntaxParsingContext(SyntaxParsingContext &Another);
 public:
   struct ContextInfo;
   ContextInfo &ContextData;
-  const Token &Tok;
 
   // Add a token syntax at the given source location to the context; this
   // token node can be used to build more complex syntax nodes in later call
@@ -85,21 +66,18 @@ public:
 // of all other entity-specific contexts. This is the context Parser
 // has when the parser instance is firstly created.
 class SyntaxParsingContextRoot: public SyntaxParsingContext {
-  SourceFile &File;
 public:
-  SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID, Token &Tok):
-    SyntaxParsingContext(File, BufferID, Tok), File(File) {}
+  struct GlobalInfo;
+
+  // Contains global information of the source file under parsing.
+  GlobalInfo &GlobalData;
+  SyntaxParsingContextRoot(SourceFile &SF, unsigned BufferID);
   ~SyntaxParsingContextRoot();
   void addTokenSyntax(SourceLoc Loc) override {};
   void makeNode(SyntaxKind Kind) override {};
   SyntaxParsingContextKind getKind() override {
     return SyntaxParsingContextKind::Root;
   };
-};
-
-enum class SyntaxContextKind: uint8_t{
-  Expr,
-  Decl,
 };
 
 // The base class for contexts that are created from a parent context.
@@ -109,10 +87,14 @@ enum class SyntaxContextKind: uint8_t{
 class SyntaxParsingContextChild: public SyntaxParsingContext {
   SyntaxParsingContext *Parent;
   SyntaxParsingContext *&ContextHolder;
-  const SyntaxContextKind Kind;
+  const SyntaxKind FinalKind;
 public:
   SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-                            SyntaxContextKind Kind);
+                            SyntaxKind FinalKind):
+    SyntaxParsingContext(*ContextHolder), Parent(ContextHolder),
+    ContextHolder(ContextHolder), FinalKind(FinalKind) {
+      ContextHolder = this;
+  }
   ~SyntaxParsingContextChild();
   void makeNode(SyntaxKind Kind) override;
   void addTokenSyntax(SourceLoc Loc) override;
