@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -whole-module-optimization | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -11,7 +11,7 @@ _ = atan2test(0.0, 0.0)
 
 
 // Ordinary Swift definitions
-// WMO is expected to eliminate the unused internal and private functions.
+// The unused internal and private functions are expected to be eliminated.
 
 public   func PlainPublic()   { }
 internal func PlainInternal() { }
@@ -22,7 +22,7 @@ private  func PlainPrivate()  { }
 
 
 // Swift _silgen_name definitions
-// WMO is expected to eliminate the private function
+// The private function is expected to be eliminated
 // but the internal function must survive for C use.
 // Only the C-named definition is emitted.
 
@@ -36,7 +36,7 @@ private  func PlainPrivate()  { }
 
 
 // Swift cdecl definitions
-// WMO is expected to eliminate the private functions
+// The private functions are expected to be eliminated
 // but the internal functions must survive for C use.
 // Both a C-named definition and a Swift-named definition are emitted.
 
