@@ -25,8 +25,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Syntax/RawTokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
@@ -55,6 +53,13 @@ namespace swift {
   
   struct EnumElementInfo;
   
+  namespace syntax {
+    class AbsolutePosition;
+    class SyntaxParsingContext;
+    struct RawTokenInfo;
+    struct RawTokenSyntax;
+  }// end of syntax namespace
+
   /// Different contexts in which BraceItemList are parsed.
   enum class BraceItemListKind {
     /// A statement list terminated by a closing brace. The default.
