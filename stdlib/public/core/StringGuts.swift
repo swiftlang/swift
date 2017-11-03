@@ -89,8 +89,14 @@ extension _StringGuts {
   }
 
   var isSingleByte: Bool {
-    return (_objectBitPattern & _twoByteCodeUnitBit) == 0
+    switch classification {
+    case .native, .unsafe:
+      return (_objectBitPattern & _twoByteCodeUnitBit) == 0
+    case .nonTaggedCocoa, .smallCocoa, .error:
+      return false
+    }   
   }
+
   var byteWidth: Int {
     return isSingleByte ? 1 : 2
   }
@@ -103,7 +109,14 @@ extension _StringGuts {
 
   // TODO: remove
   var hasCocoaBuffer: Bool {
-    return (_objectBitPattern & _hasCocoaBufferBit) != 0
+    switch classification {
+    case .native, .unsafe:
+      return (_objectBitPattern & _hasCocoaBufferBit) != 0
+    case .nonTaggedCocoa:
+      return true
+    case .error, .smallCocoa:
+      return false
+    }   
   }
 
   var _unflaggedObject: _BuiltinBridgeObject {
@@ -396,24 +409,11 @@ internal struct UnsafeString {
     // TODO: Does this incur ref counting?
     var buffer = self.stringBuffer
 
-    // TODO: Eventual small form check on other. We could even do this now for
-    // the tagged cocoa strings.
-
-    // Rare
-    if _slowPath(other._isOpaque) {
-      fatalError("TODO: copy opaque")
-      return
-    }
-
-    let unmangedOther = other._unmangedContiguous._unsafelyUnwrappedUnchecked
-
-    unmangedOther._copy(
+    other._copy(
       into: buffer.usedEnd,
       capacityEnd: buffer.capacityEnd,
       accomodatingElementWidth: buffer.elementWidth)
- 
     buffer.usedEnd += otherCount &<< buffer.elementShift
-    _fixLifetime(other)
   }
 }
 
@@ -518,11 +518,7 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NonTaggedCocoaString) {
     _sanityCheck(!_isObjCTaggedPointer(s.owner))
-    self.init(
-      _unflagged: _bridgeObject(fromNonTaggedObjC: s.owner),
-      isSingleByte: false,
-      hasCocoaBuffer: true,
-      otherBits: 0)
+    self.init(_bridgeObject(fromNonTaggedObjC: s.owner), 0)
   }
 
   //
@@ -845,18 +841,9 @@ extension _StringGuts {
     let newCapacity = Swift.max(
       _growArrayCapacity(oldCapacity),
       minimumCapacity)
-    let newBuffer = _StringBuffer(
+    let newBuffer = _copyToStringBuffer(
       capacity: newCapacity,
-      initialSize: oldCount,
-      elementWidth: newWidth)
-    _sanityCheck(newBuffer.capacity >= newCapacity)
-
-    // Copy ourselves in
-    self._copy(
-      into: newBuffer.start,
-      capacityEnd: newBuffer.capacityEnd,
-      accomodatingElementWidth: newWidth)
-
+      byteWidth: newWidth)
     self = _StringGuts(NativeString(newBuffer))
   }
 
@@ -880,7 +867,11 @@ extension _StringGuts {
     capacityEnd: UnsafeMutableRawPointer,
     accomodatingElementWidth width: Int
   ) {
-    _sanityCheck(capacityEnd >= dest + self.count)
+    _sanityCheck(byteWidth == 1 || byteWidth == 2)
+    _sanityCheck(capacityEnd >= dest + (self.count &<< (byteWidth &- 1)))
+
+    // TODO: Eventual small form check on other. We could even do this now for
+    // the tagged cocoa strings.
     let unmangedSelfOpt = self._unmangedContiguous
     if _fastPath(unmangedSelfOpt != nil) {
       unmangedSelfOpt._unsafelyUnwrappedUnchecked._copy(
@@ -889,7 +880,11 @@ extension _StringGuts {
       return
     }
 
-    fatalError("TODO: non-contig loop, use `_cocoaStringReadAll`")
+    _sanityCheck(width == 2)
+    let opaque = getOpaque()
+    _cocoaStringReadAll(
+      opaque.object,
+      dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
   }
 
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
@@ -910,10 +905,9 @@ extension _StringGuts {
     return nil
   }
 
-  @_versioned
-
   // TODO(perf): guarantee this is a simple bitmask operation, and probably
   // make inlineable or inline allways
+  @_versioned
   internal
   var _isOpaque: Bool {
       @inline(never) // TODO(perf): to inspect code quality
@@ -924,7 +918,11 @@ extension _StringGuts {
   internal
   func getOpaque() -> OpaqueCocoaString {
     _sanityCheck(_isOpaque)
-    return OpaqueCocoaString(Builtin.reinterpretCast(self._objectBitPattern))
+    if let cocoa = self._cocoa {
+      return OpaqueCocoaString(cocoa.owner)
+    } else {
+      return OpaqueCocoaString(self._smallCocoa!.taggedObject)
+    }
   }
 }
 
