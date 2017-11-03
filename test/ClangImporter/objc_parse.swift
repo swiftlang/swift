@@ -643,3 +643,9 @@ func testTypeAndValue() {
 func testBridgedTypedef(bt: BridgedTypedefs) {
   let _: Int = bt.arrayOfArrayOfStrings // expected-error{{'[[String]]'}}
 }
+
+func testBridgeFunctionPointerTypedefs(fptrTypedef: FPTypedef) {
+  // See also print_clang_bool_bridging.swift.
+  let _: Int = fptrTypedef // expected-error{{'@convention(c) (String) -> String'}}
+  let _: Int = getFP() // expected-error{{'@convention(c) (String) -> String'}}
+}

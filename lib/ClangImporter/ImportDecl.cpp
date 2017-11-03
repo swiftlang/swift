@@ -3476,6 +3476,8 @@ namespace {
                                                 Impl.CurrentVersion))
           declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
 
+      // Note that we deliberately don't bridge most globals because we want to
+      // preserve pointer identity.
       Type type = Impl.importType(declType,
                                   (isAudited ? ImportTypeKind::AuditedVariable
                                    : ImportTypeKind::Variable),
