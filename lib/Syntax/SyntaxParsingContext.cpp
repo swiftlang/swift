@@ -31,7 +31,7 @@ static Syntax makeUnknownSyntax(SyntaxKind Kind, ArrayRef<Syntax> SubExpr) {
 }
 
 static ArrayRef<Syntax> getSyntaxNodes(ArrayRef<RawSyntaxInfo> RawNodes,
-                                       std::vector<Syntax> &Scratch) {
+                                       llvm::SmallVectorImpl<Syntax> &Scratch) {
   std::transform(RawNodes.begin(), RawNodes.end(), std::back_inserter(Scratch),
     [](const RawSyntaxInfo &Info) { return Info.makeSyntax<Syntax>(); });
   return Scratch;
@@ -161,7 +161,7 @@ SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
     N = Size;
   assert(Size >= N);
   auto Parts = llvm::makeArrayRef(PendingSyntax).slice(Size - N);
-  std::vector<Syntax> Scratch;
+  llvm::SmallVector<Syntax, 8> Scratch;
   auto SyntaxParts = getSyntaxNodes(Parts, Scratch);
 
   // Try to create the node of the given syntax.
@@ -300,7 +300,7 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
     return;
   }
 
-  std::vector<Syntax> Scratch;
+  llvm::SmallVector<Syntax, 8> Scratch;
   auto SyntaxNodes = getSyntaxNodes(AllNodes, Scratch);
   SourceLoc Start = AllNodes.front().StartLoc;
   unsigned TokCount = countTokens(AllNodes);
