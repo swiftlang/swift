@@ -210,7 +210,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
         if (canGuarantee && !var->getType()->is<ReferenceStorageType>()) {
-          auto guaranteed = ManagedValue::forUnmanaged(Val);
+          auto guaranteed = ManagedValue::forUnmanaged(Val).borrow(*this, loc);
           capturedArgs.push_back(guaranteed);
           break;
         }
@@ -256,7 +256,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       if (vl.box) {
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
-          capturedArgs.push_back(ManagedValue::forUnmanaged(vl.box));
+          capturedArgs.push_back(
+              ManagedValue::forUnmanaged(vl.box).borrow(*this, loc));
         } else {
           capturedArgs.push_back(emitManagedRetain(loc, vl.box));
         }
@@ -282,7 +283,11 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
         B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,
                          IsInitialization);
-        capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));
+        if (canGuarantee)
+          capturedArgs.push_back(
+              emitManagedRValueWithCleanup(allocBox).borrow(*this, loc));
+        else
+          capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));
       }
 
       break;
@@ -357,11 +362,14 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   for (auto capture : capturedArgs)
     forwardedArgs.push_back(capture.forward(*this));
 
-  SILType closureTy =
-    SILGenBuilder::getPartialApplyResultType(functionRef->getType(),
-                                             capturedArgs.size(), SGM.M,
-                                             subs,
-                                             ParameterConvention::Direct_Owned);
+  auto calleeConvention = SGM.M.getOptions().EnableGuaranteedClosureContexts
+                              ? ParameterConvention::Direct_Guaranteed
+                              : ParameterConvention::Direct_Owned;
+
+  SILType closureTy = SILGenBuilder::getPartialApplyResultType(
+      functionRef->getType(), capturedArgs.size(), SGM.M, subs,
+      calleeConvention);
+
   auto toClosure =
     B.createPartialApply(loc, functionRef, functionTy,
                          subs, forwardedArgs, closureTy);

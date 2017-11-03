@@ -2624,11 +2624,12 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // Add the rest of the arguments.
   forwardFunctionArguments(SGF, loc, fnType, args, argValues);
 
+  auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
+                                          : fnValue.forward(SGF);
   SILValue innerResult =
-    SGF.emitApplyWithRethrow(loc, fnValue.forward(SGF),
-                             /*substFnType*/ fnValue.getType(),
-                             /*substitutions*/ {},
-                             argValues);
+      SGF.emitApplyWithRethrow(loc, fun,
+                               /*substFnType*/ fnValue.getType(),
+                               /*substitutions*/ {}, argValues);
 
   // Reabstract the result.
   SILValue outerResult = resultPlanner.execute(innerResult);
