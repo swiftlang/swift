@@ -654,7 +654,11 @@ func testNSNumberBridgeFromUInt() {
 
             let float = (number!) as? Float
             let expectedFloat = Float(exactly: uint!)
-            testFloat(expectedFloat, float)
+            if UInt.bitWidth == 32 && uint! >= UInt.max - 1 {
+              expectNil(expectedFloat)
+            } else {
+              testFloat(expectedFloat, float)
+            }
 
             let double = (number!) as? Double
             let expectedDouble = Double(exactly: uint!)

@@ -125,27 +125,36 @@ _UnimplementedError()
 
 % for int_ty in int_types:
 %  OtherInt = int_ty.stdlib_name
-%  OtherMin = int_ty.min
-%  OtherMax = int_ty.max
-%  (FloatMin, FloatMax) = getFtoIBounds(self_type.bits, int_ty.bits, int_ty.is_signed)
+
+extension ${OtherInt} {
+  static var _test${Self}Conversion: [(${OtherInt}, ${OtherInt}, ${OtherInt}?)] {
+    if bitWidth > ${Self}.significandBitCount + 1 {
+      let bitOffset = ${Self}.significandBitCount + 1
+      let limit: ${OtherInt} = ~(~0 << bitOffset)
+      let over: ${OtherInt} = 1 + limit << 1
+      return [
+        (0, 0, 0),
+        (limit, limit, limit),
+        (over, over + 1, nil),
+%   if int_ty.is_signed:
+        (-limit, -limit, -limit),
+        (-over, -(over + 1), nil),
+%   end
+      ]
+    } else {
+      return [
+        (0, 0, 0),
+        (.min, .min, .min),
+        (.max, .max, .max),
+      ]
+    }
+  }
+}
 
 FixedPointConversionTruncations.test("${OtherInt}to${Self}")
-  .forEach(in: [
-    (0, 0, 0),
-% if int_ty.bits > self_type.significand_bits + 1:
-%   limit = ~(~0 << (self_type.significand_bits + 1))
-%   over = ~(~0 << (self_type.significand_bits + 2))
-    (${limit}, ${limit}, ${limit}),
-    (${over}, ${over + 1}, nil),
-%   if int_ty.is_signed:
-    (-${limit}, -${limit}, -${limit}),
-    (-${over}, -${over + 1}, nil),
-%   end
-% else:
-    (${OtherInt}.min, ${OtherInt}.min, ${OtherInt}.min),
-    (${OtherInt}.max, ${OtherInt}.max, ${OtherInt}.max),
-% end
-  ] as [(${OtherInt}, ${OtherInt}, ${OtherInt}?)]) { value, roundedExpectation, exactExpectation in
+  .forEach(in: ${OtherInt}._test${Self}Conversion) {
+    value, roundedExpectation, exactExpectation in
+
   let roundedResult = ${Self}(value)
   expectEqual(roundedResult, ${Self}(roundedExpectation))
 
