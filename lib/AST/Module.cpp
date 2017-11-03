@@ -1376,7 +1376,14 @@ ArrayRef<Token> SourceFile::getAllTokens() const {
 }
 
 bool SourceFile::shouldKeepTokens() const {
-  return (bool)AllCorrectedTokens;
+  switch (Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    return (bool)AllCorrectedTokens;
+  case SourceFileKind::REPL:
+  case SourceFileKind::SIL:
+    return false;
+  }
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
