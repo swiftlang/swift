@@ -3418,6 +3418,12 @@ public:
   bool isCalleeConsumed() const {
     return getCalleeConvention() == ParameterConvention::Direct_Owned;
   }
+  bool isCalleeUnowned() const {
+    return getCalleeConvention() == ParameterConvention::Direct_Unowned;
+  }
+  bool isCalleeGuaranteed() const {
+    return getCalleeConvention() == ParameterConvention::Direct_Guaranteed;
+  }
 
   /// Return the array of all result information. This may contain inter-mingled
   /// direct and indirect results.

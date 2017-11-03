@@ -165,11 +165,13 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   resultTy = F.mapTypeIntoContext(resultTy);
   auto substTy = toFn->getType().substGenericArgs(SGM.M,  subs);
 
+  auto calleeConvention = SGM.M.getOptions().EnableGuaranteedClosureContexts
+                              ? ParameterConvention::Direct_Guaranteed
+                              : ParameterConvention::Direct_Owned;
+
   // Partially apply the next uncurry level and return the result closure.
-  auto closureTy =
-    SILGenBuilder::getPartialApplyResultType(toFn->getType(), /*appliedParams=*/1,
-                                             SGM.M, subs,
-                                             ParameterConvention::Direct_Owned);
+  auto closureTy = SILGenBuilder::getPartialApplyResultType(
+      toFn->getType(), /*appliedParams=*/1, SGM.M, subs, calleeConvention);
   SILValue toClosure =
     B.createPartialApply(vd, toFn, substTy, subs, {selfArg}, closureTy);
   if (resultTy != closureTy)
