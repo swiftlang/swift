@@ -56,7 +56,7 @@ namespace swift {
   namespace syntax {
     class AbsolutePosition;
     class SyntaxParsingContext;
-    struct RawTokenInfo;
+    struct RawSyntaxInfo;
     struct RawTokenSyntax;
   }// end of syntax namespace
 
@@ -1434,7 +1434,7 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
 void populateTokenSyntaxMap(const LangOptions &LangOpts,
                             const SourceManager &SM,
                             unsigned BufferID,
-                            std::vector<syntax::RawTokenInfo> &Result);
+                            std::vector<syntax::RawSyntaxInfo> &Result);
 } // end namespace swift
 
 #endif

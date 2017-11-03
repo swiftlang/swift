@@ -269,7 +269,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
                         syntax::AbsolutePosition>> Tokens;
   syntax::AbsolutePosition RunningPos;
   do {
-    auto ThisToken = L.fullLex().Token;
+    auto ThisToken = L.fullLex().getRaw<syntax::RawTokenSyntax>();
     auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
     Tokens.push_back({ThisToken, ThisTokenPos});
   } while (Tokens.back().first->isNot(tok::eof));
@@ -280,7 +280,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
 void swift::populateTokenSyntaxMap(const LangOptions &LangOpts,
                                    const SourceManager &SM,
                                    unsigned BufferID,
-                                   std::vector<syntax::RawTokenInfo> &Result) {
+                                   std::vector<syntax::RawSyntaxInfo> &Result) {
   if (!Result.empty())
     return;
   Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
@@ -288,7 +288,7 @@ void swift::populateTokenSyntaxMap(const LangOptions &LangOpts,
           TriviaRetentionMode::WithTrivia);
   do {
     Result.emplace_back(L.fullLex());
-    if (Result.back().Token->is(tok::eof))
+    if (Result.back().getRaw<syntax::RawTokenSyntax>()->is(tok::eof))
       return;
   } while (true);
 }
@@ -435,7 +435,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldKeepTokens() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new syntax::SyntaxParsingContextRoot(SF, L->getBufferID())) {
+    SyntaxContext(new syntax::SyntaxParsingContextRoot(SF, L->getBufferID(), Tok)) {
 
   State = PersistentState;
   if (!State) {

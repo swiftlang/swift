@@ -12,6 +12,7 @@
 
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Parse/Token.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Syntax/RawTokenSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -28,112 +29,188 @@ using namespace swift::syntax;
 
 namespace {
 static Syntax makeUnknownSyntax(SyntaxKind Kind, ArrayRef<Syntax> SubExpr) {
+  assert(isUnknownKind(Kind));
   RawSyntax::LayoutList Layout;
   std::transform(SubExpr.begin(), SubExpr.end(), std::back_inserter(Layout),
                  [](const Syntax &S) { return S.getRaw(); });
   return make<Syntax>(RawSyntax::make(Kind, Layout, SourcePresence::Present));
 }
+
+static ArrayRef<Syntax> getSyntaxNodes(ArrayRef<RawSyntaxInfo> RawNodes,
+                                       llvm::SmallVectorImpl<Syntax> &Scratch) {
+  std::transform(RawNodes.begin(), RawNodes.end(), std::back_inserter(Scratch),
+    [](const RawSyntaxInfo &Info) { return Info.makeSyntax<Syntax>(); });
+  return Scratch;
+}
+
+static unsigned countTokens(ArrayRef<RawSyntaxInfo> AllNodes) {
+  return std::accumulate(AllNodes.begin(), AllNodes.end(), 0,
+    [](unsigned Sum, const RawSyntaxInfo &Info) { return Sum + Info.TokCount; });
+}
 } // End of anonymous namespace
+
+RawSyntaxInfo::RawSyntaxInfo(SourceLoc StartLoc, unsigned TokCount,
+  RC<RawSyntax> RawNode): StartLoc(StartLoc), TokCount(TokCount), RawNode(RawNode) {
+    assert(StartLoc.isValid());
+}
 
 struct SyntaxParsingContext::ContextInfo {
   bool Enabled;
-  std::vector<Syntax> PendingSyntax;
+private:
+  SourceLoc ContextStartLoc;
+  SourceLoc ContextEndLoc;
+  std::vector<RawSyntaxInfo> PendingSyntax;
 
-  ContextInfo(bool Enabled): Enabled(Enabled) {}
+  // All tokens after the start of this context.
+  ArrayRef<RawSyntaxInfo> Tokens;
+
+  ArrayRef<RawSyntaxInfo>::const_iterator findTokenAt(SourceLoc Loc) {
+    for (auto It = Tokens.begin(); It != Tokens.end(); It ++) {
+      assert(It->TokCount == 1);
+      if (It->StartLoc == Loc)
+        return It;
+    }
+    llvm_unreachable("cannot find the token on the given location");
+  }
+
+public:
+  ContextInfo(SourceFile &File, unsigned BufferID):
+      Enabled(File.shouldKeepTokens()) {
+    if (Enabled) {
+      populateTokenSyntaxMap(File.getASTContext().LangOpts,
+                             File.getASTContext().SourceMgr,
+                             BufferID, File.AllRawTokenSyntax);
+      Tokens = File.AllRawTokenSyntax;
+      assert(Tokens.back().makeSyntax<TokenSyntax>().getTokenKind() == tok::eof);
+    }
+  }
+
+  ContextInfo(ArrayRef<RawSyntaxInfo> Tokens, bool Enabled): Enabled(Enabled) {
+    if (Enabled) {
+      this->Tokens = Tokens;
+    }
+  }
+
+  // Squash N syntax nodex from the back of the pending list into one.
+  void createFromBack(SyntaxKind Kind, unsigned N = 0);
+  std::vector<RawSyntaxInfo> collectAllSyntax();
+  ArrayRef<RawSyntaxInfo> allTokens() const { return Tokens; }
+  ArrayRef<RawSyntaxInfo> getPendingSyntax() const { return PendingSyntax; };
+
+  void addPendingSyntax(RawSyntaxInfo Info) {
+    assert(PendingSyntax.empty() || PendingSyntax.back().StartLoc.
+           getOpaquePointerValue() < Info.StartLoc.getOpaquePointerValue());
+    PendingSyntax.push_back(Info);
+  }
+
+  void setContextStart(SourceLoc Loc) {
+    assert(ContextStartLoc.isInvalid());
+    ContextStartLoc = Loc;
+    Tokens = Tokens.slice(findTokenAt(Loc) - Tokens.begin());
+  }
+
+  void setContextEnd(SourceLoc Loc) {
+    assert(ContextEndLoc.isInvalid());
+    ContextEndLoc = Loc;
+    Tokens = Tokens.take_front(findTokenAt(Loc) - Tokens.begin());
+  }
+
+  void promoteTokenAt(SourceLoc Loc) {
+    PendingSyntax.push_back(*findTokenAt(Loc));
+  }
 
   // Check if the pending syntax is a token syntax in the given kind.
   bool checkTokenFromBack(tok Kind, unsigned OffsetFromBack = 0) {
     if (PendingSyntax.size() - 1 < OffsetFromBack)
       return false;
     auto Back = PendingSyntax[PendingSyntax.size() - 1 - OffsetFromBack].
-      getAs<TokenSyntax>();
+      makeSyntax<Syntax>().getAs<TokenSyntax>();
     return Back.hasValue() && Back->getTokenKind() == Kind;
-  }
-
-  void addPendingSyntax(ArrayRef<Syntax> More) {
-    std::transform(More.begin(), More.end(), std::back_inserter(PendingSyntax),
-                 [](const Syntax &S) { return make<Syntax>(S.getRaw()); });
-  }
-
-  // Squash N syntax nodex from the back of the pending list into one.
-  void createFromBack(SyntaxKind Kind, unsigned N = 0) {
-    auto Size = PendingSyntax.size();
-    assert(Size >= N);
-    if (!N)
-      N = Size;
-    auto Parts = llvm::makeArrayRef(PendingSyntax).slice(Size - N);
-
-    // Try to create the node of the given syntax.
-    Optional<Syntax> Result = SyntaxFactory::createSyntax(Kind, Parts);
-    if (!Result) {
-
-      // If unable to create, we should create an unknown node.
-      Result.emplace(makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind),
-                                       Parts));
-    }
-
-    // Remove the building bricks and re-append the result.
-    for (unsigned I = 0; I < N; I ++)
-      PendingSyntax.pop_back();
-    addPendingSyntax({ *Result });
-    assert(Size - N + 1 == PendingSyntax.size());
   }
 };
 
-SyntaxParsingContext::SyntaxParsingContext(bool Enabled):
-  ContextData(*new ContextInfo(Enabled)) {}
+std::vector<RawSyntaxInfo>
+SyntaxParsingContext::ContextInfo::collectAllSyntax() {
+  std::vector<RawSyntaxInfo> Results;
+  auto CurSyntax = PendingSyntax.begin();
+  for (auto It = Tokens.begin(); It != Tokens.end();) {
+    auto Tok = *It;
+    if (CurSyntax == PendingSyntax.end()) {
+      // If no remaining syntax nodes, add the token.
+      Results.emplace_back(Tok);
+      It ++;
+    } else if (CurSyntax->StartLoc == Tok.StartLoc) {
+      // Prefer syntax nodes to tokens.
+      Results.emplace_back(*CurSyntax);
+      It += CurSyntax->TokCount;
+      CurSyntax ++;
+    } else {
+      // We have to add token in this case since the next syntax node has not
+      // started.
+      assert(Tok.StartLoc.getOpaquePointerValue() <
+             CurSyntax->StartLoc.getOpaquePointerValue());
+      Results.push_back(Tok);
+      It ++;
+    }
+  }
+  // Add the remaining syntax nodes.
+  for (;CurSyntax != PendingSyntax.end(); CurSyntax ++) {
+    Results.emplace_back(*CurSyntax);
+  }
+  return Results;
+}
+
+void
+SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
+  auto Size = PendingSyntax.size();
+  if (!N)
+    N = Size;
+  assert(Size >= N);
+  auto Parts = llvm::makeArrayRef(PendingSyntax).slice(Size - N);
+  llvm::SmallVector<Syntax, 8> Scratch;
+  auto SyntaxParts = getSyntaxNodes(Parts, Scratch);
+
+  // Try to create the node of the given syntax.
+  Optional<Syntax> Result = SyntaxFactory::createSyntax(Kind, SyntaxParts);
+  if (!Result) {
+
+    // If unable to create, we should create an unknown node.
+    Result.emplace(makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind),
+                                     SyntaxParts));
+  }
+  RawSyntaxInfo NewSyntaxNode(Parts.front().StartLoc, countTokens(Parts),
+                              Result->getRaw());
+  // Remove the building bricks and re-append the result.
+  for (unsigned I = 0; I < N; I ++)
+    PendingSyntax.pop_back();
+  addPendingSyntax(NewSyntaxNode);
+  assert(Size - N + 1 == PendingSyntax.size());
+}
+
+SyntaxParsingContext::
+SyntaxParsingContext(SourceFile &SF, unsigned BufferID, Token &Tok):
+  ContextData(*new ContextInfo(SF, BufferID)), Tok(Tok) {}
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext &Another):
-    SyntaxParsingContext(Another.ContextData.Enabled) {}
+  ContextData(*new ContextInfo(Another.ContextData.allTokens(),
+                               Another.ContextData.Enabled)), Tok(Another.Tok) {}
 
 SyntaxParsingContext::~SyntaxParsingContext() { delete &ContextData; }
 
 void SyntaxParsingContext::disable() { ContextData.Enabled = false; }
 
-struct SyntaxParsingContextRoot::GlobalInfo {
-  // The source file under parsing.
-  SourceFile &File;
-
-  // All tokens in the source file. This list will shrink from the start when
-  // we start to build syntax nodes.
-  ArrayRef<RawTokenInfo> Tokens;
-
-  GlobalInfo(SourceFile &File) : File(File) {}
-  TokenSyntax retrieveTokenSyntax(SourceLoc Loc) {
-    auto TargetLoc = Loc.getOpaquePointerValue();
-    for (unsigned I = 0, N = Tokens.size(); I < N; I ++) {
-      auto Info = Tokens[I];
-      auto InfoLoc = Info.Loc.getOpaquePointerValue();
-      if (InfoLoc < TargetLoc)
-        continue;
-      assert(InfoLoc == TargetLoc);
-      Tokens = Tokens.slice(I + 1);
-      return make<TokenSyntax>(Info.Token);
-    }
-    llvm_unreachable("can not find token at Loc");
-  }
-};
-
-SyntaxParsingContextRoot::
-SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID):
-    SyntaxParsingContext(File.shouldKeepTokens()),
-    GlobalData(*new GlobalInfo(File)) {
-  populateTokenSyntaxMap(File.getASTContext().LangOpts,
-                         File.getASTContext().SourceMgr,
-                         BufferID, File.AllRawTokenSyntax);
-  // Keep track of the raw tokens.
-  GlobalData.Tokens = llvm::makeArrayRef(File.AllRawTokenSyntax);
-}
-
 SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
+  if (!ContextData.Enabled)
+    return;
   std::vector<DeclSyntax> AllTopLevel;
-  if (GlobalData.File.hasSyntaxRoot()) {
-    for (auto It: GlobalData.File.getSyntaxRoot().getTopLevelDecls()) {
+  if (File.hasSyntaxRoot()) {
+    for (auto It: File.getSyntaxRoot().getTopLevelDecls()) {
       AllTopLevel.push_back(It);
     }
   }
-  for (auto S: ContextData.PendingSyntax) {
+  for (auto Info: ContextData.getPendingSyntax()) {
     std::vector<StmtSyntax> AllStmts;
+    auto S = Info.makeSyntax<Syntax>();
     if (S.isDecl()) {
       AllStmts.push_back(SyntaxFactory::makeDeclarationStmt(
         S.getAs<DeclSyntax>().getValue(), None));
@@ -154,12 +231,10 @@ SyntaxParsingContextRoot::~SyntaxParsingContextRoot() {
       SyntaxFactory::makeStmtList(AllStmts)));
   }
 
-  Trivia Leading = Trivia::newlines(1), Trailing;
-  GlobalData.File.setSyntaxRoot(
+  File.setSyntaxRoot(
     SyntaxFactory::makeSourceFile(SyntaxFactory::makeDeclList(AllTopLevel),
-      SyntaxFactory::makeToken(tok::eof, "", SourcePresence::Present,
-                               Leading, Trailing)));
-  delete &GlobalData;
+    // The last node must be eof.
+    ContextData.allTokens().back().makeSyntax<TokenSyntax>()));
 }
 
 SyntaxParsingContextRoot &SyntaxParsingContextChild::getRoot() {
@@ -171,10 +246,19 @@ SyntaxParsingContextRoot &SyntaxParsingContextChild::getRoot() {
   llvm_unreachable("can not find root");
 }
 
+SyntaxParsingContextChild::
+SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
+                          SyntaxContextKind Kind):
+    SyntaxParsingContext(*ContextHolder), Parent(ContextHolder),
+    ContextHolder(ContextHolder), Kind(Kind) {
+  ContextHolder = this;
+  if (ContextData.Enabled)
+    ContextData.setContextStart(Tok.getLoc());
+}
+
 void SyntaxParsingContextChild::addTokenSyntax(SourceLoc Loc) {
   if (ContextData.Enabled)
-    ContextData.PendingSyntax.push_back(getRoot().GlobalData.
-      retrieveTokenSyntax(Loc));
+    ContextData.promoteTokenAt(Loc);
 }
 
 void SyntaxParsingContextChild::makeNode(SyntaxKind Kind) {
@@ -202,16 +286,40 @@ void SyntaxParsingContextChild::makeNode(SyntaxKind Kind) {
 
 SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   SWIFT_DEFER {
-    // Parent should take care of the created syntax.
-    Parent->ContextData.addPendingSyntax(ContextData.PendingSyntax);
-
     // Reset the context holder to be Parent.
     ContextHolder = Parent;
   };
+  if (!ContextData.Enabled)
+    return;
 
-  // If we've created more than one syntax node, we should try building by using
-  // the final kind.
-  if (ContextData.PendingSyntax.size() > 1) {
-    ContextData.createFromBack(FinalKind);
+  // Set the end of the context.
+  ContextData.setContextEnd(Tok.getLoc());
+  auto AllNodes = ContextData.collectAllSyntax();
+  assert(countTokens(AllNodes) == ContextData.allTokens().size());
+  RC<RawSyntax> FinalResult;
+  if (AllNodes.empty())
+    return;
+
+  if (AllNodes.size() == 1) {
+    // FIXME: Check kind
+    Parent->ContextData.addPendingSyntax(AllNodes.front());
+    return;
   }
+
+  llvm::SmallVector<Syntax, 8> Scratch;
+  auto SyntaxNodes = getSyntaxNodes(AllNodes, Scratch);
+  SourceLoc Start = AllNodes.front().StartLoc;
+  unsigned TokCount = countTokens(AllNodes);
+  SyntaxKind UnknownKind;
+  switch (Kind) {
+    case SyntaxContextKind::Expr:
+      UnknownKind = SyntaxKind::UnknownExpr;
+      break;
+    case SyntaxContextKind::Decl:
+      UnknownKind = SyntaxKind::UnknownDecl;
+      break;
+  }
+  // Create an unknown node and give it to the parent context.
+  Parent->ContextData.addPendingSyntax({Start, TokCount,
+    makeUnknownSyntax(UnknownKind, SyntaxNodes).getRaw()});
 }

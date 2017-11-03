@@ -738,7 +738,7 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-syntax::RawTokenInfo Lexer::fullLex() {
+syntax::RawSyntaxInfo Lexer::fullLex() {
   if (NextToken.isEscapedIdentifier()) {
     LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
     TrailingTrivia.insert(TrailingTrivia.begin(),
@@ -746,7 +746,7 @@ syntax::RawTokenInfo Lexer::fullLex() {
   }
   auto Loc = NextToken.getLoc();
   auto Result = syntax::RawTokenSyntax::make(NextToken.getKind(),
-                                        OwnedString(NextToken.getText()).copy(),
+                                        OwnedString(NextToken.getText()),
                                         syntax::SourcePresence::Present,
                                         {LeadingTrivia}, {TrailingTrivia});
   LeadingTrivia.clear();
