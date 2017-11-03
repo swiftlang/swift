@@ -673,8 +673,29 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
 
   if (hadError)
     TP->setType(ErrorType::get(TC.Context));
-  else
+  else {
     TP->setType(TL.getType());
+
+    // Track whether the decl in this typed pattern should be
+    // implicitly unwrapped as needed during expression type checking.
+    if (TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
+        TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto *subPattern = TP->getSubPattern();
+
+      while (auto *parenPattern = dyn_cast<ParenPattern>(subPattern))
+        subPattern = parenPattern->getSubPattern();
+
+      if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
+        auto &C = DC->getASTContext();
+        namedPattern->getDecl()->getAttrs().add(
+            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      } else {
+        assert(isa<AnyPattern>(subPattern) &&
+               "Unexpected pattern nested in typed pattern!");
+      }
+    }
+  }
+
   return hadError;
 }
 
