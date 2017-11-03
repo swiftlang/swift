@@ -13,7 +13,13 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Syntax/RawTokenSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/References.h"
+#include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/TokenKinds.h"
+#include "swift/Syntax/Trivia.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxFactory.h"
 
