@@ -935,7 +935,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // Check for a single prefixing hyphen
     let negative = source.hasPrefix("-")
     if negative {
-      source = String(source.characters.dropFirst())
+      source = String(source.dropFirst())
     }
 
     // Loop through characters, multiplying

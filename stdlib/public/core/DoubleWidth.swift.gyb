@@ -12,22 +12,15 @@
 
 /// A fixed-width integer that is twice the size of its base type.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct DoubleWidth<Base : FixedWidthInteger> :
-  FixedWidthInteger, _ExpressibleByBuiltinIntegerLiteral
-  where Base.Words : Collection, Base.Magnitude.Words : Collection {
+public struct DoubleWidth<Base : FixedWidthInteger> : _ExpressibleByBuiltinIntegerLiteral
+  where Base.Words : Collection, Base.Magnitude.Words : Collection {    
 
   public typealias High = Base
   public typealias Low = Base.Magnitude
 
   @_versioned // FIXME(sil-serialize-all)
   internal var _storage: (high: Base, low: Base.Magnitude)
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  init(_ _value: (High, Low)) {
-    self._storage = (high: _value.0, low: _value.1)
-  }
-
+  
   @_inlineable // FIXME(sil-serialize-all)
   public var high: High {
     return _storage.high
@@ -38,32 +31,19 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     return _storage.low
   }
 
-  // Numeric
-  //
+  @_inlineable // FIXME(sil-serialize-all)
+  public // @testable
+  init(_ _value: (High, Low)) {
+    self._storage = (high: _value.0, low: _value.1)
+  }
+
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
     self.init((0, 0))
   }
+}
 
-  // BinaryInteger
-  //
-  @_inlineable // FIXME(sil-serialize-all)
-  public var magnitude: DoubleWidth<Low> {
-    if Base.isSigned && _storage.high < (0 as High) {
-      return self == .min
-        ? DoubleWidth.max.magnitude &+ 1
-        : (0 - self).magnitude
-    }
-    return DoubleWidth<Low>((
-      _storage.high.magnitude, _storage.low.magnitude))
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(_ _magnitude: Magnitude) {
-    self.init((High(_magnitude._storage.high), _magnitude._storage.low))
-  }
-
+extension DoubleWidth: Comparable {
   @_inlineable // FIXME(sil-serialize-all)
   public static func ==(lhs: DoubleWidth, rhs: DoubleWidth) -> Bool {
     return (lhs._storage.high == rhs._storage.high) &&
@@ -79,6 +59,28 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       return false
     }
     return lhs._storage.low < rhs._storage.low
+  }
+}
+
+
+extension DoubleWidth: Numeric {
+  public typealias Magnitude = DoubleWidth<Low>
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var magnitude: DoubleWidth<Low> {
+    if Base.isSigned && _storage.high < (0 as High) {
+      return self == .min
+        ? DoubleWidth.max.magnitude &+ 1
+        : (0 - self).magnitude
+    }
+    return DoubleWidth<Low>((
+      _storage.high.magnitude, _storage.low.magnitude))
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_ _magnitude: Magnitude) {
+    self.init((High(_magnitude._storage.high), _magnitude._storage.low))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -112,7 +114,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       self.init((high, low))
     }
   }
+}
 
+extension DoubleWidth {
   @_inlineable // FIXME(sil-serialize-all)
   public init<T : BinaryFloatingPoint>(_ source: T) {
     fatalError()
@@ -177,7 +181,9 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
       self.init(exactly: integerPart)
     }
   }
+}
 
+extension DoubleWidth: FixedWidthInteger {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : Collection {
     public enum _IndexValue {
