@@ -1497,7 +1497,7 @@ void ASTMangler::appendFunctionInputType(
     // it as a single type dropping sugar.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
-      appendType(type);
+      appendTypeListElement(param.getLabel(), type, param.getParameterFlags());
       break;
     }
 
