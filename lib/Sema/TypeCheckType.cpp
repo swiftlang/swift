@@ -2845,6 +2845,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   // ImmediateFunctionInput marker and install a FunctionInput one instead.
   auto elementOptions = options;
   if (repr->isParenType()) {
+    // We also want to disallow IUO within even a paren.
+    elementOptions -= TR_AllowIUO;
+
     // If we have a single ParenType, don't clear the context bits; we
     // still want to parse the type contained therein as if it were in
     // parameter position, meaning function types are not @escaping by
