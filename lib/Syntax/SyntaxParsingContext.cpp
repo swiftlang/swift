@@ -75,7 +75,7 @@ private:
 
 public:
   ContextInfo(SourceFile &File, unsigned BufferID):
-      Enabled(File.shouldKeepTokens()) {
+      Enabled(File.shouldKeepSyntaxInfo()) {
     if (Enabled) {
       populateTokenSyntaxMap(File.getASTContext().LangOpts,
                              File.getASTContext().SourceMgr,

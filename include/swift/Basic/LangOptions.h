@@ -246,10 +246,9 @@ namespace swift {
     /// This is used to guard preemptive testing for the fix-it.
     bool FixStringToSubstringConversions = false;
 
-    /// Whether to keep track of a refined token stream in SourceFile while
-    /// parsing. This is set true usually for tooling purposes like semantic
-    /// coloring.
-    bool KeepTokensInSourceFile = false;
+    /// Whether to create and keep track of a libSyntax tree associated with
+    /// this source file.
+    bool KeepSyntaxInfoInSourceFile = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
