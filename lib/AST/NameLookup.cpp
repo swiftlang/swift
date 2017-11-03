@@ -1310,6 +1310,20 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   }
 }
 
+static void
+populateLookupTableEntryFromMembers(ASTContext &ctx,
+                                    MemberLookupTable &LookupTable,
+                                    DeclName name,
+                                    IterableDeclContext *IDC) {
+  for (auto m : IDC->getMembers()) {
+    if (auto v = dyn_cast<ValueDecl>(m)) {
+      if (v->getFullName().matchesRef(name)) {
+        LookupTable.addMember(m);
+      }
+    }
+  }
+}
+
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
@@ -1385,10 +1399,15 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     } else {
       if (!ignoreNewExtensions) {
         for (auto E : getExtensions()) {
-          if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                        name, E)) {
-            useNamedLazyMemberLoading = false;
-            break;
+          if (E->wasDeserialized()) {
+            if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
+                                                          name, E)) {
+              useNamedLazyMemberLoading = false;
+              break;
+            }
+          } else {
+            populateLookupTableEntryFromMembers(ctx, Table,
+                                                name, E);
           }
         }
       }
