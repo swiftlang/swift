@@ -18,9 +18,11 @@ import SwiftShims
 // FIXME: what about ppc64 and s390x?
 //
 
+@_fixed_layout
 public // FIXME
 struct _StringGuts {
   // TODO 32-bit: Insert padding between fields
+  public // FIXME for testing only
   var _storage: (_BuiltinBridgeObject, UInt)
 
   var _object: _BuiltinBridgeObject {
@@ -248,6 +250,8 @@ extension _StringGuts {
   }
 }
 
+@_fixed_layout
+@_versioned
 internal struct UnsafeString {
   // TODO: Use the extra 13 bits
   //
@@ -484,7 +488,8 @@ extension _StringGuts {
   //
   // Native Swift Strings
   //
-  /*fileprivate*/ internal // TODO: private in Swift 4
+  ///*fileprivate*/ internal // TODO: private in Swift 4
+  public // TODO(StringGuts): for testing only 
   var _isNative: Bool { return classification == .native }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
@@ -809,10 +814,12 @@ extension _StringGuts {
     return buffer
   }
   
-  @_versioned
-  internal
+  @_inlineable
+  // TODO: @_versioned
+  // TODO: internal
+  public // TODO(StringGuts): for testing only
   mutating func isUniqueNative() -> Bool {
-    return _isNative && _isUnique(&_object)
+    return _isNative && _isUnique(&_storage.0)
   }
 
   @_versioned
