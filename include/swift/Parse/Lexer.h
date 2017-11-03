@@ -30,7 +30,7 @@ namespace swift {
 
 namespace syntax {
   struct RawTokenSyntax;
-  struct RawTokenInfo;
+  struct RawSyntaxInfo;
 }
 
   /// Given a pointer to the starting byte of a UTF8 character, validate it and
@@ -246,7 +246,7 @@ public:
   }
 
   /// Lex a full token including leading and trailing trivia.
-  syntax::RawTokenInfo fullLex();
+  syntax::RawSyntaxInfo fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;

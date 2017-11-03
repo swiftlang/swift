@@ -83,7 +83,7 @@ namespace syntax {
   class SourceFileSyntax;
   class SyntaxParsingContext;
   class SyntaxParsingContextRoot;
-  struct RawTokenInfo;
+  struct RawSyntaxInfo;
 }
 
 /// Discriminator for file-units.
@@ -1092,7 +1092,7 @@ private:
   Optional<std::vector<Token>> AllCorrectedTokens;
 
   /// All of the raw token syntax nodes in the underlying source.
-  std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
+  std::vector<syntax::RawSyntaxInfo> AllRawTokenSyntax;
 
   SourceFileSyntaxInfo &SyntaxInfo;
 
