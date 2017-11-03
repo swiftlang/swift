@@ -4798,6 +4798,30 @@ public:
     return hadError;
   }
 
+  static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
+    if (!FD->getAccessorStorageDecl()) {
+      assert(!FD->isAccessor());
+      return FD->getBodyResultTypeLoc();
+    }
+
+    assert(FD->isAccessor() && FD->isGetter());
+    auto *accessor = cast<AbstractStorageDecl>(FD->getAccessorStorageDecl());
+    assert(isa<VarDecl>(accessor) || isa<SubscriptDecl>(accessor));
+
+    if (auto *subscript = dyn_cast<SubscriptDecl>(accessor))
+      return subscript->getElementTypeLoc();
+
+    return cast<VarDecl>(accessor)->getTypeLoc();
+  }
+
+  static bool functionHasImplicitlyUnwrappedResult(FuncDecl *FD) {
+    if (FD->isAccessor() && !FD->isGetter())
+      return false;
+
+    auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
+    return TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional;
+  }
+
   bool semaFuncDecl(FuncDecl *FD, GenericTypeResolver &resolver) {
     TC.checkForForbiddenPrefix(FD);
 
@@ -4819,6 +4843,12 @@ public:
       FD->setInterfaceType(ErrorType::get(TC.Context));
       FD->setInvalid();
       return true;
+    }
+
+    if (functionHasImplicitlyUnwrappedResult(FD)) {
+      auto &C = FD->getASTContext();
+      FD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
     }
 
     return false;
@@ -6363,6 +6393,7 @@ public:
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
     UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
+    UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

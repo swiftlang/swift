@@ -292,6 +292,10 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
 SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
                  OnEnumElement | LongAttribute | UserInaccessible, 71)
 
+SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional,
+                 ImplicitlyUnwrappedOptional,
+                 OnFunc | OnVar | OnSubscript | OnConstructor | RejectByParser, 72)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

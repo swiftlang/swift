@@ -2211,6 +2211,18 @@ public:
         }
       }
 
+      if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        auto varTy = var->getInterfaceType()->getReferenceStorageReferent();
+
+        // FIXME: Update to look for plain Optional once
+        // ImplicitlyUnwrappedOptional is removed
+        if (!varTy->getAnyOptionalObjectType()) {
+          Out << "implicitly unwrapped optional attribute should only be set on VarDecl "
+                 "with optional type\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(var);
     }
 
@@ -2782,6 +2794,24 @@ public:
         const ParamDecl *selfParam = FD->getImplicitSelfDecl();
         if (selfParam && selfParam->getInterfaceType()->is<InOutType>()) {
           Out << "non-mutating function has inout 'self'\n";
+          abort();
+        }
+      }
+
+      if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        if (!FD->getInterfaceType() ||
+            !FD->getInterfaceType()->is<AnyFunctionType>()) {
+          Out << "Expected FuncDecl to have a function type!\n";
+          abort();
+        }
+
+        auto resultTy = FD->getResultInterfaceType();
+
+        // FIXME: Update to look for plain Optional once
+        // ImplicitlyUnwrappedOptional is removed
+        if (!resultTy->getAnyOptionalObjectType()) {
+          Out << "implicitly unwrapped optional attribute should only be set "
+                 "on functions with optional return types\n";
           abort();
         }
       }
