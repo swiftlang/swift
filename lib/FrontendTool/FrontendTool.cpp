@@ -835,8 +835,6 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
-      serializationOpts.EnableDeclMemberNamesTable =
-        Invocation.getLangOptions().NamedLazyMemberLoading;
 
       serialize(DC, serializationOpts, SM.get());
     }
@@ -901,8 +899,6 @@ static bool performCompile(CompilerInstance &Instance,
             Invocation.getClangImporterOptions().ExtraArgs;
         serializationOpts.EnableNestedTypeLookupTable =
             opts.EnableSerializationNestedTypeLookupTable;
-        serializationOpts.EnableDeclMemberNamesTable =
-          Invocation.getLangOptions().NamedLazyMemberLoading;
         if (!IRGenOpts.ForceLoadSymbolName.empty())
           serializationOpts.AutolinkForceLoad = true;
 
@@ -981,8 +977,6 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
-      serializationOpts.EnableDeclMemberNamesTable =
-        Invocation.getLangOptions().NamedLazyMemberLoading;
 
       serialize(DC, serializationOpts, SM.get());
     }
