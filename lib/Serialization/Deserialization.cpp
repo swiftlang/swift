@@ -3125,13 +3125,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isClassBounded, isObjC;
+    bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
+                                            existentialTypeSupported,
                                             genericEnvID, rawAccessLevel,
                                             rawInheritedIDs);
 
@@ -3145,7 +3146,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     declOrOffset = proto;
 
     proto->setRequiresClass(isClassBounded);
-    
+    proto->setExistentialTypeSupported(existentialTypeSupported);
+
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       proto->setAccess(*accessLevel);
     } else {
