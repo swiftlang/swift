@@ -3585,7 +3585,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName =
       mangler.mangleOutlinedInitializeWithTakeFunction(canType);
-  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
                         Address dest, Address src, SILType T) {
     objectTI.initializeWithTake(IGF, dest, src, T);
   };
@@ -3599,7 +3599,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName =
       mangler.mangleOutlinedInitializeWithCopyFunction(canType);
-  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
                         Address dest, Address src, SILType T) {
     objectTI.initializeWithCopy(IGF, dest, src, T);
   };
@@ -3612,7 +3612,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName = mangler.mangleOutlinedAssignWithTakeFunction(canType);
-  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
                         Address dest, Address src, SILType T) {
     objectTI.assignWithTake(IGF, dest, src, T);
   };
@@ -3625,7 +3625,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName = mangler.mangleOutlinedAssignWithCopyFunction(canType);
-  auto GenFunc = [this](const TypeInfo &objectTI, IRGenFunction &IGF,
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
                         Address dest, Address src, SILType T) {
     objectTI.assignWithCopy(IGF, dest, src, T);
   };
