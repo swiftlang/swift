@@ -288,7 +288,10 @@ public func stride<T>(
 
 /// An iterator for `StrideThrough<Element>`.
 @_fixed_layout
-public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
+public struct StrideThroughIterator<
+  // FIXME: Should just be Strideable
+  Element : _Strideable & Comparable
+> : IteratorProtocol {
   @_versioned
   internal let _start: Element
 

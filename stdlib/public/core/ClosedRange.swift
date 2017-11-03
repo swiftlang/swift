@@ -200,15 +200,16 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 
   // FIXME(ABI)#175 (Type checker)
   // WORKAROUND: needed because of rdar://25584401
-  public typealias Iterator = ClosedRangeIterator<Bound>
+  public typealias Iterator = StrideThroughIterator<Bound>
 
   // FIXME(ABI)#175 (Type checker)
   // WORKAROUND: needed because of rdar://25584401
   @_inlineable
-  public func makeIterator() -> ClosedRangeIterator<Bound> {
-    return ClosedRangeIterator(
-      _range: self.lowerBound ... self.upperBound,
-      step: 1)
+  public func makeIterator() -> StrideThroughIterator<Bound> {
+    return StrideThroughIterator(
+      _start: self.lowerBound,
+      end: self.upperBound,
+      stride: 1)
   }
 
   /// The position of the first element in the range.
