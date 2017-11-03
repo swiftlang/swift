@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 378; // Last change: DECL_MEMBER_NAMES
+const uint16_t VERSION_MINOR = 379; // Last change: ProtocolDecl existential-type-supported
 
 using DeclIDField = BCFixed<31>;
 
@@ -879,6 +879,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
+    BCFixed<1>,             // existential-type-supported?
     GenericEnvironmentIDField, // generic environment
     AccessLevelField, // access level
     BCArray<DeclIDField>    // inherited types

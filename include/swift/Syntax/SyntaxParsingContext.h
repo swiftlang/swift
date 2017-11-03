@@ -13,19 +13,14 @@
 #ifndef SWIFT_SYNTAX_PARSING_CONTEXT_H
 #define SWIFT_SYNTAX_PARSING_CONTEXT_H
 
-#include "swift/Syntax/RawTokenSyntax.h"
-#include "swift/Syntax/TokenSyntax.h"
-#include "swift/Syntax/References.h"
-#include "swift/Syntax/RawSyntax.h"
-#include "swift/Syntax/Syntax.h"
-#include "swift/Syntax/TokenKinds.h"
-#include "swift/Syntax/Trivia.h"
-
 namespace swift {
+  class SourceLoc;
   class SourceFile;
   class Token;
 
 namespace syntax {
+  struct RawTokenSyntax;
+  enum class SyntaxKind;
 
 /// The handler for parser to generate libSyntax entities.
 struct RawSyntaxInfo {
