@@ -1985,9 +1985,9 @@ for host in "${ALL_HOSTS[@]}"; do
         if [ "${host}" == "linux-x86_64" ] ; then
             LIBDIR_SUFFIX="64"
             cmake_options+=(
-            -DLLVM_LIBDIR_SUFFIX="64"
-            -DCLANG_LIBDIR_SUFFIX="64"
-            -DSWIFT_LIBDIR_SUFFIX="64"
+            -DLLVM_LIBDIR_SUFFIX:STRING="64"
+            -DCLANG_LIBDIR_SUFFIX:STRING="64"
+            -DSWIFT_LIBDIR_SUFFIX:STRING="64"
             )
         fi
 
@@ -2547,16 +2547,16 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 *)
                   cmake_options=(
-                    ${cmake_options[@]}
+                  "${cmake_options[@]}"
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
                     -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                    -DCMAKE_INSTALL_LIBDIR:PATH="lib"
+                    -DCMAKE_INSTALL_LIBDIR:PATH="lib${LIBDIR_SUFFIX}"
 
                     -DENABLE_SWIFT=YES
-                    -DSWIFT_RUNTIME_LIBDIR:PATH="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                    -DSWIFT_RUNTIME_LIBDIR:PATH="${SWIFT_BUILD_PATH}/lib${LIBDIR_SUFFIX}/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
 
                     -DENABLE_TESTING=YES
                   )
@@ -3228,8 +3228,8 @@ for host in "${ALL_HOSTS[@]}"; do
                   LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                   with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                       call make install
-                  DISPATCH_LIBDIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
-                  DISPATCH_LIBDIR_STATIC="${host_install_destdir}${host_install_prefix}/lib/swift_static/${SWIFT_HOST_VARIANT}"
+                  DISPATCH_LIBDIR="${host_install_destdir}${host_install_prefix}/lib${LIBDIR_SUFFIX}/swift/${SWIFT_HOST_VARIANT}"
+                  DISPATCH_LIBDIR_STATIC="${host_install_destdir}${host_install_prefix}/lib${LIBDIR_SUFFIX}/swift_static/${SWIFT_HOST_VARIANT}"
                   if [ -f "$DISPATCH_LIBDIR/libdispatch.a" ]; then
                       mv "$DISPATCH_LIBDIR/libdispatch.a" "$DISPATCH_LIBDIR_STATIC"
                   fi
