@@ -4668,8 +4668,7 @@ static void collectInterestingNestedDeclarations(
 }
 
 void Serializer::writeAST(ModuleOrSourceFile DC,
-                          bool enableNestedTypeLookupTable,
-                          bool enableDeclMemberNamesTable) {
+                          bool enableNestedTypeLookupTable) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
@@ -4804,24 +4803,22 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
       EntryPoint.emit(ScratchRecord, entryPointClassID.getValue());
     }
 
-    if (enableDeclMemberNamesTable) {
-      {
-        // Write sub-tables to a skippable sub-block.
-        BCBlockRAII restoreBlock(Out, DECL_MEMBER_TABLES_BLOCK_ID, 4);
-        decl_member_tables_block::DeclMembersLayout DeclMembersTable(Out);
-        for (auto &entry : DeclMemberNames) {
-          // Save BitOffset we're writing sub-table to.
-          static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
-          assert(Out.GetCurrentBitNo() < (1ull << 32));
-          entry.second.first = Out.GetCurrentBitNo();
-          // Write sub-table.
-          writeDeclMembersTable(DeclMembersTable, *entry.second.second);
-        }
+    {
+      // Write sub-tables to a skippable sub-block.
+      BCBlockRAII restoreBlock(Out, DECL_MEMBER_TABLES_BLOCK_ID, 4);
+      decl_member_tables_block::DeclMembersLayout DeclMembersTable(Out);
+      for (auto &entry : DeclMemberNames) {
+        // Save BitOffset we're writing sub-table to.
+        static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
+        assert(Out.GetCurrentBitNo() < (1ull << 32));
+        entry.second.first = Out.GetCurrentBitNo();
+        // Write sub-table.
+        writeDeclMembersTable(DeclMembersTable, *entry.second.second);
       }
-      // Write top-level table mapping names to sub-tables.
-      index_block::DeclMemberNamesLayout DeclMemberNamesTable(Out);
-      writeDeclMemberNamesTable(DeclMemberNamesTable, DeclMemberNames);
     }
+    // Write top-level table mapping names to sub-tables.
+    index_block::DeclMemberNamesLayout DeclMemberNamesTable(Out);
+    writeDeclMemberNamesTable(DeclMemberNamesTable, DeclMemberNames);
   }
 }
 
@@ -4854,8 +4851,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
-    S.writeAST(DC, options.EnableNestedTypeLookupTable,
-               options.EnableDeclMemberNamesTable);
+    S.writeAST(DC, options.EnableNestedTypeLookupTable);
   }
 
   S.writeToStream(os);

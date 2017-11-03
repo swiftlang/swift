@@ -387,8 +387,7 @@ private:
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC,
-                bool enableNestedTypeLookupTable,
-                bool enableDeclMemberNamesTable);
+                bool enableNestedTypeLookupTable);
 
   void writeToStream(raw_ostream &os);
 
