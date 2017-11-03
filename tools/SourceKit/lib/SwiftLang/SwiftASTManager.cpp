@@ -420,7 +420,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   Invocation.setSerializedDiagnosticsPath(StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   auto &FrontendOpts = Invocation.getFrontendOptions();
   if (FrontendOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
@@ -812,7 +812,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
   CompilerInvocation Invocation;
   Opts.applyTo(Invocation);
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   for (auto &Content : Contents)
     Invocation.addInputBuffer(Content.Buffer.get());
 

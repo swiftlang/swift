@@ -128,7 +128,7 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
                           StringRef InputFileName,
                           const char *MainExecutablePath) {
   CompilerInvocation Invocation;
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   Invocation.addInputFilename(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
