@@ -1165,13 +1165,19 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     case TypeMetadataAddress::FullMetadata:
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
-    case TypeMetadataAddress::AddressPoint:
-      return getSILLinkage(getTypeLinkage(getType()), forDefinition);
+    case TypeMetadataAddress::AddressPoint: {
+      auto *nominal = getType().getAnyNominal();
+      return getSILLinkage(nominal
+                           ? getDeclLinkage(nominal)
+                           : FormalLinkage::PublicUnique,
+                           forDefinition);
+    }
     }
 
   // ...but we don't actually expose individual value witnesses (right now).
   case Kind::ValueWitness:
-    return getNonUniqueSILLinkage(getTypeLinkage(getType()), forDefinition);
+    return getNonUniqueSILLinkage(getDeclLinkage(getType().getAnyNominal()),
+                                  forDefinition);
 
   // Foreign type metadata candidates are always shared; the runtime
   // does the uniquing.
@@ -1209,13 +1215,16 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getLinkageAsConformance();
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
-  case Kind::ProtocolWitnessTableLazyCacheVariable:
-    if (getTypeLinkage(getType()) == FormalLinkage::Private ||
+  case Kind::ProtocolWitnessTableLazyCacheVariable: {
+    auto *nominal = getType().getAnyNominal();
+    assert(nominal);
+    if (getDeclLinkage(nominal) == FormalLinkage::Private ||
         getLinkageAsConformance() == SILLinkage::Private) {
       return SILLinkage::Private;
     } else {
       return SILLinkage::Shared;
     }
+  }
 
   case Kind::AssociatedTypeMetadataAccessFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
@@ -1230,12 +1239,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILGlobalVariable()->getLinkage();
 
   case Kind::ReflectionBuiltinDescriptor:
-  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionFieldDescriptor: {
     // Reflection descriptors for imported types have shared linkage,
     // since we may emit them in other TUs in the same module.
-    if (getTypeLinkage(getType()) == FormalLinkage::PublicNonUnique)
-      return SILLinkage::Shared;
+    if (auto *nominal = getType().getAnyNominal())
+      if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
+        return SILLinkage::Shared;
     return SILLinkage::Private;
+  }
   case Kind::ReflectionAssociatedTypeDescriptor:
     if (getLinkageAsConformance() == SILLinkage::Shared)
       return SILLinkage::Shared;
