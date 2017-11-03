@@ -178,12 +178,12 @@ SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
     Result.emplace(makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind),
                                      SyntaxParts));
   }
-
+  RawSyntaxInfo NewSyntaxNode(Parts.front().StartLoc, countTokens(Parts),
+                              Result->getRaw());
   // Remove the building bricks and re-append the result.
   for (unsigned I = 0; I < N; I ++)
     PendingSyntax.pop_back();
-  addPendingSyntax({ Parts.front().StartLoc, countTokens(Parts),
-                     Result->getRaw()});
+  addPendingSyntax(NewSyntaxNode);
   assert(Size - N + 1 == PendingSyntax.size());
 }
 
