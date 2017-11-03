@@ -162,7 +162,18 @@ namespace {
     }
 
     void collect(IRGenFunction &IGF, CanType type) {
-      auto *decl = type.getNominalOrBoundGenericNominal();
+      NominalTypeDecl *decl;
+      CanType parentType;
+
+      if (auto nominalType = dyn_cast<NominalType>(type)) {
+        decl = nominalType->getDecl();
+        parentType = nominalType.getParent();
+      } else {
+        auto boundType = cast<BoundGenericType>(type);
+        decl = boundType->getDecl();
+        parentType = boundType.getParent();
+      }
+
       GenericTypeRequirements requirements(IGF.IGM, decl);
 
       auto subs =
@@ -398,15 +409,15 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
     auto nominalType = cast<NominalType>(type);
-    auto *nominalDecl = nominalType->getDecl();
 
     // Imported type metadata always requires an accessor.
-    if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
+    if (isa<ClangModuleUnit>(nominalType->getDecl()->getModuleScopeContext()))
       return false;
 
-    // Generic type metadata always requires an accessor.
-    if (nominalDecl->isGenericContext())
-      return false;
+    // Metadata with a non-trivial parent node always requires an accessor.
+    if (auto parent = nominalType.getParent())
+      if (!isTypeMetadataAccessTrivial(IGM, parent))
+        return false;
 
     // Resiliently-sized metadata access always requires an accessor.
     return (IGM.getTypeInfoForUnlowered(type).isFixedSize());

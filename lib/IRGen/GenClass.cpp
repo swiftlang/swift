@@ -253,6 +253,16 @@ namespace {
       if (theClass->isGenericContext())
         ClassMetadataRequiresDynamicInitialization = true;
 
+      if (!ClassMetadataRequiresDynamicInitialization) {
+        if (auto parentType =
+              theClass->getDeclContext()->getDeclaredTypeInContext()) {
+          if (!tryEmitConstantTypeMetadataRef(IGM,
+                                              parentType->getCanonicalType(),
+                                              SymbolReferenceKind::Absolute))
+            ClassMetadataRequiresDynamicInitialization = true;
+        }
+      }
+
       if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
         auto superclass = superclassType.getClassOrBoundGenericClass();
