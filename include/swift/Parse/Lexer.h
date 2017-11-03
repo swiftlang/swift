@@ -30,7 +30,7 @@ namespace swift {
 
 namespace syntax {
   struct RawTokenSyntax;
-  struct RawTokenInfo;
+  struct RawSyntaxInfo;
 }
 
   /// Given a pointer to the starting byte of a UTF8 character, validate it and

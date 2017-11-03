@@ -13,6 +13,8 @@
 #ifndef SWIFT_SYNTAX_PARSING_CONTEXT_H
 #define SWIFT_SYNTAX_PARSING_CONTEXT_H
 
+ #include "swift/Syntax/Syntax.h"
+
 namespace swift {
   class SourceLoc;
   class SourceFile;
@@ -20,6 +22,7 @@ namespace swift {
 
 namespace syntax {
   struct RawTokenSyntax;
+  struct RawSyntax;
   enum class SyntaxKind;
 
 /// The handler for parser to generate libSyntax entities.
@@ -35,6 +38,7 @@ struct RawSyntaxInfo {
   RawSyntaxInfo(SourceLoc StartLoc, RC<RawSyntax> RawNode):
     RawSyntaxInfo(StartLoc, 1, RawNode) {}
   RawSyntaxInfo(SourceLoc StartLoc, unsigned TokCount, RC<RawSyntax> RawNode);
+
   template <typename SyntaxNode>
   SyntaxNode makeSyntax() const { return make<SyntaxNode>(RawNode); }
 

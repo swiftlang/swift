@@ -56,7 +56,7 @@ namespace swift {
   namespace syntax {
     class AbsolutePosition;
     class SyntaxParsingContext;
-    struct RawTokenInfo;
+    struct RawSyntaxInfo;
     struct RawTokenSyntax;
   }// end of syntax namespace
 
