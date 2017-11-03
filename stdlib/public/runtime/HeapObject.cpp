@@ -248,6 +248,8 @@ BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
 
 void swift::swift_deallocBox(HeapObject *o) {
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
+  // Move the object to the deallocating state (+1 -> +0).
+  o->refCounts.decrementFromOneNonAtomic();
   SWIFT_RT_ENTRY_CALL(swift_deallocObject)(o, metadata->getAllocSize(),
                                            metadata->getAllocAlignMask());
 }
