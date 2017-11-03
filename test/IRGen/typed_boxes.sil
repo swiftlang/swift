@@ -15,7 +15,7 @@ entry:
   // CHECK-64: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 1
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast [8 x i8]* [[BOX_DATA]] to i64*
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
-  // CHECK: call void @swift_rt_swift_deallocObject(%swift.refcounted* [[BOX]], [[WORD]] 24, [[WORD]] 7)
+  // CHECK: call void @swift_rt_swift_deallocUninitializedObject(%swift.refcounted* [[BOX]], [[WORD]] 24, [[WORD]] 7)
   dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return undef : $()
 }
@@ -31,7 +31,7 @@ entry:
   // CHECK-64: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 1
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast [8 x i8]* [[BOX_DATA]] to double*
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
-  // CHECK: call void @swift_rt_swift_deallocObject(%swift.refcounted* [[BOX]], [[WORD]] 24, [[WORD]] 7)
+  // CHECK: call void @swift_rt_swift_deallocUninitializedObject(%swift.refcounted* [[BOX]], [[WORD]] 24, [[WORD]] 7)
   dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>
   return undef : $()
 }
@@ -51,7 +51,7 @@ entry:
   // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_32_32_LAYOUT]], [[POD_32_32_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast [32 x i8]* [[BOX_DATA]] to %T11typed_boxes11OverAlignedV*
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <OverAligned>, 0
-  // CHECK: call void @swift_rt_swift_deallocObject(%swift.refcounted* [[BOX]], [[WORD]] 64, [[WORD]] 31)
+  // CHECK: call void @swift_rt_swift_deallocUninitializedObject(%swift.refcounted* [[BOX]], [[WORD]] 64, [[WORD]] 31)
   dealloc_box %a : $<τ_0_0> { var τ_0_0 } <OverAligned>
   return undef : $()
 }
