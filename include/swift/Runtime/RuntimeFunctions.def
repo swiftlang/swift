@@ -111,6 +111,13 @@ FUNCTION(DeallocObject, swift_deallocObject, RegisterPreservingCC,
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
+// void swift_deallocUninitializedObject(HeapObject *obj, size_t size, size_t alignMask);
+FUNCTION(DeallocUninitializedObject, swift_deallocUninitializedObject,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
 // void swift_deallocClassInstance(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocClassInstance, swift_deallocClassInstance, DefaultCC,
          RETURNS(VoidTy),
