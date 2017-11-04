@@ -511,8 +511,23 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
   }
 
+  /// If \p LV is non-trivial, return a \p Qualifier load of \p LV. If \p LV is
+  /// trivial, use trivial instead.
+  ///
+  /// *NOTE* The SupportUnqualifiedSIL is an option to ease the bring up of
+  /// Semantic SIL. It enables a pass that must be able to run on both Semantic
+  /// SIL and non-Semantic SIL. It has a default argument of false, so if this
+  /// is not necessary for your pass, just ignore the parameter.
   LoadInst *createTrivialLoadOr(SILLocation Loc, SILValue LV,
-                                LoadOwnershipQualifier Qualifier) {
+                                LoadOwnershipQualifier Qualifier,
+                                bool SupportUnqualifiedSIL = false) {
+    if (SupportUnqualifiedSIL && getFunction().hasUnqualifiedOwnership()) {
+      assert(
+          Qualifier != LoadOwnershipQualifier::Copy &&
+          "In unqualified SIL, a copy must be done separately form the load");
+      return createLoad(Loc, LV, LoadOwnershipQualifier::Unqualified);
+    }
+
     if (LV->getType().isTrivial(getModule())) {
       return createLoad(Loc, LV, LoadOwnershipQualifier::Trivial);
     }
@@ -567,9 +582,22 @@ public:
 
   /// Utility function that returns a trivial store if the stored type is
   /// trivial and a \p Qualifier store if the stored type is non-trivial.
+  ///
+  /// *NOTE* The SupportUnqualifiedSIL is an option to ease the bring up of
+  /// Semantic SIL. It enables a pass that must be able to run on both Semantic
+  /// SIL and non-Semantic SIL. It has a default argument of false, so if this
+  /// is not necessary for your pass, just ignore the parameter.
   StoreInst *createTrivialStoreOr(SILLocation Loc, SILValue Src,
                                   SILValue DestAddr,
-                                  StoreOwnershipQualifier Qualifier) {
+                                  StoreOwnershipQualifier Qualifier,
+                                  bool SupportUnqualifiedSIL = false) {
+    if (SupportUnqualifiedSIL && getFunction().hasUnqualifiedOwnership()) {
+      assert(
+          Qualifier != StoreOwnershipQualifier::Assign &&
+          "In unqualified SIL, assigns must be represented via 2 instructions");
+      return createStore(Loc, Src, DestAddr,
+                         StoreOwnershipQualifier::Unqualified);
+    }
     if (Src->getType().isTrivial(getModule())) {
       return createStore(Loc, Src, DestAddr, StoreOwnershipQualifier::Trivial);
     }
