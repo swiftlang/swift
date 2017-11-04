@@ -2738,9 +2738,12 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
   if (!options.contains(TR_AllowIUO)) {
-    TC.diagnose(repr->getStartLoc(), diag::iuo_in_illegal_position)
-      .fixItReplace(repr->getExclamationLoc(), "?");
-    return ErrorType::get(Context);
+    if (TC.Context.isSwiftVersionAtLeast(5)) {
+      TC.diagnose(repr->getStartLoc(), diag::iuo_in_illegal_position)
+        .fixItReplace(repr->getExclamationLoc(), "?");
+      return ErrorType::get(Context);
+    }
+    TC.diagnose(repr->getStartLoc(), diag::iuo_in_illegal_position_decay_to_optional);
   }
 
   auto elementOptions = withoutContext(options, true);
@@ -2751,8 +2754,17 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   Type baseTy = resolveType(repr->getBase(), elementOptions);
   if (!baseTy || baseTy->hasError()) return baseTy;
 
-  auto uncheckedOptionalTy =
-    TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
+  Type uncheckedOptionalTy;
+
+  if (!options.contains(TR_AllowIUO)) {
+    assert(!TC.Context.isSwiftVersionAtLeast(5));
+    uncheckedOptionalTy =
+      TC.getOptionalType(repr->getExclamationLoc(), baseTy);
+  } else {
+    uncheckedOptionalTy =
+      TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
+  }
+
   if (!uncheckedOptionalTy)
     return ErrorType::get(Context);
 

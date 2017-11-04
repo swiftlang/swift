@@ -3113,6 +3113,10 @@ ERROR(iuo_in_illegal_position,none,
       "implicitly unwrapped optionals are only allowed at top level and as "
       "function results", ())
 
+WARNING(iuo_in_illegal_position_decay_to_optional,none,
+      "implicitly unwrapped optionals are only allowed at top level and as "
+      "function results; treating '!' as if it were '?' for Swift 3 and Swift 4", ())
+
 // Ownership
 ERROR(invalid_ownership_type,none,
       "'%select{strong|weak|unowned|unowned}0' may only be applied to "

@@ -90,12 +90,10 @@ FunctionConversionTestSuite.test("Optional") {
   expectEqual(24, g12(Trivial(n: 12))?.n)
 
   let g21: (Loadable?) -> Loadable? = l1
-  let g22: (Loadable?) -> Loadable? = l1
 
   expectEqual(42, g21(Loadable(n: 21))?.n)
 
   let g31: (AddrOnly?) -> AddrOnly? = a1
-  let g32: (AddrOnly?) -> AddrOnly? = a1
 
   expectEqual(62, g31(AddrOnly(n: 31))?.n)
 }

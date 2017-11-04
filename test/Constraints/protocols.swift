@@ -318,11 +318,14 @@ func testClonableArchetype<T : Clonable>(_ t: T) {
   let _: (Bool) -> T? = id(t.extMaybeClone)
   let _: T? = id(t.extMaybeClone(true))
 
-  let _: (T) -> (Bool) -> T! = id(T.extProbablyClone) // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
-  let _: (Bool) -> T! = id(T.extProbablyClone(t)) // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  let _: (T) -> (Bool) -> T! = id(T.extProbablyClone) // expected-warning {{implicitly unwrapped optionals are only allowed at top level and as function results; treating '!' as if it were '?' for Swift 3 and Swift 4}}
+  // expected-error@-1 {{cannot convert value of type '(T) -> (Bool) -> T!' to specified type '(T) -> (Bool) -> T?'}}
+  let _: (Bool) -> T! = id(T.extProbablyClone(t)) // expected-warning {{implicitly unwrapped optionals are only allowed at top level and as function results; treating '!' as if it were '?' for Swift 3 and Swift 4}}
+  // expected-error@-1 {{cannot convert value of type '(Bool) -> T!' to specified type '(Bool) -> T?'}}
   let _: T! = id(T.extProbablyClone(t)(true))
 
-  let _: (Bool) -> T! = id(t.extProbablyClone) // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  let _: (Bool) -> T! = id(t.extProbablyClone) // expected-warning {{implicitly unwrapped optionals are only allowed at top level and as function results; treating '!' as if it were '?' for Swift 3 and Swift 4}}
+  // expected-error@-1 {{cannot convert value of type '(Bool) -> T!' to specified type '(Bool) -> T?'}}
   let _: T! = id(t.extProbablyClone(true))
 
   // Static member of extension returning Self)
@@ -332,7 +335,8 @@ func testClonableArchetype<T : Clonable>(_ t: T) {
   let _: (Bool) -> T? = id(T.returnSelfOptionalStatic)
   let _: T? = id(T.returnSelfOptionalStatic(false))
 
-  let _: (Bool) -> T! = id(T.returnSelfIUOStatic) // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  let _: (Bool) -> T! = id(T.returnSelfIUOStatic) // expected-warning {{implicitly unwrapped optionals are only allowed at top level and as function results; treating '!' as if it were '?' for Swift 3 and Swift 4}}
+  // expected-error@-1 {{cannot convert value of type '(Bool) -> T!' to specified type '(Bool) -> T?'}}
   let _: T! = id(T.returnSelfIUOStatic(true))
 }
 
@@ -358,7 +362,8 @@ func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
   let _: (Bool) -> Clonable? = id(vv.returnSelfOptionalStatic)
   let _: Clonable? = id(vv.returnSelfOptionalStatic(false))
 
-  let _: (Bool) -> Clonable! = id(vv.returnSelfIUOStatic) // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  let _: (Bool) -> Clonable! = id(vv.returnSelfIUOStatic) // expected-warning {{implicitly unwrapped optionals are only allowed at top level and as function results; treating '!' as if it were '?' for Swift 3 and Swift 4}}
+  // expected-error@-1 {{cannot convert value of type '(Bool) -> Clonable!' to specified type '(Bool) -> Clonable?'}}
   let _: Clonable! = id(vv.returnSelfIUOStatic(true))
 
   let _ = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
