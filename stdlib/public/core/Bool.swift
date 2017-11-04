@@ -86,6 +86,18 @@ public struct Bool {
   public init(_ value: Bool) {
     self = value
   }
+
+  /// Returns a random Boolean
+  ///
+  /// - Parameter generator: The random number generator to use when getting a
+  ///   random Boolean.
+  /// - Returns: A random Boolean.
+  @_inlineable
+  public static func random(
+    using generator: RandomNumberGenerator = Random.default
+  ) -> Bool {
+    return generator.next() % 2 == 0
+  }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
