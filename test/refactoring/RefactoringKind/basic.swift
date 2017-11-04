@@ -231,6 +231,17 @@ func testExpandTernaryExpr() {
   let x = a < 5 ? a : b
 }
 
+func testConvertToTernaryExpr() {
+  let a = 3
+  let b = 5
+  let x: Int
+  if a < 5 {
+    x = a
+  } else {
+    x = b
+  }
+}
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -320,6 +331,8 @@ func testExpandTernaryExpr() {
 
 // RUN: %refactor -source-filename %s -pos=231:3 -end-pos=231:24 | %FileCheck %s -check-prefix=CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION
 
+// RUN: %refactor -source-filename %s -pos=237:3 -end-pos=242:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -364,3 +377,5 @@ func testExpandTernaryExpr() {
 // CHECK-EXPAND-SWITCH: Expand Switch Cases
 
 // CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION: Expand Ternary Expression
+
+// CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION: Convert To Ternary Expression
