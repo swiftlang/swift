@@ -368,6 +368,50 @@ extension MutableCollection where Self : BidirectionalCollection {
 }
 
 //===----------------------------------------------------------------------===//
+// shuffled()
+//===----------------------------------------------------------------------===//
+
+extension Sequence {
+  /// Returns the elements of the sequence, shuffled.
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the sequence.
+  /// - Returns: A shuffled array of this sequence's elements.
+  @_inlineable
+  public func shuffled(
+    using generator: RandomNumberGenerator = Random.default
+  ) -> [Element] {
+    var result = ContiguousArray(self)
+    result.shuffle(using: generator)
+    return Array(result)
+  }
+}
+
+extension MutableCollection {
+  /// Shuffles the collection in place.
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the collection.
+  @_inlineable
+  public mutating func shuffle(
+    using generator: RandomNumberGenerator = Random.default
+  ) {
+    guard count > 1 else { return }
+    var amount = count
+    var currentIndex = startIndex
+    while amount > 1 {
+      let random = generator.next(upperBound: UInt(amount))
+      amount -= 1
+      swapAt(
+        currentIndex,
+        index(currentIndex, offsetBy: numericCast(random))
+      )
+      formIndex(after: &currentIndex)
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // sorted()/sort()
 //===----------------------------------------------------------------------===//
 

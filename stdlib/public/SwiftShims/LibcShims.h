@@ -149,6 +149,10 @@ __swift_uint32_t _stdlib_cxx11_mt19937(void);
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 
+// Random number for stdlib
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _stdlib_random(void *buf, __swift_size_t nbytes);
+
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_remainderf(float _self, float _other) {

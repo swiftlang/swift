@@ -37,6 +37,7 @@
 #include <sys/stat.h>
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
 #include "../SwiftShims/LibcShims.h"
 #include "llvm/Support/DataTypes.h"
 
@@ -308,3 +309,46 @@ swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
+
+#if defined(__APPLE__)
+#include <Security/Security.h>
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  if (__builtin_available(macOS 10.12, iOS 10, tvOS 10, watchOS 3, *)) {
+    arc4random_buf(buf, nbytes);
+  }else {
+    OSStatus status = SecRandomCopyBytes(kSecRandomDefault, nbytes, buf);
+    if (status != errSecSuccess) {
+      fatalError(0, "Fatal error: SecRandomCopyBytes failed with error %d\n", status);
+    }
+  }
+}
+#elif defined(__linux__)
+#include <linux/version.h>
+#include <sys/syscall.h>
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0)
+  auto _read = [&]() -> __swift_ssize_t {
+    return syscall(SYS_getrandom, buf, bytes, 0);
+  };
+#else
+  auto _read = [&]() -> __swift_ssize_t {
+    static const int fd = _stdlib_open("/dev/urandom", O_RDONLY);
+    if (fd < 0) {
+      fatalError(0, "Unable to open '/dev/urandom'\n");
+    }
+    return _stdlib_read(fd, buf, bytes);
+  };
+#endif
+  while (nbytes > 0) {
+    auto result = _read();
+    if (result < 1) {
+      if (errno == EINTR) { continue; }
+      fatalError(0, "Unable to read '/dev/urandom'\n");
+    }
+    buf = static_cast<uint8_t *>(buf) + result;
+    nbytes -= result;
+  }
+}
+#endif
