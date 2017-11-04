@@ -423,6 +423,22 @@ void swift_deallocObject(HeapObject *object, size_t allocatedSize,
                          size_t allocatedAlignMask)
     SWIFT_CC(RegisterPreservingCC);
 
+/// Deallocate an uninitialized object with a strong reference count of +1.
+///
+/// It must have been returned by swift_allocObject, but otherwise the object is
+/// in an unknown state.
+///
+/// \param object - never null
+/// \param allocatedSize - the allocated size of the object from the
+///   program's perspective, i.e. the value
+/// \param allocatedAlignMask - the alignment requirement that was passed
+///   to allocObject
+///
+SWIFT_RT_ENTRY_VISIBILITY
+void swift_deallocUninitializedObject(HeapObject *object, size_t allocatedSize,
+                                      size_t allocatedAlignMask)
+    SWIFT_CC(RegisterPreservingCC);
+
 /// Deallocate the given memory.
 ///
 /// It must have been returned by swift_allocObject, possibly used as an

@@ -168,6 +168,14 @@ void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
                          {object, size, alignMask});
 }
 
+void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
+                                           llvm::Value *object,
+                                           llvm::Value *size,
+                                           llvm::Value *alignMask) {
+  IGF.Builder.CreateCall(IGF.IGM.getDeallocUninitializedObjectFn(),
+                         {object, size, alignMask});
+}
+
 void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
                                         llvm::Value *object,
                                         llvm::Value *size,
@@ -1541,8 +1549,7 @@ public:
     auto size = layout.emitSize(IGF.IGM);
     auto alignMask = layout.emitAlignMask(IGF.IGM);
 
-    IGF.emitNativeSetDeallocating(box);
-    emitDeallocateHeapObject(IGF, box, size, alignMask);
+    emitDeallocateUninitializedHeapObject(IGF, box, size, alignMask);
   }
 
   Address
