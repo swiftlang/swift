@@ -3380,6 +3380,10 @@ public:
   /// Retrieve the destructor for this class.
   DestructorDecl *getDestructor();
 
+  /// Synthesize implicit, trivial destructor, add it to this ClassDecl
+  /// and return it.
+  DestructorDecl *addImplicitDestructor();
+
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
   ///
