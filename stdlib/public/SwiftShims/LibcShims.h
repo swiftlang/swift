@@ -72,6 +72,8 @@ int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
 // <unistd.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
+int _swift_stdlib_open(const char *path, int oflags);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t _swift_stdlib_write(int fd, const void *buf,

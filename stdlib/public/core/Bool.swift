@@ -91,7 +91,7 @@ public struct Bool : Randomizable {
   @_inlineable
   public static func random(using generator: RandomGenerator) -> Bool {
     let random = generator.next(Int8.self, upperBound: 2)
-    return self(Builtin.trunc_Int8_Int1(random._value))
+    return self.init(Builtin.trunc_Int8_Int1(random._value))
   }
 }
 

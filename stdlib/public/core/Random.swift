@@ -1,4 +1,4 @@
-//===--- Print.swift ------------------------------------------------------===//
+//===--- Random.swift ------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -40,7 +40,7 @@ public enum Random : RandomGenerator {
   }
 }
 
-public protocol RandomizableCollection: Collection {
+public protocol RandomizableCollection : Collection {
   var random: Element { get }
   func random(using generator: RandomGenerator) -> Element
 }

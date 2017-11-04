@@ -2599,7 +2599,7 @@ ${operatorComment('&' + x.operator, True)}
 extension FixedWidthInteger {
   @_inlineable
   public static func random(using generator: RandomGenerator) -> Self {
-    return generator.next(Self.self, upperBound: Self.max)
+    return generator.next(Self.self)
     }
 }
 

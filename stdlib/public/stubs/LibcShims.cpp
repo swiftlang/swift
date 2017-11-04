@@ -24,6 +24,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <sys/types.h>
 #include <string.h>
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
@@ -71,6 +73,15 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 int swift::_swift_stdlib_memcmp(const void *s1, const void *s2,
                                 __swift_size_t n) {
   return memcmp(s1, s2, n);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int swift::_swift_stdlib_open(const char *path, int oflags) {
+#if defined(_WIN32)
+  return _open(path, oflags);
+#else
+  return open(path, oflags);
+#endif
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -227,24 +238,23 @@ void swift::_swift_stdlib_random(void *buf,
   arc4random_buf(buf, nbytes);
 }
 #else
-#include <fstream>
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debugFlags) {
-  std::ifstream device_urandom("/dev/urandom", std::ios::in | std::ios::binary);
-
-  if (!device_urandom) {
+  #if defined(_WIN32)
+  int oflags = _O_RDONLY | _O_BINARY;
+  #else
+  int oflags = O_RDONLY;
+  #endif
+  int fd = swift::_swift_stdlib_open("/dev/urandom", oflags);
+  if (fd < 0) {
+    fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom");
+  }
+  if (swift::_swift_stdlib_read(fd, buf, nbytes) < 0) {
     fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
   }
-
-  device_urandom.read(reinterpret_cast<char *>(buf), nbytes);
-
-  if (!device_urandom) {
-    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
-  }
-
-  device_urandom.close();
+  swift::_swift_stdlib_close(fd);
 }
 #endif
 #elif defined(__linux__)
@@ -263,24 +273,23 @@ void swift::_swift_stdlib_random(void *buf,
   }
 }
 #else
-#include <fstream>
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debugFlags) {
-  std::ifstream device_urandom("/dev/urandom", std::ios::in | std::ios::binary);
-
-  if (!device_urandom) {
+  #if defined(_WIN32)
+  int oflags = _O_RDONLY | _O_BINARY;
+  #else
+  int oflags = O_RDONLY;
+  #endif
+  int fd = swift::_swift_stdlib_open("/dev/urandom", oflags);
+  if (fd < 0) {
+    fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom");
+  }
+  if (swift::_swift_stdlib_read(fd, buf, nbytes) < 0) {
     fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
   }
-
-  device_urandom.read(reinterpret_cast<char *>(buf), nbytes);
-
-  if (!device_urandom) {
-    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
-  }
-
-  device_urandom.close();
+  swift::_swift_stdlib_close(fd);
 }
 #endif
 #endif
