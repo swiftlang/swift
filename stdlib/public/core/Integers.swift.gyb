@@ -2005,7 +2005,7 @@ extension BinaryInteger {
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
 public protocol FixedWidthInteger :
-  BinaryInteger, LosslessStringConvertible, _BitwiseOperations
+  BinaryInteger, Randomizable, LosslessStringConvertible, _BitwiseOperations
   where Magnitude : FixedWidthInteger
 {
   /// The number of bits used for the underlying binary representation of
@@ -2594,6 +2594,13 @@ ${operatorComment('&' + x.operator, True)}
   }
 %   end
 % end
+}
+
+extension FixedWidthInteger {
+  @_inlineable
+  public static func random(using generator: RandomGenerator) -> Self {
+    return generator.next(Self.self, upperBound: Self.max)
+    }
 }
 
 //===----------------------------------------------------------------------===//

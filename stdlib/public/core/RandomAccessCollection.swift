@@ -38,7 +38,7 @@ public typealias RandomAccessIndexable = RandomAccessCollection
 /// collection, either the index for your custom type must conform to the
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
-public protocol RandomAccessCollection : BidirectionalCollection
+public protocol RandomAccessCollection : BidirectionalCollection, RandomizableCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
@@ -198,6 +198,24 @@ extension RandomAccessCollection {
       return nil
     }
     return index(i, offsetBy: n)
+  }
+
+  @_inlineable
+  public func random(using generator: RandomGenerator) -> Element {
+    _precondition(!self.isEmpty, "Tried to get random element from empty collection.")
+    var random = generator.next(Int.self, upperBound: Int(self.count))
+
+    if random < 0 {
+      random *= -1
+    }
+
+    let index = self.index(
+      self.startIndex,
+      offsetBy: IndexDistance(random),
+      limitedBy: self.endIndex
+    )
+
+    return self[index!]
   }
 }
 

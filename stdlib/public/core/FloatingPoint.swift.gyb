@@ -1435,7 +1435,8 @@ extension FloatingPoint {
 /// the standard library by `Float`, `Double`, and `Float80` where available.
 ///
 /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
+public protocol BinaryFloatingPoint:
+  FloatingPoint, ExpressibleByFloatLiteral, Randomizable {
 
   /// A type that represents the encoded significand of a value.
   associatedtype RawSignificand: UnsignedInteger
@@ -2012,6 +2013,12 @@ extension FloatingPoint {
     if isNormal { return sign == .minus ? .negativeNormal : .positiveNormal }
     if isSubnormal { return sign == .minus ? .negativeSubnormal : .positiveSubnormal }
     return sign == .minus ? .negativeZero : .positiveZero
+  }
+
+  @_inlineable
+  public static func random(using generator: RandomGenerator) -> Self {
+    let random = generator.next(UInt64.self)
+    return Self(random) / Self(UInt64.max)
   }
 }
 

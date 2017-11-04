@@ -60,7 +60,7 @@
 /// that functions, methods, and properties imported from C and Objective-C
 /// have a consistent type interface.
 @_fixed_layout
-public struct Bool {
+public struct Bool : Randomizable {
   @_versioned
   internal var _value: Builtin.Int1
 
@@ -86,6 +86,12 @@ public struct Bool {
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ value: Bool) {
     self = value
+  }
+
+  @_inlineable
+  public static func random(using generator: RandomGenerator) -> Bool {
+    let random = generator.next(Int8.self, upperBound: 2)
+    return self(Builtin.trunc_Int8_Int1(random._value))
   }
 }
 
