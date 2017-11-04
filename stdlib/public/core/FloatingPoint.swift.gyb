@@ -2374,6 +2374,53 @@ extension BinaryFloatingPoint {
   */
 }
 
+% for Range in ['Range', 'ClosedRange']:
+
+extension BinaryFloatingPoint
+where Self.RawSignificand : FixedWidthInteger,
+      Self.RawSignificand.Stride : SignedInteger & FixedWidthInteger,
+      Self.RawSignificand.Magnitude : UnsignedInteger {
+
+  /// Returns a random representation of this floating point within the range.
+  ///
+  /// - Parameter range: A ${Range} to determine the bounds to get a random value
+  ///   from.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random floating point.
+  /// - Returns: A random representation of this floating point.
+  @_inlineable
+  public static func random(
+    in range: ${Range}<Self>,
+    using generator: RandomNumberGenerator = Random.default
+  ) -> Self {
+%   if 'Closed' not in Range:
+    _precondition(
+      range.lowerBound != range.upperBound,
+      "Can't get random value with lowerBound == upperBound"
+    )
+%   end
+    let delta = range.upperBound - range.lowerBound
+    let maxSignificand: Self.RawSignificand = 1 << Self.significandBitCount
+%   if 'Closed' not in Range:
+    let rand: Self.RawSignificand = generator.next(upperBound: maxSignificand)
+%   else:
+    let rand: Self.RawSignificand = generator.next(upperBound: maxSignificand + 1)
+    if rand == maxSignificand {
+      return range.upperBound
+    }
+%   end
+    let unitRandom = Self.init(
+      sign: .plus,
+      exponentBitPattern: (1 as Self).exponentBitPattern,
+      significandBitPattern: rand
+    ) - 1
+    return delta * unitRandom + range.lowerBound
+  }
+
+}
+
+% end
+
 /// Returns the absolute value of `x`.
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
