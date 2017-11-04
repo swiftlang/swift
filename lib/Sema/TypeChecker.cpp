@@ -707,8 +707,10 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 
   // Fine to have unbound generic types.
   options |= TR_AllowUnboundGenerics;
-  if (isSILMode)
+  if (isSILMode) {
     options |= TR_SILMode;
+    options |= TR_AllowIUO;
+  }
   if (isSILType)
     options |= TR_SILType;
 
