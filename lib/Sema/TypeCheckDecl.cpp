@@ -8822,8 +8822,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     if (auto ref = conformsToProtocol(targetType, protocol, target,
                                       ConformanceCheckFlags::Used,
                                       SourceLoc())) {
-      if (auto *conformance =
-          dyn_cast_or_null<NormalProtocolConformance>(ref->getConcrete())) {
+      if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
         if (conformance->isIncomplete()) {
           // Check conformance, forcing synthesis.
           //
