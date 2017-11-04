@@ -8540,16 +8540,20 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.
-  bool alreadyValidatingCtor = false;
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      validateDecl(ctor);
-      if (!ctor->hasValidSignature())
-        alreadyValidatingCtor = true;
+  if (isa<ClassDecl>(decl)) {
+    bool alreadyValidatingCtor = false;
+    for (auto member : decl->getMembers()) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        validateDecl(ctor);
+        if (!ctor->hasValidSignature())
+          alreadyValidatingCtor = true;
+      }
     }
+    if (alreadyValidatingCtor)
+      return;
   }
-  if (alreadyValidatingCtor)
-    return;
+
+  decl->setAddedImplicitInitializers();
 
   // Check whether there is a user-declared constructor or an instance
   // variable.
@@ -8558,7 +8562,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   bool SuppressMemberwiseInitializer = false;
   bool FoundSynthesizedInit = false;
   bool FoundDesignatedInit = false;
-  decl->setAddedImplicitInitializers();
 
   // Before we look for constructors, we need to make sure that all synthesized
   // initializers are properly synthesized.
@@ -8599,6 +8602,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       } else if (ctor->isDesignatedInit()) {
         FoundDesignatedInit = true;
       }
+
+      if (isa<StructDecl>(decl))
+        continue;
 
       if (!ctor->isInvalid())
         initializerParamTypes.insert(getInitializerParamType(ctor));
