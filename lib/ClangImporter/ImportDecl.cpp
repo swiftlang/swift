@@ -4274,6 +4274,7 @@ namespace {
         auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
+        result->addImplicitDestructor();
         return result;
       }
 
@@ -4356,8 +4357,10 @@ namespace {
 
       if (declaredNative)
         markMissingSwiftDecl(result);
-      if (decl->getAttr<clang::ObjCRuntimeVisibleAttr>())
+      if (decl->getAttr<clang::ObjCRuntimeVisibleAttr>()) {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
+        result->addImplicitDestructor();
+      }
 
       // If this Objective-C class has a supertype, import it.
       SmallVector<TypeLoc, 4> inheritedTypes;
@@ -4389,6 +4392,7 @@ namespace {
       if (decl->getName() == "OS_object" ||
           decl->getName() == "OS_os_log") {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
+        result->addImplicitDestructor();
       }
 
       // If the superclass is runtime-only, our class is also. This only
