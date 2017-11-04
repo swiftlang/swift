@@ -1914,6 +1914,9 @@ public:
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
   }
+  bool hasCalleeGuaranteedContext() const {
+    return getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
+  }
 };
 
 //===----------------------------------------------------------------------===//
