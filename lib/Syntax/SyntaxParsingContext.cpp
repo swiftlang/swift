@@ -267,6 +267,7 @@ void SyntaxParsingContextChild::makeNode(SyntaxKind Kind) {
 
   // Create syntax nodes according to the given kind.
   switch (Kind) {
+  case SyntaxKind::FloatLiteralExpr:
   case SyntaxKind::IntegerLiteralExpr: {
     // Integer may include the signs before the digits, so check if the sign
     // exists and create.

@@ -1,15 +1,19 @@
 <DeclarationStmt><UnknownDecl>// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
-// RUN: diff -u %t %s
+// RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
-// RUN: diff -u %t.withkinds %S/Outputs/round_trip_parse_gen.swift.withkinds
+// RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 
 class C {<UnknownDecl>
   func bar(_ a: Int) {}</UnknownDecl><UnknownDecl>
+  func bar1(_ a: Float) -> Float { return <UnknownExpr><FloatLiteralExpr>-0.6 </FloatLiteralExpr>+ <FloatLiteralExpr>0.1 </FloatLiteralExpr>- <FloatLiteralExpr>0.3 </FloatLiteralExpr></UnknownExpr>}</UnknownDecl><UnknownDecl>
   func foo() {<UnknownDecl>
     var a = /*comment*/<StringLiteralExpr>"abc"/*comment*/</StringLiteralExpr></UnknownDecl><UnknownDecl>
     var b = /*comment*/<IntegerLiteralExpr>+2/*comment*/</IntegerLiteralExpr></UnknownDecl><UnknownExpr>
     bar(<IntegerLiteralExpr>1</IntegerLiteralExpr>)</UnknownExpr><UnknownExpr>
     bar(<IntegerLiteralExpr>+10</IntegerLiteralExpr>)</UnknownExpr><UnknownExpr>
-    bar(<IntegerLiteralExpr>-10</IntegerLiteralExpr>)</UnknownExpr>
+    bar(<IntegerLiteralExpr>-10</IntegerLiteralExpr>)</UnknownExpr><UnknownExpr>
+    bar1(<FloatLiteralExpr>-1.1</FloatLiteralExpr>)</UnknownExpr><UnknownExpr>
+    bar1(<FloatLiteralExpr>1.1</FloatLiteralExpr>)</UnknownExpr><UnknownDecl>
+    var f = /*comments*/<FloatLiteralExpr>+0.1/*comments*/</FloatLiteralExpr></UnknownDecl>
   }</UnknownDecl>
 }</UnknownDecl></DeclarationStmt>
