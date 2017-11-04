@@ -281,6 +281,10 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND dependencies ${validation_test_dependencies})
         endif()
 
+        if("${SWIFT_SDK_${SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+          list(APPEND dependencies swiftImageRegistration${VARIANT_SUFFIX})
+        endif()
+
         set(test_subset_target_suffix "-${test_subset}")
         if(test_subset STREQUAL "primary")
           set(test_subset_target_suffix "")
