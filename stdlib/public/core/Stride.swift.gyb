@@ -571,13 +571,16 @@ where ${Where} {
 //===----------------------------------------------------------------------===//
 
   // RandomAccessCollection conformance
-  public typealias Index = Int
-  public typealias SubSequence = ${Self}
-  public typealias Indices = CountableRange<Int>
+  public typealias Index = ClosedRangeIndex<Int>
+  public typealias IndexDistance = Int
+  public typealias SubSequence = RandomAccessSlice<${Self}>
 
-  public var startIndex: Index { return 0 }
-  public var endIndex: Index { return count }
+  @_inlineable
+  public var startIndex: Index { return ClosedRangeIndex(0) }
+  @_inlineable
+  public var endIndex: Index { return ClosedRangeIndex() }
 
+  @_inlineable
   public var count: Int {
     let (start, end, stride) =
       (_stride > 0) ? (_start, _end, _stride) : (_end, _start, -_stride)
@@ -590,32 +593,75 @@ where ${Where} {
   }
 
   public subscript(position: Index) -> Element {
-    _failEarlyRangeCheck(position, bounds: startIndex ..< endIndex)
-    return _indexToElement(position)
+    let offset = Element.Stride(position._dereferenced) * _stride
+    return _start.advanced(by: offset)
   }
 
-  public subscript(bounds: Range<Index>) -> ${Self} {
-    _failEarlyRangeCheck(bounds, bounds: startIndex ..< endIndex)
-    return ${Self}(
-      _start: _indexToElement(bounds.lowerBound),
-      end: _indexToElement(bounds.upperBound),
-      stride: _stride)
+  public subscript(bounds: Range<Index>) -> RandomAccessSlice<${Self}> {
+    return RandomAccessSlice(base: self, bounds: bounds)
   }
 
-  public func index(after i: Index) -> Index {
-    _failEarlyRangeCheck(i, bounds: startIndex-1 ..< endIndex)
-    return i+1
-  }
-
+  @_inlineable
   public func index(before i: Index) -> Index {
-    _failEarlyRangeCheck(i, bounds: startIndex+1 ... endIndex)
-    return i-1
+    switch i._value {
+    case .inRange(let n):
+      _precondition(n > 0, "Incrementing past start index")
+      return ClosedRangeIndex(n - 1)
+    case .pastEnd:
+      _precondition(_end >= _start, "Incrementing past start index")
+      return ClosedRangeIndex(count - 1)
+    }
   }
 
-  @inline(__always)
-  internal func _indexToElement(_ i: Index) -> Element {
-    return _start.advanced(by: Element.Stride(i) * _stride)
+  @_inlineable
+  public func index(after i: Index) -> Index {
+    switch i._value {
+    case .inRange(let n):
+      return n == (count - 1)
+        ? ClosedRangeIndex()
+        : ClosedRangeIndex(n + 1)
+    case .pastEnd:
+      _preconditionFailure("Incrementing past end index")
+    }
   }
+
+  /*
+  @_inlineable
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
+    switch i._value {
+    case .inRange(let x):
+      let d = x.distance(to: _end)
+      if n <= d {
+        let newElement = x.advanced(by: n*_stride)
+        _precondition(newElement >= _start, "Advancing past start index")
+        return ClosedRangeIndex(newElement)
+      }
+      if d - (-_stride) == Element.Stride(n) * _stride {
+        return ClosedRangeIndex()
+      }
+      _preconditionFailure("Advancing past end index")
+    case .pastEnd:
+      if n == 0 {
+        return i
+      }
+      if n < 0 {
+        return index(ClosedRangeIndex(_end), offsetBy: (n + 1))
+      }
+      _preconditionFailure("Advancing past end index")
+    }
+  }
+  */
+
+  // FIXME(ABI)#175 (Type checker)
+  @_inlineable
+  public // WORKAROUND: needed because of rdar://25584401
+  var indices: DefaultRandomAccessIndices<${Self}> {
+    return DefaultRandomAccessIndices(
+      _elements: self,
+      startIndex: self.startIndex,
+      endIndex: self.endIndex)
+  }
+
 }
 
 % end
