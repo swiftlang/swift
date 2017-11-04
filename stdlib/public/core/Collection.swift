@@ -780,6 +780,8 @@ public protocol Collection : Sequence
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
+
+  func shuffled(using generator: RandomGenerator) -> [Element]
 }
 
 /// Default implementation for forward collections.
@@ -991,6 +993,15 @@ extension Collection {
     return count
   }
 
+  @_inlineable
+  public func shuffled(
+    using generator: RandomGenerator = Random.default
+  ) -> [Element] {
+    var arr = Array(self)
+    arr.shuffle(using: generator)
+    return arr
+  }
+
   /// Do not use this method directly; call advanced(by: n) instead.
   @_inlineable
   @_versioned
@@ -1134,7 +1145,7 @@ extension Collection {
       return i.next()
     }
   }
-  
+
   // TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   ///
@@ -1287,7 +1298,7 @@ extension Collection {
       offsetBy: numericCast(amount), limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-  
+
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///
@@ -1304,7 +1315,7 @@ extension Collection {
     var start = startIndex
     while try start != endIndex && predicate(self[start]) {
       formIndex(after: &start)
-    } 
+    }
     return self[start..<endIndex]
   }
 
@@ -1333,7 +1344,7 @@ extension Collection {
       offsetBy: numericCast(maxLength), limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-  
+
   /// Returns a subsequence containing the initial elements until `predicate`
   /// returns `false` and skipping the remaining elements.
   ///
@@ -1463,7 +1474,7 @@ extension Collection {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position `end`. 
+  /// The resulting subsequence *includes* the element at the position `end`.
   /// The following example searches for the index of the number `40` in an
   /// array of integers, and then prints the prefix of the array up to, and
   /// including, that index:

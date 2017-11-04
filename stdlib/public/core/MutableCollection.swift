@@ -159,6 +159,8 @@ public protocol MutableCollection : Collection
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index
 
+  mutating func shuffle(using generator: RandomGenerator)
+
   /// Exchanges the values at the specified indices of the collection.
   ///
   /// Both parameters must be valid indices of the collection and not
@@ -224,6 +226,32 @@ extension MutableCollection {
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+
+  @_inlineable
+  public mutating func shuffle(
+    using generator: RandomGenerator = Random.default
+  ) {
+    guard count > 1 else { return }
+    var amount = count
+    while amount > 1 {
+      var random = generator.next(Int.self, upperBound: Int(count))
+      if random < 0 { random *= -1 }
+      guard amount != random else { continue }
+      amount -= 1
+      swapAt(
+        index(
+          startIndex,
+          offsetBy: IndexDistance(amount),
+          limitedBy: endIndex
+        )!,
+        index(
+          startIndex,
+          offsetBy: IndexDistance(random),
+          limitedBy: endIndex
+        )!
+      )
     }
   }
 

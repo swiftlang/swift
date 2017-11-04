@@ -40,18 +40,6 @@ public enum Random : RandomGenerator {
   }
 }
 
-public protocol RandomizableCollection : Collection {
-  var random: Element { get }
-  func random(using generator: RandomGenerator) -> Element
-}
-
-extension RandomizableCollection {
-  @_inlineable
-  public var random: Element {
-    return self.random(using: Random.default)
-  }
-}
-
 public protocol Randomizable {
   static var random: Self { get }
   static func random(using generator: RandomGenerator) -> Self

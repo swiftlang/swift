@@ -242,11 +242,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debugFlags) {
-  #if defined(_WIN32)
-  int oflags = _O_RDONLY | _O_BINARY;
-  #else
   int oflags = O_RDONLY;
-  #endif
   int fd = swift::_swift_stdlib_open("/dev/urandom", oflags);
   if (fd < 0) {
     fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom");
@@ -277,11 +273,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debugFlags) {
-  #if defined(_WIN32)
-  int oflags = _O_RDONLY | _O_BINARY;
-  #else
   int oflags = O_RDONLY;
-  #endif
   int fd = swift::_swift_stdlib_open("/dev/urandom", oflags);
   if (fd < 0) {
     fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom");
