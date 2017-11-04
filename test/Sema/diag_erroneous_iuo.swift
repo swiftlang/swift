@@ -137,3 +137,19 @@ let _: Generic<Int!, // expected-error {{implicitly unwrapped optionals are only
 
 func vararg(_ first: Int, more: Int!...) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
 }
+
+func iuoInTuple() -> (Int!) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return 1
+}
+
+func iuoInTuple2() -> (Float, Int!) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return 1
+}
+
+func takesFunc(_ fn: (Int!) -> Int) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return fn(0)
+}
+
+func returnsFunc() -> (Int!) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return { $0 }
+}
