@@ -83,19 +83,30 @@ public:
 /// applications: namely, that an apply of a thick function consumes the callee
 /// and that the function implementing the closure consumes its capture
 /// arguments.
-static void fixupReferenceCounts(SILBasicBlock::iterator I,
-                                 SILValue CalleeValue,
-                                 SmallVectorImpl<SILValue> &CaptureArgs) {
+static void fixupReferenceCounts(
+    SILBasicBlock::iterator I, SILValue CalleeValue,
+    SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CaptureArgs,
+    bool isCalleeGuaranteed) {
   // Add a copy of each non-address type capture argument to lifetime extend the
   // captured argument over the inlined function. This deals with the
   // possibility of the closure being destroyed by an earlier application and
   // thus cause the captured argument to be destroyed.
-  for (auto &CaptureArg : CaptureArgs)
-    if (!CaptureArg->getType().isAddress())
-      createIncrementBefore(CaptureArg, &*I);
+  for (auto &CaptureArg : CaptureArgs) {
+    if (!CaptureArg.first->getType().isAddress() &&
+        CaptureArg.second != ParameterConvention::Direct_Guaranteed &&
+        CaptureArg.second != ParameterConvention::Direct_Unowned) {
+      createIncrementBefore(CaptureArg.first, &*I);
+    } else {
+      // FIXME: What about indirectly owned parameters? The invocation of the
+      // closure would perform an indirect copy which we should mimick here.
+      assert(CaptureArg.second != ParameterConvention::Indirect_In &&
+             "Missing indirect copy");
+    }
+  }
 
   // Destroy the callee as the apply would have done.
-  createDecrementBefore(CalleeValue, &*I);
+  if (!isCalleeGuaranteed)
+    createDecrementBefore(CalleeValue, &*I);
 }
 
 static SILValue cleanupLoadedCalleeValue(SILValue CalleeValue, LoadInst *LI) {
@@ -159,9 +170,9 @@ static SILValue cleanupLoadedCalleeValue(SILValue CalleeValue, LoadInst *LI) {
 
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
-static void
-cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
-                   ArrayRef<SILValue> FullArgs) {
+static void cleanupCalleeValue(
+    SILValue CalleeValue,
+    ArrayRef<SILValue> FullArgs) {
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
     if (V != CalleeValue)
@@ -217,6 +228,22 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   }
 }
 
+static void collectPartiallyAppliedArguments(
+    PartialApplyInst *PAI,
+    SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CapturedArgs,
+    SmallVectorImpl<SILValue> &FullArgs) {
+  ApplySite Site(PAI);
+  SILFunctionConventions CalleeConv(Site.getSubstCalleeType(),
+                                    PAI->getModule());
+  for (auto &Arg : PAI->getArgumentOperands()) {
+    unsigned CalleeArgumentIndex = Site.getCalleeArgIndex(Arg);
+    assert(CalleeArgumentIndex >= CalleeConv.getSILArgIndexOfFirstParam());
+    auto ParamInfo = CalleeConv.getParamInfoForSILArg(CalleeArgumentIndex);
+    CapturedArgs.push_back(std::make_pair(Arg.get(), ParamInfo.getConvention()));
+    FullArgs.push_back(Arg.get());
+  }
+}
+
 /// \brief Returns the callee SILFunction called at a call site, in the case
 /// that the call is transparent (as in, both that the call is marked
 /// with the transparent flag and that callee function is actually transparently
@@ -225,12 +252,11 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
 ///
 /// In the case that a non-null value is returned, FullArgs contains effective
 /// argument operands for the callee function.
-static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
-                                      bool &IsThick,
-                                      SmallVectorImpl<SILValue> &CaptureArgs,
-                                      SmallVectorImpl<SILValue> &FullArgs,
-                                      PartialApplyInst *&PartialApply,
-                                      SILModule::LinkingMode Mode) {
+static SILFunction *getCalleeFunction(
+    SILFunction *F, FullApplySite AI, bool &IsThick,
+    SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CaptureArgs,
+    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply,
+    SILModule::LinkingMode Mode) {
   IsThick = false;
   PartialApply = nullptr;
   CaptureArgs.clear();
@@ -319,10 +345,9 @@ static SILFunction *getCalleeFunction(SILFunction *F, FullApplySite AI,
   // one "thin to thick function" instructions, since those are the patterns
   // generated when using auto closures.
   if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
-    for (const auto &Arg : PAI->getArguments()) {
-      CaptureArgs.push_back(Arg);
-      FullArgs.push_back(Arg);
-    }
+
+    // Collect the applied arguments and their convention.
+    collectPartiallyAppliedArguments(PAI, CaptureArgs, FullArgs);
 
     CalleeValue = PAI->getCallee();
     IsThick = true;
@@ -440,7 +465,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
   // during this call and recursive subcalls).
   CurrentInliningSet = SetFactory.add(CurrentInliningSet, F);
 
-  SmallVector<SILValue, 16> CaptureArgs;
+  SmallVector<std::pair<SILValue, ParameterConvention>, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
 
   for (auto BI = F->begin(), BE = F->end(); BI != BE; ++BI) {
@@ -465,6 +490,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(
           F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI, Mode);
+
       if (!CalleeFunction)
         continue;
 
@@ -529,8 +555,12 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.
-      if (IsThick)
-        fixupReferenceCounts(II, CalleeValue, CaptureArgs);
+      if (IsThick) {
+        bool IsCalleeGuaranteed =
+            PAI &&
+            PAI->getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
+        fixupReferenceCounts(II, CalleeValue, CaptureArgs, IsCalleeGuaranteed);
+      }
 
       // Decrement our iterator (carefully, to avoid going off the front) so it
       // is valid after inlining is done.  Inlining deletes the apply, and can
@@ -551,7 +581,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // Now that the IR is correct, see if we can remove dead callee
       // computations (e.g. dead partial_apply closures).
-      cleanupCalleeValue(CalleeValue, CaptureArgs, FullArgs);
+      cleanupCalleeValue(CalleeValue, FullArgs);
 
       // Reposition iterators possibly invalidated by mutation.
       BI = SILFunction::iterator(ApplyBlock);
