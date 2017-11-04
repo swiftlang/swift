@@ -84,6 +84,14 @@
 // CHECK:  (result
 // CHECK:    (tuple))
 
+// CHECK: aFunctionWithShared: (__shared TypesToReflect.C) -> ()
+// CHECK: (function
+// CHECK:  (parameters
+// CHECK:    (shared
+// CHECK:      (class TypesToReflect.C))
+// CHECK:  (result
+// CHECK:    (tuple))
+
 // CHECK: TypesToReflect.S.NestedS
 // CHECK: ------------------------
 // CHECK: aField: Swift.Int
