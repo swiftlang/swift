@@ -335,8 +335,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     if (!PAI->hasCalleeGuaranteedContext())
-      Builder.createStrongRelease(AI.getLoc(), PAI,
-                                  Builder.getDefaultAtomicity());
+      Builder.emitDestroyValueOperation(PAI->getLoc(), PAI);
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
@@ -344,8 +343,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
     if (!PAI->hasCalleeGuaranteedContext())
-      Builder.createStrongRelease(AI.getLoc(), PAI,
-                                  Builder.getDefaultAtomicity());
+      Builder.emitDestroyValueOperation(PAI->getLoc(), PAI);
   }
 
   if (auto apply = dyn_cast<ApplyInst>(AI))
