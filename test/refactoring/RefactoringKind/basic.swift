@@ -224,6 +224,13 @@ func testSwitchExpand() {
   let account: AccountType = .savings
   switch account { }
 }
+
+func testExpandTernaryExpr() {
+  let a = 3
+  let b = 5
+  let x = a < 5 ? a : b
+}
+
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=4:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -311,6 +318,7 @@ func testSwitchExpand() {
 
 // RUN: %refactor -source-filename %s -pos=225:3 | %FileCheck %s -check-prefix=CHECK-EXPAND-SWITCH
 
+// RUN: %refactor -source-filename %s -pos=231:3 -end-pos=231:24 | %FileCheck %s -check-prefix=CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
@@ -354,3 +362,5 @@ func testSwitchExpand() {
 // CHECK-TRY-CATCH: Convert To Do/Catch
 
 // CHECK-EXPAND-SWITCH: Expand Switch Cases
+
+// CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION: Expand Ternary Expression
