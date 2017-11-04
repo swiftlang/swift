@@ -2207,20 +2207,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 }
 
 void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
-  if (CD->hasDestructor() || CD->isInvalid())
-    return;
-
-  auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
-
-  auto *DD = new (Context) DestructorDecl(CD->getLoc(), selfDecl, CD);
-
-  DD->setImplicit();
-
-  // Type-check the destructor declaration.
-  typeCheckDecl(DD, /*isFirstPass=*/true);
-
-  // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(), true));
-  CD->addMember(DD);
-  CD->setHasDestructor();
+  auto *DD = CD->addImplicitDestructor();
+  if (DD)
+    typeCheckDecl(DD, /*isFirstPass=*/true);
 }
