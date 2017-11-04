@@ -432,7 +432,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
-    TokReceiver(SF.shouldKeepTokens() ?
+    TokReceiver(SF.shouldKeepSyntaxInfo() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new syntax::SyntaxParsingContextRoot(SF, L->getBufferID(), Tok)) {
@@ -912,7 +912,7 @@ struct ParserUnit::Implementation {
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
             SourceFile::ImplicitModuleImportKind::None,
-            Opts.KeepTokensInSourceFile)) {
+            Opts.KeepSyntaxInfoInSourceFile)) {
   }
 };
 

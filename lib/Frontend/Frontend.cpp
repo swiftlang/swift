@@ -391,7 +391,7 @@ void CompilerInstance::createREPLFile(
     const ImplicitImports &implicitImports) const {
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
-      Invocation.getLangOptions().KeepTokensInSourceFile);
+      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
   MainModule->addFile(*SingleInputFile);
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
@@ -416,7 +416,7 @@ void CompilerInstance::addMainFileToModule(
 
   auto *MainFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), MainBufferID,
-      implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
+      implicitImports.kind, Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
   MainModule->addFile(*MainFile);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 
@@ -484,7 +484,7 @@ void CompilerInstance::parseLibraryFile(
 
   auto *NextInput = new (*Context) SourceFile(
       *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind,
-      Invocation.getLangOptions().KeepTokensInSourceFile);
+      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
   MainModule->addFile(*NextInput);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
@@ -639,7 +639,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
-  bool KeepTokens = Invocation.getLangOptions().KeepTokensInSourceFile;
+  bool KeepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
 
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
@@ -656,7 +656,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
 
     auto *MainFile = new (*Context)
         SourceFile(*MainModule, Invocation.getSourceFileKind(), MainBufferID,
-                   implicitModuleImportKind, KeepTokens);
+                   implicitModuleImportKind, KeepSyntaxInfo);
     MainModule->addFile(*MainFile);
 
     if (MainBufferID == PrimaryBufferID)
@@ -672,7 +672,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
 
     auto *NextInput = new (*Context)
         SourceFile(*MainModule, SourceFileKind::Library, BufferID,
-                   implicitModuleImportKind, KeepTokens);
+                   implicitModuleImportKind, KeepSyntaxInfo);
     MainModule->addFile(*NextInput);
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);

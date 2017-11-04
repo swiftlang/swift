@@ -942,7 +942,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   Invocation.getLangOptions().Playground = Playground;
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   if (CI.setup(Invocation))
     return 1;
   if (!RunTypeChecker)
@@ -1153,7 +1153,7 @@ private:
 static int doStructureAnnotation(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   Invocation.addInputFilename(SourceFilename);
 
   CompilerInstance CI;
@@ -2670,7 +2670,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
 
   CompilerInstance CI;
 
@@ -2991,6 +2991,7 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
+  InitInvok.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
