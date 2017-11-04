@@ -90,6 +90,12 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 
+// Random number for stdlib
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_random(void *buf,
+                          __swift_ssize_t nbytes,
+                          __swift_uint32_t debugFlags);
+
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
 float _swift_stdlib_remainderf(float _self, float _other) {

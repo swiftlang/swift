@@ -27,6 +27,7 @@
 #include <string.h>
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
 #include "../SwiftShims/LibcShims.h"
 #include "llvm/Support/DataTypes.h"
 
@@ -213,3 +214,73 @@ swift::_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
+
+#if defined(__APPLE__)
+#include "TargetConditionals.h"
+#if defined(TARGET_IPHONE_SIMULATOR) \
+  || ( defined(TARGET_OS_IPHONE) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 10000 ) \
+  || ( defined(TARGET_OS_MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 )
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_swift_stdlib_random(void *buf,
+                                __swift_ssize_t nbytes,
+                                __swift_uint32_t debugFlags) {
+  arc4random_buf(buf, nbytes);
+}
+#else
+#include <fstream>
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_swift_stdlib_random(void *buf,
+                                __swift_ssize_t nbytes,
+                                __swift_uint32_t debugFlags) {
+  std::ifstream device_urandom("/dev/urandom", std::ios::in | std::ios::binary);
+
+  if (!device_urandom) {
+    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
+  }
+
+  device_urandom.read(reinterpret_cast<char *>(buf), nbytes);
+
+  if (!device_urandom) {
+    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
+  }
+
+  device_urandom.close();
+}
+#endif
+#elif defined(__linux__)
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0)
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <sys/syscall.h>
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_swift_stdlib_random(void *buf,
+                                __swift_ssize_t nbytes,
+                                __swift_uint32_t debugFlags) {
+  int result = syscall(SYS_getrandom, buf, nbytes, 0);
+  if (result != 0) {
+    fatalError(debugFlags, "Fatal error: Unexpected error with getrandom")
+  }
+}
+#else
+#include <fstream>
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_swift_stdlib_random(void *buf,
+                                __swift_ssize_t nbytes,
+                                __swift_uint32_t debugFlags) {
+  std::ifstream device_urandom("/dev/urandom", std::ios::in | std::ios::binary);
+
+  if (!device_urandom) {
+    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
+  }
+
+  device_urandom.read(reinterpret_cast<char *>(buf), nbytes);
+
+  if (!device_urandom) {
+    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
+  }
+
+  device_urandom.close();
+}
+#endif
+#endif
