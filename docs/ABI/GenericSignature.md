@@ -21,7 +21,7 @@ Generic signatures are used in a few places within the ABI, including:
 
 * The mangled names of generic entities include the generic signature
 * The generic type parameters and protocol-conformance constraints in a generic signature are mapped to type metadata and witness-table parameters in a generic function, respectively.
-* The entries in a witness table
+* The entries in a protocol witness table correspond to a variant of the generic signature of a protocol called the [requirement signature](#requirement-signature).
 
 Whenever used in the ABI, a generic signature must be both *minimal* and *canonical*, as defined below.
 
@@ -177,6 +177,16 @@ The minimal canonical generic signature for this function is:
 Note that `C1.Element`, `C2.Element`, and `C3.SubSequence.Element` are all
 in the same equivalence class, but are in different components. The first two are the local anchors of their respective components, while the local anchor for the third component is `C3.Element`. Because the equivalence class is constrained to a concrete type (`String`), the canonical form includes a same-type constraint making each local anchor equivalent to that concrete type.
 
+## Requirement signatures
+A protocol can introduce a number of constraints, including inherited protocols and constraints on associated types. The *requirement signature* of a protocol is a form of a generic signature that describes those constraints. For example, consider a `Collection` protocol similar to the one in the standard library:
 
+```swift
+protocol Collection: Sequence where SubSequence: Collection {
+  associatedtype Index
+  associatedtype Indices: Collection where Indices.Element == Index
+  // ...
+}
+```
 
+This protocol introduces a number of constraints: `Self: Sequence` (stated as inheritance), `Self.SubSequence: Collection` (in the protocol where clause), `Self.Indices: Collection` (associated type declaration) and `Self.Indices.Element == Index` (associated type where clause). These constraints, which are directly implied by `Self: Collection`, form the *requirement signature* of a protocol. As with other generic signatures used for the ABI, the requirement signature is minimal and canonical according to the rules described elsewhere in this document.
 
