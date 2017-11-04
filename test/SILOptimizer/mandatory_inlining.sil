@@ -1084,3 +1084,103 @@ bb11(%128 : $Error):
 bb12(%result : $C):
   return %result : $C
 }
+
+sil @use_c : $@convention(thin) (@guaranteed C) -> ()
+sil @use_c_unowned : $@convention(thin) (C) -> ()
+
+sil [transparent] @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %use = function_ref @use_c : $@convention(thin) (@guaranteed C) -> ()
+  apply %use(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [transparent] @unowned_closure_func : $@convention(thin) (C) -> () {
+bb0(%0 : $C):
+  %use = function_ref @use_c_unowned : $@convention(thin) (C) -> ()
+  apply %use(%0) : $@convention(thin) (C) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_guaranteed_closure_capture
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK:   strong_retain [[ARG]] : $C
+// @guaranteed closure captures *don't* release the capture in the closure implementation.
+// CHECK-NOT:   strong_retain [[ARG]] : $C
+// CHECK:   [[F:%.*]] = function_ref @use_c
+// CHECK:   apply [[F]]([[ARG]])
+// CHECK:   strong_release [[ARG]]
+// CHECK:   return
+sil @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  apply %closure() : $@callee_guaranteed () -> ()
+  strong_release %closure : $@callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_guaranteed_closure_capture2
+// CHECK: bb0([[ARG:%.*]] : $C):
+// @guaranteed closure captures *don't* release the capture in the closure implementation.
+// CHECK:   strong_retain [[ARG]] : $C
+// CHECK:   strong_release [[ARG]] : $C
+// CHECK:   [[F:%.*]] = function_ref @use_c
+// CHECK:   apply [[F]]([[ARG]])
+// CHECK-NOT:   strong_release [[ARG]]
+// CHECK:   return
+sil @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  apply %closure() : $@callee_owned () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_unowned_closure_capture2
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK:   strong_retain [[ARG]]
+// CHECK:   strong_release [[ARG]]
+// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   [[F:%.*]] = function_ref @use_c_unowned
+// CHECK:   apply [[F]]([[ARG]]) : $@convention(thin) (C) -> ()
+// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   return
+sil @test_unowned_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @unowned_closure_func : $@convention(thin) (C) -> ()
+  %closure = partial_apply %closure_fun(%0) : $@convention(thin) (C) -> ()
+  apply %closure() : $@callee_owned () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+// CHECK-LABEL: sil @test_guaranteed_closure
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK:   strong_retain [[ARG]] : $C
+// CHECK:   [[F:%.*]] = function_ref @guaranteed_closure_func
+// CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]])
+// @guaranteed closure captures *don't* release the capture in the closure implementation.
+// CHECK-NOT:   strong_retain [[ARG]] : $C
+// @callee_guaranteed closures *don't* release the context on application.
+// CHECK-NOT:   strong_release [[C]]
+// CHECK:   [[F:%.*]] = function_ref @use_c
+// CHECK:   apply [[F]]([[ARG]])
+// CHECK:   return [[C]]
+
+sil @test_guaranteed_closure : $@convention(thin) (@guaranteed C) -> @owned @callee_guaranteed () -> () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+// NOTE: No ``strong_retain %closure`` is needed here because the context is
+// @callee_guaranteed.
+  apply %closure() : $@callee_guaranteed () -> ()
+  return %closure : $@callee_guaranteed () -> ()
+}
