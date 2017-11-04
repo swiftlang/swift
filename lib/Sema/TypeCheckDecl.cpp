@@ -4127,8 +4127,25 @@ public:
             TC.checkTypeModifyingDeclAttributes(var);
 
           // Decide whether we should suppress default initialization.
-          if (!PBD->isDefaultInitializable(i))
-            continue;
+          //
+          // Note: Swift 4 had a bug where properties with a desugared optional
+          // type like Optional<Int> had a half-way behavior where sometimes
+          // they behave like they are default initialized, and sometimes not.
+          //
+          // In Swift 5 mode, use the right condition here, and only default
+          // initialize properties with a sugared Optional type.
+          //
+          // (The restriction to sugared types only comes because we don't have
+          // the iterative declaration checker yet; so in general, we cannot
+          // look at the type of a property at all, and can only look at the
+          // TypeRepr, because we haven't validated the property yet.)
+          if (TC.Context.isSwiftVersionAtLeast(5)) {
+            if (!PBD->isDefaultInitializable(i))
+              continue;
+          } else {
+            if (PBD->getPattern(i)->isNeverDefaultInitializable())
+              continue;
+          }
 
           auto type = PBD->getPattern(i)->getType();
           if (auto defaultInit = buildDefaultInitializer(TC, type)) {
