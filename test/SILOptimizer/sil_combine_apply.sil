@@ -437,3 +437,29 @@ bb99:
   %empty = tuple ()
   return %empty : $()
 }
+
+class C {}
+
+sil @guaranteed_closure : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil @test_guaranteed_closure
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK: strong_retain [[ARG]]
+// CHECK: [[F:%.*]] = function_ref @guaranteed_closure
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]])
+// CHECK: strong_retain [[ARG]]
+// CHECK: apply [[F]]
+// Don't release the closure context -- it is @callee_guaranteed.
+// CHECK-NOT: strong_release [[C]] : $@callee_guaranteed () -> ()
+// CHECK: strong_release [[ARG]]
+// CHECK-NOT: strong_release [[C]] : $@callee_guaranteed () -> ()
+// CHECK: return [[C]]
+
+sil @test_guaranteed_closure : $@convention(thin) (@guaranteed C) -> @owned @callee_guaranteed () -> () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  apply %closure() : $@callee_guaranteed () -> ()
+  return %closure : $@callee_guaranteed () -> ()
+}
