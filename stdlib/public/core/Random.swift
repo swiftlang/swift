@@ -29,10 +29,9 @@ import SwiftShims
 /// `FixedWidthInteger`. They must also be able to constrict that number down
 /// to an upperBound.
 ///
-/// - Note: It should be worth noting that types that implement RandomGenerator
-///   should have a decent amount of documentation that clearly conveys whether
-///   or not the generator produces cryptographically-secure numbers or
-///   deterministically generated numbers.
+/// - Note: Types that implement RandomGenerator should have a decent amount of
+///   documentation that clearly conveys whether or not the generator produces
+///   cryptographically secure numbers or deterministically generated numbers.
 public protocol RandomGenerator {
   /// Produces the next randomly generated number
   ///
@@ -64,7 +63,7 @@ public protocol RandomGenerator {
 ///     let random = Int.random
 ///     let randomToTen = (0 ... 10).random
 ///
-/// - Note: The default implementation of randomness is cryptographically-secure.
+/// - Note: The default implementation of randomness is cryptographically secure.
 ///   It utilizes arc4random on newer versions of macOS, iOS, etc. On older
 ///   versions of these operating systems it uses /dev/urandom and SecRandomCopyBytes
 ///   on iOS. For Linux, it tries to use the getrandom(2) system call on newer

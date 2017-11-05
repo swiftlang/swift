@@ -117,7 +117,7 @@ public protocol RandomAccessCollection : BidirectionalCollection
   ///
   /// - Parameter generator: The random number generator to use when getting
   ///   a random element.
-  /// - Returns: A random random element this collection.
+  /// - Returns: A random element this collection.
   ///
   /// A good example of this is getting a random number from 1 to 10:
   ///
@@ -234,7 +234,7 @@ extension RandomAccessCollection {
   ///
   /// - Parameter generator: The random number generator to use when getting
   ///   a random element.
-  /// - Returns: A random random element this collection.
+  /// - Returns: A random element this collection.
   ///
   /// A good example of this is getting a random number from 1 to 10:
   ///

@@ -2106,7 +2106,7 @@ extension BinaryFloatingPoint {
   /// - Returns: A random representation of this floating point conforming to
   ///   `Randomizable`
   ///
-  /// The range of this random floating point is from 0 to 1
+  /// The range of this random floating point is from 0 to 1 inclusive
   @_inlineable
   public static func random(using generator: RandomGenerator) -> Self {
     let random = generator.next(UInt64.self)

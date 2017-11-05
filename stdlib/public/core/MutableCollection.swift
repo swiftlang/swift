@@ -162,7 +162,7 @@ public protocol MutableCollection : Collection
   /// Shuffles the current collection
   ///
   /// - Parameter generator: The random number generator to use when shuffling
-  ///   the collection. This parameter is not need as the default implementation
+  ///   the collection. This parameter is not needed as the default implementation
   ///   of `Collection` uses the default random source in the standard library.
   mutating func shuffle(using generator: RandomGenerator)
 
@@ -237,7 +237,7 @@ extension MutableCollection {
   /// Shuffles the current collection
   ///
   /// - Parameter generator: The random number generator to use when shuffling
-  ///   the collection. This parameter is not need as the default implementation
+  ///   the collection. This parameter is not needed as the default implementation
   ///   of `Collection` uses the default random source in the standard library.
   @_inlineable
   public mutating func shuffle(
