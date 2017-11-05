@@ -1716,12 +1716,10 @@ public:
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    RecursiveTypeProperties properties;
-    Profile(ID, TheDecl, Parent, GenericArgs, properties);
+    Profile(ID, TheDecl, Parent, GenericArgs);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
-                      Type Parent, ArrayRef<Type> GenericArgs,
-                      RecursiveTypeProperties &properties);
+                      Type Parent, ArrayRef<Type> GenericArgs);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

@@ -3190,15 +3190,12 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
 
 void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
                                NominalTypeDecl *TheDecl, Type Parent,
-                               ArrayRef<Type> GenericArgs,
-                               RecursiveTypeProperties &properties) {
+                               ArrayRef<Type> GenericArgs) {
   ID.AddPointer(TheDecl);
   ID.AddPointer(Parent.getPointer());
-  if (Parent) properties |= Parent->getRecursiveProperties();
   ID.AddInteger(GenericArgs.size());
   for (Type Arg : GenericArgs) {
     ID.AddPointer(Arg.getPointer());
-    properties |= Arg->getRecursiveProperties();
   }
 }
 
@@ -3224,8 +3221,12 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
+  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
   RecursiveTypeProperties properties;
-  BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs, properties);
+  if (Parent) properties |= Parent->getRecursiveProperties();
+  for (Type Arg : GenericArgs) {
+    properties |= Arg->getRecursiveProperties();
+  }
 
   auto arena = getArena(properties);
 
