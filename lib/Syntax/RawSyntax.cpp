@@ -29,6 +29,7 @@ static bool isTrivialSyntaxKind(SyntaxKind Kind) {
   case SyntaxKind::SourceFile:
   case SyntaxKind::TopLevelCodeDecl:
   case SyntaxKind::ExpressionStmt:
+  case SyntaxKind::DeclarationStmt:
     return true;
   default:
     return false;
