@@ -3628,6 +3628,11 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       if (genericDecl->getGenericParams())
         continue;
 
+    // Skip typealiases with an unbound generic type as their underlying type.
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.first))
+      if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
+        continue;
+
     // Check this type against the protocol requirements.
     if (auto checkResult = checkTypeWitness(TC, DC, Proto, assocType,
                                             candidate.second)) {
