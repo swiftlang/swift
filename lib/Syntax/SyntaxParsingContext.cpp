@@ -43,26 +43,20 @@ static ArrayRef<Syntax> getSyntaxNodes(ArrayRef<RawSyntaxInfo> RawNodes,
   return Scratch;
 }
 
-static std::pair<SourceLoc, SourceLoc>
-getNodesLocation(ArrayRef<RawSyntaxInfo> RawNodes) {
+static SourceRange getNodesRange(ArrayRef<RawSyntaxInfo> RawNodes) {
   SourceLoc StartLoc, EndLoc;
   for (auto Info: RawNodes) {
     if (Info.isImplicit())
       continue;
     if (StartLoc.isInvalid()) {
-      StartLoc = Info.StartLoc;
+      StartLoc = Info.getStartLoc();
     }
-    EndLoc = Info.EndLoc;
+    EndLoc = Info.getEndLoc();
   }
   assert(StartLoc.isValid() == EndLoc.isValid());
-  return std::tie(StartLoc, EndLoc);
+  return SourceRange(StartLoc, EndLoc);
 }
 } // End of anonymous namespace
-
-RawSyntaxInfo::RawSyntaxInfo(SourceLoc StartLoc, SourceLoc EndLoc,
-    RC<RawSyntax> RawNode): StartLoc(StartLoc), EndLoc(EndLoc), RawNode(RawNode) {
-  assert(StartLoc.isValid() == EndLoc.isValid());
-}
 
 struct SyntaxParsingContext::ContextInfo {
   bool Enabled;
@@ -76,8 +70,8 @@ private:
 
   ArrayRef<RawSyntaxInfo>::const_iterator findTokenAt(SourceLoc Loc) {
     for (auto It = Tokens.begin(); It != Tokens.end(); It ++) {
-      assert(It->StartLoc == It->EndLoc);
-      if (It->StartLoc == Loc)
+      assert(It->getStartLoc() == It->getEndLoc());
+      if (It->getStartLoc() == Loc)
         return It;
     }
     llvm_unreachable("cannot find the token on the given location");
@@ -109,8 +103,8 @@ public:
 
   void addPendingSyntax(RawSyntaxInfo Info) {
     assert(Info.isImplicit() || PendingSyntax.empty() ||
-           PendingSyntax.back().StartLoc.getOpaquePointerValue() <
-             Info.StartLoc.getOpaquePointerValue());
+           PendingSyntax.back().getStartLoc().getOpaquePointerValue() <
+             Info.getStartLoc().getOpaquePointerValue());
     PendingSyntax.push_back(Info);
   }
 
@@ -153,18 +147,18 @@ SyntaxParsingContext::ContextInfo::collectAllSyntax() {
     } else if (CurSyntax->isImplicit()) {
       // Skip implicit syntax node.
       CurSyntax ++;
-    } else if (CurSyntax->StartLoc == Tok.StartLoc) {
+    } else if (CurSyntax->getStartLoc() == Tok.getStartLoc()) {
       // Prefer syntax nodes to tokens.
       Results.emplace_back(*CurSyntax);
-      while(It->EndLoc != CurSyntax->EndLoc) It++;
-      assert(It < Tokens.end() && It->EndLoc == CurSyntax->EndLoc);
+      while(It->getEndLoc() != CurSyntax->getEndLoc()) It++;
+      assert(It < Tokens.end() && It->getEndLoc() == CurSyntax->getEndLoc());
       It ++;
       CurSyntax ++;
     } else {
       // We have to add token in this case since the next syntax node has not
       // started.
-      assert(Tok.StartLoc.getOpaquePointerValue() <
-             CurSyntax->StartLoc.getOpaquePointerValue());
+      assert(Tok.getStartLoc().getOpaquePointerValue() <
+             CurSyntax->getStartLoc().getOpaquePointerValue());
       Results.push_back(Tok);
       It ++;
     }
@@ -194,9 +188,7 @@ SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
     Result.emplace(makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind),
                                      SyntaxParts));
   }
-  SourceLoc StartLoc, EndLoc;
-  std::tie(StartLoc, EndLoc) = getNodesLocation(Parts);
-  RawSyntaxInfo NewSyntaxNode(StartLoc, EndLoc, Result->getRaw());
+  RawSyntaxInfo NewSyntaxNode(getNodesRange(Parts), Result->getRaw());
 
   // Remove the building bricks and re-append the result.
   for (unsigned I = 0; I < N; I ++)
@@ -361,8 +353,8 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
     return;
 
   // Make sure we used all tokens.
-  assert(AllNodes.front().StartLoc == ContextData.allTokens().front().StartLoc);
-  assert(AllNodes.back().EndLoc == ContextData.allTokens().back().StartLoc);
+  assert(AllNodes.front().getStartLoc() == ContextData.allTokens().front().getStartLoc());
+  assert(AllNodes.back().getEndLoc() == ContextData.allTokens().back().getStartLoc());
 
   if (AllNodes.size() == 1) {
     // If we have only one syntax node remaining, we are done.
@@ -375,8 +367,8 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
 
   llvm::SmallVector<Syntax, 8> Scratch;
   auto SyntaxNodes = getSyntaxNodes(AllNodes, Scratch);
-  SourceLoc Start = AllNodes.front().StartLoc;
-  SourceLoc End = AllNodes.back().EndLoc;
+  SourceLoc Start = AllNodes.front().getStartLoc();
+  SourceLoc End = AllNodes.back().getEndLoc();
   SyntaxKind UnknownKind;
   switch (*Kind) {
     case SyntaxContextKind::Expr:
@@ -390,6 +382,6 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
       break;
   }
   // Create an unknown node and give it to the parent context.
-  Parent->ContextData.addPendingSyntax({Start, End,
+  Parent->ContextData.addPendingSyntax({SourceRange(Start, End),
     makeUnknownSyntax(UnknownKind, SyntaxNodes).getRaw()});
 }

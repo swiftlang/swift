@@ -34,20 +34,20 @@ enum class SyntaxContextKind: uint8_t{
 
 /// The handler for parser to generate libSyntax entities.
 struct RawSyntaxInfo {
-  /// Start location of this syntax node.
-  SourceLoc StartLoc;
-
-  /// The end location of this syntax node.
-  SourceLoc EndLoc;
+  /// Start and end location of this syntax node.
+  SourceRange SyntaxRange;
 
   /// The raw node.
   RC<RawSyntax> RawNode;
-  RawSyntaxInfo(RC<RawSyntax> RawNode): RawSyntaxInfo(SourceLoc(), RawNode) {}
+  RawSyntaxInfo(RC<RawSyntax> RawNode): RawNode(RawNode) {}
   RawSyntaxInfo(SourceLoc StartLoc, RC<RawSyntax> RawNode):
-    RawSyntaxInfo(StartLoc, StartLoc, RawNode) {}
-  RawSyntaxInfo(SourceLoc StartLoc, SourceLoc EndLoc, RC<RawSyntax> RawNode);
+    SyntaxRange(StartLoc), RawNode(RawNode) {}
+  RawSyntaxInfo(SourceRange SyntaxRange, RC<RawSyntax> RawNode):
+    SyntaxRange(SyntaxRange), RawNode(RawNode) {}
 
-  bool isImplicit() const { return StartLoc.isInvalid(); }
+  bool isImplicit() const { return SyntaxRange.isInvalid(); }
+  SourceLoc getStartLoc() const { return SyntaxRange.Start; }
+  SourceLoc getEndLoc() const { return SyntaxRange.End; }
 
   template <typename SyntaxNode>
   SyntaxNode makeSyntax() const { return make<SyntaxNode>(RawNode); }
