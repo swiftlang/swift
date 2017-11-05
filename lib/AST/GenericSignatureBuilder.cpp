@@ -193,8 +193,7 @@ void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
 }
 
 #pragma mark GraphViz visualization
-static int compareDependentTypes(Type type1, Type type2,
-                                 bool outermost = true);
+static int compareDependentTypes(Type type1, Type type2);
 
 namespace {
   /// A node in the equivalence class, used for visualization.
@@ -2479,22 +2478,9 @@ auto PotentialArchetype::getRepresentative() const -> PotentialArchetype * {
 }
 
 /// Canonical ordering for dependent types.
-static int compareDependentTypes(Type type1, Type type2,
-                                 bool outermost) {
+static int compareDependentTypes(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
-
-  if (outermost) {
-    // If there are any unresolved dependent member types in a type,
-    // it's an indication of a reference to a concrete, non-associated-type
-    // declaration. We prefer the type without such declarations.
-    bool hasConcreteDecls1 =
-      static_cast<bool>(type1->findUnresolvedDependentMemberType());
-    bool hasConcreteDecls2 =
-      static_cast<bool>(type2->findUnresolvedDependentMemberType());
-    if (hasConcreteDecls1 != hasConcreteDecls2)
-      return hasConcreteDecls1 ? +1 : -1;
-  }
 
   // Ordering is as follows:
   // - Generic params
@@ -2513,8 +2499,7 @@ static int compareDependentTypes(Type type1, Type type2,
 
   // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
   if (int compareBases =
-        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase(),
-                              /*outermost=*/false))
+        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
