@@ -1744,6 +1744,9 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
   }
 }
 
+/// Canonical ordering for dependent types.
+int compareDependentTypes(Type type1, Type type2);
+
 } // end namespace swift
 
 #endif
