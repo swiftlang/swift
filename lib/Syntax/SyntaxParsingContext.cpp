@@ -43,6 +43,20 @@ static ArrayRef<Syntax> getSyntaxNodes(ArrayRef<RawSyntaxInfo> RawNodes,
   return Scratch;
 }
 
+static std::pair<SourceLoc, SourceLoc>
+getNodesLocation(ArrayRef<RawSyntaxInfo> RawNodes) {
+  SourceLoc StartLoc, EndLoc;
+  for (auto Info: RawNodes) {
+    if (Info.isImplicit())
+      continue;
+    if (StartLoc.isInvalid()) {
+      StartLoc = Info.StartLoc;
+    }
+    EndLoc = Info.EndLoc;
+  }
+  assert(StartLoc.isValid() == EndLoc.isValid());
+  return std::tie(StartLoc, EndLoc);
+}
 } // End of anonymous namespace
 
 RawSyntaxInfo::RawSyntaxInfo(SourceLoc StartLoc, SourceLoc EndLoc,
@@ -180,8 +194,10 @@ SyntaxParsingContext::ContextInfo::createFromBack(SyntaxKind Kind, unsigned N) {
     Result.emplace(makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind),
                                      SyntaxParts));
   }
-  RawSyntaxInfo NewSyntaxNode(Parts.front().StartLoc, Parts.back().EndLoc,
-                              Result->getRaw());
+  SourceLoc StartLoc, EndLoc;
+  std::tie(StartLoc, EndLoc) = getNodesLocation(Parts);
+  RawSyntaxInfo NewSyntaxNode(StartLoc, EndLoc, Result->getRaw());
+
   // Remove the building bricks and re-append the result.
   for (unsigned I = 0; I < N; I ++)
     PendingSyntax.pop_back();
@@ -304,6 +320,11 @@ void RawSyntaxInfo::brigeWithContext(SyntaxContextKind Kind) {
       // Wrap an expression with an expression statement
       RawNode = SyntaxFactory::createSyntax(SyntaxKind::ExpressionStmt,
         { makeSyntax<Syntax>() })->getRaw();
+    } else if (RawNode->isToken()) {
+      // Wrap a standalone token withn an expression statement
+      RawNode = SyntaxFactory::createSyntax(SyntaxKind::ExpressionStmt,
+        makeUnknownSyntax(SyntaxKind::UnknownExpr,
+                          {make<Syntax>(RawNode)}))->getRaw();
     }
     assert(RawNode->isStmt());
     break;
