@@ -193,8 +193,6 @@ void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
 }
 
 #pragma mark GraphViz visualization
-static int compareDependentTypes(Type type1, Type type2);
-
 namespace {
   /// A node in the equivalence class, used for visualization.
   struct EquivalenceClassVizNode {
@@ -2478,7 +2476,7 @@ auto PotentialArchetype::getRepresentative() const -> PotentialArchetype * {
 }
 
 /// Canonical ordering for dependent types.
-static int compareDependentTypes(Type type1, Type type2) {
+int swift::compareDependentTypes(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
 
