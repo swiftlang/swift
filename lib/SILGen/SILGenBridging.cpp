@@ -811,7 +811,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   // Add the block argument.
   SILValue blockV =
       entry->createFunctionArgument(SILType::getPrimitiveObjectType(blockTy));
-  ManagedValue block = SGF.emitManagedRValueWithCleanup(blockV);
+  ManagedValue block = SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
+                           ? ManagedValue::forUnmanaged(blockV)
+                           : SGF.emitManagedRValueWithCleanup(blockV);
 
   CanType formalResultType = formalFuncTy.getResult();
 

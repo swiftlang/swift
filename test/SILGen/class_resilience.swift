@@ -83,11 +83,11 @@ public func callResilientMethod(_ s: MyResilientSubclass) {
 // CHECK:   return
 }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_owned () -> Int
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_guaranteed () -> Int
 // CHECK:     function_ref @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTj
 // CHECK:     return
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyXlSgFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_owned (@owned Optional<AnyObject>) -> ()
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyXlSgFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_guaranteed (@owned Optional<AnyObject>) -> ()
 // CHECK:     function_ref @_T016class_resilience16MyResilientClassC18publicMethodSecondyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
 // CHECK:     return
 

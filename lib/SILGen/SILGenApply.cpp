@@ -1101,7 +1101,8 @@ public:
         }
         auto loweredResultTy = SGF.getLoweredLoadableType(resultTy);
         if (loweredResultTy != selfValue.getType()) {
-          selfValue = SGF.B.createUpcast(ice, selfValue, loweredResultTy);
+          selfValue = SGF.emitManagedRValueWithCleanup(
+              SGF.B.createUpcast(ice, selfValue.forward(SGF), loweredResultTy));
         }
 
         selfArg = ice->getSubExpr();
@@ -4100,8 +4101,8 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   SILValue partialApply =
       SGF.B.createPartialApply(loc, superMethod.getValue(), partialApplyTy,
                                subs, {upcastedSelf.forward(SGF)}, closureTy);
-  firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(),
-                                  ManagedValue::forUnmanaged(partialApply));
+  ManagedValue pa = SGF.emitManagedRValueWithCleanup(partialApply);
+  firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
   return firstLevelResult;
 }
 

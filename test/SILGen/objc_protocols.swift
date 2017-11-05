@@ -56,7 +56,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   _ = x.runce
 
   // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1]] :
-  // CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<T>()
+  // CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<T>()
   // CHECK:   destroy_value [[METHOD]]
   _ = T.runce
 
@@ -72,7 +72,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: sil shared [serializable] [thunk] @[[THUNK1]] :
 // CHECK: bb0([[SELF:%.*]] : @owned $Self):
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
-// CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<Self>([[SELF]])
+// CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Self>([[SELF]])
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK1]]'
 
@@ -87,7 +87,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK2]] :
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:_T014objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTO]]
-// CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<Self>(%0)
+// CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Self>(%0)
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK2]]'
 

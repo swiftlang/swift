@@ -445,16 +445,15 @@ public class Base {
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @_T07dynamic3SubC1xSbvg : $@convention(method) (@guaranteed Sub) -> Bool {
   // CHECK: bb0([[SELF:%.*]] : $Sub):
-  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
+  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error)
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:     = partial_apply [[AUTOCLOSURE]]([[SELF_COPY]])
+  // CHECK:     = partial_apply [callee_guaranteed] [[AUTOCLOSURE]]([[SELF_COPY]])
   // CHECK:     return {{%.*}} : $Bool
   // CHECK: } // end sil function '_T07dynamic3SubC1xSbvg'
 
-  // CHECK-LABEL: sil private [transparent] @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
+  // CHECK-LABEL: sil private [transparent] @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error) {
   // CHECK: bb0([[VALUE:%.*]] : $Sub):
-  // CHECK:     [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
-  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[BORROWED_VALUE]]
+  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
   // CHECK:     [[BORROWED_CASTED_VALUE_COPY:%.*]] = begin_borrow [[CASTED_VALUE_COPY]]
   // CHECK:     [[DOWNCAST_FOR_SUPERMETHOD:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_VALUE_COPY]]
@@ -462,8 +461,6 @@ public class Sub : Base {
   // CHECK:     end_borrow [[BORROWED_CASTED_VALUE_COPY]]
   // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
   // CHECK:     destroy_value [[CASTED_VALUE_COPY]]
-  // CHECK:     end_borrow [[BORROWED_VALUE]] from [[VALUE]]
-  // CHECK:     destroy_value [[VALUE]]
   // CHECK: } // end sil function '_T07dynamic3SubC1xSbvgSbyKXKfu_'
   override var x: Bool { return false || super.x }
 }

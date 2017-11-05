@@ -23,10 +23,10 @@ func test_capture_promotion() -> () -> Int {
 // CHECK-NOT: alloc_box
 
 // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_T017capture_promotion05test_a1_B0SiycyFSiycfU_Tf2iii_n
-// CHECK: partial_apply [[CLOSURE0_PROMOTE0]]({{%[0-9]*}}, {{%[0-9]*}}, {{%[0-9]*}})
+// CHECK: partial_apply [callee_guaranteed] [[CLOSURE0_PROMOTE0]]({{%[0-9]*}}, {{%[0-9]*}}, {{%[0-9]*}})
 
   return { x + y.foo() + z.x }
 }
 
-// CHECK: sil private @_T017capture_promotion05test_a1_B0SiycyFSiycfU_Tf2iii_n : $@convention(thin) (Int, @owned Foo, @owned Baz) -> Int
+// CHECK: sil private @_T017capture_promotion05test_a1_B0SiycyFSiycfU_Tf2iii_n : $@convention(thin) (Int, @guaranteed Foo, @guaranteed Baz) -> Int
 

@@ -306,26 +306,32 @@ func create<T>(_ fn: () throws -> T) throws -> T {
 func testThunk(_ fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Sis5Error_pIxdzo_SisAA_pIxrzo_TR : $@convention(thin) (@owned @noescape @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
-// CHECK: bb0(%0 : @trivial $*Int, %1 : @owned $@noescape @callee_owned () -> (Int, @error Error)):
-// CHECK:   try_apply %1()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Sis5Error_pIgdzo_SisAA_pIgrzo_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error Error)) -> (@out Int, @error Error)
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @guaranteed $@noescape @callee_guaranteed () -> (Int, @error Error)):
+// CHECK:  [[COPY:%.*]] = copy_value %1
+// CHECK:  [[BORROW:%.*]] = begin_borrow [[COPY]] 
+// CHECK:   try_apply [[BORROW]]()
 // CHECK: bb1([[T0:%.*]] : @trivial $Int):
 // CHECK:   store [[T0]] to [trivial] %0 : $*Int
 // CHECK:   [[T0:%.*]] = tuple ()
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_value [[COPY]]
 // CHECK:   return [[T0]]
 // CHECK: bb2([[T0:%.*]] : @owned $Error):
 // CHECK:   builtin "willThrow"([[T0]] : $Error)
+// CHECK:   end_borrow [[BORROW]]
+// CHECK:   destroy_value [[COPY]]
 // CHECK:   throw [[T0]] : $Error
 
 func createInt(_ fn: () -> Int) throws {}
 func testForceTry(_ fn: () -> Int) {
   try! createInt(fn)
 }
-// CHECK-LABEL: sil hidden @_T06errors12testForceTryySiycF : $@convention(thin) (@owned @noescape @callee_owned () -> Int) -> ()
-// CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_owned () -> Int):
+// CHECK-LABEL: sil hidden @_T06errors12testForceTryySiycF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> ()
+// CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_guaranteed () -> Int):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK: [[FUNC:%.*]] = function_ref @_T06errors9createIntySiycKF : $@convention(thin) (@owned @noescape @callee_owned () -> Int) -> @error Error
+// CHECK: [[FUNC:%.*]] = function_ref @_T06errors9createIntySiycKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> @error Error
 // CHECK: try_apply [[FUNC]]([[ARG_COPY]])
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: destroy_value [[ARG]]

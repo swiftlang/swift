@@ -6,8 +6,8 @@ import resilient_struct
 
 // Resilient structs are always address-only
 
-// CHECK-LABEL: sil hidden @_T017struct_resilience26functionWithResilientTypes010resilient_A04SizeVAE_A2Ec1ftF : $@convention(thin) (@in Size, @owned @noescape @callee_owned (@in Size) -> @out Size) -> @out Size
-// CHECK:       bb0(%0 : @trivial $*Size, %1 : @trivial $*Size, %2 : @owned $@noescape @callee_owned (@in Size) -> @out Size):
+// CHECK-LABEL: sil hidden @_T017struct_resilience26functionWithResilientTypes010resilient_A04SizeVAE_A2Ec1ftF : $@convention(thin) (@in Size, @owned @noescape @callee_guaranteed (@in Size) -> @out Size) -> @out Size
+// CHECK:       bb0(%0 : @trivial $*Size, %1 : @trivial $*Size, %2 : @owned $@noescape @callee_guaranteed (@in Size) -> @out Size):
 func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
   // Stored properties of resilient structs from outside our resilience
@@ -31,7 +31,9 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
 // CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %2
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         apply [[COPIED_CLOSURE]](%0, [[SIZE_BOX]])
+// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPIED_CLOSURE]]
+// CHECK:         apply [[BORROW]](%0, [[SIZE_BOX]])
+// CHECK:         destroy_value [[COPIED_CLOSURE]]
 // CHECK:         return
   return f(s)
 }
@@ -55,8 +57,8 @@ func resilientInOutTest(_ s: inout Size) {
 
 // Fixed-layout structs may be trivial or loadable
 
-// CHECK-LABEL: sil hidden @_T017struct_resilience28functionWithFixedLayoutTypes010resilient_A05PointVAE_A2Ec1ftF : $@convention(thin) (Point, @owned @noescape @callee_owned (Point) -> Point) -> Point
-// CHECK:       bb0(%0 : @trivial $Point, %1 : @owned $@noescape @callee_owned (Point) -> Point):
+// CHECK-LABEL: sil hidden @_T017struct_resilience28functionWithFixedLayoutTypes010resilient_A05PointVAE_A2Ec1ftF : $@convention(thin) (Point, @owned @noescape @callee_guaranteed (Point) -> Point) -> Point
+// CHECK:       bb0(%0 : @trivial $Point, %1 : @owned $@noescape @callee_guaranteed (Point) -> Point):
 func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 
   // Stored properties of fixed layout structs are accessed directly
@@ -71,15 +73,17 @@ func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
   _ = p.y
 
 // CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %1
-// CHECK:         [[NEW_POINT:%.*]] = apply [[COPIED_CLOSURE]](%0)
+// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPIED_CLOSURE]]
+// CHECK:         [[NEW_POINT:%.*]] = apply [[BORROW]](%0)
+// CHECK:         destroy_value [[COPIED_CLOSURE]]
 // CHECK:         return [[NEW_POINT]]
   return f(p)
 }
 
 // Fixed-layout struct with resilient stored properties is still address-only
 
-// CHECK-LABEL: sil hidden @_T017struct_resilience39functionWithFixedLayoutOfResilientTypes010resilient_A09RectangleVAE_A2Ec1ftF : $@convention(thin) (@in Rectangle, @owned @noescape @callee_owned (@in Rectangle) -> @out Rectangle) -> @out Rectangle
-// CHECK:        bb0(%0 : @trivial $*Rectangle, %1 : @trivial $*Rectangle, %2 : @owned $@noescape @callee_owned (@in Rectangle) -> @out Rectangle):
+// CHECK-LABEL: sil hidden @_T017struct_resilience39functionWithFixedLayoutOfResilientTypes010resilient_A09RectangleVAE_A2Ec1ftF : $@convention(thin) (@in Rectangle, @owned @noescape @callee_guaranteed (@in Rectangle) -> @out Rectangle) -> @out Rectangle
+// CHECK:        bb0(%0 : @trivial $*Rectangle, %1 : @trivial $*Rectangle, %2 : @owned $@noescape @callee_guaranteed (@in Rectangle) -> @out Rectangle):
 func functionWithFixedLayoutOfResilientTypes(_ r: Rectangle, f: (Rectangle) -> Rectangle) -> Rectangle {
   return f(r)
 }
@@ -129,7 +133,7 @@ public struct MySize {
   public static var copyright: Int = 0
 }
 
-// CHECK-LABEL: sil @_T017struct_resilience28functionWithMyResilientTypesAA0E4SizeVAD_A2Dc1ftF : $@convention(thin) (@in MySize, @owned @noescape @callee_owned (@in MySize) -> @out MySize) -> @out MySize
+// CHECK-LABEL: sil @_T017struct_resilience28functionWithMyResilientTypesAA0E4SizeVAD_A2Dc1ftF : $@convention(thin) (@in MySize, @owned @noescape @callee_guaranteed (@in MySize) -> @out MySize) -> @out MySize
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
   // Stored properties of resilient structs from inside our resilience
@@ -152,7 +156,9 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK:         [[BORROWED_CLOSURE:%.*]] = begin_borrow %2
 // CHECK:         [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*MySize
-// CHECK:         apply [[CLOSURE_COPY]](%0, [[SIZE_BOX]])
+// CHECK:         [[BORROW:%.*]] = begin_borrow [[CLOSURE_COPY]]
+// CHECK:         apply [[BORROW]](%0, [[SIZE_BOX]])
+// CHECK:         destroy_value [[CLOSURE_COPY]]
 // CHECK:         return
   return f(s)
 }
@@ -175,10 +181,10 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   return s.w
 }
 
-// CHECK-LABEL: sil [transparent] [serialized] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVF : $@convention(thin) (@in MySize) -> @owned @callee_owned () -> Int
+// CHECK-LABEL: sil [transparent] [serialized] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVF : $@convention(thin) (@in MySize) -> @owned @callee_guaranteed () -> Int
 @_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
-// CHECK-LABEL: sil shared [serialized] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVFSiycfU_ : $@convention(thin) (@owned { var MySize }) -> Int
+// CHECK-LABEL: sil shared [serialized] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVFSiycfU_ : $@convention(thin) (@guaranteed { var MySize }) -> Int
 // CHECK: function_ref @_T017struct_resilience6MySizeV1wSivg : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK: return {{.*}} : $Int
 

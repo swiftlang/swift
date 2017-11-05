@@ -205,13 +205,13 @@ public func reabstraction<T>(_ f: (Medium) -> T) {}
 public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 // CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
-// CHECK:     call swiftcc void @_T015enum_resilience13reabstractionyx010resilient_A06MediumOclF(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @_T014resilient_enum6MediumOSiIxid_ACSiIxir_TRTA to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_T0SiN)
+// CHECK:     call swiftcc void @_T015enum_resilience13reabstractionyx010resilient_A06MediumOclF(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @_T014resilient_enum6MediumOSiIgid_ACSiIgir_TRTA to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_T0SiN)
   reabstraction(f)
 
 // CHECK:     ret void
 }
 
-// CHECK-LABEL: define internal swiftcc void @_T014resilient_enum6MediumOSiIxid_ACSiIxir_TRTA(%TSi* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc void @_T014resilient_enum6MediumOSiIgid_ACSiIgir_TRTA(%TSi* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted* swiftself)
 
 
 // Enums with resilient payloads from a different resilience domain

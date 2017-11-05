@@ -146,9 +146,9 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_owned () -> @error Error
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_guaranteed () -> @error Error
 // CHECK:      [[T0:%.*]] = function_ref @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [[T0]](%0)
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[T0]](%0)
 // CHECK-NEXT: return [[T1]]
 
 // CHECK-LABEL: sil shared [serializable] [thunk] @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error {
