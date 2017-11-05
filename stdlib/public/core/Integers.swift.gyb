@@ -2597,10 +2597,18 @@ ${operatorComment('&' + x.operator, True)}
 }
 
 extension FixedWidthInteger {
+  /// Returns a random representation of this integer.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random integer
+  /// - Returns: A random representation of this integer conforming to `Randomizable`
+  ///
+  /// The range of this random integer is from the integer's min to the integer's
+  /// max.
   @_inlineable
   public static func random(using generator: RandomGenerator) -> Self {
     return generator.next(Self.self)
-    }
+  }
 }
 
 //===----------------------------------------------------------------------===//

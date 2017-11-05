@@ -2014,12 +2014,6 @@ extension FloatingPoint {
     if isSubnormal { return sign == .minus ? .negativeSubnormal : .positiveSubnormal }
     return sign == .minus ? .negativeZero : .positiveZero
   }
-
-  @_inlineable
-  public static func random(using generator: RandomGenerator) -> Self {
-    let random = generator.next(UInt64.self)
-    return Self(random) / Self(UInt64.max)
-  }
 }
 
 extension BinaryFloatingPoint {
@@ -2105,6 +2099,19 @@ extension BinaryFloatingPoint {
     return true
   }
 
+  /// Returns a random representation of this floating point.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random floating point
+  /// - Returns: A random representation of this floating point conforming to
+  ///   `Randomizable`
+  ///
+  /// The range of this random floating point is from 0 to 1
+  @_inlineable
+  public static func random(using generator: RandomGenerator) -> Self {
+    let random = generator.next(UInt64.self)
+    return Self(random) / Self(UInt64.max)
+  }
 
   /*  TODO: uncomment these default implementations when it becomes possible
       to use them.

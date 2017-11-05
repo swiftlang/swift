@@ -238,6 +238,17 @@ void swift::_swift_stdlib_random(void *buf,
   arc4random_buf(buf, nbytes);
 }
 #else
+#if defined(TARGET_OS_IPHONE)
+#include <Security/Security.h>
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void swift::_swift_stdlib_random(void *buf,
+                                __swift_ssize_t nbytes,
+                                __swift_uint32_t debugFlags) {
+  if (SecRandomCopyBytes(kSecRandomDefault, nbytes, buf) != 0) {
+    fatalError(debugFlags, "Fatal error: Unexpected error with SecRandomCopyBytes\n");
+  }
+}
+#else
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift::_swift_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
@@ -245,13 +256,14 @@ void swift::_swift_stdlib_random(void *buf,
   int oflags = O_RDONLY;
   int fd = swift::_swift_stdlib_open("/dev/urandom", oflags);
   if (fd < 0) {
-    fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom");
+    fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom\n");
   }
   if (swift::_swift_stdlib_read(fd, buf, nbytes) < 0) {
-    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
+    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom\n");
   }
   swift::_swift_stdlib_close(fd);
 }
+#endif
 #endif
 #elif defined(__linux__)
 #include <linux/version.h>
@@ -265,7 +277,7 @@ void swift::_swift_stdlib_random(void *buf,
                                 __swift_uint32_t debugFlags) {
   int result = syscall(SYS_getrandom, buf, nbytes, 0);
   if (result != 0) {
-    fatalError(debugFlags, "Fatal error: Unexpected error with getrandom")
+    fatalError(debugFlags, "Fatal error: Unexpected error with getrandom\n")
   }
 }
 #else
@@ -276,10 +288,10 @@ void swift::_swift_stdlib_random(void *buf,
   int oflags = O_RDONLY;
   int fd = swift::_swift_stdlib_open("/dev/urandom", oflags);
   if (fd < 0) {
-    fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom");
+    fatalError(debugFlags, "Fatal error: Unable to open /dev/urandom\n");
   }
   if (swift::_swift_stdlib_read(fd, buf, nbytes) < 0) {
-    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom");
+    fatalError(debugFlags, "Fatal error: Unable to read /dev/urandom\n");
   }
   swift::_swift_stdlib_close(fd);
 }

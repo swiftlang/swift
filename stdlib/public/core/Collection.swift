@@ -781,6 +781,13 @@ public protocol Collection : Sequence
   ///   `endIndex`.
   func formIndex(after i: inout Index)
 
+  /// Returns a shuffled version of this collection.
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the collection. This parameter is not need as the default implementation
+  ///   of `Collection` uses the default random source in the standard library.
+  /// - Returns: A new array containing a shuffled version of this collection's
+  ///   elements.
   func shuffled(using generator: RandomGenerator) -> [Element]
 }
 
@@ -993,6 +1000,13 @@ extension Collection {
     return count
   }
 
+  /// Returns a shuffled version of this collection.
+  ///
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the collection. This parameter is not need as the default implementation
+  ///   of `Collection` uses the default random source in the standard library.
+  /// - Returns: A new array containing a shuffled version of this collection's
+  ///   elements.
   @_inlineable
   public func shuffled(
     using generator: RandomGenerator = Random.default
