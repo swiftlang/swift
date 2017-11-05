@@ -1,0 +1,32 @@
+class Foo {
+  /// This is just some documentation
+  func methodWithoutParameters() {
+  }
+
+  func methodWithParameters(param1: Foo, param2: Foo) {
+  }
+
+  @discardableResult
+  private func privateMethodWithAnnotation() -> Foo? {
+    return nil
+  }
+
+  var anInstanceVariable: String?
+
+  func justAnotherMethod() {
+  }
+}
+
+class OtherClass {
+  func foo() {
+  }
+
+  
+}
+
+extension OtherClass {
+var computedVariable: Int {
+    return 0
+  }
+}
+

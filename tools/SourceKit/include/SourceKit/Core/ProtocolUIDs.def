@@ -283,6 +283,8 @@ KIND(RangeSingleStatement, "source.lang.swift.range.singlestatement")
 KIND(RangeSingleExpression, "source.lang.swift.range.singleexpression")
 KIND(RangeSingleDeclaration, "source.lang.swift.range.singledeclaration")
 KIND(RangeMultiStatement, "source.lang.swift.range.multistatement")
+KIND(RangeMultiTypeMemberDeclaration,
+     "source.lang.swift.range.multitypememberdeclaration")
 KIND(RangeInvalid, "source.lang.swift.range.invalid")
 KIND(NameObjc, "source.lang.name.kind.objc")
 KIND(NameSwift, "source.lang.name.kind.swift")

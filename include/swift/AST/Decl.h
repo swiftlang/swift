@@ -771,6 +771,9 @@ public:
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
 
+  /// Returns the source range of the declaration including its attributes.
+  SourceRange getSourceRangeIncludingAttrs() const;
+
   SourceLoc TrailingSemiLoc;
 
   LLVM_ATTRIBUTE_DEPRECATED(

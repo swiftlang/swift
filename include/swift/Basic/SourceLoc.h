@@ -96,6 +96,10 @@ public:
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
 
+  /// Extend this SourceRange to the smallest continuous SourceRange that
+  /// includes both this range and the other one.
+  void widen(SourceRange Other);
+
   bool operator==(const SourceRange &other) const {
     return Start == other.Start && End == other.End;
   }

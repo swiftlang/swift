@@ -361,6 +361,15 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
   llvm_unreachable("Unknown decl kind");
 }
 
+SourceRange Decl::getSourceRangeIncludingAttrs() const {
+  auto Range = getSourceRange();
+  for (auto Attr : getAttrs()) {
+    if (Attr->getRange().isValid())
+      Range.widen(Attr->getRange());
+  }
+  return Range;
+}
+
 SourceLoc Decl::getLoc() const {
   switch (getKind()) {
 #define DECL(ID, X) \

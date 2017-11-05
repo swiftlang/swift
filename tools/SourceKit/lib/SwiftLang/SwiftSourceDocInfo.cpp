@@ -1515,6 +1515,7 @@ static void resolveRange(SwiftLangSupport &Lang,
         return;
       }
       case RangeKind::SingleDecl:
+      case RangeKind::MultiTypeMemberDecl:
       case RangeKind::MultiStatement:
       case RangeKind::SingleStatement: {
         Receiver(Result);
