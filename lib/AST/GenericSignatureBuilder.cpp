@@ -193,18 +193,6 @@ void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
 }
 
 #pragma mark GraphViz visualization
-static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb,
-                                 bool outermost);
-
-static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb) {
-  return compareDependentTypes(pa, pb, /*outermost=*/true);
-}
-
-static int compareDependentTypes(Type type1, Type type2,
-                                 bool outermost = true);
-
 namespace {
   /// A node in the equivalence class, used for visualization.
   struct EquivalenceClassVizNode {
@@ -1967,13 +1955,14 @@ Type EquivalenceClass::getAnchor(
   // within that equivalence class.
   llvm::SmallDenseMap<EquivalenceClass *, AssociatedTypeDecl *> nestedTypes;
 
-  PotentialArchetype *bestGenericParam = nullptr;
+  Type bestGenericParam;
   for (auto member : members) {
     // If the member is a generic parameter, keep the best generic parameter.
     if (member->isGenericParam()) {
+      Type genericParamType = member->getDependentType(genericParams);
       if (!bestGenericParam ||
-          compareDependentTypes(&member, &bestGenericParam) < 0)
-        bestGenericParam = member;
+          compareDependentTypes(genericParamType, bestGenericParam) < 0)
+        bestGenericParam = genericParamType;
       continue;
     }
 
@@ -2003,7 +1992,7 @@ Type EquivalenceClass::getAnchor(
 
   // If we found a generic parameter, return that.
   if (bestGenericParam)
-    return bestGenericParam->getDependentType(genericParams);
+    return bestGenericParam;
 
   // Determine the best anchor among the parent equivalence classes.
   Type bestParentAnchor;
@@ -2486,34 +2475,10 @@ auto PotentialArchetype::getRepresentative() const -> PotentialArchetype * {
   return result;
 }
 
-/// Whether there are any concrete type declarations in the potential archetype.
-static bool hasConcreteDecls(const PotentialArchetype *pa) {
-  auto parent = pa->getParent();
-  if (!parent) return false;
-
-  if (pa->getConcreteTypeDecl())
-    return true;
-
-  return hasConcreteDecls(parent);
-}
-
 /// Canonical ordering for dependent types.
-static int compareDependentTypes(Type type1, Type type2,
-                                 bool outermost) {
+int swift::compareDependentTypes(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
-
-  if (outermost) {
-    // If there are any unresolved dependent member types in a type,
-    // it's an indication of a reference to a concrete, non-associated-type
-    // declaration. We prefer the type without such declarations.
-    bool hasConcreteDecls1 =
-      static_cast<bool>(type1->findUnresolvedDependentMemberType());
-    bool hasConcreteDecls2 =
-      static_cast<bool>(type2->findUnresolvedDependentMemberType());
-    if (hasConcreteDecls1 != hasConcreteDecls2)
-      return hasConcreteDecls1 ? +1 : -1;
-  }
 
   // Ordering is as follows:
   // - Generic params
@@ -2532,8 +2497,7 @@ static int compareDependentTypes(Type type1, Type type2,
 
   // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
   if (int compareBases =
-        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase(),
-                              /*outermost=*/false))
+        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
@@ -2556,86 +2520,6 @@ static int compareDependentTypes(Type type1, Type type2,
   }
 
   return 0;
-}
-
-/// Canonical ordering for dependent types in generic signatures.
-static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb,
-                                 bool outermost) {
-  auto a = *pa, b = *pb;
-
-  // Fast-path check for equality.
-  if (a == b)
-    return 0;
-
-  // If one has concrete declarations somewhere but the other does not,
-  // prefer the one without concrete declarations.
-  if (outermost) {
-    bool aHasConcreteDecls = hasConcreteDecls(a);
-    bool bHasConcreteDecls = hasConcreteDecls(b);
-    if (aHasConcreteDecls != bHasConcreteDecls)
-      return aHasConcreteDecls ? +1 : -1;
-  }
-
-  // Ordering is as follows:
-  // - Generic params
-  if (a->isGenericParam() && b->isGenericParam())
-    return a->getGenericParamKey() < b->getGenericParamKey() ? -1 : +1;
-
-  // A generic parameter is always ordered before a nested type.
-  if (a->isGenericParam() != b->isGenericParam())
-    return a->isGenericParam() ? -1 : +1;
-
-  // - Dependent members
-  auto ppa = a->getParent();
-  auto ppb = b->getParent();
-
-  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
-  if (int compareBases = compareDependentTypes(&ppa, &ppb, /*outermost=*/false))
-    return compareBases;
-
-  // Types that are equivalent to concrete types follow types that are still
-  // type parameters.
-  if (a->isConcreteType() != b->isConcreteType())
-    return a->isConcreteType() ? +1 : -1;
-
-  // Concrete types must be ordered *after* everything else, to ensure they
-  // don't become representatives in the case where a concrete type is equated
-  // with an associated type.
-  if (a->getParent() && b->getParent() &&
-      !!a->getConcreteTypeDecl() != !!b->getConcreteTypeDecl())
-    return a->getConcreteTypeDecl() ? +1 : -1;
-
-  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
-  if (int compareNames = a->getNestedName().str().compare(
-                                                      b->getNestedName().str()))
-    return compareNames;
-
-  if (auto *aa = a->getResolvedAssociatedType()) {
-    if (auto *ab = b->getResolvedAssociatedType()) {
-      if (int result = compareAssociatedTypes(aa, ab))
-        return result;
-    } else {
-      // A resolved archetype is always ordered before an unresolved one.
-      return -1;
-    }
-  } else {
-    // A resolved archetype is always ordered before an unresolved one.
-    if (b->getResolvedAssociatedType())
-      return +1;
-  }
-
-  // Make sure concrete type declarations are properly ordered, to avoid
-  // crashers.
-  if (auto *aa = a->getConcreteTypeDecl()) {
-    auto *ab = b->getConcreteTypeDecl();
-    assert(ab != nullptr && "Should have handled this case above");
-
-    if (int result = TypeDecl::compare(aa, ab))
-      return result;
-  }
-
-  llvm_unreachable("potential archetype total order failure");
 }
 
 namespace {
