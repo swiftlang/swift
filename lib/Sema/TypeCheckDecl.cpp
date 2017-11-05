@@ -4127,8 +4127,25 @@ public:
             TC.checkTypeModifyingDeclAttributes(var);
 
           // Decide whether we should suppress default initialization.
-          if (!PBD->isDefaultInitializable(i))
-            continue;
+          //
+          // Note: Swift 4 had a bug where properties with a desugared optional
+          // type like Optional<Int> had a half-way behavior where sometimes
+          // they behave like they are default initialized, and sometimes not.
+          //
+          // In Swift 5 mode, use the right condition here, and only default
+          // initialize properties with a sugared Optional type.
+          //
+          // (The restriction to sugared types only comes because we don't have
+          // the iterative declaration checker yet; so in general, we cannot
+          // look at the type of a property at all, and can only look at the
+          // TypeRepr, because we haven't validated the property yet.)
+          if (TC.Context.isSwiftVersionAtLeast(5)) {
+            if (!PBD->isDefaultInitializable(i))
+              continue;
+          } else {
+            if (PBD->getPattern(i)->isNeverDefaultInitializable())
+              continue;
+          }
 
           auto type = PBD->getPattern(i)->getType();
           if (auto defaultInit = buildDefaultInitializer(TC, type)) {
@@ -8540,16 +8557,20 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.
-  bool alreadyValidatingCtor = false;
-  for (auto member : decl->getMembers()) {
-    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      validateDecl(ctor);
-      if (!ctor->hasValidSignature())
-        alreadyValidatingCtor = true;
+  if (isa<ClassDecl>(decl)) {
+    bool alreadyValidatingCtor = false;
+    for (auto member : decl->getMembers()) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        validateDecl(ctor);
+        if (!ctor->hasValidSignature())
+          alreadyValidatingCtor = true;
+      }
     }
+    if (alreadyValidatingCtor)
+      return;
   }
-  if (alreadyValidatingCtor)
-    return;
+
+  decl->setAddedImplicitInitializers();
 
   // Check whether there is a user-declared constructor or an instance
   // variable.
@@ -8558,7 +8579,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   bool SuppressMemberwiseInitializer = false;
   bool FoundSynthesizedInit = false;
   bool FoundDesignatedInit = false;
-  decl->setAddedImplicitInitializers();
 
   // Before we look for constructors, we need to make sure that all synthesized
   // initializers are properly synthesized.
@@ -8599,6 +8619,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       } else if (ctor->isDesignatedInit()) {
         FoundDesignatedInit = true;
       }
+
+      if (isa<StructDecl>(decl))
+        continue;
 
       if (!ctor->isInvalid())
         initializerParamTypes.insert(getInitializerParamType(ctor));
@@ -8816,8 +8839,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     if (auto ref = conformsToProtocol(targetType, protocol, target,
                                       ConformanceCheckFlags::Used,
                                       SourceLoc())) {
-      if (auto *conformance =
-          dyn_cast_or_null<NormalProtocolConformance>(ref->getConcrete())) {
+      if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
         if (conformance->isIncomplete()) {
           // Check conformance, forcing synthesis.
           //

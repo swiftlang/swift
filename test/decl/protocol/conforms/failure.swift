@@ -100,9 +100,10 @@ struct A: OptionSet {
   init() { } // expected-note 2{{candidate has non-matching type '()'}}
 }
 
+// Type witness cannot have its own generic parameters
 // FIXME: Crappy diagnostic
 protocol PA {
-  associatedtype A // expected-note 2 {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note 3 {{protocol requires nested type 'A'; do you want to add it?}}
 }
 
 struct BadCase1 : PA { // expected-error {{type 'BadCase1' does not conform to protocol 'PA'}}
@@ -111,6 +112,13 @@ struct BadCase1 : PA { // expected-error {{type 'BadCase1' does not conform to p
 
 struct BadCase2 : PA { // expected-error {{type 'BadCase2' does not conform to protocol 'PA'}}
   typealias A<T> = T
+}
+
+// Variation on the above
+struct G<T> {}
+
+struct BadCase3 : PA { // expected-error {{type 'BadCase3' does not conform to protocol 'PA'}}
+  typealias A = G
 }
 
 // rdar://problem/32215763
