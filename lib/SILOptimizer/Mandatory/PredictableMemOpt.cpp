@@ -146,10 +146,12 @@ static unsigned computeSubelement(SILValue Pointer,
 //                           Subelement Extraction
 //===----------------------------------------------------------------------===//
 
-/// Given an aggregate value and an access path, extract the value indicated by
-/// the path.
-static SILValue extractSubElement(SILValue Val, unsigned SubElementNumber,
-                                  SILBuilder &B, SILLocation Loc) {
+/// Given an aggregate value and an access path, non-destructively extract the
+/// value indicated by the path.
+static SILValue nonDestructivelyExtractSubElement(SILValue Val,
+                                                  unsigned SubElementNumber,
+                                                  SILBuilder &B,
+                                                  SILLocation Loc) {
   SILType ValTy = Val->getType();
   
   // Extract tuple elements.
@@ -160,7 +162,7 @@ static SILValue extractSubElement(SILValue Val, unsigned SubElementNumber,
       unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
       if (SubElementNumber < NumSubElt) {
         Val = B.emitTupleExtract(Loc, Val, EltNo, EltTy);
-        return extractSubElement(Val, SubElementNumber, B, Loc);
+        return nonDestructivelyExtractSubElement(Val, SubElementNumber, B, Loc);
       }
       
       SubElementNumber -= NumSubElt;
@@ -177,7 +179,7 @@ static SILValue extractSubElement(SILValue Val, unsigned SubElementNumber,
       
       if (SubElementNumber < NumSubElt) {
         Val = B.emitStructExtract(Loc, Val, D);
-        return extractSubElement(Val, SubElementNumber, B, Loc);
+        return nonDestructivelyExtractSubElement(Val, SubElementNumber, B, Loc);
       }
       
       SubElementNumber -= NumSubElt;
@@ -290,7 +292,8 @@ static SILValue aggregateAvailableValues(
     return B.createLoad(Inst->getLoc(), Address,
                         LoadOwnershipQualifier::Unqualified);
 
-  SILValue EltVal = extractSubElement(Val.first, Val.second, B, Inst->getLoc());
+  SILValue EltVal = nonDestructivelyExtractSubElement(Val.first, Val.second, B,
+                                                      Inst->getLoc());
   // It must be the same type as LoadTy if available.
   assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
   return EltVal;
