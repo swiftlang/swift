@@ -610,6 +610,22 @@ computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
   }
 }
 
+/// If we are able to optimize \p Inst, return the source address that
+/// instruction is loading from. If we can not optimize \p Inst, then just
+/// return an empty SILValue.
+static SILValue tryFindSrcAddrForLoad(SILInstruction *Inst) {
+  // We only handle load [copy], load [trivial] and copy_addr right now.
+  if (auto *LI = dyn_cast<LoadInst>(Inst))
+    return LI->getOperand();
+
+  // If this is a CopyAddr, verify that the element type is loadable.  If not,
+  // we can't explode to a load.
+  auto *CAI = dyn_cast<CopyAddrInst>(Inst);
+  if (!CAI || !CAI->getSrc()->getType().isLoadable(CAI->getModule()))
+    return SILValue();
+  return CAI->getSrc();
+}
+
 /// At this point, we know that this element satisfies the definitive init
 /// requirements, so we can try to promote loads to enable SSA-based dataflow
 /// analysis.  We know that accesses to this element only access this element,
@@ -623,33 +639,25 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // have to prove that something in this function is holding the weak value
   // live across the promoted region and that isn't desired for a stable
   // diagnostics pass this like one.
-  
-  // We only handle load and copy_addr right now.
-  SILValue src;
-  if (auto CAI = dyn_cast<CopyAddrInst>(Inst)) {
-    // If this is a CopyAddr, verify that the element type is loadable.  If not,
-    // we can't explode to a load.
-    src = CAI->getSrc();
-    if (!src->getType().isLoadable(Module))
-      return false;
-  } else if (auto load = dyn_cast<LoadInst>(Inst)) {
-    src = load->getOperand();
-  } else {
+
+  // First attempt to find a source addr for our "load" instruction. If we fail
+  // to find a valid value, just return.
+  SILValue SrcAddr = tryFindSrcAddrForLoad(Inst);
+  if (!SrcAddr)
     return false;
-  }
 
   // If the box has escaped at this instruction, we can't safely promote the
   // load.
   if (hasEscapedAt(Inst))
     return false;
-  
-  SILType LoadTy = src->getType().getObjectType();
-  
+
+  SILType LoadTy = SrcAddr->getType().getObjectType();
+
   // If this is a load/copy_addr from a struct field that we want to promote,
   // compute the access path down to the field so we can determine precise
   // def/use behavior.
-  unsigned FirstElt = computeSubelement(src, TheMemory);
-  
+  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
+
   // If this is a load from within an enum projection, we can't promote it since
   // we don't track subelements in a type that could be changing.
   if (FirstElt == ~0U)
