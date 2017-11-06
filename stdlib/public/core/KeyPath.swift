@@ -1915,13 +1915,14 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   // Scan the pattern to figure out the dynamic capability of the key path.
   // Start off assuming the key path is writable.
   var capability: KeyPathKind = .value
+  var didChain = false
 
   let bufferPtr = pattern.advanced(by: keyPathObjectHeaderSize)
   var buffer = KeyPathBuffer(base: bufferPtr)
   var size = buffer.data.count + MemoryLayout<Int>.size
   var alignmentMask = MemoryLayout<Int>.alignment - 1
 
-  scanComponents: while true {
+  while true {
     let header = buffer.pop(RawKeyPathComponent.Header.self)
 
     func popOffset() {
@@ -2006,8 +2007,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     case .optionalChain,
          .optionalWrap:
       // Chaining always renders the whole key path read-only.
-      capability = .readOnly
-      break scanComponents
+      didChain = true
+      break
 
     case .optionalForce:
       // No effect.
@@ -2020,6 +2021,11 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     // Pop the type accessor reference.
     _ = buffer.popRaw(size: MemoryLayout<Int>.size,
                       alignment: MemoryLayout<Int>.alignment)
+  }
+
+  // Chaining always renders the whole key path read-only.
+  if didChain {
+    capability = .readOnly
   }
 
   // Grab the class object for the key path type we'll end up with.
