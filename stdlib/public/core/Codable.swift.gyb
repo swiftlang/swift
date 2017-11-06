@@ -9,6 +9,11 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+%{
+codable_types = ['Bool', 'String', 'Double', 'Float',
+                 'Int', 'Int8', 'Int16', 'Int32', 'Int64',
+                 'UInt', 'UInt8', 'UInt16', 'UInt32', 'UInt64']
+}%
 
 //===----------------------------------------------------------------------===//
 // Codable
