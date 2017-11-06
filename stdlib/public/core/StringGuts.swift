@@ -879,9 +879,9 @@ extension _StringGuts {
 
     // TODO: Eventual small form check on other. We could even do this now for
     // the tagged cocoa strings.
-    let unmangedSelfOpt = self._unmangedContiguous
-    if _fastPath(unmangedSelfOpt != nil) {
-      unmangedSelfOpt._unsafelyUnwrappedUnchecked._copy(
+    let unmanagedSelfOpt = self._unmanagedContiguous
+    if _fastPath(unmanagedSelfOpt != nil) {
+      unmanagedSelfOpt._unsafelyUnwrappedUnchecked._copy(
         into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
       _fixLifetime(self)
       return
@@ -898,7 +898,7 @@ extension _StringGuts {
   // the return value.
   @_versioned
   internal
-  var _unmangedContiguous: UnsafeString? {
+  var _unmanagedContiguous: UnsafeString? {
     if let unsafe = self._unsafeString {
       return unsafe
     }
@@ -918,7 +918,7 @@ extension _StringGuts {
   internal
   var _isOpaque: Bool {
       @inline(never) // TODO(perf): to inspect code quality
-      get { return _unmangedContiguous == nil }
+      get { return _unmanagedContiguous == nil }
   }
 
   @_versioned
@@ -941,7 +941,7 @@ extension _StringGuts {
   @_versioned
   internal
   var count: Int {
-    let contigOpt = self._unmangedContiguous
+    let contigOpt = self._unmanagedContiguous
     if _fastPath(contigOpt != nil) {
       return contigOpt._unsafelyUnwrappedUnchecked.count
     }
