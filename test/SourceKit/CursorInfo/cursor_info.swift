@@ -214,6 +214,12 @@ struct HasLocalizationKey {}
 /// - LocalizationKey: ABC
 func hasLocalizationKey2() {}
 
+/// doc
+func funcWithNestedEscaping(a : (@escaping () -> ()) -> ()) {}
+
+/// doc
+typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -629,10 +635,10 @@ func hasLocalizationKey2() {}
 // CHECK70: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=156:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK71
-// CHECK71: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: @autoclosure <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+// CHECK71: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=157:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK72
-// CHECK72: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape3</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: @autoclosure @escaping <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+// CHECK72: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape3</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@escaping</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=159:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK73
 // CHECK73: <decl.function.free>
@@ -733,3 +739,11 @@ func hasLocalizationKey2() {}
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
 // CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="215" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function
 // CHECK88-NEXT: <LocalizationKey>ABC</LocalizationKey>
+
+// RUN: %sourcekitd-test -req=cursor -pos=218:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK89 %s
+// CHECK89: <Declaration>func funcWithNestedEscaping(a: (@escaping () -&gt; ()) -&gt; ())</Declaration>
+// CHECK89-NEXT: <decl.var.parameter.type>(<decl.var.parameter><decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@escaping</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>
+
+// RUN: %sourcekitd-test -req=cursor -pos=221:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK90 %s
+// CHECK90: <Declaration>typealias typeWithNestedAutoclosure = (@autoclosure () -&gt; ()) -&gt; ()</Declaration>
+// CHECK90-NEXT: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>

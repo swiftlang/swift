@@ -216,9 +216,6 @@ struct PrintOptions {
   /// protocol requirements.
   bool SkipOverrides = false;
 
-  /// Whether to skip parameter type attributes
-  bool SkipParameterTypeAttributes = false;
-
   /// Whether to skip placeholder members.
   bool SkipMissingMemberPlaceholders = true;
   
