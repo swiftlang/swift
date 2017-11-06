@@ -777,16 +777,8 @@ public:
       std::vector<BuiltType> elementTypes;
       elementTypes.reserve(tupleMeta->NumElements);
 
-      StoredPointer elementAddress = MetadataAddress +
-        sizeof(TargetTupleTypeMetadata<Runtime>);
-      using Element = typename TargetTupleTypeMetadata<Runtime>::Element;
-      for (StoredPointer i = 0; i < tupleMeta->NumElements; ++i,
-           elementAddress += sizeof(Element)) {
-        Element element;
-        if (!Reader->readBytes(RemoteAddress(elementAddress),
-                               (uint8_t*)&element, sizeof(Element)))
-          return BuiltType();
-
+      for (unsigned i = 0, n = tupleMeta->NumElements; i != n; ++i) {
+        auto &element = tupleMeta->getElement(i);
         if (auto elementType = readTypeFromMetadata(element.Type))
           elementTypes.push_back(elementType);
         else
@@ -1226,8 +1218,8 @@ protected:
         if (!Reader->readInteger(RemoteAddress(numElementsAddress),
                                  &numElements))
           return nullptr;
-        auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>)
-          + numElements * sizeof(StoredPointer);
+        auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
+                         numElements * sizeof(TupleTypeMetadata::Element);
 
         // Make sure the number of elements is reasonable
         if (numElements >= 256)
