@@ -1452,26 +1452,11 @@ public:
                                        : value - ParameterTypeFlags::Shared);
   }
 
-  ParameterTypeFlags withAutoClosure(bool isAutoClosure) const {
-    return ParameterTypeFlags(isAutoClosure
-                                  ? value | ParameterTypeFlags::AutoClosure
-                                  : value - ParameterTypeFlags::AutoClosure);
-  }
-
   bool operator ==(const ParameterTypeFlags &other) const {
     return value.toRaw() == other.value.toRaw();
   }
 
   uint8_t toRaw() const { return value.toRaw(); }
-
-  static ParameterTypeFlags fromRaw(uint8_t value) {
-    return ParameterTypeFlags()
-        .withVariadic(value & Variadic)
-        .withAutoClosure(value & AutoClosure)
-        .withEscaping(value & Escaping)
-        .withInOut(value & InOut)
-        .withShared(value & Shared);
-  }
 };
 
 /// ParenType - A paren type is a type that's been written in parentheses.
