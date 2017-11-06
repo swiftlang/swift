@@ -42,7 +42,7 @@ public extension XCTContext {
 @available(macOS 10.11, *)
 public extension XCUIElement {
   /// Types a single key from the XCUIKeyboardKey enumeration with the specified modifier flags.
-  @nonobjc public func typeKey(_ key: XCUIKeyboardKey, modifierFlags: XCUIKeyModifierFlags) {
+  @nonobjc public func typeKey(_ key: XCUIKeyboardKey, modifierFlags: XCUIElement.KeyModifierFlags) {
     // Call the version of the method defined in XCTest.framework.
     typeKey(key.rawValue, modifierFlags: modifierFlags)
   }
@@ -55,11 +55,11 @@ public extension XCUIElement {
 func _XCTRegisterFailure(_ expected: Bool, _ condition: String, _ message: @autoclosure () -> String, _ file: StaticString, _ line: UInt) {
   // Call the real _XCTFailureHandler.
   let test = _XCTCurrentTestCase()
-  _XCTPreformattedFailureHandler(test, expected, file.description, line, condition, message())
+  _XCTPreformattedFailureHandler(test, expected, file.description, Int(line), condition, message())
 }
 
 /// Produce a failure description for the given assertion type.
-func _XCTFailureDescription(_ assertionType: _XCTAssertionType, _ formatIndex: UInt, _ expressionStrings: CVarArg...) -> String {
+func _XCTFailureDescription(_ assertionType: _XCTAssertionType, _ formatIndex: Int, _ expressionStrings: CVarArg...) -> String {
   // In order to avoid revlock/submission issues between XCTest and the Swift XCTest overlay,
   // we are using the convention with _XCTFailureFormat that (formatIndex >= 100) should be
   // treated just like (formatIndex - 100), but WITHOUT the expression strings. (Swift can't
