@@ -214,9 +214,8 @@ class Foo {
 
   // x86_64-macosx:      define hidden i8* @_T08abitypes3FooC9copyClass{{[_0-9a-zA-Z]*}}FTo(i8*, i8*, i8*) unnamed_addr {{.*}} {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call swiftcc [[TYPE:%.*]]* @_T08abitypes3FooC9copyClass{{[_0-9a-zA-Z]*}}F
-  // x86_64-macosx:      [[T0:%.*]] = phi [[TYPE]]* [ [[VALUE]],
-  // x86_64-macosx:      [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[OBJC:%objc_class]]*
-  // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[OBJC]]* [[T1]] to i8*
+  // x86_64-macosx:      [[T0:%.*]] = call [[OBJC:%objc_class]]* @swift_getObjCClassFromMetadata([[TYPE]]* [[VALUE]])
+  // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[OBJC]]* [[T0]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
   dynamic func copyClass(_ a: AnyClass) -> AnyClass {
     return a

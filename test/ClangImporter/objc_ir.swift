@@ -73,7 +73,7 @@ func propertyAccess(b b: B) {
    b.counter = b.counter + 1
 
    // CHECK: call %swift.type* @_T0So1BCMa()
-   // CHECK: bitcast %swift.type* {{%.+}} to %objc_class*
+   // CHECK: call %objc_class* @swift_getObjCClassFromMetadata
    // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
    // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
    B.sharedCounter = B.sharedCounter + 1

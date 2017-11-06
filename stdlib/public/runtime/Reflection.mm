@@ -295,7 +295,7 @@ const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
                                                     const Metadata *type) {
   void *object = *reinterpret_cast<void * const *>(value);
   auto isa = _swift_getClass(object);
-  return swift_getObjCClassMetadata(isa);
+  return getMetadataForClass(isa);
 }
 
 static std::tuple<const Metadata *, const OpaqueValue *>

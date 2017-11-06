@@ -137,8 +137,9 @@ const Metadata *TypeMetadataRecord::getCanonicalTypeMetadata() const {
   }
   case TypeMetadataRecordKind::UniqueDirectClass:
     if (auto *ClassMetadata =
-          static_cast<const ::ClassMetadata *>(getDirectType()))
-      return swift_getObjCClassMetadata(ClassMetadata);
+          static_cast<const ::ClassMetadata *>(getDirectType())) {
+      return getMetadataForClass(ClassMetadata);
+    }
     else
       return nullptr;
   default:

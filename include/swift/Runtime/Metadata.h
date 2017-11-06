@@ -2750,12 +2750,17 @@ swift_getBlockTypeMetadata3(const void *arg0,
 SWIFT_RUNTIME_EXPORT
 void
 swift_instantiateObjCClass(const ClassMetadata *theClass);
-#endif
 
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 SWIFT_RUNTIME_EXPORT
 const Metadata *
 swift_getObjCClassMetadata(const ClassMetadata *theClass);
+
+/// \brief Get the ObjC class object from class type metadata.
+SWIFT_RUNTIME_EXPORT
+const ClassMetadata *
+swift_getObjCClassFromMetadata(const Metadata *theClass);
+#endif
 
 /// \brief Fetch a unique type metadata object for a foreign type.
 SWIFT_RUNTIME_EXPORT
