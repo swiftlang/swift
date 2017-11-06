@@ -165,20 +165,38 @@ using BoxPair = TwoWordPair<HeapObject *, OpaqueValue *>;
 /// appropriate to store a value of the given type.
 /// The heap object has an initial retain count of 1, and its metadata is set
 /// such that destroying the heap object destroys the contained value.
+#if defined(__linux__) && defined(__s390x__)
+
+SWIFT_RUNTIME_EXPORT
+BoxPair::Return swift_allocBox(Metadata const *type) SWIFT_CC(swift);
+
+SWIFT_RUNTIME_EXPORT
+BoxPair::Return (*_swift_allocBox)(Metadata const *type) SWIFT_CC(swift);
+
+#else
+
 SWIFT_RUNTIME_EXPORT
 BoxPair::Return swift_allocBox(Metadata const *type);
 
 SWIFT_RUNTIME_EXPORT
 BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
+#endif
+
 /// Performs a uniqueness check on the pointer to a box structure. If the check
 /// fails allocates a new box and stores the pointer in the buffer.
 ///
 ///  if (!isUnique(buffer[0]))
 ///    buffer[0] = swift_allocBox(type)
+#if defined(__linux__) && defined(__s390x__)
+SWIFT_RUNTIME_EXPORT
+BoxPair::Return swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
+                                    size_t alignMask) SWIFT_CC(swift);
+#else
 SWIFT_RUNTIME_EXPORT
 BoxPair::Return swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
+#endif
 
 /// Returns the address of a heap object representing all empty box types.
 SWIFT_RUNTIME_EXPORT
