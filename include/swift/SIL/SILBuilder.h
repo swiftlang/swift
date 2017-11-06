@@ -1864,6 +1864,53 @@ public:
     lowering.emitDestroyValue(*this, Loc, v);
   }
 
+  /// Convenience function for handling begin_borrow instructions in ownership
+  /// and non-ownership SIL. In non-ownership SIL we just forward the input
+  /// value. Otherwise, we emit the begin_borrow instruction.
+  SILValue emitBeginBorrowOperation(SILLocation Loc, SILValue Value) {
+    assert(!Value->getType().isAddress());
+    // If ownership is not enabled in the function, just return our original
+    // value.
+    if (getFunction().hasUnqualifiedOwnership())
+      return Value;
+
+    // If we have a trivial value, just return the value. Trivial values have
+    // lifetimes independent of any other values.
+    //
+    // *NOTE* For now to be conservative since we do not have the ownership
+    // verifier everywhere, we use getType()::isTrivial() instead of
+    // getOwnershipKind().
+    if (Value->getType().isTrivial(getModule())) {
+      return Value;
+    }
+
+    // Otherwise, we have a non-trivial value, perform the borrow.
+    return createBeginBorrow(Loc, Value);
+  }
+
+  /// Convenience function for handling end_borrow instructions in ownership and
+  /// non-ownership SIL. In non-ownership SIL we just early exit. Otherwise, we
+  /// emit the end_borrow.
+  void emitEndBorrowOperation(SILLocation Loc, SILValue Borrowed,
+                              SILValue Original) {
+    assert(!Borrowed->getType().isAddress());
+    // If ownership is not enabled, just return.
+    if (getFunction().hasUnqualifiedOwnership())
+      return;
+
+    // If we have a trivial value, just return. Trivial values have lifetimes
+    // independent of any other values.
+    //
+    // *NOTE* For now to be conservative since we do not have the ownership
+    // verifier everywhere, we use getType()::isTrivial() instead of
+    // getOwnershipKind().
+    if (Borrowed->getType().isTrivial(getModule())) {
+      return;
+    }
+
+    createEndBorrow(Loc, Borrowed, Original);
+  }
+
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,
                             SILType ResultTy) {
     // Fold tuple_extract(tuple(x,y,z),2)
