@@ -68,7 +68,7 @@ private:
     SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, SF, nullptr, &ParserState);
-
+    TheParser.SyntaxContext->disable();
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
       CodeCompletion.reset(
@@ -101,6 +101,9 @@ static void parseDelayedDecl(
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, SF, nullptr, &ParserState);
+
+  // Disable libSyntax creation in the delayed parsing.
+  TheParser.SyntaxContext->disable();
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
