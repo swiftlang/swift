@@ -2693,9 +2693,9 @@ DestructorDecl *ClassDecl::getDestructor() {
   return cast<DestructorDecl>(results.front());
 }
 
-DestructorDecl *ClassDecl::addImplicitDestructor() {
+void ClassDecl::addImplicitDestructor() {
   if (hasDestructor() || isInvalid())
-    return nullptr;
+    return;
 
   auto *selfDecl = ParamDecl::createSelf(getLoc(), this);
 
@@ -2713,9 +2713,7 @@ DestructorDecl *ClassDecl::addImplicitDestructor() {
   DD->copyFormalAccessAndVersionedAttrFrom(this);
 
   // Wire up generic environment of DD.
-  DeclContext *DC = DD->getDeclContext();
-  GenericEnvironment *env = DC->getGenericEnvironmentOfContext();
-  DD->setGenericEnvironment(env);
+  DD->setGenericEnvironment(getGenericEnvironmentOfContext());
 
   // Assign DD the interface type (Self) -> () -> ()
   ArrayRef<AnyFunctionType::Param> noParams;
@@ -2730,8 +2728,6 @@ DestructorDecl *ClassDecl::addImplicitDestructor() {
     DD->setInterfaceType(
       FunctionType::get({selfTy}, funcTy, info));
   }
-
-  return DD;
 }
 
 

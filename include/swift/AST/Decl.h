@@ -3386,7 +3386,7 @@ public:
 
   /// Synthesize implicit, trivial destructor, add it to this ClassDecl
   /// and return it.
-  DestructorDecl *addImplicitDestructor();
+  void addImplicitDestructor();
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
