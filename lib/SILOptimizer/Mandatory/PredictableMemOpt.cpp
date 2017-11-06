@@ -29,7 +29,7 @@ STATISTIC(NumDestroyAddrPromoted, "Number of destroy_addrs promoted");
 STATISTIC(NumAllocRemoved, "Number of allocations completely removed");
 
 //===----------------------------------------------------------------------===//
-// Subelement Analysis Implementation
+//                            Subelement Analysis
 //===----------------------------------------------------------------------===//
 
 // We can only analyze components of structs whose storage is fully accessible
@@ -89,7 +89,6 @@ static SILValue getAccessPathRoot(SILValue Pointer) {
 /// This will return a subelement number of 2.
 ///
 /// If this pointer is to within an existential projection, it returns ~0U.
-///
 static unsigned computeSubelement(SILValue Pointer,
                                   SingleValueInstruction *RootInst) {
   unsigned SubEltNumber = 0;
@@ -143,7 +142,9 @@ static unsigned computeSubelement(SILValue Pointer,
   }
 }
 
-
+//===----------------------------------------------------------------------===//
+//                           Subelement Extraction
+//===----------------------------------------------------------------------===//
 
 /// Given an aggregate value and an access path, extract the value indicated by
 /// the path.
@@ -188,6 +189,111 @@ static SILValue extractSubElement(SILValue Val, unsigned SubElementNumber,
   // Otherwise, we're down to a scalar.
   assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
   return Val;
+}
+
+//===----------------------------------------------------------------------===//
+//                        Available Value Aggregation
+//===----------------------------------------------------------------------===//
+
+static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
+                       ArrayRef<std::pair<SILValue, unsigned>> &Values) {
+  while (NumSubElts) {
+    if (!Values[StartSubElt].first)
+      return true;
+    ++StartSubElt;
+    --NumSubElts;
+  }
+  return false;
+}
+
+/// Given a bunch of primitive subelement values, build out the right aggregate
+/// type (LoadTy) by emitting tuple and struct instructions as necessary.
+static SILValue aggregateAvailableValues(
+    SILInstruction *Inst, SILType LoadTy, SILValue Address,
+    ArrayRef<std::pair<SILValue, unsigned>> AvailableValues,
+    unsigned FirstElt) {
+  assert(LoadTy.isObject());
+  SILModule &M = Inst->getModule();
+
+  // Check to see if the requested value is fully available, as an aggregate.
+  // This is a super-common case for single-element structs, but is also a
+  // general answer for arbitrary structs and tuples as well.
+  if (FirstElt < AvailableValues.size()) { // #Elements may be zero.
+    SILValue FirstVal = AvailableValues[FirstElt].first;
+    if (FirstVal && AvailableValues[FirstElt].second == 0 &&
+        FirstVal->getType() == LoadTy) {
+      // If the first element of this value is available, check any extra ones
+      // before declaring success.
+      bool AllMatch = true;
+      for (unsigned i = 0, e = getNumSubElements(LoadTy, M); i != e; ++i)
+        if (AvailableValues[FirstElt + i].first != FirstVal ||
+            AvailableValues[FirstElt + i].second != i) {
+          AllMatch = false;
+          break;
+        }
+
+      if (AllMatch)
+        return FirstVal;
+    }
+  }
+
+  SILBuilderWithScope B(Inst);
+
+  if (TupleType *TT = LoadTy.getAs<TupleType>()) {
+    SmallVector<SILValue, 4> ResultElts;
+
+    for (unsigned EltNo : indices(TT->getElements())) {
+      SILType EltTy = LoadTy.getTupleElementType(EltNo);
+      unsigned NumSubElt = getNumSubElements(EltTy, M);
+
+      // If we are missing any of the available values in this struct element,
+      // compute an address to load from.
+      SILValue EltAddr;
+      if (anyMissing(FirstElt, NumSubElt, AvailableValues))
+        EltAddr = B.createTupleElementAddr(Inst->getLoc(), Address, EltNo,
+                                           EltTy.getAddressType());
+
+      ResultElts.push_back(aggregateAvailableValues(Inst, EltTy, EltAddr,
+                                                    AvailableValues, FirstElt));
+      FirstElt += NumSubElt;
+    }
+
+    return B.createTuple(Inst->getLoc(), LoadTy, ResultElts);
+  }
+
+  // Extract struct elements from fully referenceable structs.
+  if (auto *SD = getFullyReferenceableStruct(LoadTy)) {
+    SmallVector<SILValue, 4> ResultElts;
+
+    for (auto *FD : SD->getStoredProperties()) {
+      SILType EltTy = LoadTy.getFieldType(FD, M);
+      unsigned NumSubElt = getNumSubElements(EltTy, M);
+
+      // If we are missing any of the available values in this struct element,
+      // compute an address to load from.
+      SILValue EltAddr;
+      if (anyMissing(FirstElt, NumSubElt, AvailableValues))
+        EltAddr = B.createStructElementAddr(Inst->getLoc(), Address, FD,
+                                            EltTy.getAddressType());
+
+      ResultElts.push_back(aggregateAvailableValues(Inst, EltTy, EltAddr,
+                                                    AvailableValues, FirstElt));
+      FirstElt += NumSubElt;
+    }
+    return B.createStruct(Inst->getLoc(), LoadTy, ResultElts);
+  }
+
+  // Otherwise, we have a simple primitive.  If the value is available, use it,
+  // otherwise emit a load of the value.
+  auto Val = AvailableValues[FirstElt];
+  if (!Val.first)
+    return B.createLoad(Inst->getLoc(), Address,
+                        LoadOwnershipQualifier::Unqualified);
+
+  SILValue EltVal = extractSubElement(Val.first, Val.second, B, Inst->getLoc());
+  // It must be the same type as LoadTy if available.
+  assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
+  return EltVal;
 }
 
 //===----------------------------------------------------------------------===//
@@ -500,112 +606,6 @@ computeAvailableValuesFrom(SILBasicBlock::iterator StartingFrom,
       return;
   }
 }
-
-
-static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
-                       ArrayRef<std::pair<SILValue, unsigned>> &Values) {
-  while (NumSubElts) {
-    if (!Values[StartSubElt].first) return true;
-    ++StartSubElt;
-    --NumSubElts;
-  }
-  return false;
-}
-
-
-/// AggregateAvailableValues - Given a bunch of primitive subelement values,
-/// build out the right aggregate type (LoadTy) by emitting tuple and struct
-/// instructions as necessary.
-static SILValue aggregateAvailableValues(
-    SILInstruction *Inst, SILType LoadTy, SILValue Address,
-    ArrayRef<std::pair<SILValue, unsigned>> AvailableValues,
-    unsigned FirstElt) {
-  assert(LoadTy.isObject());
-  SILModule &M = Inst->getModule();
-  
-  // Check to see if the requested value is fully available, as an aggregate.
-  // This is a super-common case for single-element structs, but is also a
-  // general answer for arbitrary structs and tuples as well.
-  if (FirstElt < AvailableValues.size()) {  // #Elements may be zero.
-    SILValue FirstVal = AvailableValues[FirstElt].first;
-    if (FirstVal && AvailableValues[FirstElt].second == 0 &&
-        FirstVal->getType() == LoadTy) {
-      // If the first element of this value is available, check any extra ones
-      // before declaring success.
-      bool AllMatch = true;
-      for (unsigned i = 0, e = getNumSubElements(LoadTy, M); i != e; ++i)
-        if (AvailableValues[FirstElt+i].first != FirstVal ||
-            AvailableValues[FirstElt+i].second != i) {
-          AllMatch = false;
-          break;
-        }
-      
-      if (AllMatch)
-        return FirstVal;
-    }
-  }
-  
-  
-  SILBuilderWithScope B(Inst);
-  
-  if (TupleType *TT = LoadTy.getAs<TupleType>()) {
-    SmallVector<SILValue, 4> ResultElts;
-    
-    for (unsigned EltNo : indices(TT->getElements())) {
-      SILType EltTy = LoadTy.getTupleElementType(EltNo);
-      unsigned NumSubElt = getNumSubElements(EltTy, M);
-      
-      // If we are missing any of the available values in this struct element,
-      // compute an address to load from.
-      SILValue EltAddr;
-      if (anyMissing(FirstElt, NumSubElt, AvailableValues))
-        EltAddr = B.createTupleElementAddr(Inst->getLoc(), Address, EltNo,
-                                           EltTy.getAddressType());
-
-      ResultElts.push_back(aggregateAvailableValues(Inst, EltTy, EltAddr,
-                                                    AvailableValues, FirstElt));
-      FirstElt += NumSubElt;
-    }
-    
-    return B.createTuple(Inst->getLoc(), LoadTy, ResultElts);
-  }
-  
-  // Extract struct elements from fully referenceable structs.
-  if (auto *SD = getFullyReferenceableStruct(LoadTy)) {
-    SmallVector<SILValue, 4> ResultElts;
-    
-    for (auto *FD : SD->getStoredProperties()) {
-      SILType EltTy = LoadTy.getFieldType(FD, M);
-      unsigned NumSubElt = getNumSubElements(EltTy, M);
-      
-      // If we are missing any of the available values in this struct element,
-      // compute an address to load from.
-      SILValue EltAddr;
-      if (anyMissing(FirstElt, NumSubElt, AvailableValues))
-        EltAddr = B.createStructElementAddr(Inst->getLoc(), Address, FD,
-                                            EltTy.getAddressType());
-
-      ResultElts.push_back(aggregateAvailableValues(Inst, EltTy, EltAddr,
-                                                    AvailableValues, FirstElt));
-      FirstElt += NumSubElt;
-    }
-    return B.createStruct(Inst->getLoc(), LoadTy, ResultElts);
-  }
-  
-  // Otherwise, we have a simple primitive.  If the value is available, use it,
-  // otherwise emit a load of the value.
-  auto Val = AvailableValues[FirstElt];
-  if (!Val.first)
-    return B.createLoad(Inst->getLoc(), Address,
-                        LoadOwnershipQualifier::Unqualified);
-
-  SILValue EltVal = extractSubElement(Val.first, Val.second, B, Inst->getLoc());
-  // It must be the same type as LoadTy if available.
-  assert(EltVal->getType() == LoadTy &&
-         "Subelement types mismatch");
-  return EltVal;
-}
-
 
 /// At this point, we know that this element satisfies the definitive init
 /// requirements, so we can try to promote loads to enable SSA-based dataflow
@@ -982,8 +982,7 @@ bool AllocOptimize::doIt() {
   Changed |= tryToRemoveDeadAllocation();
 
   return Changed;
- }
-
+}
 
 static bool optimizeMemoryAllocations(SILFunction &Fn) {
   bool Changed = false;
@@ -1022,15 +1021,15 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
 }
 
 namespace {
-class PredictableMemoryOptimizations : public SILFunctionTransform {
 
+class PredictableMemoryOptimizations : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     if (optimizeMemoryAllocations(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
-
 };
+
 } // end anonymous namespace
 
 
