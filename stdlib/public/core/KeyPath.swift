@@ -1526,7 +1526,7 @@ internal struct KeyPathBuffer {
             src: UnsafeMutableRawPointer(mutating: raw.baseAddress.unsafelyUnwrapped),
             size: UInt(MemoryLayout<T>.size))
     let result = resultBuf.pointee
-    resultBuf.deallocate(capacity: 1)
+    resultBuf.deallocate()
     return result
   }
   @_inlineable // FIXME(sil-serialize-all)

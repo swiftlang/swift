@@ -303,8 +303,35 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     _position = Unsafe${Mutable}Pointer._max
     _end = _position
   }
+
+%  if Mutable:
+
+  /// Creates a mutable typed buffer pointer referencing the same memory as the 
+  /// given immutable buffer pointer.
+  ///
+  /// - Parameter other: The immutable buffer pointer to convert.
+  @_inlineable
+  public init(mutating other: UnsafeBufferPointer<Element>) {
+    _position = UnsafeMutablePointer<Element>(mutating: other._position)
+    _end = UnsafeMutablePointer<Element>(mutating: other._end)
+  }
+
+%  else:
+
+  /// Creates an immutable typed buffer pointer referencing the same memory as the 
+  /// given mutable buffer pointer.
+  ///
+  /// - Parameter other: The mutable buffer pointer to convert.
+  @_inlineable
+  public init(_ other: UnsafeMutableBufferPointer<Element>) {
+    _position = UnsafePointer<Element>(other._position)
+    _end = UnsafePointer<Element>(other._end)
+  }
+
+%  end
   
 %  if not Mutable:
+
   /// Creates a buffer over the same memory as the given buffer slice.
   ///
   /// The new buffer represents the same region of memory as `slice`, but is
@@ -329,7 +356,8 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     self.init(start: slice.base.baseAddress! + slice.startIndex,
       count: slice.count)
   }
-%  end # !mutable
+
+%  end
 
   /// Creates a buffer over the same memory as the given buffer slice.
   ///
@@ -366,6 +394,143 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   public func makeIterator() -> UnsafeBufferPointerIterator<Element> {
     return UnsafeBufferPointerIterator(_position: _position, _end: _end)
   }
+  
+  /// Deallocates the memory block previously allocated at this buffer pointer’s 
+  /// base address. 
+  ///
+  /// This buffer pointer's `baseAddress` must be `nil` or a pointer to a memory 
+  /// block previously returned by a Swift allocation method. If `baseAddress` is 
+  /// `nil`, this function does nothing. Otherwise, the memory must not be initialized 
+  /// or `Pointee` must be a trivial type. This buffer pointer's `count` must 
+  /// be equal to the originally allocated size of the memory block.
+  @_inlineable
+  public func deallocate() {
+    _position?.deallocate()
+  }
+
+% if Mutable:
+
+  /// Allocates uninitialized memory for the specified number of instances of
+  /// type `Element`.
+  ///
+  /// The resulting buffer references a region of memory that is bound to
+  /// `Element` and is `count * MemoryLayout<Element>.stride` bytes in size.
+  /// 
+  /// The following example allocates a buffer that can store four `Int` 
+  /// instances and then initializes that memory with the elements of a range:
+  /// 
+  ///     let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  ///     _ = buffer.initialize(from: 1...4)
+  ///     print(buffer[2])
+  ///     // Prints "3"
+  ///
+  /// When you allocate memory, always remember to deallocate once you're
+  /// finished.
+  ///
+  ///     buffer.deallocate()
+  ///
+  /// - Parameter count: The amount of memory to allocate, counted in instances
+  ///   of `Element`. 
+  @_inlineable
+  public static func allocate(capacity count: Int) 
+    -> UnsafeMutableBufferPointer<Element> {
+    let size = MemoryLayout<Element>.stride * count
+    let raw  = Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Element.self))
+    Builtin.bindMemory(raw, count._builtinWordValue, Element.self)
+    return UnsafeMutableBufferPointer(
+      start: UnsafeMutablePointer(raw), count: count)
+  }
+  
+  /// Initializes every element in this buffer's memory to a copy of the given value.
+  ///
+  /// The destination memory must be uninitialized or the buffer's `Element`
+  /// must be a trivial type. After a call to `initialize(repeating:)`, the
+  /// entire region of memory referenced by this buffer is initialized.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The instance to initialize this buffer's memory with.
+  @_inlineable
+  public func initialize(repeating repeatedValue: Element) {
+    guard let dstBase = _position else {
+      return
+    }
+
+    dstBase.initialize(repeating: repeatedValue, count: _end! - dstBase)
+  }
+  
+  /// Assigns every element in this buffer's memory to a copy of the given value.
+  ///
+  /// The buffer’s memory must be initialized or the buffer's `Element`
+  /// must be a trivial type. 
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The instance to assign this buffer's memory to.
+  ///
+  /// Warning: All buffer elements must be initialized before calling this. 
+  /// Assigning to part of the buffer must be done using the `assign(repeating:count:)`` 
+  /// method on the buffer’s `baseAddress`. 
+  @_inlineable
+  public func assign(repeating repeatedValue: Element) {
+    guard let dstBase = _position else {
+      return
+    }
+
+    dstBase.assign(repeating: repeatedValue, count: _end! - dstBase)
+  }
+  
+% end
+
+  /// Executes the given closure while temporarily binding the memory referenced 
+  /// by this buffer to the given type.
+  ///
+  /// Use this method when you have a buffer of memory bound to one type and
+  /// you need to access that memory as a buffer of another type. Accessing
+  /// memory as type `T` requires that the memory be bound to that type. A
+  /// memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// The entire region of memory referenced by this buffer must be initialized.
+  /// 
+  /// Because this buffer's memory is no longer bound to its `Element` type
+  /// while the `body` closure executes, do not access memory using the
+  /// original buffer from within `body`. Instead, use the `body` closure's
+  /// buffer argument to access the values in memory as instances of type
+  /// `T`.
+  ///
+  /// After executing `body`, this method rebinds memory back to the original
+  /// `Element` type.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     buffer. The type `T` must have the same stride and be layout compatible
+  ///     with the pointer's `Element` type.
+  ///   - body: A closure that takes a ${Mutable.lower()} typed buffer to the
+  ///     same memory as this buffer, only bound to type `T`. The buffer argument 
+  ///     contains the same number of complete instances of `T` as the original  
+  ///     buffer’s `count`. The closure's buffer argument is valid only for the 
+  ///     duration of the closure's execution. If `body` has a return value, that 
+  ///     value is also used as the return value for the `withMemoryRebound(to:_:)` 
+  ///     method.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @_inlineable
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type, _ body: (${Self}<T>) throws -> Result
+  ) rethrows -> Result {
+    if let base = _position {
+      _debugPrecondition(MemoryLayout<Element>.stride == MemoryLayout<T>.stride)
+      Builtin.bindMemory(base._rawValue, count._builtinWordValue, T.self)
+      defer {
+        Builtin.bindMemory(base._rawValue, count._builtinWordValue, Element.self)
+      }
+
+      return try body(${Self}<T>(
+        start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: count))
+    }
+    else {
+      return try body(${Self}<T>(start: nil, count: 0))
+    }
+  }
 
   /// A pointer to the first element of the buffer.
   ///
@@ -382,12 +547,11 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
   public var count: Int {
-    switch(_position, _end) {
-    case (.some(let pos), .some(let end)):
-      return (end - pos)
-    case _:
+    guard let start = _position, let end = _end else {
       return 0
     }
+    
+    return end - start
   }
 
   @_versioned

@@ -69,7 +69,7 @@ internal func _withUninitializedString<R>(
   let stringPtr = UnsafeMutablePointer<String>.allocate(capacity: 1)
   let bodyResult = body(stringPtr)
   let stringResult = stringPtr.move()
-  stringPtr.deallocate(capacity: 1)
+  stringPtr.deallocate()
   return (bodyResult, stringResult)
 }
 

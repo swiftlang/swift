@@ -58,7 +58,7 @@ struct _UnsafeBitMap {
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   func initializeToZero() {
-    values.initialize(to: 0, count: numberOfWords)
+    values.initialize(repeating: 0, count: numberOfWords)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -82,4 +82,3 @@ struct _UnsafeBitMap {
     }
   }
 }
-

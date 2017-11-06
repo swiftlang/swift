@@ -82,9 +82,7 @@ class Vector<T> {
   }
 
   deinit {
-    for i in 0..<length {
-      (base + i).deinitialize()
-    }
+    base.deinitialize(count: length)
     c_free(base)
   }
 }

@@ -162,7 +162,7 @@ open class ManagedBuffer<Header, Element> {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
 ///            (pointerToHeader, pointerToElements) -> Void in
 ///            pointerToElements.deinitialize(count: self.count)
-///            pointerToHeader.deinitialize()
+///            pointerToHeader.deinitialize(count: 1)
 ///          }
 ///        }
 ///

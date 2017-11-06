@@ -121,7 +121,7 @@ internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
   let tlsPtr = ptr!.assumingMemoryBound(to: _ThreadLocalStorage.self)
   __swift_stdlib_ubrk_close(tlsPtr[0].uBreakIterator)
   tlsPtr.deinitialize(count: 1)
-  tlsPtr.deallocate(capacity: 1)
+  tlsPtr.deallocate()
 
 #if INTERNAL_CHECKS_ENABLED
   // Log the fact we've destroyed our storage
@@ -167,4 +167,3 @@ internal func _initializeThreadLocalStorage()
   _sanityCheck(success == 0, "setspecific failed")
   return tlsPtr
 }
-

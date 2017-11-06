@@ -3314,7 +3314,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
     if !_isPOD(Key.self) {
       for i in 0 ..< capacity {
         if initializedEntries[i] {
-          (keys+i).deinitialize()
+          (keys+i).deinitialize(count: 1)
         }
       }
     }
@@ -3323,7 +3323,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
     if !_isPOD(Value.self) {
       for i in 0 ..< capacity {
         if initializedEntries[i] {
-          (values+i).deinitialize()
+          (values+i).deinitialize(count: 1)
         }
       }
     }
@@ -3728,9 +3728,9 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    (keys + i).deinitialize()
+    (keys + i).deinitialize(count: 1)
 %if Self == 'Dictionary':
-    (values + i).deinitialize()
+    (values + i).deinitialize(count: 1)
 %end
     _storage.initializedEntries[i] = false
   }
