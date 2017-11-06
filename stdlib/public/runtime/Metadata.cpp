@@ -337,7 +337,10 @@ public:
         Result(result) {}
 
     FunctionTypeFlags getFlags() const { return Flags; }
-    const Metadata *const *getParameters() const { return Parameters; }
+    const Metadata *getParameter(unsigned index) const {
+      assert(index < Flags.getNumParameters());
+      return Parameters[index];
+    }
     const Metadata *getResult() const { return Result; }
 
     const uint32_t *getParameterFlags() const {
@@ -367,8 +370,8 @@ public:
       return result;
 
     for (unsigned i = 0, e = keyFlags.getNumParameters(); i != e; ++i) {
-      if (auto result = comparePointers(key.getParameters()[i],
-                                        Data.getParameters()[i]))
+      if (auto result =
+              comparePointers(key.getParameter(i), Data.getParameter(i)))
         return result;
 
       if (auto result =
@@ -537,7 +540,7 @@ FunctionCacheEntry::FunctionCacheEntry(Key key) {
   Data.ResultType = key.getResult();
 
   for (unsigned i = 0; i < numParameters; ++i) {
-    Data.getParameters()[i] = key.getParameters()[i];
+    Data.getParameters()[i] = key.getParameter(i);
     if (flags.hasParameterFlags())
       Data.getParameterFlags()[i] = key.getParameterFlags(i).getIntValue();
   }

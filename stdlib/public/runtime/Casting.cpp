@@ -1927,7 +1927,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
       return _fail(src, srcType, targetType, flags);
 
     for (unsigned i = 0, e = srcFn->getNumParameters(); i < e; ++i) {
-      if (srcFn->getParameters()[i] != targetFn->getParameters()[i] ||
+      if (srcFn->getParameter(i) != targetFn->getParameter(i) ||
           srcFn->getParameterFlags(i) != targetFn->getParameterFlags(i))
         return _fail(src, srcType, targetType, flags);
     }

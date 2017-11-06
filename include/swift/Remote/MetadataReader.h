@@ -798,38 +798,17 @@ public:
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
-      auto numParameters = Function->getNumParameters();
 
       std::vector<FunctionParam<BuiltType>> Parameters;
-      StoredPointer ArgumentAddress = MetadataAddress +
-        sizeof(TargetFunctionTypeMetadata<Runtime>);
-      StoredPointer ParameterFlagsAddress =
-                    ArgumentAddress + (numParameters * sizeof(StoredPointer));
-
-      for (unsigned i = 0; i < numParameters; ++i,
-           ArgumentAddress += sizeof(StoredPointer),
-           ParameterFlagsAddress += sizeof(uint32_t)) {
-        StoredPointer ParamMetadata;
-        if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
-                                 &ParamMetadata))
+      for (unsigned i = 0, n = Function->getNumParameters(); i != n; ++i) {
+        auto ParamTypeRef = readTypeFromMetadata(Function->getParameter(i));
+        if (!ParamTypeRef)
           return BuiltType();
 
-        if (auto ParamTypeRef = readTypeFromMetadata(ParamMetadata)) {
-          FunctionParam<BuiltType> Param;
-          Param.setType(ParamTypeRef);
-
-          if (Function->hasParameterFlags()) {
-            uint32_t ParameterFlags;
-            if (!Reader->readInteger(RemoteAddress(ParameterFlagsAddress),
-                                     &ParameterFlags))
-              return BuiltType();
-              Param.setFlags(ParameterFlags::fromIntValue(ParameterFlags));
-          }
-
-          Parameters.push_back(std::move(Param));
-        } else {
-          return BuiltType();
-        }
+        FunctionParam<BuiltType> Param;
+        Param.setType(ParamTypeRef);
+        Param.setFlags(Function->getParameterFlags(i));
+        Parameters.push_back(std::move(Param));
       }
 
       auto Result = readTypeFromMetadata(Function->ResultType);
@@ -1203,8 +1182,26 @@ protected:
         return _readMetadata<TargetExistentialMetatypeMetadata>(address);
       case MetadataKind::ForeignClass:
         return _readMetadata<TargetForeignClassMetadata>(address);
-      case MetadataKind::Function:
-        return _readMetadata<TargetFunctionTypeMetadata>(address);
+      case MetadataKind::Function: {
+        StoredSize flagsValue;
+        auto flagsAddr =
+            address + TargetFunctionTypeMetadata<Runtime>::OffsetToFlags;
+        if (!Reader->readInteger(RemoteAddress(flagsAddr), &flagsValue))
+          return nullptr;
+
+        auto flags =
+            TargetFunctionTypeFlags<StoredSize>::fromIntValue(flagsValue);
+
+        using Parameter =
+            ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
+        auto totalSize = sizeof(TargetFunctionTypeMetadata<Runtime>) +
+                         flags.getNumParameters() * sizeof(Parameter);
+
+        if (flags.hasParameterFlags())
+          totalSize += flags.getNumParameters() * sizeof(uint32_t);
+
+        return _readMetadata(address, totalSize);
+      }
       case MetadataKind::HeapGenericLocalVariable:
         return _readMetadata<TargetGenericBoxHeapMetadata>(address);
       case MetadataKind::HeapLocalVariable:
