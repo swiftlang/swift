@@ -92,9 +92,9 @@ extension _StringGuts {
 
   var isSingleByte: Bool {
     switch classification {
-    case .native, .unsafe:
+    case .native, .unsafe, .nonTaggedCocoa:
       return (_objectBitPattern & _twoByteCodeUnitBit) == 0
-    case .nonTaggedCocoa, .smallCocoa, .error:
+    case .smallCocoa, .error:
       return false
     }   
   }
@@ -167,10 +167,9 @@ extension _StringGuts {
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
     } else if let cocoa = self._cocoa {
-      _sanityCheck(!self.isSingleByte)
       _sanityCheck(self.hasCocoaBuffer)
       _sanityCheck(self.count >= 0)
-      _sanityCheck(self.capacity >= self.count)
+      _sanityCheck(self.capacity == 0)
     } else if let _ = self._smallCocoa {
       _sanityCheck(!self.isSingleByte)
       _sanityCheck(!self.hasCocoaBuffer) // FIXME: Is this right?
@@ -435,9 +434,27 @@ internal struct UnsafeString {
   // TODO: AnyObject ABI encompases tagged pointers too. What we could use is a
   // NonTaggedObjCObject.
   let owner: AnyObject
+  let isSingleByte: Bool
+  let start: UnsafeRawPointer?
+
+  init(_ owner: AnyObject, isSingleByte: Bool, start: UnsafeRawPointer?) {
+    self.owner = owner
+    self.isSingleByte = isSingleByte
+    self.start = start
+  }
 
   init(_ owner: AnyObject) {
-    self.owner = owner
+    self.init(owner, isSingleByte: false, start: nil)
+  }
+
+  internal var unsafe: UnsafeString? {
+    guard let start = start else { return nil }
+    let count = _stdlib_binary_CFStringGetLength(owner)
+    return UnsafeString(
+      baseAddress: UnsafeMutableRawPointer(mutating: start),
+      count: count,
+      isSingleByte: isSingleByte,
+      hasCocoaBuffer: true)
   }
 }
 
@@ -446,8 +463,12 @@ internal struct OpaqueCocoaString {
   let count: Int
 
   init(_ object: AnyObject) {
+    self.init(object, count: _stdlib_binary_CFStringGetLength(object))
+  }
+
+  init(_ object: AnyObject, count: Int) {
     self.object = object
-    self.count = _stdlib_binary_CFStringGetLength(object)
+    self.count = count
   }
 }
 
@@ -517,13 +538,20 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _cocoa: NonTaggedCocoaString? {
     guard _isCocoa else { return nil }
-    return NonTaggedCocoaString(_bridgeObject(toNonTaggedObjC: _object))
+    return NonTaggedCocoaString(
+      _bridgeObject(toNonTaggedObjC: _object),
+      isSingleByte: self.isSingleByte,
+      start: UnsafeRawPointer(bitPattern: _otherBits))
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NonTaggedCocoaString) {
     _sanityCheck(!_isObjCTaggedPointer(s.owner))
-    self.init(_bridgeObject(fromNonTaggedObjC: s.owner), 0)
+    self.init(
+      _unflagged: _bridgeObject(fromNonTaggedObjC: s.owner),
+      isSingleByte: s.isSingleByte,
+      hasCocoaBuffer: true,
+      otherBits: UInt(bitPattern: s.start))
   }
 
   //
@@ -667,8 +695,7 @@ extension _StringGuts {
   @_versioned
   init(_ legacyCore: _LegacyStringCore) {
     guard !legacyCore.hasCocoaBuffer else {
-      _sanityCheck(legacyCore._owner != nil,
-        "how? is this yet another case we don't know about?")
+      _sanityCheck(legacyCore._owner != nil, "Cocoa string with no owner")
       let owner = legacyCore._owner._unsafelyUnwrappedUnchecked
 
       // NOTE: Sometimes a _LegacyStringCore is a self-slice of a cocoa string
@@ -906,8 +933,7 @@ extension _StringGuts {
       return native.unsafe
     }
     if let cocoa = self._cocoa {
-      // FIXME: Most of these are contiguous!
-      return nil
+      return cocoa.unsafe
     }
     return nil
   }
