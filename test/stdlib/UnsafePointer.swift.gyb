@@ -360,7 +360,7 @@ UnsafeMutablePointerTestSuite.test("initialize:from:/immutable") {
   var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 3)
   defer {
     ptr.deinitialize(count: 3)
-    ptr.deallocate(capacity: 3)
+    ptr.deallocate()
   }
   let source = (0..<3).map(Missile.init)
   source.withUnsafeBufferPointer { bufferPtr in
@@ -375,7 +375,7 @@ UnsafeMutablePointerTestSuite.test("assign/immutable") {
   var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 2)
   defer {
     ptr.deinitialize(count: 2)
-    ptr.deallocate(capacity: 2)
+    ptr.deallocate()
   }
   ptr.initialize(to: Missile(1))
   (ptr + 1).initialize(to: Missile(2))
@@ -458,7 +458,7 @@ ${SelfName}TestSuite.test("Comparable") {
 
 ${SelfName}TestSuite.test("withMemoryRebound") {
   let mutablePtrI = UnsafeMutablePointer<Int>.allocate(capacity: 4)
-  defer { mutablePtrI.deallocate(capacity: 4) }
+  defer { mutablePtrI.deallocate() }
   let ptrI = ${SelfName}<Int>(mutablePtrI)
   ptrI.withMemoryRebound(to: UInt.self, capacity: 4) {
     // Make sure the closure argument isa $SelfName

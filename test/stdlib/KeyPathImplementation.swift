@@ -243,7 +243,7 @@ struct TestKeyPathBuilder {
     pushWord(args.count)
     pushWord(witnesses)
 
-    buffer.copyBytes(from: args)
+    buffer.copyMemory(from: args)
     buffer = .init(start: buffer.baseAddress! + args.count,
                    count: buffer.count - args.count)
 
@@ -952,7 +952,7 @@ func testCopy(from: UnsafeRawPointer,
               to: UnsafeMutableRawPointer,
               count: Int) {
   numberOfCopyOperations += 1
-  to.copyBytes(from: from, count: count)
+  to.copyMemory(from: from, byteCount: count)
 }
 
 var numberOfEqualsOperations = 0

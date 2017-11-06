@@ -412,8 +412,6 @@ public struct ${Self}<Pointee>
   ///
   /// The resulting pointer references a region of memory that is bound to
   /// `Pointee` and is `count * MemoryLayout<Pointee>.stride` bytes in size.
-  /// You must eventually deallocate the memory referenced by the returned
-  /// pointer.
   ///
   /// The following example allocates enough new memory to store four `Int`
   /// instances and then initializes that memory with the elements of a range.
@@ -426,7 +424,7 @@ public struct ${Self}<Pointee>
   /// When you allocate memory, always remember to deallocate once you're
   /// finished.
   ///
-  ///     intPointer.deallocate(capacity: 4)
+  ///     intPointer.deallocate()
   ///
   /// - Parameter count: The amount of memory to allocate, counted in instances
   ///   of `Pointee`.
@@ -439,22 +437,22 @@ public struct ${Self}<Pointee>
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return UnsafeMutablePointer(rawPtr)
   }
-
-  /// Deallocates memory that was allocated for `count` instances of `Pointee`.
-  ///
-  /// The memory region that is deallocated is
-  /// `capacity * MemoryLayout<Pointee>.stride` bytes in size. The memory must
-  /// not be initialized or `Pointee` must be a trivial type.
-  ///
-  /// - Parameter capacity: The amount of memory to deallocate, counted in
-  ///   instances of `Pointee`.
-  @_inlineable
-  public func deallocate(capacity: Int) {
-    let size = MemoryLayout<Pointee>.stride * capacity
-    Builtin.deallocRaw(
-      _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
+  public func deallocate(capacity _: Int) { 
+    self.deallocate()
   }
+
 %  end
+
+  /// Deallocates the memory block previously allocated at this pointer.
+  ///
+  /// This pointer must be a pointer to the start of a previously allocated memory 
+  /// block. The memory must not be initialized or `Pointee` must be a trivial type.
+  @_inlineable
+  public func deallocate() {
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+  }
 
   /// Accesses the instance referenced by this pointer.
   ///
@@ -488,27 +486,47 @@ public struct ${Self}<Pointee>
   }
 
 %  if mutable:
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "initialize(repeating:count:)")
+  public func initialize(to newValue: Pointee, count: Int = 1) { 
+    initialize(repeating: newValue, count: count)
+  }
+
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
   /// The destination memory must be uninitialized or the pointer's `Pointee`
-  /// must be a trivial type. After a call to `initialize(to:count:)`, the
+  /// must be a trivial type. After a call to `initialize(repeating:count:)`, the
   /// memory referenced by this pointer is initialized.
   ///
   /// - Parameters:
-  ///   - newValue: The instance to initialize this pointer's memory with.
+  ///   - repeatedValue: The instance to initialize this pointer's memory with.
   ///   - count: The number of consecutive copies of `newValue` to initialize.
-  ///     `count` must not be negative. The default is `1`.
+  ///     `count` must not be negative. 
   @_inlineable
-  public func initialize(to newValue: Pointee, count: Int = 1) {
+  public func initialize(repeating repeatedValue: Pointee, count: Int) {
     // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
-      "${Self}.initialize(to:): negative count")
+      "${Self}.initialize(repeating:count:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
-      Builtin.initialize(newValue, (self + offset)._rawValue)
+      Builtin.initialize(repeatedValue, (self + offset)._rawValue)
     }
+  }
+  
+  /// Initializes this pointer's memory with a single instance of the given value.
+  ///
+  /// The destination memory must be uninitialized or the pointer's `Pointee`
+  /// must be a trivial type. After a call to `initialize(to:)`, the
+  /// memory referenced by this pointer is initialized. Calling this method is 
+  /// roughly equivalent to calling `initialize(repeating:count:)` with a 
+  /// `count` of 1.
+  ///
+  /// - Parameters:
+  ///   - value: The instance to initialize this pointer's pointee to.
+  @_inlineable
+  public func initialize(to value: Pointee) {
+    Builtin.initialize(value, self._rawValue)
   }
 
   /// Retrieves and returns the referenced instance, returning the pointer's
@@ -519,7 +537,7 @@ public struct ${Self}<Pointee>
   /// incidental side effects of copying and destroying the value:
   ///
   ///     let value: T = {
-  ///         defer { p.deinitialize() }
+  ///         defer { p.deinitialize(count: 1) }
   ///         return p.pointee
   ///     }()
   ///
@@ -532,6 +550,26 @@ public struct ${Self}<Pointee>
     return Builtin.take(_rawValue)
   }
 
+  /// Replaces this pointer's memory with the specified number of
+  /// consecutive copies of the given value.
+  ///
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `assign(repeating:count:)`, the region is initialized.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The instance to assign this pointer's memory to.
+  ///   - count: The number of consecutive copies of `newValue` to assign.
+  ///     `count` must not be negative. 
+  @_inlineable
+  public func assign(repeating repeatedValue: Pointee, count: Int) {
+    _debugPrecondition(count >= 0, "${Self}.assign(repeating:count:) with negative count")
+    for i in 0..<count {
+      self[i] = repeatedValue
+    }
+  }
+  
   /// Replaces this pointer's initialized memory with the specified number of
   /// instances from the given pointer's memory.
   ///
@@ -695,7 +733,14 @@ public struct ${Self}<Pointee>
     //   self[i] = (source + i).move()
     // }
   }
-
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
+  @_inlineable
+  @discardableResult
+  public func deinitialize() -> UnsafeMutableRawPointer {
+    return deinitialize(count: 1)
+  }
+  
   /// Deinitializes the specified number of values starting at this pointer.
   ///
   /// The region of memory starting at this pointer and covering `count`
@@ -704,12 +749,12 @@ public struct ${Self}<Pointee>
   /// bound to the `Pointee` type.
   ///
   /// - Parameter count: The number of instances to deinitialize. `count` must
-  ///   not be negative. The default value is `1`.
+  ///   not be negative. 
   /// - Returns: A raw pointer to the same address as this pointer. The memory
   ///   referenced by the returned raw pointer is still bound to `Pointee`.
   @_inlineable
   @discardableResult
-  public func deinitialize(count: Int = 1) -> UnsafeMutableRawPointer {
+  public func deinitialize(count: Int) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "${Self}.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.

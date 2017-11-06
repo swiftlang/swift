@@ -101,9 +101,9 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       // These objects are "returned" at +0, so treat them as pointer values to
       // avoid retains. Copy bytes via a raw pointer to circumvent reference
       // counting while correctly aliasing with all other pointer types.
-      UnsafeMutableRawPointer(aBuffer).copyBytes(
+      UnsafeMutableRawPointer(aBuffer).copyMemory(
         from: objects.baseAddress! + range.location,
-        count: range.length * MemoryLayout<AnyObject>.stride)
+        byteCount: range.length * MemoryLayout<AnyObject>.stride)
     }
   }
 

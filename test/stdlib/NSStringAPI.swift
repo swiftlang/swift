@@ -215,7 +215,7 @@ NSStringAPIs.test("init(utf8String:)") {
   let cstr = UnsafeMutableRawPointer(up)
     .bindMemory(to: CChar.self, capacity: 100)
   expectOptionalEqual(s, String(utf8String: cstr))
-  up.deallocate(capacity: 100)
+  up.deallocate()
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
@@ -1837,4 +1837,3 @@ NSStringAPIs.test("copy construction") {
 }
 
 runAllTests()
-

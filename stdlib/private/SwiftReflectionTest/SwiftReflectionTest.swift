@@ -361,7 +361,7 @@ public func reflect<T>(any: T) {
   anyPointer.initialize(to: any)
   let anyPointerValue = UInt(bitPattern: anyPointer)
   reflect(instanceAddress: anyPointerValue, kind: .Existential)
-  anyPointer.deallocate(capacity: MemoryLayout<Any>.size)
+  anyPointer.deallocate()
 }
 
 // Reflect an `Error`, a.k.a. an "error existential".
@@ -431,7 +431,7 @@ public func reflect(function: @escaping () -> Void) {
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocate(capacity: MemoryLayout<ThickFunction0>.size)
+  fn.deallocate()
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
@@ -449,7 +449,7 @@ public func reflect(function: @escaping (Int) -> Void) {
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocate(capacity: MemoryLayout<ThickFunction1>.size)
+  fn.deallocate()
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
@@ -466,7 +466,7 @@ public func reflect(function: @escaping (Int, String) -> Void) {
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocate(capacity: MemoryLayout<ThickFunction2>.size)
+  fn.deallocate()
 }
 
 /// Reflect a closure context. The given function must be a Swift-native
@@ -483,7 +483,7 @@ public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
 
   reflect(instanceAddress: contextPointer, kind: .Object)
 
-  fn.deallocate(capacity: MemoryLayout<ThickFunction3>.size)
+  fn.deallocate()
 }
 
 /// Call this function to indicate to the parent that there are
