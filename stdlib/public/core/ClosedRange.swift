@@ -19,7 +19,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
   // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   Bound : _Strideable & Comparable,
-  Bound.Stride : BinaryInteger {
+  Bound.Stride : Numeric {
   case pastEnd
   case inRange(Bound)
 }
@@ -35,8 +35,7 @@ public struct ClosedRangeIndex<Bound>
   // swift-3-indexing-model: should conform to _Strideable, otherwise
   // CountableClosedRange is not interchangeable with CountableRange in all
   // contexts.
-  Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
+  Bound : _Strideable & Comparable {
   /// Creates the "past the end" position.
   @_inlineable
   @_versioned
@@ -100,11 +99,11 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
   // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
+  Bound.Stride : SignedNumeric {
 
   @_inlineable
   @_versioned
-  internal init(_range r: CountableClosedRange<Bound>) {
+  internal init(_range r: ClosedRange<Bound>, step: Bound.Stride) {
     _nextResult = r.lowerBound
     _upperBound = r.upperBound
   }
@@ -118,7 +117,7 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
   public mutating func next() -> Bound? {
     let r = _nextResult
     if let x = r {
-      _nextResult = x == _upperBound ? nil : x.advanced(by: 1)
+      _nextResult = x >= _upperBound ? nil : x.advanced(by: 1)
     }
     return r
   }
@@ -201,13 +200,16 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 
   // FIXME(ABI)#175 (Type checker)
   // WORKAROUND: needed because of rdar://25584401
-  public typealias Iterator = ClosedRangeIterator<Bound>
+  public typealias Iterator = StrideThroughIterator<Bound>
 
   // FIXME(ABI)#175 (Type checker)
   // WORKAROUND: needed because of rdar://25584401
   @_inlineable
-  public func makeIterator() -> ClosedRangeIterator<Bound> {
-    return ClosedRangeIterator(_range: self)
+  public func makeIterator() -> StrideThroughIterator<Bound> {
+    return StrideThroughIterator(
+      _start: self.lowerBound,
+      end: self.upperBound,
+      stride: 1)
   }
 
   /// The position of the first element in the range.
