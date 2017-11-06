@@ -7192,13 +7192,7 @@ public:
            && "Decl parsing must prevent destructors outside of types!");
 
     TC.checkDeclAttributesEarly(DD);
-    if (!DD->hasAccess()) {
-      DD->setAccess(enclosingClass->getFormalAccess());
-    }
-
-    if (enclosingClass->getAttrs().hasAttribute<VersionedAttr>()) {
-      DD->getAttrs().add(new (TC.Context) VersionedAttr(/*implicit=*/true));
-    }
+    DD->copyFormalAccessAndVersionedAttrFrom(enclosingClass);
 
     configureImplicitSelf(TC, DD);
 

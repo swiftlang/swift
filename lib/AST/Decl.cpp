@@ -2175,6 +2175,19 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   llvm_unreachable("unknown access level");
 }
 
+void ValueDecl::copyFormalAccessAndVersionedAttrFrom(ValueDecl *source) {
+  if (!hasAccess()) {
+    setAccess(source->getFormalAccess());
+  }
+
+  // Inherit the @_versioned attribute.
+  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto &ctx = getASTContext();
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    getAttrs().add(clonedAttr);
+  }
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
