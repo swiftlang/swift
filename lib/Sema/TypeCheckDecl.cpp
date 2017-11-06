@@ -4618,7 +4618,7 @@ public:
     if (!IsFirstPass)
       TC.addImplicitConstructors(CD);
 
-    TC.addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
 
     if (!IsFirstPass && !CD->isInvalid())
       TC.checkConformancesInContext(CD, CD);
@@ -7932,7 +7932,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   // class, you shouldn't have to know what the vtable layout is.
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
     TC.addImplicitConstructors(CD);
-    TC.addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
   }
 
   // validateDeclForNameLookup will not trigger an immediate full
