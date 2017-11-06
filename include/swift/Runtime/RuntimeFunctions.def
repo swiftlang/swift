@@ -841,6 +841,12 @@ FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, DefaultCC,
          ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// Metadata *swift_getObjCClassFromMetadata(objc_class *theClass);
+FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, DefaultCC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // Metadata *swift_getTupleTypeMetadata(size_t numElements,
 //                                      Metadata * const *elts,
 //                                      const char *labels,

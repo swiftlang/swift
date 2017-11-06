@@ -190,6 +190,14 @@ namespace swift {
                      void (*function)(void *));
 #endif
 
+  static inline const Metadata *getMetadataForClass(const ClassMetadata *c) {
+#if SWIFT_OBJC_INTEROP
+    return swift_getObjCClassMetadata(c);
+#else
+    return c;
+#endif
+  }
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

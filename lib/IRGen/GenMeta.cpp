@@ -108,6 +108,7 @@ static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
                                                    llvm::Value *classPtr) {
+  assert(IGF.IGM.Context.LangOpts.EnableObjCInterop);
   classPtr = IGF.Builder.CreateBitCast(classPtr, IGF.IGM.ObjCClassPtrTy);
   
   // Fetch the metadata for that class.
@@ -4204,46 +4205,16 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   if (hasKnownSwiftMetadata(IGF.IGM, type))
     return metatype;
 
-  // Otherwise, we inline a little operation here.
-
-  // Load the metatype kind.
-  auto metatypeKindAddr =
-    Address(IGF.Builder.CreateStructGEP(/*Ty=*/nullptr, metatype, 0),
-            IGF.IGM.getPointerAlignment());
-  auto metatypeKind =
-    IGF.Builder.CreateLoad(metatypeKindAddr, metatype->getName() + ".kind");
-
-  // Compare it with the class wrapper kind.
-  auto classWrapperKind =
-    llvm::ConstantInt::get(IGF.IGM.MetadataKindTy,
-                           unsigned(MetadataKind::ObjCClassWrapper));
-  auto isObjCClassWrapper =
-    IGF.Builder.CreateICmpEQ(metatypeKind, classWrapperKind,
-                             "isObjCClassWrapper");
-
-  // Branch based on that.
-  llvm::BasicBlock *contBB = IGF.createBasicBlock("metadataForClass.cont");
-  llvm::BasicBlock *wrapBB = IGF.createBasicBlock("isWrapper");
-  IGF.Builder.CreateCondBr(isObjCClassWrapper, wrapBB, contBB);
-  llvm::BasicBlock *origBB = IGF.Builder.GetInsertBlock();
-
-  // If it's a wrapper, load from the 'Class' field, which is at index 1.
-  // TODO: if we guaranteed that this load couldn't crash, we could use
-  // a select here instead, which might be profitable.
-  IGF.Builder.emitBlock(wrapBB);
-  auto classFromWrapper = 
-    emitInvariantLoadFromMetadataAtIndex(IGF, metatype, 1,
-                                         IGF.IGM.TypeMetadataPtrTy);
-  IGF.Builder.CreateBr(contBB);
-
-  // Continuation block.
-  IGF.Builder.emitBlock(contBB);
-  auto phi = IGF.Builder.CreatePHI(IGF.IGM.TypeMetadataPtrTy, 2,
-                                   metatype->getName() + ".class");
-  phi->addIncoming(metatype, origBB);
-  phi->addIncoming(classFromWrapper, wrapBB);
-
-  return phi;
+  // Otherwise, we may have to unwrap an ObjC class wrapper.
+  assert(IGF.IGM.Context.LangOpts.EnableObjCInterop);
+  metatype = IGF.Builder.CreateBitCast(metatype, IGF.IGM.TypeMetadataPtrTy);
+  
+  // Fetch the metadata for that class.
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassFromMetadataFn(),
+                                     metatype);
+  call->setDoesNotThrow();
+  call->setDoesNotAccessMemory();
+  return call;
 }
 
 /// Load the correct virtual function for the given class method.

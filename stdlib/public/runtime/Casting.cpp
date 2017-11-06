@@ -3196,7 +3196,7 @@ SWIFT_CC(swift)
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject())
     if (classHasSuperclass(classType))
-      return swift_getObjCClassMetadata(classType->SuperClass);
+      return getMetadataForClass(classType->SuperClass);
   return nullptr;
 }
 

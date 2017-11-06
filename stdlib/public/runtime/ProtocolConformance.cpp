@@ -108,14 +108,14 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
     if (auto *ClassMetadata = *getIndirectClass())
-      return swift_getObjCClassMetadata(ClassMetadata);
+      return getMetadataForClass(ClassMetadata);
     return nullptr;
       
   case TypeMetadataRecordKind::UniqueDirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
     if (auto *ClassMetadata = getDirectClass())
-      return swift_getObjCClassMetadata(ClassMetadata);
+      return getMetadataForClass(ClassMetadata);
     return nullptr;
       
   case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
@@ -394,7 +394,7 @@ recur:
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (classHasSuperclass(classType)) {
-      type = swift_getObjCClassMetadata(classType->SuperClass);
+      type = getMetadataForClass(classType->SuperClass);
       goto recur;
     }
   }
@@ -433,7 +433,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
       if (classHasSuperclass(classType)) {
-        type = swift_getObjCClassMetadata(classType->SuperClass);
+        type = getMetadataForClass(classType->SuperClass);
         continue;
       }
     }
