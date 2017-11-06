@@ -148,12 +148,76 @@ bb0(%0 : $Int):
 
 
 struct ContainsNativeObject {
-  var x : Int
-  var y : Builtin.NativeObject
+  var x : Builtin.NativeObject
+  var y : Int32
+  var z : Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil @multiple_level_extract_1 : $@convention(thin) (@owned ContainsNativeObject) -> Builtin.Int32 {
+// CHECK: bb0([[ARG:%.*]] : $ContainsNativeObject):
+// CHECK:   [[FIELD1:%.*]] = struct_extract [[ARG]] : $ContainsNativeObject, #ContainsNativeObject.y
+// CHECK:   [[FIELD2:%.*]] = struct_extract [[FIELD1]] : $Int32, #Int32._value
+// CHECK:   release_value [[ARG]]
+// CHECK:   return [[FIELD2]]
+// CHECK: } // end sil function 'multiple_level_extract_1'
+sil @multiple_level_extract_1 : $@convention(thin) (@owned ContainsNativeObject) -> Builtin.Int32 {
+bb0(%0 : $ContainsNativeObject):
+  %1 = alloc_stack $ContainsNativeObject
+  store %0 to %1 : $*ContainsNativeObject
+
+  %2 = struct_element_addr %1 : $*ContainsNativeObject, #ContainsNativeObject.y
+  %3 = struct_element_addr %2 : $*Int32, #Int32._value
+  %4 = load %3 : $*Builtin.Int32
+
+  destroy_addr %1 : $*ContainsNativeObject
+  dealloc_stack %1 : $*ContainsNativeObject
+  return %4 : $Builtin.Int32
+}
+
+struct ComplexStruct {
+  var f1 : Builtin.NativeObject
+  var f2 : ContainsNativeObject
+  var f3 : Builtin.Int32
+}
+
+// CHECK-LABEL: sil @multiple_level_extract_2 : $@convention(thin) (@owned ComplexStruct) -> (@owned Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32) {
+// CHECK: bb0([[ARG:%.*]] : $ComplexStruct):
+// CHECK: [[f1:%.*]] = struct_extract [[ARG]]
+// CHECK: strong_retain [[f1]]
+// CHECK-NOT: strong_retain [[f1]]
+// CHECK: [[f2:%.*]] = struct_extract [[ARG]]
+// CHECK: [[f2_x:%.*]] = struct_extract [[f2]]
+// CHECK: strong_retain [[f2_x]]
+// CHECK-NOT: strong_retain [[f2_x]]
+// CHECK: [[f3:%.*]] = struct_extract [[ARG]]
+// CHECK: release_value [[ARG]]
+// CHECK: [[RESULT:%.*]] = tuple ([[f1]] : $Builtin.NativeObject, [[f2_x]] : $Builtin.NativeObject, [[f3]] : $Builtin.Int32)
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'multiple_level_extract_2'
+sil @multiple_level_extract_2 : $@convention(thin) (@owned ComplexStruct) -> (@owned Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32) {
+bb0(%0 : $ComplexStruct):
+  %1 = alloc_stack $ComplexStruct
+  store %0 to %1 : $*ComplexStruct
+
+  %2 = struct_element_addr %1 : $*ComplexStruct, #ComplexStruct.f1
+  %3 = struct_element_addr %1 : $*ComplexStruct, #ComplexStruct.f2
+  %4 = struct_element_addr %3 : $*ContainsNativeObject, #ContainsNativeObject.x
+  %5 = struct_element_addr %1 : $*ComplexStruct, #ComplexStruct.f3
+
+  %6 = load %2 : $*Builtin.NativeObject
+  strong_retain %6 : $Builtin.NativeObject
+  %7 = load %4 : $*Builtin.NativeObject
+  strong_retain %7 : $Builtin.NativeObject
+  %8 = load %5 : $*Builtin.Int32
+
+  destroy_addr %1 : $*ComplexStruct
+  dealloc_stack %1 : $*ComplexStruct
+
+  %9 = tuple(%6 : $Builtin.NativeObject, %7 : $Builtin.NativeObject, %8 : $Builtin.Int32)
+  return %9 : $(Builtin.NativeObject, Builtin.NativeObject, Builtin.Int32)
 }
 
 var int_global : Int
-
 
 // CHECK-LABEL: sil @promote_alloc_stack
 sil @promote_alloc_stack : $@convention(thin) (Int32) -> Builtin.Int32 {
