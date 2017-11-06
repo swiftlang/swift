@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module -enable-guaranteed-closure-contexts %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
@@ -180,6 +181,34 @@ func opt_to_property(_ obj: AnyObject) {
 }
 // CHECK: } // end sil function '_T014dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F'
 
+// GUARANTEED-LABEL: sil hidden @_T014dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
+  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+  // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
+  // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // GUARANTEED:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
+  // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // GUARANTEED:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
+  // GUARANTEED:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
+  // GUARANTEED:   project_box [[INT_BOX]]
+  // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // GUARANTEED:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
+  // GUARANTEED:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
+  // GUARANTEED:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
+  // GUARANTEED:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
+
+  // GUARANTEED: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
+  // GUARANTEED:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
+  // GUARANTEED:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[RAWOBJ_SELF_COPY]])
+  // GUARANTEED:   [[BEGIN_BORROW:%.*]] = begin_borrow [[BOUND_METHOD]]
+  // GUARANTEED:   [[VALUE:%[0-9]+]] = apply [[BEGIN_BORROW]]
+  // GUARANTEED:   end_borrow [[BEGIN_BORROW]] from [[BOUND_METHOD]]
+  // GUARANTEED:   [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
+  // GUARANTEED:   store [[VALUE]] to [trivial] [[VALUETEMP]]
+  // GUARANTEED:   inject_enum_addr [[OPTTEMP]]{{.*}}some
+  // GUARANTEED:   destroy_value [[BOUND_METHOD]]
+  // GUARANTEED:   br bb3
+
 // CHECK-LABEL: sil hidden @_T014dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
 func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
@@ -215,6 +244,39 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var x: Int = obj[i]!
 }
 // CHECK: } // end sil function '_T014dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F'
+
+// GUARANTEED-LABEL: sil hidden @_T014dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
+  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
+  // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
+  // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
+  // GUARANTEED:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
+  // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
+  // GUARANTEED:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
+  // GUARANTEED:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
+  // GUARANTEED:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // GUARANTEED:   store [[I]] to [trivial] [[PBI]] : $*Int
+  // GUARANTEED:   alloc_box ${ var Int }
+  // GUARANTEED:   project_box
+  // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
+  // GUARANTEED:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
+  // GUARANTEED:   [[OBJ_REF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBI]]
+  // GUARANTEED:   [[I:%[0-9]+]] = load [trivial] [[READ]] : $*Int
+  // GUARANTEED:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
+  // GUARANTEED:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
+
+  // GUARANTEED: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
+  // GUARANTEED:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
+  // GUARANTEED:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]])
+  // GUARANTEED:   [[BORROW:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
+  // GUARANTEED:   [[RESULT:%[0-9]+]] = apply [[BORROW]]([[I]])
+  // GUARANTEED:   end_borrow [[BORROW]] from [[GETTER_WITH_SELF]]
+  // GUARANTEED:   [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
+  // GUARANTEED:   store [[RESULT]] to [trivial] [[RESULTTEMP]]
+  // GUARANTEED:   inject_enum_addr [[OPTTEMP]]{{.*}}some
+  // GUARANTEED:   destroy_value [[GETTER_WITH_SELF]]
+  // GUARANTEED:   br bb3
 
 // CHECK-LABEL: sil hidden @_T014dynamic_lookup16opt_to_subscript{{[_0-9a-zA-Z]*}}F
 func opt_to_subscript(_ obj: AnyObject, i: Int) {

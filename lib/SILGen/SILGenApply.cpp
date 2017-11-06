@@ -5382,10 +5382,11 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
         loweredMethodTy, ValueOwnershipKind::Owned);
 
     // Create the result value.
+    Scope applyScope(Cleanups, CleanupLocation(e));
     ManagedValue result =
       emitDynamicPartialApply(*this, e, memberArg, operand,
                               foreignMethodTy, methodTy);
-    Scope applyScope(Cleanups, CleanupLocation(e));
+
     RValue resultRV;
     if (isa<VarDecl>(e->getMember().getDecl())) {
       resultRV = emitMonomorphicApply(e, result, {},
@@ -5476,13 +5477,13 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     SILValue memberArg = hasMemberBB->createPHIArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
     // Emit the application of 'self'.
+    Scope applyScope(Cleanups, CleanupLocation(e));
     ManagedValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                                   foreignMethodTy, methodTy);
     // Emit the index.
     llvm::SmallVector<ManagedValue, 2> indexArgs;
     std::move(index).getAll(indexArgs);
     
-    Scope applyScope(Cleanups, CleanupLocation(e));
     auto resultRV = emitMonomorphicApply(e, result, indexArgs,
                                          foreignMethodTy.getResult(), valueTy,
                                          ApplyOptions::DoesNotThrow,
