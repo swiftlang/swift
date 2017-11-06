@@ -170,8 +170,9 @@ public:
 
   /// Return true if this pattern (or a subpattern) is refutable.
   bool isRefutablePattern() const;
-  
-  
+
+  bool isNeverDefaultInitializable() const;
+
   /// \brief Mark all vardecls in this pattern as having non-pattern initial
   /// values bound into them.
   void markHasNonPatternBindingInit() {
