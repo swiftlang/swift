@@ -100,15 +100,7 @@ public struct Character {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_largeRepresentationString s: String) {
-    if let native = s._core.nativeBuffer,
-      native.start == s._core._baseAddress!,
-      native.usedCount == s._core.count {
-      _representation = .large(native._storage)
-      return
-    }
-    var nativeString = ""
-    nativeString.append(s)
-    _representation = .large(nativeString._core.nativeBuffer!._storage)
+    _representation = .large(s._guts._extractStringBuffer()._storage)
   }
 }
 
