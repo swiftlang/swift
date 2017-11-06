@@ -2708,6 +2708,29 @@ DestructorDecl *ClassDecl::addImplicitDestructor() {
   DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
   addMember(DD);
   setHasDestructor();
+
+  // Propagate access control and versioned-ness.
+  DD->copyFormalAccessAndVersionedAttrFrom(this);
+
+  // Wire up generic environment of DD.
+  DeclContext *DC = DD->getDeclContext();
+  GenericEnvironment *env = DC->getGenericEnvironmentOfContext();
+  DD->setGenericEnvironment(env);
+
+  // Assign DD the interface type (Self) -> () -> ()
+  ArrayRef<AnyFunctionType::Param> noParams;
+  AnyFunctionType::ExtInfo info;
+  Type selfTy = selfDecl->getInterfaceType();
+  Type voidTy = TupleType::getEmpty(ctx);
+  Type funcTy = FunctionType::get(noParams, voidTy, info);
+  if (auto *sig = DD->getGenericSignature()) {
+    DD->setInterfaceType(
+      GenericFunctionType::get(sig, {selfTy}, funcTy, info));
+  } else {
+    DD->setInterfaceType(
+      FunctionType::get({selfTy}, funcTy, info));
+  }
+
   return DD;
 }
 
