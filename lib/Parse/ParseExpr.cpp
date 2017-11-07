@@ -1935,7 +1935,7 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
       name = Context.getIdentifier(text);
     if (!underscore)
       Tok.setKind(tok::identifier);
-    consumeToken();
+    loc = consumeToken();
     consumeToken(tok::colon);
   }
 }
