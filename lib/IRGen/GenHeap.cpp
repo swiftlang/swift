@@ -1294,7 +1294,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
   // If we aren't running the LLVM ARC optimizer, we don't need to emit this.
-  if (!IGM.IRGen.Opts.Optimize || IGM.IRGen.Opts.DisableLLVMARCOpts)
+  if (!IGM.IRGen.Opts.shouldOptimize() || IGM.IRGen.Opts.DisableLLVMARCOpts)
     return;
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);

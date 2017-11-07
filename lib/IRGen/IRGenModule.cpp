@@ -88,7 +88,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getClangCodeGenOpts();
-  CGO.OptimizationLevel = Opts.Optimize ? 3 : 0;
+  CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoKind) {
@@ -851,7 +851,7 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
     });
     Attrs.addAttribute("target-features", allFeatures);
   }
-  if (IRGen.Opts.OptimizeForSize)
+  if (IRGen.Opts.optimizeForSize())
     Attrs.addAttribute(llvm::Attribute::MinSize);
 }
 

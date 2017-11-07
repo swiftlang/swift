@@ -20,6 +20,7 @@
 
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
@@ -52,16 +53,6 @@ public:
     LinkAll
   };
 
-  /// Representation of optimization modes.
-  enum class SILOptMode: unsigned {
-    NotSet,
-    None,
-    Debug,
-    Optimize,
-    OptimizeForSize,
-    OptimizeUnchecked
-  };
-
   /// Controls how to perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
 
@@ -91,7 +82,7 @@ public:
   bool EmitVerboseSIL = false;
 
   /// Optimization mode being used.
-  SILOptMode Optimization = SILOptMode::NotSet;
+  OptimizationMode OptMode = OptimizationMode::NotSet;
 
   enum AssertConfiguration: unsigned {
     // Used by standard library code to distinguish between a debug and release
@@ -166,6 +157,10 @@ public:
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
+  }
+
+  bool shouldOptimize() const {
+    return OptMode > OptimizationMode::NoOptimization;
   }
 };
 

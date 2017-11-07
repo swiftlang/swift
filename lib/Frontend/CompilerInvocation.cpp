@@ -1170,8 +1170,7 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
-  if (Opts.Optimization > SILOptions::SILOptMode::None
-      && Opts.EnforceExclusivityDynamic) {
+  if (Opts.shouldOptimize() && Opts.EnforceExclusivityDynamic) {
     Diags.diagnose(SourceLoc(),
                    diag::warning_argument_not_supported_with_optimization,
                    A->getOption().getPrefixedName() + A->getValue());
@@ -1230,40 +1229,31 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
-  IRGenOpts.Optimize = false;
-  IRGenOpts.OptimizeForSize = false;
-  Opts.Optimization = SILOptions::SILOptMode::None;
+  Opts.OptMode = OptimizationMode::NoOptimization;
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     if (A->getOption().matches(OPT_Onone)) {
       // Already set.
     } else if (A->getOption().matches(OPT_Ounchecked)) {
       // Turn on optimizations and remove all runtime checks.
-      IRGenOpts.Optimize = true;
-      IRGenOpts.OptimizeForSize = false;
-      Opts.Optimization = SILOptions::SILOptMode::OptimizeUnchecked;
+      Opts.OptMode = OptimizationMode::ForSpeed;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
       Opts.AssertConfig = SILOptions::Unchecked;
     } else if (A->getOption().matches(OPT_Oplayground)) {
       // For now -Oplayground is equivalent to -Onone.
-      IRGenOpts.Optimize = false;
-      IRGenOpts.OptimizeForSize = false;
-      Opts.Optimization = SILOptions::SILOptMode::None;
+      Opts.OptMode = OptimizationMode::NoOptimization;
     } else if (A->getOption().matches(OPT_Osize)) {
-      IRGenOpts.Optimize = true;
-      IRGenOpts.OptimizeForSize = true;
-      Opts.Optimization = SILOptions::SILOptMode::OptimizeForSize;
+      Opts.OptMode = OptimizationMode::ForSize;
     } else {
       assert(A->getOption().matches(OPT_O));
-      IRGenOpts.OptimizeForSize = false;
-      IRGenOpts.Optimize = true;
-      Opts.Optimization = SILOptions::SILOptMode::Optimize;
+      Opts.OptMode = OptimizationMode::ForSpeed;
     }
 
-    if (IRGenOpts.Optimize) {
+    if (Opts.shouldOptimize()) {
       ClangOpts.Optimization = "-Os";
     }
   }
+  IRGenOpts.OptMode = Opts.OptMode;
 
   if (Args.getLastArg(OPT_AssumeSingleThreaded)) {
     Opts.AssumeSingleThreaded = true;
@@ -1293,7 +1283,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     // Set the assert configuration according to the optimization level if it
     // has not been set by the -Ounchecked flag.
     Opts.AssertConfig =
-        IRGenOpts.Optimize ? SILOptions::Release : SILOptions::Debug;
+        (IRGenOpts.shouldOptimize() ? SILOptions::Release : SILOptions::Debug);
   }
 
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
@@ -1350,7 +1340,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.Sanitizers = Opts.Sanitizers;
   }
 
-  if (Opts.Optimization > SILOptions::SILOptMode::None)
+  if (Opts.shouldOptimize())
     Opts.EnforceExclusivityDynamic = false;
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);

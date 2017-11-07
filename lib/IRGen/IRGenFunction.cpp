@@ -32,10 +32,12 @@ using namespace swift;
 using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
+                             OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
+      OptMode(OptMode),
       CurFn(Fn), DbgScope(DbgScope), inOutlinedFunction(false) {
 
   // Make sure the instructions in this function are attached its debug scope.
@@ -58,6 +60,13 @@ IRGenFunction::~IRGenFunction() {
 
   // Tear down any side-table data structures.
   if (LocalTypeData) destroyLocalTypeData();
+}
+
+OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
+  if (OptMode != OptimizationMode::NotSet)
+    return OptMode;
+
+  return IGM.getOptions().OptMode;
 }
 
 ModuleDecl *IRGenFunction::getSwiftModule() const {

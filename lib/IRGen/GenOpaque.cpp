@@ -735,7 +735,7 @@ llvm::Value *irgen::emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF,
                                                     SILType T,
                                                     llvm::Value *numEmptyCases,
                                                     Address destObject) {
-  if (!IGF.IGM.getOptions().OptimizeForSize) {
+  if (!IGF.optimizeForSize()) {
     llvm::Value *metadata;
     auto fn = IGF.emitValueWitnessFunctionRef(
         T, metadata, ValueWitness::GetEnumTagSinglePayload);
@@ -755,7 +755,7 @@ llvm::Value *irgen::emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF,
 llvm::Value *irgen::emitStoreEnumTagSinglePayloadCall(
     IRGenFunction &IGF, SILType T, llvm::Value *whichCase,
     llvm::Value *numEmptyCases, Address destObject) {
-  if (!IGF.IGM.getOptions().OptimizeForSize) {
+  if (!IGF.optimizeForSize()) {
     llvm::Value *metadata;
     auto fn = IGF.emitValueWitnessFunctionRef(
         T, metadata, ValueWitness::StoreEnumTagSinglePayload);

@@ -194,7 +194,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
 
   // At -O0, create an alloca to keep the type alive.
   auto name = type->getFullName();
-  if (!IGF.IGM.IRGen.Opts.Optimize) {
+  if (!IGF.IGM.IRGen.Opts.shouldOptimize()) {
     auto temp = IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(),
                                  name);
     IGF.Builder.CreateStore(data, temp);

@@ -88,8 +88,7 @@ bool
 swift::isInstructionTriviallyDead(SILInstruction *I) {
   // At Onone, consider all uses, including the debug_info.
   // This way, debug_info is preserved at Onone.
-  if (I->hasUsesOfAnyResult() &&
-      I->getModule().getOptions().Optimization <= SILOptions::SILOptMode::None)
+  if (I->hasUsesOfAnyResult() && !I->getFunction()->shouldOptimize())
     return false;
 
   if (!onlyHaveDebugUsesOfAllResults(I) || isa<TermInst>(I))

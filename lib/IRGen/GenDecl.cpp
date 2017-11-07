@@ -73,7 +73,7 @@ using namespace irgen;
 bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
   // When compiling with -Onone keep all metadata for the debugger. Even if it
   // is not used by the program itself.
-  if (!Opts.Optimize)
+  if (!Opts.shouldOptimize())
     return false;
 
   switch (Nominal->getKind()) {

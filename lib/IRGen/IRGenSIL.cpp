@@ -593,7 +593,7 @@ public:
   /// expression depending on the value in the blocks dominated by the
   /// value.
   void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
-    if (IGM.IRGen.Opts.Optimize)
+    if (IGM.IRGen.Opts.shouldOptimize())
       return;
     for (auto &Variable : ValueDomPoints) {
       auto VarDominancePoint = Variable.second;
@@ -671,7 +671,7 @@ public:
                               Alignment Align = Alignment(0)) {
     auto Ty = Storage->getType();
     // Never emit shadow copies when optimizing, or if already on the stack.
-    if (IGM.IRGen.Opts.Optimize ||
+    if (IGM.IRGen.Opts.shouldOptimize() ||
         isa<llvm::AllocaInst>(Storage) ||
         isa<llvm::UndefValue>(Storage) ||
         Ty == IGM.RefCountedPtrTy) // No debug info is emitted for refcounts.
@@ -710,7 +710,7 @@ public:
                       StringRef Name, unsigned ArgNo,
                       llvm::SmallVectorImpl<llvm::Value *> &copy) {
     // Only do this at -O0.
-    if (IGM.IRGen.Opts.Optimize) {
+    if (IGM.IRGen.Opts.shouldOptimize()) {
       copy.append(vals.begin(), vals.end());
       return;
     }
@@ -776,7 +776,7 @@ public:
 
     auto runtimeTy = getRuntimeReifiedType(IGM,
                                            Ty.getType()->getCanonicalType());
-    if (!IGM.IRGen.Opts.Optimize && runtimeTy->hasArchetype())
+    if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
       runtimeTy.visit([&](CanType t) {
         if (auto archetype = dyn_cast<ArchetypeType>(t))
           emitTypeMetadataRef(archetype);
@@ -1109,6 +1109,7 @@ llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF,
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f)
   : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, ForDefinition),
+                  f->getOptimizationMode(),
                   f->getDebugScope(), f->getLocation()),
     CurSILFn(f) {
   // Apply sanitizer attributes to the function.
@@ -5107,7 +5108,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
 
-  if (IGM.IRGen.Opts.Optimize) {
+  if (IGM.IRGen.Opts.shouldOptimize()) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass
     // will merge these blocks back together again. We emit an empty asm

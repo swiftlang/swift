@@ -910,8 +910,7 @@ static bool performCompile(CompilerInstance &Instance,
   {
     SharedTimer timer("SIL optimization");
     if (Action != FrontendOptions::ActionType::MergeModules &&
-        Invocation.getSILOptions().Optimization >
-            SILOptions::SILOptMode::None) {
+        Invocation.getSILOptions().shouldOptimize()) {
 
       runSILOptPreparePasses(*SM);
 
@@ -1110,15 +1109,13 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
   // paths as a fallback.
 
   bool isDebugCompilation;
-  switch (Invocation.getSILOptions().Optimization) {
-    case SILOptions::SILOptMode::NotSet:
-    case SILOptions::SILOptMode::None:
-    case SILOptions::SILOptMode::Debug:
+  switch (Invocation.getSILOptions().OptMode) {
+    case OptimizationMode::NotSet:
+    case OptimizationMode::NoOptimization:
       isDebugCompilation = true;
       break;
-    case SILOptions::SILOptMode::Optimize:
-    case SILOptions::SILOptMode::OptimizeForSize:
-    case SILOptions::SILOptMode::OptimizeUnchecked:
+    case OptimizationMode::ForSpeed:
+    case OptimizationMode::ForSize:
       isDebugCompilation = false;
       break;
   }
@@ -1211,13 +1208,11 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
 }
 
 static StringRef
-silOptModeArgStr(SILOptions::SILOptMode mode) {
+silOptModeArgStr(OptimizationMode mode) {
   switch (mode) {
- case SILOptions::SILOptMode::Optimize:
+ case OptimizationMode::ForSpeed:
    return "O";
- case SILOptions::SILOptMode::OptimizeUnchecked:
-   return "Ounchecked";
- case SILOptions::SILOptMode::OptimizeForSize:
+ case OptimizationMode::ForSize:
    return "Osize";
  default:
    return "Onone";
@@ -1379,7 +1374,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
     StringRef InputName = FEOpts.Inputs.primaryInputFilenameIfAny();
-    StringRef OptType = silOptModeArgStr(SILOpts.Optimization);
+    StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
     std::string TripleName = LangOpts.Target.normalize();

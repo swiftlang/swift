@@ -143,7 +143,7 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // If we're emitting optimized code, record the string in the module
   // and let the late ARC pass insert it, but don't generate any calls
   // right now.
-  if (IRGen.Opts.Optimize) {
+  if (IRGen.Opts.shouldOptimize()) {
     llvm::NamedMDNode *metadata =
       Module.getOrInsertNamedMetadata(
                             "clang.arc.retainAutoreleasedReturnValueMarker");

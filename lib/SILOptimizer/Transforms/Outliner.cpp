@@ -1289,8 +1289,7 @@ public:
     auto *Fun = getFunction();
 
     // Only outline if we optimize for size.
-    if (Fun->getModule().getOptions().Optimization !=
-        SILOptions::SILOptMode::OptimizeForSize)
+    if (!Fun->optimizeForSize())
       return;
 
     // Dump function if requested.

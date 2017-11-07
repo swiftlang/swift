@@ -257,14 +257,14 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   if (Invocation.getImplicitModuleImportKind() !=
       SourceFile::ImplicitModuleImportKind::Stdlib)
     return false;
-  SILOptions::SILOptMode optimization = Invocation.getSILOptions().Optimization;
-  if (optimization <= SILOptions::SILOptMode::None &&
-      shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
+  if (Invocation.getSILOptions().shouldOptimize())
+    return false;
+
+  if (shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
           Invocation.getFrontendOptions().RequestedAction)) {
     return true;
   }
-  return optimization == SILOptions::SILOptMode::None &&
-         Invocation.getFrontendOptions().isCreatingSIL();
+  return Invocation.getFrontendOptions().isCreatingSIL();
 }
 
 void CompilerInstance::performSema() {

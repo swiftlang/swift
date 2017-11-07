@@ -1841,12 +1841,10 @@ void ReabstractionInfo::verify() const {
 /// Create a new specialized function if possible, and cache it.
 SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   // Do not create any new specializations at Onone.
-  if (M.getOptions().Optimization <= SILOptions::SILOptMode::None)
+  if (!GenericFunc->shouldOptimize())
     return nullptr;
 
-  DEBUG(
-    if (M.getOptions().Optimization <= SILOptions::SILOptMode::Debug) {
-      llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n"; });
+  DEBUG(llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n";);
 
   ReInfo.verify();
 
