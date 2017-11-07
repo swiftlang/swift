@@ -100,6 +100,10 @@ private:
   /// A map from local DeclContexts to their serialized IDs.
   llvm::DenseMap<const DeclContext*, DeclContextID> LocalDeclContextIDs;
 
+  /// A map from generic signatures to their serialized IDs.
+  llvm::DenseMap<const GenericSignature *, GenericSignatureID>
+    GenericSignatureIDs;
+
   /// A map from generic environments to their serialized IDs.
   llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
     GenericEnvironmentIDs;
@@ -167,6 +171,9 @@ private:
   /// Local DeclContexts that need to be serialized.
   std::queue<const DeclContext*> LocalDeclContextsToWrite;
 
+  /// Generic signatures that need to be serialized.
+  std::queue<const GenericSignature *> GenericSignaturesToWrite;
+
   /// Generic environments that need to be serialized.
   std::queue<const GenericEnvironment*> GenericEnvironmentsToWrite;
 
@@ -201,6 +208,10 @@ private:
   /// The offset of each Identifier in the identifier data block, indexed by
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
+
+  /// The offset of each GenericSignature in the bitstream, indexed by
+  /// GenericSignatureID.
+  std::vector<BitOffset> GenericSignatureOffsets;
 
   /// The offset of each GenericEnvironment in the bitstream, indexed by
   /// GenericEnvironmentID.
@@ -242,6 +253,10 @@ private:
   uint32_t /*IdentifierID*/ LastIdentifierID =
       serialization::NUM_SPECIAL_IDS - 1;
 
+  /// The last assigned GenericSignatureID for generic signature from this
+  /// module.
+  uint32_t /*GenericSignatureID*/ LastGenericSignatureID = 0;
+
   /// The last assigned GenericEnvironmentID for generic environments from this
   /// module.
   uint32_t /*GenericEnvironmentID*/ LastGenericEnvironmentID = 0;
@@ -261,6 +276,8 @@ private:
       return index_block::DECL_CONTEXT_OFFSETS;
     if (&values == &LocalDeclContextOffsets)
       return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
+    if (&values == &GenericSignatureOffsets)
+      return index_block::GENERIC_SIGNATURE_OFFSETS;
     if (&values == &GenericEnvironmentOffsets)
       return index_block::GENERIC_ENVIRONMENT_OFFSETS;
     if (&values == &NormalConformanceOffsets)
@@ -354,6 +371,9 @@ private:
   /// Writes the given type.
   void writeType(Type ty);
 
+  /// Writes a generic signature.
+  void writeGenericSignature(const GenericSignature *sig);
+
   /// Writes a generic environment.
   void writeGenericEnvironment(const GenericEnvironment *env);
 
@@ -435,6 +455,11 @@ public:
   ///
   /// The DeclContext will be scheduled for serialization if necessary.
   DeclContextID addLocalDeclContextRef(const DeclContext *DC);
+
+  /// Records the use of the given generic signature.
+  ///
+  /// The GenericSignature will be scheduled for serialization if necessary.
+  GenericSignatureID addGenericSignatureRef(const GenericSignature *sig);
 
   /// Records the use of the given generic environment.
   ///
