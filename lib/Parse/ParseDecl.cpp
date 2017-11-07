@@ -613,7 +613,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::inline_attribute_expect_option, AttrName);
+      diagnose(Loc, diag::optimization_attribute_expect_option, AttrName,
+               "none");
       return false;
     }
 
@@ -623,7 +624,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     else if (Tok.getText() == "__always")
       kind = InlineKind::Always;
     else {
-      diagnose(Loc, diag::inline_attribute_unknown_option,
+      diagnose(Loc, diag::optimization_attribute_unknown_option,
                Tok.getText(), AttrName);
       return false;
     }
@@ -638,6 +639,46 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute)
       Attributes.add(new (Context) InlineAttr(AtLoc, AttrRange, kind));
+
+    break;
+  }
+
+  case DAK_Optimize: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (Tok.isNot(tok::identifier)) {
+      diagnose(Loc, diag::optimization_attribute_expect_option, AttrName,
+               "speed");
+      return false;
+    }
+
+    OptimizationMode optMode = OptimizationMode::NotSet;
+    if (Tok.getText() == "none")
+      optMode = OptimizationMode::NoOptimization;
+    else if (Tok.getText() == "speed")
+      optMode = OptimizationMode::ForSpeed;
+    else if (Tok.getText() == "size")
+      optMode = OptimizationMode::ForSize;
+    else {
+      diagnose(Loc, diag::optimization_attribute_unknown_option,
+               Tok.getText(), AttrName);
+      return false;
+    }
+    consumeToken(tok::identifier);
+    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) OptimizeAttr(AtLoc, AttrRange, optMode));
 
     break;
   }

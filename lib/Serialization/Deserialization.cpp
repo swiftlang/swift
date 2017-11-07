@@ -2318,6 +2318,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         break;
       }
 
+      case decls_block::Optimize_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::OptimizeDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) OptimizeAttr((OptimizationMode)kind);
+        break;
+      }
+
       case decls_block::Effects_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::EffectsDeclAttrLayout::readRecord(scratch,

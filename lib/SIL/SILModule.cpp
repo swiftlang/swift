@@ -354,6 +354,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
           *this, SA->getRequirements(), SA->isExported(), kind));
     }
 
+    if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
+      F->setOptimizationMode(OA->getMode());
+    }
+
     // @_silgen_name and @_cdecl functions may be called from C code somewhere.
     if (Attrs.hasAttribute<SILGenNameAttr>() ||
         Attrs.hasAttribute<CDeclAttr>())

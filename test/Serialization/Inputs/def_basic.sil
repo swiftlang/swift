@@ -920,6 +920,27 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: [Onone] @test_onone : $@convention(thin) () -> ()
+sil [serialized] [Onone] @test_onone : $@convention(thin) () -> () {
+bb0:
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: [Ospeed] @test_ospeed : $@convention(thin) () -> ()
+sil [serialized] [Ospeed] @test_ospeed : $@convention(thin) () -> () {
+bb0:
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: [Osize] @test_osize : $@convention(thin) () -> ()
+sil [serialized] [Osize] @test_osize : $@convention(thin) () -> () {
+bb0:
+  %2 = tuple ()
+  return %2 : $()
+}
+
 sil [serialized] @takes_unnamed_closure : $@convention(thin) (@callee_owned () -> Int) -> @callee_owned () -> @callee_owned () -> Int
 
 sil [serialized] @takes_int64_float32 : $@convention(thin) (Int, Float32) -> ()
@@ -1420,6 +1441,9 @@ bb0:
   %130 = function_ref @noinline_callee : $@convention(thin) () -> Int
   %132 = function_ref @always_inline_callee : $@convention(thin) () -> Int
   %131 = function_ref @test_semantics : $@convention(thin) () -> ()
+  %136 = function_ref @test_onone : $@convention(thin) () -> ()
+  %137 = function_ref @test_ospeed : $@convention(thin) () -> ()
+  %138 = function_ref @test_osize : $@convention(thin) () -> ()
   %111 = function_ref @test_partial_apply : $@convention(thin) Float32 -> @callee_owned Int -> ()
   %113 = function_ref @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@convention(thin) () -> ()

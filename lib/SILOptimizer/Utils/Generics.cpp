@@ -347,12 +347,6 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 
 static bool shouldNotSpecializeCallee(SILFunction *Callee,
                                       SubstitutionList Subs = {}) {
-  if (!Callee->shouldOptimize()) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize function " << Callee->getName()
-          << " marked to be excluded from optimizations.\n");
-    return true;
-  }
-
   if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
     return true;
 

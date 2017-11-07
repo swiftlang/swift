@@ -405,6 +405,9 @@ static SILFunction *getSpecializedWithDeadParams(
   if (PAI->hasSubstitutions()) {
     if (Specialized->isExternalDeclaration())
       return nullptr;
+    if (!Orig->shouldOptimize())
+      return nullptr;
+
     // Perform a generic specialization of the Specialized function.
     ReabstractionInfo ReInfo(ApplySite(), Specialized, PAI->getSubstitutions(),
                              /* ConvertIndirectToDirect */ false);

@@ -79,6 +79,7 @@ public:
   IGNORED_ATTR(FixedLayout)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
+  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Inlineable)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
@@ -279,7 +280,9 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Stored properties and variables can't be transparent.
     if (VD->hasStorage())
-      return diagnoseAndRemoveAttr(attr, diag::transparent_stored_property);
+      return diagnoseAndRemoveAttr(attr,
+                                   diag::attribute_invalid_on_stored_property,
+                                   attr->getAttrName());
   }
 }
 
@@ -866,7 +869,8 @@ public:
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitVersionedAttr(VersionedAttr *attr);
   void visitInlineableAttr(InlineableAttr *attr);
-  
+  void visitOptimizeAttr(OptimizeAttr *attr);
+
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
 };
@@ -1914,7 +1918,8 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->hasStorage() || VD->getAttrs().hasAttribute<LazyAttr>()) {
       TC.diagnose(attr->getLocation(),
-                  diag::inlineable_stored_property)
+                  diag::attribute_invalid_on_stored_property,
+                  attr->getAttrName())
         .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
       return;
@@ -1944,6 +1949,19 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
     return;
+  }
+}
+
+void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (VD->hasStorage()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::attribute_invalid_on_stored_property,
+                  attr->getAttrName())
+      .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+      return;
+    }
   }
 }
 
