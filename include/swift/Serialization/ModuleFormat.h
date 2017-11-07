@@ -156,6 +156,15 @@ using SILFunctionTypeRepresentationField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
+enum class SILCoroutineKind : uint8_t {
+  None = 0,
+  YieldOnce = 1,
+  YieldMany = 2,
+};
+using SILCoroutineKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
 enum OperatorKind : uint8_t {
   Infix = 0,
   Prefix,
@@ -735,12 +744,14 @@ namespace decls_block {
 
   using SILFunctionTypeLayout = BCRecordLayout<
     SIL_FUNCTION_TYPE,
+    SILCoroutineKindField, // coroutine kind
     ParameterConventionField, // callee convention
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters
+    BCFixed<30>,           // number of yields
     BCFixed<30>,           // number of results
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating

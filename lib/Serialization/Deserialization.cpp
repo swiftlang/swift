@@ -3771,6 +3771,26 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
   }
 }
 
+/// Translate from the Serialization coroutine kind enum values to the AST
+/// strongly-typed enum.
+///
+/// The former is guaranteed to be stable, but may not reflect this version of
+/// the AST.
+static Optional<swift::SILCoroutineKind>
+getActualSILCoroutineKind(uint8_t rep) {
+  switch (rep) {
+#define CASE(KIND) \
+  case (uint8_t)serialization::SILCoroutineKind::KIND: \
+    return swift::SILCoroutineKind::KIND;
+  CASE(None)
+  CASE(YieldOnce)
+  CASE(YieldMany)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
 /// Translate from the serialization Ownership enumerators, which are
 /// guaranteed to be stable, to the AST ones.
 static
@@ -4354,22 +4374,26 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   }
       
   case decls_block::SIL_FUNCTION_TYPE: {
+    uint8_t rawCoroutineKind;
     uint8_t rawCalleeConvention;
     uint8_t rawRepresentation;
     bool pseudogeneric = false;
     bool noescape;
     bool hasErrorResult;
     unsigned numParams;
+    unsigned numYields;
     unsigned numResults;
     ArrayRef<uint64_t> variableData;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
+                                             rawCoroutineKind,
                                              rawCalleeConvention,
                                              rawRepresentation,
                                              pseudogeneric,
                                              noescape,
                                              hasErrorResult,
                                              numParams,
+                                             numYields,
                                              numResults,
                                              variableData);
 
@@ -4381,6 +4405,13 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape);
+
+    // Process the coroutine kind.
+    auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
+    if (!coroutineKind.hasValue()) {
+      error();
+      return nullptr;
+    }
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
@@ -4395,6 +4426,14 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       auto type = getType(typeID);
       if (!convention || !type) return None;
       return SILParameterInfo(type->getCanonicalType(), *convention);
+    };
+
+    auto processYield = [&](TypeID typeID, uint64_t rawConvention)
+                                  -> Optional<SILYieldInfo> {
+      auto convention = getActualParameterConvention(rawConvention);
+      auto type = getType(typeID);
+      if (!convention || !type) return None;
+      return SILYieldInfo(type->getCanonicalType(), *convention);
     };
 
     auto processResult = [&](TypeID typeID, uint64_t rawConvention)
@@ -4426,6 +4465,20 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
         return nullptr;
       }
       allParams.push_back(*param);
+    }
+
+    // Process the yields.
+    SmallVector<SILYieldInfo, 8> allYields;
+    allYields.reserve(numYields);
+    for (unsigned i = 0; i != numYields; ++i) {
+      auto typeID = variableData[nextVariableDataIndex++];
+      auto rawConvention = variableData[nextVariableDataIndex++];
+      auto yield = processYield(typeID, rawConvention);
+      if (!yield) {
+        error();
+        return nullptr;
+      }
+      allYields.push_back(*yield);
     }
 
     // Process the results.
@@ -4475,9 +4528,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       genericSig = GenericSignature::get(genericParamTypes, requirements,
                                          /*isKnownCanonical=*/true);
 
-    typeOrOffset = SILFunctionType::get(
-        genericSig, extInfo, calleeConvention.getValue(), allParams, allResults,
-        errorResult, ctx, witnessMethodConformance);
+    typeOrOffset = SILFunctionType::get(genericSig, extInfo,
+                                        coroutineKind.getValue(),
+                                        calleeConvention.getValue(),
+                                        allParams, allYields, allResults,
+                                        errorResult,
+                                        ctx, witnessMethodConformance);
     break;
   }
 

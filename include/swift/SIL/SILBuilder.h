@@ -1617,6 +1617,18 @@ public:
         new (getModule()) ThrowInst(getSILDebugLocation(Loc), errorValue));
   }
 
+  UnwindInst *createUnwind(SILLocation loc) {
+    return insertTerminator(
+        new (getModule()) UnwindInst(getSILDebugLocation(loc)));
+  }
+
+  YieldInst *createYield(SILLocation loc, ArrayRef<SILValue> yieldedValues,
+                         SILBasicBlock *resumeBB, SILBasicBlock *unwindBB) {
+    return insertTerminator(
+        YieldInst::create(getSILDebugLocation(loc), yieldedValues,
+                          resumeBB, unwindBB, getFunction()));
+  }
+
   CondBranchInst *
   createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
                    SILBasicBlock *Target2,

@@ -119,6 +119,7 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
                                 CanSILFunctionType fnType,
                                 CanType newSelfType,
                                 SILDeclRef methodName) {
+  assert(!fnType->isCoroutine());
   auto oldParams = fnType->getParameters();
   SmallVector<SILParameterInfo, 4> newParams;
   newParams.append(oldParams.begin(), oldParams.end() - 1);
@@ -139,7 +140,8 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
   }
 
   return SILFunctionType::get(nullptr, fnType->getExtInfo(),
-                              fnType->getCalleeConvention(), newParams,
+                              SILCoroutineKind::None,
+                              fnType->getCalleeConvention(), newParams, {},
                               newResults, fnType->getOptionalErrorResult(), ctx,
                               fnType->getWitnessMethodConformanceOrNone());
 }

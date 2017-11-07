@@ -3032,8 +3032,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
                              /*noescape*/ false),
+    SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
-    params, result, None, SGF.getASTContext());
+    params, {}, result, None, SGF.getASTContext());
   
   // Find the function and see if we already created it.
   SmallVector<CanType, 2> interfaceSubs;
@@ -3152,8 +3153,9 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
                              /*noescape*/ false),
+    SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
-    params, {}, None, SGF.getASTContext());
+    params, {}, {}, None, SGF.getASTContext());
   
   // Mangle the name of the thunk to see if we already created it.
   SmallString<64> nameBuf;
@@ -3320,8 +3322,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
                                /*noescape*/ false),
+    SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
-      params, results, None, C);
+      params, /*yields*/ {}, results, None, C);
     
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;
@@ -3486,8 +3489,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
                                /*noescape*/ false),
+      SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
-      params, results, None, C);
+      params, /*yields*/ {}, results, None, C);
     
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;

@@ -84,7 +84,8 @@ class BugReducerTester : public SILFunctionTransform {
         nullptr, SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                           false /*isPseudoGeneric*/,
                                           false /*noescape*/),
-        ParameterConvention::Direct_Unowned, ArrayRef<SILParameterInfo>(),
+        SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
+        ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(),
         ResultInfoArray, None, getFunction()->getModule().getASTContext());
 
     SILFunction *F = getFunction()->getModule().getOrCreateSharedFunction(

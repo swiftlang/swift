@@ -2594,8 +2594,10 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   auto generics = ncGenerics->getCanonicalSignature();
   CanSILFunctionType fnType = [&]() -> CanSILFunctionType {
     return SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
+                                SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
-                                /*params*/ {}, /*results*/ {}, /*error*/ None,
+                                /*params*/ {}, /*yields*/ {},
+                                /*results*/ {}, /*error*/ None,
                                 IGM.Context);
   }();
 

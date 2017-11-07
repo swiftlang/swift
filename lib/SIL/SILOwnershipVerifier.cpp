@@ -448,6 +448,7 @@ NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(StrongRetainUnowned)
 NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
+NO_OPERAND_INST(Unwind)
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -1106,6 +1107,35 @@ OwnershipCompatibilityUseChecker::visitPartialApplyInst(PartialApplyInst *I) {
   }
   return {compatibleWithOwnership(ValueOwnershipKind::Owned),
           UseLifetimeConstraint::MustBeInvalidated};
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
+  // Indirect return arguments are address types.
+  if (isAddressOrTrivialType())
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
+            UseLifetimeConstraint::MustBeLive};
+
+  auto fnType = I->getFunction()->getLoweredFunctionType();
+  auto yieldInfo = fnType->getYields()[getOperandIndex()];
+  switch (yieldInfo.getConvention()) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Owned:
+    return visitApplyParameter(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::MustBeInvalidated);
+  case ParameterConvention::Indirect_In_Constant:
+  case ParameterConvention::Direct_Unowned:
+    // We accept unowned, owned, and guaranteed in unowned positions.
+    return {true, UseLifetimeConstraint::MustBeLive};
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Direct_Guaranteed:
+    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+                               UseLifetimeConstraint::MustBeLive);
+  // The following conventions should take address types.
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    llvm_unreachable("Unexpected non-trivial parameter convention.");
+  }
 }
 
 OwnershipUseCheckerResult

@@ -3787,16 +3787,22 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
 void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
                               GenericSignature *genericParams,
                               ExtInfo info,
+                              SILCoroutineKind coroutineKind,
                               ParameterConvention calleeConvention,
                               ArrayRef<SILParameterInfo> params,
+                              ArrayRef<SILYieldInfo> yields,
                               ArrayRef<SILResultInfo> results,
                               Optional<SILResultInfo> errorResult) {
   id.AddPointer(genericParams);
   id.AddInteger(info.getFuncAttrKey());
+  id.AddInteger(unsigned(coroutineKind));
   id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
   for (auto param : params)
     param.profile(id);
+  id.AddInteger(yields.size());
+  for (auto yield : yields)
+    yield.profile(id);
   id.AddInteger(results.size());
   for (auto result : results)
     result.profile(id);
@@ -3806,32 +3812,47 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   if (errorResult) errorResult->profile(id);
 }
 
-SILFunctionType::SILFunctionType(
-    GenericSignature *genericSig, ExtInfo ext,
-    ParameterConvention calleeConvention, ArrayRef<SILParameterInfo> params,
-    ArrayRef<SILResultInfo> normalResults, Optional<SILResultInfo> errorResult,
-    const ASTContext &ctx, RecursiveTypeProperties properties,
-    Optional<ProtocolConformanceRef> witnessMethodConformance)
-    : TypeBase(TypeKind::SILFunction, &ctx, properties), GenericSig(genericSig),
+SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
+                                 SILCoroutineKind coroutineKind,
+                                 ParameterConvention calleeConvention,
+                                 ArrayRef<SILParameterInfo> params,
+                                 ArrayRef<SILYieldInfo> yields,
+                                 ArrayRef<SILResultInfo> normalResults,
+                                 Optional<SILResultInfo> errorResult,
+                                 const ASTContext &ctx,
+                                 RecursiveTypeProperties properties,
+                      Optional<ProtocolConformanceRef> witnessMethodConformance)
+    : TypeBase(TypeKind::SILFunction, &ctx, properties),
+      GenericSig(genericSig),
       WitnessMethodConformance(witnessMethodConformance) {
 
   SILFunctionTypeBits.HasErrorResult = errorResult.hasValue();
   SILFunctionTypeBits.ExtInfo = ext.Bits;
+  SILFunctionTypeBits.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
-  NumResults = normalResults.size();
-  NumIndirectFormalResults =
+  if (coroutineKind == SILCoroutineKind::None) {
+    assert(yields.empty());
+    NumAnyResults = normalResults.size();
+    NumAnyIndirectFormalResults =
       std::count_if(normalResults.begin(), normalResults.end(),
                     [](const SILResultInfo &resultInfo) {
                       return resultInfo.isFormalIndirect();
                     });
+    memcpy(getMutableResults().data(), normalResults.data(),
+           normalResults.size() * sizeof(SILResultInfo));
+  } else {
+    assert(normalResults.empty());    
+    NumAnyResults = yields.size();
+    NumAnyIndirectFormalResults = 0; // unused
+    memcpy(getMutableYields().data(), yields.data(),
+           yields.size() * sizeof(SILYieldInfo));
+  }
 
   assert(!isIndirectFormalParameter(calleeConvention));
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
 
   memcpy(getMutableParameters().data(), params.data(),
          params.size() * sizeof(SILParameterInfo));
-  memcpy(getMutableResults().data(), normalResults.data(),
-         normalResults.size() * sizeof(SILResultInfo));
   if (errorResult)
     getMutableErrorResult() = *errorResult;
 
@@ -3868,6 +3889,13 @@ SILFunctionType::SILFunctionType(
       assert(!result.getType()->hasArchetype()
              && "interface type of result should not contain context archetypes");
     }
+    for (auto yield : getYields()) {
+      (void)yield;
+      assert(!yield.getType()->hasError()
+             && "interface type of yield should not contain error types");
+      assert(!yield.getType()->hasArchetype()
+             && "interface type of yield should not contain context archetypes");
+    }
     if (hasErrorResult()) {
       assert(!getErrorResult().getType()->hasError()
              && "interface type of result should not contain error types");
@@ -3892,14 +3920,22 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   return CanSILBlockStorageType(storageTy);
 }
 
-CanSILFunctionType SILFunctionType::get(
-    GenericSignature *genericSig, ExtInfo ext, ParameterConvention callee,
-    ArrayRef<SILParameterInfo> params, ArrayRef<SILResultInfo> normalResults,
-    Optional<SILResultInfo> errorResult, const ASTContext &ctx,
-    Optional<ProtocolConformanceRef> witnessMethodConformance) {
+CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
+                                        ExtInfo ext,
+                                        SILCoroutineKind coroutineKind,
+                                        ParameterConvention callee,
+                                        ArrayRef<SILParameterInfo> params,
+                                        ArrayRef<SILYieldInfo> yields,
+                                        ArrayRef<SILResultInfo> normalResults,
+                                        Optional<SILResultInfo> errorResult,
+                                        const ASTContext &ctx,
+                    Optional<ProtocolConformanceRef> witnessMethodConformance) {
+  assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
+  assert(coroutineKind != SILCoroutineKind::None || yields.empty());
+
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericSig, ext, callee, params, normalResults,
-                           errorResult);
+  SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee,
+                           params, yields, normalResults, errorResult);
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -3912,6 +3948,7 @@ CanSILFunctionType SILFunctionType::get(
   // Allocate storage for the object.
   size_t bytes = sizeof(SILFunctionType)
                  + sizeof(SILParameterInfo) * params.size()
+                 + sizeof(SILYieldInfo) * yields.size()
                  + sizeof(SILResultInfo) * normalResults.size()
                  + (errorResult ? sizeof(SILResultInfo) : 0)
                  + (normalResults.size() > 1 ? sizeof(CanType) * 2 : 0);
@@ -3922,6 +3959,8 @@ CanSILFunctionType SILFunctionType::get(
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getType()->getRecursiveProperties();
+  for (auto &yield : yields)
+    properties |= yield.getType()->getRecursiveProperties();
   for (auto &result : normalResults)
     properties |= result.getType()->getRecursiveProperties();
   if (errorResult)
@@ -3934,9 +3973,10 @@ CanSILFunctionType SILFunctionType::get(
     properties.removeHasDependentMember();
   }
 
-  auto fnType = new (mem)
-      SILFunctionType(genericSig, ext, callee, params, normalResults,
-                      errorResult, ctx, properties, witnessMethodConformance);
+  auto fnType =
+      new (mem) SILFunctionType(genericSig, ext, coroutineKind, callee,
+                                params, yields, normalResults, errorResult,
+                                ctx, properties, witnessMethodConformance);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }

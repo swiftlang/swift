@@ -498,6 +498,10 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   TERMINATOR(ThrowInst, throw,
              TermInst, None, DoesNotRelease)
+  TERMINATOR(YieldInst, yield,
+             TermInst, MayHaveSideEffects, MayRelease)
+  TERMINATOR(UnwindInst, unwind,
+             TermInst, None, DoesNotRelease)
   TERMINATOR(TryApplyInst, try_apply,
              TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(BranchInst, br,

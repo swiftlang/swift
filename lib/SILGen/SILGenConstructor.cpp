@@ -857,8 +857,10 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
     
     initConstantTy = SILFunctionType::get(initConstantTy->getGenericSignature(),
                                           initConstantTy->getExtInfo(),
+                                          SILCoroutineKind::None,
                                           ParameterConvention::Direct_Unowned,
                                           param,
+                                          /*yields*/ {},
                                           result,
                                           // TODO: throwing initializer?
                                           None,

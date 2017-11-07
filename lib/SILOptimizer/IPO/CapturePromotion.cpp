@@ -416,7 +416,8 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
   // Create the thin function type for the cloned closure.
   auto ClonedTy = SILFunctionType::get(
       OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
-      OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
+      OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
+      ClonedInterfaceArgTys, OrigFTI->getYields(),
       OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
       M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
 

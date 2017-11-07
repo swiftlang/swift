@@ -307,9 +307,25 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
+  case TermKind::YieldInst: {
+    auto *YI = cast<YieldInst>(T);
+    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
+    auto *resumeBB = !EdgeIdx ? NewDest : YI->getResumeBB();
+    auto *unwindBB = EdgeIdx ? NewDest : YI->getUnwindBB();
+    SmallVector<SILValue, 4> yieldedValues;
+    for (auto value : YI->getYieldedValues())
+      yieldedValues.push_back(value);
+
+    B.createYield(YI->getLoc(), yieldedValues, resumeBB, unwindBB);
+
+    YI->eraseFromParent();
+    return;
+  }
+
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
   case TermKind::UnreachableInst:
+  case TermKind::UnwindInst:
     llvm_unreachable("Branch target cannot be changed for this terminator instruction!");
   }
   llvm_unreachable("Not yet implemented!");
@@ -469,6 +485,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   case TermKind::ThrowInst:
   case TermKind::TryApplyInst:
   case TermKind::UnreachableInst:
+  case TermKind::UnwindInst:
+  case TermKind::YieldInst:
     llvm_unreachable("Branch target cannot be replaced for this terminator instruction!");
   }
   llvm_unreachable("Not yet implemented!");

@@ -498,6 +498,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto blockInterfaceTy = cast<SILFunctionType>(
     F.mapTypeOutOfContext(loweredBlockTy)->getCanonicalType());
 
+  assert(!blockInterfaceTy->isCoroutine());
+
   auto storageTy = SILBlockStorageType::get(loweredFuncTy);
   auto storageInterfaceTy = SILBlockStorageType::get(fnInterfaceTy);
 
@@ -535,8 +537,9 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   }
 
   auto invokeTy = SILFunctionType::get(
-      genericSig, extInfo, ParameterConvention::Direct_Unowned, params,
-      blockInterfaceTy->getResults(),
+      genericSig, extInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, params, 
+      /*yields*/ {}, blockInterfaceTy->getResults(),
       blockInterfaceTy->getOptionalErrorResult(), getASTContext());
 
   // Create the invoke function. Borrow the mangling scheme from reabstraction
