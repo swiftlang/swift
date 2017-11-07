@@ -299,6 +299,9 @@ private:
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
 
+  /// Generic signatures referenced by this module.
+  std::vector<Serialized<GenericSignature *>> GenericSignatures;
+
   /// Generic environments referenced by this module.
   std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
 
@@ -817,6 +820,9 @@ public:
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
   ModuleDecl *getModule(ArrayRef<Identifier> name);
+
+  /// Returns the generic signature for the given ID.
+  GenericSignature *getGenericSignature(serialization::GenericSignatureID ID);
 
   /// Returns the generic signature or environment for the given ID,
   /// deserializing it if needed.
