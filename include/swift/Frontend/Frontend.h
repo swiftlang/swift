@@ -251,12 +251,6 @@ public:
     FrontendOpts.Inputs.addInputBuffer(Buf);
   }
 
-  void setPrimaryInput(SelectedInput pi) {
-    FrontendOpts.Inputs.setPrimaryInput(pi);
-  }
-
-  void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
-
   StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
   }
@@ -308,6 +302,16 @@ public:
       return SourceFile::ImplicitModuleImportKind::Builtin;
     }
     return SourceFile::ImplicitModuleImportKind::Stdlib;
+  }
+  
+  /// Return value includes the buffer so caller can keep it alive.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  setupForToolInputFile(const std::string &InputFilename,
+                        const std::string &ModuleNameArg,
+                        bool alwaysSetModuleToMain,
+                        serialization::ExtendedValidationInfo &extendedInfo);
+  bool hasSerializedAST() {
+    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 };
 

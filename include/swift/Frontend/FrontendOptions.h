@@ -21,11 +21,9 @@
 
 namespace llvm {
   class MemoryBuffer;
-  namespace opt {
-  class ArgList;
-  class Arg;
-  } // namespace opt
 }
+
+// Force change for PR for linux test
 
 namespace swift {
 
@@ -68,6 +66,8 @@ enum class InputFileKind {
 
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
+  friend class ArgsToFrontendInputsConverter;
+
 private:
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
@@ -75,9 +75,9 @@ private:
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
-  /// The input for which output should be generated. If not set, output will
+  /// The inputs for which output should be generated. If not set, output will
   /// be generated for the whole module.
-  Optional<SelectedInput> PrimaryInput;
+  std::vector<SelectedInput> PrimaryInputs;
 
 public:
   // Readers:
@@ -110,24 +110,82 @@ public:
 
   // Primary input readers
 
-  Optional<SelectedInput> getPrimaryInput() const { return PrimaryInput; }
-  bool hasPrimaryInput() const { return getPrimaryInput().hasValue(); }
+private:
+  void mustNotBeMoreThanOnePrimaryInput() const {
+    assert(PrimaryInputs.size() < 2 &&
+           "have not implemented >1 primary input yet");
+  }
 
-  bool isWholeModule() { return !hasPrimaryInput(); }
+public:
+  bool havePrimaryInputsFilenames() const {
+    for (const SelectedInput &SI : getPrimaryInputs())
+      if (SI.isFilename())
+        return true;
+    return false;
+  }
+  unsigned primaryInputFilenameCount() const {
+    unsigned r = 0;
+    for (const SelectedInput &SI : getPrimaryInputs())
+      r += SI.isFilename() ? 1 : 0;
+    return r;
+  }
+  std::vector<std::string> primaryFilenames() const {
+    std::vector<std::string> r;
+    for (const SelectedInput &SI : getPrimaryInputs()) {
+      if (!SI.isFilename())
+        continue;
+      r.push_back(getInputFilenames()[SI.Index]);
+    }
+    return r;
+  }
+
+  const ArrayRef<SelectedInput> getPrimaryInputs() const {
+    return PrimaryInputs;
+  }
+
+private:
+  std::vector<SelectedInput> &getMutablePrimaryInputs() {
+    mustNotBeMoreThanOnePrimaryInput();
+    return PrimaryInputs;
+  }
+
+public:
+  unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+
+  bool havePrimaryInputs() const { return primaryInputCount() > 0; }
+ 
+  bool isWholeModule() { return !havePrimaryInputs(); }
+
+  Optional<SelectedInput> getOptionalPrimaryInput() const {
+    return havePrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
+                             : Optional<SelectedInput>();
+  }
 
   bool isPrimaryInputAFileAt(unsigned i) {
-    return hasPrimaryInput() && getPrimaryInput()->isFilename() &&
-           getPrimaryInput()->Index == i;
+    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename() &&
+           getOptionalPrimaryInput()->Index == i;
   }
   bool haveAPrimaryInputFile() const {
-    return hasPrimaryInput() && getPrimaryInput()->isFilename();
-  }
-  Optional<unsigned> primaryInputFileIndex() const {
-    return haveAPrimaryInputFile()
-               ? Optional<unsigned>(getPrimaryInput()->Index)
-               : None;
+    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename();
   }
 
+  bool hasUniquePrimaryInputFilename() const {
+    return primaryInputCount() == 1 && getPrimaryInputs()[0].isFilename();
+  }
+
+  llvm::Optional<StringRef> uniquePrimaryInputFilename() const {
+    return hasUniquePrimaryInputFilename()
+               ? llvm::Optional<StringRef>(
+                     getInputFilenames()[getPrimaryInputs()[0].Index])
+               : llvm::Optional<StringRef>();
+  }
+
+  Optional<unsigned> primaryInputFileIndex() const {
+    return haveAPrimaryInputFile()
+               ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
+               : None;
+  }
+ 
   StringRef primaryInputFilenameIfAny() const {
     if (auto Index = primaryInputFileIndex()) {
       return getInputFilenames()[*Index];
@@ -135,9 +193,8 @@ public:
     return StringRef();
   }
 
+public:
   // Multi-facet readers
-  StringRef baseNameOfOutput(const llvm::opt::ArgList &Args,
-                             StringRef ModuleName) const;
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
@@ -158,8 +215,25 @@ public:
 
   // Primary input writers
 
-  void setPrimaryInput(SelectedInput si) { PrimaryInput = si; }
-  void clearPrimaryInput() { PrimaryInput = 0; }
+  void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
+
+  void setPrimaryInputToFirstFile() {
+    clearPrimaryInputs();
+    addPrimaryInput(SelectedInput(0, SelectedInput::InputKind::Filename));
+  }
+
+  void addPrimaryInput(SelectedInput si) { PrimaryInputs.push_back(si); }
+
+  void setPrimaryInput(SelectedInput si) {
+    clearPrimaryInputs();
+    getMutablePrimaryInputs().push_back(si);
+  }
+
+  void addPrimaryInputFilename(const std::string &inputFilename,
+                               unsigned index) {
+    addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
+  }
+
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
     setPrimaryInput(!inputFilename.empty() && inputFilename != "-"
                         ? SelectedInput(inputFilenameCount(),
@@ -174,16 +248,11 @@ public:
     InputFilenames.clear();
     InputBuffers.clear();
   }
-
-  void setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags,
-                                        llvm::opt::ArgList &Args);
-
-  void readInputFileList(DiagnosticEngine &diags, llvm::opt::ArgList &Args,
-                         const llvm::opt::Arg *filelistPath);
 };
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
+  friend class FrontendArgsToOptionsConverter;
 public:
   FrontendInputs Inputs;
 
@@ -213,12 +282,9 @@ public:
     return getSingleOutputFilename() == "-";
   }
   bool isOutputFileDirectory() const;
-  bool isOutputFilePlainFile() const;
   bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
-  void setOutputFileList(DiagnosticEngine &Diags,
-                         const llvm::opt::ArgList &Args);
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -471,16 +537,22 @@ public:
 
   StringRef originalPath() const;
 
-  StringRef determineFallbackModuleName() const;
-
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift &&
            Inputs.hasUniqueInputFilename();
   }
-
-  void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
+private:
+  const char *computeSuffix();
+  
+  bool canEmitDependencies() const;
+  bool canEmitHeader() const;
+  bool canEmitLoadedModuleTrace() const;
+  bool canEmitModule() const;
+  
+  /// Return true if changed output filename.
+  bool actionProducesOutputFromFrontend() const;
+  bool actionOutputsToStdout() const;
 };
-
 }
 
 #endif
