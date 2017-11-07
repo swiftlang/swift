@@ -2348,25 +2348,14 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
   // Replace generic type parameters and associated types with their
   // witnesses, when we have them.
   auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
-  type = type.transform([&](Type type) -> Type {
-    // If a dependent member refers to an associated type, replace it.
-    if (auto member = type->getAs<DependentMemberType>()) {
-      if (member->getBase()->isEqual(selfTy)) {
-        // FIXME: Could handle inherited conformances here.
-        if (conformance->hasTypeWitness(member->getAssocType()))
-          return conformance->getTypeWitness(member->getAssocType(), nullptr);
-      }
-    }
+  return type.subst([&](SubstitutableType *dependentType) {
+                      if (dependentType->isEqual(selfTy))
+                        return conformance->getType();
 
-    // Replace 'Self' with the conforming type.
-    if (type->isEqual(selfTy))
-      return conformance->getType();
-
-    return type;
-  });
-
-  //
-  return type;
+                      return Type(dependentType);
+                    },
+                    LookUpConformanceInModule(module),
+                    SubstFlags::UseErrorType);
 }
 
 /// \brief Retrieve the kind of requirement described by the given declaration,
