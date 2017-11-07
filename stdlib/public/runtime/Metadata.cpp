@@ -14,23 +14,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Metadata.h"
-#include "MetadataCache.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/Lazy.h"
-#include "swift/Basic/Range.h"
+#include "llvm/Support/MathExtras.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/Range.h"
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/PointerLikeTypeTraits.h"
+#include "MetadataCache.h"
 #include <algorithm>
-#include <cctype>
 #include <condition_variable>
-#include <iostream>
 #include <new>
+#include <cctype>
+#include <iostream>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -330,21 +329,13 @@ public:
     }
 
     const Metadata *getResult() const {
-      auto opaqueResult = FlagsArgsAndResult[getFlags().getNumArguments() + 2];
+      auto opaqueResult = FlagsArgsAndResult[getFlags().getNumArguments() + 1];
       return reinterpret_cast<const Metadata *>(opaqueResult);
     }
 
     const void * const *getArguments() const {
       return getFlags().getNumArguments() == 0
               ? nullptr : &FlagsArgsAndResult[1];
-    }
-
-    uint32_t getParameterFlags(unsigned index) const {
-      auto numArguments = getFlags().getNumArguments();
-      assert(index < numArguments);
-      auto *flags = reinterpret_cast<const uint32_t *>(
-          FlagsArgsAndResult[numArguments + 1]);
-      return flags[index];
     }
   };
 
@@ -364,13 +355,9 @@ public:
       return result;
 
     for (unsigned i = 0, e = keyFlags.getNumArguments(); i != e; ++i) {
-      if (auto result = compareIntegers(key.getParameterFlags(i),
-                                        Data.getParameterFlags(i)))
-        return result;
-
-      if (auto result = comparePointers(
-              key.getArguments()[i],
-              reinterpret_cast<const void *>(Data.getArguments()[i])))
+      if (auto result =
+            comparePointers(key.getArguments()[i],
+                            Data.getArguments()[i].getOpaqueValue()))
         return result;
     }
 
@@ -396,71 +383,45 @@ const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
                                       const void *arg0,
                                       const Metadata *result) {
-  return swift_getFunctionTypeMetadata1WithFlags(flags, arg0, nullptr, result);
-}
-
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                               const void *arg0,
-                                               const uint32_t *paramFlags,
-                                               const Metadata *result) {
   assert(flags.getNumArguments() == 1
          && "wrong number of arguments in function metadata flags?!");
   const void *flagsArgsAndResult[] = {
-      reinterpret_cast<const void *>(flags.getIntValue()), arg0, paramFlags,
-      static_cast<const void *>(result)};
+    reinterpret_cast<const void*>(flags.getIntValue()),
+    arg0,
+    static_cast<const void *>(result)                      
+  };                                                       
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}
-
-const FunctionTypeMetadata *
+}                                                          
+const FunctionTypeMetadata *                               
 swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
                                       const void *arg0,
                                       const void *arg1,
                                       const Metadata *result) {
-  return swift_getFunctionTypeMetadata2WithFlags(
-                                            flags, arg0, arg1, nullptr, result);
-}
-
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                               const void *arg0,
-                                               const void *arg1,
-                                               const uint32_t *paramFlags,
-                                               const Metadata *result) {
   assert(flags.getNumArguments() == 2
          && "wrong number of arguments in function metadata flags?!");
   const void *flagsArgsAndResult[] = {
-      reinterpret_cast<const void *>(flags.getIntValue()), arg0, arg1,
-      paramFlags, static_cast<const void *>(result)};
+    reinterpret_cast<const void*>(flags.getIntValue()),
+    arg0,
+    arg1,                                                  
+    static_cast<const void *>(result)                      
+  };                                                       
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}
-
-const FunctionTypeMetadata *
+}                                                          
+const FunctionTypeMetadata *                               
 swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
                                       const void *arg0,
                                       const void *arg1,
                                       const void *arg2,
                                       const Metadata *result) {
-  return swift_getFunctionTypeMetadata3WithFlags(flags, arg0, arg1, arg2,
-                                                 nullptr, result);
-}
-
-const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata3WithFlags(FunctionTypeFlags flags,
-                                               const void *arg0,
-                                               const void *arg1,
-                                               const void *arg2,
-                                               const uint32_t *paramFlags,
-                                               const Metadata *result) {
   assert(flags.getNumArguments() == 3
          && "wrong number of arguments in function metadata flags?!");
   const void *flagsArgsAndResult[] = {
-      reinterpret_cast<const void *>(flags.getIntValue()),
-      arg0,
-      arg1,
-      arg2,
-      paramFlags,
-      static_cast<const void *>(result)};
+    reinterpret_cast<const void*>(flags.getIntValue()),
+    arg0,                                                  
+    arg1,                                                  
+    arg2,                                                  
+    static_cast<const void *>(result)                      
+  };                                                       
   return swift_getFunctionTypeMetadata(flagsArgsAndResult);
 }
 
@@ -505,8 +466,8 @@ FunctionCacheEntry::FunctionCacheEntry(Key key) {
 
   for (size_t i = 0; i < numArguments; ++i) {
     auto opaqueArg = key.getArguments()[i];
-    Data.getArguments()[i] =
-        reinterpret_cast<FunctionTypeMetadata::Argument>(opaqueArg);
+    auto arg = FunctionTypeMetadata::Argument::getFromOpaqueValue(opaqueArg);
+    Data.getArguments()[i] = arg;
   }
 }
 

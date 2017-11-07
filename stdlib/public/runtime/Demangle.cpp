@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Types.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
 #include "Private.h"
@@ -322,17 +321,11 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     std::vector<NodePointer> inputs;
     for (unsigned i = 0, e = func->getNumArguments(); i < e; ++i) {
       auto arg = func->getArguments()[i];
-      auto flags = ParameterTypeFlags::fromRaw(func->getParameterFlags(i));
-      auto input = _swift_buildDemanglingForMetadata(arg, Dem);
-
-      if (flags.isInOut()) {
+      auto input = _swift_buildDemanglingForMetadata(arg.getPointer(), Dem);
+      if (arg.getFlag()) {
         NodePointer inout = Dem.createNode(Node::Kind::InOut);
         inout->addChild(input, Dem);
         input = inout;
-      } else if (flags.isShared()) {
-        NodePointer shared = Dem.createNode(Node::Kind::Shared);
-        shared->addChild(input, Dem);
-        input = shared;
       }
       inputs.push_back(input);
     }

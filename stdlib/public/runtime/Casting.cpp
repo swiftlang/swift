@@ -1923,8 +1923,7 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
     if (srcFn->getNumArguments() != targetFn->getNumArguments())
       return _fail(src, srcType, targetType, flags);
     for (unsigned i = 0, e = srcFn->getNumArguments(); i < e; ++i)
-      if (srcFn->getArguments()[i] != targetFn->getArguments()[i] ||
-          srcFn->getParameterFlags(i) != targetFn->getParameterFlags(i))
+      if (srcFn->getArguments()[i] != targetFn->getArguments()[i])
         return _fail(src, srcType, targetType, flags);
     
     return _succeed(dest, src, srcType, flags);
