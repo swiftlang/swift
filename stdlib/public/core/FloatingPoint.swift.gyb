@@ -688,7 +688,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///
   /// If this value and `other` are finite numbers, the remainder is in the
   /// closed range `-abs(other / 2)...abs(other / 2)`. The
-  /// `remainder(dividingBy:)` method is always exact.
+  /// `formRemainder(dividingBy:)` method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
   mutating func formRemainder(dividingBy other: Self)

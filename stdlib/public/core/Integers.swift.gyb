@@ -1293,7 +1293,7 @@ extension Numeric {
 ///     // r == 82
 ///     //   == 0b01010010
 ///
-///     let s = Int16(truncatingIfNeeded: s)     // extend 'r' to fill 16 bits
+///     let s = Int16(truncatingIfNeeded: r)     // extend 'r' to fill 16 bits
 ///     // s == 82
 ///     //   == 0b00000000_01010010
 ///
@@ -1648,6 +1648,14 @@ ${operatorComment(x.nonMaskingOperator, False)}
 // Strideable conformance
 extension BinaryInteger {
   // FIXME(ABI): using Int as the return type is wrong.
+  /// Returns the distance from this value to the given value, expressed as a
+  /// stride.
+  ///
+  /// For two values `x` and `y`, and a distance `n = x.distance(to: y)`,
+  /// `x.advanced(by: n) == y`.
+  ///
+  /// - Parameter other: The value to calculate the distance to.
+  /// - Returns: The distance from this value to `other`.
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func distance(to other: Self) -> Int {
@@ -1677,6 +1685,17 @@ extension BinaryInteger {
   }
 
   // FIXME(ABI): using Int as the parameter type is wrong.
+  /// Returns a value that is offset the specified distance from this value.
+  ///
+  /// Use the `advanced(by:)` method in generic code to offset a value by a
+  /// specified distance. If you're working directly with numeric values, use
+  /// the addition operator (`+`) instead of this method.
+  ///
+  /// For a value `x`, a distance `n`, and a value `y = x.advanced(by: n)`,
+  /// `x.distance(to: y) == n`.
+  ///
+  /// - Parameter n: The distance to advance this value.
+  /// - Returns: A value that is offset from this value by `n`.
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
   public func advanced(by n: Int) -> Self {
@@ -1696,12 +1715,31 @@ extension BinaryInteger {
 
 extension Int {
   // FIXME(ABI): using Int as the return type is wrong.
+  /// Returns the distance from this value to the given value, expressed as a
+  /// stride.
+  ///
+  /// For two values `x` and `y`, and a distance `n = x.distance(to: y)`,
+  /// `x.advanced(by: n) == y`.
+  ///
+  /// - Parameter other: The value to calculate the distance to.
+  /// - Returns: The distance from this value to `other`.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func distance(to other: Int) -> Int {
     return other - self
   }
 
+  /// Returns a value that is offset the specified distance from this value.
+  ///
+  /// Use the `advanced(by:)` method in generic code to offset a value by a
+  /// specified distance. If you're working directly with numeric values, use
+  /// the addition operator (`+`) instead of this method.
+  ///
+  /// For a value `x`, a distance `n`, and a value `y = x.advanced(by: n)`,
+  /// `x.distance(to: y) == n`.
+  ///
+  /// - Parameter n: The distance to advance this value.
+  /// - Returns: A value that is offset from this value by `n`.
   // FIXME(ABI): using Int as the parameter type is wrong.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
@@ -3207,6 +3245,7 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   // FIXME should be RandomAccessCollection
+  /// A type that represents the words of this integer.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : BidirectionalCollection {
     public typealias Indices = CountableRange<Int>
@@ -3286,6 +3325,8 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${truncOrExt}OrBitCast_Int${word_bits}_Int${bits}(bits._value))
   }
 
+  /// A type that can represent the absolute value of any possible value of
+  /// this type.
   public typealias Magnitude = ${U}${Self}
 
 % if signed:
