@@ -1777,7 +1777,7 @@ static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
     return false;
 
   // Must be a type member.
-  if (constant.getUncurryLevel() != 1)
+  if (constant.getParameterListCount() != 2)
     return false;
 
   // Must be imported from a function.
@@ -2486,7 +2486,7 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
 TypeConverter::LoweredFormalTypes
 TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
                                      CanAnyFunctionType fnType) {
-  unsigned uncurryLevel = constant.getUncurryLevel();
+  unsigned uncurryLevel = constant.getParameterListCount() - 1;
   auto extInfo = fnType->getExtInfo();
 
   // Form an abstraction pattern for bridging purposes.
