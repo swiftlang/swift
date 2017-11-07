@@ -26,10 +26,10 @@ class Foo: Fooable {
 
 // CHECK-LABEL: sil hidden @_T015witnesses_class3genyxAA7FooableRzlF
 // CHECK:         bb0([[SELF:%.*]] : @owned $T)
-// CHECK:         [[METHOD:%.*]] = witness_method $T
 // CHECK-NOT:     copy_value [[SELF]]
 // CHECK:         [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-NOT:     copy_value [[SELF]]
+// CHECK:         [[METHOD:%.*]] = witness_method $T
 // CHECK:         apply [[METHOD]]<T>([[BORROWED_SELF]])
 // CHECK:         end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:         destroy_value [[SELF]]

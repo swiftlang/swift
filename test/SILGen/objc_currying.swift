@@ -13,8 +13,8 @@ func curry_pod(_ x: CurryTest) -> (Int) -> Int {
 // CHECK-LABEL: sil hidden @_T013objc_currying9curry_podS2icSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:      bb0([[ARG1:%.*]] : @owned $CurryTest):
 // CHECK:         [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-// CHECK:         [[THUNK:%.*]] = function_ref @[[THUNK_FOO_1:_T0So9CurryTestC3podS2iFTcTO]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:         [[COPIED_ARG1:%.*]] = copy_value [[BORROWED_ARG1]]
+// CHECK:         [[THUNK:%.*]] = function_ref @[[THUNK_FOO_1:_T0So9CurryTestC3podS2iFTcTO]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:         [[FN:%.*]] = apply [[THUNK]]([[COPIED_ARG1]])
 // CHECK:         end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:         destroy_value [[ARG1]]
@@ -42,8 +42,8 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 // CHECK-LABEL: sil hidden @_T013objc_currying13curry_bridgedSQySSGACcSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
 // CHECK: bb0([[ARG1:%.*]] : @owned $CurryTest):
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_1:_T0So9CurryTestC7bridgedSQySSGADFTcTO]]
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_1:_T0So9CurryTestC7bridgedSQySSGADFTcTO]]
 // CHECK:   [[FN:%.*]] = apply [[THUNK]]([[ARG1_COPY]])
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   destroy_value [[ARG1]]
@@ -103,8 +103,8 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer!
 // CHECK-LABEL: sil hidden @_T013objc_currying25curry_returnsInnerPointerSQySvGycSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> Optional<UnsafeMutableRawPointer> {
 // CHECK: bb0([[SELF:%.*]] : @owned $CurryTest):
 // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_RETURNSINNERPOINTER:_T0So9CurryTestC19returnsInnerPointerSQySvGyFTcTO]]
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[BORROWED_SELF]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_RETURNSINNERPOINTER:_T0So9CurryTestC19returnsInnerPointerSQySvGyFTcTO]]
 // CHECK:   [[FN:%.*]] = apply [[THUNK]]([[SELF_COPY]])
 // CHECK:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:   destroy_value [[SELF]]

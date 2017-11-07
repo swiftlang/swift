@@ -20,8 +20,8 @@ class TestDerived : TestClass {
 
 // CHECK-LABEL: sil hidden @{{.*}}testDirectDispatch{{.*}} : $@convention(thin) (@owned TestClass) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @owned $TestClass):
-// CHECK: [[FINALMETH:%[0-9]+]] = function_ref @_T05final9TestClassC0A6Method{{[_0-9a-zA-Z]*}}F
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: [[FINALMETH:%[0-9]+]] = function_ref @_T05final9TestClassC0A6Method{{[_0-9a-zA-Z]*}}F
 // CHECK: apply [[FINALMETH]]([[BORROWED_ARG]])
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]

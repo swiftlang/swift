@@ -73,9 +73,9 @@ func test3() {
   
   // CHECK-NOT: destroy_value
 
-  // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
-  // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+  // CHECK: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK-NEXT: [[STR_COPY:%.*]] = copy_value [[BORROWED_STR]]
+  // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_COPY]])
   // CHECK-NEXT: end_borrow [[BORROWED_STR]] from [[STR]]
   useAString(o)
@@ -98,10 +98,10 @@ func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
-  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: [[ARG:%.*]] = alloc_stack $T
   // CHECK: copy_addr [[FUNC_ARG]] to [initialization] [[ARG]]
+  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
   // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
@@ -115,9 +115,9 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
 func testAddressOnlyStructElt<T>(_ a : T) -> T {
   return produceAddressOnlyStruct(a).elt
   
-  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: [[ARG:%.*]] = alloc_stack $T
+  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
   // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt

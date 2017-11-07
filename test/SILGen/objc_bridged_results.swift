@@ -125,10 +125,9 @@ func testNonnullString(_ obj: Test) -> String {
 
 // CHECK-LABEL: sil hidden @_T020objc_bridged_results13testClassPropSSyF
 func testClassProp() -> String {
-  // CHECK: [[CLASS:%.+]] = metatype $@thick Test.Type
-  // CHECK: [[METHOD:%.+]] = objc_method [[CLASS]] : $@thick Test.Type, #Test.nonnullSharedString!getter.1.foreign : (Test.Type) -> () -> String, $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
-  // CHECK: [[OBJC_CLASS:%.+]] = thick_to_objc_metatype [[CLASS]] : $@thick Test.Type to $@objc_metatype Test.Type
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_CLASS]]) : $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[CLASS:%.+]] = metatype $@objc_metatype Test.Type
+  // CHECK: [[METHOD:%.+]] = objc_method [[CLASS]] : $@objc_metatype Test.Type, #Test.nonnullSharedString!getter.1.foreign : (Test.Type) -> () -> String, $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[CLASS]]) : $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
   // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String

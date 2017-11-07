@@ -492,10 +492,10 @@ class DesignatedStubs : Gizmo {
   override init() { i = 5 }
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks15DesignatedStubsCSQyACGSi7bellsOn_tcfc
-  // CHECK: function_ref @_T0s25_unimplementedInitializers5NeverOs12StaticStringV9className_AE04initG0AE4fileSu4lineSu6columntF
   // CHECK: string_literal utf8 "objc_thunks.DesignatedStubs"
   // CHECK: string_literal utf8 "init(bellsOn:)"
   // CHECK: string_literal utf8 "{{.*}}objc_thunks.swift"
+  // CHECK: function_ref @_T0s25_unimplementedInitializers5NeverOs12StaticStringV9className_AE04initG0AE4fileSu4lineSu6columntF
   // CHECK: return
 
   // CHECK-NOT: sil hidden @_TFCSo15DesignatedStubsc{{.*}}

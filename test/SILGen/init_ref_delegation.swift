@@ -10,11 +10,11 @@ struct S {
     // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S }
     // CHECK-NEXT:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK-NEXT:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
-    // CHECK:   [[S_DELEG_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, @thin S.Type) -> S
     
-    // CHECK:   [[X_CTOR:%[0-9]+]] = function_ref @_T019init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
     // CHECK-NEXT:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
+    // CHECK:   [[X_CTOR:%[0-9]+]] = function_ref @_T019init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
     // CHECK-NEXT:   [[X:%[0-9]+]] = apply [[X_CTOR]]([[X_META]]) : $@convention(method) (@thin X.Type) -> X
+    // CHECK:   [[S_DELEG_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, @thin S.Type) -> S
     // CHECK-NEXT:   [[REPLACEMENT_SELF:%[0-9]+]] = apply [[S_DELEG_INIT]]([[X]], [[SELF_META]]) : $@convention(method) (X, @thin S.Type) -> S
     self.init(x: X())
     // CHECK-NEXT:   assign [[REPLACEMENT_SELF]] to [[PB]] : $*S
@@ -38,11 +38,10 @@ enum E {
     // CHECK:   [[MARKED_E_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[E_BOX]]
     // CHECK:   [[PB:%.*]] = project_box [[MARKED_E_BOX]]
 
-    // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1EO{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, @thin E.Type) -> E
-
-    // CHECK:   [[E_DELEG_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
+    // CHECK:   [[E_DELEG_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
     // CHECK:   [[X:%[0-9]+]] = apply [[E_DELEG_INIT]]([[X_META]]) : $@convention(method) (@thin X.Type) -> X
+    // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1EO{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, @thin E.Type) -> E
     // CHECK:   [[S:%[0-9]+]] = apply [[X_INIT]]([[X]], [[E_META]]) : $@convention(method) (X, @thin E.Type) -> E
     // CHECK:   assign [[S:%[0-9]+]] to [[PB]] : $*E
     // CHECK:   [[E_BOX1:%[0-9]+]] = load [trivial] [[PB]] : $*E
@@ -62,13 +61,13 @@ struct S2 {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S2 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
-    // CHECK:   [[S2_DELEG_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation2S2V{{[_0-9a-zA-Z]*}}fC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
 
-    // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
+    // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
     // CHECK:   [[X:%[0-9]+]] = apply [[X_INIT]]([[X_META]]) : $@convention(method) (@thin X.Type) -> X
     // CHECK:   [[X_BOX:%[0-9]+]] = alloc_stack $X
     // CHECK:   store [[X]] to [trivial] [[X_BOX]] : $*X
+    // CHECK:   [[S2_DELEG_INIT:%[0-9]+]] = function_ref @_T019init_ref_delegation2S2V{{[_0-9a-zA-Z]*}}fC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
     // CHECK:   [[SELF_BOX1:%[0-9]+]] = apply [[S2_DELEG_INIT]]<X>([[X_BOX]], [[S2_META]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
     // CHECK:   dealloc_stack [[X_BOX]] : $*X
     // CHECK:   assign [[SELF_BOX1]] to [[PB]] : $*S2
@@ -95,8 +94,7 @@ class C1 {
 
     // CHECK:   store [[ORIG_SELF]] to [init] [[PB]] : $*C1
     // CHECK:   [[SELF_FROM_BOX:%[0-9]+]] = load [take] [[PB]] : $*C1
-    // CHECK:   [[BORROWED_SELF_FROM_BOX:%.*]] = begin_borrow [[SELF_FROM_BOX]]
-    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[BORROWED_SELF_FROM_BOX]] : $C1, #C1.init!initializer.1 : (C1.Type) -> (X, X) -> C1, $@convention(method) (X, X, @owned C1) -> @owned C1
+    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_FROM_BOX]] : $C1, #C1.init!initializer.1 : (C1.Type) -> (X, X) -> C1, $@convention(method) (X, X, @owned C1) -> @owned C1
     // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@convention(method) (X, X, @owned C1) -> @owned C1
     // CHECK:   store [[SELFP]] to [init] [[PB]] : $*C1
     // CHECK:   [[SELFP:%[0-9]+]] = load [copy] [[PB]] : $*C1
@@ -119,8 +117,7 @@ class C1 {
     // CHECK:   [[PB_SELF:%.*]] = project_box [[MARKED_SELF_BOX]]
     // CHECK:   store [[ORIG_SELF]] to [init] [[PB_SELF]] : $*C2
     // CHECK:   [[SELF:%[0-9]+]] = load [take] [[PB_SELF]] : $*C2
-    // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[BORROWED_SELF]] : $C2, #C2.init!initializer.1 : (C2.Type) -> (X, X) -> C2, $@convention(method) (X, X, @owned C2) -> @owned C2
+    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF]] : $C2, #C2.init!initializer.1 : (C2.Type) -> (X, X) -> C2, $@convention(method) (X, X, @owned C2) -> @owned C2
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF]]) : $@convention(method) (X, X, @owned C2) -> @owned C2
     // CHECK:   store [[REPLACE_SELF]] to [init] [[PB_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [copy] [[PB_SELF]] : $*C2

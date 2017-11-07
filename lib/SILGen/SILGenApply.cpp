@@ -157,6 +157,9 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 }
 
 static SILValue getOriginalSelfValue(SILValue selfValue) {
+  if (auto *TTOI = dyn_cast<ThickToObjCMetatypeInst>(selfValue))
+    selfValue = TTOI->getOperand();
+
   if (auto *BBI = dyn_cast<BeginBorrowInst>(selfValue))
     selfValue = BBI->getOperand();
 
@@ -242,10 +245,6 @@ private:
   /// *NOTE* This should never be non-null if IndirectValue is non-null.
   SILDeclRef Constant;
 
-  /// This field is set if we are calling to a SuperMethod or ClassMethod and
-  /// thus need to pass self to get the correct implementation.
-  Optional<ArgumentSource> SelfValue;
-
   /// The abstraction pattern of the callee.
   AbstractionPattern OrigFormalInterfaceType;
 
@@ -298,11 +297,10 @@ private:
   {
   }
 
-  Callee(Kind methodKind, SILGenFunction &SGF,
-         Optional<ArgumentSource> &&selfValue, SILDeclRef methodName,
+  Callee(Kind methodKind, SILGenFunction &SGF, SILDeclRef methodName,
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
          SubstitutionList subs, SILLocation l)
-      : kind(methodKind), Constant(methodName), SelfValue(std::move(selfValue)),
+      : kind(methodKind), Constant(methodName),
         OrigFormalInterfaceType(origFormalType),
         SubstFormalInterfaceType(
             getSubstFormalInterfaceType(substFormalType, subs)),
@@ -327,23 +325,23 @@ public:
                                SILLocation l) {
     assert(isa<EnumElementDecl>(c.getDecl()));
     auto &ci = SGF.getConstantInfo(c);
-    return Callee(Kind::EnumElement, SGF, None, c, ci.FormalPattern,
+    return Callee(Kind::EnumElement, SGF, c, ci.FormalPattern,
                   ci.FormalType, subs, l);
   }
-  static Callee forClassMethod(SILGenFunction &SGF, ArgumentSource &&selfValue,
+  static Callee forClassMethod(SILGenFunction &SGF,
                                SILDeclRef c, SubstitutionList subs,
                                SILLocation l) {
     auto base = SGF.SGM.Types.getOverriddenVTableEntry(c);
     auto &baseCI = SGF.getConstantInfo(base);
     auto &derivedCI = SGF.getConstantInfo(c);
-    return Callee(Kind::ClassMethod, SGF, std::move(selfValue), c,
+    return Callee(Kind::ClassMethod, SGF, c,
                   baseCI.FormalPattern, derivedCI.FormalType, subs, l);
   }
-  static Callee forSuperMethod(SILGenFunction &SGF, ArgumentSource &&selfValue,
+  static Callee forSuperMethod(SILGenFunction &SGF,
                                SILDeclRef c, SubstitutionList subs,
                                SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
-    return Callee(Kind::SuperMethod, SGF, std::move(selfValue), c,
+    return Callee(Kind::SuperMethod, SGF, c,
                   ci.FormalPattern, ci.FormalType, subs, l);
   }
   static Callee forWitnessMethod(SILGenFunction &SGF,
@@ -352,10 +350,10 @@ public:
                                  SubstitutionList subs,
                                  SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
-    return Callee(Kind::WitnessMethod, SGF, None, c, ci.FormalPattern,
+    return Callee(Kind::WitnessMethod, SGF, c, ci.FormalPattern,
                   ci.FormalType, subs, l);
   }
-  static Callee forDynamic(SILGenFunction &SGF, ArgumentSource &&arg,
+  static Callee forDynamic(SILGenFunction &SGF,
                            SILDeclRef c, const SubstitutionList &constantSubs,
                            CanAnyFunctionType substFormalType,
                            SubstitutionList subs, SILLocation l) {
@@ -377,7 +375,7 @@ public:
     }
     origFormalType.rewriteType(CanGenericSignature(), origFormalFnType);
 
-    return Callee(Kind::DynamicMethod, SGF, std::move(arg), c, origFormalType,
+    return Callee(Kind::DynamicMethod, SGF, c, origFormalType,
                   substFormalType, subs, l);
   }
 
@@ -418,6 +416,22 @@ public:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
       return Constant.getParameterListCount();
+    }
+
+    llvm_unreachable("Unhandled Kind in switch.");
+  }
+
+  bool requiresSelfValueForDispatch() const {
+    switch (kind) {
+    case Kind::IndirectValue:
+    case Kind::StandaloneFunction:
+    case Kind::EnumElement:
+    case Kind::WitnessMethod:
+      return false;
+    case Kind::ClassMethod:
+    case Kind::SuperMethod:
+    case Kind::DynamicMethod:
+      return true;
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
@@ -480,7 +494,8 @@ public:
     return SILType::getPrimitiveObjectType(fnType);
   }
 
-  ManagedValue getFnValue(SILGenFunction &SGF, bool isCurried) const & {
+  ManagedValue getFnValue(SILGenFunction &SGF, bool isCurried,
+                          Optional<ManagedValue> borrowedSelf) const & {
     Optional<SILDeclRef> constant = None;
 
     if (!Constant) {
@@ -513,17 +528,15 @@ public:
 
       // Otherwise, do the dynamic dispatch inline.
       Scope S(SGF, Loc);
-      ManagedValue borrowedSelf =
-          SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
 
       SILValue methodVal;
       if (!constant->isForeign) {
         methodVal = SGF.B.createClassMethod(
-            Loc, borrowedSelf.getValue(), *constant,
+            Loc, borrowedSelf->getValue(), *constant,
             SILType::getPrimitiveObjectType(methodTy));
       } else {
         methodVal = SGF.B.createObjCMethod(
-            Loc, borrowedSelf.getValue(), *constant,
+            Loc, borrowedSelf->getValue(), *constant,
             SILType::getPrimitiveObjectType(methodTy));
       }
       return ManagedValue::forUnmanaged(methodVal);
@@ -532,9 +545,8 @@ public:
       assert(!constant->isCurried);
 
       Scope S(SGF, Loc);
-      ManagedValue self =
-          SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
-      ManagedValue castValue = borrowedCastToOriginalSelfType(SGF, Loc, self);
+      ManagedValue castValue = borrowedCastToOriginalSelfType(
+        SGF, Loc, *borrowedSelf);
 
       auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
       auto constantInfo =
@@ -568,10 +580,8 @@ public:
       auto closureType = getDynamicMethodType(SGF.SGM.M);
 
       Scope S(SGF, Loc);
-      ManagedValue self =
-          SelfValue.getValue().borrow(SGF).getAsSingleValue(SGF);
       SILValue fn = SGF.B.createObjCMethod(
-          Loc, self.getValue(), *constant,
+          Loc, borrowedSelf->getValue(), *constant,
           closureType);
       return ManagedValue::forUnmanaged(fn);
     }
@@ -955,8 +965,7 @@ public:
     ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
     auto subs = e->getDeclRef().getSubstitutions();
     SILLocation loc(thisCallSite->getArg());
-    setCallee(Callee::forClassMethod(SGF, selfArgSource.delayedBorrow(SGF),
-                                     constant, subs, e));
+    setCallee(Callee::forClassMethod(SGF, constant, subs, e));
 
     setSelfParam(std::move(selfArgSource), thisCallSite);
     return true;
@@ -1139,8 +1148,7 @@ public:
     ArgumentSource superArgSource(arg, std::move(super));
     if (!canUseStaticDispatch(SGF, constant)) {
       // ObjC super calls require dynamic dispatch.
-      setCallee(Callee::forSuperMethod(SGF, superArgSource.delayedBorrow(SGF),
-                                       constant, substitutions, fn));
+      setCallee(Callee::forSuperMethod(SGF, constant, substitutions, fn));
     } else {
       // Native Swift super calls to final methods are direct.
       setCallee(Callee::forDirect(SGF, constant, substitutions, fn));
@@ -1309,8 +1317,7 @@ public:
       // Dynamic dispatch to the initializer.
       Scope S(SGF, expr);
       setCallee(Callee::forClassMethod(
-          SGF, selfArgSource.delayedBorrow(SGF),
-          constant, subs, fn));
+          SGF, constant, subs, fn));
     } else {
       // Directly call the peer constructor.
       setCallee(
@@ -1409,8 +1416,7 @@ public:
         dynamicMemberRef->getBase()->getType()->getCanonicalType(),
         substFormalType, AnyFunctionType::ExtInfo());
 
-      setCallee(Callee::forDynamic(SGF, baseArgSource.delayedBorrow(SGF),
-                                   member, memberRef.getSubstitutions(),
+      setCallee(Callee::forDynamic(SGF, member, memberRef.getSubstitutions(),
                                    substFormalType, {}, e));
       setSelfParam(std::move(baseArgSource), dynamicMemberRef);
     };
@@ -4069,7 +4075,6 @@ CallEmission::applyNormalCall(SGFContext C) {
 
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF, isCurried);
-  auto mv = callee.getFnValue(SGF, isCurried);
 
   // In C language modes, substitute the type of the AbstractionPattern
   // so that we won't see type parameters down when we try to form bridging
@@ -4117,6 +4122,15 @@ CallEmission::applyNormalCall(SGFContext C) {
       firstLevelResult.formalType, origFormalType, calleeTypeInfo.substFnType,
       calleeTypeInfo.foreignError, calleeTypeInfo.foreignSelf, uncurriedArgs,
       uncurriedLoc, formalApplyType);
+
+  // Now evaluate the callee.
+  Optional<ManagedValue> borrowedSelf;
+  if (callee.requiresSelfValueForDispatch()) {
+    borrowedSelf = uncurriedArgs.back();
+  }
+
+  auto mv = callee.getFnValue(SGF, isCurried, borrowedSelf);
+
   // Emit the uncurried call.
   firstLevelResult.value =
       SGF.emitApply(std::move(resultPlan), std::move(argScope),
@@ -4555,7 +4569,12 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   auto substFormalType = callee.getSubstFormalType();
 
   auto calleeTypeInfo = callee.getTypeInfo(*this, /*isCurried=*/false);
-  auto mv = callee.getFnValue(*this, /*isCurried=*/false);
+
+  Optional<ManagedValue> borrowedSelf;
+  if (callee.requiresSelfValueForDispatch())
+    borrowedSelf = args.back();
+  auto mv = callee.getFnValue(*this, /*isCurried=*/false,
+                              borrowedSelf);
 
   assert(!calleeTypeInfo.foreignError);
   assert(!calleeTypeInfo.foreignSelf.isImportAsMember());
@@ -4884,14 +4903,12 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   // Otherwise, if we have a non-final class dispatch to a normal method,
   // perform a dynamic dispatch.
   if (!isSuper)
-    return Callee::forClassMethod(SGF, selfValue.delayedBorrow(SGF), constant,
-                                  subs, loc);
+    return Callee::forClassMethod(SGF, constant, subs, loc);
 
   // If this is a "super." dispatch, we do a dynamic dispatch for objc methods
   // or non-final native Swift methods.
   if (!canUseStaticDispatch(SGF, constant))
-    return Callee::forSuperMethod(SGF, selfValue.delayedBorrow(SGF), constant,
-                                  subs, loc);
+    return Callee::forSuperMethod(SGF, constant, subs, loc);
 
   return Callee::forDirect(SGF, constant, subs, loc);
 }

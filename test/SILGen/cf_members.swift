@@ -32,14 +32,14 @@ public func foo(_ x: Double) {
   var z = Struct1(value: x)
   // The metatype expression should still be evaluated even if it isn't
   // used.
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1CreateSimple
   // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @_T010cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1CreateSimple
   // CHECK: apply [[FN]]([[X]])
   z = makeMetatype().init(value: x)
 
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1VABSd5value_tcfCTcTO
   // CHECK: [[SELF_META:%.*]] = metatype $@thin Struct1.Type
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1VABSd5value_tcfCTcTO
   // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF_META]])
   // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[A]]
   // CHECK: [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
@@ -52,21 +52,21 @@ public func foo(_ x: Double) {
   // let b: @convention(c) (Double) -> Struct1 = Struct1.init(value:)
   // z = b(x)
 
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1InvertInPlace
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1InvertInPlace
   // CHECK: apply [[FN]]([[WRITE]])
   z.invert()
 
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
   // CHECK: [[WRITE:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[WRITE]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
   // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
-  // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_T0SC7Struct1V9translateABSd7radians_tFTcTO]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
+  // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_T0SC7Struct1V9translateABSd7radians_tFTcTO]]
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
@@ -75,8 +75,13 @@ public func foo(_ x: Double) {
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME]]
-  // CHECK: thin_to_thick_function [[THUNK]]
+  // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
+  // CHECK: [[BORROW:%.*]] = begin_borrow [[THICK]]
+  // CHECK: [[COPY:%.*]] = copy_value [[BORROW]]
   let d: (Struct1) -> (Double) -> Struct1 = Struct1.translate(radians:)
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
+  // CHECK: apply [[COPY]]([[ZVAL]])
   z = d(z)(x)
 
   // TODO: If we implement SE-0042, this should thunk the value Struct1 param
@@ -86,15 +91,15 @@ public func foo(_ x: Double) {
   //  = Struct1.translate(radians:)
   // z = e(z, x)
 
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Scale
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Scale
   // CHECK: apply [[FN]]([[ZVAL]], [[X]])
   z = z.scale(x)
 
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
   // CHECK: [[F_COPY:%.*]] = copy_value [[BORROWED_F]]
@@ -118,8 +123,8 @@ public func foo(_ x: Double) {
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
   // CHECK: [[ZVAL_2:%.*]] = load [trivial] [[ZTMP]]
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
   // CHECK: store [[ZVAL_2]] to [trivial] [[ZTMP_2:%.*]] :
+  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
   // CHECK: apply [[GET]]([[ZTMP_2]])
   _ = z.radius
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
@@ -133,8 +138,8 @@ public func foo(_ x: Double) {
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetAltitude : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
-  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
   // CHECK: apply [[SET]]([[WRITE]], [[X]])
   z.altitude = x
   
@@ -147,8 +152,8 @@ public func foo(_ x: Double) {
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1StaticMethod
   // CHECK: apply [[FN]]()
   var y = Struct1.staticMethod()
-  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V12staticMethods5Int32VyFZTcTO
   // CHECK: [[SELF:%.*]] = metatype
+  // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V12staticMethods5Int32VyFZTcTO
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
   // CHECK: [[BORROWED_I:%.*]] = begin_borrow [[I]]
   // CHECK: [[I_COPY:%.*]] = copy_value [[BORROWED_I]]
@@ -187,23 +192,27 @@ public func foo(_ x: Double) {
   // CHECK: apply [[GET]]()
   _ = makeMetatype().getOnlyProperty
 
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesLast : $@convention(c) (Double, Struct1) -> ()
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesLast : $@convention(c) (Double, Struct1) -> ()
   // CHECK: apply [[FN]]([[X]], [[ZVAL]])
   z.selfComesLast(x: x)
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   let k: (Double) -> () = z.selfComesLast(x:)
   k(x)
   let l: (Struct1) -> (Double) -> () = Struct1.selfComesLast(x:)
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
+  // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   l(z)(x)
 
   // TODO: If we implement SE-0042, this should thunk to reorder the arguments.
   // let m: @convention(c) (Struct1, Double) -> () = Struct1.selfComesLast(x:)
   // m(z, x)
 
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesThird : $@convention(c) (Int32, Float, Struct1, Double) -> ()
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
+  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesThird : $@convention(c) (Int32, Float, Struct1, Double) -> ()
   // CHECK: apply [[FN]]({{.*}}, {{.*}}, [[ZVAL]], [[X]])
   z.selfComesThird(a: y, b: 0, x: x)
   let n: (Int32, Float, Double) -> () = z.selfComesThird(a:b:x:)

@@ -22,9 +22,9 @@ func if_no_else() {
   // CHECK:  br [[CONT:bb[0-9]+]]
   if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : @owned $String):
-  // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
+  // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
   // CHECK:   apply [[A]]([[VAL_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
@@ -47,9 +47,9 @@ func if_else_chain() {
   //
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : @owned $String):
   // CHECK:   debug_value [[VAL]] : $String, let, name "x"
-  // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
+  // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
   // CHECK:   apply [[A]]([[VAL_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
@@ -286,7 +286,8 @@ func if_leading_boolean(_ a : Int) {
   // CHECK: debug_value %0 : $Int, let, name "a"
   // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0{{.*}}) : $@convention({{.*}}) (Int, Int{{.*}}) -> Bool
 
-  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply %2([[EQRESULT]]) : $@convention(method) (Bool) -> Builtin.Int1
+  // CHECK:      [[FN:%.*]] = function_ref {{.*}}
+  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply [[FN:%.*]]([[EQRESULT]]) : $@convention(method) (Bool) -> Builtin.Int1
   // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[IFDONE:bb[0-9]+]]
 
   // Call Foo and test for the optional being present.

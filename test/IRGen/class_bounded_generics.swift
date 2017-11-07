@@ -91,10 +91,10 @@ func class_bounded_archetype_method<T : ClassBoundBinary>(_ x: T, y: T) {
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*, i8**)
   // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* swiftself %0, %swift.type* {{.*}}, i8** [[INHERITED_WTBL]])
   x.classBoundBinaryMethod(y)
+  // CHECK: call %objc_object* @swift_unknownRetain(%objc_object* returned [[Y:%.*]])
   // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 1
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ENTRY]], align 8
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %objc_object*, %swift.type*, i8**)
-  // CHECK: call %objc_object* @swift_unknownRetain(%objc_object* returned [[Y:%.*]])
   // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* [[Y]], %objc_object* swiftself %0, %swift.type* %T, i8** %T.ClassBoundBinary)
 }
 

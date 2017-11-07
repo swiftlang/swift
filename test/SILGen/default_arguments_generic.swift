@@ -42,8 +42,8 @@ struct InitializableImpl: Initializable {
 func testInitializable() {
   // The ".init" is required to trigger the crash that used to happen.
   _ = Generic<InitializableImpl>.init()
-  // CHECK: [[INIT:%.+]] = function_ref @_T025default_arguments_generic7GenericVACyxGxcfC
   // CHECK: function_ref @_T025default_arguments_generic7GenericVACyxGxcfcfA_ : $@convention(thin) <τ_0_0 where τ_0_0 : Initializable> () -> @out τ_0_0
+  // CHECK: [[INIT:%.+]] = function_ref @_T025default_arguments_generic7GenericVACyxGxcfC
   // CHECK: apply [[INIT]]<InitializableImpl>({{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : Initializable> (@in τ_0_0, @thin Generic<τ_0_0>.Type) -> Generic<τ_0_0>
 } // CHECK: end sil function '_T025default_arguments_generic17testInitializableyyF'
 

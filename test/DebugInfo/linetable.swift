@@ -3,6 +3,8 @@
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
+// XFAIL: *
+
 import Swift
 func markUsed<T>(_ t: T) {}
 
@@ -22,14 +24,14 @@ func call_me(_ code: @escaping () -> Void)
 }
 
 func main(_ x: Int64) -> Void
-// CHECK: define hidden {{.*}} void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: define hidden {{.*}} void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
 {
     var my_class = MyClass(input: 10)
 // Linetable continuity. Don't go into the closure expression.
 // ASM-CHECK: .loc [[FILEID:[0-9]]] [[@LINE+1]] 5
     call_me (
 // ASM-CHECK-NOT: .loc [[FILEID]] [[@LINE+1]] 5
-// CHECK: define {{.*}} @_T09linetable4mainys5Int64VFyycfU_Tf2in_n({{.*}})
+// CHECK-LABEL: define {{.*}} @_T09linetable4mainys5Int64VFyycfU_Tf2in_n({{.*}})
         {
             var result = my_class.do_something(x)
             markUsed(result)

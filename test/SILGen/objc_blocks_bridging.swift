@@ -101,7 +101,6 @@ func callBlocks(_ x: Foo,
 ) -> (Int, String, String?, String?) {
   // CHECK: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @owned $@callee_owned (Int) -> Int, [[ARG2:%.*]] : @owned $@callee_owned (@owned String) -> @owned String, [[ARG3:%.*]] : @owned $@callee_owned (@owned Optional<String>) -> @owned Optional<String>):
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK: [[FOO:%.*]] =  objc_method [[BORROWED_ARG0]] : $Foo, #Foo.foo!1.foreign
   // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
   // CHECK: [[CONVERT:%.*]] = convert_function [[CLOSURE_COPY]]
@@ -111,20 +110,21 @@ func callBlocks(_ x: Foo,
   // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @_T0S2iIxyd_S2iIyByd_TR
   // CHECK: [[F_STACK_BLOCK:%.*]] = init_block_storage_header [[F_BLOCK_STORAGE]] : {{.*}}, invoke [[F_BLOCK_INVOKE]]
   // CHECK: [[F_BLOCK:%.*]] = copy_block [[F_STACK_BLOCK]]
+  // CHECK: [[FOO:%.*]] =  objc_method [[BORROWED_ARG0]] : $Foo, #Foo.foo!1.foreign
   // CHECK: apply [[FOO]]([[F_BLOCK]]
 
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK: [[BAR:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.bar!1.foreign
   // CHECK: [[G_BLOCK_INVOKE:%.*]] = function_ref @_T0S2SIxxo_So8NSStringCABIyBya_TR
   // CHECK: [[G_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[G_BLOCK_INVOKE]]
   // CHECK: [[G_BLOCK:%.*]] = copy_block [[G_STACK_BLOCK]]
+  // CHECK: [[BAR:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.bar!1.foreign
   // CHECK: apply [[BAR]]([[G_BLOCK]]
 
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK: [[BAS:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.bas!1.foreign
   // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @_T0SSSgAAIxxo_So8NSStringCSgADIyBya_TR
   // CHECK: [[H_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[H_BLOCK_INVOKE]]
   // CHECK: [[H_BLOCK:%.*]] = copy_block [[H_STACK_BLOCK]]
+  // CHECK: [[BAS:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.bas!1.foreign
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
   // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@convention(block) (NSString) -> @autoreleased NSString

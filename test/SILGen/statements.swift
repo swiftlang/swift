@@ -164,9 +164,9 @@ func for_loops1(_ x: Int, c: Bool) {
 // CHECK-LABEL: sil hidden @{{.*}}for_loops2
 func for_loops2() {
   // rdar://problem/19316670
-  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0s16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: alloc_stack $Optional<MyClass>
+  // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
+  // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0s16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
   // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
@@ -365,8 +365,8 @@ func test_if_break(_ a : Bool) {
 
 // CHECK-LABEL: sil hidden @_T010statements7test_doyyF
 func test_do() {
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: apply [[BAR]](
   bar(0)
   // CHECK-NOT: br bb
@@ -376,8 +376,8 @@ func test_do() {
     let obj = MyClass()
     _ = obj
     
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: apply [[BAR]](
     bar(1)
 
@@ -386,16 +386,16 @@ func test_do() {
     // CHECK-NOT: br bb
   }
 
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: integer_literal $Builtin.Int2048, 2
+  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: apply [[BAR]](
   bar(2)
 }
 
 // CHECK-LABEL: sil hidden @_T010statements15test_do_labeledyyF
 func test_do_labeled() {
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: apply [[BAR]](
   bar(0)
   // CHECK: br bb1
@@ -406,8 +406,8 @@ func test_do_labeled() {
     let obj = MyClass()
     _ = obj
 
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: apply [[BAR]](
     bar(1)
 
@@ -421,8 +421,8 @@ func test_do_labeled() {
     }
 
     // CHECK: bb3:
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: integer_literal $Builtin.Int2048, 2
+    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: apply [[BAR]](
     bar(2)
 
@@ -436,8 +436,8 @@ func test_do_labeled() {
     }
 
     // CHECK: bb5:
-    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: integer_literal $Builtin.Int2048, 3
+    // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
     // CHECK: apply [[BAR]](
     bar(3)
 
@@ -445,8 +445,8 @@ func test_do_labeled() {
     // CHECK: br bb6
   }
 
-  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: integer_literal $Builtin.Int2048, 4
+  // CHECK: [[BAR:%.*]] = function_ref @_T010statements3barySiF
   // CHECK: apply [[BAR]](
   bar(4)
 }

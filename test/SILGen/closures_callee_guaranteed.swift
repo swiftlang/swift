@@ -21,10 +21,10 @@ public func apply(_ f : () -> Int) -> Int {
 }
 
 // CHECK-LABEL: sil @{{.*}}test{{.*}} : $@convention(thin) () -> ()
-// CHECK:   [[A:%.*]] = function_ref @{{.*}}apply{{.*}} : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> Int
 // CHECK:   [[C1:%.*]] = function_ref @{{.*}}test{{.*}} : $@convention(thin) () -> Int
 // CHECK:   [[C2:%.*]] = convert_function [[C1]] : $@convention(thin) () -> Int to $@convention(thin) @noescape () -> Int
 // CHECK:   [[C3:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) @noescape () -> Int to $@noescape @callee_guaranteed () -> Int
+// CHECK:   [[A:%.*]] = function_ref @{{.*}}apply{{.*}} : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> Int
 // CHECK:   apply [[A]]([[C3]]) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> Int
 public func test() {
   let res = apply({ return 1 })

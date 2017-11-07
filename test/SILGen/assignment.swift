@@ -18,15 +18,14 @@ class D { var child: C = C() }
 // Verify that the LHS is formally evaluated before the RHS.
 // CHECK-LABEL: sil hidden @_T010assignment5test1yyF : $@convention(thin) () -> () {
 func test1() {
-  // CHECK: [[CTOR:%.*]] = function_ref @_T010assignment1DC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[T0:%.*]] = metatype $@thick D.Type
+  // CHECK: [[CTOR:%.*]] = function_ref @_T010assignment1DC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[D:%.*]] = apply [[CTOR]]([[T0]])
   // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
-  // CHECK: [[SETTER:%.*]] = class_method [[BORROWED_D]] : $D,  #D.child!setter.1
-  // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
-  // CHECK: [[CTOR:%.*]] = function_ref @_T010assignment1CC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[T0:%.*]] = metatype $@thick C.Type
+  // CHECK: [[CTOR:%.*]] = function_ref @_T010assignment1CC{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[C:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(method) (@thick C.Type) -> @owned C
+  // CHECK: [[SETTER:%.*]] = class_method [[BORROWED_D]] : $D,  #D.child!setter.1
   // CHECK: apply [[SETTER]]([[C]], [[BORROWED_D]])
   // CHECK: end_borrow [[BORROWED_D]] from [[D]]
   // CHECK: destroy_value [[D]]

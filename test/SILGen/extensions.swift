@@ -44,8 +44,8 @@ func extensionMethodCurrying(_ x: Foo) {
 
 // CHECK-LABEL: sil hidden [transparent] @_T010extensions3BoxV1txSgvpfi : $@convention(thin) <T> () -> @out Optional<T>
 // CHECK:      bb0(%0 : @trivial $*Optional<T>):
-// CHECK:      [[FN:%.*]] = function_ref @_T0SqxSgyt10nilLiteral_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Optional<T>.Type
+// CHECK:      [[FN:%.*]] = function_ref @_T0SqxSgyt10nilLiteral_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 // CHECK-NEXT: apply [[FN]]<T>(%0, [[METATYPE]]) : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()

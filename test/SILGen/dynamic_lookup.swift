@@ -27,8 +27,7 @@ func direct_to_class(_ obj: AnyObject) {
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[BORROWED_ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
-  // CHECK: [[BORROWED_OPENED_ARG_COPY:%.*]] = begin_borrow [[OPENED_ARG_COPY]]
-  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: destroy_value [[OPENED_ARG_COPY]]
   // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -43,8 +42,7 @@ func direct_to_protocol(_ obj: AnyObject) {
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[BORROWED_ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
-  // CHECK:   [[BORROWED_OPENED_ARG_COPY:%.*]] = begin_borrow [[OPENED_ARG_COPY]]
-  // CHECK:   [[METHOD:%[0-9]+]] = objc_method [[BORROWED_OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK:   [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   destroy_value [[OPENED_ARG_COPY]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]

@@ -17,11 +17,10 @@ class A {
 // CHECK:   [[PB:%.*]] = project_box [[UNINIT_SELF]]
 // CHECK:   store [[SELF_PARAM]] to [init] [[PB]] : $*A
 // CHECK:   [[SELFP:%[0-9]+]] = load [take] [[PB]] : $*A
-// CHECK:   [[BORROWED_SELFP:%.*]] = begin_borrow [[SELFP]]
-// CHECK:   [[INIT:%[0-9]+]] = class_method [[BORROWED_SELFP]] : $A, #A.init!initializer.1 : (A.Type) -> (X) -> A, $@convention(method) (X, @owned A) -> @owned A
-// CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_T020complete_object_init1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
 // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
+// CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_T020complete_object_init1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
 // CHECK:   [[X:%[0-9]+]] = apply [[X_INIT]]([[X_META]]) : $@convention(method) (@thin X.Type) -> X
+// CHECK:   [[INIT:%[0-9]+]] = class_method [[SELFP]] : $A, #A.init!initializer.1 : (A.Type) -> (X) -> A, $@convention(method) (X, @owned A) -> @owned A
 // CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT]]([[X]], [[SELFP]]) : $@convention(method) (X, @owned A) -> @owned A
 // CHECK:   store [[INIT_RESULT]] to [init] [[PB]] : $*A
 // CHECK:   [[RESULT:%[0-9]+]] = load [copy] [[PB]] : $*A
