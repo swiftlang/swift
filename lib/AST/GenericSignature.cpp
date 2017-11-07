@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
 #include <functional>
@@ -174,6 +175,18 @@ bool GenericSignature::isCanonical() const {
   return getCanonicalSignature() == this;
 }
 
+#ifndef NDEBUG
+/// Determine the canonical ordering of requirements.
+static unsigned getRequirementKindOrder(RequirementKind kind) {
+  switch (kind) {
+  case RequirementKind::Conformance: return 2;
+  case RequirementKind::Superclass: return 0;
+  case RequirementKind::SameType: return 3;
+  case RequirementKind::Layout: return 1;
+  }
+}
+#endif
+
 CanGenericSignature GenericSignature::getCanonical(
                                         ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements) {
@@ -197,8 +210,105 @@ CanGenericSignature GenericSignature::getCanonical(
           Requirement(reqt.getKind(), reqt.getFirstType()->getCanonicalType(),
                       reqt.getLayoutConstraint()));
   }
+
   auto canSig = get(canonicalParams, canonicalRequirements,
                     /*isKnownCanonical=*/true);
+
+#ifndef NDEBUG
+  PrettyStackTraceGenericSignature debugStack("canonicalizing", canSig);
+
+  // Check that the signature is canonical.
+  for (unsigned idx : indices(canonicalRequirements)) {
+    debugStack.setRequirement(idx);
+
+    const auto &reqt = canonicalRequirements[idx];
+
+    // Left-hand side must be canonical in its context.
+    // Check canonicalization of requirement itself.
+    switch (reqt.getKind()) {
+    case RequirementKind::Superclass:
+      assert(canSig->isCanonicalTypeInContext(reqt.getFirstType()) &&
+             "Left-hand side is not canonical");
+      assert(canSig->isCanonicalTypeInContext(reqt.getSecondType()) &&
+             "Superclass type isn't canonical in its own context");
+      break;
+
+    case RequirementKind::Layout:
+      assert(canSig->isCanonicalTypeInContext(reqt.getFirstType()) &&
+             "Left-hand side is not canonical");
+      break;
+
+    case RequirementKind::SameType:
+      assert(reqt.getFirstType()->isTypeParameter() &&
+             "Left-hand side must be a type parameter");
+      if (reqt.getSecondType()->isTypeParameter()) {
+        assert(compareDependentTypes(reqt.getFirstType(), reqt.getSecondType())
+                 < 0 &&
+               "Out-of-order type parameters in same-type constraint");
+      } else {
+        assert(canSig->isCanonicalTypeInContext(reqt.getSecondType()) &&
+               "Concrete same-type isn't canonical in its own context");
+      }
+      break;
+
+    case RequirementKind::Conformance:
+      assert(reqt.getFirstType()->isTypeParameter() &&
+             "Left-hand side must be a type parameter");
+      assert(isa<ProtocolType>(reqt.getSecondType().getPointer()) &&
+             "Right-hand side of conformance isn't a protocol type");
+      break;
+    }
+
+    // From here on, we're only interested in requirements beyond the first.
+    if (idx == 0) continue;
+
+    // Make sure that the left-hand sides are in nondecreasing order.
+    const auto &prevReqt = canonicalRequirements[idx-1];
+    int compareLHS =
+      compareDependentTypes(prevReqt.getFirstType(), reqt.getFirstType());
+    assert(compareLHS <= 0 && "Out-of-order left-hand sides");
+
+    // If we have two same-type requirements where the left-hand sides differ
+    // but fall into the same equivalence class, we can check the form.
+    if (compareLHS < 0 && reqt.getKind() == RequirementKind::SameType &&
+        prevReqt.getKind() == RequirementKind::SameType &&
+        canSig->areSameTypeParameterInContext(prevReqt.getFirstType(),
+                                              reqt.getFirstType())) {
+      // If it's a it's a type parameter, make sure the equivalence class is
+      // wired together sanely.
+      if (prevReqt.getSecondType()->isTypeParameter()) {
+        assert(prevReqt.getSecondType()->isEqual(reqt.getFirstType()) &&
+               "same-type constraints within an equiv. class are out-of-order");
+      } else {
+        // Otherwise, the concrete types must match up.
+        assert(prevReqt.getSecondType()->isEqual(reqt.getSecondType()) &&
+               "inconsistent concrete same-type constraints in equiv. class");
+      }
+    }
+
+    // From here on, we only care about cases where the previous and current
+    // requirements have the same left-hand side.
+    if (compareLHS != 0) continue;
+
+    // Check ordering of requirement kinds.
+    assert((getRequirementKindOrder(prevReqt.getKind()) <=
+            getRequirementKindOrder(reqt.getKind())) &&
+           "Requirements for a given kind are out-of-order");
+
+    // From here on, we only care about the same requirement kind.
+    if (prevReqt.getKind() != reqt.getKind()) continue;
+
+    assert(reqt.getKind() == RequirementKind::Conformance &&
+           "Only conformance requirements can have multiples");
+
+    auto prevProto =
+      prevReqt.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
+    assert(ProtocolType::compareProtocols(&prevProto, &proto) < 0 &&
+           "Out-of-order conformance requirements");
+  }
+#endif
+
   return CanGenericSignature(canSig);
 }
 
@@ -621,14 +731,12 @@ bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2) {
                              type1,
                              ArchetypeResolutionKind::CompleteWellFormed);
   assert(equivClass1 && "not a valid dependent type of this signature?");
-  assert(!equivClass1->concreteType);
 
   auto equivClass2 =
     builder.resolveEquivalenceClass(
                              type2,
                              ArchetypeResolutionKind::CompleteWellFormed);
   assert(equivClass2 && "not a valid dependent type of this signature?");
-  assert(!equivClass2->concreteType);
 
   return equivClass1 == equivClass2;
 }
