@@ -81,6 +81,8 @@ struct S : P {
 
   var x: V
   var y: W
+  var fn1: (Int!) -> Int // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  var fn2: (Int) -> Int! // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
 
   subscript (
     index: ImplicitlyUnwrappedOptional<Int> // expected-error {{the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use '!' after the type name}}{{12-40=}}{{43-43=!}}{{43-44=}}
@@ -138,18 +140,53 @@ let _: Generic<Int!, // expected-error {{implicitly unwrapped optionals are only
 func vararg(_ first: Int, more: Int!...) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
 }
 
+func varargIdentifier(_ first: Int, more: ImplicitlyUnwrappedOptional<Int>...) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+}
+
 func iuoInTuple() -> (Int!) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
   return 1
 }
 
-func iuoInTuple2() -> (Float, Int!) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+func iuoInTupleIdentifier() -> (ImplicitlyUnwrappedOptional<Int>) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
   return 1
+}
+
+func iuoInTuple2() -> (Float, Int!) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return (1.0, 1)
+}
+
+func iuoInTuple2Identifier() -> (Float, ImplicitlyUnwrappedOptional<Int>) { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return (1.0, 1)
 }
 
 func takesFunc(_ fn: (Int!) -> Int) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
   return fn(0)
 }
 
+func takesFuncIdentifier(_ fn: (ImplicitlyUnwrappedOptional<Int>) -> Int) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return fn(0)
+}
+
+func takesFunc2(_ fn: (Int) -> Int!) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return fn(0)
+}
+
+func takesFunc2Identifier(_ fn: (Int) -> ImplicitlyUnwrappedOptional<Int>) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return fn(0)
+}
+
 func returnsFunc() -> (Int!) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return { $0 }
+}
+
+func returnsFuncIdentifier() -> (ImplicitlyUnwrappedOptional<Int>) -> Int { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return { $0 }
+}
+
+func returnsFunc2() -> (Int) -> Int! { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
+  return { $0 }
+}
+
+func returnsFunc2Identifier() -> (Int) -> ImplicitlyUnwrappedOptional<Int> { // expected-error {{implicitly unwrapped optionals are only allowed at top level and as function results}}
   return { $0 }
 }
