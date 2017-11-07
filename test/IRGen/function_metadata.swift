@@ -31,15 +31,15 @@ func test_arch() {
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata3([[WORD]] 3, %swift.type* @_T0SfN, %swift.type* @_T0SfN, %swift.type* @_T0SiN, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_T0ytN, i32 0, i32 1))
   arch({(a: Float, b: Float, c: Int) -> () in })
 
-  // CHECK: getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 0
-  // CHECK: store %swift.type* @_T0SiN, %swift.type** [[T:%.*]], align [[ALIGN:(4|8)]]
-  // CHECK: getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 1
-  // CHECK: store %swift.type* @_T0SdN, %swift.type** [[T:%.*]], align [[ALIGN:(4|8)]]
-  // CHECK: getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 2
-  // CHECK: store %swift.type* @_T0SSN, %swift.type** [[T:%.*]], align [[ALIGN:(4|8)]]
-  // CHECK: getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 3
-  // CHECK: store %swift.type* @_T0s4Int8VN, %swift.type** [[T:%.*]], align [[ALIGN:(4|8)]]
-  // CHECK: [[T:%.*]] = getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 0
+  // CHECK: store %swift.type* @_T0SiN, %swift.type** [[T0:%.*]], align 8
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 1
+  // CHECK: store %swift.type* @_T0SdN, %swift.type** [[T0:%.*]], align 8
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 2
+  // CHECK: store %swift.type* @_T0SSN, %swift.type** [[T0:%.*]], align 8
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 3
+  // CHECK: store %swift.type* @_T0s4Int8VN, %swift.type** [[T0:%.*]], align 8
+  // CHECK: [[T0:%.*]] = getelementptr inbounds [4 x %swift.type*], [4 x %swift.type*]* %function-parameters, i32 0, i32 0
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata([[WORD]] 16777220, %swift.type** %7, i32* getelementptr inbounds ([4 x i32], [4 x i32]* @parameter-flags, i32 0, i32 0), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_T0ytN, i32 0, i32 1))
   arch({(x: inout Int, y: Double, z: String, w: Int8) -> () in })
 }
