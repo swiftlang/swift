@@ -2650,45 +2650,45 @@ swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]);
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
-                               const Metadata *arg0,
+                               const void *arg0,
                                const Metadata *resultMetadata);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
+                                        const void *arg0,
                                         const uint32_t *paramFlags,
                                         const Metadata *resultMetadata);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
-                               const Metadata *arg0,
-                               const Metadata *arg1,
+                               const void *arg0,
+                               const void *arg1,
                                const Metadata *resultMetadata);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
-                                        const Metadata *arg0,
-                                        const Metadata *arg1,
+                                        const void *arg0,
+                                        const void *arg1,
                                         const uint32_t *paramFlags,
                                         const Metadata *resultMetadata);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
                                                 FunctionTypeFlags flags,
-                                                const Metadata *arg0,
-                                                const Metadata *arg1,
-                                                const Metadata *arg2,
+                                                const void *arg0,
+                                                const void *arg1,
+                                                const void *arg2,
                                                 const Metadata *resultMetadata);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *swift_getFunctionTypeMetadata3WithFlags(
                                                 FunctionTypeFlags flags,
-                                                const Metadata *arg0,
-                                                const Metadata *arg1,
-                                                const Metadata *arg2,
+                                                const void *arg0,
+                                                const void *arg1,
+                                                const void *arg2,
                                                 const uint32_t *paramFlags,
                                                 const Metadata *resultMetadata);
 
