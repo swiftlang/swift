@@ -205,15 +205,15 @@ reflect(object: obj)
 // CHECK-32: (class reflect_multiple_types.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32-NEXT: (class_instance size=129 alignment=8 stride=136 num_extra_inhabitants=0
-// CHECK-32-NEXT:   (field name=t00 offset=12
+// CHECK-32-NEXT: (class_instance size=121 alignment=8 stride=128 num_extra_inhabitants=0
+// CHECK-32-NEXT:   (field name=t00 offset=8
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // (unstable implementation details omitted)
-// CHECK-32:   (field name=t01 offset=16
+// CHECK-32:   (field name=t01 offset=12
 // CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254))))
-// CHECK-32-NEXT:   (field name=t02 offset=24
+// CHECK-32-NEXT:   (field name=t02 offset=16
 // CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_representation offset=0
 // CHECK-32-NEXT:         (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
@@ -223,68 +223,68 @@ reflect(object: obj)
 // CHECK-32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096
 // CHECK-32-NEXT:               (field name=_nativeBuffer offset=0
 // CHECK-32-NEXT:                 (reference kind=strong refcounting=native))))))
-// CHECK-32-NEXT:   (field name=t03 offset=32
+// CHECK-32-NEXT:   (field name=t03 offset=24
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // (unstable implementation details omitted)
-// CHECK-32:   (field name=t04 offset=40
+// CHECK-32:   (field name=t04 offset=32
 // CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t05 offset=48
+// CHECK-32-NEXT:   (field name=t05 offset=40
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t06 offset=52
+// CHECK-32-NEXT:   (field name=t06 offset=44
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t07 offset=56
+// CHECK-32-NEXT:   (field name=t07 offset=48
 // CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t08 offset=60
+// CHECK-32-NEXT:   (field name=t08 offset=52
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t09 offset=64
+// CHECK-32-NEXT:   (field name=t09 offset=56
 // CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t10 offset=72
+// CHECK-32-NEXT:   (field name=t10 offset=64
 // CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t11 offset=76
+// CHECK-32-NEXT:   (field name=t11 offset=68
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-32-NEXT:   (field name=t12 offset=80
+// CHECK-32-NEXT:   (field name=t12 offset=72
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-32-NEXT:   (field name=t13 offset=84
+// CHECK-32-NEXT:   (field name=t13 offset=76
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-32-NEXT:   (field name=t14 offset=88
+// CHECK-32-NEXT:   (field name=t14 offset=80
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
-// CHECK-32-NEXT:   (field name=t15 offset=92
+// CHECK-32-NEXT:   (field name=t15 offset=84
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // (unstable implementation details omitted)
-// CHECK-32:   (field name=t16 offset=96
+// CHECK-32:   (field name=t16 offset=88
 // CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=0
 // (unstable implementation details omitted)
-// CHECK-32:   (field name=t17 offset=108
+// CHECK-32:   (field name=t17 offset=100
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t18 offset=112
+// CHECK-32-NEXT:   (field name=t18 offset=104
 // CHECK-32-NEXT:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t19 offset=116
+// CHECK-32-NEXT:   (field name=t19 offset=108
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t20 offset=120
+// CHECK-32-NEXT:   (field name=t20 offset=112
 // CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))
-// CHECK-32-NEXT:   (field name=t21 offset=128
+// CHECK-32-NEXT:   (field name=t21 offset=120
 // CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0)))))
