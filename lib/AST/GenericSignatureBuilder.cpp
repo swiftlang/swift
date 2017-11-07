@@ -2954,36 +2954,30 @@ LazyResolver *GenericSignatureBuilder::getLazyResolver() const {
 
 /// Resolve any unresolved dependent member types using the given builder.
 static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
-                                        Type type,
-                                        ArchetypeResolutionKind kind) {
+                                        Type type) {
   if (!type->hasTypeParameter()) return type;
 
-  return type.transformRec([&builder,kind](TypeBase *type) -> Optional<Type> {
-    if (auto depTy = dyn_cast<DependentMemberType>(type)) {
-      if (depTy->getAssocType()) return None;
+  return type.transformRec([&builder](TypeBase *type) -> Optional<Type> {
+    if (!type->isTypeParameter())
+      return None;
 
-      Type newBase =
-        resolveDependentMemberTypes(builder, depTy->getBase(), kind);
-      if (newBase->is<ErrorType>())
-        return ErrorType::get(depTy);
+    // Map the type parameter to an equivalence class.
+    auto equivClass =
+      builder.resolveEquivalenceClass(Type(type),
+                                      ArchetypeResolutionKind::WellFormed);
+    if (!equivClass)
+      return ErrorType::get(Type(type));
 
-      auto parentEquivClass = builder.resolveEquivalenceClass(newBase, kind);
-      if (!parentEquivClass)
-        return ErrorType::get(depTy);
+    // If there is a concrete type in this equivalence class, use that.
+    if (equivClass->concreteType) {
+      // .. unless it's recursive.
+      if (equivClass->recursiveConcreteType)
+        return ErrorType::get(Type(type));
 
-      auto memberType =
-        parentEquivClass->lookupNestedType(builder, depTy->getName());
-      if (!memberType)
-        return ErrorType::get(depTy);
-
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(memberType))
-        return Type(DependentMemberType::get(newBase, assocType));
-
-      // FIXME: Need to substitute here.
-      return Type(type);
+      return resolveDependentMemberTypes(builder, equivClass->concreteType);
     }
 
-    return None;
+    return equivClass->getAnchor(builder, builder.getGenericParams());
   });
 }
 
@@ -3094,9 +3088,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
   // FIXME: Generic typealiases contradict the assumption above.
   // If there is a type parameter somewhere in this type, resolve it.
   if (type->hasTypeParameter()) {
-    Type resolved =
-    resolveDependentMemberTypes(*this, type,
-                                ArchetypeResolutionKind::WellFormed);
+    Type resolved = resolveDependentMemberTypes(*this, type);
     if (resolved->hasError() && !type->hasError())
       return ResolvedType::forUnresolved(nullptr);
 
@@ -5951,10 +5943,9 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
 
-  // Resolve any this-far-unresolved dependent types.
+  // Resolve any thus-far-unresolved dependent types.
   equivClass->concreteType =
-    resolveDependentMemberTypes(*this, equivClass->concreteType,
-                                ArchetypeResolutionKind::CompleteWellFormed);
+    resolveDependentMemberTypes(*this, equivClass->concreteType);
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
@@ -5996,8 +5987,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
   // Resolve any this-far-unresolved dependent types.
   equivClass->superclass =
-    resolveDependentMemberTypes(*this, equivClass->superclass,
-                                ArchetypeResolutionKind::CompleteWellFormed);
+    resolveDependentMemberTypes(*this, equivClass->superclass);
 
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.

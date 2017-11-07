@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
@@ -213,4 +214,13 @@ void swift::printSourceLocDescription(llvm::raw_ostream &out,
 void PrettyStackTraceLocation::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " starting at ";
   printSourceLocDescription(out, Loc, Context);
+}
+
+void PrettyStackTraceGenericSignature::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " generic signature ";
+  GenericSig->print(out);
+  if (Requirement) {
+    out << " in requirement #" << *Requirement;
+  }
+  out << '\n';
 }
