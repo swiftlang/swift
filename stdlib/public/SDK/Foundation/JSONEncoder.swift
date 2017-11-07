@@ -866,7 +866,7 @@ open class JSONDecoder {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given data was not valid JSON.", underlyingError: error))
         }
         
-        return try _decode(type, topLevel: topLevel)
+        return try _decode(topLevel: topLevel)
     }
     
     /// Decodes a top-level value of the given type from the given Foundation object.
@@ -881,10 +881,10 @@ open class JSONDecoder {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given object is not valid JSON.", underlyingError: nil))
         }
         
-        return try _decode(type, topLevel: obj)
+        return try _decode(topLevel: obj)
     }
     
-    private func _decode<T : Decodable>(_ type: T.Type, topLevel: Any) throws -> T
+    private func _decode<T : Decodable>(topLevel: Any) throws -> T
     {
         let decoder = _JSONDecoder(referencing: topLevel, options: self.options)
         guard let value = try decoder.unbox(topLevel, as: T.self) else {
