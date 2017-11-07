@@ -1,0 +1,11 @@
+// RUN: %target-swift-frontend %s -emit-sil -verify
+
+sil_stage raw
+
+import Swift
+
+sil @tuple_yield : $@yield_once () -> (@yields Int, @yields Float) {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

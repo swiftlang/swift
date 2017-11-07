@@ -79,8 +79,10 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   }
 
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
+                                            FTI->getCoroutineKind(),
                                             calleeConvention,
                                             newParams,
+                                            FTI->getYields(),
                                             results,
                                             FTI->getOptionalErrorResult(),
                                             M.getASTContext());

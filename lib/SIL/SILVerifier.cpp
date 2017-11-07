@@ -941,6 +941,9 @@ public:
               "apply instruction cannot call function with error result");
     }
 
+    require(!calleeConv.funcTy->isCoroutine(),
+            "cannot call coroutine with normal apply");
+
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
     if (AI->getModule().getStage() == SILStage::Raw ||
@@ -954,6 +957,9 @@ public:
     checkFullApplySite(AI);
 
     SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+
+    require(!calleeConv.funcTy->isCoroutine(),
+            "cannot call coroutine with normal apply");
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
@@ -2164,6 +2170,8 @@ public:
     auto constantInfo = F.getModule().Types.getConstantInfo(method);
     auto methodTy = constantInfo.SILFnType;
 
+    assert(!methodTy->isCoroutine());
+
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
       auto subs = env->getForwardingSubstitutions();
@@ -2196,8 +2204,10 @@ public:
 
     auto fnTy = SILFunctionType::get(nullptr,
                                      methodTy->getExtInfo(),
+                                     methodTy->getCoroutineKind(),
                                      methodTy->getCalleeConvention(),
                                      dynParams,
+                                     methodTy->getYields(),
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
                                      F.getASTContext());

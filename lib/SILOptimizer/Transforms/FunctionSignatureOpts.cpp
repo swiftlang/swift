@@ -577,6 +577,12 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
     InterfaceResults.push_back(InterfaceResult);
   }
 
+  llvm::SmallVector<SILYieldInfo, 8> InterfaceYields;
+  for (SILYieldInfo InterfaceYield : FTy->getYields()) {
+    // For now, don't touch the yield types.
+    InterfaceYields.push_back(InterfaceYield);
+  }
+
   bool UsesGenerics = false;
   if (HasGenericSignature) {
     // Not all of the generic type parameters are used by the function
@@ -630,9 +636,9 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
       UsesGenerics ? FTy->getGenericSignature() : nullptr;
 
   return SILFunctionType::get(
-      GenericSig, ExtInfo, FTy->getCalleeConvention(), InterfaceParams,
-      InterfaceResults, InterfaceErrorResult, F->getModule().getASTContext(),
-      witnessMethodConformance);
+      GenericSig, ExtInfo, FTy->getCoroutineKind(), FTy->getCalleeConvention(),
+      InterfaceParams, InterfaceYields, InterfaceResults, InterfaceErrorResult,
+      F->getModule().getASTContext(), witnessMethodConformance);
 }
 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
