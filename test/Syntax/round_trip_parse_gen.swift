@@ -18,6 +18,7 @@ class C {
     bar1(-1.1)
     bar1(1.1)
     var f = /*comments*/+0.1/*comments*/
+    foo()
   }
 
   func foo1() {
