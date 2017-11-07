@@ -48,7 +48,7 @@ public protocol StringProtocol
   /// encoding.
   ///
   /// - Parameters:
-  ///   - codeUnits: A collection of code units encoded in the ecoding
+  ///   - codeUnits: A collection of code units encoded in the encoding
   ///     specified in `sourceEncoding`.
   ///   - sourceEncoding: The encoding in which `codeUnits` should be
   ///     interpreted.
@@ -280,7 +280,7 @@ extension String {
   /// encoding.
   ///
   /// - Parameters:
-  ///   - codeUnits: A collection of code units encoded in the ecoding
+  ///   - codeUnits: A collection of code units encoded in the encoding
   ///     specified in `sourceEncoding`.
   ///   - sourceEncoding: The encoding in which `codeUnits` should be
   ///     interpreted.
@@ -673,6 +673,12 @@ extension String {
 @_fixed_layout
 public struct String {
   /// Creates an empty string.
+  ///
+  /// Using this initializer is equivalent to initializing a string with an
+  /// empty string literal.
+  ///
+  ///     let empty = ""
+  ///     let alsoEmpty = String()
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
     _core = _StringCore()
