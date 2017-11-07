@@ -1499,6 +1499,27 @@ bool TypeChecker::isInsideUnavailableDeclaration(
                                   IsUnavailable);
 }
 
+bool TypeChecker::isInsideCompatibleUnavailableDeclaration(
+    SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+    const AvailableAttr *attr) {
+  if (!attr->isUnconditionallyUnavailable()) {
+    return false;
+  }
+  PlatformKind platform = attr->Platform;
+  if (platform == PlatformKind::none) {
+    return false;
+  }
+
+  auto IsUnavailable = [platform](const Decl *D) {
+    auto EnclosingUnavailable =
+        D->getAttrs().getUnavailable(D->getASTContext());
+    return EnclosingUnavailable && EnclosingUnavailable->Platform == platform;
+  };
+
+  return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, *this,
+                                  IsUnavailable);
+}
+
 bool TypeChecker::isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
                                                 const DeclContext *ReferenceDC){
   auto IsDeprecated = [](const Decl *D) {
@@ -2090,6 +2111,14 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   // first place. rdar://problem/20491640
   if (R.isInvalid() && isInsideImplicitFunction(R, DC) &&
       isInsideUnavailableDeclaration(R, DC)) {
+    return false;
+  }
+
+  // Calling unavailable code from within code with the same
+  // unavailability is OK -- the eventual caller can't call the
+  // enclosing code in the same situations it wouldn't be able to
+  // call this code.
+  if (isInsideCompatibleUnavailableDeclaration(R, DC, Attr)) {
     return false;
   }
 
