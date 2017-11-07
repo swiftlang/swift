@@ -147,45 +147,50 @@ public:
   }
 };
 
+static void addNodeToResults(std::vector<RawSyntaxInfo> &Results,
+                             std::vector<RawSyntaxInfo> &ImplicitNodes,
+                             RawSyntaxInfo Info) {
+  // Add implicit nodes before adding the explicit nodes they attach to.
+  assert(!Info.isImplicit());
+  auto StartSize = Results.size();
+
+  // Find all implicit nodes where the attach-to location is the start position
+  // of this non-implicit nodes.
+  Results.insert(Results.end(),
+                 std::find_if(ImplicitNodes.begin(), ImplicitNodes.end(),
+                   [&](const RawSyntaxInfo &Imp) {
+                     return Imp.BeforeLoc == Info.getStartLoc();
+                   }),
+                 ImplicitNodes.end());
+
+  // If any implicit nodes are inserted to results, we should clear the buffer
+  // to avoid re-inserting them.
+  if (StartSize != Results.size()) {
+    ImplicitNodes.clear();
+  }
+
+  // Add the non-implicit node.
+  Results.emplace_back(Info);
+}
+
 std::vector<RawSyntaxInfo>
 SyntaxParsingContext::ContextInfo::collectAllSyntax(SourceLoc EndLoc) {
   std::vector<RawSyntaxInfo> Results;
   std::vector<RawSyntaxInfo> ImplicitNodes;
-
-  // Add implicit nodes before adding the explicit nodes they attach to.
-  auto addImplicit = [&](const RawSyntaxInfo &Info) {
-    assert(!Info.isImplicit());
-    auto StartSize = Results.size();
-
-    // Find all implicit nodes where the attach-to location is the start position
-    // of this non-implicit nodes.
-    Results.insert(Results.end(),
-                   std::find_if(ImplicitNodes.begin(), ImplicitNodes.end(),
-      [&](const RawSyntaxInfo &Imp) { return Imp.BeforeLoc == Info.getStartLoc(); }),
-                   ImplicitNodes.end());
-
-    // If any implicit nodes are inserted to results, we should clear the buffer
-    // to avoid re-inserting them.
-    if (StartSize != Results.size()) {
-      ImplicitNodes.clear();
-    }
-  };
   auto CurSyntax = PendingSyntax.begin();
   for (auto It = Tokens.begin(); It->getStartLoc() != EndLoc;) {
     auto Tok = *It;
     if (CurSyntax == PendingSyntax.end()) {
-      addImplicit(Tok);
       // If no remaining syntax nodes, add the token.
-      Results.emplace_back(Tok);
+      addNodeToResults(Results, ImplicitNodes, Tok);
       It ++;
     } else if (CurSyntax->isImplicit()) {
       ImplicitNodes.emplace_back(*CurSyntax);
       // Skip implicit syntax node.
       CurSyntax ++;
     } else if (CurSyntax->getStartLoc() == Tok.getStartLoc()) {
-      addImplicit(*CurSyntax);
       // Prefer syntax nodes to tokens.
-      Results.emplace_back(*CurSyntax);
+      addNodeToResults(Results, ImplicitNodes, *CurSyntax);
       while(It->getEndLoc() != CurSyntax->getEndLoc()) It++;
       assert(It < Tokens.end() && It->getEndLoc() == CurSyntax->getEndLoc());
       It ++;
@@ -195,8 +200,7 @@ SyntaxParsingContext::ContextInfo::collectAllSyntax(SourceLoc EndLoc) {
       // started.
       assert(Tok.getStartLoc().getOpaquePointerValue() <
              CurSyntax->getStartLoc().getOpaquePointerValue());
-      addImplicit(Tok);
-      Results.push_back(Tok);
+      addNodeToResults(Results, ImplicitNodes, Tok);
       It ++;
     }
   }
