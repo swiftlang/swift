@@ -551,10 +551,10 @@ template <typename int_type>
 class TargetFunctionTypeFlags {
   enum : int_type {
     NumArgumentsMask = 0x00FFFFFFU,
-    ConventionMask   = 0x0F000000U,
-    ConventionShift  = 25U,
-    ThrowsMask       = 0x10000000U,
-    ParamFlagsMask   = 0x01000000U,
+    ConventionMask = 0x0F000000U,
+    ConventionShift = 24U,
+    ThrowsMask = 0x10000000U,
+    ParamFlagsMask = 0x01000000U,
   };
   int_type Data;
   
@@ -614,56 +614,6 @@ public:
   }
 };
 using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
-
-template <typename int_type>
-class TargetParameterTypeFlags {
-  enum : int_type {
-    InOutMask    = 1 << 0,
-    SharedMask   = 1 << 1,
-    VariadicMask = 1 << 2,
-  };
-  int_type Data;
-
-  constexpr TargetParameterTypeFlags(int_type Data) : Data(Data) {}
-
-public:
-  constexpr TargetParameterTypeFlags() : Data(0) {}
-
-  constexpr TargetParameterTypeFlags<int_type> withInOut(bool isInOut) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~InOutMask) |
-                                              (isInOut ? InOutMask : 0));
-  }
-
-  constexpr TargetParameterTypeFlags<int_type> withShared(bool isShared) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~SharedMask) |
-                                              (isShared ? SharedMask : 0));
-  }
-
-  constexpr TargetParameterTypeFlags<int_type>
-  withVariadic(bool isVariadic) const {
-    return TargetParameterTypeFlags<int_type>((Data & ~VariadicMask) |
-                                              (isVariadic ? VariadicMask : 0));
-  }
-
-  bool isNone() const { return Data == 0; }
-  bool isInOut() const { return Data & InOutMask; }
-  bool isShared() const { return Data & SharedMask; }
-  bool isVariadic() const { return Data & VariadicMask; }
-
-  int_type getIntValue() const { return Data; }
-
-  static TargetParameterTypeFlags<int_type> fromIntValue(int_type Data) {
-    return TargetParameterTypeFlags(Data);
-  }
-
-  bool operator==(TargetParameterTypeFlags<int_type> other) const {
-    return Data == other.Data;
-  }
-  bool operator!=(TargetParameterTypeFlags<int_type> other) const {
-    return Data != other.Data;
-  }
-};
-using ParameterFlags = TargetParameterTypeFlags<uint32_t>;
 
 /// Field types and flags as represented in a nominal type's field/case type
 /// vector.
