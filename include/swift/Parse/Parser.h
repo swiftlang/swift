@@ -58,6 +58,7 @@ namespace swift {
     class SyntaxParsingContext;
     struct RawSyntaxInfo;
     struct RawTokenSyntax;
+    enum class SyntaxKind;
   }// end of syntax namespace
 
   /// Different contexts in which BraceItemList are parsed.
@@ -416,12 +417,7 @@ public:
     BacktrackingScope(Parser &P)
       : P(P), PP(P.getParserPosition()), DT(P.Diags) {}
 
-    ~BacktrackingScope() {
-      if (Backtrack) {
-        P.backtrackToPosition(PP);
-        DT.abort();
-      }
-    }
+    ~BacktrackingScope();
 
     void cancelBacktrack() {
       Backtrack = false;
@@ -674,6 +670,7 @@ public:
   /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
+                         syntax::SyntaxKind Kind,
                          std::function<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
@@ -1247,7 +1244,8 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
+                                   syntax::SyntaxKind Kind);
 
   /// Parse an expression list, keeping all of the pieces separated.
   ParserStatus parseExprList(tok leftTok, tok rightTok,
@@ -1258,7 +1256,8 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             Expr *&trailingClosure);
+                             Expr *&trailingClosure,
+                             syntax::SyntaxKind Kind);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 

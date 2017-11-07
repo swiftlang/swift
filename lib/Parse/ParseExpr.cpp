@@ -473,7 +473,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     Tok.setKind(tok::oper_prefix);
     LLVM_FALLTHROUGH;
   case tok::oper_prefix:
-    SyntaxContext->addTokenSyntax(Tok.getLoc());
     Operator = parseExprOperator();
     break;
   case tok::oper_binary_spaced:
@@ -867,7 +866,8 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                         lSquareLoc, indexArgs, indexArgLabels,
                                         indexArgLabelLocs,
                                         rSquareLoc,
-                                        trailingClosure);
+                                        trailingClosure,
+                                        SyntaxKind::Unknown);
     if (status.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (status.isError())
@@ -1216,7 +1216,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       ParserStatus status = parseExprList(
           tok::l_square, tok::r_square,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
-          indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure);
+          indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure,
+          SyntaxKind::Unknown);
       if (status.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
       if (status.isError() || Result.isNull())
@@ -1389,8 +1390,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
-    SyntaxContext->addTokenSyntax(Loc);
-    SyntaxContext->makeNode(SyntaxKind::IntegerLiteralExpr);
+    SyntaxContext->makeNode(SyntaxKind::IntegerLiteralExpr, Loc);
     Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;
@@ -1398,8 +1398,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
-    SyntaxContext->addTokenSyntax(Loc);
-    SyntaxContext->makeNode(SyntaxKind::FloatLiteralExpr);
+    SyntaxContext->makeNode(SyntaxKind::FloatLiteralExpr, Loc);
     Result = makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;
@@ -1608,7 +1607,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                           lParenLoc, args, argLabels,
                                           argLabelLocs,
                                           rParenLoc,
-                                          trailingClosure);
+                                          trailingClosure,
+                                          SyntaxKind::FunctionCallArgumentList);
       if (status.isError())
         return nullptr;
 
@@ -1657,7 +1657,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::l_paren:
-    Result = parseExprList(tok::l_paren, tok::r_paren);
+    Result = parseExprList(tok::l_paren, tok::r_paren,
+                           SyntaxKind::FunctionCallArgumentList);
     break;
 
   case tok::l_square:
@@ -1805,8 +1806,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   Token EntireTok = Tok;
 
   // Create a syntax node for string literal.
-  SyntaxContext->addTokenSyntax(Tok.getLoc());
-  SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr);
+  SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr, Tok.getLoc());
   SyntaxParsingContextChild LocalContext(SyntaxContext,
                                          SyntaxContextKind::Expr);
 
@@ -1883,7 +1883,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       assert(Tok.is(tok::l_paren));
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::string_interpolation_anchor);
-      ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
+      ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren,
+                                           SyntaxKind::Unknown);
       Status |= E;
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
@@ -1995,6 +1996,11 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   SourceLoc lparenLoc = consumeToken(tok::l_paren);
   SourceLoc rparenLoc;
   while (true) {
+    SyntaxParsingContextChild DisabledContext(SyntaxContext,
+                                              SyntaxContextKind::Expr);
+    // The following code may backtrack; so we disable the syntax tree creation
+    // in this scope.
+    DisabledContext.disable();
     // Terminate at ')'.
     if (Tok.is(tok::r_paren)) {
       rparenLoc = consumeToken(tok::r_paren);
@@ -2752,7 +2758,8 @@ Expr *Parser::parseExprAnonClosureArg() {
 ///   expr-paren-element:
 ///     (identifier ':')? expr
 ///
-ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
+ParserResult<Expr>
+Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
   SmallVector<Expr*, 8> subExprs;
   SmallVector<Identifier, 8> subExprNames;
   SmallVector<SourceLoc, 8> subExprNameLocs;
@@ -2766,7 +2773,8 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
                                       subExprNames,
                                       subExprNameLocs,
                                       rightLoc,
-                                      trailingClosure);
+                                      trailingClosure,
+                                      Kind);
 
   // A tuple with a single, unlabeled element is just parentheses.
   if (subExprs.size() == 1 &&
@@ -2801,7 +2809,8 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    SmallVectorImpl<Identifier> &exprLabels,
                                    SmallVectorImpl<SourceLoc> &exprLabelLocs,
                                    SourceLoc &rightLoc,
-                                   Expr *&trailingClosure) {
+                                   Expr *&trailingClosure,
+                                   SyntaxKind Kind) {
   trailingClosure = nullptr;
 
   StructureMarkerRAII ParsingExprList(*this, Tok);
@@ -2812,6 +2821,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                   rightTok == tok::r_paren
                                     ? diag::expected_rparen_expr_list
                                     : diag::expected_rsquare_expr_list,
+                                  Kind,
                                   [&] () -> ParserStatus {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
@@ -2823,6 +2833,8 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     ParserStatus Status;
     Expr *SubExpr = nullptr;
     if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
+      SyntaxParsingContextChild operatorContext(SyntaxContext,
+                                                SyntaxContextKind::Expr);
       SourceLoc Loc;
       Identifier OperName;
       if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
@@ -2963,7 +2975,8 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingClosure);
+                                      trailingClosure,
+                                      SyntaxKind::FunctionCallArgumentList);
   if (status.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (status.isError())
@@ -3055,7 +3068,8 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingClosure);
+                                      trailingClosure,
+                                      SyntaxKind::FunctionCallArgumentList);
 
   // Form the call.
   auto Result = makeParserResult(status | fn, 
@@ -3151,6 +3165,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
+                      SyntaxKind::Unknown,
                       [&] () -> ParserStatus
   {
     ParserResult<Expr> Element
@@ -3199,7 +3214,9 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   Status |=
       parseList(tok::r_square, LSquareLoc, RSquareLoc,
                 /*AllowSepAfterLast=*/true,
-                diag::expected_rsquare_array_expr, [&]() -> ParserStatus {
+                diag::expected_rsquare_array_expr,
+                SyntaxKind::Unknown,
+                [&]() -> ParserStatus {
     // Parse the next key.
     ParserResult<Expr> Key;
     if (FirstPair) {

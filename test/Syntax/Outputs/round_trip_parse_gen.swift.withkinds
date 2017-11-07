@@ -6,14 +6,26 @@
 class C {<UnknownDecl>
   func bar(_ a: Int) <CodeBlock>{}</CodeBlock></UnknownDecl><UnknownDecl>
   func bar1(_ a: Float) -> Float <CodeBlock>{ <UnknownStmt>return <UnknownExpr><FloatLiteralExpr>-0.6 </FloatLiteralExpr>+ <FloatLiteralExpr>0.1 </FloatLiteralExpr>- <FloatLiteralExpr>0.3 </FloatLiteralExpr></UnknownExpr></UnknownStmt>}</CodeBlock></UnknownDecl><UnknownDecl>
+  func bar2(a: Int, b: Int, c:Int) -> Int <CodeBlock>{ <UnknownStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></UnknownStmt>}</CodeBlock></UnknownDecl><UnknownDecl>
+  func bar3(a: Int) -> Int <CodeBlock>{ <UnknownStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></UnknownStmt>}</CodeBlock></UnknownDecl><UnknownDecl>
+  func bar4(_ a: Int) -> Int <CodeBlock>{ <UnknownStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></UnknownStmt>}</CodeBlock></UnknownDecl><UnknownDecl>
   func foo() <CodeBlock>{<UnknownDecl>
     var a = /*comment*/<StringLiteralExpr>"abc"/*comment*/</StringLiteralExpr></UnknownDecl><UnknownDecl>
     var b = /*comment*/<IntegerLiteralExpr>+2/*comment*/</IntegerLiteralExpr></UnknownDecl><UnknownExpr>
-    bar(<IntegerLiteralExpr>1</IntegerLiteralExpr>)</UnknownExpr><UnknownExpr>
-    bar(<IntegerLiteralExpr>+10</IntegerLiteralExpr>)</UnknownExpr><UnknownExpr>
-    bar(<IntegerLiteralExpr>-10</IntegerLiteralExpr>)</UnknownExpr><UnknownExpr>
-    bar1(<FloatLiteralExpr>-1.1</FloatLiteralExpr>)</UnknownExpr><UnknownExpr>
-    bar1(<FloatLiteralExpr>1.1</FloatLiteralExpr>)</UnknownExpr><UnknownDecl>
-    var f = /*comments*/<FloatLiteralExpr>+0.1/*comments*/</FloatLiteralExpr></UnknownDecl>
+    bar(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    bar(<FunctionCallArgument><IntegerLiteralExpr>+10</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    bar(<FunctionCallArgument><IntegerLiteralExpr>-10</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    bar1(<FunctionCallArgument><FloatLiteralExpr>-1.1</FloatLiteralExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    bar1(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)</UnknownExpr><UnknownDecl>
+    var f = /*comments*/<FloatLiteralExpr>+0.1/*comments*/</FloatLiteralExpr></UnknownDecl><UnknownExpr>
+    foo()</UnknownExpr>
+  }</CodeBlock></UnknownDecl><UnknownDecl>
+
+  func foo1() <CodeBlock>{<UnknownExpr>
+    _ = bar2(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>b:<IntegerLiteralExpr>2</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>c:<IntegerLiteralExpr>2</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    _ = bar2(<FunctionCallArgument>a:<UnknownExpr><IntegerLiteralExpr>1 </IntegerLiteralExpr>+ <IntegerLiteralExpr>1</IntegerLiteralExpr></UnknownExpr>, </FunctionCallArgument><FunctionCallArgument>b:<UnknownExpr><IntegerLiteralExpr>2 </IntegerLiteralExpr>* <IntegerLiteralExpr>2 </IntegerLiteralExpr>+ <IntegerLiteralExpr>2</IntegerLiteralExpr></UnknownExpr>, </FunctionCallArgument><FunctionCallArgument>c:<UnknownExpr><IntegerLiteralExpr>2 </IntegerLiteralExpr>+ <IntegerLiteralExpr>2</IntegerLiteralExpr></UnknownExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    _ = bar2(<FunctionCallArgument>a : <UnknownExpr>bar2(<FunctionCallArgument>a: <IntegerLiteralExpr>1</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>b: <IntegerLiteralExpr>2</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>c: <IntegerLiteralExpr>3</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr>, </FunctionCallArgument><FunctionCallArgument>b: <IntegerLiteralExpr>2</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>c: <IntegerLiteralExpr>3</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    _ = bar3(<FunctionCallArgument>a : <UnknownExpr>bar3(<FunctionCallArgument>a: <UnknownExpr>bar3(<FunctionCallArgument>a: <IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr></FunctionCallArgument>)</UnknownExpr></FunctionCallArgument>)</UnknownExpr><UnknownExpr>
+    _ = bar4(<FunctionCallArgument><UnknownExpr>bar4(<FunctionCallArgument><UnknownExpr>bar4(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</UnknownExpr></FunctionCallArgument>)</UnknownExpr></FunctionCallArgument>)</UnknownExpr>
   }</CodeBlock></UnknownDecl>
 }</UnknownDecl>

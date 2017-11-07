@@ -37,6 +37,12 @@ struct RawSyntaxInfo {
   /// Start and end location of this syntax node.
   SourceRange SyntaxRange;
 
+  /// This location must be valid if this node is an implicit node, e.g.
+  /// an empty statement list collection.
+  /// This location indicates the implicit node should appear before the token
+  /// on the location.
+  SourceLoc BeforeLoc;
+
   /// The raw node.
   RC<RawSyntax> RawNode;
   RawSyntaxInfo(RC<RawSyntax> RawNode): RawNode(RawNode) {}
@@ -57,6 +63,10 @@ struct RawSyntaxInfo {
     return RC<RawSyntaxNode>(cast<RawSyntaxNode>(RawNode));
   }
   void brigeWithContext(SyntaxContextKind Kind);
+  void setBeforeLoc(SourceLoc Loc) {
+    assert(isImplicit());
+    BeforeLoc = Loc;
+  }
 };
 
 enum class SyntaxParsingContextKind: uint8_t {
@@ -75,16 +85,11 @@ public:
   ContextInfo &ContextData;
   const Token &Tok;
 
-  // Add a token syntax at the given source location to the context; this
-  // token node can be used to build more complex syntax nodes in later call
-  // back.
-  virtual void addTokenSyntax(SourceLoc Loc) = 0;
-
   // Get the context kind.
   virtual SyntaxParsingContextKind getKind() = 0;
 
   // Create a syntax node of the given kind.
-  virtual void makeNode(SyntaxKind Kind) = 0;
+  virtual void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) = 0;
   virtual ~SyntaxParsingContext();
 
   // Disable the building of syntax tree in the current context.
@@ -100,8 +105,7 @@ public:
   SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID, Token &Tok):
     SyntaxParsingContext(File, BufferID, Tok), File(File) {}
   ~SyntaxParsingContextRoot();
-  void addTokenSyntax(SourceLoc Loc) override {};
-  void makeNode(SyntaxKind Kind) override {};
+  void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override {};
   SyntaxParsingContextKind getKind() override {
     return SyntaxParsingContextKind::Root;
   };
@@ -130,8 +134,7 @@ public:
                              None, KnownSyntax) {};
 
   ~SyntaxParsingContextChild();
-  void makeNode(SyntaxKind Kind) override;
-  void addTokenSyntax(SourceLoc Loc) override;
+  void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override;
   SyntaxParsingContext* getParent() { return Parent; }
   SyntaxParsingContextRoot &getRoot();
   SyntaxParsingContextKind getKind() override {

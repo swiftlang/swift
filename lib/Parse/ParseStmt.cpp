@@ -592,17 +592,14 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   }
   SyntaxParsingContextChild LocalContext(SyntaxContext, SyntaxKind::CodeBlock);
   SourceLoc LBLoc = consumeToken(tok::l_brace);
-  LocalContext.addTokenSyntax(LBLoc);
 
   SmallVector<ASTNode, 16> Entries;
   SourceLoc RBLoc;
 
   ParserStatus Status = parseBraceItems(Entries, BraceItemListKind::Brace,
                                         BraceItemListKind::Brace);
-  if (!parseMatchingToken(tok::r_brace, RBLoc,
-                          diag::expected_rbrace_in_brace_stmt, LBLoc)) {
-    LocalContext.addTokenSyntax(RBLoc);
-  }
+  parseMatchingToken(tok::r_brace, RBLoc,
+                     diag::expected_rbrace_in_brace_stmt, LBLoc);
 
   return makeParserResult(Status,
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
