@@ -865,12 +865,32 @@ open class JSONDecoder {
         } catch {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given data was not valid JSON.", underlyingError: error))
         }
-
+        
+        return try _decode(topLevel: topLevel)
+    }
+    
+    /// Decodes a top-level value of the given type from the given Foundation object.
+    ///
+    /// - parameter type: The type of the value to decode.
+    /// - parameter fromJSONObject: The Foundation object to decode from.
+    /// - returns: A value of the requested type.
+    /// - throws: `DecodingError.dataCorrupted` if the given Foundation object is not valid JSON.
+    /// - throws: An error if any value throws an error during decoding.
+    open func decode<T : Decodable>(_ type: T.Type, fromJSONObject obj: Any) throws -> T {
+        guard JSONSerialization.isValidJSONObject(obj) else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given object is not valid JSON.", underlyingError: nil))
+        }
+        
+        return try _decode(topLevel: obj)
+    }
+    
+    private func _decode<T : Decodable>(topLevel: Any) throws -> T
+    {
         let decoder = _JSONDecoder(referencing: topLevel, options: self.options)
         guard let value = try decoder.unbox(topLevel, as: T.self) else {
             throw DecodingError.valueNotFound(T.self, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
         }
-
+        
         return value
     }
 }
