@@ -1920,14 +1920,14 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
     // The result and argument types must match.
     if (srcFn->ResultType != targetFn->ResultType)
       return _fail(src, srcType, targetType, flags);
-    if (srcFn->getNumParameters() != targetFn->getNumParameters())
+    if (srcFn->getNumArguments() != targetFn->getNumArguments())
       return _fail(src, srcType, targetType, flags);
 
     if (srcFn->hasParameterFlags() != targetFn->hasParameterFlags())
       return _fail(src, srcType, targetType, flags);
 
-    for (unsigned i = 0, e = srcFn->getNumParameters(); i < e; ++i) {
-      if (srcFn->getParameters()[i] != targetFn->getParameters()[i] ||
+    for (unsigned i = 0, e = srcFn->getNumArguments(); i < e; ++i) {
+      if (srcFn->getArguments()[i] != targetFn->getArguments()[i] ||
           srcFn->getParameterFlags(i) != targetFn->getParameterFlags(i))
         return _fail(src, srcType, targetType, flags);
     }

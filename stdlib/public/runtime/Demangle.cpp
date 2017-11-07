@@ -319,10 +319,10 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     
     std::vector<NodePointer> inputs;
-    for (unsigned i = 0, e = func->getNumParameters(); i < e; ++i) {
-      auto param = func->getParameters()[i];
+    for (unsigned i = 0, e = func->getNumArguments(); i < e; ++i) {
+      auto arg = func->getArguments()[i];
       auto flags = func->getParameterFlags(i);
-      auto input = _swift_buildDemanglingForMetadata(param, Dem);
+      auto input = _swift_buildDemanglingForMetadata(arg, Dem);
 
       if (flags.isInOut()) {
         NodePointer inout = Dem.createNode(Node::Kind::InOut);

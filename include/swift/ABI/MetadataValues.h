@@ -550,11 +550,11 @@ enum class FunctionMetadataConvention: uint8_t {
 template <typename int_type>
 class TargetFunctionTypeFlags {
   enum : int_type {
-    NumParametersMask = 0x00FFFFFFU,
-    ConventionMask    = 0x0F000000U,
-    ConventionShift   = 25U,
-    ThrowsMask        = 0x10000000U,
-    ParamFlagsMask    = 0x01000000U,
+    NumArgumentsMask = 0x00FFFFFFU,
+    ConventionMask   = 0x0F000000U,
+    ConventionShift  = 25U,
+    ThrowsMask       = 0x10000000U,
+    ParamFlagsMask   = 0x01000000U,
   };
   int_type Data;
   
@@ -562,9 +562,8 @@ class TargetFunctionTypeFlags {
 public:
   constexpr TargetFunctionTypeFlags() : Data(0) {}
 
-  constexpr TargetFunctionTypeFlags
-  withNumParameters(unsigned numParams) const {
-    return TargetFunctionTypeFlags((Data & ~NumParametersMask) | numParams);
+  constexpr TargetFunctionTypeFlags withNumArguments(unsigned numArguments) const {
+    return TargetFunctionTypeFlags((Data & ~NumArgumentsMask) | numArguments);
   }
   
   constexpr TargetFunctionTypeFlags<int_type>
@@ -585,8 +584,10 @@ public:
                                              (hasFlags ? ParamFlagsMask : 0));
   }
 
-  unsigned getNumParameters() const { return Data & NumParametersMask; }
-
+  unsigned getNumArguments() const {
+    return Data & NumArgumentsMask;
+  }
+  
   FunctionMetadataConvention getConvention() const {
     return FunctionMetadataConvention((Data&ConventionMask) >> ConventionShift);
   }
