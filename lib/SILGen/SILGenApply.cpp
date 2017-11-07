@@ -4128,8 +4128,7 @@ CallEmission::applyNormalCall(SGFContext C) {
   // In C language modes, substitute the type of the AbstractionPattern
   // so that we won't see type parameters down when we try to form bridging
   // conversions.
-  CanSILFunctionType calleeFnTy = mv.getType().castTo<SILFunctionType>();
-  if (calleeFnTy->getLanguage() == SILFunctionLanguage::C) {
+  if (calleeTypeInfo.substFnType->getLanguage() == SILFunctionLanguage::C) {
     if (auto genericFnType =
           dyn_cast<GenericFunctionType>(origFormalType.getType())) {
       auto fnType = genericFnType->substGenericArgs(callee.getSubstitutions());
