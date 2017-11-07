@@ -1056,13 +1056,31 @@ bool TermInst::isFunctionExiting() const {
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::UnreachableInst:
   case TermKind::TryApplyInst:
+  case TermKind::YieldInst:
     return false;
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::UnwindInst:
     return true;
   }
 
   llvm_unreachable("Unhandled TermKind in switch.");
+}
+
+YieldInst::YieldInst(SILDebugLocation loc, ArrayRef<SILValue> yieldedValues,
+                     SILBasicBlock *normalBB, SILBasicBlock *unwindBB)
+  : InstructionBase(loc),
+    DestBBs{{this, normalBB}, {this, unwindBB}},
+    Operands(this, yieldedValues) {}
+
+YieldInst *YieldInst::create(SILDebugLocation loc,
+                             ArrayRef<SILValue> yieldedValues,
+                             SILBasicBlock *normalBB, SILBasicBlock *unwindBB,
+                             SILFunction &F) {
+  void *buffer = F.getModule().allocateInst(sizeof(YieldInst) +
+                        decltype(Operands)::getExtraSize(yieldedValues.size()),
+                                            alignof(YieldInst));
+  return ::new (buffer) YieldInst(loc, yieldedValues, normalBB, unwindBB);
 }
 
 BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,

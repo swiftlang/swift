@@ -1854,6 +1854,21 @@ public:
     *this << getIDAndType(TI->getOperand());
   }
 
+  void visitUnwindInst(UnwindInst *UI) {
+    // no operands
+  }
+
+  void visitYieldInst(YieldInst *YI) {
+    auto values = YI->getYieldedValues();
+    if (values.size() != 1) *this << '(';
+    interleave(values,
+               [&](SILValue value) { *this << getIDAndType(value); },
+               [&] { *this << ", "; });
+    if (values.size() != 1) *this << ')';
+    *this << ", resume " << Ctx.getID(YI->getResumeBB())
+          << ", unwind " << Ctx.getID(YI->getUnwindBB());
+  }
+
   void visitSwitchValueInst(SwitchValueInst *SII) {
     *this << getIDAndType(SII->getOperand());
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {

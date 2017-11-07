@@ -3319,6 +3319,35 @@ public:
             "throw operand type does not match error result type of function");
   }
   
+  void checkUnwindInst(UnwindInst *UI) {
+    require(F.getLoweredFunctionType()->isCoroutine(),
+            "unwind in non-coroutine function");
+  }
+
+  void checkYieldInst(YieldInst *YI) {
+    CanSILFunctionType fnType = F.getLoweredFunctionType();
+    require(fnType->isCoroutine(),
+            "yield in non-coroutine function");
+
+    auto yieldedValues = YI->getYieldedValues();
+    auto yieldInfos = fnType->getYields();
+    require(yieldedValues.size() == yieldInfos.size(),
+            "wrong number of yielded values for function");
+    for (auto i : indices(yieldedValues)) {
+      SILType yieldType =
+        F.mapTypeIntoContext(fnConv.getSILType(yieldInfos[i]));
+      require(yieldedValues[i]->getType() == yieldType,
+              "yielded value does not match yield type of coroutine");
+    }
+
+    // We require the resume and unwind destinations to be unique in order
+    // to prevent either edge from becoming critical.
+    require(YI->getResumeBB()->getSinglePredecessorBlock(),
+            "resume dest of 'yield' must be uniquely used");
+    require(YI->getUnwindBB()->getSinglePredecessorBlock(),
+            "unwind dest of 'yield' must be uniquely used");
+  }
+
   void checkSelectEnumCases(SelectEnumInstBase *I) {
     EnumDecl *eDecl = I->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
     require(eDecl, "select_enum operand must be an enum");
@@ -4157,9 +4186,18 @@ public:
   /// - accesses must be uniquely ended
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
+    enum CFGState {
+      /// No special rules are in play.
+      Normal,
+      /// We've followed the resume edge of a yield in a yield_once coroutine.
+      YieldOnceResume,
+      /// We've followed the unwind edge of a yield.
+      YieldUnwind
+    };
     struct BBState {
       std::vector<SingleValueInstruction*> Stack;
       std::set<BeginAccessInst*> Accesses;
+      CFGState CFG = Normal;
     };
 
     // Do a breath-first search through the basic blocks.
@@ -4205,6 +4243,29 @@ public:
                     "return with stack allocs that haven't been deallocated");
             require(state.Accesses.empty(),
                     "return with accesses that haven't been ended");
+
+            if (isa<UnwindInst>(term)) {
+              require(state.CFG == YieldUnwind,
+                      "encountered 'unwind' when not on unwind path");
+            } else {
+              require(state.CFG != YieldUnwind,
+                      "encountered 'return' or 'throw' when on unwind path");
+              if (isa<ReturnInst>(term) &&
+                  F->getLoweredFunctionType()->getCoroutineKind() ==
+                    SILCoroutineKind::YieldOnce &&
+                  F->getModule().getStage() != SILStage::Raw) {
+                require(state.CFG == YieldOnceResume,
+                        "encountered 'return' before yielding a value in "
+                        "yield_once coroutine");
+              }
+            }
+          }
+
+          if (isa<YieldInst>(term)) {
+            require(state.CFG != YieldOnceResume,
+                    "encountered multiple 'yield's along single path");
+            require(state.CFG == Normal,
+                    "encountered 'yield' on abnormal CFG path");
           }
 
           auto successors = term->getSuccessors();
@@ -4225,8 +4286,29 @@ public:
             // worklist and continue.
             if (insertResult.second) {
               Worklist.push_back(succBB);
+
+              // If we're following a 'yield', update the CFG state:
+              if (isa<YieldInst>(term)) {
+                // Enforce that the unwind logic is segregated in all stages.
+                if (i == 1) {
+                  insertResult.first->second.CFG = YieldUnwind;
+
+                // We check the yield_once rule in the mandatory analyses,
+                // so we can't assert it yet in the raw stage.
+                } else if (F->getLoweredFunctionType()->getCoroutineKind()
+                             == SILCoroutineKind::YieldOnce && 
+                           F->getModule().getStage() != SILStage::Raw) {
+                  insertResult.first->second.CFG = YieldOnceResume;
+                }
+              }
+
               continue;
             }
+
+            // This rule is checked elsewhere, but we'd want to assert it
+            // here anyway.
+            require(!isa<YieldInst>(term),
+                    "successor of 'yield' should not be encountered twice");
 
             // Check that the stack height is consistent coming from all entry
             // points into this BB. We only care about consistency if there is
@@ -4243,6 +4325,8 @@ public:
                     "inconsistent stack heights entering basic block");
             require(state.Accesses == foundState.Accesses || isUnreachable(),
                     "inconsistent access sets entering basic block");
+            require(state.CFG == foundState.CFG,
+                    "inconsistent coroutine states entering basic block");
           }
         }
       }

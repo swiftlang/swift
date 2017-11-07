@@ -582,6 +582,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // TODO: decide if we want to serialize those instructions.
     return;
       
+  case SILInstructionKind::UnwindInst:
   case SILInstructionKind::UnreachableInst: {
     unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
     SILInstNoOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1122,6 +1123,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::YieldInst: {
+    auto YI = cast<YieldInst>(&SI);
+    SmallVector<ValueID, 4> args;
+    for (auto arg: YI->getYieldedValues()) {
+      args.push_back(S.addTypeRef(arg->getType().getSwiftRValueType()));
+      args.push_back((unsigned)arg->getType().getCategory());
+      args.push_back(addValueRef(arg));
+    }
+    args.push_back(BasicBlockMap[YI->getResumeBB()]);
+    args.push_back(BasicBlockMap[YI->getUnwindBB()]);
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)YI->getKind(), 0, 0, args);
     break;
   }
   case SILInstructionKind::FunctionRefInst: {

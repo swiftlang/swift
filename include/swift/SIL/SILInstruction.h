@@ -6242,6 +6242,84 @@ public:
   }
 };
 
+/// UnwindInst - Continue unwinding out of this function.  Currently this is
+/// only used in coroutines as the eventual terminator of the unwind edge
+/// out of a 'yield'.
+class UnwindInst
+  : public InstructionBase<SILInstructionKind::UnwindInst,
+                           TermInst> {
+  friend SILBuilder;
+
+  UnwindInst(SILDebugLocation loc)
+    : InstructionBase(loc) {}
+
+public:
+  SuccessorListTy getSuccessors() {
+    // No successors.
+    return SuccessorListTy();
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+};
+
+/// YieldInst - Yield control temporarily to the caller of this coroutine.
+///
+/// This is a terminator because the caller can abort the coroutine,
+/// e.g. if an error is thrown and an unwind is provoked.
+class YieldInst
+  : public InstructionBase<SILInstructionKind::YieldInst,
+                           TermInst> {
+  friend SILBuilder;
+
+  SILSuccessor DestBBs[2];
+
+  TailAllocatedOperandList<0> Operands;
+
+  YieldInst(SILDebugLocation loc, ArrayRef<SILValue> yieldedValues,
+            SILBasicBlock *normalBB, SILBasicBlock *unwindBB);
+
+  static YieldInst *create(SILDebugLocation loc,
+                           ArrayRef<SILValue> yieldedValues,
+                           SILBasicBlock *normalBB, SILBasicBlock *unwindBB,
+                           SILFunction &F);
+
+public:
+  /// Return the normal resume destination of the yield, which is where the
+  /// coroutine resumes when the caller is ready to continue normally.
+  ///
+  /// This must be the unique predecessor edge of the given block.
+  ///
+  /// Control flow along every path from this block must either loop or
+  /// eventually terminate in a 'return', 'throw', or 'unreachable'
+  /// instruction.  In a yield_many coroutine, control is permitted to
+  /// first reach a 'yield' instruction; this is prohibited in a
+  /// yield_once coroutine.
+  SILBasicBlock *getResumeBB() const { return DestBBs[0]; }
+
+  /// Return the 'unwind' destination of the yield, which is where the
+  /// coroutine resumes when the caller is unconditionally aborting the
+  /// coroutine.
+  ///
+  /// This must be the unique predecessor edge of the given block.
+  ///
+  /// Control flow along every path from this block must either loop or
+  /// eventually terminate in an 'unwind' or 'unreachable' instruction.
+  /// It is not permitted to reach a 'yield' instruction.
+  SILBasicBlock *getUnwindBB() const { return DestBBs[1]; }
+
+  OperandValueArrayRef getYieldedValues() const {
+    return Operands.asValueArray();
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  SuccessorListTy getSuccessors() {
+    return DestBBs;
+  }
+};
+
 /// BranchInst - An unconditional branch.
 class BranchInst
     : public InstructionBase<SILInstructionKind::BranchInst,

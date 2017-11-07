@@ -1024,6 +1024,8 @@ public:
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
   void visitThrowInst(ThrowInst *i);
+  void visitUnwindInst(UnwindInst *i);
+  void visitYieldInst(YieldInst *i);
   void visitSwitchValueInst(SwitchValueInst *i);
   void visitSwitchEnumInst(SwitchEnumInst *i);
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
@@ -2468,6 +2470,20 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   } else {
     Builder.CreateRet(llvm::UndefValue::get(retTy));
   }
+}
+
+void IRGenSILFunction::visitUnwindInst(swift::UnwindInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(),
+                    "unwind instruction");
+  Builder.CreateUnreachable();
+  Builder.emitBlock(createBasicBlock("unwind"));
+}
+
+void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(),
+                    "yield instruction");
+  Builder.CreateUnreachable();
+  Builder.emitBlock(createBasicBlock("yield"));
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchValue(
