@@ -759,14 +759,10 @@ FUNCTION(ArrayDestroy, swift_arrayDestroy, DefaultCC,
          ARGS(OpaquePtrTy, SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
-// Metadata *swift_getFunctionTypeMetadata(unsigned long flags,
-//                                         const Metadata **parameters,
-//                                         const uint32_t *parameterFlags,
-//                                         const Metadata *result);
+// Metadata *swift_getFunctionTypeMetadata(const void **args);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(), Int32Ty->getPointerTo(),
-              TypeMetadataPtrTy),
+         ARGS(Int8PtrTy->getPointerTo(0)),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata1(unsigned long flags,
@@ -779,12 +775,13 @@ FUNCTION(GetFunctionMetadata1, swift_getFunctionTypeMetadata1, DefaultCC,
 
 // Metadata *swift_getFunctionTypeMetadata1WithFlags(unsigned long flags,
 //                                                   const Metadata *arg0,
-//                                                   const uint32_t paramFlags,
+//                                                   const uint32_t *paramFlags,
 //                                                   const Metadata *resultMetadata);
 FUNCTION(GetFunctionMetadata1WithFlags, swift_getFunctionTypeMetadata1WithFlags,
          DefaultCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty->getPointerTo(),
+              TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata2(unsigned long flags,
@@ -799,15 +796,14 @@ FUNCTION(GetFunctionMetadata2, swift_getFunctionTypeMetadata2,
 
 // Metadata *swift_getFunctionTypeMetadata2WithFlags(unsigned long flags,
 //                                                   const Metadata *arg0,
-//                                                   const uint32_t flags0,
 //                                                   const Metadata *arg1,
-//                                                   const uint32_t flags1,
+//                                                   const uint32_t *paramFlags,
 //                                                   const Metadata *resultMetadata);
 FUNCTION(GetFunctionMetadata2WithFlags, swift_getFunctionTypeMetadata2WithFlags,
          DefaultCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy, Int32Ty,
-              TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+              Int32Ty->getPointerTo(), TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getFunctionTypeMetadata3(unsigned long flags,
@@ -824,17 +820,15 @@ FUNCTION(GetFunctionMetadata3, swift_getFunctionTypeMetadata3,
 
 // Metadata *swift_getFunctionTypeMetadata3WithFlags(unsigned long flags,
 //                                                   const Metadata *arg0,
-//                                                   const uint32_t flags0,
 //                                                   const Metadata *arg1,
-//                                                   const uint32_t flags1,
 //                                                   const Metadata *arg2,
-//                                                   const uint32_t flags2,
+//                                                   const uint32_t *paramFlags,
 //                                                   const Metadata *resultMetadata);
 FUNCTION(GetFunctionMetadata3WithFlags, swift_getFunctionTypeMetadata3WithFlags,
          DefaultCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy, Int32Ty,
-              TypeMetadataPtrTy, Int32Ty, TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+              Int32Ty->getPointerTo(), TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getForeignTypeMetadata(Metadata *nonUnique);

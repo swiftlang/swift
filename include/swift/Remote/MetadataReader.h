@@ -799,35 +799,23 @@ public:
     }
     case MetadataKind::Function: {
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
-      auto numParameters = Function->getNumArguments();
 
       std::vector<FunctionParam<BuiltType>> Parameters;
       StoredPointer ArgumentAddress = MetadataAddress +
         sizeof(TargetFunctionTypeMetadata<Runtime>);
-      StoredPointer ParameterFlagsAddress =
-          ArgumentAddress + (numParameters * sizeof(StoredPointer));
-
-      for (StoredPointer i = 0; i < numParameters; ++i,
-                         ArgumentAddress += sizeof(StoredPointer),
-                         ParameterFlagsAddress += sizeof(StoredPointer)) {
+      for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
+           ArgumentAddress += sizeof(StoredPointer)) {
         StoredPointer ParameterAddress;
         if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
                                  &ParameterAddress))
           return BuiltType();
 
+        FunctionParam<BuiltType> Param;
         if (auto ParamTypeRef = readTypeFromMetadata(ParameterAddress)) {
-          FunctionParam<BuiltType> Param;
+          auto ParameterFlags = Function->getParameterFlags(i);
+
           Param.setType(ParamTypeRef);
-
-          if (Function->hasParameterFlags()) {
-            uint32_t ParameterFlags;
-            if (!Reader->readInteger(RemoteAddress(ParameterFlagsAddress),
-                                     &ParameterFlags))
-              return BuiltType();
-
-            Param.setFlags(ParameterTypeFlags::fromRaw(ParameterFlags));
-          }
-
+          Param.setFlags(ParameterTypeFlags::fromRaw(ParameterFlags));
           Parameters.push_back(std::move(Param));
         } else {
           return BuiltType();

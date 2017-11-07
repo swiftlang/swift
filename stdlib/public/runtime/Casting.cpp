@@ -1922,16 +1922,11 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
       return _fail(src, srcType, targetType, flags);
     if (srcFn->getNumArguments() != targetFn->getNumArguments())
       return _fail(src, srcType, targetType, flags);
-
-    if (srcFn->hasParameterFlags() != targetFn->hasParameterFlags())
-      return _fail(src, srcType, targetType, flags);
-
-    for (unsigned i = 0, e = srcFn->getNumArguments(); i < e; ++i) {
+    for (unsigned i = 0, e = srcFn->getNumArguments(); i < e; ++i)
       if (srcFn->getArguments()[i] != targetFn->getArguments()[i] ||
           srcFn->getParameterFlags(i) != targetFn->getParameterFlags(i))
         return _fail(src, srcType, targetType, flags);
-    }
-
+    
     return _succeed(dest, src, srcType, flags);
   }
   
