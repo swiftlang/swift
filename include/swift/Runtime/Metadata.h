@@ -1752,10 +1752,22 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ResultType;
 
-  Parameter *getParameters() { return reinterpret_cast<Parameter *>(this + 1); }
+  TargetPointer<Runtime, Parameter> getParameters() {
+    return reinterpret_cast<TargetPointer<Runtime, Parameter>>(this + 1);
+  }
 
-  const Parameter *getParameters() const {
-    return reinterpret_cast<const Parameter *>(this + 1);
+  TargetPointer<Runtime, const Parameter> getParameters() const {
+    return reinterpret_cast<TargetPointer<Runtime, const Parameter>>(this + 1);
+  }
+
+  TargetPointer<Runtime, uint32_t> getParameterFlags() {
+    return reinterpret_cast<TargetPointer<Runtime, uint32_t>>(
+                  reinterpret_cast<Parameter *>(this + 1) + getNumParameters());
+  }
+
+  TargetPointer<Runtime, const uint32_t> getParameterFlags() const {
+    return reinterpret_cast<TargetPointer<Runtime, const uint32_t>>(
+            reinterpret_cast<const Parameter *>(this + 1) + getNumParameters());
   }
 
   ParameterFlags getParameterFlags(unsigned index) const {
@@ -1777,15 +1789,6 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Function;
-  }
-
-  uint32_t *getParameterFlags() {
-    return reinterpret_cast<uint32_t *>(getParameters() + getNumParameters());
-  }
-
-  const uint32_t *getParameterFlags() const {
-    return reinterpret_cast<const uint32_t *>(getParameters() +
-                                              getNumParameters());
   }
 };
 using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;
