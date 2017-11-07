@@ -178,7 +178,7 @@ if True:
 /// can store any kind of elements---from integers to strings to classes.
 ///
 /// Swift makes it easy to create arrays in your code using an array literal:
-/// simply surround a comma separated list of values with square brackets.
+/// simply surround a comma-separated list of values with square brackets.
 /// Without any other information, Swift creates an array that includes the
 /// specified values, automatically inferring the array's `Element` type. For
 /// example:

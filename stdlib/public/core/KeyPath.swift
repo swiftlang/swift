@@ -1620,8 +1620,8 @@ func _projectKeyPathReferenceWritable<Root, Value>(
 // on `Self` to prevent dynamically-typed methods from being inherited by
 // statically-typed key paths.
 
-/// This protocol is an implementation detail of key path expressions; do not
-/// use it directly.
+/// An implementation detail of key path expressions; do not use this protocol
+/// directly.
 @_show_in_interface
 public protocol _AppendKeyPath {}
 

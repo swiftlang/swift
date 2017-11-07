@@ -42,7 +42,7 @@ public struct UnsafeBufferPointerIterator<Element>
 % for mutable in (True, False):
 %  Self = 'UnsafeMutableBufferPointer' if mutable else 'UnsafeBufferPointer'
 %  Mutable = 'Mutable' if mutable else ''
-/// A non-owning collection interface to a buffer of ${Mutable.lower()}
+/// A nonowning collection interface to a buffer of ${Mutable.lower()}
 /// elements stored contiguously in memory.
 ///
 /// You can use an `${Self}` instance in low level operations to eliminate
