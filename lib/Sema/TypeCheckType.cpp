@@ -2257,6 +2257,11 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_TypeAliasUnderlyingType;
+  // FIXME: Until we remove the IUO type from the type system, we
+  // need to continue to parse IUOs in SIL tests so that we can
+  // match the types we generate from the importer.
+  if (!options.contains(TR_SILMode))
+    options -= TR_AllowIUO;
 
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
