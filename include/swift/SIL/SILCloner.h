@@ -2118,6 +2118,27 @@ SILCloner<ImplClass>::visitThrowInst(ThrowInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitUnwindInst(UnwindInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createUnwind(getOpLocation(Inst->getLoc())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitYieldInst(YieldInst *Inst) {
+  auto Values = getOpValueArray<8>(Inst->getYieldedValues());
+  auto ResumeBB = getOpBasicBlock(Inst->getResumeBB());
+  auto UnwindBB = getOpBasicBlock(Inst->getUnwindBB());
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createYield(getOpLocation(Inst->getLoc()), Values,
+                             ResumeBB, UnwindBB));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitBranchInst(BranchInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArgs());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

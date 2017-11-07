@@ -475,9 +475,11 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   SILFunctionType::ExtInfo()
                     .withRepresentation(SILFunctionType::Representation::
                                         CFunctionPointer),
+                  SILCoroutineKind::None,
                   ParameterConvention::Direct_Unowned,
                   SILParameterInfo(anyObjectMetaTy,
                                    ParameterConvention::Direct_Unowned),
+                  /*yields*/ {},
                   SILResultInfo(OptNSStringTy,
                                 ResultConvention::Autoreleased),
                   /*error result*/ None,
@@ -577,8 +579,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                     // Should be C calling convention, but NSApplicationMain
                     // has an overlay to fix the type of argv.
                     .withRepresentation(SILFunctionType::Representation::Thin),
+                  SILCoroutineKind::None,
                   ParameterConvention::Direct_Unowned,
                   argTypes,
+                  /*yields*/ {},
                   SILResultInfo(argc->getType().getSwiftRValueType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,

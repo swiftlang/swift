@@ -2837,6 +2837,15 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                        param.getConvention()));
   }
 
+  SmallVector<SILYieldInfo, 4> interfaceYields;
+  for (auto &yield : expectedType->getYields()) {
+    auto yieldIfaceTy = GenericEnvironment::mapTypeOutOfContext(
+        genericEnv, yield.getType());
+    auto interfaceYield =
+      yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
+    interfaceYields.push_back(interfaceYield);
+  }
+
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getResults()) {
     auto resultIfaceTy = GenericEnvironment::mapTypeOutOfContext(
@@ -2858,9 +2867,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   
   // The type of the thunk function.
   return SILFunctionType::get(genericSig, extInfo,
+                              expectedType->getCoroutineKind(),
                               ParameterConvention::Direct_Unowned,
-                              interfaceParams, interfaceResults,
-                              interfaceErrorResult,
+                              interfaceParams, interfaceYields,
+                              interfaceResults, interfaceErrorResult,
                               getASTContext());
 }
 

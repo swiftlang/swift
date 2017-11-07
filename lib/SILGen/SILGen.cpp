@@ -432,8 +432,9 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   };
 
   CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
+                                   SILCoroutineKind::None,
                                    ParameterConvention::Direct_Unowned,
-                                   params,
+                                   params, /*yields*/ {},
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,

@@ -3560,6 +3560,20 @@ static bool transformSILResult(
   return false;
 }
 
+static bool transformSILYield(
+                            SILYieldInfo &yield, bool &changed,
+                            llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
+  Type transType = yield.getType().transformRec(fn);
+  if (!transType) return true;
+
+  CanType canTransType = transType->getCanonicalType();
+  if (canTransType != yield.getType()) {
+    changed = true;
+    yield = yield.getWithType(canTransType);
+  }
+  return false;
+}
+
 static bool transformSILParameter(
                             SILParameterInfo &param, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
@@ -3665,6 +3679,12 @@ case TypeKind::Id:
       transInterfaceParams.push_back(param);
     }
 
+    SmallVector<SILYieldInfo, 8> transInterfaceYields;
+    for (SILYieldInfo yield : fnTy->getYields()) {
+      if (transformSILYield(yield, changed, fn)) return Type();
+      transInterfaceYields.push_back(yield);
+    }
+
     SmallVector<SILResultInfo, 8> transInterfaceResults;
     for (SILResultInfo result : fnTy->getResults()) {
       if (transformSILResult(result, changed, fn)) return Type();
@@ -3680,10 +3700,15 @@ case TypeKind::Id:
 
     if (!changed) return *this;
 
-    return SILFunctionType::get(fnTy->getGenericSignature(), fnTy->getExtInfo(),
+    return SILFunctionType::get(fnTy->getGenericSignature(),
+                                fnTy->getExtInfo(),
+                                fnTy->getCoroutineKind(),
                                 fnTy->getCalleeConvention(),
-                                transInterfaceParams, transInterfaceResults,
-                                transErrorResult, Ptr->getASTContext(),
+                                transInterfaceParams,
+                                transInterfaceYields,
+                                transInterfaceResults,
+                                transErrorResult,
+                                Ptr->getASTContext(),
                                 fnTy->getWitnessMethodConformanceOrNone());
   }
 

@@ -1702,17 +1702,25 @@ namespace {
                                 TypeResolutionOptions options,
                                 FunctionType::ExtInfo extInfo
                                   = FunctionType::ExtInfo());
-    Type resolveSILFunctionType(
-        FunctionTypeRepr *repr, TypeResolutionOptions options,
-        SILFunctionType::ExtInfo extInfo = SILFunctionType::ExtInfo(),
-        ParameterConvention calleeConvention = DefaultParameterConvention,
-        TypeRepr *witnessmethodProtocol = nullptr);
+    Type resolveSILFunctionType(FunctionTypeRepr *repr,
+                                TypeResolutionOptions options,
+                                SILCoroutineKind coroutineKind
+                                  = SILCoroutineKind::None,
+                                SILFunctionType::ExtInfo extInfo
+                                  = SILFunctionType::ExtInfo(),
+                                ParameterConvention calleeConvention
+                                  = DefaultParameterConvention,
+                                TypeRepr *witnessmethodProtocol = nullptr);
     SILParameterInfo resolveSILParameter(TypeRepr *repr,
                                          TypeResolutionOptions options);
+    SILYieldInfo resolveSILYield(TypeAttributes &remainingAttrs,
+                                 TypeRepr *repr, TypeResolutionOptions options);
     bool resolveSILResults(TypeRepr *repr, TypeResolutionOptions options,
+                           SmallVectorImpl<SILYieldInfo> &yields,
                            SmallVectorImpl<SILResultInfo> &results,
                            Optional<SILResultInfo> &errorResult);
     bool resolveSingleSILResult(TypeRepr *repr, TypeResolutionOptions options,
+                                SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
                                 Optional<SILResultInfo> &errorResult);
     Type resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
@@ -1970,7 +1978,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_noreturn, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_escaping
+    TAK_escaping, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2017,6 +2025,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   } else if (hasFunctionAttr && (options & TR_SILType)) {
     SILFunctionType::Representation rep;
     TypeRepr *witnessMethodProtocol = nullptr;
+
+    auto coroutineKind = SILCoroutineKind::None;
+    if (attrs.has(TAK_yield_once)) {
+      coroutineKind = SILCoroutineKind::YieldOnce;
+    } else if (attrs.has(TAK_yield_many)) {
+      coroutineKind = SILCoroutineKind::YieldMany;
+    }
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
@@ -2065,7 +2080,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                      attrs.has(TAK_noescape));
 
-    ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention,
+    ty = resolveSILFunctionType(fnRepr, options, coroutineKind,
+                                extInfo, calleeConvention,
                                 witnessMethodProtocol);
     if (!ty || ty->hasError()) return ty;
   } else if (hasFunctionAttr) {
@@ -2429,6 +2445,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
+                                          SILCoroutineKind coroutineKind,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee,
                                           TypeRepr *witnessMethodProtocol) {
@@ -2441,6 +2458,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // Resolve parameter and result types using the function's generic
   // environment.
   SmallVector<SILParameterInfo, 4> params;
+  SmallVector<SILYieldInfo, 4> yields;
   SmallVector<SILResultInfo, 4> results;
   Optional<SILResultInfo> errorResult;
   {
@@ -2489,8 +2507,15 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     {
       // FIXME: Deal with unsatisfied dependencies.
-      if (resolveSILResults(repr->getResultTypeRepr(), options,
+      if (resolveSILResults(repr->getResultTypeRepr(), options, yields,
                             results, errorResult)) {
+        hasError = true;
+      }
+
+      // Diagnose non-coroutines that declare yields.
+      if (coroutineKind == SILCoroutineKind::None && !yields.empty()) {
+        TC.diagnose(repr->getResultTypeRepr()->getLoc(),
+                    diag::sil_non_coro_yields);
         hasError = true;
       }
     }
@@ -2503,6 +2528,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // FIXME: Remap the parsed context types to interface types.
   CanGenericSignature genericSig;
   SmallVector<SILParameterInfo, 4> interfaceParams;
+  SmallVector<SILYieldInfo, 4> interfaceYields;
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
@@ -2512,6 +2538,11 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       auto transParamType = genericEnv->mapTypeOutOfContext(
           param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
+    }
+    for (auto &yield : yields) {
+      auto transYieldType = genericEnv->mapTypeOutOfContext(
+          yield.getType())->getCanonicalType();
+      interfaceYields.push_back(yield.getWithType(transYieldType));
     }
     for (auto &result : results) {
       auto transResultType = genericEnv->mapTypeOutOfContext(
@@ -2527,6 +2558,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   } else {
     interfaceParams = params;
+    interfaceYields = yields;
     interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
@@ -2557,9 +2589,20 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
            "found witness_method without matching conformance");
   }
 
-  return SILFunctionType::get(genericSig, extInfo, callee, interfaceParams,
-                              interfaceResults, interfaceErrorResult, Context,
-                              witnessMethodConformance);
+  return SILFunctionType::get(genericSig, extInfo, coroutineKind,
+                              callee,
+                              interfaceParams, interfaceYields,
+                              interfaceResults, interfaceErrorResult,
+                              Context, witnessMethodConformance);
+}
+
+SILYieldInfo TypeResolver::resolveSILYield(TypeAttributes &attrs,
+                                           TypeRepr *repr,
+                                           TypeResolutionOptions options) {
+  AttributedTypeRepr attrRepr(attrs, repr);
+  SILParameterInfo paramInfo =
+    resolveSILParameter(&attrRepr, options | TR_ImmediateFunctionInput);
+  return SILYieldInfo(paramInfo.getType(), paramInfo.getConvention());
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(
@@ -2573,6 +2616,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
+
     auto checkFor = [&](TypeAttrKind tak, ParameterConvention attrConv) {
       if (!attrs.has(tak)) return;
       if (convention != DefaultParameterConvention) {
@@ -2615,6 +2659,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
 bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
                                           TypeResolutionOptions options,
+                                          SmallVectorImpl<SILYieldInfo> &yields,
                               SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                        Optional<SILResultInfo> &errorResult) {
   Type type;
@@ -2624,6 +2669,19 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     // Copy the attributes out; we're going to destructively modify them.
     auto attrs = attrRepr->getAttrs();
+
+    // Recognize @yields.
+    if (attrs.has(TypeAttrKind::TAK_yields)) {
+      attrs.clearAttribute(TypeAttrKind::TAK_yields);
+
+      // The treatment from this point on is basically completely different.
+      auto yield = resolveSILYield(attrs, attrRepr->getTypeRepr(), options);
+      if (yield.getType()->hasError())
+        return true;
+
+      yields.push_back(yield);
+      return false;
+    }
 
     // Recognize @error.
     if (attrs.has(TypeAttrKind::TAK_error)) {
@@ -2692,6 +2750,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
 
 bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                      TypeResolutionOptions options,
+                                SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                 Optional<SILResultInfo> &errorResult) {
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
@@ -2701,13 +2760,15 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
         TC.diagnose(element.UnderscoreLoc, diag::sil_function_output_label);
     }
     for (auto elt : tuple->getElements()) {
-      if (resolveSingleSILResult(elt.Type, options, ordinaryResults, errorResult))
+      if (resolveSingleSILResult(elt.Type, options,
+                                 yields, ordinaryResults, errorResult))
         hadError = true;
     }
     return hadError;
   }
 
-  return resolveSingleSILResult(repr, options, ordinaryResults, errorResult);
+  return resolveSingleSILResult(repr, options,
+                                yields, ordinaryResults, errorResult);
 }
 
 Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,

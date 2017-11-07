@@ -260,7 +260,8 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, Results, None,
+      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
+      /*params*/ {}, /*yields*/ {}, Results, None,
       Store->getModule().getASTContext());
   auto *GetterF = Store->getModule().getOrCreateFunction(
       Store->getLoc(),
@@ -514,7 +515,8 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, Results, None,
+      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
+      /*params*/ {}, /*yields*/ {}, Results, None,
       InitF->getASTContext());
   auto *GetterF = InitF->getModule().getOrCreateFunction(
       InitF->getLocation(),

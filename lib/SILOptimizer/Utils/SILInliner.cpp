@@ -338,6 +338,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::YieldInst:
     return InlineCost::Free;
 
   case SILInstructionKind::ApplyInst:

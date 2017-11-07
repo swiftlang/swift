@@ -2112,6 +2112,27 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createUnreachable(Loc);
     break;
   }
+  case SILInstructionKind::UnwindInst: {
+    ResultVal = Builder.createUnwind(Loc);
+    break;
+  }
+  case SILInstructionKind::YieldInst: {
+    SILBasicBlock *unwindBB = getBBForReference(Fn, ListOfValues.back());
+    ListOfValues = ListOfValues.drop_back();
+    SILBasicBlock *resumeBB = getBBForReference(Fn, ListOfValues.back());
+    ListOfValues = ListOfValues.drop_back();
+
+    SmallVector<SILValue, 4> yieldedValues;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3) {
+      auto valueTy = MF->getType(ListOfValues[I]);
+      auto valueCategory = (SILValueCategory) ListOfValues[I+1];
+      yieldedValues.push_back(
+        getLocalValue(ListOfValues[I+2], getSILType(valueTy, valueCategory)));
+    }
+
+    ResultVal = Builder.createYield(Loc, yieldedValues, resumeBB, unwindBB);
+    break;
+  }
   case SILInstructionKind::KeyPathInst: {
     unsigned nextValue = 0;
     SILType kpTy

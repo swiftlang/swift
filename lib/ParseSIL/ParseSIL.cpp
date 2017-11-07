@@ -3735,6 +3735,51 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ResultVal = B.createThrow(InstLoc, Val);
     break;
   }
+  case SILInstructionKind::UnwindInst: {
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createUnwind(InstLoc);
+    break;
+  }
+  case SILInstructionKind::YieldInst: {
+    SmallVector<SILValue, 6> values;
+
+    // Parse a parenthesized (unless length-1), comma-separated list
+    // of yielded values.
+    if (P.consumeIf(tok::l_paren)) {
+      do {
+        if (parseTypedValueRef(Val, B))
+          return true;
+        values.push_back(Val);
+      } while (P.consumeIf(tok::comma));
+
+      if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+        return true;
+
+    } else {
+      if (parseTypedValueRef(Val, B))
+        return true;
+      values.push_back(Val);
+    }
+
+    Identifier resumeName, unwindName;
+    SourceLoc resumeLoc, unwindLoc;
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("resume") ||
+        parseSILIdentifier(resumeName, resumeLoc,
+                           diag::expected_sil_block_name) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("unwind") ||
+        parseSILIdentifier(unwindName, unwindLoc,
+                           diag::expected_sil_block_name) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    auto resumeBB = getBBForReference(resumeName, resumeLoc);
+    auto unwindBB = getBBForReference(unwindName, unwindLoc);
+    ResultVal = B.createYield(InstLoc, values, resumeBB, unwindBB);
+    break;
+  }
   case SILInstructionKind::BranchInst: {
     Identifier BBName;
     SourceLoc NameLoc;

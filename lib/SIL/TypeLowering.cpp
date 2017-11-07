@@ -2107,9 +2107,9 @@ CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
   if (genericSig && genericSig->areAllParamsConcrete())
     genericSig = nullptr;
 
-  return SILFunctionType::get(genericSig, extInfo,
+  return SILFunctionType::get(genericSig, extInfo, SILCoroutineKind::None,
                               /*callee*/ ParameterConvention::Direct_Unowned,
-                              params, results, None, ctx,
+                              params, {}, results, None, ctx,
                               witnessMethodConformance);
 }
 
