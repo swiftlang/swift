@@ -344,7 +344,7 @@ class FunctionTypeRef final : public TypeRef {
     for (const auto &Param : Parameters) {
       ID.addString(Param.getLabel().str());
       ID.addPointer(Param.getType());
-      ID.addInteger(static_cast<uint32_t>(Param.getFlags().toRaw()));
+      ID.addInteger(static_cast<uint32_t>(Param.getFlags().getIntValue()));
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
