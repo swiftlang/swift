@@ -1998,6 +1998,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   while (true) {
     SyntaxParsingContextChild DisabledContext(SyntaxContext,
                                               SyntaxContextKind::Expr);
+    // The following code may backtrack; so we disable the syntax tree creation
+    // in this scope.
     DisabledContext.disable();
     // Terminate at ')'.
     if (Tok.is(tok::r_paren)) {

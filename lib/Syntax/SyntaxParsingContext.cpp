@@ -151,22 +151,28 @@ std::vector<RawSyntaxInfo>
 SyntaxParsingContext::ContextInfo::collectAllSyntax(SourceLoc EndLoc) {
   std::vector<RawSyntaxInfo> Results;
   std::vector<RawSyntaxInfo> ImplicitNodes;
+
+  // Add implicit nodes before adding the explicit nodes they attach to.
   auto addImplicit = [&](const RawSyntaxInfo &Info) {
     assert(!Info.isImplicit());
     auto StartSize = Results.size();
+
+    // Find all implicit nodes where the attach-to location is the start position
+    // of this non-implicit nodes.
     Results.insert(Results.end(),
                    std::find_if(ImplicitNodes.begin(), ImplicitNodes.end(),
       [&](const RawSyntaxInfo &Imp) { return Imp.BeforeLoc == Info.getStartLoc(); }),
                    ImplicitNodes.end());
-    if (StartSize < Results.size()) {
+
+    // If any implicit nodes are inserted to results, we should clear the buffer
+    // to avoid re-inserting them.
+    if (StartSize != Results.size()) {
       ImplicitNodes.clear();
     }
   };
   auto CurSyntax = PendingSyntax.begin();
-  for (auto It = Tokens.begin(); It != Tokens.end();) {
+  for (auto It = Tokens.begin(); It->getStartLoc() != EndLoc;) {
     auto Tok = *It;
-    if (Tok.getStartLoc() == EndLoc)
-      break;
     if (CurSyntax == PendingSyntax.end()) {
       addImplicit(Tok);
       // If no remaining syntax nodes, add the token.

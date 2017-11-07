@@ -37,7 +37,10 @@ struct RawSyntaxInfo {
   /// Start and end location of this syntax node.
   SourceRange SyntaxRange;
 
-  /// Implicit node before this location.
+  /// This location must be valid if this node is an implicit node, e.g.
+  /// an empty statement list collection.
+  /// This location indicates the implicit node should appear before the token
+  /// on the location.
   SourceLoc BeforeLoc;
 
   /// The raw node.

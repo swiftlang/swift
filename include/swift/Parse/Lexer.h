@@ -148,8 +148,6 @@ public:
       return State(Loc.getAdvancedLoc(Offset), LeadingTrivia, TrailingTrivia);
     }
 
-    SourceLoc getLoc() const { return Loc; }
-
   private:
     explicit State(SourceLoc Loc,
                    syntax::TriviaList LeadingTrivia,
