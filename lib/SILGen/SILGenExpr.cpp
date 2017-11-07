@@ -1042,8 +1042,11 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
-  if (silDeclRef.getUncurryLevel() > 0)
+  if (silDeclRef.getParameterListCount() == 2) {
+    // Unqualified reference to an instance method from a static context,
+    // without applying 'self'.
     silDeclRef = silDeclRef.asCurried();
+  }
 
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
                                          declRef.getSubstitutions());

@@ -66,8 +66,6 @@ bool requiresForeignEntryPoint(ValueDecl *vd);
 /// True if the entry point is natively foreign.
 bool requiresForeignToNativeThunk(ValueDecl *vd);
 
-unsigned getNaturalUncurryLevel(ValueDecl *vd);
-
 enum ForDefinition_t : bool {
   NotForDefinition = false,
   ForDefinition = true
@@ -304,7 +302,7 @@ struct SILDeclRef {
   void print(llvm::raw_ostream &os) const;
   void dump() const;
 
-  unsigned getUncurryLevel() const;
+  unsigned getParameterListCount() const;
 
   ResilienceExpansion getResilienceExpansion() const {
     return ResilienceExpansion(Expansion);

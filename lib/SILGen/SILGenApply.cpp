@@ -457,10 +457,10 @@ public:
     return SubstFormalInterfaceType;
   }
 
-  unsigned getNaturalUncurryLevel() const {
+  unsigned getParameterListCount() const {
     switch (kind) {
     case Kind::IndirectValue:
-      return 0;
+      return 1;
 
     case Kind::StandaloneFunction:
     case Kind::EnumElement:
@@ -468,7 +468,7 @@ public:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
-      return Constant.getUncurryLevel();
+      return Constant.getParameterListCount();
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
@@ -498,12 +498,8 @@ public:
     return result;
   }
 
-  SILDeclRef getConstantAtUncurryLevel(unsigned level) const {
-    unsigned uncurryLevel = Constant.getUncurryLevel();
-    assert(level <= uncurryLevel &&
-           "uncurrying past natural uncurry level of standalone function");
-    if (level < uncurryLevel) {
-      assert(level == 0);
+  SILDeclRef getCurriedConstant(bool isCurried) const {
+    if (isCurried) {
       auto constant = Constant.asCurried();
 
       // If we're currying a direct reference to a class-dispatched method,
@@ -540,14 +536,13 @@ public:
     return SILType::getPrimitiveObjectType(closureType);
   }
 
-  ManagedValue getFnValueAtUncurryLevel(SILGenFunction &SGF,
-                                        unsigned level) const & {
+  ManagedValue getFnValue(SILGenFunction &SGF, bool isCurried) const & {
     Optional<SILDeclRef> constant = None;
 
     if (!Constant) {
-      assert(level == 0 && "can't curry indirect function");
+      assert(!isCurried && "can't curry indirect function");
     } else {
-      constant = getConstantAtUncurryLevel(level);
+      constant = getCurriedConstant(isCurried);
 
       // If the call is curried, emit a direct call to the curry thunk.
       if (constant->isCurried) {
@@ -639,14 +634,13 @@ public:
     }
   }
 
-  CalleeTypeInfo getTypeInfoAtUncurryLevel(SILGenFunction &SGF,
-                                           unsigned level) const & {
+  CalleeTypeInfo getTypeInfo(SILGenFunction &SGF, bool isCurried) const & {
     Optional<SILDeclRef> constant = None;
 
     if (!Constant) {
-      assert(level == 0 && "can't curry indirect function");
+      assert(!isCurried && "can't curry indirect function");
     } else {
-      constant = getConstantAtUncurryLevel(level);
+      constant = getCurriedConstant(isCurried);
 
       // If the call is curried, emit a direct call to the curry thunk.
       if (constant->isCurried) {
@@ -699,11 +693,7 @@ public:
   /// lowering, such as a builtin, or return null if there is no specialized
   /// emitter.
   Optional<SpecializedEmitter>
-  getSpecializedEmitter(SILGenModule &SGM, unsigned uncurryLevel) const {
-    // Currently we have no curried known functions.
-    if (uncurryLevel != 0)
-      return None;
-
+  getSpecializedEmitter(SILGenModule &SGM) const {
     switch (kind) {
     case Kind::StandaloneFunction: {
       return SpecializedEmitter::forDecl(SGM, Constant);
@@ -3913,8 +3903,7 @@ namespace {
     std::vector<CallSite> extraSites;
     Callee callee;
     FormalEvaluationScope initialWritebackScope;
-    unsigned uncurries;
-    bool applied;
+    unsigned expectedSiteCount;
     bool assumedPlusZeroSelf;
 
   public:
@@ -3924,17 +3913,14 @@ namespace {
                  bool assumedPlusZeroSelf = false)
         : SGF(SGF), callee(std::move(callee)),
           initialWritebackScope(std::move(writebackScope)),
-          uncurries(callee.getNaturalUncurryLevel() + 1), applied(false),
+          expectedSiteCount(callee.getParameterListCount()),
           assumedPlusZeroSelf(assumedPlusZeroSelf) {}
 
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type.
     void addCallSite(CallSite &&site) {
-      assert(!applied && "already applied!");
-
       // Append to the main argument list if we have uncurry levels remaining.
-      if (uncurries > 0) {
-        --uncurries;
+      if (uncurriedSites.size() < expectedSiteCount) {
         uncurriedSites.push_back(std::move(site));
         return;
       }
@@ -3965,30 +3951,21 @@ namespace {
 
     /// Is this a fully-applied enum element constructor call?
     bool isEnumElementConstructor() {
-      return (callee.kind == Callee::Kind::EnumElement && uncurries == 0);
+      return (callee.kind == Callee::Kind::EnumElement &&
+              uncurriedSites.size() == expectedSiteCount);
     }
 
     /// True if this is a completely unapplied super method call
-    bool isPartiallyAppliedSuperMethod(unsigned uncurryLevel) {
+    bool isPartiallyAppliedSuperMethod() {
       return (callee.kind == Callee::Kind::SuperMethod &&
-              uncurryLevel == 0);
+              uncurriedSites.size() == 1);
     }
 
     RValue apply(SGFContext C = SGFContext()) {
       initialWritebackScope.verify();
 
-      assert(!applied && "already applied!");
-
-      applied = true;
-
-      // Get the callee value at the needed uncurry level, uncurrying as
-      // much as possible. If the number of calls is less than the natural
-      // uncurry level, the callee emission might create a curry thunk.
-      unsigned uncurryLevel = callee.getNaturalUncurryLevel() - uncurries;
-
       // Emit the first level of call.
-      FirstLevelApplicationResult firstLevelResult =
-          applyFirstLevelCallee(uncurryLevel, C);
+      auto firstLevelResult = applyFirstLevelCallee(C);
 
       // End of the initial writeback scope.
       initialWritebackScope.verify();
@@ -4017,17 +3994,8 @@ namespace {
           firstLevelResult.foreignSelf, C, formalTypeThrows);
     }
 
-    ~CallEmission() { assert(applied && "never applied!"); }
-
     // Movable, but not copyable.
-    CallEmission(CallEmission &&e)
-        : SGF(e.SGF), uncurriedSites(std::move(e.uncurriedSites)),
-          extraSites(std::move(e.extraSites)), callee(std::move(e.callee)),
-          initialWritebackScope(std::move(e.initialWritebackScope)),
-          uncurries(e.uncurries), applied(e.applied),
-          assumedPlusZeroSelf(e.assumedPlusZeroSelf) {
-      e.applied = true;
-    }
+    CallEmission(CallEmission &&e) = default;
 
   private:
     CallEmission(const CallEmission &) = delete;
@@ -4086,19 +4054,17 @@ namespace {
 
     FirstLevelApplicationResult
     applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
-                            unsigned uncurryLevel, SGFContext C);
+                            SGFContext C);
 
     FirstLevelApplicationResult
-    applyPartiallyAppliedSuperMethod(unsigned uncurryLevel, SGFContext C);
+    applyPartiallyAppliedSuperMethod(SGFContext C);
 
     FirstLevelApplicationResult
-    applyEnumElementConstructor(unsigned uncurryLevel, SGFContext C);
+    applyEnumElementConstructor(SGFContext C);
 
-    FirstLevelApplicationResult applyNormalCall(unsigned uncurryLevel,
-                                                SGFContext C);
+    FirstLevelApplicationResult applyNormalCall(SGFContext C);
 
-    FirstLevelApplicationResult applyFirstLevelCallee(unsigned uncurryLevel,
-                                                      SGFContext C);
+    FirstLevelApplicationResult applyFirstLevelCallee(SGFContext C);
 
     RValue applyRemainingCallSites(RValue &&result,
                                    AbstractionPattern origFormalType,
@@ -4121,25 +4087,27 @@ getUncurriedOrigFormalResultType(AbstractionPattern origFormalType,
 }
 
 CallEmission::FirstLevelApplicationResult
-CallEmission::applyFirstLevelCallee(unsigned uncurryLevel, SGFContext C) {
+CallEmission::applyFirstLevelCallee(SGFContext C) {
   // Check for a specialized emitter.
-  if (auto emitter = callee.getSpecializedEmitter(SGF.SGM, uncurryLevel)) {
-    return applySpecializedEmitter(emitter.getValue(), uncurryLevel, C);
+  if (uncurriedSites.size() == expectedSiteCount) {
+    if (auto emitter = callee.getSpecializedEmitter(SGF.SGM)) {
+      return applySpecializedEmitter(emitter.getValue(), C);
+    }
   }
 
-  if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
-    return applyPartiallyAppliedSuperMethod(uncurryLevel, C);
+  if (isPartiallyAppliedSuperMethod()) {
+    return applyPartiallyAppliedSuperMethod(C);
   }
 
   if (isEnumElementConstructor()) {
-    return applyEnumElementConstructor(uncurryLevel, C);
+    return applyEnumElementConstructor(C);
   }
 
-  return applyNormalCall(uncurryLevel, C);
+  return applyNormalCall(C);
 }
 
 CallEmission::FirstLevelApplicationResult
-CallEmission::applyNormalCall(unsigned uncurryLevel, SGFContext C) {
+CallEmission::applyNormalCall(SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
 
   // We use the context emit-into initialization only for the
@@ -4149,10 +4117,11 @@ CallEmission::applyNormalCall(unsigned uncurryLevel, SGFContext C) {
   firstLevelResult.formalType = callee.getSubstFormalType();
   auto origFormalType = callee.getOrigFormalType();
 
+  bool isCurried = (uncurriedSites.size() < callee.getParameterListCount());
+
   // Get the callee type information.
-  CalleeTypeInfo calleeTypeInfo =
-      callee.getTypeInfoAtUncurryLevel(SGF, uncurryLevel);
-  ManagedValue mv = callee.getFnValueAtUncurryLevel(SGF, uncurryLevel);
+  auto calleeTypeInfo = callee.getTypeInfo(SGF, isCurried);
+  auto mv = callee.getFnValue(SGF, isCurried);
 
   // In C language modes, substitute the type of the AbstractionPattern
   // so that we won't see type parameters down when we try to form bridging
@@ -4211,7 +4180,7 @@ CallEmission::applyNormalCall(unsigned uncurryLevel, SGFContext C) {
 }
 
 CallEmission::FirstLevelApplicationResult
-CallEmission::applyEnumElementConstructor(unsigned uncurryLevel, SGFContext C) {
+CallEmission::applyEnumElementConstructor(SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
   assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
@@ -4266,10 +4235,8 @@ CallEmission::applyEnumElementConstructor(unsigned uncurryLevel, SGFContext C) {
 }
 
 CallEmission::FirstLevelApplicationResult
-CallEmission::applyPartiallyAppliedSuperMethod(unsigned uncurryLevel,
-                                               SGFContext C) {
+CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
-  assert(uncurryLevel == 0);
 
   // We want to emit the arguments as fully-substituted values
   // because that's what the partially applied super method expects;
@@ -4349,7 +4316,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(unsigned uncurryLevel,
 
 CallEmission::FirstLevelApplicationResult
 CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
-                                      unsigned uncurryLevel, SGFContext C) {
+                                      SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
 
   // We use the context emit-into initialization only for the
@@ -4357,8 +4324,6 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
 
   ManagedValue mv;
-
-  assert(uncurryLevel == 0);
 
   // Get the callee type information. We want to emit the arguments as
   // fully-substituted values because that's what the specialized emitters
@@ -4642,8 +4607,8 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   auto origFormalType = callee.getOrigFormalType();
   auto substFormalType = callee.getSubstFormalType();
 
-  CalleeTypeInfo calleeTypeInfo = callee.getTypeInfoAtUncurryLevel(*this, 0);
-  ManagedValue mv = callee.getFnValueAtUncurryLevel(*this, 0);
+  auto calleeTypeInfo = callee.getTypeInfo(*this, /*isCurried=*/false);
+  auto mv = callee.getFnValue(*this, /*isCurried=*/false);
 
   assert(!calleeTypeInfo.foreignError);
   assert(!calleeTypeInfo.foreignSelf.isImportAsMember());

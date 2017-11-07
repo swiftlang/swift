@@ -710,7 +710,7 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
                   (swift::ResilienceExpansion)ListOfValues[NextIdx+2],
                   /*isCurried=*/false, ListOfValues[NextIdx+4] > 0);
-  if (ListOfValues[NextIdx+3] < DRef.getUncurryLevel())
+  if (ListOfValues[NextIdx+3] < DRef.getParameterListCount() - 1)
     DRef = DRef.asCurried();
   NextIdx += 5;
   return DRef;
