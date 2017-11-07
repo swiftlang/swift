@@ -193,7 +193,7 @@ bb0:
   %c30 = builtin "assert_configuration"() : $Builtin.Int32
 
   %f = function_ref @update_global: $@convention(thin) () -> ()
-  // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: update_global inlined into regular_large_callee (cost = {{.*}}, benefit = {{.*}})
+  // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: "update_global" inlined into "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
   // YAML:      --- !Passed
   // YAML-NEXT: Pass:            sil-inliner
   // YAML-NEXT: Name:            Inlined
@@ -203,13 +203,13 @@ bb0:
   // YAML-NEXT:   Column:          3
   // YAML-NEXT: Function:        regular_large_callee
   // YAML-NEXT: Args:
-  // YAML-NEXT:   - Callee:          update_global
+  // YAML-NEXT:   - Callee:          '"update_global"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
   // YAML-NEXT:       Line:            20
   // YAML-NEXT:       Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
-  // YAML-NEXT:   - Caller:          regular_large_callee
+  // YAML-NEXT:   - Caller:          '"regular_large_callee"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
   // YAML-NEXT:       Line:            162

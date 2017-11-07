@@ -19,6 +19,7 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Demangling/Demangler.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -43,7 +44,13 @@ Argument::Argument(StringRef Key, unsigned long long N)
     : Key(Key), Val(llvm::utostr(N)) {}
 
 Argument::Argument(StringRef Key, SILFunction *F)
-    : Key(Key), Val(F->getName()) {
+    : Key(Key),
+      Val((Twine("\"") +
+           Demangle::demangleSymbolAsString(
+               F->getName(),
+               Demangle::DemangleOptions::SimplifiedUIDemangleOptions()) +
+           "\"")
+              .str()) {
   if (F->hasLocation())
     Loc = F->getLocation().getSourceLoc();
 }
@@ -110,7 +117,9 @@ template <typename KindT> struct MappingTraits<Remark<KindT>> {
     if (!io.outputting() || Loc.isValid())
       io.mapOptional("DebugLoc", Loc);
 
-    StringRef FN = R.getFunction()->getName();
+    std::string FN = Demangle::demangleSymbolAsString(
+        R.getFunction()->getName(),
+        Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
     io.mapRequired("Function", FN);
     io.mapOptional("Args", R.getArgs());
   }
