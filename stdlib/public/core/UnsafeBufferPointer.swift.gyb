@@ -500,9 +500,14 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// After executing `body`, this method rebinds memory back to the original
   /// `Element` type.
   ///
+  /// - Note: Only use this method to rebind the buffer's memory to a type
+  ///   with the same size and stride as the currently bound `Element` type.
+  ///   To bind a region of memory to a type that is a different size, convert
+  ///   the buffer to a raw buffer and use the `bindMemory(to:)` method.
+  ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     buffer. The type `T` must have the same stride and be layout compatible
+  ///     buffer. The type `T` must have the same size and be layout compatible
   ///     with the pointer's `Element` type.
   ///   - body: A closure that takes a ${Mutable.lower()} typed buffer to the
   ///     same memory as this buffer, only bound to type `T`. The buffer argument 

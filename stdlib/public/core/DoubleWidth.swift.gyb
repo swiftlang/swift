@@ -11,6 +11,38 @@
 //===----------------------------------------------------------------------===//
 
 /// A fixed-width integer that is twice the size of its base type.
+///
+/// You can use the `DoubleWidth` type to continue calculations with the result
+/// of a full width arithmetic operation. Normally, when you perform a full
+/// width operation, the result is a tuple of the high and low components of
+/// the result.
+///
+///     let a = 2241543570477705381
+///     let b = 186319822866995413
+///     let c = a.multipliedFullWidth(by: b)
+///     // c == (22640526660490081, 7959093232766896457)
+///
+/// The tuple `c` can't be used in any further comparisons or calculations. To
+/// use this value, create a `DoubleWidth` instance from the result. You can
+/// use the `DoubleWidth` instance the way you use any other integer type.
+///
+///     let d = DoubleWidth(a.multipliedFullWidth(by: b))
+///     // d == 417644001000058515200174966092417353
+///
+///     // Check the calculation:
+///     print(d / DoubleWidth(a) == b)
+///     // Prints "true"
+///
+///     if d > Int.max {
+///         print("Too big to be an 'Int'!")
+///     } else {
+///         print("Small enough to fit in an 'Int'")
+///     }
+///     // Prints "Too big to be an 'Int'!"
+///
+/// The `DoubleWidth` type is intended for intermediate calculations, not as a
+/// replacement for a variable-width integer type. Nesting `DoubleWidth`
+/// instances, in particular, can result in undesirable performance.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct DoubleWidth<Base : FixedWidthInteger> : _ExpressibleByBuiltinIntegerLiteral
   where Base.Words : Collection, Base.Magnitude.Words : Collection {    
