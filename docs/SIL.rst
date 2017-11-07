@@ -583,7 +583,7 @@ autorelease in the callee.
     when it is possible to do this automatically.
 
 Coroutine Types
-`````````````
+```````````````
 
 A coroutine is a function which can suspend itself and return control to
 its caller without terminating the function.  That is, it does not need to
@@ -4794,7 +4794,7 @@ an ``unwind`` edge. That is, the blocks reachable from ``unwind`` edges
 must jointly form a disjoint subfunction of the coroutine.
 
 unwind
-`````
+``````
 ::
 
   sil-terminator ::= 'unwind'
