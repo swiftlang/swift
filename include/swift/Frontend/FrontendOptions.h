@@ -296,6 +296,9 @@ public:
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
 
+  /// The module for which we should verify all of the generic signatures.
+  std::string VerifyGenericSignaturesInModule;
+
   enum ActionType {
     NoneAction, ///< No specific action
     Parse, ///< Parse only
