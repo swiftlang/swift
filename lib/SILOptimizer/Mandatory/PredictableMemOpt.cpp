@@ -143,17 +143,84 @@ static unsigned computeSubelement(SILValue Pointer,
 }
 
 //===----------------------------------------------------------------------===//
+//                              Available Value
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct AvailableValue {
+  SILValue Value;
+  unsigned SubElementNumber;
+
+public:
+  AvailableValue() = default;
+
+  AvailableValue(SILValue Value, unsigned SubElementNumber)
+      : Value(Value), SubElementNumber(SubElementNumber) {}
+
+  /// Deleted copy constructor. This is a move only type.
+  AvailableValue(const AvailableValue &) = delete;
+
+  /// Deleted copy operator. This is a move only type.
+  AvailableValue &operator=(const AvailableValue &) = delete;
+
+  /// Move constructor.
+  AvailableValue(AvailableValue &&Other)
+      : Value(nullptr), SubElementNumber(~0) {
+    std::swap(Value, Other.Value);
+    std::swap(SubElementNumber, Other.SubElementNumber);
+  }
+
+  /// Move operator.
+  AvailableValue &operator=(AvailableValue &&Other) {
+    std::swap(Value, Other.Value);
+    std::swap(SubElementNumber, Other.SubElementNumber);
+    return *this;
+  }
+
+  operator bool() const { return bool(Value); }
+
+  bool operator==(const AvailableValue &Other) const {
+    return Value == Other.Value && SubElementNumber == Other.SubElementNumber;
+  }
+
+  bool operator!=(const AvailableValue &Other) const {
+    return !(*this == Other);
+  }
+
+  SILValue getValue() const { return Value; }
+  SILType getType() const { return Value->getType(); }
+  unsigned getSubElementNumber() const { return SubElementNumber; }
+
+  /// TODO: This needs a better name.
+  AvailableValue emitStructExtract(SILBuilder &B, SILLocation Loc, VarDecl *D,
+                                   unsigned SubEltNumber) const {
+    SILValue NewValue = B.emitStructExtract(Loc, Value, D);
+    return {NewValue, SubEltNumber};
+  }
+
+  /// TODO: This needs a better name.
+  AvailableValue emitTupleExtract(SILBuilder &B, SILLocation Loc,
+                                  unsigned EltNo, unsigned SubEltNumber) const {
+    SILValue NewValue = B.emitTupleExtract(Loc, Value, EltNo);
+    return {NewValue, SubEltNumber};
+  }
+};
+
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
 //                           Subelement Extraction
 //===----------------------------------------------------------------------===//
 
 /// Given an aggregate value and an access path, non-destructively extract the
 /// value indicated by the path.
-static SILValue nonDestructivelyExtractSubElement(SILValue Val,
-                                                  unsigned SubElementNumber,
+static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
                                                   SILBuilder &B,
                                                   SILLocation Loc) {
-  SILType ValTy = Val->getType();
-  
+  SILType ValTy = Val.getType();
+  unsigned SubElementNumber = Val.SubElementNumber;
+
   // Extract tuple elements.
   if (auto TT = ValTy.getAs<TupleType>()) {
     for (unsigned EltNo : indices(TT.getElementTypes())) {
@@ -161,8 +228,8 @@ static SILValue nonDestructivelyExtractSubElement(SILValue Val,
       SILType EltTy = ValTy.getTupleElementType(EltNo);
       unsigned NumSubElt = getNumSubElements(EltTy, B.getModule());
       if (SubElementNumber < NumSubElt) {
-        Val = B.emitTupleExtract(Loc, Val, EltNo, EltTy);
-        return nonDestructivelyExtractSubElement(Val, SubElementNumber, B, Loc);
+        auto NewVal = Val.emitTupleExtract(B, Loc, EltNo, SubElementNumber);
+        return nonDestructivelyExtractSubElement(NewVal, B, Loc);
       }
       
       SubElementNumber -= NumSubElt;
@@ -178,8 +245,8 @@ static SILValue nonDestructivelyExtractSubElement(SILValue Val,
       unsigned NumSubElt = getNumSubElements(fieldType, B.getModule());
       
       if (SubElementNumber < NumSubElt) {
-        Val = B.emitStructExtract(Loc, Val, D);
-        return nonDestructivelyExtractSubElement(Val, SubElementNumber, B, Loc);
+        auto NewVal = Val.emitStructExtract(B, Loc, D, SubElementNumber);
+        return nonDestructivelyExtractSubElement(NewVal, B, Loc);
       }
       
       SubElementNumber -= NumSubElt;
@@ -190,24 +257,17 @@ static SILValue nonDestructivelyExtractSubElement(SILValue Val,
   
   // Otherwise, we're down to a scalar.
   assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
-  return Val;
+  return Val.getValue();
 }
 
 //===----------------------------------------------------------------------===//
 //                        Available Value Aggregation
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// Our available value representation. Will become a struct later.
-using AvailableValue = std::pair<SILValue, unsigned>;
-
-} // end anonymous namespace
-
 static bool anyMissing(unsigned StartSubElt, unsigned NumSubElts,
                        ArrayRef<AvailableValue> &Values) {
   while (NumSubElts) {
-    if (!Values[StartSubElt].first)
+    if (!Values[StartSubElt])
       return true;
     ++StartSubElt;
     --NumSubElts;
@@ -240,6 +300,9 @@ public:
 
   SILValue aggregateValues(SILType LoadTy, SILValue Address, unsigned FirstElt);
 
+  void print(llvm::raw_ostream &os) const;
+  void dump() const;
+
 private:
   SILValue aggregateFullyAvailableValue(SILType LoadTy, unsigned FirstElt);
   SILValue aggregateTupleSubElts(TupleType *TT, SILType LoadTy,
@@ -251,6 +314,17 @@ private:
 };
 
 } // end anonymous namespace
+
+void AvailableValueAggregator::dump() const { print(llvm::dbgs()); }
+
+void AvailableValueAggregator::print(llvm::raw_ostream &os) const {
+  os << "Available Value List, N = " << AvailableValueList.size()
+     << ". Elts:\n";
+  for (auto &V : AvailableValueList) {
+    os << "Value: " << V.getValue()
+       << "SubElementNumber: " << V.getSubElementNumber() << "\n";
+  }
+}
 
 /// Given a bunch of primitive subelement values, build out the right aggregate
 /// type (LoadTy) by emitting tuple and struct instructions as necessary.
@@ -287,23 +361,23 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType LoadTy,
     return SILValue();
   }
 
-  SILValue FirstVal = AvailableValueList[FirstElt].first;
-  // Make sure that the first element is available.
-  if (!FirstVal || AvailableValueList[FirstElt].second != 0 ||
-      FirstVal->getType() != LoadTy) {
+  auto &FirstVal = AvailableValueList[FirstElt];
+
+  // Make sure that the first element is available and is the correct type.
+  if (!FirstVal || FirstVal.getType() != LoadTy)
     return SILValue();
-  }
 
   // If the first element of this value is available, check that any extra
-  // available values match our first value.
-  if (llvm::any_of(
-          range(getNumSubElements(LoadTy, M)), [&](unsigned Index) -> bool {
-            return AvailableValueList[FirstElt + Index].first != FirstVal ||
-                   AvailableValueList[FirstElt + Index].second != Index;
-          }))
+  // available values are from the same place as our first value.
+  if (llvm::any_of(range(getNumSubElements(LoadTy, M)),
+                   [&](unsigned Index) -> bool {
+                     auto &Val = AvailableValueList[FirstElt + Index];
+                     return Val.getValue() != FirstVal.getValue() ||
+                            Val.getSubElementNumber() != Index;
+                   }))
     return SILValue();
 
-  return FirstVal;
+  return FirstVal.getValue();
 }
 
 SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
@@ -362,7 +436,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   auto &Val = AvailableValueList[FirstElt];
 
   // If the value is not available, load the value.
-  if (!Val.first) {
+  if (!Val) {
     return B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
   }
 
@@ -371,12 +445,9 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   // insert a copy of EltVal after we extract it if we do not have a trivial
   // value. We use SILBuilder::emit*Operation to handle both trivial/non-trivial
   // cases without needing to introduce control flow here.
-  SILValue Aggregate = Val.first;
-  unsigned AggregateSubElementNumber = Val.second;
 
   // Then extract the subelement from the borrowed aggregate.
-  SILValue EltVal = nonDestructivelyExtractSubElement(
-      Aggregate, AggregateSubElementNumber, B, Loc);
+  SILValue EltVal = nonDestructivelyExtractSubElement(Val, B, Loc);
   assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
   return EltVal;
 }
@@ -517,11 +588,11 @@ void AllocOptimize::updateAvailableValues(
     SmallVectorImpl<AvailableValue> &Result,
     llvm::SmallBitVector &ConflictingValues) {
   // Handle store and assign.
-  if (isa<StoreInst>(Inst)) {
-    unsigned StartSubElt = computeSubelement(Inst->getOperand(1), TheMemory);
+  if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+    unsigned StartSubElt = computeSubelement(SI->getDest(), TheMemory);
     assert(StartSubElt != ~0U && "Store within enum projection not handled");
-    SILType ValTy = Inst->getOperand(0)->getType();
-    
+    SILType ValTy = SI->getSrc()->getType();
+
     for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
       // If this element is not required, don't fill it in.
       if (!RequiredElts[StartSubElt+i]) continue;
@@ -530,9 +601,10 @@ void AllocOptimize::updateAvailableValues(
       // there already is a result, check it for conflict.  If there is no
       // conflict, then we're ok.
       auto &Entry = Result[StartSubElt+i];
-      if (Entry.first == SILValue())
-        Entry = { Inst->getOperand(0), i };
-      else if (Entry.first != Inst->getOperand(0) || Entry.second != i)
+      if (!Entry)
+        Entry = {SI->getSrc(), i};
+      else if (Entry.getValue() != SI->getSrc() ||
+               Entry.getSubElementNumber() != i)
         ConflictingValues[StartSubElt+i] = true;
       
       // This element is now provided.
@@ -760,7 +832,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
     // promote this load and there is nothing to do.
     bool AnyAvailable = false;
     for (unsigned i = FirstElt, e = i+NumLoadSubElements; i != e; ++i)
-      if (AvailableValues[i].first) {
+      if (AvailableValues[i].getValue()) {
         AnyAvailable = true;
         break;
       }
@@ -838,11 +910,11 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   // trivially succeed. This can happen when there is a load of an empty struct.
   if (NumLoadSubElements != 0) {
     computeAvailableValues(DAI, RequiredElts, AvailableValues);
-    
+
     // If some value is not available at this load point, then we fail.
-    for (unsigned i = FirstElt, e = FirstElt+NumLoadSubElements; i != e; ++i)
-      if (!AvailableValues[i].first)
-        return false;
+    if (llvm::any_of(range(FirstElt, FirstElt + NumLoadSubElements),
+                     [&](unsigned i) -> bool { return !AvailableValues[i]; }))
+      return false;
   }
   
   // Aggregate together all of the subelements into something that has the same
