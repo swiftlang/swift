@@ -460,7 +460,7 @@ bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
   return canActionEmitModule(action);
 }
 
-bool FrontendOptions::actionProducesOutput(ActionType action) {
+bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::EmitPCH:
@@ -493,7 +493,7 @@ bool FrontendOptions::actionProducesOutput(ActionType action) {
   }
 }
 
-bool FrontendOptions::actionHasTextualOutput(ActionType action) {
+bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::EmitPCH:

@@ -558,9 +558,8 @@ private:
   bool hasUnusableModuleDocOutputPath() const;
   static bool canActionEmitModuleDoc(ActionType);
 
-  /// Return true if changed output filename.
-  static bool actionProducesOutput(ActionType);
-  static bool actionHasTextualOutput(ActionType);
+  static bool doesActionProduceOutput(ActionType);
+  static bool doesActionProduceTextualOutput(ActionType);
 };
 } // namespace swift
 
