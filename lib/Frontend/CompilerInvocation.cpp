@@ -177,7 +177,7 @@ private:
       Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
                      filelistBufferOrError.getError().message());
       return FilesInfo::error();
-    }
+  }
     // Keep buffer alive because code passes around StringRefs.
     FilelistBuffer = std::move(*filelistBufferOrError);
     std::vector<StringRef> inputFilesFromFilelist(
@@ -671,7 +671,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
       !llvm::sys::fs::is_directory((*outputFilenames)[0]);
   std::string nameToStem = isOutputAUniqueOrdinaryFile
                                ? (*outputFilenames)[0]
-                               : Opts.Inputs.getFilenameOfFirstInput();
+          : Opts.Inputs.getFilenameOfFirstInput();
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
 }
@@ -705,11 +705,11 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
 }
 
 // No output filename was specified.
-// Determine the correct output filename.
+  // Determine the correct output filename.
 
-// Note: this should typically only be used when invoking the frontend
-// directly, as the driver will always pass -o with an appropriate filename
-// if output is required for the requested action.
+  // Note: this should typically only be used when invoking the frontend
+  // directly, as the driver will always pass -o with an appropriate filename
+  // if output is required for the requested action.
 
 bool FrontendArgsToOptionsConverter::deriveOutputFilename() {
   if (Opts.Inputs.isReadingFromStdin() ||
@@ -730,10 +730,10 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilename() {
   llvm::SmallString<128> Path(baseName);
   StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
       Opts.RequestedAction);
-  llvm::sys::path::replace_extension(Path, Suffix);
-  Opts.OutputFilenames.push_back(Path.str());
+    llvm::sys::path::replace_extension(Path, Suffix);
+    Opts.OutputFilenames.push_back(Path.str());
   return false;
-}
+  }
 
 // An output directory was specified.
 // Determine the correct output filename.
@@ -766,7 +766,7 @@ std::string FrontendArgsToOptionsConverter::computeBaseNameOfOutput() const {
            "Cannot handle multiple primaries yet");
     nameToStem = Opts.Inputs.primaryFilenames()[0];
   } else if (auto UserSpecifiedModuleName =
-                 Args.getLastArg(options::OPT_module_name)) {
+               Args.getLastArg(options::OPT_module_name)) {
     nameToStem = std::string(UserSpecifiedModuleName->getValue());
   } else if (Opts.Inputs.inputFilenameCount() == 1) {
     nameToStem = Opts.Inputs.getFilenameOfFirstInput();
@@ -843,25 +843,25 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
                           SERIALIZED_MODULE_DOC_EXTENSION, false);
 }
 
-bool FrontendArgsToOptionsConverter::hasAnUnusedOutputPath() const {
-  if (Opts.hasUnusedDependenciesFilePath()) {
+bool FrontendArgsToOptionsConverter::hasAnUnusableOutputPath() const {
+  if (Opts.hasUnusableDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
-  if (Opts.hasUnusedObjCHeaderOutputPath()) {
+  if (Opts.hasUnusableObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }
-  if (Opts.hasUnusedLoadedModuleTracePath()) {
+  if (Opts.hasUnusableLoadedModuleTracePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return true;
   }
-  if (Opts.hasUnusedModuleOutputPath()) {
+  if (Opts.hasUnusableModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     return true;
   }
-  if (Opts.hasUnusedModuleDocOutputPath()) {
+  if (Opts.hasUnusableModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
