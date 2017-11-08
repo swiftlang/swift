@@ -413,8 +413,8 @@ bool FrontendOptions::actionProducesOutputFromFrontend() const {
   }
 }
 
-bool FrontendOptions::actionOutputsToStdout() const {
-  switch (RequestedAction) {
+bool FrontendOptions::actionHasTextualOutput(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::EmitPCH:
   case ActionType::EmitSIBGen:
