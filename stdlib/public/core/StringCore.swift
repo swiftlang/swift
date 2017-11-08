@@ -117,7 +117,7 @@ public struct _LegacyStringCore {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal static func _copyElements(
-    _ srcStart: UnsafeMutableRawPointer, srcElementWidth: Int,
+    _ srcStart: UnsafeRawPointer, srcElementWidth: Int,
     dstStart: UnsafeMutableRawPointer, dstElementWidth: Int,
     count: Int
   ) {
