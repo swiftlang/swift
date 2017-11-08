@@ -380,10 +380,13 @@ bool FrontendOptions::doesActionEmitHeader(ActionType action) {
   }
 }
 
-bool FrontendOptions::canEmitLoadedModuleTrace() const {
-  if (LoadedModuleTracePath.empty())
-    return true;
-  switch (RequestedAction) {
+bool FrontendOptions::areEmittingLoadedModuleTrace() const {
+  return LoadedModuleTracePath.empty() ||
+         doesActionEmitLoadedModuleTrace(RequestedAction);
+}
+
+bool FrontendOptions::doesActionEmitLoadedModuleTrace(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::DumpParse:

@@ -823,7 +823,7 @@ bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return false;
   }
-  if (!Opts.canEmitLoadedModuleTrace()) {
+  if (!Opts.areEmittingLoadedModuleTrace()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return false;
