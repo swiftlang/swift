@@ -815,7 +815,7 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
 }
 
 bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
-  if (!Opts.canEmitDependencies()) {
+  if (!Opts.areEmittingDependencies()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return false;
   }

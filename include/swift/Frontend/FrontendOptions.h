@@ -545,7 +545,8 @@ public:
 private:
   const char *computeSuffix();
 
-  bool canEmitDependencies() const;
+  bool areEmittingDependencies() const;
+  static bool doesActionEmitDependencies(ActionType);
   bool canEmitHeader() const;
   bool canEmitLoadedModuleTrace() const;
   bool canEmitModule() const;
