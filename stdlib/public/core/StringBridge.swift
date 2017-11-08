@@ -147,7 +147,7 @@ internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
 
 internal func getCocoaPointer(
   _cocoaString cfImmutableValue: AnyObject
-) -> (UnsafeMutableRawPointer?, isUTF16: Bool)  {
+) -> (UnsafeRawPointer?, isUTF16: Bool)  {
   // Look first for null-terminated ASCII
   // Note: the code in clownfish appears to guarantee
   // nul-termination, but I'm waiting for an answer from Chris Kane
@@ -157,13 +157,13 @@ internal func getCocoaPointer(
 
   // start will hold the base pointer of contiguous storage, if it
   // is found.
-  var start: UnsafeMutableRawPointer?
+  var start: UnsafeRawPointer?
   let isUTF16 = (nulTerminatedASCII == nil)
   if isUTF16 {
     let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-    start = UnsafeMutableRawPointer(mutating: utf16Buf)
+    start = UnsafeRawPointer(utf16Buf)
   } else {
-    start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
+    start = UnsafeRawPointer(nulTerminatedASCII)
   }
   return (start, isUTF16: isUTF16)
 }
@@ -195,7 +195,7 @@ func makeCocoaLegacyStringCore(_cocoaString: AnyObject) -> _LegacyStringCore {
   let (start, isUTF16) = getCocoaPointer(_cocoaString: cfImmutableValue)
 
   return _LegacyStringCore(
-    baseAddress: start,
+    baseAddress: UnsafeMutableRawPointer(mutating: start),
     count: length,
     elementShift: isUTF16 ? 1 : 0,
     hasCocoaBuffer: true,
