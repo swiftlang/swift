@@ -27,7 +27,8 @@ func main() {
 // CHECK:  call void @swift_bridgeObjectRelease({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  llvm.lifetime.end
-// CHECK-NEXT:  bitcast
+// CHECK-NEXT:  load
+// CHECK-NEXT:  swift_rt_swift_release
 // CHECK-NEXT:  bitcast
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  ret void, !dbg ![[CLEANUPS]]

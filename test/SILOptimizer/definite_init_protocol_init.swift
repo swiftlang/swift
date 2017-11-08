@@ -40,6 +40,9 @@ class TrivialClass : TriviallyConstructible {
   // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick TrivialClass.Type, %1
   // CHECK-NEXT:  dealloc_partial_ref %1 : $TrivialClass, [[METATYPE]] : $@thick TrivialClass.Type
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
+  // TODO: Once we restore arbitrary takes, the strong_retain/destroy_addr pair below will go away.
+  // CHECK-NEXT:  strong_retain [[NEW_SELF]]
+  // CHECK-NEXT:  destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:  dealloc_stack [[SELF_BOX]]
   // CHECK-NEXT:  return [[NEW_SELF]]
   convenience init(upper: Int) {
