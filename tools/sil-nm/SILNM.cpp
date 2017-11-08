@@ -19,10 +19,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Range.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -73,8 +73,9 @@ static llvm::cl::opt<std::string> ResourceDir(
     llvm::cl::desc("The directory that holds the compiler resource files"));
 
 static llvm::cl::opt<std::string>
-    SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
-                                  "importer."),
+    SDKPath("sdk",
+            llvm::cl::desc("The path to the SDK for use with the clang "
+                           "importer."),
             llvm::cl::init(""));
 
 static llvm::cl::opt<std::string> Triple("target",
@@ -170,8 +171,8 @@ int main(int argc, char **argv) {
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-  Invocation.setupForToolInputFile(InputFilename, ModuleName, true,
-                                   extendedInfo);
+      Invocation.setUpForToolInputFile(InputFilename, ModuleName, true,
+                                       extendedInfo);
   if (!FileBufOrErr)
     exit(-1);
 

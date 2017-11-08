@@ -20,7 +20,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-func-extractor"
-#include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
@@ -33,9 +32,10 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -66,8 +66,8 @@ static llvm::cl::opt<std::string> FunctionNameFile(
     "func-file", llvm::cl::desc("File to load additional function names from"));
 
 static llvm::cl::opt<bool>
-EmitSIB("emit-sib",
-        llvm::cl::desc("Emit a sib file as output instead of a sil file"));
+    EmitSIB("emit-sib",
+            llvm::cl::desc("Emit a sib file as output instead of a sil file"));
 
 static llvm::cl::opt<bool> InvertMatch(
     "invert",
@@ -93,23 +93,23 @@ static llvm::cl::opt<std::string> ResourceDir(
     llvm::cl::desc("The directory that holds the compiler resource files"));
 
 static llvm::cl::opt<std::string>
-    SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
-                                  "importer."),
+    SDKPath("sdk",
+            llvm::cl::desc("The path to the SDK for use with the clang "
+                           "importer."),
             llvm::cl::init(""));
 
 static llvm::cl::opt<std::string> Triple("target",
                                          llvm::cl::desc("target triple"));
 
-static llvm::cl::opt<bool>
-EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
-                    llvm::cl::init(false),
-                    llvm::cl::desc("Sort Functions, VTables, Globals, "
-                                   "WitnessTables by name to ease diffing."));
+static llvm::cl::opt<bool> EnableSILSortOutput(
+    "emit-sorted-sil", llvm::cl::Hidden, llvm::cl::init(false),
+    llvm::cl::desc("Sort Functions, VTables, Globals, "
+                   "WitnessTables by name to ease diffing."));
 
-static llvm::cl::opt<bool>
-DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
-               llvm::cl::init(false),
-               llvm::cl::desc("Do not dump AST."));
+static llvm::cl::opt<bool> DisableASTDump("sil-disable-ast-dump",
+                                          llvm::cl::Hidden,
+                                          llvm::cl::init(false),
+                                          llvm::cl::desc("Do not dump AST."));
 
 static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
@@ -117,9 +117,8 @@ static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
 static llvm::cl::opt<bool>
-DisableSILLinking("disable-sil-linking",
-                  llvm::cl::init(true),
-                  llvm::cl::desc("Disable SIL linking"));
+    DisableSILLinking("disable-sil-linking", llvm::cl::init(true),
+                      llvm::cl::desc("Disable SIL linking"));
 
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
@@ -256,8 +255,8 @@ int main(int argc, char **argv) {
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-  Invocation.setupForToolInputFile(InputFilename, ModuleName, true,
-                                   extendedInfo);
+      Invocation.setUpForToolInputFile(InputFilename, ModuleName, true,
+                                       extendedInfo);
   if (!FileBufOrErr)
     exit(-1);
 
