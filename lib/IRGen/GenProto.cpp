@@ -1069,7 +1069,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
   // If the conformance is generic, the accessor takes the metatype plus
   // possible conditional conformances arguments.
   llvm::CallInst *call;
-  if (conformance->getDeclContext()->isGenericContext()) {
+  if (conformance->witnessTableAccessorRequiresArguments()) {
     // Emit the source metadata if we haven't yet.
     if (!*srcMetadataCache) {
       *srcMetadataCache = IGF.emitTypeMetadataRef(conformingType);
@@ -1530,15 +1530,11 @@ getOrCreateWitnessTableAccessFunction(IRGenModule &IGM, CanType type,
   // and won't let us re-use the cache with other non-dependent uses in
   // the module.  Therefore, in this case, we use the address of the lazy-cache
   // function.
-  //
-  // FIXME: we will need to pass additional parameters if the target
-  // conformance is conditional.
   auto rootConformance = conformance->getRootNormalConformance();
-  if (rootConformance->getDeclContext()->isGenericContext()) {
+  if (rootConformance->witnessTableAccessorRequiresArguments()) {
     return getWitnessTableLazyAccessFunction(IGM, rootConformance, type);
   } else {
-    return IGM.getAddrOfWitnessTableAccessFunction(
-                                    conformance->getRootNormalConformance(),
+    return IGM.getAddrOfWitnessTableAccessFunction(rootConformance,
                                                    NotForDefinition);
   }
 }
@@ -1731,7 +1727,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   llvm::Value *conditionalReqtWtables;
   llvm::Value *numConditionalReqtWtables;
 
-  if (Conformance.getDeclContext()->isGenericContext()) {
+  if (Conformance.witnessTableAccessorRequiresArguments()) {
     metadata = params.claimNext();
     conditionalReqtWtables = params.claimNext();
     numConditionalReqtWtables = params.claimNext();

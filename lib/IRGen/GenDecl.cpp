@@ -3354,7 +3354,7 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
   }
 
   llvm::FunctionType *fnType;
-  if (conf->getDeclContext()->isGenericContext()) {
+  if (conf->witnessTableAccessorRequiresArguments()) {
     // conditional requirements are passed indirectly, as an array of witness
     // tables.
     fnType = llvm::FunctionType::get(
