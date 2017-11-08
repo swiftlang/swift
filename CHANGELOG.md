@@ -26,7 +26,7 @@ Swift 4.1
 	constraints, which require that the associated type conform to the enclosing
 	protocol. The standard library protocols have been updated to make use of
 	recursive constraints. For example, the `SubSequence` associated type of
-	follows the enclosing protocol:
+	`Sequence` follows the enclosing protocol:
 
         protocol Sequence {
           associatedtype Element
