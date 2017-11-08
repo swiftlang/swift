@@ -345,10 +345,12 @@ bool FrontendOptions::doesActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::canEmitHeader() const {
-  if (ObjCHeaderOutputPath.empty())
-    return true;
-  switch (RequestedAction) {
+bool FrontendOptions::areEmittingHeader() const {
+  return ObjCHeaderOutputPath.empty() || doesActionEmitHeader(RequestedAction);
+}
+
+bool FrontendOptions::doesActionEmitHeader(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:

@@ -819,7 +819,7 @@ bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return false;
   }
-  if (!Opts.canEmitHeader()) {
+  if (!Opts.areEmittingHeader()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return false;
   }
