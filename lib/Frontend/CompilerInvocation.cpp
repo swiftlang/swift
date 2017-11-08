@@ -168,8 +168,7 @@ private:
   }
 
   bool enforceFilelistExclusion() {
-    if (Args.hasArg(options::OPT_primary_file) &&
-        Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
+    if (Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
       Diags.diagnose(SourceLoc(),
                      diag::error_cannot_have_input_files_with_file_list);
       return true;
