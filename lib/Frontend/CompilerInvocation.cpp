@@ -132,16 +132,6 @@ private:
     return std::move(buffer.get());
   }
 
-  static std::vector<StringRef>
-  splitIntoLines(const llvm::MemoryBuffer *buffer) {
-    std::vector<StringRef> fileNames;
-    if (buffer != nullptr)
-      for (StringRef line : make_range(llvm::line_iterator(*buffer), {})) {
-        fileNames.push_back(line);
-      }
-    return fileNames;
-  }
-
   bool hasFilelist() const { return filelistPathOrNull != nullptr; }
   enum Semantics {
     PrimariesAlsoCountAsOrdinaries,
@@ -169,8 +159,10 @@ private:
   }
 
   void getFilesFromFilelist() {
-    std::vector<StringRef> inputFilesFromFilelist =
-        splitIntoLines(filelistBuffer.get());
+    if (filelistBuffer == nullptr)
+      return;
+    std::vector<StringRef> inputFilesFromFilelist(
+        llvm::line_iterator(*filelistBuffer), {});
     for (auto file : inputFilesFromFilelist) {
       files.push_back(std::pair<StringRef, PrimaryOrOrdinary>(file, Ordinary));
     }
