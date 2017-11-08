@@ -1173,6 +1173,15 @@ public:
 
   virtual bool isSystemModule() const { return false; }
 
+  /// Retrieve the set of generic signatures stored within this module.
+  ///
+  /// \returns \c true if this module file supports retrieving all of the
+  /// generic signatures, \c false otherwise.
+  virtual bool getAllGenericSignatures(
+                 SmallVectorImpl<GenericSignature*> &genericSignatures) {
+    return false;
+  }
+
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
            file->getKind() == FileUnitKind::ClangModule;

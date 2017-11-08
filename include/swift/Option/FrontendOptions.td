@@ -76,6 +76,9 @@ def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
 def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,
   HelpText<"Allow diagnostics for '<unknown>' location in verify mode">;
+def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
+  MetaVarName<"<module-name>">,
+  HelpText<"Verify the generic signatures in the given module">;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
