@@ -416,10 +416,13 @@ bool FrontendOptions::doesActionEmitLoadedModuleTrace(ActionType action) {
   }
 }
 
-bool FrontendOptions::canEmitModule() const {
-  if (ModuleOutputPath.empty() && ModuleDocOutputPath.empty())
-    return true;
-  switch (RequestedAction) {
+bool FrontendOptions::areEmittingModule() const {
+  return (ModuleOutputPath.empty() && ModuleDocOutputPath.empty()) ||
+         doesActionEmitModule(RequestedAction);
+}
+
+bool FrontendOptions::doesActionEmitModule(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::Typecheck:
