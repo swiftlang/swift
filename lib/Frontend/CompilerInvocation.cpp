@@ -105,7 +105,7 @@ class ArgsToFrontendInputsConverter {
   FrontendInputs &Inputs;
 
   const llvm::opt::Arg *filelistPathOrNull;
-  const std::unique_ptr<llvm::MemoryBuffer> filelistBuffer;
+  const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer;
   /// A primary file is one that the compiler will generate code for,
   /// a secondary file supplies definitions used by the primaries.
   enum class FileKind { Primary, Secondary };
@@ -120,10 +120,10 @@ public:
         filelistBuffer(getFilelistBuffer(Diags, filelistPathOrNull)) {}
 
 private:
-  static std::unique_ptr<llvm::MemoryBuffer>
+  static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   getFilelistBuffer(DiagnosticEngine &diags, const llvm::opt::Arg *pathOrNull) {
     if (!pathOrNull)
-      return nullptr;
+      return llvm::MemoryBuffer::getMemBuffer("");
     char const *const path = pathOrNull->getValue();
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
         llvm::MemoryBuffer::getFile(path);
@@ -131,7 +131,7 @@ private:
       diags.diagnose(SourceLoc(), diag::cannot_open_file, path,
                      buffer.getError().message());
     }
-    return std::move(buffer.get());
+    return buffer;
   }
 
   bool hasFilelist() const { return filelistPathOrNull != nullptr; }
@@ -160,10 +160,8 @@ private:
   }
 
   void getFilesFromFilelist() {
-    if (filelistBuffer == nullptr)
-      return;
     std::vector<StringRef> inputFilesFromFilelist(
-        llvm::line_iterator(*filelistBuffer), {});
+        llvm::line_iterator(*filelistBuffer->get()), {});
     for (auto file : inputFilesFromFilelist) {
       files.push_back(
           std::pair<StringRef, FileKind>(file, FileKind::Secondary));
