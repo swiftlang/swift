@@ -431,7 +431,7 @@ extension _ArrayBuffer {
         refCopy.replaceSubrange(
           i..<(i + 1),
           with: 1,
-          arrayCount: arrayCount,
+          arrayCount: 0, //how can I get the array count here?
           elementsOf: CollectionOfOne(newValue))
       }
     }
