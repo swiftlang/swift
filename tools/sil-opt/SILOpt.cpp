@@ -346,8 +346,10 @@ int main(int argc, char **argv) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
   Invocation.setupForToolInputFile(InputFilename, ModuleName, false,
                                        extendedInfo);
-  if (!FileBufOrErr)
+  if (!FileBufOrErr) {
+    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
+  }
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
