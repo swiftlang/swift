@@ -3149,7 +3149,6 @@ IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
   auto *capacity = llvm::ConstantInt::get(Int32Ty, utf8.size() + 1);
   auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
 
-  // FIXME: Big endian-ness.
   llvm::Constant *heapObjectHeaderFields[] = {
       metaclass, refCountInit
   };
@@ -3225,7 +3224,6 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
   auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
   auto *padding = llvm::ConstantInt::get(Int8Ty, 0);
 
-  // FIXME: Big endian-ness
   llvm::Constant *heapObjectHeaderFields[] = {
       metaclass, refCountInit
   };
