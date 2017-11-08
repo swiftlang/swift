@@ -815,24 +815,25 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
 }
 
 bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
-  if (!Opts.areEmittingDependencies()) {
+  if (Opts.hasUnusableDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return false;
   }
-  if (!Opts.areEmittingHeader()) {
+  if (Opts.hasUnusableObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return false;
   }
-  if (!Opts.areEmittingLoadedModuleTrace()) {
+  if (Opts.hasUnusableLoadedModuleTracePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return false;
   }
-  if (!Opts.areEmittingModule()) {
-    if (!Opts.ModuleOutputPath.empty())
-      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
-    else
-      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
+  if (Opts.hasUnusableModuleOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
+    return false;
+  }
+  if (Opts.hasUnusableModuleOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return false;
   }
   return true;
