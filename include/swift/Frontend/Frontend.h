@@ -308,8 +308,8 @@ public:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  setUpForToolInputFile(const std::string &InputFilename,
-                        const std::string &ModuleNameArg,
+  setUpForToolInputFile(const llvm::StringRef InputFilename,
+                        const llvm::StringRef ModuleNameArg,
                         bool alwaysSetModuleToMain,
                         serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {

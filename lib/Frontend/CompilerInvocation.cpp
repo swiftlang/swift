@@ -1825,14 +1825,15 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInvocation::setUpForToolInputFile(
-    const std::string &InputFilename, const std::string &ModuleNameArg,
+    const llvm::StringRef InputFilename, const llvm::StringRef ModuleNameArg,
     bool alwaysSetModuleToMain,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
   if (!FileBufOrErr) {
-    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    fprintf(stderr, "Error! Failed to open file: %s\n",
+            InputFilename.str().c_str());
     return FileBufOrErr;
   }
 
