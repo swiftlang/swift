@@ -104,23 +104,15 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
 }
 
 /// Retrieve the type to use for a method found via dynamic lookup.
-static CanSILFunctionType
-getDynamicMethodLoweredType(SILGenFunction &SGF, SILValue v,
-                            SILDeclRef methodName,
+static SILType
+getDynamicMethodLoweredType(SILModule &M,
+                            SILDeclRef constant,
                             CanAnyFunctionType substMemberTy) {
-  auto &ctx = SGF.getASTContext();
-  CanType selfTy = v->getType().getSwiftRValueType();
-  assert((!methodName.getDecl()->isInstanceMember() ||
-          selfTy->is<ArchetypeType>()) &&
-         "Dynamic lookup needs an archetype");
-
-  // Replace the 'self' parameter type in the method type with it.
+  assert(constant.isForeign);
   auto objcFormalTy = substMemberTy.withExtInfo(substMemberTy->getExtInfo()
              .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
-
-  auto methodTy = SGF.SGM.M.Types
-    .getUncachedSILFunctionTypeForConstant(methodName, objcFormalTy);
-  return methodTy;
+  return SILType::getPrimitiveObjectType(
+      M.Types.getUncachedSILFunctionTypeForConstant(constant, objcFormalTy));
 }
 
 /// Check if we can perform a dynamic dispatch on a super method call.
@@ -481,19 +473,6 @@ public:
     return Constant;
   }
 
-  SILType getDynamicMethodType(SILModule &M) const {
-    // Lower the substituted type from the AST, which should have any generic
-    // parameters in the original signature erased to their upper bounds.
-    auto substFormalType = getSubstFormalType();
-    auto objcFormalType = substFormalType.withExtInfo(
-      substFormalType->getExtInfo().withSILRepresentation(
-        SILFunctionTypeRepresentation::ObjCMethod));
-    auto fnType = M.Types.getUncachedSILFunctionTypeForConstant(
-        Constant, objcFormalType);
-
-    return SILType::getPrimitiveObjectType(fnType);
-  }
-
   ManagedValue getFnValue(SILGenFunction &SGF, bool isCurried,
                           Optional<ManagedValue> borrowedSelf) const & {
     Optional<SILDeclRef> constant = None;
@@ -576,8 +555,8 @@ public:
       return ManagedValue::forUnmanaged(fn);
     }
     case Kind::DynamicMethod: {
-      assert(constant->isForeign);
-      auto closureType = getDynamicMethodType(SGF.SGM.M);
+      auto closureType = getDynamicMethodLoweredType(
+          SGF.SGM.M, *constant, getSubstFormalType());
 
       Scope S(SGF, Loc);
       SILValue fn = SGF.B.createObjCMethod(
@@ -629,7 +608,8 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::DynamicMethod: {
-      auto formalType = getDynamicMethodType(SGF.SGM.M);
+      auto formalType = getDynamicMethodLoweredType(
+          SGF.SGM.M, *constant, getSubstFormalType());
       return createCalleeTypeInfo(SGF, constant, formalType);
     }
     }
@@ -5561,9 +5541,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                        operand->getType().getSwiftRValueType(),
                                        memberMethodTy->getCanonicalType());
 
-    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, operand, member,
+    auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
-    auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = hasMemberBB->createPHIArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
 
@@ -5657,9 +5636,8 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     
     auto functionTy = CanFunctionType::get(base->getType().getSwiftRValueType(),
                                            methodTy);
-    auto dynamicMethodTy = getDynamicMethodLoweredType(*this, base, member,
+    auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
-    auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = hasMemberBB->createPHIArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
     // Emit the application of 'self'.
