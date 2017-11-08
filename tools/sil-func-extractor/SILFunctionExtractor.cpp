@@ -255,8 +255,8 @@ int main(int argc, char **argv) {
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      Invocation.setUpForToolInputFile(InputFilename, ModuleName, true,
-                                       extendedInfo);
+      Invocation.setUpInputForSILTool(InputFilename, ModuleName, true,
+                                      extendedInfo);
   if (!FileBufOrErr) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
