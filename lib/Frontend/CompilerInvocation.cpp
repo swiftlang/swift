@@ -1844,15 +1844,15 @@ CompilerInvocation::setUpForToolInputFile(
   bool HasSerializedAST = result.status == serialization::Status::Valid;
 
   if (HasSerializedAST) {
-    const StringRef Stem = ModuleNameArg.size()
+    const StringRef Stem = !ModuleNameArg.empty()
                                ? StringRef(ModuleNameArg)
                                : llvm::sys::path::stem(InputFilename);
     setModuleName(Stem);
     setInputKind(InputFileKind::IFK_Swift_Library);
   } else {
-    const StringRef Name = !alwaysSetModuleToMain && ModuleNameArg.size()
-                               ? StringRef(ModuleNameArg)
-                               : "main";
+    const StringRef Name = alwaysSetModuleToMain || ModuleNameArg.empty()
+                               ? "main"
+                               : StringRef(ModuleNameArg);
     setModuleName(Name);
     setInputKind(InputFileKind::IFK_SIL);
   }
