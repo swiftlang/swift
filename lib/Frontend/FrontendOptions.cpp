@@ -157,33 +157,33 @@ void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
 
 bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
-  case NoneAction:
-  case Parse:
-  case Typecheck:
-  case DumpParse:
-  case DumpAST:
-  case EmitSyntax:
-  case DumpInterfaceHash:
-  case PrintAST:
-  case DumpScopeMaps:
-  case DumpTypeRefinementContexts:
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
     return false;
-  case EmitPCH:
-  case EmitSILGen:
-  case EmitSIL:
-  case EmitSIBGen:
-  case EmitSIB:
-  case EmitModuleOnly:
-  case MergeModules:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
     return true;
-  case Immediate:
-  case REPL:
+  case ActionType::Immediate:
+  case ActionType::REPL:
     return false;
-  case EmitAssembly:
-  case EmitIR:
-  case EmitBC:
-  case EmitObject:
-  case EmitImportedModules:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -191,32 +191,32 @@ bool FrontendOptions::actionHasOutput() const {
 
 bool FrontendOptions::actionIsImmediate() const {
   switch (RequestedAction) {
-  case NoneAction:
-  case Parse:
-  case Typecheck:
-  case DumpParse:
-  case DumpAST:
-  case EmitSyntax:
-  case DumpInterfaceHash:
-  case PrintAST:
-  case DumpScopeMaps:
-  case DumpTypeRefinementContexts:
-  case EmitPCH:
-  case EmitSILGen:
-  case EmitSIL:
-  case EmitSIBGen:
-  case EmitSIB:
-  case EmitModuleOnly:
-  case MergeModules:
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
     return false;
-  case Immediate:
-  case REPL:
+  case ActionType::Immediate:
+  case ActionType::REPL:
     return true;
-  case EmitAssembly:
-  case EmitIR:
-  case EmitBC:
-  case EmitObject:
-  case EmitImportedModules:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
     return false;
   }
   llvm_unreachable("Unknown ActionType");
@@ -224,17 +224,14 @@ bool FrontendOptions::actionIsImmediate() const {
 
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
-  if (RequestedAction != FrontendOptions::EmitModuleOnly &&
-      RequestedAction != FrontendOptions::MergeModules) {
+  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
+      RequestedAction != FrontendOptions::ActionType::MergeModules) {
     for (const std::string &OutputFileName : OutputFilenames) {
       fn(OutputFileName);
     }
   }
-  const std::string *outputs[] = {
-    &ModuleOutputPath,
-    &ModuleDocOutputPath,
-    &ObjCHeaderOutputPath
-  };
+  const std::string *outputs[] = {&ModuleOutputPath, &ModuleDocOutputPath,
+                                  &ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
@@ -253,7 +250,6 @@ StringRef FrontendOptions::originalPath() const {
   return !fn.empty() ? llvm::sys::path::filename(fn) : StringRef(ModuleName);
 }
 
-
 bool FrontendOptions::isOutputFileDirectory() const {
   return hasNamedOutputFile() &&
          llvm::sys::fs::is_directory(getSingleOutputFilename());
@@ -261,55 +257,55 @@ bool FrontendOptions::isOutputFileDirectory() const {
 
 const char *FrontendOptions::computeSuffix() {
   switch (RequestedAction) {
-    case NoneAction:
-      return nullptr;
-      
-    case Parse:
-    case Typecheck:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-      // Textual modes.
-      return nullptr;
-      
-    case EmitPCH:
-      return PCH_EXTENSION;
-      
-    case EmitSILGen:
-    case EmitSIL:
-      return SIL_EXTENSION;
-      
-    case EmitSIBGen:
-    case EmitSIB:
-      return SIB_EXTENSION;
-      
-    case MergeModules:
-    case EmitModuleOnly:
-      return SERIALIZED_MODULE_EXTENSION;
-      
-    case Immediate:
-    case REPL:
-      // These modes have no frontend-generated output.
-      return nullptr;
-      
-    case EmitAssembly:
-      return "s";
-      
-    case EmitIR:
-      return "ll";
-      
-    case EmitBC:
-      return "bc";
-      
-    case EmitObject:
-      return "o";
-      
-    case EmitImportedModules:
-      return "importedmodules";
+  case ActionType::NoneAction:
+    return nullptr;
+
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+    // Textual modes.
+    return nullptr;
+
+  case ActionType::EmitPCH:
+    return PCH_EXTENSION;
+
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+    return SIL_EXTENSION;
+
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+    return SIB_EXTENSION;
+
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+    return SERIALIZED_MODULE_EXTENSION;
+
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    // These modes have no frontend-generated output.
+    return nullptr;
+
+  case ActionType::EmitAssembly:
+    return "s";
+
+  case ActionType::EmitIR:
+    return "ll";
+
+  case ActionType::EmitBC:
+    return "bc";
+
+  case ActionType::EmitObject:
+    return "o";
+
+  case ActionType::EmitImportedModules:
+    return "importedmodules";
   }
 }
 
@@ -317,32 +313,32 @@ bool FrontendOptions::canEmitDependencies() const {
   if (DependenciesFilePath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case Immediate:
-    case REPL:
-      return false;
-    case Parse:
-    case Typecheck:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitPCH:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case ActionType::NoneAction:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    return false;
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+    return true;
   }
 }
 
@@ -350,32 +346,32 @@ bool FrontendOptions::canEmitHeader() const {
   if (ObjCHeaderOutputPath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case EmitPCH:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case Immediate:
-    case REPL:
-      return false;
-    case Parse:
-    case Typecheck:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case ActionType::NoneAction:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::EmitPCH:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    return false;
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+    return true;
   }
 }
 
@@ -383,32 +379,32 @@ bool FrontendOptions::canEmitLoadedModuleTrace() const {
   if (LoadedModuleTracePath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case Parse:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case Immediate:
-    case REPL:
-      return false;
-    case Typecheck:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitPCH:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    return false;
+  case ActionType::Typecheck:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+    return true;
   }
 }
 
@@ -416,97 +412,96 @@ bool FrontendOptions::canEmitModule() const {
   if (ModuleOutputPath.empty() && ModuleDocOutputPath.empty())
     return true;
   switch (RequestedAction) {
-    case NoneAction:
-    case Parse:
-    case Typecheck:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case EmitPCH:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case EmitSILGen:
-    case Immediate:
-    case REPL:
-      return false;
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitSIL:
-    case EmitSIBGen:
-    case EmitSIB:
-    case EmitIR:
-    case EmitBC:
-    case EmitAssembly:
-    case EmitObject:
-    case EmitImportedModules:
-      return true;
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::EmitPCH:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitSILGen:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    return false;
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+    return true;
   }
 }
 
 bool FrontendOptions::actionProducesOutputFromFrontend() const {
   switch (RequestedAction) {
-    case NoneAction:
-    case EmitPCH:
-    case EmitSIBGen:
-    case EmitSIB:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitBC:
-    case EmitObject:
-    case Parse:
-    case Typecheck:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case EmitImportedModules:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitAssembly:
-    case EmitIR:
-      return true;
-      
-    case Immediate:
-    case REPL:
-      // These modes have no frontend-generated output.
-      return false;
+  case ActionType::NoneAction:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+    return true;
+
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    // These modes have no frontend-generated output.
+    return false;
   }
 }
 
 bool FrontendOptions::actionOutputsToStdout() const {
   switch (RequestedAction) {
-    case NoneAction:
-    case EmitPCH:
-    case EmitSIBGen:
-    case EmitSIB:
-    case MergeModules:
-    case EmitModuleOnly:
-    case EmitBC:
-    case EmitObject:
-    case Immediate:
-    case REPL:
-      return false;
-      
-    case Parse:
-    case Typecheck:
-    case DumpParse:
-    case DumpInterfaceHash:
-    case DumpAST:
-    case EmitSyntax:
-    case PrintAST:
-    case DumpScopeMaps:
-    case DumpTypeRefinementContexts:
-    case EmitImportedModules:
-    case EmitSILGen:
-    case EmitSIL:
-    case EmitAssembly:
-    case EmitIR:
-      return true;
+  case ActionType::NoneAction:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    return false;
+
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+    return true;
   }
 }
-
