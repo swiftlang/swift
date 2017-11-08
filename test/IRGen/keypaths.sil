@@ -75,7 +75,7 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x4000_000c> }>
+// CHECK-32-SAME: <i32 0x4000_0008> }>
 // CHECK-64-SAME: <i32 0x4000_0010> }>
 
 // -- %e: C.y
@@ -87,7 +87,7 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.y
-// CHECK-32-SAME: <i32 0x4000_0010> }>
+// CHECK-32-SAME: <i32 0x4000_000c> }>
 // CHECK-64-SAME: <i32 0x4000_0018> }>
 
 // -- %f: C.z
@@ -99,7 +99,7 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_001c> }>
+// CHECK-32-SAME: <i32 0x4000_0018> }>
 // CHECK-64-SAME: <i32 0x4000_0030> }>
 
 // -- %g: S.z.x
@@ -118,7 +118,7 @@ sil_vtable C {}
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x4000_000c> }>
+// CHECK-32-SAME: <i32 0x4000_0008> }>
 // CHECK-64-SAME: <i32 0x4000_0010> }>
 
 // -- %h: C.z.x
@@ -132,7 +132,7 @@ sil_vtable C {}
 // CHECK-64-SAME: <i32 0x8000_0014>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_001c>,
+// CHECK-32-SAME: <i32 0x4000_0018>,
 // CHECK-64-SAME: <i32 0x4000_0030>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*

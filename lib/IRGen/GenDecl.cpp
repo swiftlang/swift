@@ -3138,11 +3138,10 @@ IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
   metaclass = llvm::ConstantExpr::getBitCast(metaclass, TypeMetadataPtrTy);
 
   // Get a reference count of two.
-  auto *strongRefCountInit = llvm::ConstantInt::get(
-      Int32Ty,
-      InlineRefCountBits(0 /*unowned ref count*/, 2 /*strong ref count*/)
+  auto *refCountInit = llvm::ConstantInt::get(
+      IntPtrTy,
+      InlineRefCountBits(1 /* "extra" strong ref count*/, 1 /* unowned count */)
           .getBitsValue());
-  auto *unownedRefCountInit = llvm::ConstantInt::get(Int32Ty, 0);
 
   auto *count = llvm::ConstantInt::get(Int32Ty, utf8.size());
   // Capacity is length plus one because of the implicitly added '\0'
@@ -3150,9 +3149,8 @@ IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
   auto *capacity = llvm::ConstantInt::get(Int32Ty, utf8.size() + 1);
   auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
 
-  // FIXME: Big endian-ness.
   llvm::Constant *heapObjectHeaderFields[] = {
-      metaclass, strongRefCountInit, unownedRefCountInit
+      metaclass, refCountInit
   };
 
   auto *initRefCountStruct = llvm::ConstantStruct::get(
@@ -3216,11 +3214,10 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
   metaclass = llvm::ConstantExpr::getBitCast(metaclass, TypeMetadataPtrTy);
 
   // Get a reference count of two.
-  auto *strongRefCountInit = llvm::ConstantInt::get(
-      Int32Ty,
-      InlineRefCountBits(0 /*unowned ref count*/, 2 /*strong ref count*/)
+  auto *refCountInit = llvm::ConstantInt::get(
+      IntPtrTy,
+      InlineRefCountBits(1 /* "extra" strong ref count*/, 1 /* unowned count */)
           .getBitsValue());
-  auto *unownedRefCountInit = llvm::ConstantInt::get(Int32Ty, 0);
 
   auto *count = llvm::ConstantInt::get(Int32Ty, utf16Length);
   auto *capacity = llvm::ConstantInt::get(Int32Ty, utf16Length + 1);
@@ -3228,7 +3225,7 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
   auto *padding = llvm::ConstantInt::get(Int8Ty, 0);
 
   llvm::Constant *heapObjectHeaderFields[] = {
-      metaclass, strongRefCountInit, unownedRefCountInit
+      metaclass, refCountInit
   };
 
   auto *initRefCountStruct = llvm::ConstantStruct::get(

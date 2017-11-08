@@ -12,8 +12,7 @@ func align<T>(_ offset: Int, to: T.Type) -> Int {
   return (offset + alignMask) & ~alignMask
 }
 
-// FIXME: Object header size will eventually be MemoryLayout<Int>.size * 2
-let classHeaderSize = MemoryLayout<Int>.size + 8
+let classHeaderSize = MemoryLayout<Int>.size * 2
 
 class C<T> {
   var x: Int

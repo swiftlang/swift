@@ -38,11 +38,6 @@ static bool requiresHeapHeader(LayoutKind kind) {
   llvm_unreachable("bad layout kind!");
 }
 
-/// Return the size of the standard heap header.
-Size irgen::getHeapHeaderSize(IRGenModule &IGM) {
-  return IGM.getPointerSize() + Size(8);
-}
-
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
                            LayoutKind layoutKind,
@@ -184,7 +179,7 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
 
 void StructLayoutBuilder::addHeapHeader() {
   assert(StructFields.empty() && "adding heap header at a non-zero offset");
-  CurSize = getHeapHeaderSize(IGM);
+  CurSize = IGM.RefCountedStructSize;
   CurAlignment = IGM.getPointerAlignment();
   StructFields.push_back(IGM.RefCountedStructTy);
 }
