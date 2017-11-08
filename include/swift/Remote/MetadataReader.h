@@ -17,7 +17,6 @@
 #ifndef SWIFT_REMOTE_METADATAREADER_H
 #define SWIFT_REMOTE_METADATAREADER_H
 
-#include "swift/AST/Types.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
@@ -33,9 +32,9 @@ namespace remote {
 template <typename BuiltType> class FunctionParam {
   StringRef Label;
   BuiltType Type;
-  ParameterTypeFlags Flags;
+  ParameterFlags Flags;
 
-  FunctionParam(StringRef label, BuiltType type, ParameterTypeFlags flags)
+  FunctionParam(StringRef label, BuiltType type, ParameterFlags flags)
       : Label(label), Type(type), Flags(flags) {}
 
 public:
@@ -45,7 +44,7 @@ public:
 
   StringRef getLabel() const { return Label; }
   BuiltType getType() const { return Type; }
-  ParameterTypeFlags getFlags() const { return Flags; }
+  ParameterFlags getFlags() const { return Flags; }
 
   void setLabel(StringRef label) { Label = label; }
   void setType(BuiltType type) { Type = type; }
@@ -53,6 +52,7 @@ public:
   void setVariadic() { Flags = Flags.withVariadic(true); }
   void setShared() { Flags = Flags.withShared(true); }
   void setInOut() { Flags = Flags.withInOut(true); }
+  void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
     return FunctionParam(label, Type, Flags);
@@ -62,7 +62,7 @@ public:
     return FunctionParam(Label, type, Flags);
   }
 
-  FunctionParam withFlags(ParameterTypeFlags flags) const {
+  FunctionParam withFlags(ParameterFlags flags) const {
     return FunctionParam(Label, Type, flags);
   }
 };
@@ -800,38 +800,25 @@ public:
       auto Function = cast<TargetFunctionTypeMetadata<Runtime>>(Meta);
 
       std::vector<FunctionParam<BuiltType>> Parameters;
-      StoredPointer ArgumentAddress = MetadataAddress +
-        sizeof(TargetFunctionTypeMetadata<Runtime>);
-      for (StoredPointer i = 0; i < Function->getNumArguments(); ++i,
-           ArgumentAddress += sizeof(StoredPointer)) {
-        StoredPointer FlaggedArgumentAddress;
-        if (!Reader->readInteger(RemoteAddress(ArgumentAddress),
-                                 &FlaggedArgumentAddress))
+      for (unsigned i = 0, n = Function->getNumParameters(); i != n; ++i) {
+        auto ParamTypeRef = readTypeFromMetadata(Function->getParameter(i));
+        if (!ParamTypeRef)
           return BuiltType();
 
         FunctionParam<BuiltType> Param;
-
-        // TODO: Use target-agnostic FlaggedPointer to mask this!
-        const auto InOutMask = (StoredPointer) 1;
-        // FIXME: Add import parameter related flags from metadata
-        if ((FlaggedArgumentAddress & InOutMask) != 0)
-          Param.setInOut();
-
-        FlaggedArgumentAddress &= ~InOutMask;
-        if (auto ParamTypeRef = readTypeFromMetadata(FlaggedArgumentAddress)) {
-          Param.setType(ParamTypeRef);
-          Parameters.push_back(std::move(Param));
-        } else {
-          return BuiltType();
-        }
+        Param.setType(ParamTypeRef);
+        Param.setFlags(Function->getParameterFlags(i));
+        Parameters.push_back(std::move(Param));
       }
 
       auto Result = readTypeFromMetadata(Function->ResultType);
       if (!Result)
         return BuiltType();
 
-      auto flags = FunctionTypeFlags().withConvention(Function->getConvention())
-                                      .withThrows(Function->throws());
+      auto flags = FunctionTypeFlags()
+                       .withConvention(Function->getConvention())
+                       .withThrows(Function->throws())
+                       .withParameterFlags(Function->hasParameterFlags());
       auto BuiltFunction =
           Builder.createFunctionType(Parameters, Result, flags);
       TypeCache[MetadataAddress] = BuiltFunction;
@@ -1195,8 +1182,26 @@ protected:
         return _readMetadata<TargetExistentialMetatypeMetadata>(address);
       case MetadataKind::ForeignClass:
         return _readMetadata<TargetForeignClassMetadata>(address);
-      case MetadataKind::Function:
-        return _readMetadata<TargetFunctionTypeMetadata>(address);
+      case MetadataKind::Function: {
+        StoredSize flagsValue;
+        auto flagsAddr =
+            address + TargetFunctionTypeMetadata<Runtime>::OffsetToFlags;
+        if (!Reader->readInteger(RemoteAddress(flagsAddr), &flagsValue))
+          return nullptr;
+
+        auto flags =
+            TargetFunctionTypeFlags<StoredSize>::fromIntValue(flagsValue);
+
+        using Parameter =
+            ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
+        auto totalSize = sizeof(TargetFunctionTypeMetadata<Runtime>) +
+                         flags.getNumParameters() * sizeof(Parameter);
+
+        if (flags.hasParameterFlags())
+          totalSize += flags.getNumParameters() * sizeof(uint32_t);
+
+        return _readMetadata(address, totalSize);
+      }
       case MetadataKind::HeapGenericLocalVariable:
         return _readMetadata<TargetGenericBoxHeapMetadata>(address);
       case MetadataKind::HeapLocalVariable:

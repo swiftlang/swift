@@ -334,7 +334,12 @@ public:
 
       auto label = Ctx.getIdentifier(param.getLabel());
       auto flags = param.getFlags();
-      funcParams.push_back(AnyFunctionType::Param(type, label, flags));
+      auto parameterFlags = ParameterTypeFlags()
+                                .withInOut(flags.isInOut())
+                                .withShared(flags.isShared())
+                                .withVariadic(flags.isVariadic());
+
+      funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
     }
 
     return FunctionType::get(funcParams, output, einfo);
