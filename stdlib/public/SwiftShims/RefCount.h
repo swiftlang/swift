@@ -15,19 +15,17 @@
 #include "Visibility.h"
 #include "SwiftStdint.h"
 
+// This definition is a placeholder for importing into Swift.
+// It provides size and alignment but cannot be manipulated safely there.
+typedef struct {
+  __swift_uintptr_t refCounts SWIFT_ATTRIBUTE_UNAVAILABLE;
+} InlineRefCountsPlaceholder;
+
 #if !defined(__cplusplus)
 
-// These definitions are placeholders for importing into Swift.
-// They provide size and alignment but cannot be manipulated safely there.
+typedef InlineRefCountsPlaceholder InlineRefCounts;
 
-typedef struct {
-  _Alignas(__swift_uintptr_t) __swift_uint32_t refCounts1 SWIFT_ATTRIBUTE_UNAVAILABLE;
-  __swift_uint32_t refCounts2 SWIFT_ATTRIBUTE_UNAVAILABLE;
-} InlineRefCounts;
-
-// not __cplusplus
 #else
-// __cplusplus
 
 #include <type_traits>
 #include <atomic>
@@ -733,11 +731,6 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 template <typename RefCountBits>
 class RefCounts {
   std::atomic<RefCountBits> refCounts;
-#if __POINTER_WIDTH__ == 32
-  // FIXME: hack - something somewhere is assuming a 3-word header on 32-bit
-  // See also other fixmes marked "small header for 32-bit"
-  uintptr_t : 32;
-#endif
 
   // Out-of-line slow paths.
 
@@ -1572,15 +1565,11 @@ typedef swift::InlineRefCounts InlineRefCounts;
 #endif
 
 // These assertions apply to both the C and the C++ declarations.
-_Static_assert(_Alignof(InlineRefCounts) == _Alignof(__swift_uintptr_t),
-  "InlineRefCounts must be pointer-aligned");
-// FIXME: small header for 32-bit
-#if 0
+_Static_assert(sizeof(InlineRefCounts) == sizeof(InlineRefCountsPlaceholder),
+  "InlineRefCounts and InlineRefCountsPlaceholder must match");
 _Static_assert(sizeof(InlineRefCounts) == sizeof(__swift_uintptr_t),
   "InlineRefCounts must be pointer-sized");
-#else
-_Static_assert(sizeof(InlineRefCounts) == 2*sizeof(__swift_uint32_t),
-  "InlineRefCounts must be 8 bytes");
-#endif
+_Static_assert(_Alignof(InlineRefCounts) == _Alignof(__swift_uintptr_t),
+  "InlineRefCounts must be pointer-aligned");
 
 #endif

@@ -80,7 +80,7 @@ entry:
 // CHECK:  [[CONTAINER:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:  [[INLINEBUFFER:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* [[CONTAINER]], i32 0, i32 0
 // CHECK:  [[INLINEBUFFER:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* [[CONTAINER]], i32 0, i32 0
-// CHECK:  [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), {{(i64|i32)}} 48, {{(i64|i32)}} 7)
+// CHECK:  [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), {{(i64 48|i32 40)}}, {{(i64|i32)}} 7)
 // CHECK:  [[BOX_ADDR:%.*]] = bitcast %swift.refcounted* [[BOX]] to <{ %swift.refcounted{{(, \[4 x i8\])?}}, [32 x i8] }>*
 // CHECK:  [[VALUE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted{{(, \[4 x i8\])?}}, [32 x i8] }>, <{ %swift.refcounted{{(, \[4 x i8\])?}}, [32 x i8] }>* [[BOX_ADDR]], i32 0, i32 {{(1|2)}}
 // CHECK:  [[INIT_EXIST_ADDR:%.*]] = bitcast [32 x i8]* [[VALUE_ADDR]] to %T25existentials_opaque_boxed14NotInlineFixedV*
@@ -136,7 +136,7 @@ entry:
 // CHECK:   [[VW2:%.*]] = load i8*, i8** [[VW_ADDR2]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[VW2]] to {{(i64|i32)}}
 // CHECK:   [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
-// CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64|i32)}} {{(16|12)}}, [[ALIGNMASK]]
+// CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
 // CHECK:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
 // CHECK:   [[ALIGNEDSTART:%.*]] = and {{(i64|i32)}} [[HEADERSIZEPLUSALIGN]], [[NOTALIGNMASK]]
 // CHECK:   [[HEAPSIZE:%.*]] = add {{(i64|i32)}} [[ALIGNEDSTART]], [[SIZE]]
@@ -179,7 +179,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[REFADDR:%.*]] = bitcast [{{(24|12)}} x i8]* %0 to %swift.refcounted**
 // CHECK:   [[REF:%.*]] = load %swift.refcounted*, %swift.refcounted** [[REFADDR]]
 // CHECK:   [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
-// CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64|i32)}} {{(16|12)}}, [[ALIGNMASK]]
+// CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
 // CHECK:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
 // CHECK:   [[ALIGNEDSTART:%.*]] = and {{(i64|i32)}} [[HEADERSIZEPLUSALIGN]], [[NOTALIGNMASK]]
 // CHECK:   [[HEAPOBJ:%.*]] = bitcast %swift.refcounted* %9 to i8*
@@ -519,8 +519,8 @@ struct FixedOveralign : Existential {
 // CHECK:  [[INLINEBUFFER:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* [[CONTAINER]], i32 0, i32 0
 // CHECK:  [[INLINEBUFFER:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* [[CONTAINER]], i32 0, i32 0
 // CHECK:  [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.3, i32 0, i32 2), {{(i64|i32)}} 64, {{(i64|i32)}} 31)
-// CHECK:  [[BOX_ADDR:%.*]] = bitcast %swift.refcounted* [[BOX]] to <{ %swift.refcounted, [{{(20|16)}} x i8], [32 x i8] }>*
-// CHECK:  [[VALUE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{(20|16)}} x i8], [32 x i8] }>, <{ %swift.refcounted, [{{(20|16)}} x i8], [32 x i8] }>* [[BOX_ADDR]], i32 0, i32 {{(1|2)}}
+// CHECK:  [[BOX_ADDR:%.*]] = bitcast %swift.refcounted* [[BOX]] to <{ %swift.refcounted, [{{(16|24)}} x i8], [32 x i8] }>*
+// CHECK:  [[VALUE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{(16|24)}} x i8], [32 x i8] }>, <{ %swift.refcounted, [{{(16|24)}} x i8], [32 x i8] }>* [[BOX_ADDR]], i32 0, i32 {{(1|2)}}
 // CHECK:  [[INIT_EXIST_ADDR:%.*]] = bitcast [32 x i8]* [[VALUE_ADDR]] to %T25existentials_opaque_boxed14FixedOveralignV*
 // CHECK:  [[INLINEBUFFER_ADDR:%.*]] = bitcast [{{(24|12)}} x i8]* [[INLINEBUFFER]] to %swift.refcounted**
 // CHECK:  store %swift.refcounted* [[BOX]], %swift.refcounted** [[INLINEBUFFER_ADDR]]
