@@ -545,7 +545,7 @@ public:
   }
 
 private:
-  const char *computeSuffix();
+  static const char *suffixForPrincipleOutputFileForAction(ActionType);
 
   bool hasUnusableDependenciesFilePath() const;
   static bool canActionEmitDependencies(ActionType);

@@ -255,8 +255,9 @@ bool FrontendOptions::isOutputFileDirectory() const {
          llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
-const char *FrontendOptions::computeSuffix() {
-  switch (RequestedAction) {
+const char *
+FrontendOptions::suffixForPrincipleOutputFileForAction(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
     return nullptr;
 
