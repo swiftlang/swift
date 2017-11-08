@@ -673,9 +673,10 @@ bool FrontendArgsToOptionsConverter::setOutputFilenames() {
   assert(Opts.actionProducesOutputFromFrontend() ||
          Opts.OutputFilenames.empty());
   assert(Opts.actionProducesOutputFromFrontend() ||
-         !Opts.actionOutputsToStdout());
+         !FrontendOptions::actionHasTextualOutput(Opts.RequestedAction));
   if (unprocessedOutputFlienames.empty() &&
-      (Opts.Inputs.isReadingFromStdin() || Opts.actionOutputsToStdout())) {
+      (Opts.Inputs.isReadingFromStdin() ||
+       FrontendOptions::actionHasTextualOutput(Opts.RequestedAction))) {
     Opts.setOutputFilenameToStdout();
     return false;
   }

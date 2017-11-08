@@ -552,7 +552,7 @@ private:
 
   /// Return true if changed output filename.
   bool actionProducesOutputFromFrontend() const;
-  bool actionOutputsToStdout() const;
+  static bool actionHasTextualOutput(ActionType);
 };
 } // namespace swift
 
