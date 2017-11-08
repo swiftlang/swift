@@ -248,10 +248,13 @@ const char *FrontendOptions::computeSuffix() {
   }
 }
 
-bool FrontendOptions::canEmitDependencies() const {
-  if (DependenciesFilePath.empty())
-    return true;
-  switch (RequestedAction) {
+bool FrontendOptions::areEmittingDependencies() const {
+  return DependenciesFilePath.empty() ||
+         doesActionEmitDependencies(RequestedAction);
+}
+
+bool FrontendOptions::doesActionEmitDependencies(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
