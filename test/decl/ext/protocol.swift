@@ -959,3 +959,43 @@ typealias B = BadProto1
 extension A & B { // okay
 
 }
+
+// Suppress near-miss warning for unlabeled initializers.
+protocol P9 {
+  init(_: Int)
+  init(_: Double)
+}
+
+extension P9 {
+  init(_ i: Int) {
+    self.init(Double(i))
+  }
+}
+
+struct X9 : P9 {
+  init(_: Float) { }
+}
+
+extension X9 {
+  init(_: Double) { }
+}
+
+// Suppress near-miss warning for unlabeled subscripts.
+protocol P10 {
+  subscript (_: Int) -> Int { get }
+  subscript (_: Double) -> Double { get }
+}
+
+extension P10 {
+  subscript(i: Int) -> Int {
+    return Int(self[Double(i)])
+  }
+}
+
+struct X10 : P10 {
+  subscript(f: Float) -> Float { return f }
+}
+
+extension X10 {
+  subscript(d: Double) -> Double { return d }
+}
