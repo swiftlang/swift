@@ -1810,15 +1810,15 @@ public:
 
 
 /// A utility class for saving and restoring the insertion point.
-class SavedInsertionPoint {
+class SILGenSavedInsertionPoint {
   SILGenFunction &SGF;
   SILBasicBlock *SavedIP;
   FunctionSection SavedSection;
 public:
-  SavedInsertionPoint(SILGenFunction &SGF, SILBasicBlock *newIP,
-                      Optional<FunctionSection> optSection = None)
-    : SGF(SGF), SavedIP(SGF.B.getInsertionBB()),
-      SavedSection(SGF.CurFunctionSection) {
+  SILGenSavedInsertionPoint(SILGenFunction &SGF, SILBasicBlock *newIP,
+                            Optional<FunctionSection> optSection = None)
+      : SGF(SGF), SavedIP(SGF.B.getInsertionBB()),
+        SavedSection(SGF.CurFunctionSection) {
     FunctionSection section = (optSection ? *optSection : SavedSection);
     assert((section != FunctionSection::Postmatter ||
             SGF.StartOfPostmatter != SGF.F.end()) &&
@@ -1829,10 +1829,11 @@ public:
     SGF.CurFunctionSection = section;
   }
 
-  SavedInsertionPoint(const SavedInsertionPoint &) = delete;
-  SavedInsertionPoint &operator=(const SavedInsertionPoint &) = delete;
+  SILGenSavedInsertionPoint(const SILGenSavedInsertionPoint &) = delete;
+  SILGenSavedInsertionPoint &
+  operator=(const SILGenSavedInsertionPoint &) = delete;
 
-  ~SavedInsertionPoint() {
+  ~SILGenSavedInsertionPoint() {
     if (SavedIP) {
       SGF.B.setInsertionPoint(SavedIP);
     } else {

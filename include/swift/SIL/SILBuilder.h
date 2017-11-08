@@ -2049,6 +2049,35 @@ public:
   }
 };
 
+class SavedInsertionPointRAII {
+  SILBuilder &Builder;
+  PointerUnion<SILInstruction *, SILBasicBlock *> SavedIP;
+
+public:
+  SavedInsertionPointRAII(SILBuilder &B, SILInstruction *NewIP)
+      : Builder(B), SavedIP(&*B.getInsertionPoint()) {
+    Builder.setInsertionPoint(NewIP);
+  }
+
+  SavedInsertionPointRAII(SILBuilder &B, SILBasicBlock *NewIP)
+      : Builder(B), SavedIP(B.getInsertionBB()) {
+    Builder.setInsertionPoint(NewIP);
+  }
+
+  SavedInsertionPointRAII(const SavedInsertionPointRAII &) = delete;
+  SavedInsertionPointRAII &operator=(const SavedInsertionPointRAII &) = delete;
+  SavedInsertionPointRAII(SavedInsertionPointRAII &&) = delete;
+  SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
+
+  ~SavedInsertionPointRAII() {
+    if (SavedIP.is<SILInstruction *>()) {
+      Builder.setInsertionPoint(SavedIP.get<SILInstruction *>());
+    } else {
+      Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());
+    }
+  }
+};
+
 } // end swift namespace
 
 #endif
