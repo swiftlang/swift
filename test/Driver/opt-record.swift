@@ -20,15 +20,15 @@ public func bar() {
   // YAML-NEXT:   File:            {{.*}}opt-record.swift
   // YAML-NEXT:   Line:            42
   // YAML-NEXT:   Column:          3
-  // YAML-NEXT: Function:        _T012optrecordmod3baryyF
+  // YAML-NEXT: Function:        'bar()'
   // YAML-NEXT: Args:
-  // YAML-NEXT:   - Callee:          _T012optrecordmod3fooyyF
+  // YAML-NEXT:   - Callee:          '"foo()"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}opt-record.swift
   // YAML-NEXT:       Line:            11
   // YAML-NEXT:       Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
-  // YAML-NEXT:   - Caller:          _T012optrecordmod3baryyF
+  // YAML-NEXT:   - Caller:          '"bar()"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}opt-record.swift
   // YAML-NEXT:       Line:            15
