@@ -548,7 +548,8 @@ private:
   static bool doesActionEmitDependencies(ActionType);
   bool areEmittingHeader() const;
   static bool doesActionEmitHeader(ActionType);
-  bool canEmitLoadedModuleTrace() const;
+  bool areEmittingLoadedModuleTrace() const;
+  static bool doesActionEmitLoadedModuleTrace(ActionType);
   bool canEmitModule() const;
 
   /// Return true if changed output filename.
