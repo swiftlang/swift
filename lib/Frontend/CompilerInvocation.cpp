@@ -106,8 +106,10 @@ class ArgsToFrontendInputsConverter {
 
   const llvm::opt::Arg *filelistPathOrNull;
   const std::unique_ptr<llvm::MemoryBuffer> filelistBuffer;
-  enum PrimaryOrOrdinary { Primary, Ordinary };
-  std::vector<std::pair<StringRef, PrimaryOrOrdinary>> files;
+  /// A primary file is one that the compiler will generate code for,
+  /// a secondary file supplies definitions used by the primaries.
+  enum class FileKind { Primary, Secondary };
+  std::vector<std::pair<StringRef, FileKind>> files;
   llvm::StringMap<unsigned> fileIndices;
 
 public:
@@ -133,28 +135,27 @@ private:
   }
 
   bool hasFilelist() const { return filelistPathOrNull != nullptr; }
-  enum Semantics {
-    PrimariesAlsoCountAsOrdinaries,
-    PrimariesAreRepeatedInOrdinaries
+  enum class PrimaryInclusion {
+    PrimariesMustBeAdded,
+    PrimariesAreAlreadyIncluded
   };
-  Semantics whichSemantics() {
-    return hasFilelist() ? PrimariesAreRepeatedInOrdinaries
-                         : PrimariesAlsoCountAsOrdinaries;
+  PrimaryInclusion whichPrimaryInclusion() {
+    return hasFilelist() ? PrimaryInclusion::PrimariesAreAlreadyIncluded
+                         : PrimaryInclusion::PrimariesMustBeAdded;
   }
 
   void getFilesFromArgs() {
     for (const Arg *A :
          Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-      enum PrimaryOrOrdinary fileType;
+      FileKind fileType;
       if (A->getOption().matches(options::OPT_INPUT)) {
-        fileType = Ordinary;
+        fileType = FileKind::Secondary;
       } else if (A->getOption().matches(options::OPT_primary_file)) {
-        fileType = Primary;
+        fileType = FileKind::Primary;
       } else {
         llvm_unreachable("Unknown input-related argument!");
       }
-      files.push_back(
-          std::pair<StringRef, PrimaryOrOrdinary>(A->getValue(), fileType));
+      files.push_back(std::pair<StringRef, FileKind>(A->getValue(), fileType));
     }
   }
 
@@ -164,7 +165,8 @@ private:
     std::vector<StringRef> inputFilesFromFilelist(
         llvm::line_iterator(*filelistBuffer), {});
     for (auto file : inputFilesFromFilelist) {
-      files.push_back(std::pair<StringRef, PrimaryOrOrdinary>(file, Ordinary));
+      files.push_back(
+          std::pair<StringRef, FileKind>(file, FileKind::Secondary));
     }
   }
 
@@ -179,9 +181,9 @@ private:
   }
 
   void setInputFilesAndIndices() {
-    for (std::pair<StringRef, bool> p : files) {
-      if (p.second == Ordinary ||
-          whichSemantics() == PrimariesAlsoCountAsOrdinaries) {
+    for (std::pair<StringRef, FileKind> p : files) {
+      if (p.second == FileKind::Secondary ||
+          whichPrimaryInclusion() == PrimaryInclusion::PrimariesMustBeAdded) {
         unsigned index = Inputs.inputFilenameCount();
         auto file = p.first;
         Inputs.addInputFilename(file);
@@ -190,8 +192,8 @@ private:
     }
   }
   bool setPrimaryFiles() {
-    for (std::pair<StringRef, bool> p : files) {
-      if (p.second != Primary)
+    for (std::pair<StringRef, FileKind> p : files) {
+      if (p.second != FileKind::Primary)
         continue;
       auto file = p.first;
       const auto iterator = fileIndices.find(file);
