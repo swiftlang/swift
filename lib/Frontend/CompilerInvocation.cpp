@@ -828,7 +828,7 @@ bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return false;
   }
-  if (!Opts.canEmitModule()) {
+  if (!Opts.areEmittingModule()) {
     if (!Opts.ModuleOutputPath.empty())
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     else

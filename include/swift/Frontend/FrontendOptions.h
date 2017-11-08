@@ -550,7 +550,8 @@ private:
   static bool doesActionEmitHeader(ActionType);
   bool areEmittingLoadedModuleTrace() const;
   static bool doesActionEmitLoadedModuleTrace(ActionType);
-  bool canEmitModule() const;
+  bool areEmittingModule() const;
+  static bool doesActionEmitModule(ActionType);
 
   /// Return true if changed output filename.
   static bool actionProducesOutput(ActionType);
