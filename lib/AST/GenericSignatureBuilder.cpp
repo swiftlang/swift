@@ -25,6 +25,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
@@ -6364,7 +6365,7 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   // over-minimizing.
   if (allowBuilderToMove && !Impl->HadAnyError &&
       !Impl->HadAnyRedundantConstraints) {
-    // Register this generic signature builer as the canonical builder for the
+    // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));
   }
@@ -6401,4 +6402,78 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
            /*allowConcreteGenericPArams=*/false,
            /*allowBuilderToMove=*/false);
 }
+
+#pragma mark Generic signature verification
+
+void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
+                                                     GenericSignature *sig) {
+  llvm::errs() << "Validating generic signature: ";
+  sig->print(llvm::errs());
+  llvm::errs() << "\n";
+
+  // Try removing each requirement in turn.
+  auto genericParams = sig->getGenericParams();
+  auto requirements = sig->getRequirements();
+  for (unsigned victimIndex : indices(requirements)) {
+    PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
+
+    // Form a new generic signature builder.
+    GenericSignatureBuilder builder(context);
+
+    // Add the generic parameters.
+    for (auto gp : genericParams)
+      builder.addGenericParameter(gp);
+
+    // Add the requirements *except* the victim.
+    auto source = FloatingRequirementSource::forAbstract();
+    for (unsigned i : indices(requirements)) {
+      if (i != victimIndex)
+        builder.addRequirement(requirements[i], source, nullptr);
+    }
+
+    // Finalize the generic signature. If there were any errors, we formed
+    // an invalid signature, so just continue.
+    if (builder.Impl->HadAnyError) continue;
+
+    // Form a generic signature from the result.
+    auto newSig =
+      std::move(builder).computeGenericSignature(
+                                      SourceLoc(),
+                                      /*allowConcreteGenericParams=*/true,
+                                      /*allowBuilderToMove=*/true);
+
+    // Check whether the removed requirement
+    assert(!newSig->isRequirementSatisfied(requirements[victimIndex]) &&
+           "Generic signature is not minimal");
+
+    // Canonicalize the signature to check that it is canonical.
+    (void)newSig->getCanonicalSignature();
+  }
+}
+
+void GenericSignatureBuilder::verifyGenericSignaturesInModule(
+                                                        ModuleDecl *module) {
+  LoadedFile *loadedFile = nullptr;
+  for (auto fileUnit : module->getFiles()) {
+    loadedFile = dyn_cast<LoadedFile>(fileUnit);
+    if (loadedFile) break;
+  }
+
+  if (!loadedFile) return;
+
+  // Check all of the (canonical) generic signatures.
+  SmallVector<GenericSignature *, 8> allGenericSignatures;
+  SmallPtrSet<CanGenericSignature, 4> knownGenericSignatures;
+  (void)loadedFile->getAllGenericSignatures(allGenericSignatures);
+  ASTContext &context = module->getASTContext();
+  for (auto genericSig : allGenericSignatures) {
+    // Check whether this is the first time we've checked this (canonical)
+    // signature.
+    auto canGenericSig = genericSig->getCanonicalSignature();
+    if (!knownGenericSignatures.insert(canGenericSig).second) continue;
+
+    verifyGenericSignature(context, canGenericSig);
+  }
+}
+
 

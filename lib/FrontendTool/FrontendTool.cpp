@@ -30,6 +30,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/LegacyASTTransformer.h"
@@ -629,6 +630,14 @@ static bool performCompile(CompilerInstance &Instance,
     debugFailWithCrash();
 
   ASTContext &Context = Instance.getASTContext();
+
+
+  auto verifyGenericSignaturesInModule =
+    Invocation.getFrontendOptions().VerifyGenericSignaturesInModule;
+  if (!verifyGenericSignaturesInModule.empty()) {
+    if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
+      GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
+  }
 
   if (Invocation.getMigratorOptions().shouldRunMigrator()) {
     migrator::updateCodeAndEmitRemap(&Instance, Invocation);

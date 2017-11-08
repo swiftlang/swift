@@ -2175,6 +2175,17 @@ bool SerializedASTFile::hasEntryPoint() const {
   return File.Bits.HasEntryPoint;
 }
 
+bool SerializedASTFile::getAllGenericSignatures(
+                       SmallVectorImpl<GenericSignature*> &genericSignatures) {
+  genericSignatures.clear();
+  for (unsigned index : indices(File.GenericSignatures)) {
+    if (auto genericSig = File.getGenericSignature(index + 1))
+      genericSignatures.push_back(genericSig);
+  }
+
+  return true;
+}
+
 ClassDecl *SerializedASTFile::getMainClass() const {
   assert(hasEntryPoint());
   return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
