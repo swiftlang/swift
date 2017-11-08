@@ -155,7 +155,7 @@ private:
       } else {
         llvm_unreachable("Unknown input-related argument!");
       }
-      files.push_back(std::pair<StringRef, FileKind>(A->getValue(), fileType));
+      files.push_back(std::make_pair(A->getValue(), fileType));
     }
   }
 
@@ -163,8 +163,7 @@ private:
     std::vector<StringRef> inputFilesFromFilelist(
         llvm::line_iterator(*filelistBuffer->get()), {});
     for (auto file : inputFilesFromFilelist) {
-      files.push_back(
-          std::pair<StringRef, FileKind>(file, FileKind::Secondary));
+      files.push_back(std::make_pair(file, FileKind::Secondary));
     }
   }
 
