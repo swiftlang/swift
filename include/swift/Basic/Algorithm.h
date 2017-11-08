@@ -22,7 +22,7 @@ namespace swift {
   /// Returns the minimum of `a` and `b`, or `a` if they are equivalent.
   template <typename T>
   constexpr const T &min(const T &a, const T &b) {
-    return !(b < a) ? a : b;
+    return (a > b) ? b : a;
   }
   
   /// Returns the maximum of `a` and `b`, or `a` if they are equivalent.
