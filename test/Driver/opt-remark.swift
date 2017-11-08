@@ -42,7 +42,7 @@ func foo() {
   // REMARK_MISSED-NOT: remark: {{.*}} inlined
 	big()
   // REMARK_PASSED-NOT: remark: Not profitable
-  // REMARK_PASSED: opt-remark.swift:47:3: remark: _T04null5smallyyF inlined into _T04null3fooyyF (cost = {{.*}}, benefit = {{.*}})
+  // REMARK_PASSED: opt-remark.swift:47:3: remark: "small()" inlined into "foo()" (cost = {{.*}}, benefit = {{.*}})
   // REMARK_PASSED-NOT: remark: Not profitable
   small()
 }
