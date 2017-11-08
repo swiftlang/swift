@@ -685,7 +685,6 @@ public:
 
   /// The lvalue or rvalue representing the argument source of self.
   ArgumentSource selfParam;
-  Expr *selfApplyExpr = nullptr;
   Type selfType;
   std::vector<ApplyExpr*> callSites;
   Expr *sideEffect = nullptr;
@@ -713,15 +712,7 @@ public:
   void setSelfParam(ArgumentSource &&theSelfParam, Expr *theSelfApplyExpr) {
     assert(!selfParam && "already set this!");
     selfParam = std::move(theSelfParam);
-    selfApplyExpr = theSelfApplyExpr;
     selfType = theSelfApplyExpr->getType();
-  }
-
-  void setSelfParam(ArgumentSource &&theSelfParam, Type selfType) {
-    assert(!selfParam && "already set this!");
-    selfParam = std::move(theSelfParam);
-    selfApplyExpr = nullptr;
-    selfType = selfType;
   }
 
   void decompose(Expr *e) {
@@ -798,8 +789,8 @@ public:
                                        /*objc=*/true, {}, {});
   }
 
-  void processProtocolDecl(DeclRefExpr *e, AbstractFunctionDecl *afd,
-                           ProtocolDecl *proto) {
+  void processProtocolMethod(DeclRefExpr *e, AbstractFunctionDecl *afd,
+                             ProtocolDecl *proto) {
     assert(!callSites.empty());
     ApplyExpr *thisCallSite = callSites.back();
     callSites.pop_back();
@@ -844,72 +835,47 @@ public:
     setCallee(std::move(theCallee));
   }
 
-  bool processAbstractFunctionDecl(DeclRefExpr *e, AbstractFunctionDecl *afd) {
-    // We have four cases to deal with here:
-    //
-    //  1) for a "static" / "type" method, the base is a metatype.
-    //  2) for a classbound protocol, the base is a class-bound protocol
-    //  rvalue,
-    //     which is loadable.
-    //  3) for a mutating method, the base has inout type.
-    //  4) for a nonmutating method, the base is a general archetype
-    //     rvalue, which is address-only.  The base is passed at +0, so it
-    //     isn't
-    //     consumed.
-    //
-    // In the last case, the AST has this call typed as being applied
-    // to an rvalue, but the witness is actually expecting a pointer
-    // to the +0 value in memory.  We just pass in the address since
-    // archetypes are address-only.
+  bool isClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
+    if (e->getAccessSemantics() != AccessSemantics::Ordinary)
+      return false;
 
-    if (auto *proto = dyn_cast<ProtocolDecl>(afd->getDeclContext())) {
-      processProtocolDecl(e, afd, proto);
-      return true;
+    if (getMethodDispatch(afd) == MethodDispatch::Static)
+      return false;
+
+    if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
+      // Non-required initializers are statically dispatched.
+      if (!ctor->isRequired())
+        return false;
+
+      // Required constructors are statically dispatched when the 'self'
+      // value is statically derived.
+      ApplyExpr *thisCallSite = callSites.back();
+      assert(thisCallSite->getArg()->getType()->is<AnyMetatypeType>());
+      if (thisCallSite->getArg()->isStaticallyDerivedMetatype())
+        return false;
     }
 
-    Optional<SILDeclRef::Kind> kind;
-    bool isDynamicallyDispatched;
+    // Ok, we're dynamically dispatched.
+    return true;
+  }
+
+  void processClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
+    SILDeclRef::Kind kind;
     bool requiresAllocRefDynamic = false;
 
-    // Determine whether the method is dynamically dispatched.
-    if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
-      isDynamicallyDispatched = false;
-    } else {
-      switch (getMethodDispatch(afd)) {
-      case MethodDispatch::Class:
-        isDynamicallyDispatched = true;
-        break;
-      case MethodDispatch::Static:
-        isDynamicallyDispatched = false;
-        break;
-      }
-    }
-
-    if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {
+    if (isa<FuncDecl>(afd)) {
       kind = SILDeclRef::Kind::Func;
-    } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
-      ApplyExpr *thisCallSite = callSites.back();
-      // Required constructors are dynamically dispatched when the 'self'
-      // value is not statically derived.
-      if (ctor->isRequired() &&
-          thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
-          !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
-        if (requiresForeignEntryPoint(afd)) {
-          // When we're performing Objective-C dispatch, we don't have an
-          // allocating constructor to call. So, perform an alloc_ref_dynamic
-          // and pass that along to the initializer.
-          requiresAllocRefDynamic = true;
-          kind = SILDeclRef::Kind::Initializer;
-        } else {
-          kind = SILDeclRef::Kind::Allocator;
-        }
+    } else {
+      if (requiresForeignEntryPoint(afd)) {
+        // When we're performing Objective-C dispatch, we don't have an
+        // allocating constructor to call. So, perform an alloc_ref_dynamic
+        // and pass that along to the initializer.
+        requiresAllocRefDynamic = true;
+        kind = SILDeclRef::Kind::Initializer;
       } else {
-        isDynamicallyDispatched = false;
+        kind = SILDeclRef::Kind::Allocator;
       }
     }
-
-    if (!isDynamicallyDispatched)
-      return false;
 
     // At this point, we know for sure that we are actually dynamically
     // dispatched.
@@ -918,7 +884,7 @@ public:
 
     // Emit the rvalue for self, allowing for guaranteed plus zero if we
     // have a func.
-    bool AllowPlusZero = kind && *kind == SILDeclRef::Kind::Func;
+    bool AllowPlusZero = kind == SILDeclRef::Kind::Func;
     RValue self = SGF.emitRValue(
         thisCallSite->getArg(),
         AllowPlusZero ? SGFContext::AllowGuaranteedPlusZero : SGFContext());
@@ -939,7 +905,7 @@ public:
                     selfValue);
     }
 
-    auto constant = SILDeclRef(afd, kind.getValue())
+    auto constant = SILDeclRef(afd, kind)
                         .asForeign(requiresForeignEntryPoint(afd));
 
     ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
@@ -948,22 +914,13 @@ public:
     setCallee(Callee::forClassMethod(SGF, constant, subs, e));
 
     setSelfParam(std::move(selfArgSource), thisCallSite);
-    return true;
   }
 
   //
   // Known callees.
   //
   void visitDeclRefExpr(DeclRefExpr *e) {
-    // If we need to perform dynamic dispatch for the given function,
-    // emit class_method to do so.
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
-      // If after processing the abstract function decl, we do not have any more
-      // work, just return.
-      if (processAbstractFunctionDecl(e, afd)) {
-        return;
-      }
-    }
+    SubstitutionList subs = e->getDeclRef().getSubstitutions();
 
     // If this is a direct reference to a vardecl, just emit its value directly.
     // Recursive references to callable declarations are allowed.
@@ -972,38 +929,45 @@ public:
       return;
     }
 
+    // Enum case constructor references are open-coded.
+    if (auto *eed = dyn_cast<EnumElementDecl>(e->getDecl())) {
+      setCallee(Callee::forEnumElement(SGF, SILDeclRef(e->getDecl()), subs, e));
+      return;
+    }
+
+    // Ok, we have a constructor or a function.
+    auto *afd = cast<AbstractFunctionDecl>(e->getDecl());
+
+    // Witness method or @objc protocol dispatch.
+    if (auto *proto = dyn_cast<ProtocolDecl>(afd->getDeclContext())) {
+      processProtocolMethod(e, afd, proto);
+      return;
+    }
+
+    // VTable class method or @objc class method dispatch.
+    if (isClassMethod(e, afd)) {
+      processClassMethod(e, afd);
+      return;
+    }
+
+    // Otherwise, we have a statically-dispatched call.
     auto constant = SILDeclRef(e->getDecl())
       .asForeign(!isConstructorWithGeneratedAllocatorThunk(e->getDecl())
                  && requiresForeignEntryPoint(e->getDecl()));
 
-    auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
+    auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(afd);
+    if (afd->getDeclContext()->isLocalContext() &&
+        !captureInfo.hasGenericParamCaptures())
+      subs = SubstitutionList();
 
-    CaptureInfo captureInfo;
-
-    // Otherwise, we have a statically-dispatched call.
-    SubstitutionList subs = e->getDeclRef().getSubstitutions();
-
-    if (afd) {
-      captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(afd);
-      if (afd->getDeclContext()->isLocalContext() &&
-          !captureInfo.hasGenericParamCaptures())
-        subs = SubstitutionList();
-    }
-
-    // Enum case constructor references are open-coded.
-    if (isa<EnumElementDecl>(e->getDecl()))
-      setCallee(Callee::forEnumElement(SGF, constant, subs, e));
-    else
-      setCallee(Callee::forDirect(SGF, constant, subs, e));
+    setCallee(Callee::forDirect(SGF, constant, subs, e));
     
     // If the decl ref requires captures, emit the capture params.
-    if (afd) {
-      if (!captureInfo.getCaptures().empty()) {
-        SmallVector<ManagedValue, 4> captures;
-        SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
-                         captures);
-        applyCallee->setCaptures(std::move(captures));
-      }
+    if (!captureInfo.getCaptures().empty()) {
+      SmallVector<ManagedValue, 4> captures;
+      SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
+                       captures);
+      applyCallee->setCaptures(std::move(captures));
     }
   }
   
@@ -1047,6 +1011,7 @@ public:
     setCallee(Callee::forDirect(SGF,
                 SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer), subs, e));
   }
+
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
     visit(e->getRHS());
@@ -4125,9 +4090,6 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
   assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
-
-  // The uncurry level in an enum element constructor is weird, so
-  // it's quite fortunate that we can completely ignore it.
 
   // Get the callee type information.
   //
