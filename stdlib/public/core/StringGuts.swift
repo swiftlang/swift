@@ -264,7 +264,7 @@ internal struct UnsafeString {
   //
 
   @_versioned
-  internal var baseAddress: UnsafeMutableRawPointer
+  internal var baseAddress: UnsafeRawPointer
   
   @_versioned
   internal var count: Int
@@ -289,7 +289,7 @@ internal struct UnsafeString {
 
   @_versioned
   init(
-    baseAddress: UnsafeMutableRawPointer,
+    baseAddress: UnsafeRawPointer,
     count: Int,
     isSingleByte: Bool,
     hasCocoaBuffer: Bool
@@ -354,7 +354,7 @@ internal struct UnsafeString {
   /// depending on element width.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal func _pointer(toElementAt n: Int) -> UnsafeMutableRawPointer {
+  internal func _pointer(toElementAt n: Int) -> UnsafeRawPointer {
     _sanityCheck(n >= 0 && n <= count)
     return baseAddress + (n &<< (byteWidth &- 1))
   }
@@ -685,10 +685,7 @@ internal func internalDumpHex(_ x: UInt, newline: Bool = true) {
 internal func internalDumpHex(_ x: AnyObject, newline: Bool = true) {
   internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
-internal func internalDumpHex(
-  _ x: UnsafeMutableRawPointer?,
-  newline: Bool = true
-) {
+internal func internalDumpHex(_ x: UnsafeRawPointer?, newline: Bool = true) {
   internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
 internal func internalDumpHex(_ x: Bool, newline: Bool = true) {
