@@ -702,7 +702,8 @@ bool FrontendArgsToOptionsConverter::
     }
   }
 
-  StringRef Suffix = Opts.computeSuffix();
+  StringRef Suffix = FrontendOptions::suffixForPrincipleOutputFileForAction(
+      Opts.RequestedAction);
   std::vector<std::string> baseNames = computeBaseNamesOfOutputs();
   for (unsigned index : indices(baseNames)) {
     std::string outputStem = unprocessedOutputFlienames.empty()
