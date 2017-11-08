@@ -1063,23 +1063,25 @@ namespace {
       
       Space totalSpace(subjectType, Identifier());
       Space coveredSpace(spaces);
+
       size_t totalSpaceSize = totalSpace.getSize(TC);
       if (totalSpaceSize > Space::getMaximumSize()) {
-        // Because the space is large, we have to extend the size
-        // heuristic to compensate for actually exhaustively pattern matching
-        // over enormous spaces.  In this case, if the covered space covers
-        // as much as the total space, and there were no duplicates, then we
-        // can assume the user did the right thing and that they don't need
-        // a 'default' to be inserted.
+        // Because the space is large, fall back to a heuristic that rejects
+        // the common case of providing an insufficient number of covering
+        // patterns.  We still need to fall back to space subtraction if the
+        // covered space is larger than the total space because there is
+        // necessarily overlap in the pattern matrix that can't be detected
+        // by combinatorics alone.
         if (!sawRedundantPattern
-            && coveredSpace.getSize(TC) >= totalSpaceSize) {
+            && coveredSpace.getSize(TC) >= totalSpaceSize
+            && totalSpace.minus(coveredSpace, TC).simplify(TC).isEmpty()) {
           return;
         }
 
         diagnoseMissingCases(TC, Switch, /*justNeedsDefault*/true, Space());
         return;
       }
-      
+
       auto uncovered = totalSpace.minus(coveredSpace, TC).simplify(TC);
       if (uncovered.isEmpty()) {
         return;
