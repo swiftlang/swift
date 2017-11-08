@@ -56,6 +56,9 @@ struct SyntaxFactory {
 
   static SyntaxKind getUnknownKind(SyntaxKind Kind);
 
+  static Syntax
+  makeBlankCollectionSyntax(SyntaxKind Kind);
+
 % for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []

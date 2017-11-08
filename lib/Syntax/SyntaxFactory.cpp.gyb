@@ -57,6 +57,18 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
   return make<UnknownSyntax>(Raw);
 }
 
+Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+%   if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}: return makeBlank${node.syntax_kind}();
+%   end
+% end
+  default: break;
+  }
+  llvm_unreachable("not collection kind.");
+}
+
 Optional<Syntax>
 SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
   switch(Kind) {
