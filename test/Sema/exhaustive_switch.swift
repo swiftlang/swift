@@ -559,6 +559,28 @@ func infinitelySized() -> Bool {
   }
 }
 
+// SR-6316: Size heuristic is insufficient to catch space covering when the
+// covered space size is greater than or equal to the master space size.
+func largeSpaceMatch(_ x: Bool) {
+  switch (x, (x, x, x, x), (x, x, x, x)) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 {{do you want to add a default clause?}}
+  case (true, (_, _, _, _), (_, true, true, _)):
+    break
+  case (true, (_, _, _, _), (_, _, false, _)):
+    break
+  case (_, (_, true, true, _), (_, _, false, _)):
+    break
+  case (_, (_, _, false, _), (_, true, true, _)):
+    break
+  case (_, (_, true, true, _), (_, true, true, _)):
+    break
+  case (_, (_, _, false, _), (_, _, false, _)):
+    break
+  case (_, (false, false, false, false), (_, _, _, _)):
+    break
+  }
+}
+
 func diagnoseDuplicateLiterals() {
   let str = "def"
   let int = 2
