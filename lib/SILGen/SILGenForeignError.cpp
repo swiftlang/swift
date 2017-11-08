@@ -253,7 +253,8 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
                                            SILBasicBlock *errorBB,
                                            Optional<ManagedValue> errorSlot) {
-  SavedInsertionPoint savedIP(*this, errorBB, FunctionSection::Postmatter);
+  SILGenSavedInsertionPoint savedIP(*this, errorBB,
+                                    FunctionSection::Postmatter);
 
   // Load the error (taking responsibility for it).  In theory, this
   // is happening within conditional code, so we need to be only

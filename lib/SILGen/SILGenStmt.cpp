@@ -550,7 +550,7 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
     // Move the insertion point to the 'body' block temporarily and emit it.
     // Note that we don't push break/continue locations since they aren't valid
     // in this statement.
-    SavedInsertionPoint savedIP(SGF, bodyBB.getBlock());
+    SILGenSavedInsertionPoint savedIP(SGF, bodyBB.getBlock());
     SGF.emitProfilerIncrement(S->getBody());
     SGF.emitStmt(S->getBody());
 
@@ -691,7 +691,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // has no predecessors, and SGF.ThrowDest may not be valid either.
   if (auto *BB = getOrEraseBlock(SGF, throwDest)) {
     // Move the insertion point to the throw destination.
-    SavedInsertionPoint savedIP(SGF, BB, FunctionSection::Postmatter);
+    SILGenSavedInsertionPoint savedIP(SGF, BB, FunctionSection::Postmatter);
 
     // The exception cleanup should be getting forwarded around
     // correctly anyway, but push a scope to ensure it gets popped.
@@ -976,7 +976,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                            ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
-  SavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
+  SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
 
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.
