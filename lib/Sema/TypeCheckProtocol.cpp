@@ -6345,6 +6345,24 @@ static bool isGeneric(ValueDecl *decl) {
   return false;
 }
 
+/// Determine whether this is an unlabeled initializer or subscript.
+static bool isUnlabeledInitializerOrSubscript(ValueDecl *value) {
+  ParameterList *paramList = nullptr;
+  if (auto constructor = dyn_cast<ConstructorDecl>(value))
+    paramList = constructor->getParameterList(1);
+  else if (auto subscript = dyn_cast<SubscriptDecl>(value))
+    paramList = subscript->getIndices();
+  else
+    return false;
+
+  for (auto param : *paramList) {
+    if (!param->getArgumentName().empty()) return false;
+  }
+
+  return true;
+}
+
+/// Determine whether this declaration is an initializer
 /// Determine whether we should warn about the given witness being a close
 /// match for the given optional requirement.
 static bool shouldWarnAboutPotentialWitness(
@@ -6378,6 +6396,12 @@ static bool shouldWarnAboutPotentialWitness(
     if (auto attr = witness->getAttrs().getAttribute<AccessControlAttr>())
       if (!attr->isImplicit()) return false;
   }
+
+  // Don't warn if the requirement or witness is an initializer or subscript
+  // with no argument labels.
+  if (isUnlabeledInitializerOrSubscript(req) ||
+      isUnlabeledInitializerOrSubscript(witness))
+    return false;
 
   // If the score is relatively high, don't warn: this is probably
   // unrelated.  Allow about one typo for every four properly-typed
