@@ -546,7 +546,8 @@ private:
 
   bool areEmittingDependencies() const;
   static bool doesActionEmitDependencies(ActionType);
-  bool canEmitHeader() const;
+  bool areEmittingHeader() const;
+  static bool doesActionEmitHeader(ActionType);
   bool canEmitLoadedModuleTrace() const;
   bool canEmitModule() const;
 
