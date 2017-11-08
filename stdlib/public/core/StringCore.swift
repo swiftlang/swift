@@ -323,7 +323,8 @@ public struct _LegacyStringCore {
         owner: _owner)
     }
 #if _runtime(_ObjC)
-    return _cocoaStringSlice(self, bounds)
+    return String(_cocoaString:
+      _cocoaStringSlice(cocoaBuffer.unsafelyUnwrapped, bounds))._core
 #else
     _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
