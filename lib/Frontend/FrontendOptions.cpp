@@ -248,12 +248,12 @@ const char *FrontendOptions::computeSuffix() {
   }
 }
 
-bool FrontendOptions::areEmittingDependencies() const {
-  return DependenciesFilePath.empty() ||
-         doesActionEmitDependencies(RequestedAction);
+bool FrontendOptions::hasUnusableDependenciesFilePath() const {
+  return !DependenciesFilePath.empty() &&
+         !canActionEmitDependencies(RequestedAction);
 }
 
-bool FrontendOptions::doesActionEmitDependencies(ActionType action) {
+bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
@@ -284,11 +284,11 @@ bool FrontendOptions::doesActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::areEmittingHeader() const {
-  return ObjCHeaderOutputPath.empty() || doesActionEmitHeader(RequestedAction);
+bool FrontendOptions::hasUnusableObjCHeaderOutputPath() const {
+  return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
 }
 
-bool FrontendOptions::doesActionEmitHeader(ActionType action) {
+bool FrontendOptions::canActionEmitHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
@@ -319,12 +319,12 @@ bool FrontendOptions::doesActionEmitHeader(ActionType action) {
   }
 }
 
-bool FrontendOptions::areEmittingLoadedModuleTrace() const {
-  return LoadedModuleTracePath.empty() ||
-         doesActionEmitLoadedModuleTrace(RequestedAction);
+bool FrontendOptions::hasUnusableLoadedModuleTracePath() const {
+  return !LoadedModuleTracePath.empty() &&
+         !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
-bool FrontendOptions::doesActionEmitLoadedModuleTrace(ActionType action) {
+bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
@@ -355,12 +355,15 @@ bool FrontendOptions::doesActionEmitLoadedModuleTrace(ActionType action) {
   }
 }
 
-bool FrontendOptions::areEmittingModule() const {
-  return (ModuleOutputPath.empty() && ModuleDocOutputPath.empty()) ||
-         doesActionEmitModule(RequestedAction);
+bool FrontendOptions::hasUnusableModuleOutputPath() const {
+  return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
-bool FrontendOptions::doesActionEmitModule(ActionType action) {
+bool FrontendOptions::hasUnusableModuleDocOutputPath() const {
+  return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
+}
+
+bool FrontendOptions::canActionEmitModule(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
@@ -389,6 +392,10 @@ bool FrontendOptions::doesActionEmitModule(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
+}
+
+bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
+  return canActionEmitModule(action);
 }
 
 bool FrontendOptions::actionProducesOutput(ActionType action) {

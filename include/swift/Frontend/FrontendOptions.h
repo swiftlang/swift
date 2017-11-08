@@ -544,14 +544,16 @@ public:
 private:
   const char *computeSuffix();
 
-  bool areEmittingDependencies() const;
-  static bool doesActionEmitDependencies(ActionType);
-  bool areEmittingHeader() const;
-  static bool doesActionEmitHeader(ActionType);
-  bool areEmittingLoadedModuleTrace() const;
-  static bool doesActionEmitLoadedModuleTrace(ActionType);
-  bool areEmittingModule() const;
-  static bool doesActionEmitModule(ActionType);
+  bool hasUnusableDependenciesFilePath() const;
+  static bool canActionEmitDependencies(ActionType);
+  bool hasUnusableObjCHeaderOutputPath() const;
+  static bool canActionEmitHeader(ActionType);
+  bool hasUnusableLoadedModuleTracePath() const;
+  static bool canActionEmitLoadedModuleTrace(ActionType);
+  bool hasUnusableModuleOutputPath() const;
+  static bool canActionEmitModule(ActionType);
+  bool hasUnusableModuleDocOutputPath() const;
+  static bool canActionEmitModuleDoc(ActionType);
 
   /// Return true if changed output filename.
   static bool actionProducesOutput(ActionType);
