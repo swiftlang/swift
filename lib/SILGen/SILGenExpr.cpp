@@ -1417,7 +1417,7 @@ void SILGenFunction::ForceTryEmission::finish() {
     SGF.eraseBasicBlock(catchBB);
   } else {
     // Otherwise, we need to emit it.
-    SavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
+    SILGenSavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
     ASTContext &ctx = SGF.getASTContext();
     auto error = catchBB->createPHIArgument(SILType::getExceptionType(ctx),

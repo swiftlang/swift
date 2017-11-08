@@ -1324,8 +1324,8 @@ public:
         SGF.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
-        SavedInsertionPoint savedIP(SGF, rethrowBB,
-                                    FunctionSection::Postmatter);
+        SILGenSavedInsertionPoint savedIP(SGF, rethrowBB,
+                                          FunctionSection::Postmatter);
 
         // Log the error.
         SILValue error = rethrowBB->getArgument(0);

@@ -396,7 +396,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
     finalResult = emitManagedBufferWithCleanup(
         emitTemporaryAllocation(loc, resultTy), resultTL);
   } else {
-    SavedInsertionPoint IP(*this, contBB);
+    SILGenSavedInsertionPoint IP(*this, contBB);
     finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
   }
 
