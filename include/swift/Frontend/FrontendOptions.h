@@ -20,7 +20,7 @@
 #include <vector>
 
 namespace llvm {
-  class MemoryBuffer;
+class MemoryBuffer;
 }
 
 // Force change for PR for linux test
@@ -153,12 +153,12 @@ public:
   unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
 
   bool havePrimaryInputs() const { return primaryInputCount() > 0; }
- 
+
   bool isWholeModule() { return !havePrimaryInputs(); }
 
   Optional<SelectedInput> getOptionalPrimaryInput() const {
     return havePrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
-                             : Optional<SelectedInput>();
+                               : Optional<SelectedInput>();
   }
 
   bool isPrimaryInputAFileAt(unsigned i) {
@@ -185,7 +185,7 @@ public:
                ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
                : None;
   }
- 
+
   StringRef primaryInputFilenameIfAny() const {
     if (auto Index = primaryInputFileIndex()) {
       return getInputFilenames()[*Index];
@@ -253,6 +253,7 @@ public:
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class FrontendArgsToOptionsConverter;
+
 public:
   FrontendInputs Inputs;
 
@@ -362,15 +363,15 @@ public:
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
 
-  enum ActionType {
-    NoneAction, ///< No specific action
-    Parse, ///< Parse only
-    Typecheck, ///< Parse and type-check only
-    DumpParse, ///< Parse only and dump AST
+  enum class ActionType {
+    NoneAction,        ///< No specific action
+    Parse,             ///< Parse only
+    Typecheck,         ///< Parse and type-check only
+    DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
-    EmitSyntax, ///< Parse and dump Syntax tree as JSON
-    DumpAST, ///< Parse, type-check, and dump AST
-    PrintAST, ///< Parse, type-check, and pretty-print AST
+    EmitSyntax,        ///< Parse and dump Syntax tree as JSON
+    DumpAST,           ///< Parse, type-check, and dump AST
+    PrintAST,          ///< Parse, type-check, and pretty-print AST
 
     /// Parse and dump scope map.
     DumpScopeMaps,
@@ -379,30 +380,30 @@ public:
     DumpTypeRefinementContexts,
 
     EmitImportedModules, ///< Emit the modules that this one imports
-    EmitPCH, ///< Emit PCH of imported bridging header
+    EmitPCH,             ///< Emit PCH of imported bridging header
 
     EmitSILGen, ///< Emit raw SIL
-    EmitSIL, ///< Emit canonical SIL
+    EmitSIL,    ///< Emit canonical SIL
 
     EmitModuleOnly, ///< Emit module only
-    MergeModules, ///< Merge modules only
+    MergeModules,   ///< Merge modules only
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
-    EmitSIB, ///< Emit serialized AST + canonical SIL
+    EmitSIB,    ///< Emit serialized AST + canonical SIL
 
     Immediate, ///< Immediate mode
-    REPL, ///< REPL mode
+    REPL,      ///< REPL mode
 
     EmitAssembly, ///< Emit assembly
-    EmitIR, ///< Emit LLVM IR
-    EmitBC, ///< Emit LLVM BC
-    EmitObject, ///< Emit object file
+    EmitIR,       ///< Emit LLVM IR
+    EmitBC,       ///< Emit LLVM BC
+    EmitObject    ///< Emit object file
   };
 
-  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
 
   /// Indicates the action the user requested that the frontend perform.
-  ActionType RequestedAction = NoneAction;
+  ActionType RequestedAction = ActionType::NoneAction;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
@@ -417,7 +418,7 @@ public:
   /// If set, dumps wall time taken to check each expression.
   bool DebugTimeExpressionTypeChecking = false;
 
-  /// If set, prints the time taken in each major compilation phase to 
+  /// If set, prints the time taken in each major compilation phase to
   /// llvm::errs().
   ///
   /// \sa swift::SharedTimer
@@ -474,7 +475,7 @@ public:
 
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
-  
+
   /// Indicates whether the AST should be instrumented to simulate a debugger's
   /// program counter. Similar to the PlaygroundTransform, this will instrument
   /// the AST with function calls that get called when you would see a program
@@ -511,9 +512,9 @@ public:
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
-    None, ///< Don't automatically crash.
+    None,             ///< Don't automatically crash.
     AssertAfterParse, ///< Automatically assert after parsing.
-    CrashAfterParse, ///< Automatically crash after parsing.
+    CrashAfterParse,  ///< Automatically crash after parsing.
   };
 
   /// Indicates a debug crash mode for the frontend.
@@ -531,9 +532,7 @@ public:
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
-  llvm::hash_code getPCHHashComponents() const {
-    return llvm::hash_value(0);
-  }
+  llvm::hash_code getPCHHashComponents() const { return llvm::hash_value(0); }
 
   StringRef originalPath() const;
 
@@ -541,18 +540,19 @@ public:
     return InputKind == InputFileKind::IFK_Swift &&
            Inputs.hasUniqueInputFilename();
   }
+
 private:
   const char *computeSuffix();
-  
+
   bool canEmitDependencies() const;
   bool canEmitHeader() const;
   bool canEmitLoadedModuleTrace() const;
   bool canEmitModule() const;
-  
+
   /// Return true if changed output filename.
   bool actionProducesOutputFromFrontend() const;
   bool actionOutputsToStdout() const;
 };
-}
+} // namespace swift
 
 #endif
