@@ -1832,8 +1832,6 @@ CompilerInvocation::setUpForToolInputFile(
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
   if (!FileBufOrErr) {
-    fprintf(stderr, "Error! Failed to open file: %s\n",
-            InputFilename.str().c_str());
     return FileBufOrErr;
   }
 
