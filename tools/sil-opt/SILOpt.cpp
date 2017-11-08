@@ -54,10 +54,10 @@ enum class OptGroup { Unknown, Diagnostics, Performance, Lowering };
 
 static llvm::cl::opt<std::string>
 InputFilename(llvm::cl::desc("input file"), llvm::cl::init("-"),
-              llvm::cl::Positional);
+                                                llvm::cl::Positional);
 
 static llvm::cl::opt<std::string>
-OutputFilename("o", llvm::cl::desc("output filename"));
+    OutputFilename("o", llvm::cl::desc("output filename"));
 
 static llvm::cl::list<std::string>
 ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
@@ -67,14 +67,14 @@ FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path
 
 static llvm::cl::opt<std::string>
 ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
-                                         " a module. Necessary for processing "
-                                         "stdin."));
+                              " a module. Necessary for processing "
+                              "stdin."));
 
 static llvm::cl::opt<bool>
-EnableResilience("enable-resilience",
-                 llvm::cl::desc("Compile the module to export resilient "
-                                "interfaces for all public declarations by "
-                                "default"));
+    EnableResilience("enable-resilience",
+                     llvm::cl::desc("Compile the module to export resilient "
+                                    "interfaces for all public declarations by "
+                                    "default"));
 
 static llvm::cl::opt<bool>
 EnableSILOwnershipOpt("enable-sil-ownership",
@@ -82,7 +82,7 @@ EnableSILOwnershipOpt("enable-sil-ownership",
 
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
-                      llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
+    llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
 namespace {
 enum EnforceExclusivityMode {
@@ -95,7 +95,7 @@ enum EnforceExclusivityMode {
 
 static cl::opt<EnforceExclusivityMode> EnforceExclusivity(
   "enforce-exclusivity", cl::desc("Enforce law of exclusivity "
-                                  "(and support memory access markers)."),
+             "(and support memory access markers)."),
     cl::init(EnforceExclusivityMode::Checked),
     cl::values(clEnumValN(EnforceExclusivityMode::Unchecked, "unchecked",
                           "Static checking only."),
@@ -112,8 +112,8 @@ ResourceDir("resource-dir",
 
 static llvm::cl::opt<std::string>
 SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
-                              "importer."),
-        llvm::cl::init(""));
+                           "importer."),
+            llvm::cl::init(""));
 
 static llvm::cl::opt<std::string>
 Target("target", llvm::cl::desc("target triple"));
@@ -129,49 +129,49 @@ static llvm::cl::opt<OptGroup> OptimizationGroup(
 
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
-       llvm::cl::values(
+                                       llvm::cl::values(
 #define PASS(ID, TAG, NAME) clEnumValN(PassKind::ID, TAG, NAME),
 #include "swift/SILOptimizer/PassManager/Passes.def"
-       clEnumValN(0, "", "")));
+                                           clEnumValN(0, "", "")));
 
 static llvm::cl::opt<bool>
-PrintStats("print-stats", llvm::cl::desc("Print various statistics"));
+    PrintStats("print-stats", llvm::cl::desc("Print various statistics"));
 
 static llvm::cl::opt<bool>
 VerifyMode("verify",
            llvm::cl::desc("verify diagnostics against expected-"
-                          "{error|warning|note} annotations"));
+                                        "{error|warning|note} annotations"));
 
 static llvm::cl::opt<unsigned>
 AssertConfId("assert-conf-id", llvm::cl::Hidden,
-             llvm::cl::init(0));
+                                            llvm::cl::init(0));
 
 static llvm::cl::opt<bool>
-DisableSILLinking("disable-sil-linking",
-                  llvm::cl::desc("Disable SIL linking"));
+    DisableSILLinking("disable-sil-linking",
+                      llvm::cl::desc("Disable SIL linking"));
 
 static llvm::cl::opt<int>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
-                   llvm::cl::init(-1));
+                                             llvm::cl::init(-1));
 
 static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
                    llvm::cl::init(true),
-                   llvm::cl::desc("Run sil verifications after every pass."));
+    llvm::cl::desc("Run sil verifications after every pass."));
 
 static llvm::cl::opt<bool>
 RemoveRuntimeAsserts("remove-runtime-asserts",
                      llvm::cl::Hidden,
                      llvm::cl::init(false),
-                     llvm::cl::desc("Remove runtime assertions (cond_fail)."));
+    llvm::cl::desc("Remove runtime assertions (cond_fail)."));
 
 static llvm::cl::opt<bool>
-EmitVerboseSIL("emit-verbose-sil",
-               llvm::cl::desc("Emit locations during sil emission."));
+    EmitVerboseSIL("emit-verbose-sil",
+                   llvm::cl::desc("Emit locations during sil emission."));
 
 static llvm::cl::opt<bool>
-EmitSIB("emit-sib", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
+    EmitSIB("emit-sib", llvm::cl::desc("Emit serialized AST + SIL file(s)"));
 
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
@@ -179,16 +179,16 @@ ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 static llvm::cl::opt<bool>
 EnableSILSortOutput("emit-sorted-sil", llvm::cl::Hidden,
                     llvm::cl::init(false),
-                    llvm::cl::desc("Sort Functions, VTables, Globals, "
-                                   "WitnessTables by name to ease diffing."));
+    llvm::cl::desc("Sort Functions, VTables, Globals, "
+                   "WitnessTables by name to ease diffing."));
 
 static llvm::cl::opt<bool>
 DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
-               llvm::cl::init(false),
-               llvm::cl::desc("Do not dump AST."));
+                                          llvm::cl::init(false),
+                                          llvm::cl::desc("Do not dump AST."));
 
 static llvm::cl::opt<bool>
-PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
+    PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
 static llvm::cl::opt<bool>
 AssumeUnqualifiedOwnershipWhenParsing(
@@ -295,7 +295,7 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
   Invocation.getLangOptions().EnableObjCInterop =
-    llvm::Triple(Target).isOSDarwin();
+      llvm::Triple(Target).isOSDarwin();
 
   Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
 
@@ -314,7 +314,7 @@ int main(int argc, char **argv) {
     SILOpts.Optimization = SILOptions::SILOptMode::Optimize;
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-    AssumeUnqualifiedOwnershipWhenParsing;
+      AssumeUnqualifiedOwnershipWhenParsing;
 
   if (EnforceExclusivity.getNumOccurrences() != 0) {
     switch (EnforceExclusivity) {
@@ -341,11 +341,11 @@ int main(int argc, char **argv) {
       break;
     }
   }
-  
+
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
   Invocation.setupForToolInputFile(InputFilename, ModuleName, false,
-                                   extendedInfo);
+                                       extendedInfo);
   if (!FileBufOrErr)
     exit(-1);
 
@@ -389,7 +389,7 @@ int main(int argc, char **argv) {
     enableDiagnosticVerifier(CI.getSourceMgr());
 
   if (CI.getSILModule())
-    CI.getSILModule()->setSerializeSILAction([]{});
+    CI.getSILModule()->setSerializeSILAction([] {});
 
   std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile;
   if (RemarksFilename != "") {
@@ -466,8 +466,8 @@ int main(int argc, char **argv) {
   // diagnostics.  Check now to ensure that they meet our expectations.
   if (VerifyMode) {
     HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
-                                 /*autoApplyFixes*/false,
-                                 /*ignoreUnknown*/false);
+                                 /*autoApplyFixes*/ false,
+                                 /*ignoreUnknown*/ false);
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {

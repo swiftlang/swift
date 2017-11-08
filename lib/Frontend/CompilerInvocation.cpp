@@ -1861,7 +1861,7 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-CompilerInvocation::setupForToolInputFile(
+CompilerInvocation::setUpForToolInputFile(
     const std::string &InputFilename, const std::string &ModuleNameArg,
     bool alwaysSetModuleToMain,
     serialization::ExtendedValidationInfo &extendedInfo) {
