@@ -317,22 +317,12 @@ void SyntaxParsingContextChild::makeNodeWhole(SyntaxKind Kind) {
     ContextData.createWhole(Kind, AllNodes);
     break;
   }
+  case SyntaxKind::StmtList:
   case SyntaxKind::FunctionCallArgumentList: {
     if (AllNodes.empty()) {
       // Create an empty argument list if no arguments are in the context.
       RawSyntaxInfo Empty(SyntaxFactory::
-                          makeBlankFunctionCallArgumentList().getRaw());
-      Empty.setBeforeLoc(EndLoc);
-      ContextData.addPendingSyntax(Empty);
-    } else {
-      ContextData.createWhole(Kind, AllNodes);
-    }
-    break;
-  }
-  case SyntaxKind::StmtList: {
-    if (AllNodes.empty()) {
-      // Create an empty statement list if no statement is in the context.
-      RawSyntaxInfo Empty(SyntaxFactory::makeBlankStmtList().getRaw());
+                          makeBlankCollectionSyntax(Kind).getRaw());
       Empty.setBeforeLoc(EndLoc);
       ContextData.addPendingSyntax(Empty);
     } else {
