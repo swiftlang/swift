@@ -511,12 +511,12 @@ let _: ((Int?) -> Void) = { (arg: Int!) in }
 // () -> T to () -> Optional<()>.
 func returnsArray() -> [Int] { return [] }
 
-returnsArray().flatMap { $0 }.flatMap { }
+returnsArray().filterMap { $0 }.filterMap { }
 // expected-warning@-1 {{expression of type 'Int' is unused}}
-// expected-warning@-2 {{result of call to 'flatMap' is unused}}
+// expected-warning@-2 {{result of call to 'filterMap' is unused}}
 
 // rdar://problem/30271695
-_ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }
+_ = ["hi"].filterMap { $0.isEmpty ? nil : $0 }
 
 // rdar://problem/32432145 - compiler should emit fixit to remove "_ in" in closures if 0 parameters is expected
 
