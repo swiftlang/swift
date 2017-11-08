@@ -102,6 +102,8 @@ Swift 4.1
 
   If you wish to provide your own implementation of `==`/`hashValue`, you still can; a custom implementation will replace the one synthesized by the compiler.
 
+  **Add new entries to the top of this file, not here!**
+
 Swift 4.0
 ---------
 
@@ -390,8 +392,6 @@ Swift 4.0
   #define TINY    (BITWIDTH <= 16)
   #define LIMITED (SMALL || TINY)   // now imported as Bool.
   ```
-
-  **Add new entries to the top of this file, not here!**
 
 Swift 3.1
 ---------
