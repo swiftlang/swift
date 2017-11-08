@@ -91,6 +91,7 @@ public:
   // Create a syntax node of the given kind.
   virtual void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) = 0;
   virtual ~SyntaxParsingContext();
+  virtual void setSyntaxKind(SyntaxKind Kind) = 0;
 
   // Disable the building of syntax tree in the current context.
   void disable();
@@ -106,6 +107,7 @@ public:
     SyntaxParsingContext(File, BufferID, Tok), File(File) {}
   ~SyntaxParsingContextRoot();
   void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override {};
+  void setSyntaxKind(SyntaxKind Kind) override {};
   SyntaxParsingContextKind getKind() override {
     return SyntaxParsingContextKind::Root;
   };
@@ -136,6 +138,10 @@ public:
   ~SyntaxParsingContextChild();
   void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override;
   SyntaxParsingContext* getParent() { return Parent; }
+  void setSyntaxKind(SyntaxKind SKind) override {
+    Kind = None;
+    KnownSyntax = SKind;
+  }
   SyntaxParsingContextRoot &getRoot();
   SyntaxParsingContextKind getKind() override {
     return SyntaxParsingContextKind::Child;

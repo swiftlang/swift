@@ -27,5 +27,9 @@ class C {
     _ = bar2(a : bar2(a: 1, b: 2, c: 3), b: 2, c: 3)
     _ = bar3(a : bar3(a: bar3(a: 1)))
     _ = bar4(bar4(bar4(1)))
+    _ = [1, 2, 3, 4]
+    _ = [1:1, 2:2, 3:3, 4:4]
+    _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
+    _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
   }
 }
