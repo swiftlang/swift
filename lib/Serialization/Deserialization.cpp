@@ -2113,7 +2113,10 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   Expected<Decl *> deserialized = getDeclCheckedImpl(DID, ForcedContext);
   if (deserialized && deserialized.get()) {
     if (auto *IDC = dyn_cast<IterableDeclContext>(deserialized.get())) {
-      if (IDC->wasDeserialized()) {
+      // Only set the DeclID on the returned Decl if it's one that was loaded
+      // and _wasn't_ one that had its DeclID set elsewhere (a followed XREF).
+      if (IDC->wasDeserialized() &&
+          static_cast<uint32_t>(IDC->getDeclID()) == 0) {
         IDC->setDeclID(DID);
       }
     }
