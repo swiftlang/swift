@@ -12,8 +12,6 @@ class Box<T> {
 
 // CHECK: sil @_T04main7testBoxyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   // function_ref Box.__allocating_init(_:)
-// CHECK:   [[INIT_F:%.*]] = function_ref @_T04main3BoxCACyxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0> // user: %26
 // CHECK:   // function_ref closure #1 in testBox()
 // CHECK:   [[CLOSURE:%.*]] = function_ref @_T04main7testBoxyyFyycfU_ : $@convention(thin) () -> ()
 // CHECK:   [[THICK:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) () -> () to $@callee_owned () -> ()
@@ -30,6 +28,8 @@ class Box<T> {
 // CHECK:   [[TUPLEB_0:%.*]] = tuple_extract [[BORROWB]] : $(Int, @callee_owned (@in ()) -> @out ()), 0
 // CHECK:   [[TUPLEB_1:%.*]] = tuple_extract [[BORROWB]] : $(Int, @callee_owned (@in ()) -> @out ()), 1
 // CHECK:   [[COPYB_1:%.*]] = copy_value [[TUPLEB_1]] : $@callee_owned (@in ()) -> @out ()
+// CHECK:   // function_ref Box.__allocating_init(_:)
+// CHECK:   [[INIT_F:%.*]] = function_ref @_T04main3BoxCACyxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   [[CALL:%.*]] = apply [[INIT_F]]<(Int, () -> ())>(%{{.*}}, %{{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   end_borrow [[BORROWB]] from %{{.*}} : $(Int, @callee_owned (@in ()) -> @out ()), $(Int, @callee_owned (@in ()) -> @out ())
 // CHECK:   destroy_value [[TUPLEB]] : $(Int, @callee_owned (@in ()) -> @out ())

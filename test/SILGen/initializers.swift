@@ -644,13 +644,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   // Now we begin argument emission where we perform the unwrap.
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[BASE_SELF:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[INIT_FN:%.*]] = function_ref @_T021failable_initializers14ThrowBaseClassCACSi6noFail_tcfc : $@convention(method)
   // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @_T021failable_initializers6unwrapS2iKF : $@convention(thin)
   // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Now we emit the call to the initializer. Notice how we return self back to
   // its memory locatio nbefore any other work is done.
   // CHECK: [[NORMAL_BB]](
+  // CHECK:   [[INIT_FN:%.*]] = function_ref @_T021failable_initializers14ThrowBaseClassCACSi6noFail_tcfc : $@convention(method)
   // CHECK:   [[BASE_SELF_INIT:%.*]] = apply [[INIT_FN]]({{%.*}}, [[BASE_SELF]])
   // CHECK:   [[SELF:%.*]] = unchecked_ref_cast [[BASE_SELF_INIT]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[SELF]] to [init] [[PROJ]]
@@ -755,12 +755,12 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[UNWRAP_NORMAL_BB]](
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[SELF_CAST:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[INIT_FN2:%.*]] = function_ref @_T021failable_initializers14ThrowBaseClassCACSi6noFail_tcfc : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[UNWRAP_FN2:%.*]] = function_ref @_T021failable_initializers6unwrapS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
   // CHECK:   try_apply [[UNWRAP_FN2]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[UNWRAP_NORMAL_BB2:bb[0-9]+]], error [[UNWRAP_ERROR_BB2:bb[0-9]+]]
   //
   // Then since this example has a
   // CHECK: [[UNWRAP_NORMAL_BB2]]([[INT:%.*]] : @trivial $Int):
+  // CHECK:   [[INIT_FN2:%.*]] = function_ref @_T021failable_initializers14ThrowBaseClassCACSi6noFail_tcfc : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[NEW_SELF_CAST:%.*]] = apply [[INIT_FN2]]([[INT]], [[SELF_CAST]]) : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF_CAST]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[NEW_SELF]] to [init] [[PROJ]]

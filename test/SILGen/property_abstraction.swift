@@ -44,7 +44,6 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   store [[ARG_COPY]] to [init] [[XBOX_PB]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK:   [[INOUTFUNC:%.*]] = function_ref @_T020property_abstraction9inOutFunc{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[XBOX_PB]] : $*Foo<Int, Int>
 // CHECK:   [[F_ADDR:%.*]] = struct_element_addr [[WRITE]] : $*Foo<Int, Int>, #Foo.f
 // CHECK:   [[F_SUBST_MAT:%.*]] = alloc_stack
@@ -52,6 +51,7 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK:   [[REABSTRACT_FN:%.*]] = function_ref @_T0{{.*}}TR :
 // CHECK:   [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:   store [[F_SUBST_IN]] to [init] [[F_SUBST_MAT]]
+// CHECK:   [[INOUTFUNC:%.*]] = function_ref @_T020property_abstraction9inOutFunc{{[_0-9a-zA-Z]*}}F
 // CHECK:   apply [[INOUTFUNC]]([[F_SUBST_MAT]])
 // CHECK:   [[F_SUBST_OUT:%.*]] = load [take] [[F_SUBST_MAT]]
 // CHECK:   [[REABSTRACT_FN:%.*]] = function_ref @_T0{{.*}}TR :
@@ -140,10 +140,10 @@ func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
 }
 // CHECK: sil hidden @_T020property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
 // CHECK: bb0(%0 : @trivial $*F):
-// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   [[F0:%.*]] = function_ref @_T020property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} : $@convention(thin) () -> @owned MyClass
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_T0{{.*}}TR :
 // CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]([[F1]])
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
+// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   apply [[SETTER]]<F>([[F2]], [[WRITE]])

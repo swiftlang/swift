@@ -42,11 +42,11 @@ public class Base {
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @_T013auto_closures3SubC1xAA4BoolVvg : $@convention(method) (@guaranteed Sub) -> Bool {
   // CHECK: bb0([[SELF:%.*]] : $Sub):
-  // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @_T013auto_closures05call_A8_closureAA4BoolVADyXKF : $@convention(thin)
   // CHECK: [[AUTOCLOSURE_FUNC:%.*]] = function_ref @_T013auto_closures3SubC1xAA4BoolVvgAFyXKfu_ : $@convention(thin) (@owned Sub) -> Bool
   // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK: [[AUTOCLOSURE:%.*]] = partial_apply [[AUTOCLOSURE_FUNC]]([[SELF_COPY]])
   // CHECK: [[CVT:%.*]] = convert_function [[AUTOCLOSURE]]
+  // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @_T013auto_closures05call_A8_closureAA4BoolVADyXKF : $@convention(thin)
   // CHECK: [[RET:%.*]] = apply [[AUTOCLOSURE_CONSUMER]]([[CVT]])
   // CHECK: return [[RET]] : $Bool
   // CHECK: }

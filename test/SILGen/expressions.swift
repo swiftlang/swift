@@ -108,9 +108,9 @@ func call_one() {
 }
 
 // CHECK-LABEL: sil hidden @_T011expressions8call_oneyyF
-// CHECK: [[BAR:%[0-9]+]] = function_ref @_T011expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int) -> ()
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
+// CHECK: [[BAR:%[0-9]+]] = function_ref @_T011expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int) -> ()
 // CHECK: apply [[BAR]]([[FORTYTWO_CONVERTED]])
 
 func call_two() {
@@ -118,11 +118,11 @@ func call_two() {
 }
 
 // CHECK-LABEL: sil hidden @_T011expressions8call_twoyyF
-// CHECK: [[BAR:%[0-9]+]] = function_ref @_T011expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Int) -> ()
 // CHECK: [[FORTYTWO:%[0-9]+]] = integer_literal {{.*}} 42
 // CHECK: [[FORTYTWO_CONVERTED:%[0-9]+]] = apply {{.*}}([[FORTYTWO]], {{.*}})
 // CHECK: [[TWONINETEEN:%[0-9]+]] = integer_literal {{.*}} 219
 // CHECK: [[TWONINETEEN_CONVERTED:%[0-9]+]] = apply {{.*}}([[TWONINETEEN]], {{.*}})
+// CHECK: [[BAR:%[0-9]+]] = function_ref @_T011expressions3bar{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Int) -> ()
 // CHECK: apply [[BAR]]([[FORTYTWO_CONVERTED]], [[TWONINETEEN_CONVERTED]])
 
 func tuples() {
@@ -206,21 +206,21 @@ func default_args(_ x: Int, y: Int = 219, z: Int = 20721) {}
 // CHECK-LABEL: sil hidden @_T011expressions19call_default_args_1{{[_0-9a-zA-Z]*}}F
 func call_default_args_1(_ x: Int) {
   default_args(x)
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}F
   // CHECK: [[YFUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}A0_
   // CHECK: [[Y:%[0-9]+]] = apply [[YFUNC]]()
   // CHECK: [[ZFUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}A1_
   // CHECK: [[Z:%[0-9]+]] = apply [[ZFUNC]]()
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]({{.*}}, [[Y]], [[Z]])
 }
 
 // CHECK-LABEL: sil hidden @_T011expressions19call_default_args_2{{[_0-9a-zA-Z]*}}F
 func call_default_args_2(_ x: Int, z: Int) {
   default_args(x, z:z)
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}F
   // CHECK: [[DEFFN:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}A0_
   // CHECK-NEXT: [[C219:%[0-9]+]] = apply [[DEFFN]]()
-  // CHECK: apply [[FUNC]]({{.*}}, [[C219]], {{.*}})
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T011expressions12default_args{{[_0-9a-zA-Z]*}}F
+  // CHECK-NEXT: apply [[FUNC]]({{.*}}, [[C219]], {{.*}})
 }
 
 struct Generic<T> {
@@ -336,20 +336,20 @@ protocol Wibbleable { }
 func archetype_member_ref<T : Runcible>(_ x: T) {
   var x = x
   x.free_method()
-  // CHECK: witness_method $T, #Runcible.free_method!1
-  // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[X:%.*]]
+  // CHECK:      [[READ:%.*]] = begin_access [read] [unknown] [[X:%.*]]
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
   // CHECK-NEXT: copy_addr [[READ]] to [initialization] [[TEMP]]
   // CHECK-NEXT: end_access [[READ]]
+  // CHECK-NEXT: witness_method $T, #Runcible.free_method!1
   // CHECK-NEXT: apply
   // CHECK-NEXT: destroy_addr [[TEMP]]
   var u = x.associated_method()
-  // CHECK: witness_method $T, #Runcible.associated_method!1
-  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
+  // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown]
+  // CHECK-NEXT: witness_method $T, #Runcible.associated_method!1
   // CHECK-NEXT: apply
   T.static_method()
-  // CHECK: witness_method $T, #Runcible.static_method!1
-  // CHECK-NEXT: metatype $@thick T.Type
+  // CHECK:      metatype $@thick T.Type
+  // CHECK-NEXT: witness_method $T, #Runcible.static_method!1
   // CHECK-NEXT: apply
 }
 

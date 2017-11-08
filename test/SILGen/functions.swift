@@ -109,23 +109,23 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[KBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
   // CHECK: [[KADDR:%.*]] = project_box [[KBOX]]
 
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: apply [[FUNC]]([[I]], [[J]])
   standalone_function(i, j)
 
   // -- Curry 'self' onto struct method argument lists.
 
   // CHECK: [[ST_ADDR:%.*]] = alloc_box ${ var SomeStruct }
-  // CHECK: [[CTOR:%.*]] = function_ref @_T09functions10SomeStructV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   // CHECK: [[METATYPE:%.*]] = metatype $@thin SomeStruct.Type
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%.*]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%.*]] = load [trivial] [[READJ]]
+  // CHECK: [[CTOR:%.*]] = function_ref @_T09functions10SomeStructV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   // CHECK: apply [[CTOR]]([[I]], [[J]], [[METATYPE]]) : $@convention(method) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   var st = SomeStruct(x: i, y: j)
 
@@ -140,22 +140,21 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[CBOX:%[0-9]+]] = alloc_box ${ var SomeClass }
   // CHECK: [[CADDR:%.*]] = project_box [[CBOX]]
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T09functions9SomeClassC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T09functions9SomeClassC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[C:%[0-9]+]] = apply [[FUNC]]([[I]], [[J]], [[META]])
   var c = SomeClass(x: i, y: j)
 
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.method!1
   // CHECK: apply [[METHOD]]([[I]], [[BORROWED_C]])
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
@@ -170,10 +169,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.method!1
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.method!1
   // CHECK: apply [[METHOD]]([[I]], [[BORROWED_C]])
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
@@ -184,9 +182,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[META:%.*]] = value_metatype $@thick SomeClass.Type, [[C]]
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [[META]] : {{.*}}, #SomeClass.static_method!1
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[METHOD:%[0-9]+]] = class_method [[META]] : {{.*}}, #SomeClass.static_method!1
   // CHECK: apply [[METHOD]]([[I]], [[META]])
   type(of: c).static_method(i)
 
@@ -195,8 +193,8 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- FIXME: class_method-ify class getters.
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
-  // CHECK: [[GETTER:%[0-9]+]] = class_method {{.*}} : $SomeClass, #SomeClass.someProperty!getter.1
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: [[GETTER:%[0-9]+]] = class_method {{.*}} : $SomeClass, #SomeClass.someProperty!getter.1
   // CHECK: apply [[GETTER]]([[BORROWED_C]])
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
@@ -208,7 +206,6 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[BORROWED_C]] : $SomeClass, #SomeClass.someProperty!setter.1 : (SomeClass) -> (Builtin.Int64) -> ()
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: apply [[SETTER]]([[I]], [[BORROWED_C]])
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
@@ -222,7 +219,6 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[K:%[0-9]+]] = load [trivial] [[READK]]
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[GETTER:%[0-9]+]] = class_method [[BORROWED_C]] : $SomeClass, #SomeClass.subscript!getter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64) -> Builtin.Int64, $@convention(method) (Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> Builtin.Int64
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[BORROWED_C]])
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
@@ -238,7 +234,6 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[K:%[0-9]+]] = load [trivial] [[READK]]
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[SETTER:%[0-9]+]] = class_method [[BORROWED_C]] : $SomeClass, #SomeClass.subscript!setter.1 : (SomeClass) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed SomeClass) -> ()
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[BORROWED_C]])
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
@@ -255,18 +250,18 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
   // CHECK: copy_addr [[READ]] to [initialization] [[TEMP]]
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
-  // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   // CHECK: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
-  // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
+  // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
   var sp : SomeProtocol = ConformsToSomeProtocol()
   sp.method(i)
@@ -281,18 +276,17 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[GBOX:%[0-9]+]] = alloc_box ${ var SomeGeneric<Builtin.Int64> }
   // CHECK: [[GADDR:%.*]] = project_box [[GBOX]]
-  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_T09functions11SomeGenericC{{[_0-9a-zA-Z]*}}fC : $@convention(method) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
+  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_T09functions11SomeGenericC{{[_0-9a-zA-Z]*}}fC : $@convention(method) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
 
   // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
-  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.method!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.method!1
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPI]], [[BORROWED_G]])
   // CHECK: end_borrow [[BORROWED_G]] from [[G]]
   // CHECK: destroy_value [[G]]
@@ -300,11 +294,10 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
-  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.generic!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.generic!1
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPJ]], [[BORROWED_G]])
   // CHECK: end_borrow [[BORROWED_G]] from [[G]]
   // CHECK: destroy_value [[G]]
@@ -312,11 +305,10 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
-  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
-  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.generic!1
   // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.generic!1
   // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]], [[TMPK]], [[BORROWED_C]])
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   // CHECK: destroy_value [[C]]
@@ -350,7 +342,6 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: apply [[F]]([[I]], [[J]])
   f(i, j)
 
-  // CHECK: [[HOF:%[0-9]+]] = function_ref @_T09functions21higher_order_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: [[CONVERT:%.*]] = convert_function [[FUNC_THICK]]
@@ -358,10 +349,10 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
+  // CHECK: [[HOF:%[0-9]+]] = function_ref @_T09functions21higher_order_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: apply [[HOF]]([[CONVERT]], [[I]], [[J]])
   higher_order_function(standalone_function, i, j)
 
-  // CHECK: [[HOF2:%[0-9]+]] = function_ref @_T09functions22higher_order_function2{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: [[CONVERT:%.*]] = convert_function [[FUNC_THICK]]
@@ -369,6 +360,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
+  // CHECK: [[HOF2:%[0-9]+]] = function_ref @_T09functions22higher_order_function2{{[_0-9a-zA-Z]*}}F : $@convention(thin) {{.*}}
   // CHECK: apply [[HOF2]]([[CONVERT]], [[I]], [[J]])
   higher_order_function2(standalone_function, i, j)
 }

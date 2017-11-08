@@ -33,8 +33,8 @@ enum Optionable {
 // CHECK-LABEL: sil hidden @_T0s16Optionable_casesySiF
 func Optionable_cases(_ x: Int) {
 
+  // CHECK:       [[METATYPE:%.*]] = metatype $@thin Optionable.Type
   // CHECK:       [[FN:%.*]] = function_ref @_T0s10OptionableO4mereABSicABmF
-  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
   // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = Optionable.mere
@@ -67,8 +67,8 @@ enum AddressOnly {
 // CHECK-LABEL: sil hidden @_T0s17AddressOnly_casesys1SVF
 func AddressOnly_cases(_ s: S) {
 
+  // CHECK:       [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK:       [[FN:%.*]] = function_ref @_T0s11AddressOnlyO4mereABs1P_pcABmF
-  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
   // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = AddressOnly.mere

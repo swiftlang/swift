@@ -255,8 +255,8 @@ public func s060__callMultiResult(i: Int) -> (Int, (Int, Int)) {
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s070__materializeSelfyx1t_tRlzCAA3FooRzlF : $@convention(thin) <T where T : AnyObject, T : Foo> (@owned T) -> () {
 // CHECK: bb0([[ARG:%.*]] : $T):
-// CHECK: [[WITNESS_METHOD:%.*]] = witness_method $T, #Foo.foo!1 : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method: Foo) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: [[WITNESS_METHOD:%.*]] = witness_method $T, #Foo.foo!1 : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method: Foo) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[WITNESS_METHOD]]<T>([[BORROWED_ARG]]) : $@convention(witness_method: Foo) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK: destroy_value [[ARG]] : $T

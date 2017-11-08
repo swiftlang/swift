@@ -221,7 +221,7 @@ public struct TestAddressOnlyStruct<T> {
   // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
   // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPBUF]]
-  // CHECK-NEXT: apply {{.*}}<T>([[TMPBUF]], %1)
+  // CHECK: apply {{.*}}<T>([[TMPBUF]], %1)
   func testCall(_ a : T!) {
     f(a)
   }

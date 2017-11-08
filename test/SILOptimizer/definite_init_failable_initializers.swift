@@ -225,9 +225,9 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers22FailableAddrOnlyStructV{{[_0-9a-zA-Z]*}}failAfterPartialInitialization{{.*}}tcfC
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
-// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
-// CHECK-NEXT:    [[X_BOX:%.*]] = alloc_stack $T
+// CHECK:         [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
+// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
@@ -251,18 +251,18 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers22FailableAddrOnlyStructV{{[_0-9a-zA-Z]*}}failAfterFullInitialization{{.*}}tcfC
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
-// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
-// CHECK-NEXT:    [[X_BOX:%.*]] = alloc_stack $T
+// CHECK:         [[X_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
+// CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[WRITE]]
 // CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
-// CHECK-NEXT:    [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
 // CHECK-NEXT:    [[Y_BOX:%.*]] = alloc_stack $T
 // CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
+// CHECK-NEXT:    [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[Y_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*FailableAddrOnlyStruct<T>
 // CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[WRITE]]
@@ -383,10 +383,10 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers11ThrowStructVACSi29failBeforeOrDuringDelegation2_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
-// CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACSi20failBeforeDelegation_tKcfC
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @_T035definite_init_failable_initializers6unwrapS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
+// CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACSi20failBeforeDelegation_tKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[RESULT]], %1)
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowStruct):
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
@@ -584,8 +584,8 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers11ThrowStructVACSi25failDuringSelfReplacement_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK:         [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACyt4fail_tKcfC
-// CHECK-NEXT:    [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[SELF_TYPE]])
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowStruct):
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*ThrowStruct
@@ -603,8 +603,8 @@ struct ThrowStruct {
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers11ThrowStructVACSi24failAfterSelfReplacement_tKcfC
 // CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
+// CHECK:         [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACyt6noFail_tcfC
-// CHECK-NEXT:    [[SELF_TYPE:%.*]] = metatype $@thin ThrowStruct.Type
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[SELF_TYPE]])
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [modify] [static] [[SELF_BOX]] : $*ThrowStruct
 // CHECK-NEXT:    store [[NEW_SELF]] to [[WRITE]]

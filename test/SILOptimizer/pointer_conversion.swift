@@ -22,10 +22,10 @@ func get<T>() -> T
 public func testArray() {
   let array: [Int] = get()
   takesConstRawPointer(array)
-  // CHECK: [[FN:%.+]] = function_ref @takesConstRawPointer
   // CHECK: [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1,
   // CHECK-NEXT: [[POINTER:%.+]] = struct $UnsafeRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]] : $Optional<AnyObject>
+  // CHECK: [[FN:%.+]] = function_ref @takesConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -38,11 +38,11 @@ public func testArray() {
 public func testArrayToOptional() {
   let array: [Int] = get()
   takesOptConstRawPointer(array)
-  // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
   // CHECK: [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1,
   // CHECK-NEXT: [[POINTER:%.+]] = struct $UnsafeRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]] : $Optional<AnyObject>
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
+  // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -55,10 +55,10 @@ public func testArrayToOptional() {
 public func testMutableArray() {
   var array: [Int] = get()
   takesMutableRawPointer(&array)
-  // CHECK: [[FN:%.+]] = function_ref @takesMutableRawPointer
   // CHECK: [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1,
   // CHECK-NEXT: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on [[OWNER]] : $Optional<AnyObject>
+  // CHECK: [[FN:%.+]] = function_ref @takesMutableRawPointer
   // CHECK-NEXT: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -72,11 +72,11 @@ public func testMutableArray() {
 public func testMutableArrayToOptional() {
   var array: [Int] = get()
   takesOptMutableRawPointer(&array)
-  // CHECK: [[FN:%.+]] = function_ref @takesOptMutableRawPointer
   // CHECK: [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1,
   // CHECK-NEXT: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on [[OWNER]] : $Optional<AnyObject>
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
+  // CHECK: [[FN:%.+]] = function_ref @takesOptMutableRawPointer
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
@@ -98,8 +98,8 @@ public func testOptionalArray() {
 
   // CHECK: [[CALL_BRANCH]]([[OPT_POINTER:%.+]] : $Optional<UnsafeRawPointer>, [[OWNER:%.+]] : $Optional<AnyObject>):
   // CHECK-NOT: release
-  // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
   // CHECK-NEXT: [[DEP_OPT_POINTER:%.+]] = mark_dependence [[OPT_POINTER]] : $Optional<UnsafeRawPointer> on [[OWNER]] : $Optional<AnyObject>
+  // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[DEP_OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
