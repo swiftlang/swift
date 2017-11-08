@@ -35,6 +35,7 @@
 #include "llvm/ADT/Twine.h"
 
 using namespace swift;
+using namespace swift::syntax;
 
 void DelayedParsingCallbacks::anchor() { }
 void SILParserTUStateBase::anchor() { }
@@ -126,6 +127,14 @@ static void parseDelayedDecl(
     CodeCompletion->doneParsing();
 }
 } // unnamed namespace
+
+
+swift::Parser::BacktrackingScope::~BacktrackingScope() {
+  if (Backtrack) {
+    P.backtrackToPosition(PP);
+    DT.abort();
+  }
+}
 
 void swift::performDelayedParsing(
     DeclContext *DC, PersistentParserState &PersistentState,
@@ -438,8 +447,8 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldKeepSyntaxInfo() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new syntax::SyntaxParsingContextRoot(SF, L->getBufferID(), Tok)) {
-
+    SyntaxContext(new syntax::SyntaxParsingContextRoot(SF, L->getBufferID(),
+                                                       Tok)) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
@@ -819,10 +828,15 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                  bool AllowSepAfterLast, Diag<> ErrorDiag,
+                  bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
                   std::function<ParserStatus()> callback) {
+  std::unique_ptr<SyntaxParsingContext> pListContext;
+  if (Kind == SyntaxKind::FunctionCallArgumentList) {
+    pListContext.reset(new SyntaxParsingContextChild(SyntaxContext, Kind));
+  }
 
   if (Tok.is(RightK)) {
+    pListContext.reset();
     RightLoc = consumeToken(RightK);
     return makeParserSuccess();
   }
@@ -835,6 +849,11 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
+    std::unique_ptr<SyntaxParsingContext> pElementContext;
+    if (Kind == SyntaxKind::FunctionCallArgumentList) {
+      pElementContext.reset(new SyntaxParsingContextChild(SyntaxContext,
+                                            SyntaxKind::FunctionCallArgument));
+    }
     Status |= callback();
     if (Tok.is(RightK))
       break;
@@ -878,6 +897,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     Status.setIsParseError();
   }
 
+  pListContext.reset();
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
