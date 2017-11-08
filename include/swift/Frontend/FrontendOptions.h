@@ -75,8 +75,10 @@ private:
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
-  /// The inputs for which output should be generated. If not set, output will
-  /// be generated for the whole module.
+  /// The inputs for which output should be generated. If empty, output will
+  /// be generated for the whole module, in other words, whole-module mode.
+  /// Even if every input file is mentioned here, it is not the same as
+  /// whole-module mode.
   std::vector<SelectedInput> PrimaryInputs;
 
 public:
