@@ -442,8 +442,8 @@ class SuperSub : SuperBase {
     // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
-    // CHECK:   [[SUPER_METHOD:%[0-9]+]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
     // CHECK:   [[BORROWED_ARG_COPY_SUPER:%.*]] = begin_borrow [[ARG_COPY_SUPER]]
+    // CHECK:   [[SUPER_METHOD:%[0-9]+]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
     // CHECK:   = apply [[SUPER_METHOD]]([[BORROWED_ARG_COPY_SUPER]])
     // CHECK:   destroy_value [[ARG_COPY_SUPER]]
     // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -480,8 +480,8 @@ class SuperSub : SuperBase {
       // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
-      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   [[BORROWED_ARG_COPY_SUPER:%.*]] = begin_borrow [[ARG_COPY_SUPER]]
+      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[BORROWED_ARG_COPY_SUPER]]) : $@convention(method) (@guaranteed SuperBase)
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
       // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -517,8 +517,8 @@ class SuperSub : SuperBase {
     // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
-    // CHECK:   [[SUPER_METHOD:%[0-9]+]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
     // CHECK:   [[BORROWED_ARG_COPY_SUPER:%.*]] = begin_borrow [[ARG_COPY_SUPER]]
+    // CHECK:   [[SUPER_METHOD:%[0-9]+]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
     // CHECK:   = apply [[SUPER_METHOD]]([[BORROWED_ARG_COPY_SUPER]])
     // CHECK:   destroy_value [[ARG_COPY_SUPER]]
     // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -556,8 +556,8 @@ class SuperSub : SuperBase {
       // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
-      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   [[BORROWED_ARG_COPY_SUPER:%.*]] = begin_borrow [[ARG_COPY_SUPER]]
+      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[BORROWED_ARG_COPY_SUPER]])
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
       // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -596,8 +596,8 @@ class SuperSub : SuperBase {
       // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPERCAST:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
-      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   [[BORROWED_ARG_COPY_SUPERCAST:%.*]] = begin_borrow [[ARG_COPY_SUPERCAST]]
+      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[BORROWED_ARG_COPY_SUPERCAST]])
       // CHECK:   destroy_value [[ARG_COPY_SUPERCAST]]
       // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -622,13 +622,13 @@ class SuperSub : SuperBase {
   func f() {
     // CHECK: sil private @[[INNER_FUNC_1]] : $@convention(thin) (@owned SuperSub) -> () {
     // CHECK: bb0([[ARG:%.*]] : @owned $SuperSub):
-    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:_T08closures8SuperSubC1fyyFyycfU_yyKXKfu_]] : $@convention(thin) (@owned SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [[INNER]]([[ARG_COPY]])
     // CHECK:   [[CVT:%.*]] = convert_function [[PA]]
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply {{.*}}([[CVT]])
     // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_function [[REABSTRACT_PA]]    
+    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK:   destroy_value [[ARG]]
@@ -639,8 +639,8 @@ class SuperSub : SuperBase {
       // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
-      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   [[BORROWED_ARG_COPY_SUPER:%.*]] = begin_borrow [[ARG_COPY_SUPER]]
+      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[BORROWED_ARG_COPY_SUPER]]) : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
       // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -659,13 +659,13 @@ class SuperSub : SuperBase {
   func g() {
     // CHECK: sil private @[[INNER_FUNC_1]] : $@convention(thin) (@owned SuperSub) -> ()
     // CHECK: bb0([[ARG:%.*]] : @owned $SuperSub):
-    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:_T08closures8SuperSubC1g.*]] : $@convention(thin) (@owned SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [[INNER]]([[ARG_COPY]])
     // CHECK:   [[CVT:%.*]] = convert_function [[PA]] : $@callee_owned () -> @error Error to $@noescape @callee_owned () -> @error Error
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply {{%.*}}([[CVT]]) : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error)
     // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_function [[REABSTRACT_PA]]
+    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @_T0s2qqoixxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @noescape @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK:   destroy_value [[ARG]]
@@ -676,8 +676,8 @@ class SuperSub : SuperBase {
       // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
       // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
-      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   [[BORROWED_ARG_COPY_SUPER:%.*]] = begin_borrow [[ARG_COPY_SUPER]]
+      // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_T08closures9SuperBaseC4boomyyF : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[BORROWED_ARG_COPY_SUPER]])
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
       // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -767,8 +767,8 @@ class ConcreteBase {
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $GenericDerived<Ocean> to $ConcreteBase
-// CHECK:   [[METHOD:%.*]] = function_ref @_T08closures12ConcreteBaseC4swimyyF
 // CHECK:   [[BORROWED_ARG_COPY_SUPER:%.*]] = begin_borrow [[ARG_COPY_SUPER]]
+// CHECK:   [[METHOD:%.*]] = function_ref @_T08closures12ConcreteBaseC4swimyyF
 // CHECK:   apply [[METHOD]]([[BORROWED_ARG_COPY_SUPER]]) : $@convention(method) (@guaranteed ConcreteBase) -> ()
 // CHECK:   destroy_value [[ARG_COPY_SUPER]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]

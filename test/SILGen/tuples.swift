@@ -43,9 +43,9 @@ func testShuffleOpaque() {
   // CHECK-NEXT: store [[T1]] to [trivial] [[PAIR_1]]
   var pair : (y:P, x:Int) = make_xy()
 
+  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @_T06tuples7make_xySi1x_AA1P_p1ytyF
-  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TEMP]])
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: P, x: Int)
   // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: P, x: Int), 0
@@ -90,9 +90,9 @@ func testShuffleTuple() {
   // CHECK-NEXT: // function_ref
   // CHECK:      [[T0:%.*]] = function_ref @_T06tuples8make_intSiyF
   // CHECK-NEXT: [[INT:%.*]] = apply [[T0]]()
+  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @_T06tuples6make_pAA1P_pyF 
-  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $P
   // CHECK-NEXT: apply [[T0]]([[TEMP]])
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: P, x: Int)
   // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: P, x: Int), 0

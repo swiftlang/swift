@@ -364,23 +364,21 @@ func improveWizard(_ wizard: inout Wizard) {
   improve(&wizard.hocus)
 }
 // CHECK-LABEL: sil hidden @_T017materializeForSet13improveWizardyAA0E0VzF
-// CHECK:       [[IMPROVE:%.*]] = function_ref @_T017materializeForSet7improveySizF :
-// CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Wizard
+// CHECK:       [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Wizard
 // CHECK-NEXT:  [[TEMP:%.*]] = alloc_stack $Int
 //   Call the getter and materialize the result in the temporary.
 // CHECK-NEXT:  [[T0:%.*]] = load [trivial] [[WRITE:.*]] : $*Wizard
-// CHECK-NEXT:  function_ref
-// CHECK-NEXT:  [[GETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSivg
-// CHECK-NEXT:  [[WTEMP:%.*]] = alloc_stack $Wizard
+// CHECK:       [[WTEMP:%.*]] = alloc_stack $Wizard
 // CHECK-NEXT:  store [[T0]] to [trivial] [[WTEMP]]
+// CHECK:       [[GETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSivg
 // CHECK-NEXT:  [[T0:%.*]] = apply [[GETTER]]<Wizard>([[WTEMP]])
 // CHECK-NEXT:  dealloc_stack [[WTEMP]]
 // CHECK-NEXT:  store [[T0]] to [trivial] [[TEMP]]
 //   Call improve.
+// CHECK:       [[IMPROVE:%.*]] = function_ref @_T017materializeForSet7improveySizF :
 // CHECK-NEXT:  apply [[IMPROVE]]([[TEMP]])
 // CHECK-NEXT:  [[T0:%.*]] = load [trivial] [[TEMP]]
-// CHECK-NEXT:  function_ref
-// CHECK-NEXT:  [[SETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSivs
+// CHECK:       [[SETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSivs
 // CHECK-NEXT:  apply [[SETTER]]<Wizard>([[T0]], [[WRITE]])
 // CHECK-NEXT:  end_access [[WRITE]] : $*Wizard
 // CHECK-NEXT:  dealloc_stack [[TEMP]]
@@ -574,9 +572,9 @@ struct TuxedoPanda : Panda { }
 
   // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIexir_A2CIexyd_TR : $@convention(thin) (TuxedoPanda, @owned @callee_owned (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
 
-  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_owned (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
-
   // CHECK: function_ref @_T017materializeForSet11TuxedoPandaVACIexyd_A2CIexir_TR : $@convention(thin) (@in TuxedoPanda, @owned @callee_owned (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
+
+  // CHECK: function_ref @_T017materializeForSet5PandaPAAE1xxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_owned (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
 
 // CHECK: }
 

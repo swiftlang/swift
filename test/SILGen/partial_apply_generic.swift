@@ -35,9 +35,9 @@ func getStaticFunc2<T: Foo>(t: T) -> () -> () {
 
 // CHECK-LABEL: sil hidden @_T021partial_apply_generic16getInstanceFunc1{{[_0-9a-zA-Z]*}}F
 func getInstanceFunc1<T: Foo>(t: T) -> () -> () {
-// CHECK: [[REF:%.*]] = function_ref @_T021partial_apply_generic3FooP12instanceFunc{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT: alloc_stack $T
+// CHECK: alloc_stack $T
 // CHECK-NEXT: copy_addr %0 to [initialization]
+// CHECK: [[REF:%.*]] = function_ref @_T021partial_apply_generic3FooP12instanceFunc{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[REF]]<T>
   return t.instanceFunc
 // CHECK-NEXT: dealloc_stack

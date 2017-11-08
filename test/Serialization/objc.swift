@@ -18,7 +18,7 @@ func testClass(obj obj: ObjCClass) {
   // SIL: = objc_method %{{.+}} : $ObjCClass, #ObjCClass.implicitlyObjC!1.foreign
   obj.implicitlyObjC()
 
-  // SIL: = objc_method %{{.+}} : $@thick ObjCClass.Type, #ObjCClass.classMethod!1.foreign
+  // SIL: = objc_method %{{.+}} : $@objc_metatype ObjCClass.Type, #ObjCClass.classMethod!1.foreign
   ObjCClass.classMethod()
 }
 

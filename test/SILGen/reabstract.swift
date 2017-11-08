@@ -7,10 +7,9 @@ func test0() {
   takeFn(liftOptional)
 }
 // CHECK:    sil hidden @_T010reabstract5test0yyF : $@convention(thin) () -> () {
-// CHECK:      [[T0:%.*]] = function_ref @_T010reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 //   Emit a generalized reference to liftOptional.
 //   TODO: just emit a globalized thunk
-// CHECK-NEXT: reabstract.liftOptional
+// CHECK:      reabstract.liftOptional
 // CHECK-NEXT: [[T1:%.*]] = function_ref @_T010reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: [[T2:%.*]] = thin_to_thick_function [[T1]]
 // CHECK-NEXT: [[CVT:%.*]] = convert_function [[T2]]
@@ -18,6 +17,7 @@ func test0() {
 // CHECK-NEXT: [[T3:%.*]] = function_ref [[THUNK:@.*]] :
 // CHECK-NEXT: [[T4:%.*]] = partial_apply [[T3]]([[CVT]])
 // CHECK-NEXT: [[CVT:%.*]] = convert_function [[T4]]
+// CHECK:      [[T0:%.*]] = function_ref @_T010reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return

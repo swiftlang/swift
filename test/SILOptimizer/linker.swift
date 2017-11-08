@@ -13,9 +13,9 @@ doSomething2()
 
 // CHECK: sil @unknown
 
+// CHECK: sil @_T0s1AVABycfC
+
 // CHECK: sil [noinline] @_T0s12doSomething3yxlF
 // CHECK-NOT: return
-
-// CHECK: sil @_T0s1AVABycfC
 
 callDoSomething3()

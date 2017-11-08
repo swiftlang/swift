@@ -49,9 +49,9 @@ func takeS(_ s: S) {}
 // CHECK: [[ADDRI:%.*]] = struct_element_addr [[WRITE]] : $*S, #S.i
 // CHECK: store %{{.*}} to [[ADDRI]] : $*Int
 // CHECK: end_access [[WRITE]]
-// CHECK: [[FTAKE:%.*]] = function_ref @_T023access_marker_mandatory5takeSyAA1SVF : $@convention(thin) (@owned S) -> ()
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*S
 // CHECK: end_access [[READ]]
+// CHECK: [[FTAKE:%.*]] = function_ref @_T023access_marker_mandatory5takeSyAA1SVF : $@convention(thin) (@owned S) -> ()
 // CHECK: apply [[FTAKE]](%{{.*}}) : $@convention(thin) (@owned S) -> ()
 // CHECK-LABEL: } // end sil function '_T023access_marker_mandatory14modifyAndReadSyyXl1o_tF'
 public func modifyAndReadS(o: AnyObject) {

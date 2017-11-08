@@ -27,8 +27,8 @@ class C : P {
 
 // CHECK-LABEL: sil hidden @_T019generic_inline_self1CC18returnsNewInstanceACXDyF : $@convention(method) (@guaranteed C) -> @owned C
 // CHECK:       bb0(%0 : $C):
+// CHECK:         [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self C.Type, %0 : $C
 // CHECK:         [[FN:%.*]] = function_ref @_T019generic_inline_self12makeInstancexxmAA1CCRbzlF : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self C.Type, %0 : $C
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]<@dynamic_self C>([[METATYPE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : C> (@thick τ_0_0.Type) -> @owned τ_0_0
 // CHECK-NEXT:    return [[RESULT]] : $C
   func returnsNewInstance() -> Self {

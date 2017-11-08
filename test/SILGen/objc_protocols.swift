@@ -27,14 +27,14 @@ protocol Ansible {
 // CHECK-LABEL: sil hidden @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : @owned $T):
 // -- Result of runce is autoreleased according to default objc conv
-// CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
 // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+// CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
 // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
-// CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
 // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+// CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
 // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
 // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
@@ -47,9 +47,9 @@ func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
 // CHECK-LABEL: sil hidden @_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@owned T) -> () {
 func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK: bb0([[ARG:%.*]] : @owned $T):
-  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO]] :
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO]] :
   // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[ARG_COPY]])
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   destroy_value [[METHOD]]
@@ -60,8 +60,8 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK:   destroy_value [[METHOD]]
   _ = T.runce
 
-  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2:_T014objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTcTO]]
   // CHECK:   [[METATYPE:%.*]] = metatype $@thick T.Type
+  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2:_T014objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTcTO]]
   // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[METATYPE]])
   // CHECK:   destroy_value [[METHOD:%.*]]
   _ = T.mince
@@ -124,8 +124,8 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
   // CHECK: bb0([[ARG:%.*]] : @owned $NSRuncing):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[OPENED_ARG:%.*]] = open_existential_ref [[BORROWED_ARG]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
-  // CHECK:   [[FN:%.*]] = function_ref @_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO
   // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
+  // CHECK:   [[FN:%.*]] = function_ref @_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO
   // CHECK:   [[RESULT:%.*]] = apply [[FN]]<[[OPENED]]>([[OPENED_ARG_COPY]])
   // CHECK:   destroy_value [[RESULT]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]

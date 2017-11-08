@@ -16,11 +16,11 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         copy_addr %1 to [initialization] [[OTHER_SIZE_BOX:%[0-9]*]] : $*Size
   var s2 = s
 
-// CHECK:         [[SETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSivs : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
 // CHECK:         [[GETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSivg : $@convention(method) (@in_guaranteed Size) -> Int
 // CHECK:         [[RESULT:%.*]] = apply [[GETTER]]([[SIZE_BOX]])
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] [[OTHER_SIZE_BOX]] : $*Size
+// CHECK:         [[SETTER:%.*]] = function_ref @_T016resilient_struct4SizeV1wSivs : $@convention(method) (Int, @inout Size) -> ()
 // CHECK:         apply [[SETTER]]([[RESULT]], [[WRITE]])
   s2.w = s.w
 
@@ -45,8 +45,8 @@ func inoutFunc(_ x: inout Int) {}
 
 func resilientInOutTest(_ s: inout Size) {
 
-// CHECK:         function_ref @_T017struct_resilience9inoutFuncySizF
 // CHECK:         function_ref @_T016resilient_struct4SizeV1wSivm
+// CHECK:         function_ref @_T017struct_resilience9inoutFuncySizF
 
   inoutFunc(&s.w)
 
@@ -255,9 +255,9 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 @_versioned
 @_transparent func useVersionedResilientStruct(_ s: VersionedResilientStruct)
     -> VersionedResilientStruct {
-  // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructVACSi1x_Si1ytcfC
   // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructV1ySivg
   // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructV1xSivg
+  // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructVACSi1x_Si1ytcfC
 
   return VersionedResilientStruct(x: s.y, y: s.x)
 }
