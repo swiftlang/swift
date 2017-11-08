@@ -77,6 +77,8 @@ Emitter::Emitter(StringRef PassName, SILModule &M)
 template <typename RemarkT, typename... ArgTypes>
 static void emitRemark(SILModule &Module, const Remark<RemarkT> &R,
                        Diag<ArgTypes...> ID, bool DiagEnabled) {
+  if (R.getLocation().isInvalid())
+    return;
   if (auto *Out = Module.getOptRecordStream())
     // YAMLTraits takes a non-const reference even when outputting.
     *Out << const_cast<Remark<RemarkT> &>(R);
