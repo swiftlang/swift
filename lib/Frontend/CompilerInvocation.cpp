@@ -670,9 +670,9 @@ bool FrontendArgsToOptionsConverter::setOutputFilenames() {
   // directly, as the driver will always pass -o with an appropriate filename
   // if output is required for the requested action.
 
-  assert(Opts.actionProducesOutputFromFrontend() ||
+  assert(FrontendOptions::actionProducesOutput(Opts.RequestedAction) ||
          Opts.OutputFilenames.empty());
-  assert(Opts.actionProducesOutputFromFrontend() ||
+  assert(FrontendOptions::actionProducesOutput(Opts.RequestedAction) ||
          !FrontendOptions::actionHasTextualOutput(Opts.RequestedAction));
   if (unprocessedOutputFlienames.empty() &&
       (Opts.Inputs.isReadingFromStdin() ||
