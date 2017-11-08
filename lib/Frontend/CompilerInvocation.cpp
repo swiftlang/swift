@@ -105,7 +105,7 @@ class ArgsToFrontendInputsConverter {
   FrontendInputs &Inputs;
 
   const llvm::opt::Arg *filelistPathOrNull;
-  const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBuffer;
+  const std::unique_ptr<llvm::MemoryBuffer> filelistBuffer;
   enum PrimaryOrOrdinary { Primary, Ordinary };
   std::vector<std::pair<StringRef, PrimaryOrOrdinary>> files;
   llvm::StringMap<unsigned> fileIndices;
@@ -118,25 +118,27 @@ public:
         filelistBuffer(getFilelistBuffer(Diags, filelistPathOrNull)) {}
 
 private:
-  static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  static std::unique_ptr<llvm::MemoryBuffer>
   getFilelistBuffer(DiagnosticEngine &diags, const llvm::opt::Arg *pathOrNull) {
+    if (!pathOrNull)
+      return nullptr;
+    char const *const path = pathOrNull->getValue();
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-        llvm::MemoryBuffer::getFile(pathOrNull ? pathOrNull->getValue()
-                                               : "/dev/null");
+        llvm::MemoryBuffer::getFile(path);
     if (!buffer) {
-      assert(pathOrNull && "could not open /dev/null");
-      diags.diagnose(SourceLoc(), diag::cannot_open_file,
-                     pathOrNull->getValue(), buffer.getError().message());
+      diags.diagnose(SourceLoc(), diag::cannot_open_file, path,
+                     buffer.getError().message());
     }
-    return buffer;
+    return std::move(buffer.get());
   }
 
   static std::vector<StringRef>
-  splitIntoLines(const llvm::MemoryBuffer &buffer) {
+  splitIntoLines(const llvm::MemoryBuffer *buffer) {
     std::vector<StringRef> fileNames;
-    for (StringRef line : make_range(llvm::line_iterator(buffer), {})) {
-      fileNames.push_back(line);
-    }
+    if (buffer != nullptr)
+      for (StringRef line : make_range(llvm::line_iterator(*buffer), {})) {
+        fileNames.push_back(line);
+      }
     return fileNames;
   }
 
@@ -168,7 +170,7 @@ private:
 
   void getFilesFromFilelist() {
     std::vector<StringRef> inputFilesFromFilelist =
-        splitIntoLines(*filelistBuffer->get());
+        splitIntoLines(filelistBuffer.get());
     for (auto file : inputFilesFromFilelist) {
       files.push_back(std::pair<StringRef, PrimaryOrOrdinary>(file, Ordinary));
     }
