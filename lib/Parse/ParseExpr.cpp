@@ -3138,6 +3138,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
       Scope.cancelBacktrack();
       return FirstExpr;
     }
+    State->takeDelayedDeclState();
     // If we have a ':', this is a dictionary literal.
     ParseDict = Tok.is(tok::colon);
   }
@@ -3162,11 +3163,9 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc) {
   SmallVector<Expr *, 8> SubExprs;
   SmallVector<SourceLoc, 8> CommaLocs;
 
-  SourceLoc CommaLoc, RSquareLoc;
+  SourceLoc RSquareLoc;
   ParserStatus Status;
-
-  CommaLocs.push_back(CommaLoc);
-
+  bool First = true;
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
@@ -3180,7 +3179,11 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc) {
 
     if (Tok.is(tok::comma))
       CommaLocs.push_back(Tok.getLoc());
-
+    else if (Tok.isNot(tok::r_square) && First) {
+      diagnose(Tok, diag::expected_separator, ",")
+        .fixItInsertAfter(PreviousLoc, ",");
+    }
+    First = false;
     return Element;
   });
 
