@@ -441,8 +441,8 @@ bool FrontendOptions::canEmitModule() const {
   }
 }
 
-bool FrontendOptions::actionProducesOutputFromFrontend() const {
-  switch (RequestedAction) {
+bool FrontendOptions::actionProducesOutput(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::EmitPCH:
   case ActionType::EmitSIBGen:

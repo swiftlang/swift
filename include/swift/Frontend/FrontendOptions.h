@@ -551,7 +551,7 @@ private:
   bool canEmitModule() const;
 
   /// Return true if changed output filename.
-  bool actionProducesOutputFromFrontend() const;
+  static bool actionProducesOutput(ActionType);
   static bool actionHasTextualOutput(ActionType);
 };
 } // namespace swift
