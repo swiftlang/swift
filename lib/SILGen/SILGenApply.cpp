@@ -64,16 +64,6 @@ getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
   llvm_unreachable("bad representation");
 }
 
-static CanType getDynamicMethodSelfType(SILGenFunction &SGF,
-                                        const ArgumentSource &proto,
-                                        ValueDecl *member) {
-  if (member->isInstanceMember()) {
-    return SGF.getASTContext().getAnyObjectType();
-  } else {
-    return proto.getSILSubstType(SGF).getSwiftRValueType();
-  }
-}
-
 /// Return the formal type for the partial-apply result type of a
 /// dynamic method invocation.
 static CanFunctionType
@@ -113,39 +103,6 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
   return fnType;
 }
 
-/// Replace the 'self' parameter in the given type.
-static CanSILFunctionType
-replaceSelfTypeForDynamicLookup(ASTContext &ctx,
-                                CanSILFunctionType fnType,
-                                CanType newSelfType,
-                                SILDeclRef methodName) {
-  assert(!fnType->isCoroutine());
-  auto oldParams = fnType->getParameters();
-  SmallVector<SILParameterInfo, 4> newParams;
-  newParams.append(oldParams.begin(), oldParams.end() - 1);
-  newParams.push_back({newSelfType, oldParams.back().getConvention()});
-
-  // If the method returns Self, substitute AnyObject for the result type.
-  SmallVector<SILResultInfo, 4> newResults;
-  newResults.append(fnType->getResults().begin(), fnType->getResults().end());
-  if (auto fnDecl = dyn_cast<FuncDecl>(methodName.getDecl())) {
-    if (fnDecl->hasDynamicSelf()) {
-      auto anyObjectTy = ctx.getAnyObjectType();
-      for (auto &result : newResults) {
-        auto newResultTy
-          = result.getType()->replaceCovariantResultType(anyObjectTy, 0);
-        result = result.getWithType(newResultTy->getCanonicalType());
-      }
-    }
-  }
-
-  return SILFunctionType::get(nullptr, fnType->getExtInfo(),
-                              SILCoroutineKind::None,
-                              fnType->getCalleeConvention(), newParams, {},
-                              newResults, fnType->getOptionalErrorResult(), ctx,
-                              fnType->getWitnessMethodConformanceOrNone());
-}
-
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanSILFunctionType
 getDynamicMethodLoweredType(SILGenFunction &SGF, SILValue v,
@@ -163,7 +120,7 @@ getDynamicMethodLoweredType(SILGenFunction &SGF, SILValue v,
 
   auto methodTy = SGF.SGM.M.Types
     .getUncachedSILFunctionTypeForConstant(methodName, objcFormalTy);
-  return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
+  return methodTy;
 }
 
 /// Check if we can perform a dynamic dispatch on a super method call.
@@ -400,12 +357,10 @@ public:
   }
   static Callee forDynamic(SILGenFunction &SGF, ArgumentSource &&arg,
                            SILDeclRef c, const SubstitutionList &constantSubs,
-                           CanAnyFunctionType partialSubstFormalType,
+                           CanAnyFunctionType substFormalType,
                            SubstitutionList subs, SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
     AbstractionPattern origFormalType = ci.FormalPattern;
-
-    auto selfType = getDynamicMethodSelfType(SGF, arg, c.getDecl());
 
     // Replace the original self type with the partially-applied subst type.
     auto origFormalFnType = cast<AnyFunctionType>(origFormalType.getType());
@@ -420,15 +375,7 @@ public:
         cast<FunctionType>(genericFnType->substGenericArgs(constantSubs)
                                         ->getCanonicalType());
     }
-    origFormalFnType = CanFunctionType::get(selfType,
-                                            origFormalFnType.getResult(),
-                                            origFormalFnType->getExtInfo());
     origFormalType.rewriteType(CanGenericSignature(), origFormalFnType);
-
-    // Add the self type clause to the partially-applied subst type.
-    auto substFormalType = CanFunctionType::get(selfType,
-                                                partialSubstFormalType,
-                                                origFormalFnType->getExtInfo());
 
     return Callee(Kind::DynamicMethod, SGF, std::move(arg), c, origFormalType,
                   substFormalType, subs, l);
@@ -520,22 +467,17 @@ public:
     return Constant;
   }
 
-  SILType getDynamicMethodType(SILGenFunction &SGF) const {
+  SILType getDynamicMethodType(SILModule &M) const {
     // Lower the substituted type from the AST, which should have any generic
     // parameters in the original signature erased to their upper bounds.
     auto substFormalType = getSubstFormalType();
     auto objcFormalType = substFormalType.withExtInfo(
       substFormalType->getExtInfo().withSILRepresentation(
         SILFunctionTypeRepresentation::ObjCMethod));
-    auto fnType = SGF.SGM.M.Types.getUncachedSILFunctionTypeForConstant(
+    auto fnType = M.Types.getUncachedSILFunctionTypeForConstant(
         Constant, objcFormalType);
 
-    auto closureType = replaceSelfTypeForDynamicLookup(
-        SGF.getASTContext(), fnType,
-        SelfValue.getValue().getSILSubstType(SGF).getSwiftRValueType(),
-        Constant);
-
-    return SILType::getPrimitiveObjectType(closureType);
+    return SILType::getPrimitiveObjectType(fnType);
   }
 
   ManagedValue getFnValue(SILGenFunction &SGF, bool isCurried) const & {
@@ -623,7 +565,7 @@ public:
     }
     case Kind::DynamicMethod: {
       assert(constant->isForeign);
-      auto closureType = getDynamicMethodType(SGF);
+      auto closureType = getDynamicMethodType(SGF.SGM.M);
 
       Scope S(SGF, Loc);
       ManagedValue self =
@@ -677,7 +619,7 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::DynamicMethod: {
-      auto formalType = getDynamicMethodType(SGF);
+      auto formalType = getDynamicMethodType(SGF.SGM.M);
       return createCalleeTypeInfo(SGF, constant, formalType);
     }
     }
@@ -1463,6 +1405,10 @@ public:
       auto substFormalType =
         cast<FunctionType>(dynamicMemberRef->getType()->getCanonicalType()
                                             .getAnyOptionalObjectType());
+      substFormalType = CanFunctionType::get(
+        dynamicMemberRef->getBase()->getType()->getCanonicalType(),
+        substFormalType, AnyFunctionType::ExtInfo());
+
       setCallee(Callee::forDynamic(SGF, baseArgSource.delayedBorrow(SGF),
                                    member, memberRef.getSubstitutions(),
                                    substFormalType, {}, e));
@@ -4128,8 +4074,7 @@ CallEmission::applyNormalCall(SGFContext C) {
   // In C language modes, substitute the type of the AbstractionPattern
   // so that we won't see type parameters down when we try to form bridging
   // conversions.
-  CanSILFunctionType calleeFnTy = mv.getType().castTo<SILFunctionType>();
-  if (calleeFnTy->getLanguage() == SILFunctionLanguage::C) {
+  if (calleeTypeInfo.substFnType->getLanguage() == SILFunctionLanguage::C) {
     if (auto genericFnType =
           dyn_cast<GenericFunctionType>(origFormalType.getType())) {
       auto fnType = genericFnType->substGenericArgs(callee.getSubstitutions());
