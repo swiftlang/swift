@@ -263,7 +263,7 @@ private:
   std::vector<std::string> computeBaseNamesOfOutputs();
   void determineSupplementaryOutputFilenames();
   std::vector<std::string> getUnprocessedOutputFilenames() const;
-  bool canEmitWhatActionCallsFor() const;
+  bool hasAnUnusableOutputPath() const;
   void setImportObjCHeaderOptions();
   void setImplicitImportModuleNames();
   void setLLVMArgs();
@@ -344,7 +344,7 @@ bool FrontendArgsToOptionsConverter::convert() {
     return true;
   determineSupplementaryOutputFilenames();
 
-  if (!canEmitWhatActionCallsFor())
+  if (hasAnUnusableOutputPath())
     return true;
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
@@ -814,29 +814,29 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
                           SERIALIZED_MODULE_DOC_EXTENSION, false);
 }
 
-bool FrontendArgsToOptionsConverter::canEmitWhatActionCallsFor() const {
+bool FrontendArgsToOptionsConverter::hasAnUnusableOutputPath() const {
   if (Opts.hasUnusableDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
-    return false;
+    return true;
   }
   if (Opts.hasUnusableObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
-    return false;
+    return true;
   }
   if (Opts.hasUnusableLoadedModuleTracePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
-    return false;
+    return true;
   }
   if (Opts.hasUnusableModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
-    return false;
+    return true;
   }
   if (Opts.hasUnusableModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
-    return false;
+    return true;
   }
-  return true;
+  return false;
 }
 
 void FrontendArgsToOptionsConverter::setImportObjCHeaderOptions() {
