@@ -263,23 +263,31 @@ internal struct UnsafeString {
   //     designating UnsafeString
   //
 
-  var baseAddress: UnsafeMutableRawPointer
-  var count: Int
+  @_versioned
+  internal var baseAddress: UnsafeMutableRawPointer
+  
+  @_versioned
+  internal var count: Int
 
-  var isSingleByte: Bool
+  @_versioned
+  internal var isSingleByte: Bool
 
   // TODO: Is this actually important to track? Can we drop it when we're no
   // longer using _LegacyStringCore?
-  var hasCocoaBuffer: Bool
+  @_versioned
+  internal var hasCocoaBuffer: Bool
 
-  var sizeInBytes: Int {
+  @_versioned
+  internal var sizeInBytes: Int {
     return count * byteWidth
   }
 
-  var byteWidth: Int {
+  @_versioned
+  internal var byteWidth: Int {
     return isSingleByte ? 1 : 2
   }
 
+  @_versioned
   init(
     baseAddress: UnsafeMutableRawPointer,
     count: Int,
@@ -292,22 +300,68 @@ internal struct UnsafeString {
     self.hasCocoaBuffer = hasCocoaBuffer
   }
 
-  var unsafeUTF16String: UnsafeBufferPointer<UInt16>? {
-    guard !isSingleByte else { return nil }
+  @_versioned
+  var unsafeUTF16String: UnsafeBufferPointer<UInt16> {
+    _sanityCheck(!isSingleByte)
     return UnsafeBufferPointer(
       start: baseAddress.assumingMemoryBound(to: UInt16.self),
       count: count)
   }
-  var unsafeOneByteString: UnsafeBufferPointer<UInt8>? {
-    guard isSingleByte else { return nil }
+  @_versioned
+  var unsafeOneByteString: UnsafeBufferPointer<UInt8> {
+    _sanityCheck(isSingleByte)
     return UnsafeBufferPointer(
       start: baseAddress.assumingMemoryBound(to: UInt8.self),
       count: count)
   }
 
-  @_versioned
-  internal
-  func _copy(
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(position: Int) -> UTF16.CodeUnit {
+    @inline(__always)
+    get {
+      _precondition(
+        position >= 0,
+        "subscript: index precedes String start")
+      _precondition(
+        position <= count,
+        "subscript: index points past String end")
+      if isSingleByte {
+        return UTF16.CodeUnit(unsafeOneByteString[position])
+      }
+      return unsafeUTF16String[position]
+    }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(bounds: Range<Int>) -> UnsafeString {
+    _precondition(
+      bounds.lowerBound >= 0,
+      "subscript: subrange start precedes String start")
+    _precondition(
+      bounds.upperBound <= count,
+      "subscript: subrange extends past String end")
+    return UnsafeString(
+      baseAddress: _pointer(toElementAt: bounds.lowerBound),
+      count: bounds.upperBound - bounds.lowerBound,
+      isSingleByte: self.isSingleByte,
+      hasCocoaBuffer: self.hasCocoaBuffer)
+  }
+
+  /// Returns a pointer to the Nth element of contiguous
+  /// storage.  Caveats: The element may be 1 or 2 bytes wide,
+  /// depending on element width.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _pointer(toElementAt n: Int) -> UnsafeMutableRawPointer {
+    _sanityCheck(n >= 0 && n <= count)
+    return baseAddress + (n &<< (byteWidth &- 1))
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _copy(
     into dest: UnsafeMutableRawPointer,
     capacityEnd: UnsafeMutableRawPointer,
     accomodatingElementWidth width: Int
@@ -323,14 +377,14 @@ internal struct UnsafeString {
         size: UInt(self.sizeInBytes))
     } else if self.byteWidth == 1 && width == 2 {
       var dest = dest.assumingMemoryBound(to: UTF16.CodeUnit.self)
-      for byte in self.unsafeOneByteString! {
+      for byte in self.unsafeOneByteString {
         dest.pointee = UTF16.CodeUnit(byte)
         dest += 1
       }
     } else {
       _sanityCheck(self.byteWidth == 2 && width == 1)
       var dest = dest.assumingMemoryBound(to: UInt8.self)
-      for unit in self.unsafeUTF16String! {
+      for unit in self.unsafeUTF16String {
         _precondition(unit & ~0x7F == 0) // ASCII only
         dest.pointee = UInt8(truncatingIfNeeded: unit)
         dest += 1
