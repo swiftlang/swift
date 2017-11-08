@@ -195,7 +195,7 @@ bool FrontendOptions::isOutputFileDirectory() const {
 }
 
 const char *
-FrontendOptions::suffixForPrincipleOutputFileForAction(ActionType action) {
+FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
     return nullptr;
