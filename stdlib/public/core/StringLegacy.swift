@@ -120,32 +120,36 @@ extension String {
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
   @_inlineable // FIXME(sil-serialize-all)
   public func hasPrefix(_ prefix: String) -> Bool {
-    let selfCore = self._core
-    let prefixCore = prefix._core
-    let prefixCount = prefixCore.count
+    let prefixCount = prefix._guts.count
     if prefixCount == 0 {
       return true
     }
-    if let selfASCIIBuffer = selfCore.asciiBuffer,
-       let prefixASCIIBuffer = prefixCore.asciiBuffer {
-      if prefixASCIIBuffer.count > selfASCIIBuffer.count {
-        // Prefix is longer than self.
-        return false
+    if let unmanagedSelf = self._guts._unmanagedContiguous,
+      let unmanagedPrefix = prefix._guts._unmanagedContiguous {
+      defer {
+        _fixLifetime(self)
+        _fixLifetime(prefix)
       }
-      return _stdlib_memcmp(
-        selfASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.count) == (0 as CInt)
-    }
-    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(prefixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
+      if unmanagedSelf.isSingleByte, unmanagedPrefix.isSingleByte {
+        if prefixCount > self._guts.count {
+          // Prefix is longer than self.
+          return false
+        }
+        return (0 as CInt) == _stdlib_memcmp(
+          unmanagedSelf.baseAddress,
+          unmanagedPrefix.baseAddress,
+          prefixCount)
+      } else {
+        let lhsStr = _NSContiguousString(_StringGuts(unmanagedSelf))
+        let rhsStr = _NSContiguousString(_StringGuts(unmanagedPrefix))
+        return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+          return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
+        }
       }
     }
     return _stdlib_NSStringHasPrefixNFD(
-      self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
+      self._bridgeToObjectiveCImpl(),
+      prefix._bridgeToObjectiveCImpl())
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -179,33 +183,37 @@ extension String {
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
   @_inlineable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
-    let selfCore = self._core
-    let suffixCore = suffix._core
-    let suffixCount = suffixCore.count
+    let suffixCount = suffix._guts.count
     if suffixCount == 0 {
       return true
     }
-    if let selfASCIIBuffer = selfCore.asciiBuffer,
-       let suffixASCIIBuffer = suffixCore.asciiBuffer {
-      if suffixASCIIBuffer.count > selfASCIIBuffer.count {
-        // Suffix is longer than self.
-        return false
+    if let unmanagedSelf = self._guts._unmanagedContiguous,
+      let unmanagedSuffix = suffix._guts._unmanagedContiguous {
+      defer {
+        _fixLifetime(self)
+        _fixLifetime(suffix)
       }
-      return _stdlib_memcmp(
-        selfASCIIBuffer.baseAddress!
-          + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
-        suffixASCIIBuffer.baseAddress!,
-        suffixASCIIBuffer.count) == (0 as CInt)
-    }
-    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(suffixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
+      if unmanagedSelf.isSingleByte, unmanagedSuffix.isSingleByte {
+        if suffixCount > self._guts.count {
+          // Suffix is longer than self.
+          return false
+        }
+        return (0 as CInt) == _stdlib_memcmp(
+          unmanagedSelf.baseAddress +
+            (unmanagedSelf.count - unmanagedSuffix.count),
+          unmanagedSuffix.baseAddress,
+          suffixCount)
+      } else {
+        let lhsStr = _NSContiguousString(_StringGuts(unmanagedSelf))
+        let rhsStr = _NSContiguousString(_StringGuts(unmanagedSuffix))
+        return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+          return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
+        }
       }
     }
     return _stdlib_NSStringHasSuffixNFD(
-      self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
+      self._bridgeToObjectiveCImpl(),
+      suffix._bridgeToObjectiveCImpl())
   }
 }
 #else
