@@ -719,7 +719,7 @@ function(_add_swift_library_single target name)
   # On platforms that use ELF binaries we add markers for metadata sections in
   # the shared libraries using these object files.  This wouldn't be necessary
   # if the link was done by the swift binary: rdar://problem/19007002
-  if(SWIFTLIB_TARGET_LIBRARY AND
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY AND
      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     if("${libkind}" STREQUAL "SHARED")
       set(arch_subdir "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
@@ -874,7 +874,8 @@ function(_add_swift_library_single target name)
 
   # The section metadata objects are generated sources, and we need to tell CMake
   # not to expect to find them prior to their generation.
-  if("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY AND
+     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     if("${libkind}" STREQUAL "SHARED")
       set_source_files_properties(${SWIFT_SECTIONS_OBJECT_BEGIN} PROPERTIES GENERATED 1)
       set_source_files_properties(${SWIFT_SECTIONS_OBJECT_END} PROPERTIES GENERATED 1)
