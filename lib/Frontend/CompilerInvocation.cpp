@@ -547,7 +547,6 @@ FrontendArgsToOptionsConverter::determineRequestedAction() const {
   if (Opt.matches(OPT_print_ast))
     return FrontendOptions::ActionType::PrintAST;
 
-  // Symmetry violations:
   if (Opt.matches(OPT_repl) || Opt.matches(OPT_deprecated_integrated_repl))
     return FrontendOptions::ActionType::REPL;
   if (Opt.matches(OPT_interpret))
