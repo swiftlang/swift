@@ -705,6 +705,8 @@ void ASTMangler::appendType(Type type) {
       return appendOperator("BO");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
+    case TypeKind::SILToken:
+      return appendOperator("Bt");
     case TypeKind::BuiltinVector:
       appendType(cast<BuiltinVectorType>(tybase)->getElementType());
       return appendOperator("Bv",

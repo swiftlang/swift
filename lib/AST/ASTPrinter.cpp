@@ -3255,6 +3255,10 @@ public:
     }
   }
 
+  void visitSILTokenType(SILTokenType *T) {
+    Printer << "Builtin.SILToken";
+  }
+
   void visitNameAliasType(NameAliasType *T) {
     if (Options.PrintForSIL || Options.PrintNameAliasUnderlyingType) {
       visit(T->getSinglyDesugaredType());

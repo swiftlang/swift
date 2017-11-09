@@ -671,9 +671,20 @@ public:
   /// Check that the types of this value producer are all legal in the function
   /// context in which it exists.
   void checkLegalType(SILFunction *F, ValueBase *value, SILInstruction *I) {
-    if (SILType type = value->getType()) {
-      checkLegalType(F, type, I);
+    SILType type = value->getType();
+    if (type.is<SILTokenType>()) {
+      require(isLegalSILTokenProducer(value),
+              "SIL tokens can only be produced as the results of specific "
+              "instructions");
+      return;
     }
+
+    checkLegalType(F, type, I);
+  }
+
+  static bool isLegalSILTokenProducer(SILValue value) {
+    // TODO: add cases here
+    return false;
   }
 
   /// Check that the given type is a legal SIL value type.

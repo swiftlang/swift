@@ -1848,6 +1848,9 @@ private:
       if (c == 'p')
         return Factory.createNode(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");
+      if (c == 't')
+        return Factory.createNode(Node::Kind::BuiltinTypeName,
+                                     "Builtin.SILToken");
       if (c == 'w')
         return Factory.createNode(Node::Kind::BuiltinTypeName,
                                      "Builtin.Word");

@@ -579,6 +579,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'o';
   } else if (text == "Builtin.RawPointer") {
     Buffer << 'p';
+  } else if (text == "Builtin.SILToken") {
+    Buffer << 't';
   } else if (text == "Builtin.Word") {
     Buffer << 'w';
   } else if (stripPrefix(text, "Builtin.Int")) {

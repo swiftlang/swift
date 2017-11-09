@@ -981,6 +981,9 @@ namespace {
       llvm_unreachable("should not be asking for metadata of a lowered SIL "
                        "function type--SILGen should have used the AST type");
     }
+    llvm::Value *visitSILTokenType(CanSILTokenType type) {
+      llvm_unreachable("should not be asking for metadata of a SILToken type");
+    }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
       return emitArchetypeTypeMetadataRef(IGF, type);
