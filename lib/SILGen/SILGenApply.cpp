@@ -689,12 +689,6 @@ public:
   std::vector<ApplyExpr*> callSites;
   Expr *sideEffect = nullptr;
 
-  /// When visiting expressions, sometimes we need to emit self before we know
-  /// what the actual callee is. In such cases, we assume that we are passing
-  /// self at +0 and then after we know what the callee is, we check if the
-  /// self is passed at +1. If so, we add an extra retain.
-  bool assumedPlusZeroSelf = false;
-
   SILGenApply(SILGenFunction &SGF)
     : SGF(SGF)
   {}
@@ -823,13 +817,10 @@ public:
     SILDeclRef constant(afd, kind);
     constant = constant.asForeign(afd->isObjC());
 
-    // Prepare the callee.  This can modify both selfValue and subs.
+    // Prepare the callee.
     Callee theCallee = Callee::forWitnessMethod(
         SGF, selfValue.getSubstRValueType(),
         constant, subs, e);
-    assumedPlusZeroSelf =
-        selfValue.isRValue() &&
-        selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
     setSelfParam(std::move(selfValue), thisCallSite);
     setCallee(std::move(theCallee));
@@ -877,43 +868,29 @@ public:
       }
     }
 
-    // At this point, we know for sure that we are actually dynamically
-    // dispatched.
     ApplyExpr *thisCallSite = callSites.back();
     callSites.pop_back();
-
-    // Emit the rvalue for self, allowing for guaranteed plus zero if we
-    // have a func.
-    bool AllowPlusZero = kind == SILDeclRef::Kind::Func;
-    RValue self = SGF.emitRValue(
-        thisCallSite->getArg(),
-        AllowPlusZero ? SGFContext::AllowGuaranteedPlusZero : SGFContext());
-
-    // If we allowed for PlusZero and we *did* get the value back at +0,
-    // then we assumed that self could be passed at +0. We will check later
-    // if the actual callee passes self at +1 later when we know its actual
-    // type.
-    assumedPlusZeroSelf =
-        AllowPlusZero && self.peekIsPlusZeroRValueOrTrivial();
 
     // If we require a dynamic allocation of the object here, do so now.
     if (requiresAllocRefDynamic) {
       SILLocation loc = thisCallSite->getArg();
+      RValue selfMetatype = SGF.emitRValue(thisCallSite->getArg());
       auto selfValue =
-          allocateObjCObject(std::move(self).getAsSingleValue(SGF, loc), loc);
-      self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
-                    selfValue);
+          allocateObjCObject(std::move(selfMetatype).getAsSingleValue(SGF, loc), loc);
+      RValue self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
+                           selfValue);
+      ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
+      setSelfParam(std::move(selfArgSource), thisCallSite);
+    } else {
+      ArgumentSource selfArgSource(thisCallSite->getArg());
+      setSelfParam(std::move(selfArgSource), thisCallSite);
     }
 
     auto constant = SILDeclRef(afd, kind)
                         .asForeign(requiresForeignEntryPoint(afd));
 
-    ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
     auto subs = e->getDeclRef().getSubstitutions();
-    SILLocation loc(thisCallSite->getArg());
     setCallee(Callee::forClassMethod(SGF, constant, subs, e));
-
-    setSelfParam(std::move(selfArgSource), thisCallSite);
   }
 
   //
@@ -3737,50 +3714,6 @@ namespace {
     ArgumentSource &&forward() && {
       return std::move(ArgValue);
     }
-
-    /// Returns true if the argument of this value is a single valued RValue
-    /// that is passed either at plus zero or is trivial.
-    bool isArgPlusZeroOrTrivialRValue() {
-      if (!ArgValue.isRValue())
-        return false;
-      return ArgValue.peekRValue().peekIsPlusZeroRValueOrTrivial();
-    }
-
-    /// If callsite has an argument that is a plus zero or trivial rvalue, emit
-    /// a retain so that the argument is at PlusOne.
-    void convertToPlusOneFromPlusZero(SILGenFunction &SGF) {
-      assert(isArgPlusZeroOrTrivialRValue() && "Must have a plus zero or "
-             "trivial rvalue as an argument.");
-      SILValue ArgSILValue = ArgValue.peekRValue().peekScalarValue();
-      SILType ArgTy = ArgSILValue->getType();
-
-      // If we are trivial, there is no difference in between +1 and +0 since
-      // a trivial object is not reference counted.
-      if (ArgTy.isTrivial(SGF.SGM.M))
-        return;
-
-      // Grab the SILLocation and the new managed value.
-      SILLocation ArgLoc = ArgValue.getKnownRValueLocation();
-      ManagedValue ArgManagedValue;
-      if (ArgSILValue->getType().isAddress()) {
-        auto result = SGF.emitTemporaryAllocation(ArgLoc,
-                                                  ArgSILValue->getType());
-        SGF.B.createCopyAddr(ArgLoc, ArgSILValue, result,
-                             IsNotTake, IsInitialization);
-        ArgManagedValue = SGF.emitManagedBufferWithCleanup(result);
-      } else {
-        ArgManagedValue = SGF.emitManagedRetain(ArgLoc, ArgSILValue);
-      }
-
-      // Ok now we make our transformation. First set ArgValue to a used albeit
-      // invalid, empty ArgumentSource.
-      ArgValue = ArgumentSource();
-
-      // Reassign ArgValue.
-      RValue NewRValue = RValue(SGF, ArgLoc, ArgTy.getSwiftRValueType(),
-                                 ArgManagedValue);
-      ArgValue = ArgumentSource(ArgLoc, std::move(NewRValue));
-    }
   };
 
   /// Once the Callee and CallSites have been prepared by SILGenApply,
@@ -3803,17 +3736,14 @@ namespace {
     Callee callee;
     FormalEvaluationScope initialWritebackScope;
     unsigned expectedSiteCount;
-    bool assumedPlusZeroSelf;
 
   public:
     /// Create an emission for a call of the given callee.
     CallEmission(SILGenFunction &SGF, Callee &&callee,
-                 FormalEvaluationScope &&writebackScope,
-                 bool assumedPlusZeroSelf = false)
+                 FormalEvaluationScope &&writebackScope)
         : SGF(SGF), callee(std::move(callee)),
           initialWritebackScope(std::move(writebackScope)),
-          expectedSiteCount(callee.getParameterListCount()),
-          assumedPlusZeroSelf(assumedPlusZeroSelf) {}
+          expectedSiteCount(callee.getParameterListCount()) {}
 
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type.
@@ -3833,19 +3763,6 @@ namespace {
     template<typename...T>
     void addCallSite(T &&...args) {
       addCallSite(CallSite{std::forward<T>(args)...});
-    }
-
-    /// If we assumed that self was being passed at +0 before we knew what the
-    /// final uncurried level of the callee was, but given the final uncurried
-    /// level of the callee, we are actually passing self at +1, add in a retain
-    /// of self.
-    void convertSelfToPlusOneFromPlusZero() {
-      // Self is always the first callsite.
-      if (!uncurriedSites[0].isArgPlusZeroOrTrivialRValue())
-        return;
-
-      // Insert an invalid ArgumentSource into uncurriedSites[0] so it is.
-      uncurriedSites[0].convertToPlusOneFromPlusZero(SGF);
     }
 
     /// Is this a fully-applied enum element constructor call?
@@ -4042,20 +3959,6 @@ CallEmission::applyNormalCall(SGFContext C) {
       SGF, calleeTypeInfo, uncurriedSites.back().Loc, uncurriedContext);
   ArgumentScope argScope(SGF, uncurriedSites.back().Loc);
 
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self
-    // to
-    // be plus zero.
-    if (!calleeTypeInfo.substFnType->hasSelfParam() ||
-        calleeTypeInfo.substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
-
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
@@ -4088,7 +3991,6 @@ CallEmission::applyNormalCall(SGFContext C) {
 CallEmission::FirstLevelApplicationResult
 CallEmission::applyEnumElementConstructor(SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
-  assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
 
   // Get the callee type information.
@@ -4147,20 +4049,6 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   auto origFormalType = AbstractionPattern(firstLevelResult.formalType);
   auto substFnType =
       SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
-
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self
-    // to
-    // be plus zero.
-    if (!substFnType->hasSelfParam() ||
-        substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
 
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
@@ -4235,19 +4123,6 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   auto origFormalType = AbstractionPattern(firstLevelResult.formalType);
   auto substFnType =
       SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
-
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self to
-    // be plus zero.
-    if (!substFnType->hasSelfParam() ||
-        substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
 
   // If we have an early emitter, just let it take over for the
   // uncurried call site.
@@ -4462,8 +4337,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
   // Build the call.
   // Pass the writeback scope on to CallEmission so it can thread scopes through
   // nested calls.
-  CallEmission emission(SGF, apply.getCallee(), std::move(writebacks),
-                        apply.assumedPlusZeroSelf);
+  CallEmission emission(SGF, apply.getCallee(), std::move(writebacks));
 
   // Apply 'self' if provided.
   if (apply.selfParam) {

@@ -20,52 +20,52 @@ func testMethodResult(dummy: DummyClass) {
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole8useOptNSySo8NSStringCSgF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useOptNS(dummy.fetchNullableString() as NSString?)
 
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole8useOptNSySo8NSStringCSgF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useOptNS(dummy.fetchNullproneString() as NSString?)
 
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole8useOptNSySo8NSStringCSgF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useOptNS(dummy.fetchNonnullString() as NSString?)
 
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = unchecked_ref_cast [[RESULT]] : $Optional<NSString> to $Optional<AnyObject>
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole15useOptAnyObjectyyXlSgF
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useOptAnyObject(dummy.fetchNullableString() as AnyObject?)
 
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = unchecked_ref_cast [[RESULT]] : $Optional<NSString> to $Optional<AnyObject>
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole15useOptAnyObjectyyXlSgF
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useOptAnyObject(dummy.fetchNullproneString() as AnyObject?)
 
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = unchecked_ref_cast [[RESULT]] : $Optional<NSString> to $Optional<AnyObject>
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole15useOptAnyObjectyyXlSgF
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useOptAnyObject(dummy.fetchNonnullString() as AnyObject?)
 
   // CHECK:      return
@@ -76,18 +76,19 @@ func testNonNullMethodResult(dummy: DummyClass) {
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
   // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole5useNSySo8NSStringCF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.fetchNonnullString() as NSString)
 
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb3:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
@@ -95,7 +96,6 @@ func testNonNullMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole12useAnyObjectyyXlF
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useAnyObject(dummy.fetchNonnullString() as AnyObject)
 
   // CHECK:      return
@@ -106,18 +106,19 @@ func testForcedMethodResult(dummy: DummyClass) {
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
   // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole5useNSySo8NSStringCF
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.fetchNullproneString() as NSString)
 
   // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
+  // CHECK-NEXT: end_borrow [[SELF]] from %0
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb3:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
@@ -125,7 +126,6 @@ func testForcedMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole12useAnyObjectyyXlF
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
   useAnyObject(dummy.fetchNullproneString() as AnyObject)
 
   // CHECK:      return

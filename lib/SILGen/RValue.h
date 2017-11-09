@@ -225,22 +225,6 @@ public:
   /// Get the rvalue as a single unmanaged value, imploding tuples if necessary.
   /// The values must not require any cleanups.
   SILValue getUnmanagedSingleValue(SILGenFunction &SGF, SILLocation l) const &;
-  
-  /// Peek at the single scalar value backing this rvalue without consuming it.
-  /// The rvalue must not be of a tuple type.
-  SILValue peekScalarValue() const & {
-    assert(!isa<TupleType>(type) && "peekScalarValue of a tuple rvalue");
-    assert(values.size() == 1 && "exploded scalar value?!");
-    return values[0].getValue();
-  }
-
-  /// Peek at the single ManagedValue backing this rvalue without consuming it
-  /// and return true if the value is not at +1.
-  bool peekIsPlusZeroRValueOrTrivial() const & {
-    assert(!isa<TupleType>(type) && "peekScalarValue of a tuple rvalue");
-    assert(values.size() == 1 && "exploded scalar value?!");
-    return values[0].isPlusZeroRValueOrTrivial();
-  }
 
   ManagedValue getScalarValue() && {
     assert(!isa<TupleType>(type) && "getScalarValue of a tuple rvalue");
