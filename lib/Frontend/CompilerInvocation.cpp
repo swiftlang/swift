@@ -681,16 +681,16 @@ bool FrontendArgsToOptionsConverter::
   const std::vector<std::string> unprocessedOutputFilenames =
       getUnprocessedOutputFilenames();
   {
-    const unsigned commandLineOutputFilenameCount =
+    const unsigned unprocessedOutputFilenameCount =
         unprocessedOutputFilenames.size();
     const unsigned primaryFilenameCount =
         Opts.Inputs.primaryInputFilenameCount();
     if (Opts.Inputs.havePrimaryInputsFilenames() &&
-        primaryFilenameCount != commandLineOutputFilenameCount &&
-        commandLineOutputFilenameCount != 0) {
+        primaryFilenameCount != unprocessedOutputFilenameCount &&
+        unprocessedOutputFilenameCount != 0) {
       Diags.diagnose(SourceLoc(),
                      diag::error_output_filenames_dont_match_primary_filenames,
-                     commandLineOutputFilenameCount, primaryFilenameCount);
+                     unprocessedOutputFilenameCount, primaryFilenameCount);
       return true;
     }
   }
