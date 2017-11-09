@@ -681,7 +681,7 @@ public struct String {
   ///     let alsoEmpty = String()
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
-    self._guts = _StringGuts(_LegacyStringCore())
+    self._guts = _StringGuts()
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -786,13 +786,11 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
   ) {
-    self = String(
-      _LegacyStringCore(
-        baseAddress: UnsafeMutableRawPointer(start),
-        count: Int(utf16CodeUnitCount),
-        elementShift: 1,
-        hasCocoaBuffer: false,
-        owner: nil))
+    self = String(_StringGuts(UnsafeString(
+      baseAddress: UnsafeRawPointer(start),
+      count: Int(utf16CodeUnitCount),
+      isSingleByte: false,
+      hasCocoaBuffer: false)))
   }
 }
 
@@ -805,13 +803,11 @@ extension String : _ExpressibleByBuiltinStringLiteral {
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1) {
     if Bool(isASCII) {
-      self = String(
-        _LegacyStringCore(
-          baseAddress: UnsafeMutableRawPointer(start),
+        self = String(_StringGuts(UnsafeString(
+          baseAddress: UnsafeRawPointer(start),
           count: Int(utf8CodeUnitCount),
-          elementShift: 0,
-          hasCocoaBuffer: false,
-          owner: nil))
+          isSingleByte: true,
+          hasCocoaBuffer: false)))
     }
     else {
       self = String._fromWellFormedCodeUnitSequence(
@@ -919,7 +915,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _guts = _StringGuts(_LegacyStringCore(_storage))
+    _guts = _StringGuts(NativeString(_storage))
   }
 }
 
@@ -932,7 +928,7 @@ extension String {
       return rhs
     }
     var lhs = lhs
-    lhs._core.append(rhs._core)
+    lhs._guts.append(rhs._guts)
     return lhs
   }
 
@@ -943,7 +939,7 @@ extension String {
       lhs = rhs
     }
     else {
-      lhs._core.append(rhs._core)
+      lhs._guts.append(rhs._guts)
     }
   }
 
