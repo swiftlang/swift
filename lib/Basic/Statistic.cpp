@@ -143,7 +143,9 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef Directory,
                                            SourceManager *SM,
                                            bool TraceEvents)
-  : StatsFilename(Directory),
+  : currentProcessExitStatusSet(false),
+    currentProcessExitStatus(EXIT_FAILURE),
+    StatsFilename(Directory),
     TraceFilename(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
     Timer(make_unique<NamedRegionTimer>(AuxName,
@@ -181,6 +183,13 @@ UnifiedStatsReporter::getFrontendRecursiveSharedTimers() {
     FrontendRecursiveSharedTimers =
         make_unique<AlwaysOnFrontendRecursiveSharedTimers>();
   return *FrontendRecursiveSharedTimers;
+}
+
+void
+UnifiedStatsReporter::noteCurrentProcessExitStatus(int status) {
+  assert(!currentProcessExitStatusSet);
+  currentProcessExitStatusSet = true;
+  currentProcessExitStatus = status;
 }
 
 void
@@ -334,6 +343,18 @@ UnifiedStatsReporter::AlwaysOnFrontendRecursiveSharedTimers::
 
 UnifiedStatsReporter::~UnifiedStatsReporter()
 {
+  // If nobody's marked this process as successful yet,
+  // mark it as failing.
+  if (currentProcessExitStatus != EXIT_SUCCESS) {
+    if (FrontendCounters) {
+      auto &C = getFrontendCounters();
+      C.NumProcessFailures++;
+    } else {
+      auto &C = getDriverCounters();
+      C.NumProcessFailures++;
+    }
+  }
+
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a
   // NamedRegionTimer after printing all timers. The printing routines were

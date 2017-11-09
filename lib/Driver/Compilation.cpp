@@ -934,7 +934,8 @@ int Compilation::performJobs() {
         (void)llvm::sys::fs::remove(pathPair.getKey());
     }
   }
-
+  if (Stats)
+    Stats->noteCurrentProcessExitStatus(result);
   return result;
 }
 
