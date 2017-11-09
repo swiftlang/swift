@@ -549,12 +549,15 @@ enum class FunctionMetadataConvention: uint8_t {
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
+  // If we were ever to run out of space for function flags (8 bits)
+  // one of the flag bits could be used to identify that the rest of
+  // the flags is going to be stored somewhere else in the metadata.
   enum : int_type {
-    NumParametersMask = 0x00FFFFFFU,
-    ConventionMask    = 0x0F000000U,
-    ConventionShift   = 25U,
-    ThrowsMask        = 0x10000000U,
-    ParamFlagsMask    = 0x01000000U,
+    NumParametersMask = 0x0000FFFFU,
+    ConventionMask    = 0x00FF0000U,
+    ConventionShift   = 16U,
+    ThrowsMask        = 0x01000000U,
+    ParamFlagsMask    = 0x02000000U,
   };
   int_type Data;
   
