@@ -377,6 +377,8 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
       continue;
     if (Arg == "-c")
       continue;
+    if (Arg == "-v")
+      continue;
     if (Arg == "-Xfrontend")
       continue;
     if (Arg == "-embed-bitcode")
