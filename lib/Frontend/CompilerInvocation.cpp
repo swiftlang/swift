@@ -1584,8 +1584,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const auto fn = FrontendOpts.Inputs.uniquePrimaryInputFilename()) {
-    Opts.MainInputFilename = fn.getValue();
+  } else if (const llvm::Optional<StringRef> filename =
+                 FrontendOpts.Inputs.uniquePrimaryInputFilename()) {
+    Opts.MainInputFilename = filename.getValue();
   } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
