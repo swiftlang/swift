@@ -848,6 +848,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   if (ElementKind)
     ListContext.setSyntaxKind(Kind);
   else
+    // FIXME: we shouldn't need this when all cases are handled.
     ListContext.disable();
 
   if (Tok.is(RightK)) {
