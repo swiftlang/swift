@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -326,6 +327,12 @@ public:
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
     return getLoweredFunctionType()->getRepresentation();
+  }
+
+  ResilienceExpansion getResilienceExpansion() const {
+    return (isSerialized()
+            ? ResilienceExpansion::Minimal
+            : ResilienceExpansion::Maximal);
   }
 
   /// Returns true if this function has a calling convention that has a self
