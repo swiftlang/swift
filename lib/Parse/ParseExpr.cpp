@@ -3128,7 +3128,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
     SyntaxParsingContextChild DisabledContext(SyntaxContext,
                                               SyntaxContextKind::Expr);
     DisabledContext.disable();
-
+    auto HasDelayedDecl = State->hasDelayedDecl();
     // Parse the first expression.
     ParserResult<Expr> FirstExpr
       = parseExpr(diag::expected_expr_in_collection_literal);
@@ -3139,6 +3139,8 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
       Scope.cancelBacktrack();
       return FirstExpr;
     }
+    if (!HasDelayedDecl)
+      State->takeDelayedDeclState();
     // If we have a ':', this is a dictionary literal.
     ParseDict = Tok.is(tok::colon);
   }
