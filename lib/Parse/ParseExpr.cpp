@@ -3137,6 +3137,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
       if (Tok.is(tok::r_square))
         consumeToken();
       Scope.cancelBacktrack();
+      ArrayOrDictContext.setContextKind(SyntaxContextKind::Expr);
       return FirstExpr;
     }
     if (!HasDelayedDecl)
