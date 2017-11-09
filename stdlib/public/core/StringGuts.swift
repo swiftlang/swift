@@ -151,6 +151,16 @@ extension _StringGuts {
     _invariantCheck()
   }
 
+  /// Create the guts of an empty string.
+  @_inlineable
+  public init() {
+    self.init(UnsafeString(
+        baseAddress: _emptyStringBase,
+        count: 0,
+        isSingleByte: true,
+        hasCocoaBuffer: false))
+  }
+
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     if let native = self._native {
@@ -393,7 +403,9 @@ internal struct UnsafeString {
   }
 }
 
-/*fileprivate*/ internal struct NativeString {
+@_versioned
+/*fileprivate*/ internal
+struct NativeString {
   // TODO: Use the extra 72 bits.
   //
   // StringGuts when representing a native Swift string should have an extra 72
@@ -444,7 +456,8 @@ internal struct UnsafeString {
     self.owner = native
   }
 
-  init(_ buffer: _StringBuffer) {
+  @_versioned
+  internal init(_ buffer: _StringBuffer) {
     self.init(buffer._nativeObject)
   }
 
@@ -574,6 +587,7 @@ extension _StringGuts {
     return NativeString(nativeObject)
   }
 
+  @_versioned
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NativeString) {
     self.init(
@@ -1088,4 +1102,11 @@ extension _StringGuts {
   }
 }
 
+@_versioned // FIXME(sil-serialize-all)
+internal var _emptyStringStorage: UInt32 = 0
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal var _emptyStringBase: UnsafeRawPointer {
+  return UnsafeRawPointer(Builtin.addressof(&_emptyStringStorage))
+}

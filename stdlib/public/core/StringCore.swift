@@ -64,7 +64,7 @@ public struct _LegacyStringCore {
       _sanityCheck(elementWidth == 2,
         "Opaque cocoa strings should have an elementWidth of 2")
     }
-    else if _baseAddress == _emptyStringBase {
+    else if UnsafeRawPointer(_baseAddress) == _emptyStringBase {
       _sanityCheck(!hasCocoaBuffer)
       _sanityCheck(count == 0, "Empty string storage with non-zero count")
       _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
@@ -195,7 +195,7 @@ public struct _LegacyStringCore {
   /// - Note: There is no null terminator in an empty string.
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
-    self._baseAddress = _emptyStringBase
+    self._baseAddress = UnsafeMutableRawPointer(mutating: _emptyStringBase)
     self._countAndFlags = 0
     self._owner = nil
     _invariantCheck()
@@ -818,15 +818,4 @@ extension _LegacyStringCore : RangeReplaceableCollection {
       self.append(u)
     }
   }
-}
-
-// Used to support a tighter invariant: all strings with contiguous
-// storage have a non-NULL base address.
-@_versioned // FIXME(sil-serialize-all)
-internal var _emptyStringStorage: UInt32 = 0
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal var _emptyStringBase: UnsafeMutableRawPointer {
-  return UnsafeMutableRawPointer(Builtin.addressof(&_emptyStringStorage))
 }
