@@ -1711,6 +1711,11 @@ void Remangler::mangleCurryThunk(Node *node) {
   Buffer << "Tc";
 }
 
+void Remangler::mangleDispatchThunk(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Tj";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
