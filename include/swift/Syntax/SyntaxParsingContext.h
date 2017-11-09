@@ -92,6 +92,7 @@ public:
   virtual void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) = 0;
   virtual ~SyntaxParsingContext();
   virtual void setSyntaxKind(SyntaxKind Kind) = 0;
+  virtual void finalize() = 0;
 
   // Disable the building of syntax tree in the current context.
   void disable();
@@ -108,6 +109,7 @@ public:
   ~SyntaxParsingContextRoot();
   void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override {};
   void setSyntaxKind(SyntaxKind Kind) override {};
+  void finalize() override {};
   SyntaxParsingContextKind getKind() override {
     return SyntaxParsingContextKind::Root;
   };
@@ -135,13 +137,14 @@ public:
     SyntaxKind KnownSyntax): SyntaxParsingContextChild(ContextHolder,
                              None, KnownSyntax) {};
 
+  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder):
+    SyntaxParsingContextChild(ContextHolder, None, None) {}
+
   ~SyntaxParsingContextChild();
   void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override;
+  void finalize() override;
   SyntaxParsingContext* getParent() { return Parent; }
-  void setSyntaxKind(SyntaxKind SKind) override {
-    Kind = None;
-    KnownSyntax = SKind;
-  }
+  void setSyntaxKind(SyntaxKind SKind) override;
   SyntaxParsingContextRoot &getRoot();
   SyntaxParsingContextKind getKind() override {
     return SyntaxParsingContextKind::Child;

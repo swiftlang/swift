@@ -275,10 +275,15 @@ SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
       Optional<SyntaxContextKind> Kind, Optional<SyntaxKind> KnownSyntax):
     SyntaxParsingContext(*ContextHolder), Parent(ContextHolder),
     ContextHolder(ContextHolder), Kind(Kind), KnownSyntax(KnownSyntax) {
-  assert(Kind.hasValue() != KnownSyntax.hasValue());
   ContextHolder = this;
   if (ContextData.Enabled)
     ContextData.setContextStart(Tok.getLoc());
+}
+
+void SyntaxParsingContextChild::setSyntaxKind(SyntaxKind SKind) {
+  assert(!Kind.hasValue());
+  assert(!KnownSyntax.hasValue());
+  KnownSyntax = SKind;
 }
 
 void SyntaxParsingContextChild::makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) {
@@ -367,7 +372,8 @@ void RawSyntaxInfo::brigeWithContext(SyntaxContextKind Kind) {
   }
 }
 
-SyntaxParsingContextChild::~SyntaxParsingContextChild() {
+void SyntaxParsingContextChild::finalize() {
+  assert(ContextHolder == this);
   SWIFT_DEFER {
     // Reset the context holder to be Parent.
     ContextHolder = Parent;
@@ -421,4 +427,9 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   // Create an unknown node and give it to the parent context.
   Parent->ContextData.addPendingSyntax({SourceRange(Start, End),
     makeUnknownSyntax(UnknownKind, SyntaxNodes).getRaw()});
+}
+
+SyntaxParsingContextChild::~SyntaxParsingContextChild() {
+  if (ContextHolder == this)
+    finalize();
 }

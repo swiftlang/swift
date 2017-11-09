@@ -1807,8 +1807,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // Create a syntax node for string literal.
   SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr, Tok.getLoc());
-  SyntaxParsingContextChild LocalContext(SyntaxContext,
-                                         SyntaxContextKind::Expr);
+  SyntaxParsingContextChild LocalContext(SyntaxContext);
 
   // FIXME: Avoid creating syntax nodes for string interpolation.
   LocalContext.disable();
@@ -1996,8 +1995,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   SourceLoc lparenLoc = consumeToken(tok::l_paren);
   SourceLoc rparenLoc;
   while (true) {
-    SyntaxParsingContextChild DisabledContext(SyntaxContext,
-                                              SyntaxContextKind::Expr);
+    SyntaxParsingContextChild DisabledContext(SyntaxContext);
     // The following code may backtrack; so we disable the syntax tree creation
     // in this scope.
     DisabledContext.disable();
@@ -3095,8 +3093,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
 ///     expr-dictionary
 //      lsquare-starting ']'
 ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
-  SyntaxParsingContextChild ArrayOrDictContext(SyntaxContext,
-                                              SyntaxContextKind::Expr);
+  SyntaxParsingContextChild ArrayOrDictContext(SyntaxContext);
 
   // If the caller didn't already consume the '[', do so now.
   if (LSquareLoc.isInvalid())
@@ -3125,8 +3122,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
   {
     BacktrackingScope Scope(*this);
     // Disable the syntax tree creation in the context.
-    SyntaxParsingContextChild DisabledContext(SyntaxContext,
-                                              SyntaxContextKind::Expr);
+    SyntaxParsingContextChild DisabledContext(SyntaxContext);
     DisabledContext.disable();
     auto HasDelayedDecl = State->hasDelayedDecl();
     // Parse the first expression.
