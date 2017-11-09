@@ -341,6 +341,9 @@ static ManagedValue emitManagedLoad(SILGenFunction &SGF, SILLocation loc,
                                     ManagedValue addr,
                                     const TypeLowering &addrTL) {
   // SEMANTIC ARC TODO: When the verifier is finished, revisit this.
+  if (!addr.hasCleanup())
+    return SGF.B.createLoadBorrow(loc, addr);
+
   auto loadedValue = addrTL.emitLoad(SGF.B, loc, addr.forward(SGF),
                                      LoadOwnershipQualifier::Take);
   return SGF.emitManagedRValueWithCleanup(loadedValue, addrTL);
@@ -752,26 +755,14 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 static ManagedValue manageParam(SILGenFunction &SGF,
                                 SILLocation loc,
                                 SILValue paramValue,
-                                SILParameterInfo info,
-                                bool allowPlusZero) {
+                                SILParameterInfo info) {
   switch (info.getConvention()) {
   case ParameterConvention::Indirect_In_Guaranteed:
-    if (SGF.silConv.useLoweredAddresses()) {
-      // FIXME: Avoid a behavior change while guaranteed self is disabled by
-      // default.
-      if (allowPlusZero) {
-        return ManagedValue::forUnmanaged(paramValue);
-      } else {
-        auto copy = SGF.emitTemporaryAllocation(loc, paramValue->getType());
-        SGF.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
-        return SGF.emitManagedBufferWithCleanup(copy);
-      }
-    }
+    if (SGF.silConv.useLoweredAddresses())
+      return ManagedValue::forUnmanaged(paramValue);
     LLVM_FALLTHROUGH;
   case ParameterConvention::Direct_Guaranteed:
-    if (allowPlusZero)
-      return SGF.emitManagedBeginBorrow(loc, paramValue);
-    LLVM_FALLTHROUGH;
+    return SGF.emitManagedBeginBorrow(loc, paramValue);
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
@@ -796,8 +787,7 @@ static ManagedValue manageParam(SILGenFunction &SGF,
 }
 
 void SILGenFunction::collectThunkParams(SILLocation loc,
-                                        SmallVectorImpl<ManagedValue> &params,
-                                        bool allowPlusZero) {
+                                        SmallVectorImpl<ManagedValue> &params) {
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes()) {
     auto paramTy = F.mapTypeIntoContext(resultTy);
@@ -810,7 +800,7 @@ void SILGenFunction::collectThunkParams(SILLocation loc,
   for (auto param : paramTypes) {
     auto paramTy = F.mapTypeIntoContext(F.getConventions().getSILType(param));
     auto paramValue = F.begin()->createFunctionArgument(paramTy);
-    auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
+    auto paramMV = manageParam(*this, loc, paramValue, param);
     params.push_back(paramMV);
   }
 }
@@ -1329,7 +1319,8 @@ namespace {
         switch (result.getConvention()) {
         case ParameterConvention::Direct_Owned:
         case ParameterConvention::Indirect_In:
-          if (!input.hasCleanup())
+          if (!input.hasCleanup() &&
+              input.getOwnershipKind() != ValueOwnershipKind::Trivial)
             input = input.copyUnmanaged(SGF, Loc);
           break;
 
@@ -2579,9 +2570,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   FullExpr scope(SGF.Cleanups, CleanupLocation::get(loc));
 
   SmallVector<ManagedValue, 8> params;
-  // TODO: Could accept +0 arguments here when forwardFunctionArguments/
-  // emitApply can.
-  SGF.collectThunkParams(loc, params, /*allowPlusZero*/ false);
+  SGF.collectThunkParams(loc, params);
 
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
@@ -3160,7 +3149,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   auto thunkTy = F.getLoweredFunctionType();
 
   SmallVector<ManagedValue, 8> thunkArgs;
-  collectThunkParams(loc, thunkArgs, /*allowPlusZero*/ true);
+  collectThunkParams(loc, thunkArgs);
 
   SmallVector<ManagedValue, 8> substArgs;
 
@@ -3309,9 +3298,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   auto thunkTy = F.getLoweredFunctionType();
 
   SmallVector<ManagedValue, 8> origParams;
-  // TODO: Should be able to accept +0 values here, once
-  // forwardFunctionArguments/emitApply are able to.
-  collectThunkParams(loc, origParams, /*allowPlusZero*/ false);
+  collectThunkParams(loc, origParams);
 
   // Handle special abstraction differences in "self".
   // If the witness is a free function, drop it completely.

@@ -133,22 +133,14 @@ func convOptionalTrivial(_ t1: @escaping (Trivial?) -> Trivial) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion7TrivialVSgACIegyd_AcDIegyd_TR : $@convention(thin) (Trivial, @guaranteed @callee_guaranteed (Optional<Trivial>) -> Trivial) -> Optional<Trivial>
-// CHECK:    [[COPY:%.*]] = copy_value %1
-// CHECK-NEXT:    [[ENUM:%.*]] = enum $Optional<Trivial>
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]([[ENUM]])
+// CHECK:         [[ENUM:%.*]] = enum $Optional<Trivial>
+// CHECK-NEXT:    apply %1([[ENUM]])
 // CHECK-NEXT:    enum $Optional<Trivial>
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion7TrivialVSgACIegyd_A2DIegyd_TR : $@convention(thin) (Optional<Trivial>, @guaranteed @callee_guaranteed (Optional<Trivial>) -> Trivial) -> Optional<Trivial>
-// CHECK:    [[COPY:%.*]] = copy_value %1
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]](%0)
+// CHECK:         apply %1(%0)
 // CHECK-NEXT:    enum $Optional<Trivial>
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_T019function_conversion20convOptionalLoadableyAA0E0VADSgcF
@@ -163,12 +155,8 @@ func convOptionalLoadable(_ l1: @escaping (Loadable?) -> Loadable) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion8LoadableVSgACIegxo_A2DIegxo_TR : $@convention(thin) (@owned Optional<Loadable>, @guaranteed @callee_guaranteed (@owned Optional<Loadable>) -> @owned Loadable) -> @owned Optional<Loadable>
-// CHECK:    [[COPY:%.*]] = copy_value %1
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]](%0)
+// CHECK:         apply %1(%0)
 // CHECK-NEXT:    enum $Optional<Loadable>
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil hidden @_T019function_conversion20convOptionalAddrOnlyyAA0eF0VADSgcF
@@ -179,17 +167,13 @@ func convOptionalAddrOnly(_ a1: @escaping (AddrOnly?) -> AddrOnly) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion8AddrOnlyVSgACIegir_A2DIegir_TR : $@convention(thin) (@in Optional<AddrOnly>, @guaranteed @callee_guaranteed (@in Optional<AddrOnly>) -> @out AddrOnly) -> @out Optional<AddrOnly>
-// CHECK:    [[COPY:%.*]] = copy_value %2
-// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $AddrOnly
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]([[TEMP]], %1)
+// CHECK:         [[TEMP:%.*]] = alloc_stack $AddrOnly
+// CHECK-NEXT:    apply %2([[TEMP]], %1)
 // CHECK-NEXT:    init_enum_data_addr %0 : $*Optional<AddrOnly>
 // CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}} : $*AddrOnly
 // CHECK-NEXT:    inject_enum_addr %0 : $*Optional<AddrOnly>
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow
 // CHECK-NEXT:    dealloc_stack {{.*}} : $*AddrOnly
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // ==== Existentials
@@ -223,11 +207,9 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 // CHECK:         alloc_stack $Q
 // CHECK-NEXT:    init_existential_addr
 // CHECK-NEXT:    store
-// CHECK-NEXT:    begin_borrow
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    init_existential_addr
 // CHECK-NEXT:    store
-// CHECK:         end_borrow
 // CHECK:         return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion1Q_pSgAA7TrivialVIegid_AESgAA1P_pIegyr_TR
@@ -250,11 +232,9 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 // CHECK-NEXT:    open_existential_addr immutable_access %1 : $*P
 // CHECK-NEXT:    init_existential_addr [[TMP]] : $*Q
 // CHECK-NEXT:    copy_addr {{.*}} to [initialization] {{.*}}
-// CHECK-NEXT:    begin_borrow
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    init_existential_addr
 // CHECK-NEXT:    store
-// CHECK:         end_borrow
 // CHECK:         destroy_addr
 // CHECK:         return
 
@@ -276,16 +256,12 @@ func convExistentialMetatype(_ em: @escaping (Q.Type?) -> Trivial.Type) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion1Q_pXmTSgAA7TrivialVXMtIegyd_AEXMtAA1P_pXmTIegyd_TR : $@convention(thin) (@thin Trivial.Type, @guaranteed @callee_guaranteed (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
-// CHECK:         [[ARGCOPY:%.*]] = copy_value
-// CHECK-NEXT:    [[META:%.*]] = metatype $@thick Trivial.Type
+// CHECK:         [[META:%.*]] = metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype [[META]] : $@thick Trivial.Type, $@thick Q.Type
 // CHECK-NEXT:    enum $Optional<@thick Q.Type>
-// CHECK-NEXT:     begin_borrow
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick P.Type
-// CHECK-NEXT:    end_borrow
-// CHECK-NEXT:    destroy_value [[ARGCOPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion1Q_pXmTSgAA7TrivialVXMtIegyd_AEXMtSgAA1P_pXmTIegyd_TR : $@convention(thin) (Optional<@thin Trivial.Type>, @guaranteed @callee_guaranteed (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
@@ -297,25 +273,18 @@ func convExistentialMetatype(_ em: @escaping (Q.Type?) -> Trivial.Type) {
 // CHECK: bb2:
 // CHECK-NEXT:    enum $Optional<@thick Q.Type>
 // CHECK: bb3({{.*}}):
-// CHECK-NEXT:    begin_borrow
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick P.Type
-// CHECK-NEXT:    end_borrow
-// CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion1Q_pXmTSgAA7TrivialVXMtIegyd_AA1P_pXmTAaF_pXmTIegyd_TR : $@convention(thin) (@thick P.Type, @guaranteed @callee_guaranteed (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
-// CHECK:         copy_value
-// CHECK-NEXT:    open_existential_metatype %0 : $@thick P.Type to $@thick (@opened({{.*}}) P).Type
-// CHECK-NEXT:    init_existential_metatype %3 : $@thick (@opened({{.*}}) P).Type, $@thick Q.Type
+// CHECK:         open_existential_metatype %0 : $@thick P.Type to $@thick (@opened({{.*}}) P).Type
+// CHECK-NEXT:    init_existential_metatype %2 : $@thick (@opened({{.*}}) P).Type, $@thick Q.Type
 // CHECK-NEXT:    enum $Optional<@thick Q.Type>
-// CHECK-NEXT:    begin_borrow
-// CHECK-NEXT:    apply
+// CHECK-NEXT:    apply %1
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick P.Type
-// CHECK-NEXT:    end_borrow
-// CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    return
 
 // ==== Class metatype upcasts
@@ -379,14 +348,12 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypS2iIegyd_Iegio_S2iIgyd_ypIegxr_TR : $@convention(thin) (@owned @noescape @callee_guaranteed (Int) -> Int, @guaranteed @callee_guaranteed (@in Any) -> @owned @callee_guaranteed (Int) -> Int) -> @out Any
-// CHECK:         copy_value
 // CHECK:         alloc_stack $Any
 // CHECK:         function_ref @_T0S2iIgyd_S2iIgir_TR
 // CHECK-NEXT:    partial_apply
 // CHECK-NEXT:    convert_function
-// CHECK-NEXT:    init_existential_addr %4 : $*Any, $(Int) -> Int
+// CHECK-NEXT:    init_existential_addr %3 : $*Any, $(Int) -> Int
 // CHECK-NEXT:    store
-// CHECK-NEXT:    begin_borrow
 // CHECK-NEXT:    apply
 // CHECK:         function_ref @_T0S2iIegyd_S2iIegir_TR
 // CHECK-NEXT:    partial_apply
@@ -395,14 +362,10 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
 // CHECK:         return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIegyd_S2iIegir_TR : $@convention(thin) (@in Int, @guaranteed @callee_guaranteed (Int) -> Int) -> @out Int
-// CHECK:         [[COPY:%.*]] = copy_value %2
-// CHECK-NEXT:    [[LOADED:%.*]] = load [trivial] %1 : $*Int
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]([[LOADED]])
+// CHECK:         [[LOADED:%.*]] = load [trivial] %1 : $*Int
+// CHECK-NEXT:    apply %2([[LOADED]])
 // CHECK-NEXT:    store {{.*}} to [trivial] %0
 // CHECK-NEXT:    [[VOID:%.*]] = tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK:         return [[VOID]]
 
 // ==== Class-bound archetype upcast
@@ -416,15 +379,12 @@ func convClassBoundArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent) -> (T, T
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion6ParentCxAA7TrivialVIegxod_xAcESgIegxod_ACRbzlTR : $@convention(thin) <T where T : Parent> (@owned T, @guaranteed @callee_guaranteed (@owned Parent) -> (@owned T, Trivial)) -> (@owned Parent, Optional<Trivial>)
 // CHECK: bb0([[ARG:%.*]] : @owned $T, [[CLOSURE:%.*]] : @guaranteed $@callee_guaranteed (@owned Parent) -> (@owned T, Trivial)):
-// CHECK:    [[COPY:%.*]] = copy_value [[CLOSURE]]
 // CHECK:    [[CASTED_ARG:%.*]] = upcast [[ARG]] : $T to $Parent
-// CHECK:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:    [[RESULT:%.*]] = apply [[BORROW]]([[CASTED_ARG]])
+// CHECK:    [[RESULT:%.*]] = apply %1([[CASTED_ARG]])
 // CHECK:    [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]] : $(T, Trivial)
 // CHECK:    [[FIRST_RESULT:%.*]] = tuple_extract [[BORROWED_RESULT]] : $(T, Trivial), 0
 // CHECK:    [[COPIED_FIRST_RESULT:%.*]] = copy_value [[FIRST_RESULT]]
 // CHECK:    tuple_extract [[BORROWED_RESULT]] : $(T, Trivial), 1
-// CHECK:    end_borrow [[BORROWED_RESULT]] from [[RESULT]]
 // CHECK:    destroy_value [[RESULT]]
 // CHECK:    [[CAST_COPIED_FIRST_RESULT:%.*]] = upcast [[COPIED_FIRST_RESULT]] : $T to $Parent
 // CHECK:    enum $Optional<Trivial>
@@ -439,17 +399,13 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent.T
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion6ParentCXMTxXMTAA7TrivialVIegydd_xXMTACXMTAESgIegydd_ACRbzlTR : $@convention(thin) <T where T : Parent> (@thick T.Type, @guaranteed @callee_guaranteed (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
-// CHECK:         copy_value
 // CHECK:         upcast %0 : $@thick T.Type to $@thick Parent.Type
-// CHECK-NEXT:    begin_borrow
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    tuple_extract
 // CHECK-NEXT:    tuple_extract
 // CHECK-NEXT:    upcast {{.*}} : $@thick T.Type to $@thick Parent.Type
 // CHECK-NEXT:    enum $Optional<Trivial>
 // CHECK-NEXT:    tuple
-// CHECK-NEXT:    end_borrow
-// CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    return
 
 // ==== Make sure we destructure one-element tuples
@@ -487,15 +443,11 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S3iIegydd_S2i_SitSgIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> (Int, Int)) -> Optional<(Int, Int)>
 // CHECK:         bb0(%0 : @trivial $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> (Int, Int)):
-// CHECK:           [[COPY:%.*]] = copy_value %1
-// CHECK:           [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:           [[RESULT:%.*]] = apply [[BORROW]](%0)
+// CHECK:           [[RESULT:%.*]] = apply %1(%0)
 // CHECK-NEXT:      [[LEFT:%.*]] = tuple_extract [[RESULT]]
 // CHECK-NEXT:      [[RIGHT:%.*]] = tuple_extract [[RESULT]]
 // CHECK-NEXT:      [[RESULT:%.*]] = tuple ([[LEFT]] : $Int, [[RIGHT]] : $Int)
 // CHECK-NEXT:      [[OPTIONAL:%.*]] = enum $Optional<(Int, Int)>, #Optional.some!enumelt.1, [[RESULT]]
-// CHECK-NEXT:      end_borrow [[BORROW]]
-// CHECK-NEXT:      destroy_value [[COPY]]
 // CHECK-NEXT:      return [[OPTIONAL]]
 
 func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (Int, Int)? {
@@ -514,16 +466,12 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
 
 // CHECK:       sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xxxIegirr_xx_xtSgIegir_lTR : $@convention(thin) <T> (@in T, @guaranteed @callee_guaranteed (@in T) -> (@out T, @out T)) -> @out Optional<(T, T)>
 // CHECK:       bb0(%0 : @trivial $*Optional<(T, T)>, %1 : @trivial $*T, %2 : @guaranteed $@callee_guaranteed (@in T) -> (@out T, @out T)):
-// CHECK:         [[COPY:%.*]] = copy_value %2
 // CHECK:         [[OPTIONAL:%.*]] = init_enum_data_addr %0 : $*Optional<(T, T)>, #Optional.some!enumelt.1
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[OPTIONAL]] : $*(T, T), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[OPTIONAL]] : $*(T, T), 1
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]([[LEFT]], [[RIGHT]], %1)
+// CHECK-NEXT:    apply %2([[LEFT]], [[RIGHT]], %1)
 // CHECK-NEXT:    inject_enum_addr %0 : $*Optional<(T, T)>, #Optional.some!enumelt.1
 // CHECK-NEXT:    [[VOID:%.*]] = tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK:         return [[VOID]]
 
 func convTupleToOptionalIndirect<T>(_ f: @escaping (T) -> (T, T)) -> (T) -> (T, T)? {
@@ -583,79 +531,58 @@ func convTupleAny(_ f1: @escaping () -> (),
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Ieg_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any
-// CHECK:         [[COPY:%.*]] = copy_value %1
-// CHECK-NEXT:    init_existential_addr %0 : $*Any, $()
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]()
+// CHECK:         init_existential_addr %0 : $*Any, $()
+// CHECK-NEXT:    apply %1()
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Ieg_ypSgIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Optional<Any>
-// CHECK:         [[COPY:%.*]] = copy_value %1
-// CHECK-NEXT:    [[ENUM_PAYLOAD:%.*]] = init_enum_data_addr %0 : $*Optional<Any>, #Optional.some!enumelt.1
+// CHECK:         [[ENUM_PAYLOAD:%.*]] = init_enum_data_addr %0 : $*Optional<Any>, #Optional.some!enumelt.1
 // CHECK-NEXT:    init_existential_addr [[ENUM_PAYLOAD]] : $*Any, $()
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]()
+// CHECK-NEXT:    apply %1()
 // CHECK-NEXT:    inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt.1
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIegdd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Int, Int)) -> @out Any
-// CHECK:         [[COPY:%.*]] = copy_value %1
-// CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr %0
+// CHECK:         [[ANY_PAYLOAD:%.*]] = init_existential_addr %0
 // CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[BORROW]]()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply %1()
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_extract [[RESULT]]
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_extract [[RESULT]]
 // CHECK-NEXT:    store [[LEFT:%.*]] to [trivial] [[LEFT_ADDR]]
 // CHECK-NEXT:    store [[RIGHT:%.*]] to [trivial] [[RIGHT_ADDR]]
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIegdd_ypSgIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Int, Int)) -> @out Optional<Any> {
-// CHECK:         [[COPY:%.*]] = copy_value %1
 // CHECK:         [[OPTIONAL_PAYLOAD:%.*]] = init_enum_data_addr %0
 // CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[OPTIONAL_PAYLOAD]]
 // CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[BORROW]]()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply %1()
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_extract [[RESULT]]
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_extract [[RESULT]]
 // CHECK-NEXT:    store [[LEFT:%.*]] to [trivial] [[LEFT_ADDR]]
 // CHECK-NEXT:    store [[RIGHT:%.*]] to [trivial] [[RIGHT_ADDR]]
 // CHECK-NEXT:    inject_enum_addr %0
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIegi_S2iIegyy_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in Any) -> ()) -> ()
-// CHECK:         [[COPY:%.*]] = copy_value %2
 // CHECK:         [[ANY_VALUE:%.*]] = alloc_stack $Any
 // CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[ANY_VALUE]]
 // CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    store %0 to [trivial] [[LEFT_ADDR]]
 // CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    store %1 to [trivial] [[RIGHT_ADDR]]
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]([[ANY_VALUE]])
+// CHECK-NEXT:    apply %2([[ANY_VALUE]])
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
 // CHECK-NEXT:    dealloc_stack [[ANY_VALUE]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypSgIegi_S2iIegyy_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in Optional<Any>) -> ()) -> ()
-// CHECK:         [[COPY:%.*]] = copy_value %2
 // CHECK:         [[ANY_VALUE:%.*]] = alloc_stack $Any
 // CHECK-NEXT:    [[ANY_PAYLOAD:%.*]] = init_existential_addr [[ANY_VALUE]]
 // CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
@@ -666,11 +593,8 @@ func convTupleAny(_ f1: @escaping () -> (),
 // CHECK-NEXT:    [[OPTIONAL_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL_VALUE]]
 // CHECK-NEXT:    copy_addr [take] [[ANY_VALUE]] to [initialization] [[OPTIONAL_PAYLOAD]]
 // CHECK-NEXT:    inject_enum_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT:    apply [[BORROW]]([[OPTIONAL_VALUE]])
+// CHECK-NEXT:    apply %2([[OPTIONAL_VALUE]])
 // CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow [[BORROW]]
 // CHECK-NEXT:    dealloc_stack [[OPTIONAL_VALUE]]
 // CHECK-NEXT:    dealloc_stack [[ANY_VALUE]]
-// CHECK-NEXT:    destroy_value [[COPY]]
 // CHECK-NEXT:    return

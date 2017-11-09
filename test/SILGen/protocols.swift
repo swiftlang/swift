@@ -256,15 +256,10 @@ class ClassWithGetter : PropertyWithGetter {
 // ClassWithGetter.
 // CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed ClassWithGetter) -> Int {
 // CHECK: bb0([[C:%.*]] : @trivial $*ClassWithGetter):
-// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetter
-// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [take] [[CCOPY]]
-// CHECK-NEXT: [[BORROWED_CCOPY_LOADED:%.*]] = begin_borrow [[CCOPY_LOADED]]
-// CHECK-NEXT: [[FUN:%.*]] = class_method [[BORROWED_CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetter) -> Int
-// CHECK-NEXT: apply [[FUN]]([[BORROWED_CCOPY_LOADED]])
-// CHECK-NEXT: end_borrow [[BORROWED_CCOPY_LOADED]] from [[CCOPY_LOADED]]
-// CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
-// CHECK-NEXT: dealloc_stack [[CCOPY]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetter) -> Int
+// CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
+// CHECK-NEXT: end_borrow [[CCOPY_LOADED]] from %0
 // CHECK-NEXT: return
 
 class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
@@ -284,15 +279,10 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
 
 // CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW : $@convention(witness_method: PropertyWithGetterSetter) (@in_guaranteed ClassWithGetterSetter) -> Int {
 // CHECK: bb0([[C:%.*]] : @trivial $*ClassWithGetterSetter):
-// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetterSetter
-// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [take] [[CCOPY]]
-// CHECK-NEXT: [[BORROWED_CCOPY_LOADED:%.*]] = begin_borrow [[CCOPY_LOADED]]
-// CHECK-NEXT: [[FUN:%.*]] = class_method [[BORROWED_CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
-// CHECK-NEXT: apply [[FUN]]([[BORROWED_CCOPY_LOADED]])
-// CHECK-NEXT: end_borrow [[BORROWED_CCOPY_LOADED]] from [[CCOPY_LOADED]]
-// CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
-// CHECK-NEXT: dealloc_stack [[CCOPY]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
+// CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
+// CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
+// CHECK-NEXT: end_borrow [[CCOPY_LOADED]] from %0
 // CHECK-NEXT: return
 
 // Stored variables fulfilling property requirements
@@ -340,13 +330,10 @@ struct StructWithStoredProperty : PropertyWithGetter {
 //
 // CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : @trivial $*StructWithStoredProperty):
-// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredProperty
-// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [trivial] [[CCOPY]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [trivial] [[C]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUN:%.*]] = function_ref @_T09protocols24StructWithStoredPropertyV1aSivg : $@convention(method) (StructWithStoredProperty) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
-// CHECK-NEXT: dealloc_stack [[CCOPY]]
 // CHECK-NEXT: return
 
 class C {}
@@ -370,16 +357,11 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
 
 // CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredClassProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : @trivial $*StructWithStoredClassProperty):
-// CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredClassProperty
-// CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
-// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [take] [[CCOPY]]
-// CHECK-NEXT: [[BORROWED_CCOPY_LOADED:%.*]] = begin_borrow [[CCOPY_LOADED]]
+// CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow [[C]]
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUN:%.*]] = function_ref @_T09protocols29StructWithStoredClassPropertyV1aSivg : $@convention(method) (@guaranteed StructWithStoredClassProperty) -> Int
-// CHECK-NEXT: apply [[FUN]]([[BORROWED_CCOPY_LOADED]])
-// CHECK-NEXT: end_borrow [[BORROWED_CCOPY_LOADED]] from [[CCOPY_LOADED]]
-// CHECK-NEXT: destroy_value [[CCOPY_LOADED]]
-// CHECK-NEXT: dealloc_stack [[CCOPY]]
+// CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
+// CHECK-NEXT: end_borrow [[CCOPY_LOADED]] from %0
 // CHECK-NEXT: return
 
 // rdar://22676810
