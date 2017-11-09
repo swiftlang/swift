@@ -246,7 +246,7 @@ private:
   void setPlaygroundOptions();
   void setHelpOptions();
   void setDumpScopeMapLocations();
-  FrontendOptions::ActionType determineWhatUserAskedFrontendToDo() const;
+  FrontendOptions::ActionType determineRequestedAction() const;
   bool setupForSILOrLLVM();
   void setModuleName();
   StringRef determineFallbackModuleName() const;
@@ -319,7 +319,7 @@ bool FrontendArgsToOptionsConverter::convert() {
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
   setDumpScopeMapLocations();
-  Opts.RequestedAction = determineWhatUserAskedFrontendToDo();
+  Opts.RequestedAction = determineRequestedAction();
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
       Opts.Inputs.havePrimaryInputs()) {
@@ -492,7 +492,7 @@ void FrontendArgsToOptionsConverter::setDumpScopeMapLocations() {
 }
 
 FrontendOptions::ActionType
-FrontendArgsToOptionsConverter::determineWhatUserAskedFrontendToDo() const {
+FrontendArgsToOptionsConverter::determineRequestedAction() const {
   using namespace options;
   const Arg *A = Args.getLastArg(OPT_modes_Group);
   if (!A) {
