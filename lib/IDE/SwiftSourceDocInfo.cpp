@@ -698,6 +698,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   switch (Kind) {
   case RangeKind::SingleExpression: OS << "SingleExpression"; break;
   case RangeKind::SingleDecl: OS << "SingleDecl"; break;
+  case RangeKind::MultiTypeMemberDecl: OS << "MultiTypeMemberDecl"; break;
   case RangeKind::MultiStatement: OS << "MultiStatement"; break;
   case RangeKind::PartOfExpression: OS << "PartOfExpression"; break;
   case RangeKind::SingleStatement: OS << "SingleStatement"; break;
@@ -883,6 +884,17 @@ private:
       return llvm::any_of(StartMatches, IsCase) &&
           llvm::any_of(EndMatches, IsCase);
     }
+
+    bool isMultiTypeMemberDecl() {
+      if (StartMatches.empty() || EndMatches.empty())
+        return false;
+
+      // Multi-decls should have the same nominal type as a common parent
+      if (auto ParentDecl = Parent.dyn_cast<Decl *>())
+        return isa<NominalTypeDecl>(ParentDecl);
+
+      return false;
+    }
   };
 
 
@@ -911,6 +923,7 @@ private:
     switch(Kind) {
     case RangeKind::Invalid:
     case RangeKind::SingleDecl:
+    case RangeKind::MultiTypeMemberDecl:
     case RangeKind::PartOfExpression:
       llvm_unreachable("cannot get type.");
 
@@ -1247,7 +1260,15 @@ public:
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
-    switch (getRangeMatchKind(Node.getSourceRange())) {
+
+    auto NodeRange = Node.getSourceRange();
+
+    // Widen the node's source range to include all attributes to get a range
+    // match if a function with its attributes has been selected.
+    if (auto D = Node.dyn_cast<Decl *>())
+      NodeRange = D->getSourceRangeIncludingAttrs();
+
+    switch (getRangeMatchKind(NodeRange)) {
     case RangeMatchKind::NoneMatch: {
       // PatternBindingDecl is not visited; we need to explicitly analyze here.
       if (auto *VA = dyn_cast_or_null<VarDecl>(D))
@@ -1288,6 +1309,21 @@ public:
                 TokensInRange,
                 getImmediateContext(), nullptr,
                 hasSingleEntryPoint(ContainedASTNodes),
+                hasUnhandledError(ContainedASTNodes),
+                getOrphanKind(ContainedASTNodes),
+                llvm::makeArrayRef(ContainedASTNodes),
+                llvm::makeArrayRef(DeclaredDecls),
+                llvm::makeArrayRef(ReferencedDecls)};
+    }
+
+    if (DCInfo.isMultiTypeMemberDecl()) {
+      postAnalysis(DCInfo.EndMatches.back());
+      Result = {RangeKind::MultiTypeMemberDecl,
+                ReturnInfo(),
+                TokensInRange,
+                getImmediateContext(),
+                /*Common Parent Expr*/ nullptr,
+                /*SinleEntry*/ true,
                 hasUnhandledError(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),

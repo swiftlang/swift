@@ -316,7 +316,7 @@ public:
   std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
 };
 
-enum class RangeKind : int8_t{
+enum class RangeKind : int8_t {
   Invalid = -1,
   SingleExpression,
   SingleStatement,
@@ -324,6 +324,8 @@ enum class RangeKind : int8_t{
 
   MultiStatement,
   PartOfExpression,
+
+  MultiTypeMemberDecl,
 };
 
 struct DeclaredDecl {
