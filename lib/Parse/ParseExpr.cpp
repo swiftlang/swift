@@ -3095,7 +3095,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
 ///     expr-dictionary
 //      lsquare-starting ']'
 ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
-  SyntaxParsingContextChild ArryOrDictContext(SyntaxContext,
+  SyntaxParsingContextChild ArrayOrDictContext(SyntaxContext,
                                               SyntaxContextKind::Expr);
 
   // If the caller didn't already consume the '[', do so now.
@@ -3145,10 +3145,10 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
     ParseDict = Tok.is(tok::colon);
   }
   if (ParseDict) {
-    ArryOrDictContext.setSyntaxKind(SyntaxKind::DictionaryExpr);
+    ArrayOrDictContext.setSyntaxKind(SyntaxKind::DictionaryExpr);
     return parseExprDictionary(LSquareLoc);
   } else {
-    ArryOrDictContext.setSyntaxKind(SyntaxKind::ArrayExpr);
+    ArrayOrDictContext.setSyntaxKind(SyntaxKind::ArrayExpr);
     return parseExprArray(LSquareLoc);
   }
 }
