@@ -157,7 +157,7 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 
 //   Instantiation function for GenericComputed : DerivedFromSimpleAssoc.
 // CHECK-LABEL: define internal void @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI(i8**, %swift.type*, i8**)
-// CHECK:         [[T0:%.*]] = call i8** @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa(%swift.type* %1, i8*** null, i64 0)
+// CHECK:         [[T0:%.*]] = call i8** @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa(%swift.type* %1, i8*** undef, i64 0)
 // CHECK-NEXT:    [[T1:%.*]] = bitcast i8** [[T0]] to i8*
 // CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds i8*, i8** %0, i32 0
 // CHECK-NEXT:    store i8* [[T1]], i8** [[T2]], align 8
