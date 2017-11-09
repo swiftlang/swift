@@ -4036,22 +4036,28 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
-    auto rootMatches = matchTypes(kpRootTy, rootTy,
-                                  ConstraintKind::Equal,
-                                  subflags, locator);
-    switch (rootMatches) {
-    case SolutionKind::Error:
-      return SolutionKind::Error;
-    case SolutionKind::Solved:
-      break;
-    case SolutionKind::Unsolved:
-      llvm_unreachable("should have generated constraints");
-    }
+
+    auto matchRoot = [&](ConstraintKind kind) -> bool {
+      auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
+                                    subflags, locator);
+      switch (rootMatches) {
+      case SolutionKind::Error:
+        return false;
+      case SolutionKind::Solved:
+        return true;
+      case SolutionKind::Unsolved:
+        llvm_unreachable("should have generated constraints");
+      }
+    };
 
     if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any`.
       auto resultTy = ProtocolCompositionType::get(getASTContext(), {},
                                                   /*explicit AnyObject*/ false);
+
+      if (!matchRoot(ConstraintKind::Conversion))
+        return SolutionKind::Error;
+
       return matchTypes(resultTy, valueTy,
                         ConstraintKind::Bind, subflags, locator);
     }
@@ -4062,6 +4068,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
     /// Solve for an rvalue base.
     auto solveRValue = [&]() -> ConstraintSystem::SolutionKind {
+      // An rvalue base can be converted to a supertype.
       return matchTypes(kpValueTy, valueTy,
                         ConstraintKind::Bind, subflags, locator);
     };
@@ -4078,14 +4085,20 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return matchTypes(LValueType::get(kpValueTy), valueTy,
                         ConstraintKind::Bind, subflags, locator);
     };
-
   
     if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
       // Read-only keypath.
+      if (!matchRoot(ConstraintKind::Conversion))
+        return SolutionKind::Error;
+
       return solveRValue();
     }
     if (bgt->getDecl() == getASTContext().getWritableKeyPathDecl()) {
       // Writable keypath. The result can be an lvalue if the root was.
+      // We can't convert the base without giving up lvalue-ness, though.
+      if (!matchRoot(ConstraintKind::Equal))
+        return SolutionKind::Error;
+
       if (rootTy->is<LValueType>())
         return solveLValue();
       if (rootTy->isTypeVariableOrMember())
@@ -4094,6 +4107,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return solveRValue();
     }
     if (bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+      if (!matchRoot(ConstraintKind::Conversion))
+        return SolutionKind::Error;
+
       // Reference-writable keypath. The result can always be an lvalue.
       return solveLValue();
     }
