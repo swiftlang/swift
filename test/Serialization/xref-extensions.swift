@@ -14,7 +14,7 @@
 // REQUIRES: asserts
 
 // CHECK_NESTED-LABEL: Statistics
-// CHECK_NESTED: 6 Serialization - # of decls deserialized
+// CHECK_NESTED: 5 Serialization - # of decls deserialized
 // outer struct, initializer + self param,
 // inner struct, initializer + self param,
 // extension, func + self param

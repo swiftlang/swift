@@ -154,7 +154,7 @@ namespace swift {
     bool IterativeTypeChecker = false;
 
     /// \brief Enable named lazy member loading.
-    bool NamedLazyMemberLoading = false;
+    bool NamedLazyMemberLoading = true;
 
     /// Debug the generic signatures computed by the generic signature builder.
     bool DebugGenericSignatures = false;
