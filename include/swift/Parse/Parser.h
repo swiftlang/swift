@@ -412,6 +412,7 @@ public:
     ParserPosition PP;
     DiagnosticTransaction DT;
     bool Backtrack = true;
+    bool HasDelayedDecl;
 
   public:
     BacktrackingScope(Parser &P)
@@ -422,6 +423,7 @@ public:
     void cancelBacktrack() {
       Backtrack = false;
       DT.commit();
+      HasDelayedDecl = P.State->hasDelayedDecl();
     }
   };
 
