@@ -284,7 +284,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 % ]:
 %   ElementIsInteger = ElementConstraint == 'BinaryInteger'
 
-public struct ${Self}<
+internal struct ${Self}<
   Element : ${ElementConstraint}
 > : RandomAccessCollection, CustomReflectable
 where ${Where} {
@@ -390,21 +390,6 @@ public func stride<T>(
   from start: T, to end: T, by stride: T.Stride
 ) -> StrideTo<T> {
   return StrideTo(_start: start, end: end, stride: stride)
-}
-
-@_inlineable
-public func stride<T>(
-  from start: T, to end: T, by stride: T.Stride
-) -> IntegerStrideToCollection<T> {
-  return IntegerStrideToCollection(_start: start, end: end, stride: stride)
-}
-
-@_inlineable
-public func stride<T>(
-  from start: T, to end: T, by stride: T.Stride
-) -> FloatingPointStrideToCollection<T> {
-  return FloatingPointStrideToCollection(
-    _start: start, end: end, stride: stride)
 }
 
 /// An iterator for `StrideThrough<Element>`.
@@ -519,7 +504,7 @@ public struct StrideThrough<
 % ]:
 %   ElementIsInteger = ElementConstraint == 'BinaryInteger'
 
-public struct ${Self}<
+internal struct ${Self}<
   Element : ${ElementConstraint}
 > : RandomAccessCollection, CustomReflectable
 where ${Where} {
@@ -625,33 +610,6 @@ where ${Where} {
     }
   }
 
-  /*
-  @_inlineable
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
-    switch i._value {
-    case .inRange(let x):
-      let d = x.distance(to: _end)
-      if n <= d {
-        let newElement = x.advanced(by: n*_stride)
-        _precondition(newElement >= _start, "Advancing past start index")
-        return ClosedRangeIndex(newElement)
-      }
-      if d - (-_stride) == Element.Stride(n) * _stride {
-        return ClosedRangeIndex()
-      }
-      _preconditionFailure("Advancing past end index")
-    case .pastEnd:
-      if n == 0 {
-        return i
-      }
-      if n < 0 {
-        return index(ClosedRangeIndex(_end), offsetBy: (n + 1))
-      }
-      _preconditionFailure("Advancing past end index")
-    }
-  }
-  */
-
   // FIXME(ABI)#175 (Type checker)
   @_inlineable
   public // WORKAROUND: needed because of rdar://25584401
@@ -678,18 +636,3 @@ public func stride<T>(
   return StrideThrough(_start: start, end: end, stride: stride)
 }
 
-@_inlineable
-public func stride<T>(
-  from start: T, through end: T, by stride: T.Stride
-) -> IntegerStrideThroughCollection<T> {
-  return IntegerStrideThroughCollection(
-    _start: start, end: end, stride: stride)
-}
-
-@_inlineable
-public func stride<T>(
-  from start: T, through end: T, by stride: T.Stride
-) -> FloatingPointStrideThroughCollection<T> {
-  return FloatingPointStrideThroughCollection(
-    _start: start, end: end, stride: stride)
-}
