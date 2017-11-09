@@ -274,6 +274,18 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["from": _start, "to": _end, "by": _stride])
   }
+
+  // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
+  // here until a proper Collection conformance is possible
+  @_inlineable
+  public var underestimatedCount: Int {
+    var it = self.makeIterator()
+    var count = 0
+    while it.next() != nil {
+      count += 1
+    }
+    return count
+  }
 }
 
 // FIXME(conditional-conformances): these extra types can easily be turned into
@@ -493,6 +505,18 @@ public struct StrideThrough<
   public var customMirror: Mirror {
     return Mirror(self,
       children: ["from": _start, "through": _end, "by": _stride])
+  }
+
+  // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
+  // here until a proper Collection conformance is possible
+  @_inlineable
+  public var underestimatedCount: Int {
+    var it = self.makeIterator()
+    var count = 0
+    while it.next() != nil {
+      count += 1
+    }
+    return count
   }
 }
 
