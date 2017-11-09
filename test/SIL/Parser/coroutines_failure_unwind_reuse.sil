@@ -1,4 +1,5 @@
 // RUN: not --crash %target-swift-frontend %s -emit-silgen -verify
+// REQUIRES: asserts
 
 sil_stage raw
 
