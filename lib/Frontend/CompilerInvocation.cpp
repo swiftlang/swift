@@ -642,16 +642,16 @@ StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() const {
 }
 
 bool FrontendArgsToOptionsConverter::setOutputFilenames() {
-  const std::vector<std::string> unprocessedOutputFlienames =
+  const std::vector<std::string> unprocessedOutputFilenames =
       getUnprocessedOutputFilenames();
 
-  if (!unprocessedOutputFlienames.empty() &&
-      !llvm::sys::fs::is_directory(unprocessedOutputFlienames.back())) {
-    Opts.OutputFilenames = unprocessedOutputFlienames;
+  if (!unprocessedOutputFilenames.empty() &&
+      !llvm::sys::fs::is_directory(unprocessedOutputFilenames.back())) {
+    Opts.OutputFilenames = unprocessedOutputFilenames;
     return false;
   }
-  if (Opts.Inputs.isReadingFromStdin() && unprocessedOutputFlienames.empty()) {
-    Opts.OutputFilenames = unprocessedOutputFlienames;
+  if (Opts.Inputs.isReadingFromStdin() && unprocessedOutputFilenames.empty()) {
+    Opts.OutputFilenames = unprocessedOutputFilenames;
     return false;
   }
 
@@ -667,7 +667,7 @@ bool FrontendArgsToOptionsConverter::setOutputFilenames() {
   assert(
       FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
       !FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction));
-  if (unprocessedOutputFlienames.empty() &&
+  if (unprocessedOutputFilenames.empty() &&
       (Opts.Inputs.isReadingFromStdin() ||
        FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction))) {
     Opts.setOutputFilenameToStdout();
@@ -678,11 +678,11 @@ bool FrontendArgsToOptionsConverter::setOutputFilenames() {
 
 bool FrontendArgsToOptionsConverter::
     deriveOutputFilenamesFromInputsAndSuffix() {
-  const std::vector<std::string> unprocessedOutputFlienames =
+  const std::vector<std::string> unprocessedOutputFilenames =
       getUnprocessedOutputFilenames();
   {
     const unsigned commandLineOutputFilenameCount =
-        unprocessedOutputFlienames.size();
+        unprocessedOutputFilenames.size();
     const unsigned primaryFilenameCount =
         Opts.Inputs.primaryInputFilenameCount();
     if (Opts.Inputs.havePrimaryInputsFilenames() &&
@@ -699,9 +699,9 @@ bool FrontendArgsToOptionsConverter::
       Opts.RequestedAction);
   std::vector<std::string> baseNames = computeBaseNamesOfOutputs();
   for (unsigned index : indices(baseNames)) {
-    std::string outputStem = unprocessedOutputFlienames.empty()
+    std::string outputStem = unprocessedOutputFilenames.empty()
                                  ? ""
-                                 : unprocessedOutputFlienames[index];
+                                 : unprocessedOutputFilenames[index];
     llvm::SmallString<128> Path(outputStem);
     llvm::sys::path::append(Path, baseNames[index]);
     llvm::sys::path::replace_extension(Path, Suffix);
