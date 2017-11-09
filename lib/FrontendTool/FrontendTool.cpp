@@ -1467,7 +1467,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     }
   }
 
-  return finishDiagProcessing(HadError ? 1 : ReturnValue);
+  auto r = finishDiagProcessing(HadError ? 1 : ReturnValue);
+  if (StatsReporter)
+    StatsReporter->noteCurrentProcessExitStatus(r);
+  return r;
 }
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
