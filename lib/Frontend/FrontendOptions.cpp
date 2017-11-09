@@ -210,7 +210,6 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-    // Textual modes.
     return nullptr;
 
   case ActionType::EmitPCH:
