@@ -288,6 +288,11 @@ class NameImporter {
   /// Cache for repeated calls
   llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
 
+  /// The set of property names that show up in the defining module of
+  /// an Objective-C class.
+  llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
+                 std::unique_ptr<InheritedNameSet>> allProperties;
+
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
                clang::Sema &cSema, bool inferIAM)
@@ -330,6 +335,11 @@ public:
   clang::Preprocessor &getClangPreprocessor() {
     return getClangSema().getPreprocessor();
   }
+
+  /// Retrieve the inherited name set for the given Objective-C class.
+  const InheritedNameSet *getAllPropertyNames(
+                            clang::ObjCInterfaceDecl *classDecl,
+                            bool forInstance);
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }

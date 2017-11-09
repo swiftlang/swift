@@ -839,7 +839,7 @@ static bool omitNeedlessWordsInFunctionName(
   if (!contextType.isNull()) {
     if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
       if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
-        allPropertyNames = nameImporter.getContext().getAllPropertyNames(
+        allPropertyNames = nameImporter.getAllPropertyNames(
             objcClassDecl, isInstanceMethod);
   }
 
@@ -1655,8 +1655,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
             if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
               allPropertyNames =
-                  swiftCtx.getAllPropertyNames(objcClassDecl,
-                                               /*forInstance=*/true);
+                  getAllPropertyNames(objcClassDecl, /*forInstance=*/true);
         }
 
         (void)omitNeedlessWords(baseName, {}, "", propertyTypeName,
@@ -1774,3 +1773,72 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
     importNameCache[key] = res;
   return res;
 }
+
+const InheritedNameSet *NameImporter::getAllPropertyNames(
+                          clang::ObjCInterfaceDecl *classDecl,
+                          bool forInstance) {
+  classDecl = classDecl->getCanonicalDecl();
+
+  // If we already have this information, return it.
+  auto known = allProperties.find({classDecl, forInstance});
+  if (known != allProperties.end()) return known->second.get();
+
+  // Otherwise, get information from our superclass first.
+  const InheritedNameSet *parentSet = nullptr;
+  if (auto superclassDecl = classDecl->getSuperClass()) {
+    parentSet = getAllPropertyNames(superclassDecl, forInstance);
+  }
+
+  // Create the set of properties.
+  known = allProperties.insert(
+            { std::pair<const clang::ObjCInterfaceDecl *, char>(classDecl,
+                                                                forInstance),
+              llvm::make_unique<InheritedNameSet>(parentSet) }).first;
+
+  // Local function to add properties from the given set.
+  auto addProperties = [&](clang::DeclContext::decl_range members) {
+    for (auto member : members) {
+      // Add Objective-C property names.
+      if (auto property = dyn_cast<clang::ObjCPropertyDecl>(member)) {
+        if (forInstance)
+          known->second->add(property->getName());
+        continue;
+      }
+
+      // Add no-parameter, non-void method names.
+      if (auto method = dyn_cast<clang::ObjCMethodDecl>(member)) {
+        if (method->getSelector().isUnarySelector() &&
+            !method->getReturnType()->isVoidType() &&
+            !method->hasRelatedResultType() &&
+            method->isInstanceMethod() == forInstance) {
+          known->second->add(method->getSelector().getNameForSlot(0));
+          continue;
+        }
+      }
+    }
+  };
+
+  // Dig out the class definition.
+  auto classDef = classDecl->getDefinition();
+  if (!classDef) return known->second.get();
+
+  // Collect property names from the class definition.
+  addProperties(classDef->decls());
+
+  // Dig out the module that owns the class definition.
+  auto module = classDef->getImportedOwningModule();
+  if (module) module = module->getTopLevelModule();
+
+  // Collect property names from all categories and extensions in the same
+  // module as the class.
+  for (auto category : classDef->known_categories()) {
+    auto categoryModule = category->getImportedOwningModule();
+    if (categoryModule) categoryModule = categoryModule->getTopLevelModule();
+    if (module != categoryModule) continue;
+
+    addProperties(category->decls());
+  }
+
+  return known->second.get();
+}
+
