@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -46,10 +47,13 @@ llvm::cl::opt<bool> TriggerUnreachableOnFailure(
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 
 template<typename ...ArgTypes>
-static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
-  M.getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
+static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
+                                   ArgTypes... args) {
+  auto diag = M.getASTContext().Diags.diagnose(loc.getSourceLoc(),
+                                               Diagnostic(args...));
   if (TriggerUnreachableOnFailure)
     llvm_unreachable("Triggering standard assertion failure routine");
+  return diag;
 }
 
 enum class PartialInitializationKind {
@@ -1041,10 +1045,30 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     else
       selfTy = TheMemory.getType();
 
+    StructDecl *theStruct = selfTy->getStructOrBoundGenericStruct();
+    assert(theStruct);
+
     diagnose(Module, Use.Inst->getLoc(),
              diag::designated_init_in_cross_module_extension,
              selfTy, !isFullyUninitialized,
-             selfTy->getAnyNominal()->getParentModule()->getName());
+             theStruct->getParentModule()->getName(),
+             theStruct->hasClangNode());
+
+    // Special case: most (but not all) C structs have a zeroing no-argument
+    // initializer. If this struct is such a type, suggest inserting
+    // "self.init()".
+    if (theStruct->hasClangNode()) {
+      ASTContext &ctx = Module.getASTContext();
+      DeclName noArgInit(ctx, ctx.Id_init, ArrayRef<Identifier>());
+      auto lookupResults = theStruct->lookupDirect(noArgInit);
+      if (lookupResults.size() == 1 &&
+          lookupResults.front()->getDeclContext() == theStruct) {
+        diagnose(Module, Use.Inst->getLoc(),
+                 diag::designated_init_c_struct_fix)
+          .fixItInsert(Use.Inst->getLoc().getStartSourceLoc(),
+                       "self.init()\n");
+      }
+    }
 
     // Don't emit more than one of these diagnostics per initializer.
     WantsCrossModuleStructInitializerDiagnostic = false;

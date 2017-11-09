@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module_swift4/OtherModule.swift
-// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 4 %s > /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 4 %s > /dev/null -import-objc-header %S/Inputs/definite_init_cross_module_swift4/BridgingHeader.h
 
 import OtherModule
 
@@ -170,5 +170,54 @@ extension MyGenericPoint {
   init(myX: T, myY: T) {
     self.x = myX // expected-warning {{initializer for struct 'GenericPoint<T>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
     self.y = myY
+  }
+}
+
+extension CPoint {
+  init(xx: Double, yy: Double) {
+    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." because the struct was imported from C}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self.y = yy
+  }
+
+  init(xxx: Double, yyy: Double) {
+    // This is OK
+    self.init(x: xxx, y: yyy)
+  }
+
+  init(other: CPoint) {
+    // This is OK
+    self = other
+  }
+
+  init(other: CPoint, x: Double) {
+    // This is OK
+    self = other
+    self.x = x
+  }
+
+  init(other: CPoint, xx: Double) {
+    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." because the struct was imported from C}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self = other
+  }
+
+  init(other: CPoint, x: Double, cond: Bool) {
+    // This is OK
+    self = other
+    if cond { self.x = x }
+  }
+
+  init(other: CPoint, xx: Double, cond: Bool) {
+    if cond { self = other }
+    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." on all paths because the struct was imported from C}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self.y = 0
+  }
+}
+
+
+extension NonnullWrapper {
+  init(p: UnsafeMutableRawPointer) {
+    self.ptr = p // expected-warning {{initializer for struct 'NonnullWrapper' must use "self.init(...)" or "self = ..." because the struct was imported from C}}
+    // No suggestion for "self.init()" because this struct does not support a
+    // zeroing initializer.
   }
 }
