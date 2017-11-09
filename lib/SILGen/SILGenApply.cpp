@@ -510,9 +510,8 @@ public:
 
       SILValue methodVal;
       if (!constant->isForeign) {
-        methodVal = SGF.B.createClassMethod(
-            Loc, borrowedSelf->getValue(), *constant,
-            SILType::getPrimitiveObjectType(methodTy));
+        methodVal = SGF.emitClassMethodRef(
+            Loc, borrowedSelf->getValue(), *constant, methodTy);
       } else {
         methodVal = SGF.B.createObjCMethod(
             Loc, borrowedSelf->getValue(), *constant,
