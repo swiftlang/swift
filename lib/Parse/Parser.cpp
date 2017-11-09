@@ -867,6 +867,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     SyntaxParsingContextChild ElementContext(SyntaxContext);
     if (ElementKind) {
       ElementContext.setSyntaxKind(*ElementKind);
+    } else {
+      ElementContext.disable();
     }
     Status |= callback();
     if (Tok.is(RightK))
