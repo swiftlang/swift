@@ -2488,7 +2488,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # FIXME: Always re-build foundation on non-darwin platforms.
                 # Remove this when products build in the CMake system.
                 echo "Cleaning the Foundation build directory"
-                call rm -r "${build_dir}"
+                call rm -rf "${build_dir}"
 
                 with_pushd "${FOUNDATION_SOURCE_DIR}" \
                     call env SWIFTC="${SWIFTC_BIN}" CLANG="${LLVM_BIN}"/clang SWIFT="${SWIFT_BIN}" \
@@ -2548,7 +2548,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   # FIXME: Always re-build libdispatch on non-darwin platforms.
                   # Remove this when products build in the CMake system.
                   echo "Cleaning the libdispatch build directory"
-                  call rm -r "${LIBDISPATCH_BUILD_DIR}"
+                  call rm -rf "${LIBDISPATCH_BUILD_DIR}"
 
                   cmake_options=(
                     ${cmake_options[@]}
