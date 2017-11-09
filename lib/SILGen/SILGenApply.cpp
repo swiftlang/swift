@@ -510,9 +510,8 @@ public:
 
       SILValue methodVal;
       if (!constant->isForeign) {
-        methodVal = SGF.B.createClassMethod(
-            Loc, borrowedSelf->getValue(), *constant,
-            SILType::getPrimitiveObjectType(methodTy));
+        methodVal = SGF.emitClassMethodRef(
+            Loc, borrowedSelf->getValue(), *constant, methodTy);
       } else {
         methodVal = SGF.B.createObjCMethod(
             Loc, borrowedSelf->getValue(), *constant,
@@ -685,16 +684,9 @@ public:
 
   /// The lvalue or rvalue representing the argument source of self.
   ArgumentSource selfParam;
-  Expr *selfApplyExpr = nullptr;
   Type selfType;
   std::vector<ApplyExpr*> callSites;
   Expr *sideEffect = nullptr;
-
-  /// When visiting expressions, sometimes we need to emit self before we know
-  /// what the actual callee is. In such cases, we assume that we are passing
-  /// self at +0 and then after we know what the callee is, we check if the
-  /// self is passed at +1. If so, we add an extra retain.
-  bool assumedPlusZeroSelf = false;
 
   SILGenApply(SILGenFunction &SGF)
     : SGF(SGF)
@@ -713,15 +705,7 @@ public:
   void setSelfParam(ArgumentSource &&theSelfParam, Expr *theSelfApplyExpr) {
     assert(!selfParam && "already set this!");
     selfParam = std::move(theSelfParam);
-    selfApplyExpr = theSelfApplyExpr;
     selfType = theSelfApplyExpr->getType();
-  }
-
-  void setSelfParam(ArgumentSource &&theSelfParam, Type selfType) {
-    assert(!selfParam && "already set this!");
-    selfParam = std::move(theSelfParam);
-    selfApplyExpr = nullptr;
-    selfType = selfType;
   }
 
   void decompose(Expr *e) {
@@ -798,8 +782,8 @@ public:
                                        /*objc=*/true, {}, {});
   }
 
-  void processProtocolDecl(DeclRefExpr *e, AbstractFunctionDecl *afd,
-                           ProtocolDecl *proto) {
+  void processProtocolMethod(DeclRefExpr *e, AbstractFunctionDecl *afd,
+                             ProtocolDecl *proto) {
     assert(!callSites.empty());
     ApplyExpr *thisCallSite = callSites.back();
     callSites.pop_back();
@@ -832,138 +816,87 @@ public:
     SILDeclRef constant(afd, kind);
     constant = constant.asForeign(afd->isObjC());
 
-    // Prepare the callee.  This can modify both selfValue and subs.
+    // Prepare the callee.
     Callee theCallee = Callee::forWitnessMethod(
         SGF, selfValue.getSubstRValueType(),
         constant, subs, e);
-    assumedPlusZeroSelf =
-        selfValue.isRValue() &&
-        selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
     setSelfParam(std::move(selfValue), thisCallSite);
     setCallee(std::move(theCallee));
   }
 
-  bool processAbstractFunctionDecl(DeclRefExpr *e, AbstractFunctionDecl *afd) {
-    // We have four cases to deal with here:
-    //
-    //  1) for a "static" / "type" method, the base is a metatype.
-    //  2) for a classbound protocol, the base is a class-bound protocol
-    //  rvalue,
-    //     which is loadable.
-    //  3) for a mutating method, the base has inout type.
-    //  4) for a nonmutating method, the base is a general archetype
-    //     rvalue, which is address-only.  The base is passed at +0, so it
-    //     isn't
-    //     consumed.
-    //
-    // In the last case, the AST has this call typed as being applied
-    // to an rvalue, but the witness is actually expecting a pointer
-    // to the +0 value in memory.  We just pass in the address since
-    // archetypes are address-only.
-
-    if (auto *proto = dyn_cast<ProtocolDecl>(afd->getDeclContext())) {
-      processProtocolDecl(e, afd, proto);
-      return true;
-    }
-
-    Optional<SILDeclRef::Kind> kind;
-    bool isDynamicallyDispatched;
-    bool requiresAllocRefDynamic = false;
-
-    // Determine whether the method is dynamically dispatched.
-    if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
-      isDynamicallyDispatched = false;
-    } else {
-      switch (getMethodDispatch(afd)) {
-      case MethodDispatch::Class:
-        isDynamicallyDispatched = true;
-        break;
-      case MethodDispatch::Static:
-        isDynamicallyDispatched = false;
-        break;
-      }
-    }
-
-    if (isa<FuncDecl>(afd) && isDynamicallyDispatched) {
-      kind = SILDeclRef::Kind::Func;
-    } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
-      ApplyExpr *thisCallSite = callSites.back();
-      // Required constructors are dynamically dispatched when the 'self'
-      // value is not statically derived.
-      if (ctor->isRequired() &&
-          thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
-          !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
-        if (requiresForeignEntryPoint(afd)) {
-          // When we're performing Objective-C dispatch, we don't have an
-          // allocating constructor to call. So, perform an alloc_ref_dynamic
-          // and pass that along to the initializer.
-          requiresAllocRefDynamic = true;
-          kind = SILDeclRef::Kind::Initializer;
-        } else {
-          kind = SILDeclRef::Kind::Allocator;
-        }
-      } else {
-        isDynamicallyDispatched = false;
-      }
-    }
-
-    if (!isDynamicallyDispatched)
+  bool isClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
+    if (e->getAccessSemantics() != AccessSemantics::Ordinary)
       return false;
 
-    // At this point, we know for sure that we are actually dynamically
-    // dispatched.
+    if (getMethodDispatch(afd) == MethodDispatch::Static)
+      return false;
+
+    if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
+      // Non-required initializers are statically dispatched.
+      if (!ctor->isRequired())
+        return false;
+
+      // Required constructors are statically dispatched when the 'self'
+      // value is statically derived.
+      ApplyExpr *thisCallSite = callSites.back();
+      assert(thisCallSite->getArg()->getType()->is<AnyMetatypeType>());
+      if (thisCallSite->getArg()->isStaticallyDerivedMetatype())
+        return false;
+    }
+
+    // Ok, we're dynamically dispatched.
+    return true;
+  }
+
+  void processClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
+    SILDeclRef::Kind kind;
+    bool requiresAllocRefDynamic = false;
+
+    if (isa<FuncDecl>(afd)) {
+      kind = SILDeclRef::Kind::Func;
+    } else {
+      if (requiresForeignEntryPoint(afd)) {
+        // When we're performing Objective-C dispatch, we don't have an
+        // allocating constructor to call. So, perform an alloc_ref_dynamic
+        // and pass that along to the initializer.
+        requiresAllocRefDynamic = true;
+        kind = SILDeclRef::Kind::Initializer;
+      } else {
+        kind = SILDeclRef::Kind::Allocator;
+      }
+    }
+
     ApplyExpr *thisCallSite = callSites.back();
     callSites.pop_back();
-
-    // Emit the rvalue for self, allowing for guaranteed plus zero if we
-    // have a func.
-    bool AllowPlusZero = kind && *kind == SILDeclRef::Kind::Func;
-    RValue self = SGF.emitRValue(
-        thisCallSite->getArg(),
-        AllowPlusZero ? SGFContext::AllowGuaranteedPlusZero : SGFContext());
-
-    // If we allowed for PlusZero and we *did* get the value back at +0,
-    // then we assumed that self could be passed at +0. We will check later
-    // if the actual callee passes self at +1 later when we know its actual
-    // type.
-    assumedPlusZeroSelf =
-        AllowPlusZero && self.peekIsPlusZeroRValueOrTrivial();
 
     // If we require a dynamic allocation of the object here, do so now.
     if (requiresAllocRefDynamic) {
       SILLocation loc = thisCallSite->getArg();
+      RValue selfMetatype = SGF.emitRValue(thisCallSite->getArg());
       auto selfValue =
-          allocateObjCObject(std::move(self).getAsSingleValue(SGF, loc), loc);
-      self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
-                    selfValue);
+          allocateObjCObject(std::move(selfMetatype).getAsSingleValue(SGF, loc), loc);
+      RValue self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
+                           selfValue);
+      ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
+      setSelfParam(std::move(selfArgSource), thisCallSite);
+    } else {
+      ArgumentSource selfArgSource(thisCallSite->getArg());
+      setSelfParam(std::move(selfArgSource), thisCallSite);
     }
 
-    auto constant = SILDeclRef(afd, kind.getValue())
+    auto constant = SILDeclRef(afd, kind)
                         .asForeign(requiresForeignEntryPoint(afd));
 
-    ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
     auto subs = e->getDeclRef().getSubstitutions();
-    SILLocation loc(thisCallSite->getArg());
     setCallee(Callee::forClassMethod(SGF, constant, subs, e));
-
-    setSelfParam(std::move(selfArgSource), thisCallSite);
-    return true;
   }
 
   //
   // Known callees.
   //
   void visitDeclRefExpr(DeclRefExpr *e) {
-    // If we need to perform dynamic dispatch for the given function,
-    // emit class_method to do so.
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
-      // If after processing the abstract function decl, we do not have any more
-      // work, just return.
-      if (processAbstractFunctionDecl(e, afd)) {
-        return;
-      }
-    }
+    SubstitutionList subs = e->getDeclRef().getSubstitutions();
 
     // If this is a direct reference to a vardecl, just emit its value directly.
     // Recursive references to callable declarations are allowed.
@@ -972,38 +905,45 @@ public:
       return;
     }
 
+    // Enum case constructor references are open-coded.
+    if (auto *eed = dyn_cast<EnumElementDecl>(e->getDecl())) {
+      setCallee(Callee::forEnumElement(SGF, SILDeclRef(e->getDecl()), subs, e));
+      return;
+    }
+
+    // Ok, we have a constructor or a function.
+    auto *afd = cast<AbstractFunctionDecl>(e->getDecl());
+
+    // Witness method or @objc protocol dispatch.
+    if (auto *proto = dyn_cast<ProtocolDecl>(afd->getDeclContext())) {
+      processProtocolMethod(e, afd, proto);
+      return;
+    }
+
+    // VTable class method or @objc class method dispatch.
+    if (isClassMethod(e, afd)) {
+      processClassMethod(e, afd);
+      return;
+    }
+
+    // Otherwise, we have a statically-dispatched call.
     auto constant = SILDeclRef(e->getDecl())
       .asForeign(!isConstructorWithGeneratedAllocatorThunk(e->getDecl())
                  && requiresForeignEntryPoint(e->getDecl()));
 
-    auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
+    auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(afd);
+    if (afd->getDeclContext()->isLocalContext() &&
+        !captureInfo.hasGenericParamCaptures())
+      subs = SubstitutionList();
 
-    CaptureInfo captureInfo;
-
-    // Otherwise, we have a statically-dispatched call.
-    SubstitutionList subs = e->getDeclRef().getSubstitutions();
-
-    if (afd) {
-      captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(afd);
-      if (afd->getDeclContext()->isLocalContext() &&
-          !captureInfo.hasGenericParamCaptures())
-        subs = SubstitutionList();
-    }
-
-    // Enum case constructor references are open-coded.
-    if (isa<EnumElementDecl>(e->getDecl()))
-      setCallee(Callee::forEnumElement(SGF, constant, subs, e));
-    else
-      setCallee(Callee::forDirect(SGF, constant, subs, e));
+    setCallee(Callee::forDirect(SGF, constant, subs, e));
     
     // If the decl ref requires captures, emit the capture params.
-    if (afd) {
-      if (!captureInfo.getCaptures().empty()) {
-        SmallVector<ManagedValue, 4> captures;
-        SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
-                         captures);
-        applyCallee->setCaptures(std::move(captures));
-      }
+    if (!captureInfo.getCaptures().empty()) {
+      SmallVector<ManagedValue, 4> captures;
+      SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
+                       captures);
+      applyCallee->setCaptures(std::move(captures));
     }
   }
   
@@ -1047,6 +987,7 @@ public:
     setCallee(Callee::forDirect(SGF,
                 SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer), subs, e));
   }
+
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
     visit(e->getRHS());
@@ -3772,50 +3713,6 @@ namespace {
     ArgumentSource &&forward() && {
       return std::move(ArgValue);
     }
-
-    /// Returns true if the argument of this value is a single valued RValue
-    /// that is passed either at plus zero or is trivial.
-    bool isArgPlusZeroOrTrivialRValue() {
-      if (!ArgValue.isRValue())
-        return false;
-      return ArgValue.peekRValue().peekIsPlusZeroRValueOrTrivial();
-    }
-
-    /// If callsite has an argument that is a plus zero or trivial rvalue, emit
-    /// a retain so that the argument is at PlusOne.
-    void convertToPlusOneFromPlusZero(SILGenFunction &SGF) {
-      assert(isArgPlusZeroOrTrivialRValue() && "Must have a plus zero or "
-             "trivial rvalue as an argument.");
-      SILValue ArgSILValue = ArgValue.peekRValue().peekScalarValue();
-      SILType ArgTy = ArgSILValue->getType();
-
-      // If we are trivial, there is no difference in between +1 and +0 since
-      // a trivial object is not reference counted.
-      if (ArgTy.isTrivial(SGF.SGM.M))
-        return;
-
-      // Grab the SILLocation and the new managed value.
-      SILLocation ArgLoc = ArgValue.getKnownRValueLocation();
-      ManagedValue ArgManagedValue;
-      if (ArgSILValue->getType().isAddress()) {
-        auto result = SGF.emitTemporaryAllocation(ArgLoc,
-                                                  ArgSILValue->getType());
-        SGF.B.createCopyAddr(ArgLoc, ArgSILValue, result,
-                             IsNotTake, IsInitialization);
-        ArgManagedValue = SGF.emitManagedBufferWithCleanup(result);
-      } else {
-        ArgManagedValue = SGF.emitManagedRetain(ArgLoc, ArgSILValue);
-      }
-
-      // Ok now we make our transformation. First set ArgValue to a used albeit
-      // invalid, empty ArgumentSource.
-      ArgValue = ArgumentSource();
-
-      // Reassign ArgValue.
-      RValue NewRValue = RValue(SGF, ArgLoc, ArgTy.getSwiftRValueType(),
-                                 ArgManagedValue);
-      ArgValue = ArgumentSource(ArgLoc, std::move(NewRValue));
-    }
   };
 
   /// Once the Callee and CallSites have been prepared by SILGenApply,
@@ -3838,17 +3735,14 @@ namespace {
     Callee callee;
     FormalEvaluationScope initialWritebackScope;
     unsigned expectedSiteCount;
-    bool assumedPlusZeroSelf;
 
   public:
     /// Create an emission for a call of the given callee.
     CallEmission(SILGenFunction &SGF, Callee &&callee,
-                 FormalEvaluationScope &&writebackScope,
-                 bool assumedPlusZeroSelf = false)
+                 FormalEvaluationScope &&writebackScope)
         : SGF(SGF), callee(std::move(callee)),
           initialWritebackScope(std::move(writebackScope)),
-          expectedSiteCount(callee.getParameterListCount()),
-          assumedPlusZeroSelf(assumedPlusZeroSelf) {}
+          expectedSiteCount(callee.getParameterListCount()) {}
 
     /// Add a level of function application by passing in its possibly
     /// unevaluated arguments and their formal type.
@@ -3868,19 +3762,6 @@ namespace {
     template<typename...T>
     void addCallSite(T &&...args) {
       addCallSite(CallSite{std::forward<T>(args)...});
-    }
-
-    /// If we assumed that self was being passed at +0 before we knew what the
-    /// final uncurried level of the callee was, but given the final uncurried
-    /// level of the callee, we are actually passing self at +1, add in a retain
-    /// of self.
-    void convertSelfToPlusOneFromPlusZero() {
-      // Self is always the first callsite.
-      if (!uncurriedSites[0].isArgPlusZeroOrTrivialRValue())
-        return;
-
-      // Insert an invalid ArgumentSource into uncurriedSites[0] so it is.
-      uncurriedSites[0].convertToPlusOneFromPlusZero(SGF);
     }
 
     /// Is this a fully-applied enum element constructor call?
@@ -4077,20 +3958,6 @@ CallEmission::applyNormalCall(SGFContext C) {
       SGF, calleeTypeInfo, uncurriedSites.back().Loc, uncurriedContext);
   ArgumentScope argScope(SGF, uncurriedSites.back().Loc);
 
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self
-    // to
-    // be plus zero.
-    if (!calleeTypeInfo.substFnType->hasSelfParam() ||
-        calleeTypeInfo.substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
-
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
@@ -4123,11 +3990,7 @@ CallEmission::applyNormalCall(SGFContext C) {
 CallEmission::FirstLevelApplicationResult
 CallEmission::applyEnumElementConstructor(SGFContext C) {
   FirstLevelApplicationResult firstLevelResult;
-  assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
-
-  // The uncurry level in an enum element constructor is weird, so
-  // it's quite fortunate that we can completely ignore it.
 
   // Get the callee type information.
   //
@@ -4185,20 +4048,6 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   auto origFormalType = AbstractionPattern(firstLevelResult.formalType);
   auto substFnType =
       SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
-
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self
-    // to
-    // be plus zero.
-    if (!substFnType->hasSelfParam() ||
-        substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
 
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
@@ -4273,19 +4122,6 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   auto origFormalType = AbstractionPattern(firstLevelResult.formalType);
   auto substFnType =
       SGF.getSILFunctionType(origFormalType, firstLevelResult.formalType);
-
-  // Now that we know the substFnType, check if we assumed that we were
-  // passing self at +0. If we did and self is not actually passed at +0,
-  // retain Self.
-  if (assumedPlusZeroSelf) {
-    // If the final emitted function does not have a self param or it does
-    // have a self param that is consumed, convert what we think is self to
-    // be plus zero.
-    if (!substFnType->hasSelfParam() ||
-        substFnType->getSelfParameter().isConsumed()) {
-      convertSelfToPlusOneFromPlusZero();
-    }
-  }
 
   // If we have an early emitter, just let it take over for the
   // uncurried call site.
@@ -4500,8 +4336,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
   // Build the call.
   // Pass the writeback scope on to CallEmission so it can thread scopes through
   // nested calls.
-  CallEmission emission(SGF, apply.getCallee(), std::move(writebacks),
-                        apply.assumedPlusZeroSelf);
+  CallEmission emission(SGF, apply.getCallee(), std::move(writebacks));
 
   // Apply 'self' if provided.
   if (apply.selfParam) {

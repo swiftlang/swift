@@ -271,10 +271,6 @@ public:
     return result;
   }
 
-  /// Force this source to become an r-value, then return an unmoved
-  /// handle to that r-value.
-  RValue &forceAndPeekRValue(SILGenFunction &SGF) &;
-
   /// Return an unowned handle to the r-value stored in this source. Undefined
   /// if this ArgumentSource is not an rvalue.
   RValue &peekRValue() &;

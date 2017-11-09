@@ -33,6 +33,15 @@
 using namespace swift;
 using namespace Lowering;
 
+SILValue SILGenFunction::emitClassMethodRef(SILLocation loc,
+                                            SILValue selfPtr,
+                                            SILDeclRef constant,
+                                            CanSILFunctionType constantTy) {
+  assert(!constant.isForeign);
+  return B.createClassMethod(loc, selfPtr, constant,
+                             SILType::getPrimitiveObjectType(constantTy));
+}
+
 SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
                                            CanSILFunctionType constantTy) {
   assert(constant.kind != SILDeclRef::Kind::Allocator &&
@@ -98,16 +107,11 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
     if (getMethodDispatch(func) == MethodDispatch::Class) {
       // Use the dynamic thunk if dynamic.
-      if (vd->isDynamic()) {
-        auto dynamicThunk = SGF.SGM.getDynamicThunk(next,
-                                                    constantInfo.SILFnType);
-        return SGF.B.createFunctionRef(loc, dynamicThunk);
-      }
+      if (vd->isDynamic())
+        return SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType);
 
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
-      assert(!next.isForeign);
-      return SGF.B.createClassMethod(loc, selfArg, next,
-                                     SILType::getPrimitiveObjectType(methodTy));
+      return SGF.emitClassMethodRef(loc, selfArg, next, methodTy);
     }
 
     // If the fully-uncurried reference is to a generic method, look up the

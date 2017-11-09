@@ -109,9 +109,9 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-ios-i386:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
+// CHECK-ios-i386:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-ios-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
-// CHECK-ios-i386:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-ios-i386:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-ios-i386: }
 
@@ -129,9 +129,9 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-macosx-x86_64:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
+// CHECK-macosx-x86_64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-macosx-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
-// CHECK-macosx-x86_64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-macosx-x86_64:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-macosx-x86_64: }
 

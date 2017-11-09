@@ -110,10 +110,10 @@ func test8(_ g: Gizmo) -> Gizmo {
   // CHECK-NOT:  copy_value
   // CHECK:      [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK:      [[METHOD:%.*]] = objc_method [[BORROWED_G]] : {{.*}}, #Gizmo.clone!1.foreign
+  // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK:      bb2([[RESULT:%.*]] : @owned $Gizmo):
   // CHECK-NOT:  copy_value [[RESULT]]
-  // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
   // CHECK-NEXT: destroy_value [[G]]
   // CHECK-NEXT: return [[RESULT]]
 }
@@ -126,10 +126,10 @@ func test9(_ g: Gizmo) -> Gizmo {
   // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_G]] : {{.*}}, #Gizmo.duplicate!1.foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_G]])
+  // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK: bb2([[RESULT:%.*]] : @owned $Gizmo):
   // CHECK-NOT:  copy_value [[RESULT]]
-  // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
   // CHECK-NEXT: destroy_value [[G]]
   // CHECK-NEXT: return [[RESULT]]
 }
