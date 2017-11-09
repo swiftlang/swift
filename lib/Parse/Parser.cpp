@@ -133,7 +133,7 @@ swift::Parser::BacktrackingScope::~BacktrackingScope() {
   if (Backtrack) {
     P.backtrackToPosition(PP);
     DT.abort();
-    if (HasDelayedDecl)
+    if (!HasDelayedDecl)
       P.State->takeDelayedDeclState();
   }
 }
