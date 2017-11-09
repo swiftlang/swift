@@ -39,7 +39,7 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // Use materializeForSet for inout access of properties in resilient structs
 // from a different resilience domain
 
-func inoutFunc(_ x: inout Int) {}
+public func inoutFunc(_ x: inout Int) {}
 
 // CHECK-LABEL: sil hidden @_T017struct_resilience18resilientInOutTesty0c1_A04SizeVzF : $@convention(thin) (@inout Size) -> ()
 
@@ -260,6 +260,21 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // CHECK:       function_ref @_T017struct_resilience24VersionedResilientStructVACSi1x_Si1ytcfC
 
   return VersionedResilientStruct(x: s.y, y: s.x)
+
+  // CHECK:       return
+}
+
+// CHECK-LABEL: sil [serialized] @_T017struct_resilience19inlineableInoutTestyAA6MySizeVzF : $@convention(thin) (@inout MySize) -> ()
+@_inlineable public func inlineableInoutTest(_ s: inout MySize) {
+  // Inlineable functions can be inlined in other resiliene domains.
+  //
+  // Make sure we use materializeForSet for an inout access of a resilient struct
+  // property inside an inlinable function.
+
+  // CHECK:       function_ref @_T017struct_resilience6MySizeV1wSivm
+  inoutFunc(&s.w)
+
+  // CHECK:       return
 }
 
 // Initializers for resilient structs
