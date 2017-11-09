@@ -867,8 +867,8 @@ open class JSONDecoder {
         }
 
         let decoder = _JSONDecoder(referencing: topLevel, options: self.options)
-        guard let value = try decoder.unbox(topLevel, as: T.self) else {
-            throw DecodingError.valueNotFound(T.self, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
+        guard let value = try decoder.unbox(topLevel, as: type) else {
+            throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
         }
 
         return value
@@ -1236,7 +1236,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
         self.decoder.codingPath.append(key)
         defer { self.decoder.codingPath.removeLast() }
 
-        guard let value = try self.decoder.unbox(entry, as: T.self) else {
+        guard let value = try self.decoder.unbox(entry, as: type) else {
             throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: self.decoder.codingPath, debugDescription: "Expected \(type) value but found null instead."))
         }
 
@@ -1575,7 +1575,7 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         self.decoder.codingPath.append(_JSONKey(index: self.currentIndex))
         defer { self.decoder.codingPath.removeLast() }
 
-        guard let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: T.self) else {
+        guard let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: type) else {
             throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: self.decoder.codingPath + [_JSONKey(index: self.currentIndex)], debugDescription: "Expected \(type) but found null instead."))
         }
 
@@ -1734,8 +1734,8 @@ extension _JSONDecoder : SingleValueDecodingContainer {
     }
 
     public func decode<T : Decodable>(_ type: T.Type) throws -> T {
-        try expectNonNull(T.self)
-        return try self.unbox(self.storage.topContainer, as: T.self)!
+        try expectNonNull(type)
+        return try self.unbox(self.storage.topContainer, as: type)!
     }
 }
 
@@ -2094,13 +2094,13 @@ extension _JSONDecoder {
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
         let decoded: T
-        if T.self == Date.self || T.self == NSDate.self {
+        if type == Date.self || type == NSDate.self {
             guard let date = try self.unbox(value, as: Date.self) else { return nil }
             decoded = date as! T
-        } else if T.self == Data.self || T.self == NSData.self {
+        } else if type == Data.self || type == NSData.self {
             guard let data = try self.unbox(value, as: Data.self) else { return nil }
             decoded = data as! T
-        } else if T.self == URL.self || T.self == NSURL.self {
+        } else if type == URL.self || type == NSURL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
                 return nil
             }
@@ -2111,12 +2111,12 @@ extension _JSONDecoder {
             }
 
             decoded = (url as! T)
-        } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
+        } else if type == Decimal.self || type == NSDecimalNumber.self {
             guard let decimal = try self.unbox(value, as: Decimal.self) else { return nil }
             decoded = decimal as! T
         } else {
             self.storage.push(container: value)
-            decoded = try T(from: self)
+            decoded = try type.init(from: self)
             self.storage.popContainer()
         }
 

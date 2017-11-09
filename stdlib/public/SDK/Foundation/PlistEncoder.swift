@@ -612,7 +612,7 @@ open class PropertyListDecoder {
     /// - throws: An error if any value throws an error during decoding.
     open func decode<T : Decodable>(_ type: T.Type, from data: Data) throws -> T {
         var format: PropertyListSerialization.PropertyListFormat = .binary
-        return try decode(T.self, from: data, format: &format)
+        return try decode(type, from: data, format: &format)
     }
 
     /// Decodes a top-level value of the given type from the given property list representation.
@@ -631,7 +631,7 @@ open class PropertyListDecoder {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given data was not a valid property list.", underlyingError: error))
         }
 
-        return try decode(T.self, fromTopLevel: topLevel)
+        return try decode(type, fromTopLevel: topLevel)
     }
 
     /// Decodes a top-level value of the given type from the given property list container (top-level array or dictionary).
@@ -643,8 +643,8 @@ open class PropertyListDecoder {
     /// - throws: An error if any value throws an error during decoding.
     internal func decode<T : Decodable>(_ type: T.Type, fromTopLevel container: Any) throws -> T {
         let decoder = _PlistDecoder(referencing: container, options: self.options)
-        guard let value = try decoder.unbox(container, as: T.self) else {
-            throw DecodingError.valueNotFound(T.self, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
+        guard let value = try decoder.unbox(container, as: type) else {
+            throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: [], debugDescription: "The given data did not contain a top-level value."))
         }
 
         return value
@@ -1015,7 +1015,7 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
         self.decoder.codingPath.append(key)
         defer { self.decoder.codingPath.removeLast() }
 
-        guard let value = try self.decoder.unbox(entry, as: T.self) else {
+        guard let value = try self.decoder.unbox(entry, as: type) else {
             throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: self.decoder.codingPath, debugDescription: "Expected \(type) value but found null instead."))
         }
 
@@ -1354,7 +1354,7 @@ fileprivate struct _PlistUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         self.decoder.codingPath.append(_PlistKey(index: self.currentIndex))
         defer { self.decoder.codingPath.removeLast() }
 
-        guard let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: T.self) else {
+        guard let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: type) else {
             throw DecodingError.valueNotFound(type, DecodingError.Context(codingPath: self.decoder.codingPath + [_PlistKey(index: self.currentIndex)], debugDescription: "Expected \(type) but found null instead."))
         }
 
@@ -1516,8 +1516,8 @@ extension _PlistDecoder : SingleValueDecodingContainer {
     }
 
     public func decode<T : Decodable>(_ type: T.Type) throws -> T {
-        try expectNonNull(T.self)
-        return try self.unbox(self.storage.topContainer, as: T.self)!
+        try expectNonNull(type)
+        return try self.unbox(self.storage.topContainer, as: type)!
     }
 }
 
@@ -1756,15 +1756,15 @@ extension _PlistDecoder {
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
         let decoded: T
-        if T.self == Date.self || T.self == NSDate.self {
+        if type == Date.self || type == NSDate.self {
             guard let date = try self.unbox(value, as: Date.self) else { return nil }
             decoded = date as! T
-        } else if T.self == Data.self || T.self == NSData.self {
+        } else if type == Data.self || type == NSData.self {
             guard let data = try self.unbox(value, as: Data.self) else { return nil }
             decoded = data as! T
         } else {
             self.storage.push(container: value)
-            decoded = try T(from: self)
+            decoded = try type.init(from: self)
             self.storage.popContainer()
         }
 
