@@ -200,9 +200,25 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   assert(!selfTy.getClassOrBoundGenericClass()
          && "can't emit a class ctor here");
 
+  // Decide if we need to do extra work to warn on unsafe behavior in pre-Swift-5
+  // modes.
+  MarkUninitializedInst::Kind MUIKind;
+  if (isDelegating) {
+    MUIKind = MarkUninitializedInst::DelegatingSelf;
+  } else if (getASTContext().isSwiftVersionAtLeast(5)) {
+    MUIKind = MarkUninitializedInst::RootSelf;
+  } else {
+    auto *dc = ctor->getParent();
+    if (isa<ExtensionDecl>(dc) &&
+        dc->getAsStructOrStructExtensionContext()->getParentModule() !=
+          dc->getParentModule()) {
+      MUIKind = MarkUninitializedInst::CrossModuleRootSelf;
+    } else {
+      MUIKind = MarkUninitializedInst::RootSelf;
+    }
+  }
+
   // Allocate the local variable for 'self'.
-  auto MUIKind = isDelegating ? MarkUninitializedInst::DelegatingSelf
-                              : MarkUninitializedInst::RootSelf;
   emitLocalVariableWithCleanup(selfDecl, MUIKind)->finishInitialization(*this);
   SILValue selfLV = VarLocs[selfDecl].value;
 

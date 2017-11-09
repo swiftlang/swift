@@ -506,6 +506,12 @@ namespace {
     /// This is true when there is a destroy on a path where the self value may
     /// have been consumed, in which case there is nothing to do.
     bool HasConditionalSelfInitialized = false;
+    
+    /// This is true when the object being checked is a 'self' parameter for a
+    /// struct in a non-delegating cross-module initializer. In this case, the
+    /// initializer is not allowed to be fieldwise in Swift 5, so we produce a
+    /// warning in Swift 4 and earlier.
+    bool WantsCrossModuleStructInitializerDiagnostic = false;
 
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
@@ -631,6 +637,11 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   // locally inferred by the loop above.  Mark any unset elements as not
   // available.
   MemBBInfo.setUnknownToNotAvailable();
+
+  // Finally, check if we need to emit compatibility diagnostics for cross-module
+  // non-delegating struct initializers.
+  if (TheMemory.isCrossModuleStructInitSelf())
+    WantsCrossModuleStructInitializerDiagnostic = true;
 }
 
 /// Determine whether the specified block is reachable from the entry of the
@@ -993,6 +1004,50 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       }
       return;
     }
+  }
+
+  // Check if we're in a struct initializer that uses CrossModuleRootSelf rather
+  // than DelegatingSelf for Swift 4 compatibility. We look for a problem case by
+  // seeing if there are any assignments to individual fields that might be
+  // initializations; that is, that they're not dominated by `self = other`.
+
+  auto isFullValueAssignment = [this](const SILInstruction *inst) -> bool {
+    SILValue addr;
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
+      addr = copyAddr->getDest();
+    else if (auto *assign = dyn_cast<AssignInst>(inst))
+      addr = assign->getDest();
+    else
+      return false;
+
+    if (auto *access = dyn_cast<BeginAccessInst>(addr))
+      addr = access->getSource();
+    if (auto *projection = dyn_cast<ProjectBoxInst>(addr))
+      addr = projection->getOperand();
+
+    return addr == TheMemory.getAddress();
+  };
+
+  if (!isFullyInitialized && WantsCrossModuleStructInitializerDiagnostic &&
+      !isFullValueAssignment(Use.Inst)) {
+    // Deliberately don't check shouldEmitError here; we're using DI to approximate
+    // whether this would be a valid delegating initializer, but the error when it
+    // /is/ a delegating initializer won't be path-sensitive.
+
+    Type selfTy;
+    SILLocation fnLoc = TheMemory.getFunction().getLocation();
+    if (auto *ctor = fnLoc.getAsASTNode<ConstructorDecl>())
+      selfTy = ctor->getImplicitSelfDecl()->getType()->getInOutObjectType();
+    else
+      selfTy = TheMemory.getType();
+
+    diagnose(Module, Use.Inst->getLoc(),
+             diag::designated_init_in_cross_module_extension,
+             selfTy, !isFullyUninitialized,
+             selfTy->getAnyNominal()->getParentModule()->getName());
+
+    // Don't emit more than one of these diagnostics per initializer.
+    WantsCrossModuleStructInitializerDiagnostic = false;
   }
 
   // If this is an initialization or a normal assignment, upgrade the store to

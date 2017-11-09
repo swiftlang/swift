@@ -215,6 +215,11 @@ ERROR(mutating_protocol_witness_method_on_let_constant,none,
       "cannot perform mutating operation: '%0' is a 'let' constant",
       (StringRef))
 
+WARNING(designated_init_in_cross_module_extension,none,
+        "initializer for struct %0 must use \"self.init(...)\" or \"self = ...\""
+        "%select{| on all paths}1 because it is not in module %2",
+        (Type, bool, Identifier))
+
 
 // Control flow diagnostics.
 ERROR(missing_return,none,

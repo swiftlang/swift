@@ -32,14 +32,10 @@ public typealias SCNFloat = Float
 
 extension SCNVector3 {
   public init(_ x: Float, _ y: Float, _ z: Float) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z))
   }
   public init(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z))
   }
   public init(_ x: Double, _ y: Double, _ z: Double) {
     self.init(SCNFloat(x), SCNFloat(y), SCNFloat(z))
@@ -71,16 +67,10 @@ extension double3 {
 
 extension SCNVector4 {
   public init(_ x: Float, _ y: Float, _ z: Float, _ w: Float) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
-    self.w = SCNFloat(w)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z), w: SCNFloat(w))
   }
   public init(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat, _ w: CGFloat) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
-    self.w = SCNFloat(w)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z), w: SCNFloat(w))
   }
   public init(_ x: Double, _ y: Double, _ z: Double, _ w: Double) {
     self.init(SCNFloat(x), SCNFloat(y), SCNFloat(z), SCNFloat(w))
