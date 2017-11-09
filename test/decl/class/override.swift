@@ -221,10 +221,9 @@ class IUOTestSubclass2 : IUOTestBaseClass {
   // expected-note@-1 {{remove '!' to make the parameter required}} {{36-37=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{27-27=(}} {{37-37=)}}
 
-  override func oneB(x: ImplicitlyUnwrappedOptional<AnyObject>) {}
-  // expected-warning@-1 {{the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name}}{{25-53=}}{{62-62=!}}{{62-63=}}
-  // expected-warning@-2 {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'ImplicitlyUnwrappedOptional<AnyObject>'}}
-  // expected-note@-3 {{add parentheses to silence this warning}} {{25-25=(}} {{63-63=)}}
+  override func oneB(x: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
+  // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
+  // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
 
   override func oneC(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject!'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
@@ -234,10 +233,7 @@ class IUOTestSubclass2 : IUOTestBaseClass {
 
 class IUOTestSubclassOkay : IUOTestBaseClass {
   override func oneA(_: AnyObject?) {}
-  override func oneB(x: (AnyObject!)) {}
   override func oneC(_ x: AnyObject) {}
-
-  override func result() -> (AnyObject!) { return nil }
 }
 
 class GenericBase<T> {}
