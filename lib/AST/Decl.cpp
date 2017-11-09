@@ -2715,6 +2715,10 @@ void ClassDecl::addImplicitDestructor() {
   // Wire up generic environment of DD.
   DD->setGenericEnvironment(getGenericEnvironmentOfContext());
 
+  // Mark DD as ObjC, as all dtors are.
+  DD->setIsObjC(true);
+  recordObjCMethod(DD);
+
   // Assign DD the interface type (Self) -> () -> ()
   ArrayRef<AnyFunctionType::Param> noParams;
   AnyFunctionType::ExtInfo info;
