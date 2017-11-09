@@ -21,25 +21,6 @@
 using namespace swift;
 using namespace Lowering;
 
-RValue &ArgumentSource::forceAndPeekRValue(SILGenFunction &SGF) & {
-  if (isRValue()) {
-    return peekRValue();
-  }
-
-  // Extract an r-value.
-  SILLocation loc = getLocation();
-  RValue value = std::move(*this).getAsRValue(SGF);
-
-  // Destroy the current state.
-  Storage.destruct(StoredKind);
-
-  // Emplace the r-value back into the source.
-  StoredKind = Kind::RValue;
-  Storage.emplaceAggregate<RValueStorage>(StoredKind, std::move(value), loc);
-
-  return peekRValue();
-}
-
 RValue &ArgumentSource::peekRValue() & {
   assert(isRValue() && "Undefined behavior to call this method without the "
          "ArgumentSource actually being an RValue");

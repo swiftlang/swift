@@ -1044,6 +1044,11 @@ public:
   SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
                                 CanSILFunctionType constantTy);
 
+  /// Returns a reference to a vtable-dispatched method.
+  SILValue emitClassMethodRef(SILLocation loc, SILValue selfPtr,
+                              SILDeclRef constant,
+                              CanSILFunctionType constantTy);
+
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,

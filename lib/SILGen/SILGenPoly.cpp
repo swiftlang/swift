@@ -3284,9 +3284,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy);
   case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
-    assert(!witness.isForeign);
-    return SGF.B.createClassMethod(loc, selfPtr, witness,
-                                   SILType::getPrimitiveObjectType(witnessFTy));
+    return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
   }
   }
 

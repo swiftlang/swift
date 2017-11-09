@@ -262,7 +262,9 @@ public:
     (void) result;
   }
 
-  void addPlaceholder(MissingMemberDecl *) {}
+  void addPlaceholder(MissingMemberDecl *) {
+    llvm_unreachable("Should not be emitting class with missing members");
+  }
 };
 
 } // end anonymous namespace

@@ -281,9 +281,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
 
+  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
-  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.method!1
@@ -292,9 +292,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: destroy_value [[G]]
   g.method(i)
 
+  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[READG:%.*]] = begin_access [read] [unknown] [[GADDR]]
   // CHECK: [[G:%[0-9]+]] = load [copy] [[READG]]
-  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_G]] : {{.*}}, #SomeGeneric.generic!1
@@ -303,9 +303,9 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: destroy_value [[G]]
   g.generic(j)
 
+  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
-  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[BORROWED_C]] : {{.*}}, #SomeClass.generic!1
