@@ -2147,6 +2147,8 @@ Expr *Parser::parseExprIdentifier() {
 
 Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
                                          Identifier PlaceholderId) {
+  SyntaxParsingContextChild DisableContext(SyntaxContext);
+  DisableContext.disable();
   assert(PlaceholderTok.is(tok::identifier));
   assert(PlaceholderId.isEditorPlaceholder());
 
