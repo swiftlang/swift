@@ -84,22 +84,18 @@ func a1(s: AddrOnly?) -> AddrOnly {
 
 FunctionConversionTestSuite.test("Optional") {
   let g11: (Trivial) -> Trivial? = t1
-  let g12: (Trivial!) -> Trivial? = t1
+  let g12: (Trivial?) -> Trivial? = t1
 
   expectEqual(22, g11(Trivial(n: 11))?.n)
   expectEqual(24, g12(Trivial(n: 12))?.n)
 
   let g21: (Loadable?) -> Loadable? = l1
-  let g22: (Loadable!) -> Loadable? = l1
 
   expectEqual(42, g21(Loadable(n: 21))?.n)
-  expectEqual(44, g22(Loadable(n: 22))?.n)
 
   let g31: (AddrOnly?) -> AddrOnly? = a1
-  let g32: (AddrOnly!) -> AddrOnly? = a1
 
   expectEqual(62, g31(AddrOnly(n: 31))?.n)
-  expectEqual(64, g32(AddrOnly(n: 32))?.n)
 }
 
 func t2(s: Quilt) -> Trivial {

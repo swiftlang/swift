@@ -325,7 +325,7 @@ trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' 
 
 trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}} {{24-24=f: }}
 
-func trailingclosure2(x: Int, f: (() -> Int)!...) {}
+func trailingclosure2(x: Int, f: (() -> Int)?...) {}
 trailingclosure2(x: 5) { return 5 }
 
 func trailingclosure3(x: Int, f: (() -> Int)!) {
