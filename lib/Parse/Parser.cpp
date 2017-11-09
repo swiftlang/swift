@@ -855,12 +855,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   }
 
   ParserStatus Status;
-  SourceLoc LastLoc;
   while (true) {
-    if (LastLoc.isInvalid())
-      LastLoc = Tok.getLoc();
-    else
-      assert(LastLoc != Tok.getLoc());
     while (Tok.is(tok::comma)) {
       diagnose(Tok, diag::unexpected_separator, ",")
         .fixItRemove(SourceRange(Tok.getLoc()));
