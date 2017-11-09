@@ -672,6 +672,8 @@ extension String {
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @_fixed_layout
 public struct String {
+  public var _guts: _StringGuts
+
   /// Creates an empty string.
   ///
   /// Using this initializer is equivalent to initializing a string with an
@@ -695,8 +697,6 @@ public struct String {
   init(_ _core: _LegacyStringCore) {
     self.init(_StringGuts(_core))
   }
-
-  public var _guts: _StringGuts
 
   public // @testable
   var _core: _LegacyStringCore {
