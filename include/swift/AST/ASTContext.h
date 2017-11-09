@@ -884,15 +884,6 @@ public:
                                        GenericSignatureBuilder *builder,
                                        GenericSignature *sig);
 
-  /// Retrieve the inherited name set for the given class.
-  const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
-                                              bool forInstance);
-
-  /// Retrieve the inherited name set for the given Objective-C class.
-  const InheritedNameSet *getAllPropertyNames(
-                            clang::ObjCInterfaceDecl *classDecl,
-                            bool forInstance);
-
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
