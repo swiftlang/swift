@@ -1807,10 +1807,9 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // Create a syntax node for string literal.
   SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr, Tok.getLoc());
-  SyntaxParsingContextChild LocalContext(SyntaxContext);
 
   // FIXME: Avoid creating syntax nodes for string interpolation.
-  LocalContext.disable();
+  SyntaxParsingContextChild LocalContext(SyntaxContext, /*disabled*/true);
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
@@ -1995,10 +1994,10 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   SourceLoc lparenLoc = consumeToken(tok::l_paren);
   SourceLoc rparenLoc;
   while (true) {
-    SyntaxParsingContextChild DisabledContext(SyntaxContext);
     // The following code may backtrack; so we disable the syntax tree creation
     // in this scope.
-    DisabledContext.disable();
+    SyntaxParsingContextChild DisabledContext(SyntaxContext, /*disabled*/true);
+
     // Terminate at ')'.
     if (Tok.is(tok::r_paren)) {
       rparenLoc = consumeToken(tok::r_paren);
@@ -2147,8 +2146,7 @@ Expr *Parser::parseExprIdentifier() {
 
 Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
                                          Identifier PlaceholderId) {
-  SyntaxParsingContextChild DisableContext(SyntaxContext);
-  DisableContext.disable();
+  SyntaxParsingContextChild DisableContext(SyntaxContext, /*disabled*/true);
   assert(PlaceholderTok.is(tok::identifier));
   assert(PlaceholderId.isEditorPlaceholder());
 
@@ -3128,8 +3126,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
   {
     BacktrackingScope Scope(*this);
     // Disable the syntax tree creation in the context.
-    SyntaxParsingContextChild DisabledContext(SyntaxContext);
-    DisabledContext.disable();
+    SyntaxParsingContextChild DisabledContext(SyntaxContext, /*disabled*/true);
     auto HasDelayedDecl = State->hasDelayedDecl();
     // Parse the first expression.
     ParserResult<Expr> FirstExpr

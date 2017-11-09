@@ -293,6 +293,13 @@ void SyntaxParsingContextChild::setContextKind(SyntaxContextKind CKind) {
   ContextKind = CKind;
 }
 
+SyntaxParsingContextChild::
+SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder, bool Disable):
+    SyntaxParsingContextChild(ContextHolder, None, None) {
+  if (Disable)
+    disable();
+}
+
 void SyntaxParsingContextChild::makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) {
   assert(isTopOfContextStack());
   if (!ContextData.Enabled)

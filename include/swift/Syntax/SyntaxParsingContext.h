@@ -140,8 +140,8 @@ public:
     SyntaxKind KnownSyntax): SyntaxParsingContextChild(ContextHolder,
                              None, KnownSyntax) {};
 
-  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder):
-    SyntaxParsingContextChild(ContextHolder, None, None) {}
+  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
+                            bool Disable = false);
 
   ~SyntaxParsingContextChild();
   void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override;
