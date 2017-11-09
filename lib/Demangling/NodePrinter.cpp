@@ -294,6 +294,7 @@ private:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
     case Node::Kind::CurryThunk:
+    case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
@@ -796,6 +797,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::CurryThunk:
     Printer << "curry thunk of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::DispatchThunk:
+    Printer << "dispatch thunk of ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
