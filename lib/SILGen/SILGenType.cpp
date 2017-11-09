@@ -163,6 +163,24 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
   return constructor->isObjC();
 }
 
+static bool requiresMethodDispatchThunk(ClassDecl *classDecl,
+                                        AbstractFunctionDecl *func,
+                                        SILModule &M) {
+  auto access = func->getEffectiveAccess();
+
+  if (!classDecl->hasFixedLayout()) {
+    if (access >= AccessLevel::Public)
+      return true;
+  }
+
+  if (!M.isWholeModule()) {
+    if (access >= AccessLevel::Internal)
+      return true;
+  }
+
+  return false;
+}
+
 namespace {
 
 /// An ASTVisitor for populating SILVTable entries from ClassDecl members.
@@ -260,6 +278,14 @@ public:
     auto result = baseToIndexMap.insert(std::make_pair(member, index));
     assert(result.second);
     (void) result;
+
+    // Possibly emit a method dispatch thunk.
+    auto *func = cast<AbstractFunctionDecl>(member.getDecl());
+    if (func->getDeclContext() == theClass) {
+      if (requiresMethodDispatchThunk(theClass, func, SGM.M)) {
+        SGM.emitDispatchThunk(member);
+      }
+    }
   }
 
   void addPlaceholder(MissingMemberDecl *) {
