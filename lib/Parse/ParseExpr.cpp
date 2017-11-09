@@ -3095,6 +3095,9 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
 ///     expr-dictionary
 //      lsquare-starting ']'
 ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
+  SyntaxParsingContextChild ArrayOrDictContext(SyntaxContext,
+                                              SyntaxContextKind::Expr);
+
   // If the caller didn't already consume the '[', do so now.
   if (LSquareLoc.isInvalid())
     LSquareLoc = consumeToken(tok::l_square);
@@ -3118,23 +3121,36 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
                   DictionaryExpr::create(Context, LSquareLoc, {}, RSquareLoc));
   }
 
-  // Parse the first expression.
-  ParserResult<Expr> FirstExpr
-    = parseExpr(diag::expected_expr_in_collection_literal);
-  if (FirstExpr.isNull()) {
-    skipUntil(tok::r_square);
-    if (Tok.is(tok::r_square))
-      consumeToken();
-    return FirstExpr;
+  bool ParseDict;
+  {
+    BacktrackingScope Scope(*this);
+    // Disable the syntax tree creation in the context.
+    SyntaxParsingContextChild DisabledContext(SyntaxContext,
+                                              SyntaxContextKind::Expr);
+    DisabledContext.disable();
+    auto HasDelayedDecl = State->hasDelayedDecl();
+    // Parse the first expression.
+    ParserResult<Expr> FirstExpr
+      = parseExpr(diag::expected_expr_in_collection_literal);
+    if (FirstExpr.isNull() || Tok.is(tok::eof)) {
+      skipUntil(tok::r_square);
+      if (Tok.is(tok::r_square))
+        consumeToken();
+      Scope.cancelBacktrack();
+      return FirstExpr;
+    }
+    if (!HasDelayedDecl)
+      State->takeDelayedDeclState();
+    // If we have a ':', this is a dictionary literal.
+    ParseDict = Tok.is(tok::colon);
   }
-
-  // If we have a ':', this is a dictionary literal.
-  if (Tok.is(tok::colon)) {
-    return parseExprDictionary(LSquareLoc, FirstExpr);
+  if (ParseDict) {
+    ArrayOrDictContext.setSyntaxKind(SyntaxKind::DictionaryExpr);
+    return parseExprDictionary(LSquareLoc);
+  } else {
+    ArrayOrDictContext.setSyntaxKind(SyntaxKind::ArrayExpr);
+    return parseExprArray(LSquareLoc);
   }
-
-  // Otherwise, we have an array literal.
-  return parseExprArray(LSquareLoc, FirstExpr);
 }
 
 /// parseExprArray - Parse an array literal expression.
@@ -3145,27 +3161,18 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 ///   expr-array:
 ///     '[' expr (',' expr)* ','? ']'
 ///     '[' ']'
-ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
-                                          ParserResult<Expr> FirstExpr) {
+ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc) {
   SmallVector<Expr *, 8> SubExprs;
   SmallVector<SourceLoc, 8> CommaLocs;
-  SubExprs.push_back(FirstExpr.get());
 
-  SourceLoc CommaLoc, RSquareLoc;
-  ParserStatus Status(FirstExpr);
-
-  if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma, CommaLoc)) {
-    diagnose(Tok, diag::expected_separator, ",")
-        .fixItInsertAfter(PreviousLoc, ",");
-    Status.setIsParseError();
-  }
-
-  CommaLocs.push_back(CommaLoc);
-
+  SourceLoc RSquareLoc;
+  ParserStatus Status;
+  bool First = true;
+  bool HasError = false;
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
-                      SyntaxKind::Unknown,
+                      SyntaxKind::ArrayElementList,
                       [&] () -> ParserStatus
   {
     ParserResult<Expr> Element
@@ -3173,11 +3180,21 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
     if (Element.isNonNull())
       SubExprs.push_back(Element.get());
 
+    if (First) {
+      if (Tok.isNot(tok::r_square) && Tok.isNot(tok::comma)) {
+        diagnose(Tok, diag::expected_separator, ",").
+          fixItInsertAfter(PreviousLoc, ",");
+        HasError = true;
+      }
+      First = false;
+    }
+
     if (Tok.is(tok::comma))
       CommaLocs.push_back(Tok.getLoc());
-
     return Element;
   });
+  if (HasError)
+    Status.setIsParseError();
 
   assert(SubExprs.size() >= 1);
   return makeParserResult(Status,
@@ -3193,10 +3210,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 ///   expr-dictionary:
 ///     '[' expr ':' expr (',' expr ':' expr)* ','? ']'
 ///     '[' ':' ']'
-ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
-                                               ParserResult<Expr> FirstKey) {
-  assert(Tok.is(tok::colon));
-
+ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
   // Each subexpression is a (key, value) tuple.
   // FIXME: We're not tracking the colon locations in the AST.
   SmallVector<Expr *, 8> SubExprs;
@@ -3208,25 +3222,19 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     SubExprs.push_back(TupleExpr::createImplicit(Context, Exprs, { }));
   };
 
-  bool FirstPair = true;
-
-  ParserStatus Status(FirstKey);
+  ParserStatus Status;
   Status |=
       parseList(tok::r_square, LSquareLoc, RSquareLoc,
                 /*AllowSepAfterLast=*/true,
                 diag::expected_rsquare_array_expr,
-                SyntaxKind::Unknown,
+                SyntaxKind::DictionaryElementList,
                 [&]() -> ParserStatus {
     // Parse the next key.
     ParserResult<Expr> Key;
-    if (FirstPair) {
-      Key = makeParserResult(FirstKey.get());
-      FirstPair = false;
-    } else {
-      Key = parseExpr(diag::expected_key_in_dictionary_literal);
-      if (Key.isNull())
-        return Key;
-    }
+
+    Key = parseExpr(diag::expected_key_in_dictionary_literal);
+    if (Key.isNull())
+      return Key;
 
     // Parse the ':'.
     if (Tok.isNot(tok::colon)) {

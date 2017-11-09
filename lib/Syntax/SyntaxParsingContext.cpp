@@ -312,11 +312,17 @@ void SyntaxParsingContextChild::makeNodeWhole(SyntaxKind Kind) {
   auto EndLoc = Tok.getLoc();
   auto AllNodes = ContextData.collectAllSyntax(EndLoc);
   switch (Kind) {
+  case SyntaxKind::DictionaryExpr:
+  case SyntaxKind::ArrayExpr:
+  case SyntaxKind::DictionaryElement:
+  case SyntaxKind::ArrayElement:
   case SyntaxKind::FunctionCallArgument:
   case SyntaxKind::CodeBlock: {
     ContextData.createWhole(Kind, AllNodes);
     break;
   }
+  case SyntaxKind::DictionaryElementList:
+  case SyntaxKind::ArrayElementList:
   case SyntaxKind::StmtList:
   case SyntaxKind::FunctionCallArgumentList: {
     if (AllNodes.empty()) {
@@ -369,6 +375,7 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   if (!ContextData.Enabled)
     return;
 
+  assert(Kind.hasValue() != KnownSyntax.hasValue());
   SourceLoc EndLoc = Tok.getLoc();
   if (KnownSyntax) {
     // If the entire context should be created to a known syntax kind, create

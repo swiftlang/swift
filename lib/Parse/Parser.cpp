@@ -826,14 +826,27 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
+static Optional<SyntaxKind> getListElementKind(SyntaxKind ListKind) {
+  switch (ListKind) {
+  case SyntaxKind::FunctionCallArgumentList:
+    return SyntaxKind::FunctionCallArgument;
+  case SyntaxKind::ArrayElementList:
+    return SyntaxKind::ArrayElement;
+  case SyntaxKind::DictionaryElementList:
+    return SyntaxKind::DictionaryElement;
+  default:
+    return None;
+  }
+}
+
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
                   std::function<ParserStatus()> callback) {
   std::unique_ptr<SyntaxParsingContext> pListContext;
-  if (Kind == SyntaxKind::FunctionCallArgumentList) {
+  Optional<SyntaxKind> ElementKind = getListElementKind(Kind);
+  if (ElementKind)
     pListContext.reset(new SyntaxParsingContextChild(SyntaxContext, Kind));
-  }
 
   if (Tok.is(RightK)) {
     pListContext.reset();
@@ -850,9 +863,9 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     }
     SourceLoc StartLoc = Tok.getLoc();
     std::unique_ptr<SyntaxParsingContext> pElementContext;
-    if (Kind == SyntaxKind::FunctionCallArgumentList) {
+    if (ElementKind) {
       pElementContext.reset(new SyntaxParsingContextChild(SyntaxContext,
-                                            SyntaxKind::FunctionCallArgument));
+                                                          *ElementKind));
     }
     Status |= callback();
     if (Tok.is(RightK))

@@ -72,10 +72,10 @@ func testDefaultExistentials() {
   // expected-error@-1{{heterogeneous collection literal could only be inferred to 'Dictionary<String, Any>'; add explicit type annotation if this is intentional}}{{46-46= as Dictionary<String, Any>}}
 
   let _: [String : Any] = ["a" : 1, "b" : 2.5, "c" : "hello"]
-  
+
   let _ = ["a" : 1, "b" : nil, "c" : "hello"]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to 'Dictionary<String, Any?>'; add explicit type annotation if this is intentional}}{{46-46= as Dictionary<String, Any?>}}
-  
+
   let _: [String : Any?] = ["a" : 1, "b" : nil, "c" : "hello"]
 
   let d2 = [:]
@@ -102,8 +102,7 @@ func testDefaultExistentials() {
 func rdar32330004_1() -> [String: Any] {
   return ["a""one": 1, "two": 2, "three": 3] // expected-note {{did you mean to use a dictionary literal instead?}}
   // expected-error@-1 2 {{expected ',' separator}}
-  // expected-error@-2 {{expected expression in container literal}}
-  // expected-error@-3 {{contextual type '[String : Any]' cannot be used with array literal}}
+  // expected-error@-2 {{contextual type '[String : Any]' cannot be used with array literal}}
 }
 
 func rdar32330004_2() -> [String: Any] {
