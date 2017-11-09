@@ -3128,6 +3128,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
     SyntaxParsingContextChild DisabledContext(SyntaxContext,
                                               SyntaxContextKind::Expr);
     DisabledContext.disable();
+    auto HasDelayedDecl = State->hasDelayedDecl();
     // Parse the first expression.
     ParserResult<Expr> FirstExpr
       = parseExpr(diag::expected_expr_in_collection_literal);
@@ -3138,7 +3139,8 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
       Scope.cancelBacktrack();
       return FirstExpr;
     }
-    State->takeDelayedDeclState();
+    if (!HasDelayedDecl)
+      State->takeDelayedDeclState();
     // If we have a ':', this is a dictionary literal.
     ParseDict = Tok.is(tok::colon);
   }
@@ -3166,6 +3168,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc) {
   SourceLoc RSquareLoc;
   ParserStatus Status;
   bool First = true;
+  bool HasError = false;
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
@@ -3177,15 +3180,21 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc) {
     if (Element.isNonNull())
       SubExprs.push_back(Element.get());
 
+    if (First) {
+      if (Tok.isNot(tok::r_square) && Tok.isNot(tok::comma)) {
+        diagnose(Tok, diag::expected_separator, ",").
+          fixItInsertAfter(PreviousLoc, ",");
+        HasError = true;
+      }
+      First = false;
+    }
+
     if (Tok.is(tok::comma))
       CommaLocs.push_back(Tok.getLoc());
-    else if (Tok.isNot(tok::r_square) && First) {
-      diagnose(Tok, diag::expected_separator, ",")
-        .fixItInsertAfter(PreviousLoc, ",");
-    }
-    First = false;
     return Element;
   });
+  if (HasError)
+    Status.setIsParseError();
 
   assert(SubExprs.size() >= 1);
   return makeParserResult(Status,
