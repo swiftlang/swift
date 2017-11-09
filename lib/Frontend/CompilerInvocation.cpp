@@ -632,11 +632,12 @@ StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() const {
     return StringRef();
   }
   std::vector<std::string> outputFilenames = getUnprocessedOutputFilenames();
-  std::string nameToStem =
+  bool isOutputAUniqueOrdinaryFile =
       outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
-              !llvm::sys::fs::is_directory(outputFilenames[0])
-          ? outputFilenames[0]
-          : Opts.Inputs.getFilenameOfFirstInput();
+      !llvm::sys::fs::is_directory(outputFilenames[0]);
+  std::string nameToStem = isOutputAUniqueOrdinaryFile
+                               ? outputFilenames[0]
+                               : Opts.Inputs.getFilenameOfFirstInput();
   return llvm::sys::path::stem(nameToStem);
 }
 
