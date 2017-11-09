@@ -151,6 +151,11 @@ classifyDynamicCastToProtocol(CanType source,
     return DynamicCastFeasibility::WillFail;
   }
 
+  // AnyHashable is a special case: although it's a struct, there maybe another
+  // type conforming to it and to the TargetProtocol at the same time.
+  if (SourceNominalTy == SourceNominalTy->getASTContext().getAnyHashableDecl())
+    return DynamicCastFeasibility::MaySucceed;
+
   // If we are in a whole-module compilation and
   // if the source type is internal or target protocol is internal,
   // then conformances cannot be changed at run-time, because only this
