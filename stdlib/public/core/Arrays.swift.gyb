@@ -484,7 +484,12 @@ public struct ${Self}<Element>
   }
   
   /// The number of elements in the array.
-  public var count: Int
+  public var _count: Int
+  public var count: Int {
+    get {
+      return _getCount()
+    }
+  }
 
   /// The array's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
@@ -508,7 +513,7 @@ public struct ${Self}<Element>
 %else:
     @_inlineable
     get {
-      return count
+      return _getCount()
     }
 %end
   }
@@ -767,6 +772,13 @@ public struct ${Self}<Element>
   func _hoistableIsNativeTypeChecked() -> Bool {
    return _buffer.arrayPropertyIsNativeTypeChecked
   }
+  
+  @_inlineable
+  @_versioned
+  @_semantics("array.get_count")
+  internal func _getCount() -> Int {
+    return _count
+  }
 
   @_inlineable
   @_versioned
@@ -922,7 +934,7 @@ public struct ${Self}<Element>
   @_versioned
   internal init(_buffer: _Buffer, count: Int) {
     self._buffer = _buffer
-    self.count = count
+    self._count = count
   }
 
 %if Self == 'ArraySlice':
@@ -1037,7 +1049,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   @_inlineable
   @_semantics("array.init")
   public init() {
-    count = 0
+    _count = 0
     _buffer = _Buffer()
   }
 
@@ -1137,7 +1149,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       // growth.
       _buffer = ${Self}._allocateBufferUninitialized(minimumCapacity: count)
     }
-    self.count = count
+    _count = count
     // Can't store count here because the buffer might be pointing to the
     // shared empty array.
   }
@@ -1186,7 +1198,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   internal mutating func _deallocateUninitialized() {
     // Set the count to zero and just release as normal.
     // Somewhat of a hack.
-    count = 0
+    _count = 0
   }
 %end
 
@@ -1385,7 +1397,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
     _sanityCheck(_buffer.capacity >= count + 1)
 
-    count = oldCount + 1
+    _count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
   }
 
@@ -1456,12 +1468,12 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    count += writtenCount
+    _count += writtenCount
 
     if writtenUpTo == buf.endIndex {
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
-      count = _buffer._arrayAppendSequence(IteratorSequence(remainder), count)
+      _count = _buffer._arrayAppendSequence(IteratorSequence(remainder), count)
     }
   }
 
@@ -1938,7 +1950,7 @@ extension ${Self} {
     let eraseCount = subrange.count
     let insertCount = numericCast(newElements.count) as Int
     let growth = insertCount - eraseCount
-    self.count = oldCount + growth
+    _count = oldCount + growth
 
     if _buffer.requestUniqueMutableBackingBuffer(
       minimumCapacity: oldCount + growth, arrayCount: self.count) != nil {
