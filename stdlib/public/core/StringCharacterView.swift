@@ -747,7 +747,7 @@ extension String._CharacterView : RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    _core.reserveCapacity(n)
+    _guts.reserveCapacity(n)
   }
 
   /// Appends the given character to the character view.
