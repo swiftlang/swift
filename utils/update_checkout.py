@@ -479,6 +479,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
                                                             skip_history,
                                                             skip_repo_list)
 
+    if len([p for p in os.listdir(SWIFT_SOURCE_ROOT) if os.path.isdir(p)]) == 1:
+        # If there's only one folder in the root directory, it means they still have to clone all the other projects.
+        print("You only have the /swift directory. You may want to call this script with --clone to get the rest.")
+
     update_results = update_all_repositories(args, config, scheme,
                                              cross_repos_pr)
     fail_count = 0
