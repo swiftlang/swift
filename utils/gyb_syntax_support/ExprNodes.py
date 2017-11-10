@@ -40,6 +40,12 @@ EXPR_NODES = [
                    ]),
          ]),
 
+    # An identifier expression.
+    Node('IdentifierExpr', kind='Expr',
+         children=[
+             Child('Identifier', kind='IdentifierToken'),
+         ]),
+
     # A #line expression.
     Node('PoundLineExpr', kind='Expr',
          children=[
