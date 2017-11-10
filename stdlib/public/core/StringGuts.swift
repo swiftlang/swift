@@ -782,7 +782,7 @@ extension _StringGuts {
     if let smallCocoa = self._smallCocoa {
       return makeCocoaLegacyStringCore(_cocoaString: smallCocoa.taggedObject)
     }
-    if let error = self._error {
+    if let _ = self._error {
       fatalError("I AM ERROR")
     }
 
@@ -886,7 +886,7 @@ extension _StringGuts {
       internalDumpHex(unsafeString.baseAddress, newline: false)
       print(" ", terminator: "")
       print(unsafeString.count, terminator: "")
-    } else if let smallCocoa = self._smallCocoa {
+    } else if let _ = self._smallCocoa {
       print(" smallCocoa", terminator: "")
     } else {
       print(" error", terminator: "")
