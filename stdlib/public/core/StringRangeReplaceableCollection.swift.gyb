@@ -242,9 +242,7 @@ extension String {
   /// - Complexity: O(*n*)
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    withMutableCharacters {
-      (v: inout _CharacterView) in v.reserveCapacity(n)
-    }
+    _guts.reserveCapacity(n)
   }
 
   /// Appends the given character to the string.
