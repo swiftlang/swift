@@ -1,5 +1,3 @@
-// FIXME(integers): started to fail due to the new integer protocols
-// XFAIL: *
 // A (no longer) basic test for debug info.
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info by default.
@@ -43,8 +41,8 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
      // CHECK-DAG: store i64 %1, i64* [[BADDR:.*]], align
      // CHECK-DAG: [[AVAL:%.*]] = getelementptr inbounds {{.*}}, [[AMEM:.*]], i32 0, i32 0
      // CHECK-DAG: [[BVAL:%.*]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[AADDR]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[BADDR]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[AADDR]], metadata ![[AARG:.*]], metadata !DIExpression()), !dbg ![[ASCOPE]]
+     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[BADDR]], metadata ![[BARG:.*]], metadata !DIExpression())
      // CHECK-DAG: ![[AARG]] = !DILocalVariable(name: "a", arg: 1
      // CHECK-DAG: ![[BARG]] = !DILocalVariable(name: "b", arg: 2
      if b != 0 {
@@ -53,7 +51,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-DAG: [[MUL]] = !DILocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
-       // CHECK-NOSIL: @_T0s1mois5Int64VAC_ACtF{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-NOSIL: @_T0s5Int64V1moiA2B_ABtFZ{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-NOSIL: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
@@ -79,7 +77,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
 // CHECK-DAG: ![[INT64:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int64", {{.*}}, identifier: "_T0s5Int64VD")
 // CHECK-DAG: ![[PARAMTYPES]] = !{![[INT64]], ![[INT64]], ![[INT64]]}
 // Import of the main module with the implicit name.
-// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], file: ![[MAINFILE]], line: 1)
+// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], file: ![[MAINFILE]])
 // CHECK-DAG: ![[MAINMODULE]] = !DIModule({{.*}}, name: "basic"
 
 // DWARF Version
