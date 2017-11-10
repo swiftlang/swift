@@ -321,7 +321,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     let unmanaged = _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
     defer { _fixLifetime(_guts) }
     guard !unmanaged.isSingleByte else { return nil }
-    return UnsafeMutablePointer(mutating: unmanaged.unsafeUTF16String.baseAddress)
+    return UnsafeMutablePointer(mutating: unmanaged.utf16Buffer.baseAddress)
   }
 
   #if false // FIXME Bool parameter
@@ -333,7 +333,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     let unmanaged = _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
     defer { _fixLifetime(_guts) }
     guard !nullTerminationRequired, unmanaged.isSingleByte else { return nil }
-    return unmanaged.unsafeOneByteString.baseAddress
+    return unmanaged.asciiBuffer.baseAddress
   }
   #endif
 
