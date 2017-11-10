@@ -1,3 +1,5 @@
+// RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift -swift-version 4
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
 // These are all legal uses of '!'.
