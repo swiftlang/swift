@@ -314,14 +314,14 @@ internal struct UnsafeString {
   }
 
   @_versioned
-  var unsafeUTF16String: UnsafeBufferPointer<UInt16> {
+  var utf16Buffer: UnsafeBufferPointer<UInt16> {
     _sanityCheck(!isSingleByte)
     return UnsafeBufferPointer(
       start: baseAddress.assumingMemoryBound(to: UInt16.self),
       count: count)
   }
   @_versioned
-  var unsafeOneByteString: UnsafeBufferPointer<UInt8> {
+  var asciiBuffer: UnsafeBufferPointer<UInt8> {
     _sanityCheck(isSingleByte)
     return UnsafeBufferPointer(
       start: baseAddress.assumingMemoryBound(to: UInt8.self),
@@ -340,9 +340,9 @@ internal struct UnsafeString {
         position <= count,
         "subscript: index points past String end")
       if isSingleByte {
-        return UTF16.CodeUnit(unsafeOneByteString[position])
+        return UTF16.CodeUnit(asciiBuffer[position])
       }
-      return unsafeUTF16String[position]
+      return utf16Buffer[position]
     }
   }
 
@@ -390,14 +390,14 @@ internal struct UnsafeString {
         size: UInt(self.sizeInBytes))
     } else if self.byteWidth == 1 && width == 2 {
       var dest = dest.assumingMemoryBound(to: UTF16.CodeUnit.self)
-      for byte in self.unsafeOneByteString {
+      for byte in self.asciiBuffer {
         dest.pointee = UTF16.CodeUnit(byte)
         dest += 1
       }
     } else {
       _sanityCheck(self.byteWidth == 2 && width == 1)
       var dest = dest.assumingMemoryBound(to: UInt8.self)
-      for unit in self.unsafeUTF16String {
+      for unit in self.utf16Buffer {
         _sanityCheck(unit & ~0x7F == 0) // ASCII only
         dest.pointee = UInt8(truncatingIfNeeded: unit)
         dest += 1
