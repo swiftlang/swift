@@ -3,8 +3,6 @@
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
-// XFAIL: *
-
 import Swift
 func markUsed<T>(_ t: T) {}
 
