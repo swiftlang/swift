@@ -63,7 +63,7 @@ struct SyncUp<Deliverable> : Synergy {
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @testGenericWitnessMethod(%swift.opaque* noalias nocapture sret, %T14witness_method6SyncUpV* noalias nocapture, %swift.type* %T)
 // CHECK: entry:
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @_T014witness_method6SyncUpVMa(%swift.type* %T)
-// CHECK:   [[WTABLE:%.*]] = call i8** @_T014witness_method6SyncUpVyxGAA7SynergyAAWa(%swift.type* [[METADATA]])
+// CHECK:   [[WTABLE:%.*]] = call i8** @_T014witness_method6SyncUpVyxGAA7SynergyAAWa(%swift.type* [[METADATA]], i8*** undef, {{i32|i64}} 0)
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 1
 // CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK:   [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, i8**)*

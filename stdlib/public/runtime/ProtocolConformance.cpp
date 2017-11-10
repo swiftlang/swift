@@ -136,7 +136,8 @@ const {
     return getStaticWitnessTable();
 
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-    return getWitnessTableAccessor()(type);
+    // FIXME: this needs information about conditional conformances.
+    return getWitnessTableAccessor()(type, nullptr, 0);
   }
 
   swift_runtime_unreachable(

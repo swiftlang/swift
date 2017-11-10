@@ -5571,6 +5571,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   Lexer::SILBodyRAII Tmp(*P.L);
   // Parse the entry list.
   std::vector<SILWitnessTable::Entry> witnessEntries;
+  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+
   if (P.Tok.isNot(tok::r_brace)) {
     do {
       Identifier EntryKeyword;
@@ -5596,7 +5598,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
         continue;
       }
 
-      if (EntryKeyword.str() == "associated_type_protocol") {
+      if (EntryKeyword.str() == "associated_type_protocol" ||
+          EntryKeyword.str() == "conditional_conformance") {
         if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
           return true;
         CanType assoc = parseAssociatedTypePath(P, WitnessState, proto);
@@ -5621,9 +5624,14 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
           P.consumeToken();
         }
 
-        witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-          assoc, proto, conformance
-        });
+        if (EntryKeyword.str() == "associated_type_protocol")
+          witnessEntries.push_back(
+              SILWitnessTable::AssociatedTypeProtocolWitness{assoc, proto,
+                                                             conformance});
+        else
+          conditionalConformances.push_back(
+              SILWitnessTable::ConditionalConformance{assoc, conformance});
+
         continue;
       }
 
@@ -5696,7 +5704,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
 
   if (!wt)
     wt = SILWitnessTable::create(M, *Linkage, theConformance);
-  wt->convertToDefinition(witnessEntries, isSerialized);
+  wt->convertToDefinition(witnessEntries, conditionalConformances,
+                          isSerialized);
   BodyScope.reset();
   return false;
 }

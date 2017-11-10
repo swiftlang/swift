@@ -2688,6 +2688,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   kind = SILCursor.readRecord(entry.ID, scratch);
 
   std::vector<SILWitnessTable::Entry> witnessEntries;
+  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+
   // Another record means the end of this WitnessTable.
   while (kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
@@ -2718,9 +2720,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
         assoc, MF->getType(tyId)->getCanonicalType()
       });
-    } else {
-      assert(kind == SIL_WITNESS_METHOD_ENTRY &&
-             "Content of WitnessTable should be in SIL_WITNESS_METHOD_ENTRY.");
+    } else if (kind == SIL_WITNESS_METHOD_ENTRY) {
       ArrayRef<uint64_t> ListOfValues;
       DeclID NameID;
       WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
@@ -2734,6 +2734,16 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
           getSILDeclRef(MF, ListOfValues, NextValueIndex), Func
         });
       }
+    } else {
+      assert(kind == SIL_WITNESS_CONDITIONAL_CONFORMANCE &&
+             "Content of WitnessTable should be in "
+             "SIL_WITNESS_CONDITIONAL_CONFORMANCE.");
+      TypeID assocId;
+      WitnessConditionalConformanceLayout::readRecord(scratch, assocId);
+      CanType type = MF->getType(assocId)->getCanonicalType();
+      auto conformance = MF->readConformance(SILCursor);
+      conditionalConformances.push_back(
+          SILWitnessTable::ConditionalConformance{type, conformance});
     }
 
     // Fetch the next record.
@@ -2745,7 +2755,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
 
-  wT->convertToDefinition(witnessEntries,
+  wT->convertToDefinition(witnessEntries, conditionalConformances,
                           Serialized ? IsSerialized : IsNotSerialized);
   wTableOrOffset.set(wT, /*fully deserialized*/ true);
   if (Callback)

@@ -116,8 +116,6 @@ ProtocolConformanceRef::subst(Type origType,
   if (auto result = conformances(origType->getCanonicalType(),
                                  substType,
                                  proto->getDeclaredType())) {
-    assert(result->getConditionalRequirements().empty() &&
-           "unhandled conditional requirements");
     return *result;
   }
 
@@ -286,6 +284,45 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
   }
 
   llvm_unreachable("Unhandled ProtocolConformanceKind in switch.");
+}
+
+SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
+  // Walk down to the base NormalProtocolConformance.
+  SubstitutionMap subMap;
+  const ProtocolConformance *parent = this;
+  while (!isa<NormalProtocolConformance>(parent)) {
+    switch (parent->getKind()) {
+    case ProtocolConformanceKind::Normal:
+      llvm_unreachable("should have exited the loop?!");
+    case ProtocolConformanceKind::Inherited:
+      parent =
+          cast<InheritedProtocolConformance>(parent)->getInheritedConformance();
+      break;
+    case ProtocolConformanceKind::Specialized: {
+      auto SC = cast<SpecializedProtocolConformance>(parent);
+      parent = SC->getGenericConformance();
+      assert(subMap.empty() && "multiple conformance specializations?!");
+      subMap = SC->getSubstitutionMap();
+      break;
+    }
+    }
+  }
+
+  // Found something; we're done!
+  if (!subMap.empty())
+    return subMap;
+
+  // If the normal conformance is for a generic type, and we didn't hit a
+  // specialized conformance, collect the substitutions from the generic type.
+  // FIXME: The AST should do this for us.
+  const NormalProtocolConformance *normalC =
+      cast<NormalProtocolConformance>(parent);
+
+  if (!normalC->getType()->isSpecialized())
+    return SubstitutionMap();
+
+  auto *DC = normalC->getDeclContext();
+  return normalC->getType()->getContextSubstitutionMap(M, DC);
 }
 
 bool ProtocolConformance::isBehaviorConformance() const {
@@ -758,10 +795,9 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
   auto *typeDecl = genericWitnessAndDecl.second;
 
   // Form the substitution.
-  auto *genericSig = GenericConformance->getGenericSignature();
-  if (!genericSig) return { Type(), nullptr };
-
-  auto substitutionMap = genericSig->getSubstitutionMap(GenericSubstitutions);
+  auto substitutionMap = getSubstitutionMap();
+  if (substitutionMap.empty())
+    return {Type(), nullptr};
 
   // Apply the substitution we computed above
   auto specializedType = genericWitness.subst(getSubstitutionMap(), options);
@@ -874,6 +910,10 @@ ProtocolConformance::getRootNormalConformance() const {
     }
   }
   return cast<NormalProtocolConformance>(C);
+}
+
+bool ProtocolConformance::witnessTableAccessorRequiresArguments() const {
+  return getRootNormalConformance()->getDeclContext()->isGenericContext();
 }
 
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
