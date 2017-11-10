@@ -181,6 +181,8 @@ extension _StringGuts {
       _sanityCheck(self.hasCocoaBuffer)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
+      // Single-byte Cocoa strings must be contiguous
+      _sanityCheck(!self.isSingleByte || cocoa.start != nil)
     } else if let _ = self._smallCocoa {
       _sanityCheck(!self.isSingleByte)
       _sanityCheck(!self.hasCocoaBuffer) // FIXME: Is this right?
@@ -968,19 +970,16 @@ extension _StringGuts {
   ) {
     _sanityCheck(minimumByteWidth == 1 || minimumByteWidth == 2)
     let oldCapacity: Int
-    let oldCount: Int
     let newWidth = Swift.max(self.byteWidth, minimumByteWidth)
     if _fastPath(self.byteWidth == newWidth && isUniqueNative()) {
       // TODO: width extension can be done in place if there's capacity
-      var nativeBuffer = self._native._unsafelyUnwrappedUnchecked.stringBuffer
+      let nativeBuffer = self._native._unsafelyUnwrappedUnchecked.stringBuffer
       oldCapacity = nativeBuffer.capacity
-      oldCount = nativeBuffer.usedCount
       if _fastPath(oldCapacity >= minimumCapacity) {
         return
       }
     } else {
       oldCapacity = 0
-      oldCount = self.count
     }
 
     let newCapacity = Swift.max(
@@ -1113,6 +1112,16 @@ extension _StringGuts {
     return count == 0
   }
 
+  public // TODO(StringGuts): for testing
+  mutating func reserveCapacity(_ n: Int) {
+    if _fastPath(isUniqueNative() && self.capacity >= n) {
+      return
+    }
+    let newBuffer = _copyToStringBuffer(
+      capacity: n,
+      byteWidth: self.byteWidth)
+    self = _StringGuts(NativeString(newBuffer))
+  }
 
   // @_inlineable // TODO: internal-inlineable, if that's possible
   // TODO: @_versioned
