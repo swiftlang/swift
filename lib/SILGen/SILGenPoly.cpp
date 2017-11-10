@@ -60,8 +60,11 @@
 // Witness thunks
 // ==============
 //
-// Currently protocol witness methods are called with an additional generic
-// parameter bound to the Self type, and thus always require a thunk.
+// Protocol witness methods are called with an additional generic parameter
+// bound to the Self type, and thus always require a thunk. Thunks are also
+// required for conditional conformances, since the extra requirements aren't
+// part of the protocol and so any witness tables need to be loaded from the
+// original protocol's witness table and passed into the real witness method.
 //
 // Thunks for class method witnesses dispatch through the vtable allowing
 // inherited witnesses to be overridden in subclasses. Hence a witness thunk

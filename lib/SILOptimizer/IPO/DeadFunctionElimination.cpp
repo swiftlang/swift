@@ -208,6 +208,10 @@ protected:
       }
     }
 
+    for (const auto &conf : WT->getConditionalConformances()) {
+      if (conf.Conformance.isConcrete())
+        ensureAliveConformance(conf.Conformance.getConcrete());
+    }
   }
 
   /// Marks the declarations referenced by a key path pattern as alive if they

@@ -2746,7 +2746,22 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     }
     OS << '\n';
   }
-  
+
+  for (auto conditionalConformance : getConditionalConformances()) {
+    // conditional_conformance (TypeName: Protocol):
+    // <conformance>
+    OS << "  conditional_conformance (";
+    conditionalConformance.Requirement.print(OS, Options);
+    OS << ": " << conditionalConformance.Conformance.getRequirement()->getName()
+       << "): ";
+    if (conditionalConformance.Conformance.isConcrete())
+      conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
+    else
+      OS << "dependent";
+
+    OS << '\n';
+  }
+
   OS << "}\n\n";
 }
 

@@ -369,6 +369,7 @@ public:
   SILGenModule &SGM;
   NormalProtocolConformance *Conformance;
   std::vector<SILWitnessTable::Entry> Entries;
+  std::vector<SILWitnessTable::ConditionalConformance> ConditionalConformances;
   SILLinkage Linkage;
   IsSerialized_t Serialized;
 
@@ -400,6 +401,8 @@ public:
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
 
+    addConditionalRequirements();
+
     // Check if we already have a declaration or definition for this witness
     // table.
     if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false)) {
@@ -412,7 +415,7 @@ public:
 
       // If we have a declaration, convert the witness table to a definition.
       if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries, Serialized);
+        wt->convertToDefinition(Entries, ConditionalConformances, Serialized);
 
         // Since we had a declaration before, its linkage should be external,
         // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
@@ -429,8 +432,8 @@ public:
     }
 
     // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage, Serialized,
-                                   Conformance, Entries);
+    return SILWitnessTable::create(SGM.M, Linkage, Serialized, Conformance,
+                                   Entries, ConditionalConformances);
   }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
@@ -519,6 +522,22 @@ public:
     Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         req.getAssociation(), req.getAssociatedRequirement(),
         assocConformance});
+  }
+
+  void addConditionalRequirements() {
+    SILWitnessTable::enumerateWitnessTableConditionalConformances(
+        Conformance, [&](unsigned, CanType type, ProtocolDecl *protocol) {
+          auto conformance =
+              Conformance->getGenericSignature()->lookupConformance(type,
+                                                                    protocol);
+          assert(conformance &&
+                 "unable to find conformance that should be known");
+
+          ConditionalConformances.push_back(
+              SILWitnessTable::ConditionalConformance{type, *conformance});
+
+          return /*finished?*/ false;
+        });
   }
 };
 

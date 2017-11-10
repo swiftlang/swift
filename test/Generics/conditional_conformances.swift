@@ -6,6 +6,11 @@ protocol P1 {}
 protocol P2 {}
 protocol P3 {}
 protocol P4: P1 {}
+protocol P5: P2 {}
+// expected-note@-1{{type 'InheritImplicitGood<T>' does not conform to inherited protocol 'P2'}}
+// expected-note@-2{{type 'InheritImplicitBad<T>' does not conform to inherited protocol 'P2'}}
+protocol P6: P2 {}
+// expected-note@-1{{type 'InheritImplicitBad<T>' does not conform to inherited protocol 'P2'}}
 
 protocol Assoc { associatedtype AT }
 
@@ -21,6 +26,9 @@ func takes_P2<X: P2>(_: X) {}
 // expected-note@-9{{requirement from conditional conformance of 'ClassFree<U>' to 'P2'}}
 // expected-note@-10{{candidate requires that 'C3' inherit from 'U' (requirement specified as 'U' : 'C3')}}
 // expected-note@-11{{requirement from conditional conformance of 'ClassMoreSpecific<U>' to 'P2'}}
+// expected-note@-12{{candidate requires that 'C1' inherit from 'Int' (requirement specified as 'Int' : 'C1')}}
+// expected-note@-13{{requirement from conditional conformance of 'SubclassBad' to 'P2'}}
+func takes_P5<X: P5>(_: X) {}
 
 struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free<T>
@@ -188,6 +196,116 @@ struct ClassLessSpecific<T: C3> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassLessSpecific<T>
 // CHECK-NEXT: (normal_conformance type=ClassLessSpecific<T> protocol=P2)
 extension ClassLessSpecific: P2 where T: C1 {}
+
+
+// Inherited conformances:
+class Base<T> {}
+extension Base: P2 where T: C1 {}
+
+class SubclassGood: Base<C1> {}
+func subclass_good() {
+  takes_P2(SubclassGood())
+}
+class SubclassBad: Base<Int> {}
+func subclass_bad() {
+  takes_P2(SubclassBad())
+  // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SubclassBad)'}}
+}
+
+// Inheriting conformances:
+
+struct InheritEqual<T> {}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
+// CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P2
+// CHECK-NEXT:    conforms_to: τ_0_0 P1)
+extension InheritEqual: P2 where T: P1 {}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
+// CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P5
+// CHECK-NEXT:    conforms_to: τ_0_0 P1)
+extension InheritEqual: P5 where T: P1 {}
+func inheritequal_good<U: P1>(_: U) {
+  takes_P2(InheritEqual<U>())
+  takes_P5(InheritEqual<U>())
+}
+func inheritequal_bad<U>(_: U) {
+  takes_P2(InheritEqual<U>())
+  // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P1'}}
+  // expected-note@-2{{requirement specified as 'U' : 'P1'}}
+  // expected-note@-3{{requirement from conditional conformance of 'InheritEqual<U>' to 'P2'}}
+  takes_P5(InheritEqual<U>())
+  // expected-error@-1{{'<X where X : P5> (X) -> ()' requires that 'U' conform to 'P1'}}
+  // expected-note@-2{{requirement specified as 'U' : 'P1'}}
+  // expected-note@-3{{requirement from conditional conformance of 'InheritEqual<U>' to 'P5'}}
+}
+
+struct InheritLess<T> {}
+extension InheritLess: P2 where T: P1 {}
+extension InheritLess: P5 {}
+// expected-error@-1{{'P5' requires that 'T' conform to 'P1'}}
+// expected-note@-2{{requirement specified as 'T' : 'P1'}}
+// expected-note@-3{{requirement from conditional conformance of 'InheritLess<T>' to 'P2'}}
+
+
+struct InheritMore<T> {}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
+// CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P2
+// CHECK-NEXT:    conforms_to: τ_0_0 P1)
+extension InheritMore: P2 where T: P1 {}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
+// CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P5
+// CHECK-NEXT:    conforms_to: τ_0_0 P4)
+extension InheritMore: P5 where T: P4 {}
+func inheritequal_good_good<U: P4>(_: U) {
+  takes_P2(InheritMore<U>())
+  takes_P5(InheritMore<U>())
+}
+func inheritequal_good_bad<U: P1>(_: U) {
+  takes_P2(InheritMore<U>())
+  takes_P5(InheritMore<U>())
+  // expected-error@-1{{'<X where X : P5> (X) -> ()' requires that 'U' conform to 'P4'}}
+  // expected-note@-2{{requirement specified as 'U' : 'P4'}}
+  // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}
+}
+func inheritequal_bad_bad<U>(_: U) {
+  takes_P2(InheritMore<U>())
+  // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P1'}}
+  // expected-note@-2{{requirement specified as 'U' : 'P1'}}
+  // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P2'}}
+  takes_P5(InheritMore<U>())
+  // expected-error@-1{{'<X where X : P5> (X) -> ()' requires that 'U' conform to 'P4'}}
+  // expected-note@-2{{requirement specified as 'U' : 'P4'}}
+  // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}
+}
+
+struct InheritImplicitGood<T> {}
+// FIXME: per SE-0143, this should result in an implicit conformance
+// InheritImplicitGood: P2.
+extension InheritImplicitGood: P5 where T: P1 {}
+// expected-error@-1{{type 'InheritImplicitGood<T>' does not conform to protocol 'P2'}}
+
+struct InheritImplicitBad<T> {}
+// This shouldn't give anything implicit since either conformance could imply
+// InheritImplicitBad: P2.
+extension InheritImplicitBad: P5 where T: P1 {}
+// expected-error@-1{{type 'InheritImplicitBad<T>' does not conform to protocol 'P2'}}
+extension InheritImplicitBad: P6 where T: P1 {}
+// expected-error@-1{{type 'InheritImplicitBad<T>' does not conform to protocol 'P2'}}
+
+
+
+// "Multiple conformances" from SE0143
+
+struct TwoConformances<T> {}
+extension TwoConformances: P2 where T: P1 {}
+// expected-error@-1{{redundant conformance of 'TwoConformances<T>' to protocol 'P2'}}
+extension TwoConformances: P2 where T: P3 {}
+// expected-note@-1{{'TwoConformances<T>' declares conformance to protocol 'P2' here}}
+
+struct TwoDisjointConformances<T> {}
+extension TwoDisjointConformances: P2 where T == Int {}
+// expected-error@-1{{redundant conformance of 'TwoDisjointConformances<T>' to protocol 'P2'}}
+extension TwoDisjointConformances: P2 where T == String {}
+// expected-note@-1{{'TwoDisjointConformances<T>' declares conformance to protocol 'P2' here}}
 
 
 // FIXME: these cases should be equivalent (and both with the same output as the

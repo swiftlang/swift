@@ -3309,11 +3309,9 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
     return entry;
   }
 
-  auto fnType = llvm::FunctionType::get(VoidTy,
-                                        { WitnessTablePtrTy,
-                                          TypeMetadataPtrTy,
-                                          Int8PtrPtrTy },
-                                        /*varargs*/ false);
+  auto fnType = llvm::FunctionType::get(
+      VoidTy, {WitnessTablePtrTy, TypeMetadataPtrTy, Int8PtrPtrTy},
+      /*varargs*/ false);
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
@@ -3356,9 +3354,12 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
   }
 
   llvm::FunctionType *fnType;
-  if (conf->getDeclContext()->isGenericContext()) {
-    fnType = llvm::FunctionType::get(WitnessTablePtrTy, {TypeMetadataPtrTy},
-                                     false);
+  if (conf->witnessTableAccessorRequiresArguments()) {
+    // conditional requirements are passed indirectly, as an array of witness
+    // tables.
+    fnType = llvm::FunctionType::get(
+        WitnessTablePtrTy, {TypeMetadataPtrTy, WitnessTablePtrPtrTy, SizeTy},
+        false);
   } else {
     fnType = llvm::FunctionType::get(WitnessTablePtrTy, false);
   }

@@ -2421,7 +2421,9 @@ template <typename Runtime>
 struct TargetProtocolConformanceRecord {
 public:
   using WitnessTableAccessorFn
-    = const WitnessTable *(const TargetMetadata<Runtime>*);
+    = const WitnessTable *(const TargetMetadata<Runtime>*,
+                           const WitnessTable **,
+                           size_t);
 
 private:
   /// The protocol being conformed to.
