@@ -200,7 +200,6 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
   Ctx.setDiagnosticHandlerCallBack(linkerDiagnosticHandler, nullptr);
   bool Failed = llvm::Linker::linkModules(*Module, std::move(SubModule));
   Ctx.setDiagnosticHandlerCallBack(OldHandler, OldDiagnosticContext);
-
   return !Failed;
 }
 
