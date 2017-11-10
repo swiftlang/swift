@@ -49,12 +49,14 @@ SILLinkage getDispatchThunkLinkage(SILDeclRef constant,
             : SILLinkage::HiddenExternal);
   case AccessLevel::Public:
   case AccessLevel::Open:
+    #if 0
     if (cast<ClassDecl>(afd->getDeclContext())->hasFixedLayout()) {
       assert(!M.isWholeModule());
       return (forDefinition
               ? SILLinkage::Hidden
               : SILLinkage::HiddenExternal);
     }
+    #endif
     return (forDefinition
             ? SILLinkage::Public
             : SILLinkage::PublicExternal);
