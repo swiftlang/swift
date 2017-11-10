@@ -90,6 +90,7 @@ extension _StringGuts {
     return _twoByteCodeUnitBit | _hasCocoaBufferBit
   }
 
+  @_versioned
   var isSingleByte: Bool {
     switch classification {
     case .native, .unsafe, .nonTaggedCocoa:
@@ -525,8 +526,13 @@ struct NativeString {
   }
 }
 
+@_versioned
+@_fixed_layout
 internal struct OpaqueCocoaString {
+  @_versioned
   let object: AnyObject
+  
+  @_versioned
   let count: Int
 
   init(_ object: AnyObject) {
@@ -536,6 +542,18 @@ internal struct OpaqueCocoaString {
   init(_ object: AnyObject, count: Int) {
     self.object = object
     self.count = count
+  }
+
+  @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
+  subscript(position: Int) -> UTF16.CodeUnit {
+    return _cocoaStringSubscript(object, position)
+  }
+
+  @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
+  subscript(bounds: Range<Int>) -> _StringGuts {
+    return makeCocoaStringGuts(_cocoaString: _cocoaStringSlice(object, bounds))
   }
 }
 
@@ -884,10 +902,19 @@ extension _StringGuts {
   }
 }
 
-// TODO: We probably want to overhaul string storage, ala the "string-recore"
-// branch. In addition to efficiency, such an overhaul can also guarantee nul-
-// termination for all native strings. For now, this lets us bootstrap
-// quicker.
+// Subscript-based access
+extension _StringGuts {
+  /// Get the UTF-16 code unit stored at the specified position in this string.
+  @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
+  subscript(position: Int) -> UTF16.CodeUnit {
+    let unsafe = self._unmanagedContiguous
+    if _fastPath(unsafe != nil) {
+      return unsafe._unsafelyUnwrappedUnchecked[position]
+    }
+    return getOpaque()[position]
+  }
+}
 
 //
 // String API helpers
@@ -898,8 +925,9 @@ extension _StringGuts {
   @_versioned
   internal
   func _extractStringBuffer() -> _StringBuffer {
-    if let native = self._native {
-      return native.stringBuffer
+    let native = self._native
+    if _fastPath(native != nil) {
+      return native._unsafelyUnwrappedUnchecked.stringBuffer
     }
     return _copyToStringBuffer(capacity: self.count, byteWidth: self.byteWidth)
   }
