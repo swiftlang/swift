@@ -364,7 +364,7 @@ public struct _LegacyStringCore {
         return _nthContiguous(position)
       }
 #if _runtime(_ObjC)
-      return _cocoaStringSubscript(self, position)
+      return _cocoaStringSubscript(self.cocoaBuffer.unsafelyUnwrapped, position)
 #else
       _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
