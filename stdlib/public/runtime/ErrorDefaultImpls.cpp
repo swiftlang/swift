@@ -19,12 +19,12 @@
 #include "swift/Runtime/Metadata.h"
 using namespace swift;
 
-// @_silgen_name("swift_getDefaultErrorCode")
-// func _swift_getDefaultErrorCode<T : Error>(_ x: T) -> Int
-SWIFT_CC(swift) SWIFT_RT_ENTRY_VISIBILITY
-intptr_t swift_getDefaultErrorCode(OpaqueValue *error,
-                                   const Metadata *T,
-                                   const WitnessTable *Error) {
+// @_silgen_name("_swift_stdlib_getDefaultErrorCode")
+// func _getDefaultErrorCode<T : Error>(_ x: T) -> Int
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
+                                           const Metadata *T,
+                                           const WitnessTable *Error) {
   intptr_t result;
 
   switch (T->getKind()) {

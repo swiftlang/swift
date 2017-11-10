@@ -628,14 +628,14 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   }
 }
 
-// @_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorIndirect")
-// public func _stdlib_getErrorEmbeddedNSErrorIndirect<T : Error>(
-///    _ x: UnsafePointer<T>) -> AnyObject?
-SWIFT_CC(swift)
-extern "C" id swift_stdlib_getErrorEmbeddedNSErrorIndirect(
-                const OpaqueValue *error,
-                const Metadata *T,
-                const WitnessTable *Error);
+// internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
+//   _ x: UnsafePointer<T>) -> AnyObject?
+#define getErrorEmbeddedNSErrorIndirect \
+  MANGLE_SYM(s32_getErrorEmbeddedNSErrorIndirectyXlSgSPyxGs0B0RzlF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+id getErrorEmbeddedNSErrorIndirect(const OpaqueValue *error,
+                                   const Metadata *T,
+                                   const WitnessTable *Error);
 
 #endif
 
@@ -943,10 +943,9 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 #if SWIFT_OBJC_INTEROP
     // Check whether there is an embedded NSError. If so, use that for our Error
     // representation.
-    if (auto embedded =
-          swift_stdlib_getErrorEmbeddedNSErrorIndirect(srcDynamicValue,
-                                                       srcDynamicType,
-                                                       errorWitness)) {
+    if (auto embedded = getErrorEmbeddedNSErrorIndirect(srcDynamicValue,
+                                                        srcDynamicType,
+                                                        errorWitness)) {
       *destBoxAddr = reinterpret_cast<SwiftError*>(embedded);
       maybeDeallocateSource(true);
       return true;
@@ -1969,9 +1968,8 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const WitnessTable *srcErrorWitness,
                                     DynamicCastFlags flags) {
   // Check whether there is an embedded NSError.
-  if (auto embedded =
-          swift_stdlib_getErrorEmbeddedNSErrorIndirect(src, srcType,
-                                                       srcErrorWitness)) {
+  if (auto embedded = getErrorEmbeddedNSErrorIndirect(src, srcType,
+                                                      srcErrorWitness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       srcType->vw_destroy(src);
 
@@ -1980,7 +1978,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return swift_bridgeErrorToNSError((SwiftError*)errorBox.first);
+  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.first);
 }
 
 #endif
