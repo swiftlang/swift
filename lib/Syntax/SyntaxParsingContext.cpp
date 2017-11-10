@@ -334,6 +334,7 @@ void SyntaxParsingContextChild::makeNodeWhole(SyntaxKind Kind) {
   auto EndLoc = Tok.getLoc();
   auto AllNodes = ContextData.collectAllSyntax(EndLoc);
   switch (Kind) {
+  case SyntaxKind::IdentifierExpr:
   case SyntaxKind::DictionaryExpr:
   case SyntaxKind::ArrayExpr:
   case SyntaxKind::DictionaryElement:

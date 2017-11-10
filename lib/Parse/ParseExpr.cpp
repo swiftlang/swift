@@ -2057,6 +2057,8 @@ static bool shouldAddSelfFixit(DeclContext* Current, DeclName Name,
 ///     unqualified-decl-name generic-args?
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+  SyntaxParsingContextChild IDSyntaxContext(SyntaxContext,
+                                            SyntaxKind::IdentifierExpr);
   Token IdentTok = Tok;
 
   // Parse the unqualified-decl-name.
