@@ -2703,6 +2703,7 @@ void ClassDecl::addImplicitDestructor() {
   auto *DD = new (ctx) DestructorDecl(getLoc(), selfDecl, this);
 
   DD->setImplicit();
+  DD->setValidationStarted();
 
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
