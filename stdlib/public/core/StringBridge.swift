@@ -120,9 +120,9 @@ internal func _cocoaStringSlice(
 @_versioned // FIXME(sil-serialize-all)
 @inline(never) // Hide the CF dependency
 internal func _cocoaStringSubscript(
-  _ target: _LegacyStringCore, _ position: Int
+  _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
-  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
+  let cfSelf: _swift_shims_CFStringRef = target
 
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
@@ -163,6 +163,7 @@ internal func getCocoaPointer(
   return (start, isUTF16: isUTF16)
 }
 
+@_versioned
 @inline(never) // Hide the CF dependency
 internal
 func makeCocoaStringGuts(_cocoaString: _CocoaString) -> _StringGuts {
