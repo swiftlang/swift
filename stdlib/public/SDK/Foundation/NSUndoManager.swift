@@ -13,12 +13,6 @@
 @_exported import Foundation // Clang module
 import _SwiftFoundationOverlayShims
 
-@_silgen_name("NS_Swift_NSUndoManager_registerUndoWithTargetHandler")
-internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
-  _ self_: AnyObject,
-  _ target: AnyObject,
-  _ handler: @escaping @convention(block) (AnyObject) -> Void)
-
 extension UndoManager {
   @available(*, unavailable, renamed: "registerUndo(withTarget:handler:)")
   public func registerUndoWithTarget<TargetType : AnyObject>(_ target: TargetType, handler: (TargetType) -> Void) {
