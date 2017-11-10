@@ -10,6 +10,10 @@ extension Point {
     self.y = yy // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 
+  init(xx: Double) {
+    self.x = xx // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+
   init(xxx: Double, yyy: Double) {
     // This is OK
     self.init(x: xxx, y: yyy)
@@ -194,6 +198,48 @@ extension PrivatePoint {
     self = other
   }
 
+  init(other: PrivatePoint, cond: Bool) {
+    if cond { self = other }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+
   init() {
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
+
+extension Empty {
+  init(x: Double) {
+    // This is OK
+    self.init()
+  }
+
+  init(other: Empty) {
+    // This is okay
+    self = other
+  }
+
+  init(other: Empty, cond: Bool) {
+    if cond { self = other }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+
+  init(xx: Double) {
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
+
+extension GenericEmpty {
+  init(x: Double) {
+    // This is OK
+    self.init()
+  }
+
+  init(other: GenericEmpty<T>) {
+    // This is okay
+    self = other
+  }
+
+  init(other: GenericEmpty<T>, cond: Bool) {
+    if cond { self = other }
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+
+  init(xx: Double) {
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }

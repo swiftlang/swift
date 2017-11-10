@@ -10,6 +10,10 @@ extension Point {
     self.y = yy
   }
 
+  init(xx: Double) {
+    self.x = xx // expected-warning {{initializer for struct 'Point' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
   init(xxx: Double, yyy: Double) {
     // This is OK
     self.init(x: xxx, y: yyy)
@@ -234,8 +238,50 @@ extension PrivatePoint {
     self = other
   }
 
+  init(other: PrivatePoint, cond: Bool) {
+    if cond { self = other }
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
   // Ideally we wouldn't mention the names of non-public stored properties
   // across module boundaries, but this will go away in Swift 5 mode anyway.
   init() {
   } // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+extension Empty {
+  init(x: Double) {
+    // This is OK
+    self.init()
+  }
+
+  init(other: Empty) {
+    // This is okay
+    self = other
+  }
+
+  init(other: Empty, cond: Bool) {
+    if cond { self = other }
+  } // expected-warning {{initializer for struct 'Empty' must use "self.init(...)" or "self = ..." on all paths because it is not in module 'OtherModule'}}
+
+  init(xx: Double) {
+  } // expected-warning {{initializer for struct 'Empty' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+}
+
+extension GenericEmpty {
+  init(x: Double) {
+    // This is OK
+    self.init()
+  }
+
+  init(other: GenericEmpty<T>) {
+    // This is okay
+    self = other
+  }
+
+  init(other: GenericEmpty<T>, cond: Bool) {
+    if cond { self = other }
+  } // expected-warning {{initializer for struct 'GenericEmpty<T>' must use "self.init(...)" or "self = ..." on all paths because it is not in module 'OtherModule'}}
+
+  init(xx: Double) {
+  } // expected-warning {{initializer for struct 'GenericEmpty<T>' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
 }

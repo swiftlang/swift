@@ -60,14 +60,18 @@ public:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
-  /// True if the memory object being analyzed represents a 'let', which is
-  /// initialize-only (reassignments are not allowed).
-  bool IsLet = false;
-
   /// This is the count of elements being analyzed.  For memory objects that are
   /// tuples, this is the flattened element count.  For 'self' members in init
   /// methods, this is the local field count (+1 for derive classes).
   unsigned NumElements;
+
+  /// True if the memory object being analyzed represents a 'let', which is
+  /// initialize-only (reassignments are not allowed).
+  bool IsLet = false;
+
+  /// True if NumElements has a dummy value in it to force a struct to be
+  /// non-empty.
+  bool HasDummyElement = false;
 
 public:
   DIMemoryObjectInfo(SingleValueInstruction *MemoryInst);

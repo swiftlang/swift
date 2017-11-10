@@ -526,7 +526,7 @@ namespace {
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
     std::vector<SILLocation> EmittedErrorLocs;
-    SmallPtrSet<SILBasicBlock*, 16> BlocksReachableFromEntry;
+    SmallPtrSet<const SILBasicBlock *, 16> BlocksReachableFromEntry;
     
   public:
     LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
@@ -564,6 +564,9 @@ namespace {
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
+    bool diagnoseReturnWithoutInitializingStoredProperties(
+        const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use);
+
     void handleLoadUseFailure(const DIMemoryUse &Use,
                               bool SuperInitDone,
                               bool FailedSelfUse);
@@ -588,7 +591,7 @@ namespace {
     void getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result);
     void getOutSelfInitialized(SILBasicBlock *BB, Optional<DIKind> &Result);
 
-    bool shouldEmitError(SILInstruction *Inst);
+    bool shouldEmitError(const SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
     void noteUninitializedMembers(const DIMemoryUse &Use);
     void diagnoseInitError(const DIMemoryUse &Use,
@@ -597,7 +600,7 @@ namespace {
     bool diagnoseMethodCall(const DIMemoryUse &Use,
                             bool SuperInitDone);
     
-    bool isBlockIsReachableFromEntry(SILBasicBlock *BB);
+    bool isBlockIsReachableFromEntry(const SILBasicBlock *BB);
   };
 } // end anonymous namespace
 
@@ -658,17 +661,17 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
 /// Determine whether the specified block is reachable from the entry of the
 /// containing function's entrypoint.  This allows us to avoid diagnosing DI
 /// errors in synthesized code that turns out to be unreachable.
-bool LifetimeChecker::isBlockIsReachableFromEntry(SILBasicBlock *BB) {
+bool LifetimeChecker::isBlockIsReachableFromEntry(const SILBasicBlock *BB) {
   // Lazily compute reachability, so we only have to do it in the case of an
   // error.
   if (BlocksReachableFromEntry.empty()) {
-    SmallVector<SILBasicBlock*, 128> Worklist;
+    SmallVector<const SILBasicBlock*, 128> Worklist;
     Worklist.push_back(&BB->getParent()->front());
     BlocksReachableFromEntry.insert(Worklist.back());
     
     // Collect all reachable blocks by walking the successors.
     while (!Worklist.empty()) {
-      SILBasicBlock *BB = Worklist.pop_back_val();
+      const SILBasicBlock *BB = Worklist.pop_back_val();
       for (auto &Succ : BB->getSuccessors()) {
         if (BlocksReachableFromEntry.insert(Succ).second)
           Worklist.push_back(Succ);
@@ -683,7 +686,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(SILBasicBlock *BB) {
 /// shouldEmitError - Check to see if we've already emitted an error at the
 /// specified instruction.  If so, return false.  If not, remember the
 /// instruction and return true.
-bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
+bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
   // If this instruction is in a dead region, don't report the error.  This can
   // occur because we haven't run DCE before DI and this may be a synthesized
   // statement.  If it isn't synthesized, then DCE will report an error on the
@@ -1589,6 +1592,39 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
   return false;
 }
 
+bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
+    const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use) {
+  if (!TheMemory.isAnyInitSelf())
+    return false;
+  if (TheMemory.isClassInitSelf() || TheMemory.isDelegatingInit())
+    return false;
+
+  if (!shouldEmitError(Inst))
+    return true;
+
+  if (TheMemory.isCrossModuleStructInitSelf() &&
+      TheMemory.HasDummyElement) {
+    Type selfTy = TheMemory.getType();
+    const StructDecl *theStruct = selfTy->getStructOrBoundGenericStruct();
+    assert(theStruct);
+
+    bool fullyUnitialized;
+    (void)isInitializedAtUse(Use, nullptr, nullptr, &fullyUnitialized);
+
+    diagnose(Module, loc,
+             diag::designated_init_in_cross_module_extension,
+             selfTy, !fullyUnitialized,
+             theStruct->getParentModule()->getName(),
+             theStruct->hasClangNode());
+  } else {
+    diagnose(Module, loc,
+             diag::return_from_init_without_initing_stored_properties);
+    noteUninitializedMembers(Use);
+  }
+
+  return true;
+}
+
 /// Check and diagnose various failures when a load use is not fully
 /// initialized.
 ///
@@ -1657,12 +1693,8 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         }
       }
       
-      if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
-                 !TheMemory.isDelegatingInit()) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, returnLoc,
-                 diag::return_from_init_without_initing_stored_properties);
-        noteUninitializedMembers(Use);
+      if (diagnoseReturnWithoutInitializingStoredProperties(Inst, returnLoc,
+                                                            Use)) {
         return;
       }
     }
@@ -1676,12 +1708,9 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     if (CA->isInitializationOfDest() &&
         !CA->getFunction()->getArguments().empty() &&
         SILValue(CA->getFunction()->getArgument(0)) == CA->getDest()) {
-      if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
-          !TheMemory.isDelegatingInit()) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
-                 diag::return_from_init_without_initing_stored_properties);
-        noteUninitializedMembers(Use);
+      if (diagnoseReturnWithoutInitializingStoredProperties(Inst,
+                                                            Inst->getLoc(),
+                                                            Use)) {
         return;
       }
     }

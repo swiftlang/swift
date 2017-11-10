@@ -33,3 +33,11 @@ public struct PrivatePoint {
     self.y = y
   }
 }
+
+public struct Empty {
+  public init() {}
+}
+
+public struct GenericEmpty<T> {
+  public init() {}
+}
