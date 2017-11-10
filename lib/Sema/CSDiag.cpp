@@ -3101,6 +3101,27 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
     return;
   }
 
+  // Diagnose assignments to let-properties in delegating initializers.
+  if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
+    if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
+      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
+        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+            ctor->getDelegatingOrChainedInitKind(nullptr) ==
+              ConstructorDecl::BodyInitKind::Delegating) {
+          auto resolved = resolveImmutableBase(member, *this);
+          assert(resolved.first == member);
+          TC.diagnose(equalLoc, diag::assignment_let_property_delegating_init,
+                      member->getName());
+          if (resolved.second) {
+            TC.diagnose(resolved.second, diag::decl_declared_here,
+                        member->getName());
+          }
+          return;
+        }
+      }
+    }
+  }
+
   Diag<StringRef> diagID;
   if (isa<DeclRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_variable;

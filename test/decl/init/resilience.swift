@@ -16,10 +16,9 @@ extension Point {
 
 // Size is not @_fixed_layout, so we cannot define a new designated initializer
 extension Size {
-  // FIXME: Produce a decent diagnostic here
   init(ww: Int, hh: Int) {
     self.w = ww
-    self.h = hh // expected-error {{cannot assign to property: 'h' is a 'let' constant}}
+    self.h = hh // expected-error {{'let' property 'h' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 
   // This is OK
@@ -35,21 +34,19 @@ extension Size {
 
 // Animal is not @_fixed_layout, so we cannot define an @_inlineable
 // designated initializer
-//
-// FIXME: Crap diagnostics
 public struct Animal {
-  public let name: String // expected-note 3{{change 'let' to 'var' to make it mutable}}
+  public let name: String // expected-note 3 {{declared here}}
 
   @_inlineable public init(name: String) {
-    self.name = name // expected-error {{cannot assign to property: 'name' is a 'let' constant}}
+    self.name = name // expected-error {{'let' property 'name' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 
   @inline(__always) public init(dog: String) {
-    self.name = dog // expected-error {{cannot assign to property: 'name' is a 'let' constant}}
+    self.name = dog // expected-error {{'let' property 'name' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 
   @_transparent public init(cat: String) {
-    self.name = cat // expected-error {{cannot assign to property: 'name' is a 'let' constant}}
+    self.name = cat // expected-error {{'let' property 'name' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 
   // This is OK
