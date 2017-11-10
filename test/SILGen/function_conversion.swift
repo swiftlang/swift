@@ -489,10 +489,10 @@ func convTupleToOptionalIndirect<T>(_ f: @escaping (T) -> (T, T)) -> (T) -> (T, 
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0s11AnyHashableVABSbIexiid_xxSbIexiid_s0B0RzlTR : $@convention(thin) <T where T : Hashable> (@in T, @in T, @owned @callee_owned (@in AnyHashable, @in AnyHashable) -> Bool) -> Bool
 // CHECK:         alloc_stack $AnyHashable
-// CHECK:         function_ref @_swift_convertToAnyHashable
+// CHECK:         function_ref @_T0s21_convertToAnyHashables0cD0Vxs0D0RzlF
 // CHECK:         apply {{.*}}<T>
 // CHECK:         alloc_stack $AnyHashable
-// CHECK:         function_ref @_swift_convertToAnyHashable
+// CHECK:         function_ref @_T0s21_convertToAnyHashables0cD0Vxs0D0RzlF
 // CHECK:         apply {{.*}}<T>
 // CHECK:         return
 

@@ -123,16 +123,22 @@ const Metadata *swift::hashable_support::findHashableBaseType(
   return findHashableBaseTypeImpl</*KnownToConformToHashable=*/ false>(type);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
+// internal func _makeAnyHashableUsingDefaultRepresentation<H : Hashable>(
+//   of value: H,
+//   storingResultInto result: UnsafeMutablePointer<AnyHashable>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_makeAnyHashableUsingDefaultRepresentation(
   const OpaqueValue *value,
   const void *anyHashableResultPointer,
   const Metadata *T,
   const WitnessTable *hashableWT
 );
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
+// public func _makeAnyHashableUpcastingToHashableBaseType<H : Hashable>(
+//   _ value: H,
+//   storingResultInto result: UnsafeMutablePointer<AnyHashable>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_makeAnyHashableUpcastingToHashableBaseType(
   OpaqueValue *value,
   const void *anyHashableResultPointer,
   const Metadata *type,
@@ -163,7 +169,7 @@ void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
         unboxedType->vw_initializeWithCopy(
             unboxedValueCopy, const_cast<OpaqueValue *>(unboxedValue));
 
-        _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
+        _swift_makeAnyHashableUpcastingToHashableBaseType(
             unboxedValueCopy, anyHashableResultPointer, unboxedType,
             unboxedHashableWT);
         // Deallocate buffer.
@@ -174,7 +180,7 @@ void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
     }
 #endif
 
-    _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
+    _swift_makeAnyHashableUsingDefaultRepresentation(
         value, anyHashableResultPointer,
         findHashableBaseTypeOfHashableType(type),
         hashableWT);
@@ -184,7 +190,7 @@ void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
   case MetadataKind::Struct:
   case MetadataKind::Enum:
   case MetadataKind::Optional:
-    _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
+    _swift_makeAnyHashableUsingDefaultRepresentation(
         value, anyHashableResultPointer, type, hashableWT);
     return;
 

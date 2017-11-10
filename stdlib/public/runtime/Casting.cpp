@@ -2131,22 +2131,29 @@ extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
 /// Nominal type descriptor for Swift.Set.
 extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Array<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Array<TargetValue>>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_arrayDownCastIndirect(OpaqueValue *destination,
                                   OpaqueValue *source,
                                   const Metadata *sourceValueType,
                                   const Metadata *targetValueType);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Array<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Array<TargetValue>>
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
                                              OpaqueValue *source,
                                              const Metadata *sourceValueType,
                                              const Metadata *targetValueType);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _setDownCastIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Set<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Set<TargetValue>>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setDownCastIndirect(OpaqueValue *destination,
                                 OpaqueValue *source,
                                 const Metadata *sourceValueType,
@@ -2154,8 +2161,11 @@ void _swift_setDownCastIndirect(OpaqueValue *destination,
                                 const void *sourceValueHashable,
                                 const void *targetValueHashable);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Set<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Set<TargetValue>>
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool _swift_setDownCastConditionalIndirect(OpaqueValue *destination,
                                        OpaqueValue *source,
                                        const Metadata *sourceValueType,
@@ -2163,8 +2173,11 @@ bool _swift_setDownCastConditionalIndirect(OpaqueValue *destination,
                                        const void *sourceValueHashable,
                                        const void *targetValueHashable);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
+//                                           TargetKey, TargetValue>(
+//   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+//   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_dictionaryDownCastIndirect(OpaqueValue *destination,
                                        OpaqueValue *source,
                                        const Metadata *sourceKeyType,
@@ -2174,8 +2187,12 @@ void _swift_dictionaryDownCastIndirect(OpaqueValue *destination,
                                        const void *sourceKeyHashable,
                                        const void *targetKeyHashable);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
+//                                                      TargetKey, TargetValue>(
+//   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+//   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
                                         OpaqueValue *source,
                                         const Metadata *sourceKeyType,

@@ -140,7 +140,7 @@ using namespace swift::hashable_support;
     return [super isEqual:other];
   }
 
-  return swift_stdlib_Hashable_isEqual_indirect(
+  return _swift_stdlib_Hashable_isEqual_indirect(
       self_->getValue(), other_->getValue(), hashableBaseType,
       hashableConformance);
 }
