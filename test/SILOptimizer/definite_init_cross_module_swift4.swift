@@ -208,7 +208,7 @@ extension CPoint {
 
   init(other: CPoint, xx: Double, cond: Bool) {
     if cond { self = other }
-    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." on all paths because the struct was imported from C}} expected-note {{use "self.init()" to initialize the struct with zero values}} {{5-5=self.init()\n}}
+    self.x = xx // expected-warning {{initializer for struct 'CPoint' must use "self.init(...)" or "self = ..." on all paths because the struct was imported from C}}
     self.y = 0
   }
 }

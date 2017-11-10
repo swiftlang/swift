@@ -517,6 +517,12 @@ namespace {
     /// warning in Swift 4 and earlier.
     bool WantsCrossModuleStructInitializerDiagnostic = false;
 
+    /// This is true if any diagnostics have offered a fix-it to insert
+    /// `self.init()`. While the first diagnostic to offer this may not be
+    /// suggesting it in the best place, offering it more than once is clearly
+    /// wrong.
+    bool HasSuggestedNoArgSelfInit = false;
+
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
     std::vector<SILLocation> EmittedErrorLocs;
@@ -549,8 +555,9 @@ namespace {
 
     bool isInitializedAtUse(const DIMemoryUse &Use,
                             bool *SuperInitDone = nullptr,
-                            bool *FailedSelfUse = nullptr);
-    
+                            bool *FailedSelfUse = nullptr,
+                            bool *FullyUninitialized = nullptr);
+
 
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(unsigned UseID);
@@ -942,6 +949,29 @@ void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
            (unsigned)TheMemory.isDelegatingInit());
 }
 
+/// If \p theStruct is imported from C and has a zeroing no-argument
+/// initializer, add a note to suggest calling it ahead of \p loc.
+///
+/// Most (but not all) C structs have a zeroing no-argument initializer;
+/// the ones that don't have fields don't make sense to zero.
+static void maybeSuggestNoArgSelfInit(SILModule &module, SILLocation loc,
+                                      StructDecl *theStruct) {
+  if (!theStruct || !theStruct->hasClangNode())
+    return;
+
+  ASTContext &ctx = module.getASTContext();
+  DeclName noArgInit(ctx, ctx.Id_init, ArrayRef<Identifier>());
+
+  auto lookupResults = theStruct->lookupDirect(noArgInit);
+  if (lookupResults.size() != 1)
+    return;
+  if (lookupResults.front()->getDeclContext() != theStruct)
+    return;
+
+  diagnose(module, loc, diag::designated_init_c_struct_fix)
+    .fixItInsert(loc.getStartSourceLoc(), "self.init()\n");
+}
+
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &Use = Uses[UseID];
 
@@ -1053,21 +1083,9 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
              selfTy, !isFullyUninitialized,
              theStruct->getParentModule()->getName(),
              theStruct->hasClangNode());
-
-    // Special case: most (but not all) C structs have a zeroing no-argument
-    // initializer. If this struct is such a type, suggest inserting
-    // "self.init()".
-    if (theStruct->hasClangNode()) {
-      ASTContext &ctx = Module.getASTContext();
-      DeclName noArgInit(ctx, ctx.Id_init, ArrayRef<Identifier>());
-      auto lookupResults = theStruct->lookupDirect(noArgInit);
-      if (lookupResults.size() == 1 &&
-          lookupResults.front()->getDeclContext() == theStruct) {
-        diagnose(Module, Use.Inst->getLoc(),
-                 diag::designated_init_c_struct_fix)
-          .fixItInsert(Use.Inst->getLoc().getStartSourceLoc(),
-                       "self.init()\n");
-      }
+    if (!HasSuggestedNoArgSelfInit && isFullyUninitialized) {
+      maybeSuggestNoArgSelfInit(Module, Use.Inst->getLoc(), theStruct);
+      HasSuggestedNoArgSelfInit = true;
     }
 
     // Don't emit more than one of these diagnostics per initializer.
@@ -1205,10 +1223,12 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   // The value must be fully initialized at all escape points.  If not, diagnose
   // the error.
-  bool SuperInitDone, FailedSelfUse;
+  bool SuperInitDone, FailedSelfUse, FullyUninitialized;
 
-  if (isInitializedAtUse(Use, &SuperInitDone, &FailedSelfUse))
+  if (isInitializedAtUse(Use, &SuperInitDone, &FailedSelfUse,
+                         &FullyUninitialized)) {
     return;
+  }
 
   auto Inst = Use.Inst;
 
@@ -1262,6 +1282,12 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
         diagnose(Module, Inst->getLoc(), diag::self_before_selfinit);
       } else {
         diagnose(Module, Inst->getLoc(), diag::self_before_selfinit_value_type);
+        if (!HasSuggestedNoArgSelfInit && FullyUninitialized) {
+          auto *maybeStruct =
+              TheMemory.getType().getStructOrBoundGenericStruct();
+          maybeSuggestNoArgSelfInit(Module, Inst->getLoc(), maybeStruct);
+          HasSuggestedNoArgSelfInit = true;
+        }
       }
     } else {
       diagnose(Module, Inst->getLoc(), diag::self_before_superinit);
@@ -2757,9 +2783,11 @@ getSelfInitializedAtInst(SILInstruction *Inst) {
 /// initialized at this point or not.
 bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
                                          bool *SuperInitDone,
-                                         bool *FailedSelfUse) {
+                                         bool *FailedSelfUse,
+                                         bool *FullyUninitialized) {
   if (FailedSelfUse) *FailedSelfUse = false;
   if (SuperInitDone) *SuperInitDone = true;
+  if (FullyUninitialized) *FullyUninitialized = true;
 
   // Determine the liveness states of the elements that we care about.
   AvailabilitySet Liveness =
@@ -2774,11 +2802,16 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
   }
 
   // Check all the results.
+  bool isFullyInitialized = true;
   for (unsigned i = Use.FirstElement, e = i+Use.NumElements;
        i != e; ++i) {
     if (Liveness.get(i) != DIKind::Yes)
-      return false;
+      isFullyInitialized = false;
+    if (FullyUninitialized && Liveness.get(i) != DIKind::No)
+      *FullyUninitialized = false;
   }
+  if (!isFullyInitialized)
+    return false;
 
   // If the self.init() or super.init() call threw an error and
   // we caught it, self is no longer available.
