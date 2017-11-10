@@ -50,7 +50,10 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: [[NEW_SUPER_SELF:%.*]] = apply [[SUPER_FN]]([[SUPER]]) : $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
     // CHECK-NEXT: [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SUPER_SELF]] : $FakeNSObject to $Cat
     // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
+    // TODO: Once we re-enable arbitrary take promotion, this retain and the associated destroy_addr will go away.
+    // CHECK-NEXT: strong_retain [[NEW_SELF]]
     // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
+    // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: br bb4([[RESULT]] : $Optional<Cat>)
 

@@ -149,7 +149,11 @@ static unsigned computeSubelement(SILValue Pointer,
 
 namespace {
 
+class AvailableValueAggregator;
+
 struct AvailableValue {
+  friend class AvailableValueAggregator;
+
   /// If this gets too expensive in terms of copying, we can use an arena and a
   /// FrozenPtrSet like we do in ARC.
   using SetVector = llvm::SmallSetVector<SILInstruction *, 1>;
@@ -157,6 +161,9 @@ struct AvailableValue {
   SILValue Value;
   unsigned SubElementNumber;
   SetVector InsertionPoints;
+
+  /// Just for updating.
+  SmallVectorImpl<DIMemoryUse> *Uses;
 
 public:
   AvailableValue() = default;
@@ -236,7 +243,7 @@ public:
   void print(llvm::raw_ostream &os) const;
 
 private:
-  /// Private constructor for use by emitStructExtract and emitTupleExtract.
+  /// Private constructor.
   AvailableValue(SILValue Value, unsigned SubElementNumber,
                  const SetVector &InsertPoints)
       : Value(Value), SubElementNumber(SubElementNumber),
@@ -345,12 +352,14 @@ class AvailableValueAggregator {
   SILBuilderWithScope B;
   SILLocation Loc;
   MutableArrayRef<AvailableValue> AvailableValueList;
+  SmallVectorImpl<DIMemoryUse> &Uses;
 
 public:
   AvailableValueAggregator(SILInstruction *Inst,
-                           MutableArrayRef<AvailableValue> AvailableValueList)
+                           MutableArrayRef<AvailableValue> AvailableValueList,
+                           SmallVectorImpl<DIMemoryUse> &Uses)
       : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
-        AvailableValueList(AvailableValueList) {}
+        AvailableValueList(AvailableValueList), Uses(Uses) {}
 
   // This is intended to be passed by reference only once constructed.
   AvailableValueAggregator(const AvailableValueAggregator &) = delete;
@@ -495,9 +504,13 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
                                                         unsigned FirstElt) {
   auto &Val = AvailableValueList[FirstElt];
 
-  // If the value is not available, load the value.
+  // If the value is not available, load the value and update our use list.
   if (!Val) {
-    return B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
+    auto *Load =
+        B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
+    Uses.push_back(DIMemoryUse(Load, DIUseKind::Load, FirstElt,
+                               getNumSubElements(Load->getType(), M)));
+    return Load;
   }
 
   // If we have 1 insertion point, just extract the value and return.
@@ -570,7 +583,11 @@ public:
 
 private:
   bool promoteLoad(SILInstruction *Inst);
-  bool promoteDestroyAddr(DestroyAddrInst *DAI);
+  void promoteDestroyAddr(DestroyAddrInst *DAI,
+                          MutableArrayRef<AvailableValue> Values);
+  bool
+  canPromoteDestroyAddr(DestroyAddrInst *DAI,
+                        llvm::SmallVectorImpl<AvailableValue> &AvailableValues);
 
   // Load promotion.
   bool hasEscapedAt(SILInstruction *I);
@@ -867,7 +884,6 @@ static SILValue tryFindSrcAddrForLoad(SILInstruction *Inst) {
 /// cross element accesses have been scalarized.
 ///
 /// This returns true if the load has been removed from the program.
-///
 bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // Note that we intentionally don't support forwarding of weak pointers,
   // because the underlying value may drop be deallocated at any time.  We would
@@ -940,7 +956,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
   auto *Load = cast<LoadInst>(Inst);
-  AvailableValueAggregator Agg(Load, AvailableValues);
+  AvailableValueAggregator Agg(Load, AvailableValues, Uses);
   SILValue NewVal = Agg.aggregateValues(LoadTy, Load->getOperand(), FirstElt);
 
   ++NumLoadPromoted;
@@ -957,15 +973,12 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   return true;
 }
 
-/// promoteDestroyAddr - DestroyAddr is a composed operation merging
-/// load+strong_release.  If the implicit load's value is available, explode it.
-///
-/// Note that we handle the general case of a destroy_addr of a piece of the
-/// memory object, not just destroy_addrs of the entire thing.
-///
-bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
+/// Return true if we can promote the given destroy.
+bool AllocOptimize::canPromoteDestroyAddr(
+    DestroyAddrInst *DAI,
+    llvm::SmallVectorImpl<AvailableValue> &AvailableValues) {
   SILValue Address = DAI->getOperand();
-  
+
   // We cannot promote destroys of address-only types, because we can't expose
   // the load.
   SILType LoadTy = Address->getType().getObjectType();
@@ -987,24 +1000,46 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   llvm::SmallBitVector RequiredElts(NumMemorySubElements);
   RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
 
-  SmallVector<AvailableValue, 8> AvailableValues;
-  AvailableValues.resize(NumMemorySubElements);
-  
   // Find out if we have any available values.  If no bits are demanded, we
   // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements != 0) {
-    computeAvailableValues(DAI, RequiredElts, AvailableValues);
+  if (NumLoadSubElements == 0)
+    return true;
 
-    // If some value is not available at this load point, then we fail.
-    if (llvm::any_of(range(FirstElt, FirstElt + NumLoadSubElements),
-                     [&](unsigned i) -> bool { return !AvailableValues[i]; }))
-      return false;
-  }
-  
+  llvm::SmallVector<AvailableValue, 8> TmpList;
+  TmpList.resize(NumMemorySubElements);
+  computeAvailableValues(DAI, RequiredElts, TmpList);
+
+  // If some value is not available at this load point, then we fail.
+  if (llvm::any_of(range(FirstElt, FirstElt + NumLoadSubElements),
+                   [&](unsigned i) -> bool { return !TmpList[i]; }))
+    return false;
+
+  // Now that we have our final list, move the temporary lists contents into
+  // AvailableValues.
+  std::move(TmpList.begin(), TmpList.end(),
+            std::back_inserter(AvailableValues));
+
+  return true;
+}
+
+/// promoteDestroyAddr - DestroyAddr is a composed operation merging
+/// load+strong_release.  If the implicit load's value is available, explode it.
+///
+/// Note that we handle the general case of a destroy_addr of a piece of the
+/// memory object, not just destroy_addrs of the entire thing.
+void AllocOptimize::promoteDestroyAddr(
+    DestroyAddrInst *DAI, MutableArrayRef<AvailableValue> AvailableValues) {
+  SILValue Address = DAI->getOperand();
+  SILType LoadTy = Address->getType().getObjectType();
+
+  // Compute the access path down to the field so we can determine precise
+  // def/use behavior.
+  unsigned FirstElt = computeSubelement(Address, TheMemory);
+
   // Aggregate together all of the subelements into something that has the same
   // type as the load did, and emit smaller) loads for any subelements that were
   // not available.
-  AvailableValueAggregator Agg(DAI, AvailableValues);
+  AvailableValueAggregator Agg(DAI, AvailableValues, Uses);
   SILValue NewVal = Agg.aggregateValues(LoadTy, Address, FirstElt);
 
   ++NumDestroyAddrPromoted;
@@ -1014,10 +1049,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
 
   SILBuilderWithScope(DAI).emitDestroyValueOperation(DAI->getLoc(), NewVal);
   DAI->eraseFromParent();
-  return true;
 }
-
-
 
 /// Explode a copy_addr instruction of a loadable type into lower level
 /// operations like loads, stores, retains, releases, retain_value, etc.
@@ -1171,15 +1203,53 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
 
   // If the memory object has non-trivial type, then removing the deallocation
   // will drop any releases.  Check that there is nothing preventing removal.
+  llvm::SmallVector<unsigned, 8> DestroyAddrIndices;
+  llvm::SmallVector<AvailableValue, 32> AvailableValueList;
+  llvm::SmallVector<unsigned, 8> AvailableValueStartOffsets;
+
   if (!MemoryType.isTrivial(Module)) {
-    for (auto *R : Releases) {
+    for (auto P : llvm::enumerate(Releases)) {
+      auto *R = P.value();
       if (R == nullptr || isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
         continue;
+
+      // We stash all of the destroy_addr that we see.
+      if (auto *DAI = dyn_cast<DestroyAddrInst>(R)) {
+        AvailableValueStartOffsets.push_back(AvailableValueList.size());
+        // Make sure we can actually promote this destroy addr. If we can not,
+        // then we must bail. In order to not gather available values twice, we
+        // gather the available values here that we will use to promote the
+        // values.
+        if (!canPromoteDestroyAddr(DAI, AvailableValueList))
+          return false;
+        DestroyAddrIndices.push_back(P.index());
+        continue;
+      }
 
       DEBUG(llvm::dbgs() << "*** Failed to remove autogenerated alloc: "
             "kept alive by release: " << *R);
       return false;
     }
+  }
+
+  // If we reached this point, we can promote all of our destroy_addr.
+  for (auto P : llvm::enumerate(DestroyAddrIndices)) {
+    unsigned DestroyAddrIndex = P.value();
+    unsigned AvailableValueIndex = P.index();
+    unsigned StartOffset = AvailableValueStartOffsets[AvailableValueIndex];
+    unsigned Count;
+
+    if ((AvailableValueStartOffsets.size() - 1) != AvailableValueIndex) {
+      Count = AvailableValueStartOffsets[AvailableValueIndex + 1] - StartOffset;
+    } else {
+      Count = AvailableValueList.size() - StartOffset;
+    }
+
+    MutableArrayRef<AvailableValue> Values(&AvailableValueList[StartOffset],
+                                           Count);
+    auto *DAI = cast<DestroyAddrInst>(Releases[DestroyAddrIndex]);
+    promoteDestroyAddr(DAI, Values);
+    Releases[DestroyAddrIndex] = nullptr;
   }
 
   DEBUG(llvm::dbgs() << "*** Removing autogenerated alloc_stack: "<<*TheMemory);
@@ -1214,16 +1284,6 @@ bool AllocOptimize::doIt() {
     }
   }
   
-  // destroy_addr(p) is strong_release(load(p)), try to promote it too.
-  for (unsigned i = 0; i != Releases.size(); ++i) {
-    if (auto *DAI = dyn_cast_or_null<DestroyAddrInst>(Releases[i]))
-      if (promoteDestroyAddr(DAI)) {
-        // remove entry if destroy_addr got deleted.
-        Releases[i] = nullptr;
-        Changed = true;
-      }
-  }
-
   // If this is an allocation, try to remove it completely.
   Changed |= tryToRemoveDeadAllocation();
 
