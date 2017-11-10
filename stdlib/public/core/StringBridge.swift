@@ -45,22 +45,6 @@ func _stdlib_binary_CFStringGetCharactersPtr(
   return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
-/// Bridges `source` to `Swift.String`, assuming that `source` has non-ASCII
-/// characters (does not apply ASCII optimizations).
-@_versioned // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
-func _cocoaStringToSwiftString_NonASCII(
-  _ source: _CocoaString
-) -> String {
-  let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
-  let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
-  let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
-  return String(_StringGuts(NonTaggedCocoaString(
-        cfImmutableValue,
-        isSingleByte: false,
-        start: start)))
-}
-
 /// Loading Foundation initializes these function variables
 /// with useful values
 
