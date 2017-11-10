@@ -272,16 +272,36 @@ SyntaxParsingContextRoot &SyntaxParsingContextChild::getRoot() {
 
 SyntaxParsingContextChild::
 SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-      Optional<SyntaxContextKind> Kind, Optional<SyntaxKind> KnownSyntax):
+      Optional<SyntaxContextKind> ContextKind, Optional<SyntaxKind> KnownSyntax):
     SyntaxParsingContext(*ContextHolder), Parent(ContextHolder),
-    ContextHolder(ContextHolder), Kind(Kind), KnownSyntax(KnownSyntax) {
-  assert(Kind.hasValue() != KnownSyntax.hasValue());
+    ContextHolder(ContextHolder), ContextKind(ContextKind),
+    KnownSyntax(KnownSyntax) {
   ContextHolder = this;
   if (ContextData.Enabled)
     ContextData.setContextStart(Tok.getLoc());
 }
 
+void SyntaxParsingContextChild::setSyntaxKind(SyntaxKind SKind) {
+  assert(!ContextKind.hasValue());
+  assert(!KnownSyntax.hasValue());
+  KnownSyntax = SKind;
+}
+
+void SyntaxParsingContextChild::setContextKind(SyntaxContextKind CKind) {
+  assert(!ContextKind.hasValue());
+  assert(!KnownSyntax.hasValue());
+  ContextKind = CKind;
+}
+
+SyntaxParsingContextChild::
+SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder, bool Disable):
+    SyntaxParsingContextChild(ContextHolder, None, None) {
+  if (Disable)
+    disable();
+}
+
 void SyntaxParsingContextChild::makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) {
+  assert(isTopOfContextStack());
   if (!ContextData.Enabled)
     return;
   auto UsedTokens = ContextData.dropTokenAt(LastTokLoc);
@@ -309,6 +329,8 @@ void SyntaxParsingContextChild::makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) 
 
 void SyntaxParsingContextChild::makeNodeWhole(SyntaxKind Kind) {
   assert(ContextData.Enabled);
+  assert(isTopOfContextStack());
+
   auto EndLoc = Tok.getLoc();
   auto AllNodes = ContextData.collectAllSyntax(EndLoc);
   switch (Kind) {
@@ -367,7 +389,8 @@ void RawSyntaxInfo::brigeWithContext(SyntaxContextKind Kind) {
   }
 }
 
-SyntaxParsingContextChild::~SyntaxParsingContextChild() {
+void SyntaxParsingContextChild::finalize() {
+  assert(isTopOfContextStack());
   SWIFT_DEFER {
     // Reset the context holder to be Parent.
     ContextHolder = Parent;
@@ -375,7 +398,7 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   if (!ContextData.Enabled)
     return;
 
-  assert(Kind.hasValue() != KnownSyntax.hasValue());
+  assert(ContextKind.hasValue() != KnownSyntax.hasValue());
   SourceLoc EndLoc = Tok.getLoc();
   if (KnownSyntax) {
     // If the entire context should be created to a known syntax kind, create
@@ -397,7 +420,7 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
     // If we have only one syntax node remaining, we are done.
     auto Result = AllNodes.front();
     // Bridge the syntax node to the expected context kind.
-    Result.brigeWithContext(*Kind);
+    Result.brigeWithContext(*ContextKind);
     Parent->ContextData.addPendingSyntax(Result);
     return;
   }
@@ -407,7 +430,7 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   SourceLoc Start = AllNodes.front().getStartLoc();
   SourceLoc End = AllNodes.back().getEndLoc();
   SyntaxKind UnknownKind;
-  switch (*Kind) {
+  switch (*ContextKind) {
     case SyntaxContextKind::Expr:
       UnknownKind = SyntaxKind::UnknownExpr;
       break;
@@ -421,4 +444,9 @@ SyntaxParsingContextChild::~SyntaxParsingContextChild() {
   // Create an unknown node and give it to the parent context.
   Parent->ContextData.addPendingSyntax({SourceRange(Start, End),
     makeUnknownSyntax(UnknownKind, SyntaxNodes).getRaw()});
+}
+
+SyntaxParsingContextChild::~SyntaxParsingContextChild() {
+  if (isTopOfContextStack())
+    finalize();
 }

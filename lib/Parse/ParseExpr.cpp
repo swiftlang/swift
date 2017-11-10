@@ -1807,11 +1807,9 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // Create a syntax node for string literal.
   SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr, Tok.getLoc());
-  SyntaxParsingContextChild LocalContext(SyntaxContext,
-                                         SyntaxContextKind::Expr);
 
   // FIXME: Avoid creating syntax nodes for string interpolation.
-  LocalContext.disable();
+  SyntaxParsingContextChild LocalContext(SyntaxContext, /*disabled*/true);
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
@@ -1996,11 +1994,10 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   SourceLoc lparenLoc = consumeToken(tok::l_paren);
   SourceLoc rparenLoc;
   while (true) {
-    SyntaxParsingContextChild DisabledContext(SyntaxContext,
-                                              SyntaxContextKind::Expr);
     // The following code may backtrack; so we disable the syntax tree creation
     // in this scope.
-    DisabledContext.disable();
+    SyntaxParsingContextChild DisabledContext(SyntaxContext, /*disabled*/true);
+
     // Terminate at ')'.
     if (Tok.is(tok::r_paren)) {
       rparenLoc = consumeToken(tok::r_paren);
@@ -2149,6 +2146,7 @@ Expr *Parser::parseExprIdentifier() {
 
 Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
                                          Identifier PlaceholderId) {
+  SyntaxParsingContextChild DisableContext(SyntaxContext, /*disabled*/true);
   assert(PlaceholderTok.is(tok::identifier));
   assert(PlaceholderId.isEditorPlaceholder());
 
@@ -3095,8 +3093,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
 ///     expr-dictionary
 //      lsquare-starting ']'
 ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
-  SyntaxParsingContextChild ArrayOrDictContext(SyntaxContext,
-                                              SyntaxContextKind::Expr);
+  SyntaxParsingContextChild ArrayOrDictContext(SyntaxContext);
 
   // If the caller didn't already consume the '[', do so now.
   if (LSquareLoc.isInvalid())
@@ -3108,6 +3105,8 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
+    // FIXME: Handle empty array syntax node.
+    ArrayOrDictContext.setSyntaxKind(SyntaxKind::ArrayExpr);
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     return makeParserResult(
                     ArrayExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
@@ -3115,6 +3114,8 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
 
   // [:] is always an empty dictionary.
   if (Tok.is(tok::colon) && peekToken().is(tok::r_square)) {
+    // FIXME: Handle empty dictionary syntax node.
+    ArrayOrDictContext.setSyntaxKind(SyntaxKind::DictionaryExpr);
     consumeToken(tok::colon);
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     return makeParserResult(
@@ -3125,9 +3126,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
   {
     BacktrackingScope Scope(*this);
     // Disable the syntax tree creation in the context.
-    SyntaxParsingContextChild DisabledContext(SyntaxContext,
-                                              SyntaxContextKind::Expr);
-    DisabledContext.disable();
+    SyntaxParsingContextChild DisabledContext(SyntaxContext, /*disabled*/true);
     auto HasDelayedDecl = State->hasDelayedDecl();
     // Parse the first expression.
     ParserResult<Expr> FirstExpr
@@ -3137,6 +3136,7 @@ ParserResult<Expr> Parser::parseExprCollection(SourceLoc LSquareLoc) {
       if (Tok.is(tok::r_square))
         consumeToken();
       Scope.cancelBacktrack();
+      ArrayOrDictContext.setContextKind(SyntaxContextKind::Expr);
       return FirstExpr;
     }
     if (!HasDelayedDecl)
