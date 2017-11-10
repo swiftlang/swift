@@ -1176,7 +1176,8 @@ void ExtensionDecl::addedMember(Decl *member) {
       return;
 
     auto nominal = getExtendedType()->getAnyNominal();
-    if (nominal->LookupTable.getPointer()) {
+    if (nominal->LookupTable.getPointer() &&
+        nominal->LookupTable.getInt()) {
       // Make sure we have the complete list of extensions.
       // FIXME: This is completely unnecessary. We want to determine whether
       // our own extension has already been included in the lookup table.
