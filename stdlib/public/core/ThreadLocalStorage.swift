@@ -85,13 +85,10 @@ internal struct _ThreadLocalStorage {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   static internal func getUBreakIterator(
-    for core: _LegacyStringCore
+    for guts: _StringGuts
   ) -> OpaquePointer {
-    _sanityCheck(core._owner != nil || core._baseAddress != nil,
-      "invalid StringCore")
-    let corePtr: UnsafeMutablePointer<UTF16.CodeUnit> = core.startUTF16
-    return getUBreakIterator(
-      for: UnsafeBufferPointer(start: corePtr, count: core.count))
+    let unsafeString = guts._unmanagedContiguous.unsafelyUnwrapped
+    return getUBreakIterator(for: unsafeString.utf16Buffer)
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
