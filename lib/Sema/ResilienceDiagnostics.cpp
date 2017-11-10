@@ -166,13 +166,6 @@ void TypeChecker::diagnoseResilientConstructor(ConstructorDecl *ctor) {
                  : diag::designated_init_inlineable_resilient,
                nominalDecl->getDeclaredInterfaceType(),
                getFragileFunctionKind(ctor));
-    } else {
-      // A designated initializer defined on an extension of a resilient
-      // type from a different resilience domain cannot initialize stored
-      // properties directly, and must chain to another initializer.
-      diagnose(ctor->getLoc(),
-               diag::designated_init_in_extension_resilient,
-               nominalDecl->getDeclaredInterfaceType());
     }
   }
 }

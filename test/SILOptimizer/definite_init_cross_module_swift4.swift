@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module_swift4/OtherModule.swift
-// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 4 %s > /dev/null -import-objc-header %S/Inputs/definite_init_cross_module_swift4/BridgingHeader.h
+// RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
+// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 4 %s > /dev/null -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
 import OtherModule
 

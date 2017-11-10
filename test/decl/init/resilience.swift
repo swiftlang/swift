@@ -6,14 +6,6 @@
 import resilient_struct
 import resilient_protocol
 
-// Point is @_fixed_layout -- this is OK
-extension Point {
-  init(xx: Int, yy: Int) {
-    self.x = xx
-    self.y = yy
-  }
-}
-
 // Size is not @_fixed_layout, so we cannot define a new designated initializer
 extension Size {
   init(ww: Int, hh: Int) {
