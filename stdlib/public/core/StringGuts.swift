@@ -555,7 +555,7 @@ internal struct OpaqueCocoaString {
   @_versioned
   @_inlineable // FIXME(sil-serialize-all)
   subscript(bounds: Range<Int>) -> _StringGuts {
-    return makeCocoaStringGuts(_cocoaString: _cocoaStringSlice(object, bounds))
+    return _makeCocoaStringGuts(_cocoaStringSlice(object, bounds))
   }
 }
 
@@ -795,7 +795,7 @@ extension _StringGuts {
       _sanityCheck(legacyCore._owner != nil, "Cocoa string with no owner")
       let owner = legacyCore._owner._unsafelyUnwrappedUnchecked
 
-      let guts = makeCocoaStringGuts(_cocoaString: owner)
+      let guts = _makeCocoaStringGuts(owner)
       if _fastPath(guts.count == legacyCore.count) {
         self = guts
         return
@@ -820,7 +820,7 @@ extension _StringGuts {
       _sanityCheck(unsafe._pointer(toElementAt: unsafe.count) >= sliceEnd)
 
       let offset = sliceStart - unsafe.baseAddress
-      self = makeCocoaStringGuts(_cocoaString:
+      self = _makeCocoaStringGuts(
         _cocoaStringSlice(owner, offset ..< offset + legacyCore.count))
       return
     }
