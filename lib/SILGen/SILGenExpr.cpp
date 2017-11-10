@@ -1890,9 +1890,11 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
   case AnyFunctionType::Representation::Swift: {
     switch (sourceTy->getRepresentation()) {
     case SILFunctionType::Representation::Thin: {
-      auto v = SGF.B.createThinToThickFunction(loc, source.getValue(),
-        SILType::getPrimitiveObjectType(
-         adjustFunctionType(sourceTy, SILFunctionType::Representation::Thick)));
+      auto v = SGF.B.createThinToThickFunction(
+          loc, source.getValue(),
+          SILType::getPrimitiveObjectType(adjustFunctionType(
+              sourceTy, SILFunctionType::Representation::Thick,
+              SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts)));
       // FIXME: what if other reabstraction is required?
       return ManagedValue(v, source.getCleanup());
     }
@@ -1916,9 +1918,11 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     switch (sourceTy->getRepresentation()) {
     case SILFunctionType::Representation::Thin: {
       // Make thick first.
-      auto v = SGF.B.createThinToThickFunction(loc, source.getValue(),
-        SILType::getPrimitiveObjectType(
-         adjustFunctionType(sourceTy, SILFunctionType::Representation::Thick)));
+      auto v = SGF.B.createThinToThickFunction(
+          loc, source.getValue(),
+          SILType::getPrimitiveObjectType(adjustFunctionType(
+              sourceTy, SILFunctionType::Representation::Thick,
+              SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts)));
       source = ManagedValue(v, source.getCleanup());
       LLVM_FALLTHROUGH;
     }
