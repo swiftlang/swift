@@ -59,6 +59,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -256,38 +257,12 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   assert(bufferID && "frontend should have a buffer ID "
          "for the main source file");
 
-  // Get a full token stream with associated Trivia.
-  syntax::TokenPositionList tokens =
-    tokenizeWithTrivia(LangOpts, SM, *bufferID);
-
-  llvm::SmallVector<Decl *, 16> topLevelDecls;
-  SF->getTopLevelDecls(topLevelDecls);
-
-  // Convert the old ASTs to the Syntax tree and print
-  // them out.
-  SyntaxASTMap ASTMap;
-  std::vector<RC<syntax::RawSyntax>> topLevelRaw;
-  for (auto *decl : topLevelDecls) {
-    if (decl->escapedFromIfConfig()) {
-      continue;
-    }
-    auto newNode = transformAST(ASTNode(decl), ASTMap, SM, *bufferID, tokens);
-    if (newNode.hasValue()) {
-      topLevelRaw.push_back(newNode->getRaw());
-    }
-  }
-
-  // Push the EOF token -- this ensures that any remaining trivia in the
-  // file is serialized as the EOF's leading trivia.
-  if (!tokens.empty() && tokens.back().first->getTokenKind() == tok::eof) {
-    topLevelRaw.push_back(tokens.back().first);
-  }
-
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
   json::Output jsonOut(*os);
-  jsonOut << topLevelRaw;
+  auto Root = SF->getSyntaxRoot().getRaw();
+  jsonOut << Root;
   *os << "\n";
   return false;
 }
@@ -536,6 +511,9 @@ static bool performCompile(CompilerInstance &Instance,
                            UnifiedStatsReporter *Stats) {
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
+
+  Instance.getASTContext().LangOpts.KeepSyntaxInfoInSourceFile =
+    Action == FrontendOptions::EmitSyntax;
 
   // We've been asked to precompile a bridging header; we want to
   // avoid touching any other inputs and just parse, emit and exit.
