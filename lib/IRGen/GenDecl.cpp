@@ -1471,7 +1471,8 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 llvm::Function *irgen::createFunction(IRGenModule &IGM,
                                       LinkInfo &linkInfo,
                                       const Signature &signature,
-                                      llvm::Function *insertBefore) {
+                                      llvm::Function *insertBefore,
+                                      OptimizationMode FuncOptMode) {
   auto name = linkInfo.getName();
 
   llvm::Function *existing = IGM.Module.getFunction(name);
@@ -1500,7 +1501,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
  }
 
   llvm::AttrBuilder initialAttrs;
-  IGM.constructInitialFnAttributes(initialAttrs);
+  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
   // Merge initialAttrs with attrs.
   auto updatedAttrs =
     signature.getAttributes().addAttributes(IGM.getLLVMContext(),
@@ -1882,7 +1883,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::ReadOnly);
   }
-  fn = createFunction(*this, link, signature, insertBefore);
+  fn = createFunction(*this, link, signature, insertBefore,
+                      f->getOptimizationMode());
 
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {
