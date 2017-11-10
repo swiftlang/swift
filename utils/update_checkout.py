@@ -481,8 +481,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     # Quick check whether somebody is calling update in an empty directory
     directory_contents = os.listdir(SWIFT_SOURCE_ROOT)
-    if not ('cmark' in directory_contents and 
-        'llvm' in directory_contents and
+    if not ('cmark' in directory_contents or 
+        'llvm' in directory_contents or
         'clang' in directory_contents):
         print("You don't have all swift sources. "
         "Call this script with --clone to get them.")
