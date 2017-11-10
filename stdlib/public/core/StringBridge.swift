@@ -140,8 +140,8 @@ internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   return 0x0600
 }
 
-internal func getCocoaPointer(
-  _cocoaString cfImmutableValue: AnyObject
+internal func _getCocoaStringPointer(
+  _ cfImmutableValue: _CocoaString
 ) -> (UnsafeRawPointer?, isUTF16: Bool)  {
   // Look first for null-terminated ASCII
   // Note: the code in clownfish appears to guarantee
@@ -166,22 +166,22 @@ internal func getCocoaPointer(
 @_versioned
 @inline(never) // Hide the CF dependency
 internal
-func makeCocoaStringGuts(_cocoaString: _CocoaString) -> _StringGuts {
-  if let wrapped = _cocoaString as? _NSContiguousString {
+func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
+  if let wrapped = cocoaString as? _NSContiguousString {
     return wrapped._guts
   }
-  if _isObjCTaggedPointer(_cocoaString) {
-    return _StringGuts(SmallCocoaString(_cocoaString))
+  if _isObjCTaggedPointer(cocoaString) {
+    return _StringGuts(SmallCocoaString(cocoaString))
   }
   // "copy" it into a value to be sure nobody will modify behind
   // our backs.  In practice, when value is already immutable, this
   // just does a retain.
   let cfImmutableValue
-    = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
+    = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
   
-  let (start, isUTF16) = getCocoaPointer(_cocoaString: cfImmutableValue)
+  let (start, isUTF16) = _getCocoaStringPointer(cfImmutableValue)
   return _StringGuts(NonTaggedCocoaString(
-      _cocoaString,
+      cocoaString,
       isSingleByte: !isUTF16,
       start: start))
 }
@@ -210,7 +210,7 @@ func makeCocoaLegacyStringCore(_cocoaString: AnyObject) -> _LegacyStringCore {
 
   // start will hold the base pointer of contiguous storage, if it
   // is found.
-  let (start, isUTF16) = getCocoaPointer(_cocoaString: cfImmutableValue)
+  let (start, isUTF16) = _getCocoaStringPointer(cfImmutableValue)
 
   return _LegacyStringCore(
     baseAddress: UnsafeMutableRawPointer(mutating: start),
@@ -223,7 +223,7 @@ func makeCocoaLegacyStringCore(_cocoaString: AnyObject) -> _LegacyStringCore {
 extension String {
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
-    self._guts = makeCocoaStringGuts(_cocoaString: _cocoaString)
+    self._guts = _makeCocoaStringGuts(_cocoaString)
   }
 }
 
