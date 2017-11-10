@@ -146,9 +146,11 @@ static bool shouldUseDispatchThunk(SILDeclRef constant,
 
   // In non-WMO builds, classes in other translation units use
   // dispatch thunks.
-  if (dc->getParentModule() == M.getSwiftModule()) {
-    if (M.getAssociatedContext() != dc)
-      return true;
+  if (!M.isWholeModule()) {
+    if (dc->getParentModule() == M.getSwiftModule()) {
+      if (M.getAssociatedContext() != dc)
+        return true;
+    }
   }
 
   // FIXME: If the function is inlinable, but the module is not
