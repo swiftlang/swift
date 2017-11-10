@@ -988,7 +988,7 @@ static void checkForViolationsInNoEscapeClosures(
     // Check the closure's captures, which are a suffix of the closure's
     // parameters.
     unsigned StartIndex =
-        Closure->getArguments().size() - PAI->getNumCallArguments();
+        Closure->getArguments().size() - PAI->getNumArguments();
     checkForViolationWithCall(Accesses, Closure, StartIndex,
                               PAI->getArguments(), ASA, ConflictingAccesses);
   }

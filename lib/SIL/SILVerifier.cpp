@@ -929,9 +929,9 @@ public:
     // Check that the arguments and result match.
     SILFunctionConventions substConv(substTy, F.getModule());
     //require(site.getArguments().size() == substTy->getNumSILArguments(),
-    require(site.getNumCallArguments() == substConv.getNumSILArguments(),
+    require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
-    for (size_t i = 0, size = site.getNumCallArguments(); i < size; ++i) {
+    for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
       requireSameType(site.getArguments()[i]->getType(),
                       substConv.getSILArgumentType(i),
                       "operand of 'apply' doesn't match function input type");

@@ -33,6 +33,14 @@
 using namespace swift;
 using namespace Lowering;
 
+/// Allocate an instruction that inherits from llvm::TrailingObjects<>.
+template <class Inst, class... TrailingTypes, class... CountTypes>
+static void *allocateTrailingInst(SILFunction &F, CountTypes... counts) {
+  return F.getModule().allocateInst(
+             Inst::template totalSizeToAlloc<TrailingTypes...>(counts...),
+             alignof(Inst));
+}
+
 // Collect used open archetypes from a given type into the \p openedArchetypes.
 // \p openedArchetypes is being used as a set. We don't use a real set type here
 // for performance reasons.
@@ -423,7 +431,9 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionList Subs,
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                SubstCalleeSILTy.getSwiftRValueType(), Subs);
-  void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
+  void *Buffer =
+    allocateTrailingInst<ApplyInst, Operand, Substitution>(
+      F, getNumAllOperands(Args, TypeDependentOperands), Subs.size());
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
                                  TypeDependentOperands, isNonThrowing,
@@ -435,10 +445,6 @@ bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
     if (auto *F = FRI->getReferencedFunction())
       return F->hasSemanticsAttr(semantics);
   return false;
-}
-
-void *swift::allocateApplyInst(SILFunction &F, size_t size, size_t alignment) {
-  return F.getModule().allocateInst(size, alignment);
 }
 
 PartialApplyInst::PartialApplyInst(
@@ -467,7 +473,9 @@ PartialApplyInst *PartialApplyInst::create(
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                SubstCalleeTy.getSwiftRValueType(), Subs);
-  void *Buffer = allocate(F, Subs, TypeDependentOperands, Args);
+  void *Buffer =
+    allocateTrailingInst<PartialApplyInst, Operand, Substitution>(
+      F, getNumAllOperands(Args, TypeDependentOperands), Subs.size());
   return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
                                         Subs, Args,
                                         TypeDependentOperands, ClosureType,
@@ -491,20 +499,22 @@ TryApplyInst::TryApplyInst(
                       errorBB) {}
 
 TryApplyInst *TryApplyInst::create(
-    SILDebugLocation Loc, SILValue callee, SubstitutionList subs,
+    SILDebugLocation loc, SILValue callee, SubstitutionList subs,
     ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
-    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-    const GenericSpecializationInformation *SpecializationInfo) {
+    SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
+    const GenericSpecializationInformation *specializationInfo) {
   SILType substCalleeTy =
       callee->getType().substGenericArgs(F.getModule(), subs);
 
-  SmallVector<SILValue, 32> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+  SmallVector<SILValue, 32> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
                                substCalleeTy.getSwiftRValueType(), subs);
-  void *buffer = allocate(F, subs, TypeDependentOperands, args);
-  return ::new (buffer) TryApplyInst(Loc, callee, substCalleeTy, subs, args,
-                                     TypeDependentOperands,
-                                     normalBB, errorBB, SpecializationInfo);
+  void *buffer =
+    allocateTrailingInst<TryApplyInst, Operand, Substitution>(
+      F, getNumAllOperands(args, typeDependentOperands), subs.size());
+  return ::new (buffer) TryApplyInst(loc, callee, substCalleeTy, subs, args,
+                                     typeDependentOperands,
+                                     normalBB, errorBB, specializationInfo);
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
