@@ -181,3 +181,19 @@ extension NonnullWrapper {
     // zeroing initializer.
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
+
+
+extension PrivatePoint {
+  init(xxx: Double, yyy: Double) {
+    // This is OK
+    self.init(x: xxx, y: yyy)
+  }
+
+  init(other: PrivatePoint) {
+    // This is OK
+    self = other
+  }
+
+  init() {
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}

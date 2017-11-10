@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/OtherModule.swiftmodule %S/Inputs/definite_init_cross_module/OtherModule.swift
-// RUN: %target-swift-frontend -emit-sil -verify -I %t -swift-version 4 %s > /dev/null -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
+// RUN: %target-swift-frontend -emit-sil -verify -verify-ignore-unknown -I %t -swift-version 4 %s > /dev/null -import-objc-header %S/Inputs/definite_init_cross_module/BridgingHeader.h
 
 import OtherModule
 
@@ -220,4 +220,22 @@ extension NonnullWrapper {
     // No suggestion for "self.init()" because this struct does not support a
     // zeroing initializer.
   }
+}
+
+
+extension PrivatePoint {
+  init(xxx: Double, yyy: Double) {
+    // This is OK
+    self.init(x: xxx, y: yyy)
+  }
+
+  init(other: PrivatePoint) {
+    // This is OK
+    self = other
+  }
+
+  // Ideally we wouldn't mention the names of non-public stored properties
+  // across module boundaries, but this will go away in Swift 5 mode anyway.
+  init() {
+  } // expected-error {{return from initializer without initializing all stored properties}}
 }

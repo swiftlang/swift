@@ -24,3 +24,12 @@ public struct GenericPoint<T> {
     self.y = y
   }
 }
+
+public struct PrivatePoint {
+  private var x, y: Double
+
+  public init(x: Double, y: Double) {
+    self.x = x
+    self.y = y
+  }
+}
