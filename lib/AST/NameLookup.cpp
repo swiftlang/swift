@@ -1024,15 +1024,6 @@ public:
     return Lookup.find(name);
   }
 
-  /// \brief Add an empty entry to the lookup map for a given name if it does
-  /// not yet have one.
-  void addEmptyEntry(DeclName name) {
-    (void)Lookup[name];
-    if (!name.isSimpleName()) {
-      (void)Lookup[name.getBaseName()];
-    }
-  }
-
   // \brief Mark all Decls in this table as not-resident in a table, drop
   // references to them. Should only be called when this was not fully-populated
   // from an IterableDeclContext.
@@ -1289,13 +1280,14 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
                                           MemberLookupTable &LookupTable,
                                           DeclName name,
                                           IterableDeclContext *IDC) {
+  if (IDC->isLoadingLazyMembers()) {
+    return false;
+  }
+  IDC->setLoadingLazyMembers(true);
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
-  // Populate LookupTable with an empty vector before we call into our loader,
-  // so that any reentry of this routine will find the set-so-far, and not
-  // fall into infinite recursion.
-  LookupTable.addEmptyEntry(name);
   if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
+    IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
     }
@@ -1304,6 +1296,7 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
     }
     return false;
   } else {
+    IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
     }
