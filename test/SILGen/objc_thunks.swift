@@ -106,7 +106,7 @@ class Hoozit : Gizmo {
   // CHECK:   [[RES:%.*]] = apply [[FR]]([[VALUE_COPY]], [[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
-  // CHECK:   return [[RES]] : $(), scope {{.*}} // id: {{.*}} line:[[@LINE-34]]:13:auto_gen
+  // CHECK:   return [[RES]] : $(), loc {{.*}}, scope {{.*}} // id: {{.*}} line:[[@LINE-34]]:13:auto_gen
   // CHECK: } // end sil function '_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCvsTo'
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCvs
