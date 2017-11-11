@@ -31,5 +31,6 @@ class C {
     _ = [1:1, 2:2, 3:3, 4:4]
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
+    foo(nil, nil, nil)
   }
 }

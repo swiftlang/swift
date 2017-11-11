@@ -46,6 +46,18 @@ EXPR_NODES = [
              Child('Identifier', kind='IdentifierToken'),
          ]),
 
+    # A nil expression.
+    Node('NilLiteralExpr', kind='Expr',
+         children=[
+             Child('NilKeyword', kind='NilToken'),
+    ]),
+
+    # A _ expression.
+    Node('DiscardAssignmentExpr', kind='Expr',
+         children=[
+             Child('Wildcard', kind='WildcardToken'),
+    ]),
+
     # A #line expression.
     Node('PoundLineExpr', kind='Expr',
          children=[
