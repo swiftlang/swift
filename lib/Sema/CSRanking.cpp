@@ -553,6 +553,34 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
                          cast<ProtocolDecl>(outerDC2)->getDeclaredType(),
                          locator);
+
+        // The conditional requirements may be relevant for solving this system
+        // or for matching up the specialized-ness, but we're not actually
+        // entirely convinced this is necessary, since it seems like these are
+        // all guaranteed to be satisfied (since we already know we can call/use
+        // this decl).
+        for (auto requirement : conformance->getConditionalRequirements()) {
+          auto openedFirst =
+              cs.openType(requirement.getFirstType(), replacements);
+
+          Optional<Requirement> openedRequirement;
+          auto kind = requirement.getKind();
+          switch (kind) {
+          case RequirementKind::Conformance:
+          case RequirementKind::Superclass:
+          case RequirementKind::SameType: {
+            auto openedSecond =
+                cs.openType(requirement.getSecondType(), replacements);
+            openedRequirement = Requirement(kind, openedFirst, openedSecond);
+            break;
+          }
+          case RequirementKind::Layout:
+            openedRequirement = Requirement(kind, openedFirst,
+                                            requirement.getLayoutConstraint());
+          }
+          cs.addConstraint(*openedRequirement, locator);
+        }
+
         break;
 
       case SelfTypeRelationship::ConformedToBy:
@@ -561,15 +589,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                          cast<ProtocolDecl>(outerDC1)->getDeclaredType(),
                          locator);
         break;
-      }
-
-      if (conformance) {
-        assert(relationshipKind == SelfTypeRelationship::ConformsTo ||
-               relationshipKind == SelfTypeRelationship::ConformedToBy);
-
-        for (auto requirement : conformance->getConditionalRequirements()) {
-          cs.addConstraint(requirement, locator);
-        }
       }
 
       bool fewerEffectiveParameters = false;
