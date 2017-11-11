@@ -240,8 +240,8 @@ SILFunction *SILModule::getOrCreateFunction(
   assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
-    assert(fn->getLinkage() == linkage ||
-           stripExternalFromLinkage(fn->getLinkage()) == linkage);
+    assert(stripExternalFromLinkage(fn->getLinkage()) ==
+           stripExternalFromLinkage(linkage));
     return fn;
   }
 
