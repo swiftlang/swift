@@ -18,6 +18,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/Support/Compiler.h"
@@ -2606,11 +2607,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       // This conformance may be conditional, in which case we need to consider
       // those requirements as constraints too.
       //
-      // FIXME: this doesn't seem to be right; the requirements are sometimes
-      // phrased in terms of the type's generic parameters, not type variables
-      // in this context.
-      for (auto req : conformance->getConditionalRequirements()) {
-        addConstraint(req, locator);
+      // If we've got a normal conformance, we must've started with `type` in
+      // the context that declares the conformance, and so these requirements
+      // are automatically satisfied, and thus we can skip adding them. (This
+      // hacks around some representational problems caused by requirements
+      // being stored as interface types and the normal conformance's type being
+      // a contextual type. Once the latter is fixed and everything is interface
+      // types, this shouldn't be necessary.)
+      if (conformance->isConcrete() &&
+          conformance->getConcrete()->getKind() !=
+              ProtocolConformanceKind::Normal) {
+        for (auto req : conformance->getConditionalRequirements()) {
+          addConstraint(req, locator);
+        }
       }
       return SolutionKind::Solved;
     }
