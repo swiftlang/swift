@@ -2,7 +2,7 @@
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
 // RUN: %empty-directory(%t)
-// RUN: %build-silgen-test-overlays-enable-guaranteed-closure-contexts
+// RUN: %build-silgen-test-overlays-guaranteed-closure-contexts
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership -enable-guaranteed-closure-contexts %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
