@@ -1,8 +1,3 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
-
-// Too many pointer-sized integers in the IR
-// REQUIRES: PTRSIZE=64
-
 public func takes_p1<T: P1>(_: T.Type) {}
 public protocol P1 {
   associatedtype AT1
