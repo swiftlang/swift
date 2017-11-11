@@ -313,98 +313,100 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
     line: UInt(_line))
 }
 
-/// Returns a Boolean value indicating whether two optional instances are
-/// equal.
-///
-/// Use this equal-to operator (`==`) to compare any two optional instances of
-/// a type that conforms to the `Equatable` protocol. The comparison returns
-/// `true` if both arguments are `nil` or if the two arguments wrap values
-/// that are equal. Conversely, the comparison returns `false` if only one of
-/// the arguments is `nil` or if the two arguments wrap values that are not
-/// equal.
-///
-///     let group1 = [1, 2, 3, 4, 5]
-///     let group2 = [1, 3, 5, 7, 9]
-///     if group1.first == group2.first {
-///         print("The two groups start the same.")
-///     }
-///     // Prints "The two groups start the same."
-///
-/// You can also use this operator to compare a non-optional value to an
-/// optional that wraps the same type. The non-optional value is wrapped as an
-/// optional before the comparison is made. In the following example, the
-/// `numberToMatch` constant is wrapped as an optional before comparing to the
-/// optional `numberFromString`:
-///
-///     let numberToFind: Int = 23
-///     let numberFromString: Int? = Int("23")      // Optional(23)
-///     if numberToFind == numberFromString {
-///         print("It's a match!")
-///     }
-///     // Prints "It's a match!"
-///
-/// An instance that is expressed as a literal can also be used with this
-/// operator. In the next example, an integer literal is compared with the
-/// optional integer `numberFromString`. The literal `23` is inferred as an
-/// `Int` instance and then wrapped as an optional before the comparison is
-/// performed.
-///
-///     if 23 == numberFromString {
-///         print("It's a match!")
-///     }
-///     // Prints "It's a match!"
-///
-/// - Parameters:
-///   - lhs: An optional value to compare.
-///   - rhs: Another optional value to compare.
-@_inlineable
-public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l == r
-  case (nil, nil):
-    return true
-  default:
-    return false
+extension Optional where Wrapped : Equatable {
+  /// Returns a Boolean value indicating whether two optional instances are
+  /// equal.
+  ///
+  /// Use this equal-to operator (`==`) to compare any two optional instances of
+  /// a type that conforms to the `Equatable` protocol. The comparison returns
+  /// `true` if both arguments are `nil` or if the two arguments wrap values
+  /// that are equal. Conversely, the comparison returns `false` if only one of
+  /// the arguments is `nil` or if the two arguments wrap values that are not
+  /// equal.
+  ///
+  ///     let group1 = [1, 2, 3, 4, 5]
+  ///     let group2 = [1, 3, 5, 7, 9]
+  ///     if group1.first == group2.first {
+  ///         print("The two groups start the same.")
+  ///     }
+  ///     // Prints "The two groups start the same."
+  ///
+  /// You can also use this operator to compare a non-optional value to an
+  /// optional that wraps the same type. The non-optional value is wrapped as an
+  /// optional before the comparison is made. In the following example, the
+  /// `numberToMatch` constant is wrapped as an optional before comparing to the
+  /// optional `numberFromString`:
+  ///
+  ///     let numberToFind: Int = 23
+  ///     let numberFromString: Int? = Int("23")      // Optional(23)
+  ///     if numberToFind == numberFromString {
+  ///         print("It's a match!")
+  ///     }
+  ///     // Prints "It's a match!"
+  ///
+  /// An instance that is expressed as a literal can also be used with this
+  /// operator. In the next example, an integer literal is compared with the
+  /// optional integer `numberFromString`. The literal `23` is inferred as an
+  /// `Int` instance and then wrapped as an optional before the comparison is
+  /// performed.
+  ///
+  ///     if 23 == numberFromString {
+  ///         print("It's a match!")
+  ///     }
+  ///     // Prints "It's a match!"
+  ///
+  /// - Parameters:
+  ///   - lhs: An optional value to compare.
+  ///   - rhs: Another optional value to compare.
+  @_inlineable
+  public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
+    switch (lhs, rhs) {
+    case let (l?, r?):
+      return l == r
+    case (nil, nil):
+      return true
+    default:
+      return false
+    }
   }
-}
-
-/// Returns a Boolean value indicating whether two optional instances are not
-/// equal.
-///
-/// Use this not-equal-to operator (`!=`) to compare any two optional instances
-/// of a type that conforms to the `Equatable` protocol. The comparison
-/// returns `true` if only one of the arguments is `nil` or if the two
-/// arguments wrap values that are not equal. The comparison returns `false`
-/// if both arguments are `nil` or if the two arguments wrap values that are
-/// equal.
-///
-///     let group1 = [2, 4, 6, 8, 10]
-///     let group2 = [1, 3, 5, 7, 9]
-///     if group1.first != group2.first {
-///         print("The two groups start differently.")
-///     }
-///     // Prints "The two groups start differently."
-///
-/// You can also use this operator to compare a non-optional value to an
-/// optional that wraps the same type. The non-optional value is wrapped as an
-/// optional before the comparison is made. In this example, the
-/// `numberToMatch` constant is wrapped as an optional before comparing to the
-/// optional `numberFromString`:
-///
-///     let numberToFind: Int = 23
-///     let numberFromString: Int? = Int("not-a-number")      // nil
-///     if numberToFind != numberFromString {
-///         print("No match.")
-///     }
-///     // Prints "No match."
-///
-/// - Parameters:
-///   - lhs: An optional value to compare.
-///   - rhs: Another optional value to compare.
-@_inlineable
-public func != <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
-  return !(lhs == rhs)
+  
+  /// Returns a Boolean value indicating whether two optional instances are not
+  /// equal.
+  ///
+  /// Use this not-equal-to operator (`!=`) to compare any two optional instances
+  /// of a type that conforms to the `Equatable` protocol. The comparison
+  /// returns `true` if only one of the arguments is `nil` or if the two
+  /// arguments wrap values that are not equal. The comparison returns `false`
+  /// if both arguments are `nil` or if the two arguments wrap values that are
+  /// equal.
+  ///
+  ///     let group1 = [2, 4, 6, 8, 10]
+  ///     let group2 = [1, 3, 5, 7, 9]
+  ///     if group1.first != group2.first {
+  ///         print("The two groups start differently.")
+  ///     }
+  ///     // Prints "The two groups start differently."
+  ///
+  /// You can also use this operator to compare a non-optional value to an
+  /// optional that wraps the same type. The non-optional value is wrapped as an
+  /// optional before the comparison is made. In this example, the
+  /// `numberToMatch` constant is wrapped as an optional before comparing to the
+  /// optional `numberFromString`:
+  ///
+  ///     let numberToFind: Int = 23
+  ///     let numberFromString: Int? = Int("not-a-number")      // nil
+  ///     if numberToFind != numberFromString {
+  ///         print("No match.")
+  ///     }
+  ///     // Prints "No match."
+  ///
+  /// - Parameters:
+  ///   - lhs: An optional value to compare.
+  ///   - rhs: Another optional value to compare.
+  @_inlineable
+  public static func !=(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
+    return !(lhs == rhs)
+  }
 }
 
 // Enable pattern matching against the nil literal, even if the element type
