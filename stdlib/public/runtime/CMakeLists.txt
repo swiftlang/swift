@@ -193,8 +193,8 @@ foreach(sdk ${ELFISH_SDKS})
       OUTPUT
           "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
       DEPENDS
-          "${section_magic_begin_obj}"
-          "${section_magic_loader_obj}")
+          "section_magic_begin-${arch_suffix}"
+          "section_magic_loader-${arch_suffix}")
 
     add_custom_command_target(section_magic_${arch_suffix}_end_object
       COMMAND
@@ -204,7 +204,7 @@ foreach(sdk ${ELFISH_SDKS})
       OUTPUT
           "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
       DEPENDS
-          "${section_magic_end_obj}")
+          "section_magic_end-${arch_suffix}")
 
     list(APPEND object_target_list
         "${section_magic_${arch_suffix}_begin_object}"
@@ -227,7 +227,7 @@ foreach(sdk ${ELFISH_SDKS})
         OUTPUT
             "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
         DEPENDS
-            "${section_magic_begin_obj}")
+            "section_magic_begin-${arch_suffix}")
 
       add_custom_command_target(static_section_magic_${arch_suffix}_end_object
         COMMAND
@@ -237,7 +237,7 @@ foreach(sdk ${ELFISH_SDKS})
         OUTPUT
             "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
         DEPENDS
-            "${section_magic_end_obj}")
+            "section_magic_end-${arch_suffix}")
 
       list(APPEND object_target_list
             "${static_section_magic_${arch_suffix}_begin_object}"
