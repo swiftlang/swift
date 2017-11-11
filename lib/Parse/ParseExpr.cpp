@@ -1419,10 +1419,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprStringLiteral();
     break;
   
-  case tok::kw_nil:
+  case tok::kw_nil: {
+    SyntaxParsingContextChild NilContext(SyntaxContext, SyntaxKind::NilLiteralExpr);
     Result = makeParserResult(
                       new (Context) NilLiteralExpr(consumeToken(tok::kw_nil)));
     break;
+  }
 
   case tok::kw_true:
   case tok::kw_false: {
@@ -1518,10 +1520,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
 
     // If the next token is '_', parse a discard expression.
-  case tok::kw__:
+  case tok::kw__: {
+    SyntaxParsingContextChild DAContext(SyntaxContext,
+                                        SyntaxKind::DiscardAssignmentExpr);
     Result = makeParserResult(
       new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
     break;
+  }
 
   case tok::pound_selector: // expr-selector
     Result = parseExprSelector();
