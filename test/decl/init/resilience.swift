@@ -54,10 +54,30 @@ public struct Animal {
 
 public class Widget {
   public let name: String
+  
+  public init(nonInlinableName name: String) {
+    self.name = name
+  }
 
   @_inlineable public init(name: String) {
     // expected-error@-1 {{initializer for class 'Widget' is '@_inlineable' and must delegate to another initializer}}
     self.name = name
+  }
+
+  @_inlineable public convenience init(goodName name: String) {
+    // This is OK
+    self.init(nonInlinableName: name)
+  }
+}
+
+public protocol Gadget {
+  init()
+}
+
+extension Gadget {
+  @_inlineable public init(unused: Int) {
+    // This is OK
+    self.init()
   }
 }
 
