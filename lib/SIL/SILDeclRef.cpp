@@ -772,6 +772,22 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   llvm_unreachable("bad entity kind!");
 }
 
+bool SILDeclRef::requiresNewVTableEntry() const {
+  if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
+    return true;
+  if (kind == SILDeclRef::Kind::Allocator) {
+    auto *cd = cast<ConstructorDecl>(getDecl());
+    if (cd->isRequired()) {
+      auto *baseCD = cd->getOverriddenDecl();
+      if(!baseCD ||
+         !baseCD->isRequired() ||
+         baseCD->hasClangNode())
+        return true;
+    }
+  }
+  return false;
+}
+
 SILDeclRef SILDeclRef::getOverridden() const {
   if (!hasDecl())
     return SILDeclRef();
