@@ -6157,7 +6157,6 @@ protected:
       : NonValueInstruction(K, DebugLoc) {}
 
 public:
-
   using ConstSuccessorListTy = ArrayRef<SILSuccessor>;
   using SuccessorListTy = MutableArrayRef<SILSuccessor>;
 
@@ -6165,6 +6164,83 @@ public:
   SuccessorListTy getSuccessors();
   ConstSuccessorListTy getSuccessors() const {
     return const_cast<TermInst*>(this)->getSuccessors();
+  }
+
+  using const_succ_iterator = ConstSuccessorListTy::const_iterator;
+  using succ_iterator = SuccessorListTy::iterator;
+
+  bool succ_empty() const { return getSuccessors().empty(); }
+  succ_iterator succ_begin() { return getSuccessors().begin(); }
+  succ_iterator succ_end() { return getSuccessors().end(); }
+  const_succ_iterator succ_begin() const { return getSuccessors().begin(); }
+  const_succ_iterator succ_end() const { return getSuccessors().end(); }
+
+  unsigned getNumSuccessors() const { return getSuccessors().size(); }
+
+  using succblock_iterator =
+      TransformIterator<SILSuccessor *,
+                        std::function<SILBasicBlock *(const SILSuccessor &)>>;
+  using const_succblock_iterator = TransformIterator<
+      const SILSuccessor *,
+      std::function<const SILBasicBlock *(const SILSuccessor &)>>;
+  succblock_iterator succblock_begin() {
+    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().begin(), F);
+  }
+  succblock_iterator succblock_end() {
+    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().end(), F);
+  }
+  const_succblock_iterator succblock_begin() const {
+    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().begin(), F);
+  }
+  const_succblock_iterator succblock_end() const {
+    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformIterator(getSuccessors().end(), F);
+  }
+
+  SILBasicBlock *getSingleSuccessorBlock() {
+    if (succ_empty() || std::next(succ_begin()) != succ_end())
+      return nullptr;
+    return *succ_begin();
+  }
+
+  const SILBasicBlock *getSingleSuccessorBlock() const {
+    return const_cast<TermInst *>(this)->getSingleSuccessorBlock();
+  }
+
+  /// \brief Returns true if \p BB is a successor of this block.
+  bool isSuccessorBlock(SILBasicBlock *BB) const {
+    auto Range = getSuccessorBlocks();
+    return any_of(Range, [&BB](const SILBasicBlock *SuccBB) -> bool {
+      return BB == SuccBB;
+    });
+  }
+
+  using SuccessorBlockListTy =
+      TransformRange<SuccessorListTy,
+                     std::function<SILBasicBlock *(const SILSuccessor &)>>;
+  using ConstSuccessorBlockListTy =
+      TransformRange<ConstSuccessorListTy, std::function<const SILBasicBlock *(
+                                               const SILSuccessor &)>>;
+
+  /// Return the range of SILBasicBlocks that are successors of this block.
+  SuccessorBlockListTy getSuccessorBlocks() {
+    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformRange(getSuccessors(), F);
+  }
+
+  /// Return the range of SILBasicBlocks that are successors of this block.
+  ConstSuccessorBlockListTy getSuccessorBlocks() const {
+    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
+    FuncTy F(&SILSuccessor::getBB);
+    return makeTransformRange(getSuccessors(), F);
   }
 
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(TermInst)
