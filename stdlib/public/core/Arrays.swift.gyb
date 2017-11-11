@@ -2187,7 +2187,7 @@ extension _ArrayBufferProtocol {
 
 % for (Self, a_Self) in arrayTypes:
 
-extension ${Self} where Element : Equatable {
+extension ${Self} : Equatable where Element : Equatable {
   /// Returns `true` if these arrays contain the same elements.
   @_inlineable
   public static func ==(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {

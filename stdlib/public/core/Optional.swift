@@ -313,7 +313,7 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
     line: UInt(_line))
 }
 
-extension Optional where Wrapped : Equatable {
+extension Optional : Equatable where Wrapped : Equatable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
