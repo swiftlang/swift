@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership -enable-guaranteed-closure-contexts %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
@@ -39,6 +40,16 @@ import Foundation
   dynamic func bar(_ f: (String) -> String, x: String) -> String {
     return f(x)
   }
+
+  // GUARANTEED-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0So8NSStringCABIyBya_S2SIgxo_TR : $@convention(thin) (@owned String, @guaranteed @convention(block) @noescape (NSString) -> @autoreleased NSString) -> @owned String {
+  // GUARANTEED: bb0(%0 : @owned $String, %1 : @guaranteed $@convention(block) @noescape (NSString) -> @autoreleased NSString):
+  // GUARANTEED:   [[BRIDGE:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // GUARANTEED:   [[STR:%.*]] = begin_borrow %0 : $String
+  // GUARANTEED:   [[NSSTR:%.*]] = apply [[BRIDGE]]([[STR]])
+  // GUARANTEED:   [[BLOCK_COPY:%.*]] = copy_value %1 : $@convention(block) @noescape (NSString) -> @autoreleased NSString
+  // GUARANTEED:   apply [[BLOCK_COPY]]([[NSSTR]]) : $@convention(block) @noescape (NSString) -> @autoreleased NSString
+  // GUARANTEED:   destroy_value [[BLOCK_COPY]] : $@convention(block) @noescape (NSString) -> @autoreleased NSString
+  // GUARANTEED: } // end sil function '_T0So8NSStringCABIyBya_S2SIgxo_TR'
 
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3basSSSgA2Ec_AE1xtFTo : $@convention(objc_method) (@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
   // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Foo):
