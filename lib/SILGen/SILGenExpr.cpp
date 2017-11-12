@@ -361,7 +361,8 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
   return ManagedValue(v, enterDestroyCleanup(v));
 }
 
-void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
+void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
+                                  Optional<SILLocation> L) {
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
@@ -372,7 +373,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
 
   RValue result = emitRValue(E, SGFContext(I));
   if (!result.isInContext())
-    std::move(result).forwardInto(*this, E, I);
+    std::move(result).forwardInto(*this, L ? *L : E, I);
 }
 
 namespace {
