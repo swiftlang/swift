@@ -35,6 +35,7 @@
 #include <unistd.h>
 #endif
 #include <climits>
+#include <clocale>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
