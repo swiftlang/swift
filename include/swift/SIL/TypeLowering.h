@@ -79,18 +79,22 @@ adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
 }
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
+                   Optional<ProtocolConformanceRef> witnessMethodConformance,
+                   bool UseGuaranteedClosures) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
-
-  return adjustFunctionType(
-      t, extInfo, extInfo.hasContext() ? DefaultThickCalleeConvention
-                                       : ParameterConvention::Direct_Unowned,
-      witnessMethodConformance);
+  auto contextConvention = UseGuaranteedClosures
+                               ? ParameterConvention::Direct_Guaranteed
+                               : DefaultThickCalleeConvention;
+  return adjustFunctionType(t, extInfo,
+                            extInfo.hasContext()
+                                ? contextConvention
+                                : ParameterConvention::Direct_Unowned,
+                            witnessMethodConformance);
 }
 inline CanSILFunctionType
-adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep) {
-  return adjustFunctionType(t, rep, t->getWitnessMethodConformanceOrNone());
+adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep, bool UseGuaranteedClosures) {
+  return adjustFunctionType(t, rep, t->getWitnessMethodConformanceOrNone(), UseGuaranteedClosures);
 }
   
 

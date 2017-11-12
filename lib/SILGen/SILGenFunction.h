@@ -518,6 +518,8 @@ public:
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
+  /// Generates a resilient method dispatch thunk.
+  void emitDispatchThunk(SILDeclRef constant);
   
   /// Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
@@ -952,7 +954,8 @@ public:
   /// Generate SIL for the given expression, storing the final result into the
   /// specified Initialization buffer(s). This avoids an allocation and copy if
   /// the result would be allocated into temporary memory normally.
-  void emitExprInto(Expr *E, Initialization *I);
+  /// The location defaults to \c E.
+  void emitExprInto(Expr *E, Initialization *I, Optional<SILLocation> L = None);
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());

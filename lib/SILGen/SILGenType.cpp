@@ -170,6 +170,7 @@ class SILGenVTable : public SILVTableVisitor<SILGenVTable> {
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
+  bool hasFixedLayout;
 
   // Map a base SILDeclRef to the corresponding element in vtableMethods.
   llvm::DenseMap<SILDeclRef, unsigned> baseToIndexMap;
@@ -178,8 +179,9 @@ public:
   SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> vtableMethods;
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
-    : SILVTableVisitor(SGM.Types), SGM(SGM), theClass(theClass)
-  { }
+    : SILVTableVisitor(SGM.Types), SGM(SGM), theClass(theClass) {
+    hasFixedLayout = theClass->hasFixedLayout();
+  }
 
   void emitVTable() {
     // Imported types don't have vtables right now.
@@ -260,6 +262,16 @@ public:
     auto result = baseToIndexMap.insert(std::make_pair(member, index));
     assert(result.second);
     (void) result;
+
+    // Emit a method dispatch thunk if the method is public and the
+    // class is resilient.
+    auto *func = cast<AbstractFunctionDecl>(member.getDecl());
+    if (func->getDeclContext() == theClass) {
+      if (!hasFixedLayout &&
+          func->getEffectiveAccess() >= AccessLevel::Public) {
+        SGM.emitDispatchThunk(member);
+      }
+    }
   }
 
   void addPlaceholder(MissingMemberDecl *) {
