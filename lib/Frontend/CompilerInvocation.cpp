@@ -98,6 +98,8 @@ namespace swift {
 /// must match the order given on the command line or the file list. Side note:
 /// since each input file will cause a lot of work for the compiler, this code
 /// is biased towards clarity and not optimized.
+/// In the near future, it will be possible to put primary files in the filelist,
+/// or to have a separate filelist for primaries. The organization here anticipates that evolution.
 
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
