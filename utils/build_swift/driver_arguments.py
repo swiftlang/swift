@@ -243,6 +243,300 @@ def create_argument_parser():
         action="store_false",
         default=True)
 
+    parser.add_argument(
+        "--build-runtime-with-host-compiler",
+        help="Use the host compiler, not the self-built one to compile the "
+             "Swift runtime",
+        action=arguments.action.enable)
+
+    parser.add_argument(
+        "-i", "--ios",
+        help="also build for iOS, but disallow tests that require an iOS "
+             "device",
+        action="store_true")
+    parser.add_argument(
+        "-I", "--ios-all",
+        help="also build for iOS, and allow all iOS tests",
+        action="store_true",
+        dest="ios_all")
+    parser.add_argument(
+        "--skip-ios",
+        help="set to skip everything iOS-related",
+        dest="ios",
+        action="store_false")
+
+    parser.add_argument(
+        "--tvos",
+        help="also build for tvOS, but disallow tests that require a tvos "
+             "device",
+        action=arguments.action.enable)
+    parser.add_argument(
+        "--tvos-all",
+        help="also build for tvOS, and allow all tvOS tests",
+        action=arguments.action.enable,
+        dest="tvos_all")
+    parser.add_argument(
+        "--skip-tvos",
+        help="set to skip everything tvOS-related",
+        dest="tvos",
+        action="store_false")
+
+    parser.add_argument(
+        "--watchos",
+        help="also build for watchOS, but disallow tests that require an "
+             "watchOS device",
+        action=arguments.action.enable)
+    parser.add_argument(
+        "--watchos-all",
+        help="also build for Apple watchOS, and allow all Apple watchOS tests",
+        action=arguments.action.enable,
+        dest="watchos_all")
+    parser.add_argument(
+        "--skip-watchos",
+        help="set to skip everything watchOS-related",
+        dest="watchos",
+        action="store_false")
+
+    parser.add_argument(
+        "--android",
+        help="also build for Android",
+        action=arguments.action.enable)
+
+    parser.add_argument(
+        "--swift-analyze-code-coverage",
+        help="enable code coverage analysis in Swift (false, not-merged, "
+             "merged).",
+        choices=["false", "not-merged", "merged"],
+        # so CMake can see the inert mode as a false value
+        default=defaults.SWIFT_ANALYZE_CODE_COVERAGE,
+        dest="swift_analyze_code_coverage")
+
+    parser.add_argument(
+        "--build-subdir",
+        help="name of the directory under $SWIFT_BUILD_ROOT where the build "
+             "products will be placed",
+        metavar="PATH")
+    parser.add_argument(
+        "--install-prefix",
+        help="The installation prefix. This is where built Swift products "
+             "(like bin, lib, and include) will be installed.",
+        metavar="PATH",
+        default=targets.install_prefix())
+    parser.add_argument(
+        "--install-symroot",
+        help="the path to install debug symbols into",
+        metavar="PATH")
+
+    parser.add_argument(
+        "-j", "--jobs",
+        help="the number of parallel build jobs to use",
+        type=int,
+        dest="build_jobs",
+        default=multiprocessing.cpu_count())
+
+    parser.add_argument(
+        "--darwin-xcrun-toolchain",
+        help="the name of the toolchain to use on Darwin",
+        default=defaults.DARWIN_XCRUN_TOOLCHAIN)
+    parser.add_argument(
+        "--cmake",
+        help="the path to a CMake executable that will be used to build "
+             "Swift",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--show-sdks",
+        help="print installed Xcode and SDK versions",
+        action=arguments.action.enable)
+
+    parser.add_argument(
+        "--extra-swift-args",
+        help="Pass through extra flags to swift in the form of a cmake list "
+             "'module_regexp;flag'. Can be called multiple times to add "
+             "multiple such module_regexp flag pairs. All semicolons in flags "
+             "must be escaped with a '\\'",
+        action="append", dest="extra_swift_args", default=[])
+
+    parser.add_argument(
+        "--host-cc",
+        help="the absolute path to CC, the 'clang' compiler for the host "
+             "platform. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--host-cxx",
+        help="the absolute path to CXX, the 'clang++' compiler for the host "
+             "platform. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--host-lipo",
+        help="the absolute path to lipo. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--host-libtool",
+        help="the absolute path to libtool. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--distcc",
+        help="use distcc in pump mode",
+        action=arguments.action.enable)
+    parser.add_argument(
+        "--enable-asan",
+        help="enable Address Sanitizer",
+        action=arguments.action.enable)
+    parser.add_argument(
+        "--enable-ubsan",
+        help="enable Undefined Behavior Sanitizer",
+        action=arguments.action.enable)
+    parser.add_argument(
+        "--enable-tsan",
+        help="enable Thread Sanitizer for swift tools",
+        action=arguments.action.enable)
+    parser.add_argument(
+        "--enable-tsan-runtime",
+        help="enable Thread Sanitizer on the swift runtime",
+        action=arguments.action.enable)
+    parser.add_argument(
+        "--enable-lsan",
+        help="enable Leak Sanitizer for swift tools",
+        action=arguments.action.enable)
+
+    parser.add_argument(
+        "--compiler-vendor",
+        choices=["none", "apple"],
+        default=defaults.COMPILER_VENDOR,
+        help="Compiler vendor name")
+    parser.add_argument(
+        "--clang-compiler-version",
+        help="string that indicates a compiler version for Clang",
+        type=arguments.type.clang_compiler_version,
+        metavar="MAJOR.MINOR.PATCH")
+    parser.add_argument(
+        "--clang-user-visible-version",
+        help="User-visible version of the embedded Clang and LLVM compilers",
+        type=arguments.type.clang_compiler_version,
+        default=defaults.CLANG_USER_VISIBLE_VERSION,
+        metavar="MAJOR.MINOR.PATCH")
+    parser.add_argument(
+        "--swift-compiler-version",
+        help="string that indicates a compiler version for Swift",
+        type=arguments.type.swift_compiler_version,
+        metavar="MAJOR.MINOR")
+    parser.add_argument(
+        "--swift-user-visible-version",
+        help="User-visible version of the embedded Swift compiler",
+        type=arguments.type.swift_compiler_version,
+        default=defaults.SWIFT_USER_VISIBLE_VERSION,
+        metavar="MAJOR.MINOR")
+
+    parser.add_argument(
+        "--darwin-deployment-version-osx",
+        help="minimum deployment target version for OS X",
+        metavar="MAJOR.MINOR",
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX)
+    parser.add_argument(
+        "--darwin-deployment-version-ios",
+        help="minimum deployment target version for iOS",
+        metavar="MAJOR.MINOR",
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS)
+    parser.add_argument(
+        "--darwin-deployment-version-tvos",
+        help="minimum deployment target version for tvOS",
+        metavar="MAJOR.MINOR",
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS)
+    parser.add_argument(
+        "--darwin-deployment-version-watchos",
+        help="minimum deployment target version for watchOS",
+        metavar="MAJOR.MINOR",
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS)
+
+    parser.add_argument(
+        "--extra-cmake-options",
+        help="Pass through extra options to CMake in the form of comma "
+             "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
+             "called multiple times to add multiple such options.",
+        action=arguments.action.concat,
+        type=arguments.type.shell_split,
+        default=[])
+
+    parser.add_argument(
+        "--build-args",
+        help="arguments to the build tool. This would be prepended to the "
+             "default argument that is '-j8' when CMake generator is "
+             "\"Ninja\".",
+        type=arguments.type.shell_split,
+        default=[])
+
+    parser.add_argument(
+        "--verbose-build",
+        help="print the commands executed during the build",
+        action=arguments.action.enable)
+
+    parser.add_argument(
+        "--lto",
+        help="use lto optimization on llvm/swift tools. This does not "
+             "imply using lto on the swift standard library or runtime. "
+             "Options: thin, full. If no optional arg is provided, full is "
+             "chosen by default",
+        metavar="LTO_TYPE",
+        nargs='?',
+        choices=['thin', 'full'],
+        default=None,
+        const='full',
+        dest='lto_type')
+
+    parser.add_argument(
+        "--clang-profile-instr-use",
+        help="profile file to use for clang PGO",
+        metavar="PATH")
+
+    default_max_lto_link_job_counts = host.max_lto_link_job_counts()
+    parser.add_argument(
+        "--llvm-max-parallel-lto-link-jobs",
+        help="the maximum number of parallel link jobs to use when compiling "
+             "llvm",
+        metavar="COUNT",
+        default=default_max_lto_link_job_counts['llvm'])
+
+    parser.add_argument(
+        "--swift-tools-max-parallel-lto-link-jobs",
+        help="the maximum number of parallel link jobs to use when compiling "
+             "swift tools.",
+        metavar="COUNT",
+        default=default_max_lto_link_job_counts['swift'])
+
+    parser.add_argument("--enable-sil-ownership",
+                        help="Enable the SIL ownership model",
+                        action='store_true')
+
+    parser.add_argument("--force-optimized-typechecker",
+                        help="Force the type checker to be built with "
+                        "optimization",
+                        action='store_true')
+
+    parser.add_argument(
+        # Explicitly unavailable options here.
+        "--build-jobs",
+        "--common-cmake-options",
+        "--only-execute",
+        "--skip-test-optimize-for-size",
+        "--skip-test-optimized",
+        action=arguments.action.unavailable)
+
+    parser.add_argument(
+        "--lit-args",
+        help="lit args to use when testing",
+        metavar="LITARGS",
+        default="-sv")
+
+    parser.add_argument(
+        "--coverage-db",
+        help="coverage database to use when prioritizing testing",
+        metavar="PATH")
+
     targets_group = parser.add_argument_group(
         title="Host and cross-compilation targets")
     targets_group.add_argument(
@@ -599,11 +893,6 @@ iterations with -O",
         dest='test_cygwin',
         action=arguments.action.disable,
         help="skip testing Swift stdlibs for Cygwin")
-    parser.add_argument(
-        "--build-runtime-with-host-compiler",
-        help="Use the host compiler, not the self-built one to compile the "
-             "Swift runtime",
-        action=arguments.action.enable)
 
     run_build_group = parser.add_argument_group(
         title="Run build")
@@ -791,114 +1080,6 @@ iterations with -O",
         help="skip testing Android device targets on the host machine (the "
              "phone itself)")
 
-    parser.add_argument(
-        "-i", "--ios",
-        help="also build for iOS, but disallow tests that require an iOS "
-             "device",
-        action="store_true")
-    parser.add_argument(
-        "-I", "--ios-all",
-        help="also build for iOS, and allow all iOS tests",
-        action="store_true",
-        dest="ios_all")
-    parser.add_argument(
-        "--skip-ios",
-        help="set to skip everything iOS-related",
-        dest="ios",
-        action="store_false")
-
-    parser.add_argument(
-        "--tvos",
-        help="also build for tvOS, but disallow tests that require a tvos "
-             "device",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--tvos-all",
-        help="also build for tvOS, and allow all tvOS tests",
-        action=arguments.action.enable,
-        dest="tvos_all")
-    parser.add_argument(
-        "--skip-tvos",
-        help="set to skip everything tvOS-related",
-        dest="tvos",
-        action="store_false")
-
-    parser.add_argument(
-        "--watchos",
-        help="also build for watchOS, but disallow tests that require an "
-             "watchOS device",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--watchos-all",
-        help="also build for Apple watchOS, and allow all Apple watchOS tests",
-        action=arguments.action.enable,
-        dest="watchos_all")
-    parser.add_argument(
-        "--skip-watchos",
-        help="set to skip everything watchOS-related",
-        dest="watchos",
-        action="store_false")
-
-    parser.add_argument(
-        "--android",
-        help="also build for Android",
-        action=arguments.action.enable)
-
-    parser.add_argument(
-        "--swift-analyze-code-coverage",
-        help="enable code coverage analysis in Swift (false, not-merged, "
-             "merged).",
-        choices=["false", "not-merged", "merged"],
-        # so CMake can see the inert mode as a false value
-        default=defaults.SWIFT_ANALYZE_CODE_COVERAGE,
-        dest="swift_analyze_code_coverage")
-
-    parser.add_argument(
-        "--build-subdir",
-        help="name of the directory under $SWIFT_BUILD_ROOT where the build "
-             "products will be placed",
-        metavar="PATH")
-    parser.add_argument(
-        "--install-prefix",
-        help="The installation prefix. This is where built Swift products "
-             "(like bin, lib, and include) will be installed.",
-        metavar="PATH",
-        default=targets.install_prefix())
-    parser.add_argument(
-        "--install-symroot",
-        help="the path to install debug symbols into",
-        metavar="PATH")
-
-    parser.add_argument(
-        "-j", "--jobs",
-        help="the number of parallel build jobs to use",
-        type=int,
-        dest="build_jobs",
-        default=multiprocessing.cpu_count())
-
-    parser.add_argument(
-        "--darwin-xcrun-toolchain",
-        help="the name of the toolchain to use on Darwin",
-        default=defaults.DARWIN_XCRUN_TOOLCHAIN)
-    parser.add_argument(
-        "--cmake",
-        help="the path to a CMake executable that will be used to build "
-             "Swift",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--show-sdks",
-        help="print installed Xcode and SDK versions",
-        action=arguments.action.enable)
-
-    parser.add_argument(
-        "--extra-swift-args",
-        help="Pass through extra flags to swift in the form of a cmake list "
-             "'module_regexp;flag'. Can be called multiple times to add "
-             "multiple such module_regexp flag pairs. All semicolons in flags "
-             "must be escaped with a '\\'",
-        action="append", dest="extra_swift_args", default=[])
-
     llvm_group = parser.add_argument_group(
         title="Build settings specific for LLVM")
     llvm_group.add_argument(
@@ -948,186 +1129,6 @@ iterations with -O",
              "will be deployed. If running host tests, specify the '{}' "
              "directory.".format(android.adb.commands.DEVICE_TEMP_DIR),
         default=android.adb.commands.DEVICE_TEMP_DIR,
-        metavar="PATH")
-
-    parser.add_argument(
-        "--host-cc",
-        help="the absolute path to CC, the 'clang' compiler for the host "
-             "platform. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--host-cxx",
-        help="the absolute path to CXX, the 'clang++' compiler for the host "
-             "platform. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--host-lipo",
-        help="the absolute path to lipo. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--host-libtool",
-        help="the absolute path to libtool. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--distcc",
-        help="use distcc in pump mode",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-asan",
-        help="enable Address Sanitizer",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-ubsan",
-        help="enable Undefined Behavior Sanitizer",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-tsan",
-        help="enable Thread Sanitizer for swift tools",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-tsan-runtime",
-        help="enable Thread Sanitizer on the swift runtime",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-lsan",
-        help="enable Leak Sanitizer for swift tools",
-        action=arguments.action.enable)
-
-    parser.add_argument(
-        "--compiler-vendor",
-        choices=["none", "apple"],
-        default=defaults.COMPILER_VENDOR,
-        help="Compiler vendor name")
-    parser.add_argument(
-        "--clang-compiler-version",
-        help="string that indicates a compiler version for Clang",
-        type=arguments.type.clang_compiler_version,
-        metavar="MAJOR.MINOR.PATCH")
-    parser.add_argument(
-        "--clang-user-visible-version",
-        help="User-visible version of the embedded Clang and LLVM compilers",
-        type=arguments.type.clang_compiler_version,
-        default=defaults.CLANG_USER_VISIBLE_VERSION,
-        metavar="MAJOR.MINOR.PATCH")
-    parser.add_argument(
-        "--swift-compiler-version",
-        help="string that indicates a compiler version for Swift",
-        type=arguments.type.swift_compiler_version,
-        metavar="MAJOR.MINOR")
-    parser.add_argument(
-        "--swift-user-visible-version",
-        help="User-visible version of the embedded Swift compiler",
-        type=arguments.type.swift_compiler_version,
-        default=defaults.SWIFT_USER_VISIBLE_VERSION,
-        metavar="MAJOR.MINOR")
-
-    parser.add_argument(
-        "--darwin-deployment-version-osx",
-        help="minimum deployment target version for OS X",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX)
-    parser.add_argument(
-        "--darwin-deployment-version-ios",
-        help="minimum deployment target version for iOS",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS)
-    parser.add_argument(
-        "--darwin-deployment-version-tvos",
-        help="minimum deployment target version for tvOS",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS)
-    parser.add_argument(
-        "--darwin-deployment-version-watchos",
-        help="minimum deployment target version for watchOS",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS)
-
-    parser.add_argument(
-        "--extra-cmake-options",
-        help="Pass through extra options to CMake in the form of comma "
-             "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
-             "called multiple times to add multiple such options.",
-        action=arguments.action.concat,
-        type=arguments.type.shell_split,
-        default=[])
-
-    parser.add_argument(
-        "--build-args",
-        help="arguments to the build tool. This would be prepended to the "
-             "default argument that is '-j8' when CMake generator is "
-             "\"Ninja\".",
-        type=arguments.type.shell_split,
-        default=[])
-
-    parser.add_argument(
-        "--verbose-build",
-        help="print the commands executed during the build",
-        action=arguments.action.enable)
-
-    parser.add_argument(
-        "--lto",
-        help="use lto optimization on llvm/swift tools. This does not "
-             "imply using lto on the swift standard library or runtime. "
-             "Options: thin, full. If no optional arg is provided, full is "
-             "chosen by default",
-        metavar="LTO_TYPE",
-        nargs='?',
-        choices=['thin', 'full'],
-        default=None,
-        const='full',
-        dest='lto_type')
-
-    parser.add_argument(
-        "--clang-profile-instr-use",
-        help="profile file to use for clang PGO",
-        metavar="PATH")
-
-    default_max_lto_link_job_counts = host.max_lto_link_job_counts()
-    parser.add_argument(
-        "--llvm-max-parallel-lto-link-jobs",
-        help="the maximum number of parallel link jobs to use when compiling "
-             "llvm",
-        metavar="COUNT",
-        default=default_max_lto_link_job_counts['llvm'])
-
-    parser.add_argument(
-        "--swift-tools-max-parallel-lto-link-jobs",
-        help="the maximum number of parallel link jobs to use when compiling "
-             "swift tools.",
-        metavar="COUNT",
-        default=default_max_lto_link_job_counts['swift'])
-
-    parser.add_argument("--enable-sil-ownership",
-                        help="Enable the SIL ownership model",
-                        action='store_true')
-
-    parser.add_argument("--force-optimized-typechecker",
-                        help="Force the type checker to be built with "
-                        "optimization",
-                        action='store_true')
-
-    parser.add_argument(
-        # Explicitly unavailable options here.
-        "--build-jobs",
-        "--common-cmake-options",
-        "--only-execute",
-        "--skip-test-optimize-for-size",
-        "--skip-test-optimized",
-        action=arguments.action.unavailable)
-
-    parser.add_argument(
-        "--lit-args",
-        help="lit args to use when testing",
-        metavar="LITARGS",
-        default="-sv")
-
-    parser.add_argument(
-        "--coverage-db",
-        help="coverage database to use when prioritizing testing",
         metavar="PATH")
 
     return parser
