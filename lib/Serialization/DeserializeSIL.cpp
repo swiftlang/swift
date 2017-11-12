@@ -409,7 +409,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
       inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
-  // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
@@ -2486,13 +2485,8 @@ void SILDeserializer::getAllSILFunctions() {
     auto DI = FuncTable->find(*KI);
     assert(DI != FuncTable->end() && "There should never be a key without data.");
 
-    SILFunction *fn = readSILFunction(*DI, nullptr, *KI, false,
-                                      false/*errorIfEmptyBody*/);
-
-    // Update linkage for global addressors to make it pass verifier.
-    if (fn && fn->isGlobalInit() && fn->isExternalDeclaration() &&
-        fn->getLinkage() == SILLinkage::Public)
-      fn->setLinkage(SILLinkage::PublicExternal);
+    readSILFunction(*DI, nullptr, *KI, false,
+                    false/*errorIfEmptyBody*/);
   }
 }
 
