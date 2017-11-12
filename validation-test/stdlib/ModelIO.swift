@@ -6,6 +6,7 @@
 // Currently crashes on iphonesimulator.
 // rdar://35490456
 // UNSUPPORTED: OS=ios
+// UNSUPPORTED: OS=tvos
 
 import StdlibUnittest
 
