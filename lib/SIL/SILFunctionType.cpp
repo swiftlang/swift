@@ -2009,20 +2009,6 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
   return ty->getParameters().back();
 }
 
-static bool requiresNewVTableEntry(SILDeclRef method) {
-  if (cast<AbstractFunctionDecl>(method.getDecl())->needsNewVTableEntry())
-    return true;
-  if (method.kind == SILDeclRef::Kind::Allocator) {
-    auto *ctor = cast<ConstructorDecl>(method.getDecl());
-    if (ctor->isRequired()) {
-      if (!ctor->getOverriddenDecl()->isRequired()
-          || ctor->getOverriddenDecl()->hasClangNode())
-        return true;
-    }
-  }
-  return false;
-}
-
 // This check duplicates TypeConverter::checkForABIDifferences(),
 // but on AST types. The issue is we only want to introduce a new
 // vtable thunk if the AST type changes, but an abstraction change
@@ -2038,7 +2024,7 @@ SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
   SILDeclRef cur = method, next = method;
   do {
     cur = next;
-    if (requiresNewVTableEntry(cur))
+    if (cur.requiresNewVTableEntry())
       return cur;
     next = cur.getNextOverriddenVTableEntry();
   } while (next);
@@ -2116,7 +2102,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   if (found != ConstantOverrideTypes.end())
     return *found->second;
 
-  assert(requiresNewVTableEntry(base) && "base must not be an override");
+  assert(base.requiresNewVTableEntry() && "base must not be an override");
 
   auto baseInfo = getConstantInfo(base);
   auto derivedInfo = getConstantInfo(derived);

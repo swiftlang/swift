@@ -343,6 +343,10 @@ struct SILDeclRef {
   /// to foreign C or ObjC calling convention.
   bool isNativeToForeignThunk() const;
 
+  /// True if the decl ref references a method which introduces a new vtable
+  /// entry.
+  bool requiresNewVTableEntry() const;
+
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const;
