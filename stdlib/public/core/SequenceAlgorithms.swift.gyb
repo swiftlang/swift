@@ -289,7 +289,7 @@ ${equivalenceExplanation}
 % end
 
 //===----------------------------------------------------------------------===//
-// elementsEqual()
+// elementsEqualInIterationOrder()
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -325,9 +325,9 @@ ${equivalenceExplanation}
   ///     let a = 1...3
   ///     let b = 1...10
   ///
-  ///     print(a.elementsEqual(b))
+  ///     print(a.elementsEqualInIterationOrder(b))
   ///     // Prints "false"
-  ///     print(a.elementsEqual([1, 2, 3]))
+  ///     print(a.elementsEqualInIterationOrder([1, 2, 3]))
   ///     // Prints "true"
   ///
   /// - Parameter other: A sequence to compare to this sequence.
@@ -335,14 +335,14 @@ ${equivalenceExplanation}
   ///   in the same order.
 %   end
   @_inlineable
-  public func elementsEqual<OtherSequence>(
+  public func elementsEqualInIterationOrder<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
     by areEquivalent: (Element, Element) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
-    OtherSequence: Sequence,
+    OtherSequence : Sequence,
     OtherSequence.Element == Element {
 
     var iter1 = self.makeIterator()
@@ -360,6 +360,21 @@ ${equivalenceExplanation}
         return true
       }
     }
+  }
+
+  @_inlineable
+  @available(swift, deprecated: 5, renamed: "elementsEqualInIterationOrder(_:)")
+  public func elementsEqual<OtherSequence>(
+    _ other: OtherSequence${"," if preds else ""}
+%   if preds:
+    by areEquivalent: (Element, Element) throws -> Bool
+%   end
+  ) ${rethrows_}-> Bool
+    where
+    OtherSequence : Sequence,
+    OtherSequence.Element == Element {
+
+    return elementsEqualInIterationOrder(other)
   }
 }
 
