@@ -254,13 +254,14 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
                        SourceManager &SM, StringRef OutputFilename) {
   auto bufferID = SF->getBufferID();
   assert(bufferID && "frontend should have a buffer ID "
-                     "for the main source file");
+         "for the main source file");
 
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
   json::Output jsonOut(*os);
-  jsonOut << topLevelRaw;
+  auto Root = SF->getSyntaxRoot().getRaw();
+  jsonOut << Root;
   *os << "\n";
   return false;
 }
