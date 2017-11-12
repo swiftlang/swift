@@ -9,7 +9,7 @@
 
 import os.path
 
-from build_swift.argparse import types, ArgumentTypeError
+from build_swift.argparse import ArgumentTypeError, types
 from build_swift.tests.utils import TestCase
 
 

@@ -7,9 +7,8 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from contextlib import contextmanager
-
 import argparse
+from contextlib import contextmanager
 
 from . import actions
 from .actions import Action

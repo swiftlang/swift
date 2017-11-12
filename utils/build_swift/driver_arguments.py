@@ -6,6 +6,7 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+
 import argparse
 import multiprocessing
 
@@ -14,7 +15,6 @@ import android.adb.commands
 from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
-
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 

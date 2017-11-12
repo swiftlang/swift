@@ -7,8 +7,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from contextlib import contextmanager
-
 try:
     from StringIO import StringIO
 except ImportError:
@@ -17,6 +15,7 @@ except ImportError:
 import os
 import sys
 import unittest
+from contextlib import contextmanager
 
 
 __all__ = [

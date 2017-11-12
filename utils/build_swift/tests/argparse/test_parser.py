@@ -9,7 +9,7 @@
 
 import argparse as std_argparse
 
-from build_swift.argparse import actions, ArgumentParser
+from build_swift.argparse import ArgumentParser, actions
 from build_swift.tests.utils import TestCase
 
 

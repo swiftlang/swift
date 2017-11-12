@@ -8,8 +8,8 @@
 
 
 from build_swift import argparse
-from build_swift.argparse import actions, ArgumentParser, Nargs
-from build_swift.tests.utils import redirect_stderr, TestCase
+from build_swift.argparse import ArgumentParser, Nargs, actions
+from build_swift.tests.utils import TestCase, redirect_stderr
 
 
 # -----------------------------------------------------------------------------
