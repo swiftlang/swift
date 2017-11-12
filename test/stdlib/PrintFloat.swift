@@ -17,7 +17,7 @@ import PrintTestTypes
 let PrintTests = TestSuite("PrintFloat")
 
 PrintTests.setUp {
-  if let localeArgIndex = CommandLine.arguments.index(of: "--locale") {
+  if let localeArgIndex = CommandLine.arguments.firstIndex(of: "--locale") {
     let locale = CommandLine.arguments[localeArgIndex + 1]
     expectEqual("ru_RU.UTF-8", locale)
     setlocale(LC_ALL, locale)

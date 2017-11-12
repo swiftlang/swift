@@ -186,7 +186,7 @@ extension ${Self} : ${TraversalCollection} {
     return _base.count
   }
 
-  // The following requirement enables dispatching for index(of:) when
+  // The following requirement enables dispatching for firstIndex(of:) when
   // the element type is Equatable.
 
   /// Returns `Optional(Optional(index))` if an element was found;
