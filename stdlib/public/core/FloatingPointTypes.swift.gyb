@@ -559,11 +559,11 @@ extension ${Self}: BinaryFloatingPoint {
     // in angles in the wrong quadrant if users aren't careful.  This is
     // not a problem for Double or Float80, as pi rounds down in both of
     // those formats.
-    return 0x1.921fb4p1 as Float
+    return 0x1.921fb4p1
 %elif bits == 64:
-    return 0x1.921fb54442d18p1 as Double
+    return 0x1.921fb54442d18p1
 %elif bits == 80:
-    return 0x1.921fb54442d1846ap1 as Float80
+    return 0x1.921fb54442d1846ap1
 %end
   }
 
