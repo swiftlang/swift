@@ -1125,7 +1125,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
   if (auto *Init = entry.getInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
-    emitExprInto(Init, initialization.get());
+    emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
     initialization->finishUninitialized(*this);
   }
