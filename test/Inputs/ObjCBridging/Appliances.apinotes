@@ -1,0 +1,7 @@
+---
+Name: Appliances
+Classes:
+- Name: APPRefrigerator
+  SwiftBridge: Refrigerator
+- Name: APPManufacturerInfo
+  SwiftBridge: ManufacturerInfo

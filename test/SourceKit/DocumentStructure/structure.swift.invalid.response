@@ -1,49 +1,60 @@
 {
   key.offset: 0,
-  key.length: 70,
+  key.length: 82,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "3",
+      key.offset: 0,
+      key.length: 10,
+      key.nameoffset: 6,
+      key.namelength: 1,
+      key.bodyoffset: 9,
+      key.bodylength: 0
+    },
+    {
       key.kind: source.lang.swift.decl.extension,
       key.name: "OuterCls",
-      key.offset: 0,
+      key.offset: 12,
       key.length: 43,
-      key.nameoffset: 10,
+      key.nameoffset: 22,
       key.namelength: 8,
-      key.bodyoffset: 20,
+      key.bodyoffset: 32,
       key.bodylength: 22,
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.class,
           key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "InnerCls1",
-          key.offset: 23,
+          key.offset: 35,
           key.length: 18,
-          key.nameoffset: 29,
+          key.nameoffset: 41,
           key.namelength: 9,
-          key.bodyoffset: 40,
+          key.bodyoffset: 52,
           key.bodylength: 0
         }
       ]
     },
     {
       key.kind: source.lang.swift.stmt.brace,
-      key.offset: 45,
+      key.offset: 57,
       key.length: 24,
       key.nameoffset: 0,
       key.namelength: 0,
-      key.bodyoffset: 46,
+      key.bodyoffset: 58,
       key.bodylength: 22,
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.class,
           key.accessibility: source.lang.swift.accessibility.private,
           key.name: "MyCoolClass",
-          key.offset: 47,
+          key.offset: 59,
           key.length: 22,
-          key.nameoffset: 53,
+          key.nameoffset: 65,
           key.namelength: 11,
-          key.bodyoffset: 66,
+          key.bodyoffset: 78,
           key.bodylength: 2
         }
       ]
@@ -51,39 +62,23 @@
   ],
   key.diagnostics: [
     {
-      key.line: 5,
-      key.column: 1,
+      key.line: 1,
+      key.column: 7,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
-      key.description: "braced block of statements is an unused closure",
+      key.description: "class name can only start with a letter or underscore, not a number",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
     {
-      key.line: 5,
+      key.line: 7,
       key.column: 1,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
-      key.description: "statement cannot begin with a closure expression",
-      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.diagnostics: [
-        {
-          key.line: 5,
-          key.column: 1,
-          key.filepath: invalid.swift,
-          key.severity: source.diagnostic.severity.note,
-          key.description: "explicitly discard the result of the closure by assigning to '_'",
-          key.fixits: [
-            {
-              key.offset: 45,
-              key.length: 0,
-              key.sourcetext: "_ = "
-            }
-          ]
-        }
-      ]
+      key.description: "top-level statement cannot begin with a closure expression",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
     {
-      key.line: 9,
+      key.line: 11,
       key.column: 1,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
@@ -91,7 +86,7 @@
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.diagnostics: [
         {
-          key.line: 5,
+          key.line: 7,
           key.column: 1,
           key.filepath: invalid.swift,
           key.severity: source.diagnostic.severity.note,

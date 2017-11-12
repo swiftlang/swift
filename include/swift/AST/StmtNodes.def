@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -52,7 +52,6 @@ ABSTRACT_STMT(Labeled, Stmt)
   LABELED_STMT(Do, LabeledStmt)
   LABELED_STMT(DoCatch, LabeledStmt)
   LABELED_STMT(RepeatWhile, LabeledStmt)
-  LABELED_STMT(For, LabeledStmt)
   LABELED_STMT(ForEach, LabeledStmt)
   LABELED_STMT(Switch, LabeledStmt)
   STMT_RANGE(Labeled, If, Switch)
@@ -61,7 +60,6 @@ STMT(Catch, Stmt)
 STMT(Break, Stmt)
 STMT(Continue, Stmt)
 STMT(Fallthrough, Stmt)
-STMT(IfConfig, Stmt)
 STMT(Fail, Stmt)
 STMT(Throw, Stmt)
 

@@ -1,0 +1,166 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class K {
+  func ping() -> Int
+  private func pong() -> Int
+  @objc deinit
+  init()
+}
+
+//CHECK-LABEL: _TFC4test1K4pingfS0_FT_Si
+//CHECK: function_ref @_TFC4test1K4pongfS0_FT_Si
+//CHECK-NEXT: apply
+//CHECK-NEXT: return
+sil @_TFC4test1K4pingfS0_FT_Si : $@convention(method) (@guaranteed K) -> Int {
+bb0(%0 : $K):
+  %1 = class_method %0 : $K, #K.pong!1 : (K) -> () -> Int, $@convention(method) (@guaranteed K) -> Int // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed K) -> Int // user: %3
+  return %2 : $Int                                // id: %3
+}
+
+sil @_TFC5test21K4pongfS0_FT_Si : $@convention(method) (@guaranteed K) -> Int
+sil @_TFC4test1K4pongfS0_FT_Si : $@convention(method) (@guaranteed K) -> Int
+sil @_TFC4test1Kd : $@convention(method) (@guaranteed K) -> @owned Builtin.NativeObject
+sil @_TFC4test1KD : $@convention(method) (@guaranteed K) -> ()
+sil @_TFC4test1KcfMS0_FT_S0_ : $@convention(method) (@owned K) -> @owned K
+sil @_TFC4test1KCfMS0_FT_S0_ : $@convention(thin) (@thick K.Type) -> @owned K
+
+sil_vtable K {
+  #K.ping!1: _TFC4test1K4pingfS0_FT_Si	// test.K.ping (test.K)() -> Swift.Int
+  #K.pong!1: _TFC4test1K4pongfS0_FT_Si	// test.K.pong (test.K)() -> Swift.Int
+  #K.init!initializer.1: _TFC4test1KcfMS0_FT_S0_	// test.K.init (test.K.Type)() -> test.K
+}
+
+
+class X
+{
+  private func ping() -> Int
+  @objc deinit
+  init()
+}
+
+class Y : X
+{
+  @objc deinit
+  override init()
+}
+
+class A
+{
+  private func ping() -> Int
+  @objc deinit
+  init()
+}
+
+class B : A
+{
+  override func ping() -> Int
+  @objc deinit
+  override init()
+}
+
+sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int
+sil public_external [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil @_TFC14devirt_access21Xd : $@convention(method) (@guaranteed X) -> @owned Builtin.NativeObject
+sil @_TFC14devirt_access21XD : $@convention(method) (@guaranteed X) -> ()
+sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X
+sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X
+sil @_TFC14devirt_access21Yd : $@convention(method) (@guaranteed Y) -> @owned Builtin.NativeObject
+sil @_TFC14devirt_access21YD : $@convention(method) (@guaranteed Y) -> ()
+sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @owned Y
+sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y
+sil @_TFC14devirt_access21A4pingfS0_FT_Si : $@convention(method) (@guaranteed A) -> Int
+sil @_TFC14devirt_access21Ad : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject
+sil @_TFC14devirt_access21AD : $@convention(method) (@guaranteed A) -> ()
+sil @_TFC14devirt_access21AcfMS0_FT_S0_ : $@convention(method) (@owned A) -> @owned A
+sil @_TFC14devirt_access21ACfMS0_FT_S0_ : $@convention(thin) (@thick A.Type) -> @owned A
+sil @_TFC14devirt_access21B4pingfS0_FT_Si : $@convention(method) (@guaranteed B) -> Int
+sil @_TFC14devirt_access21Bd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject
+sil @_TFC14devirt_access21BD : $@convention(method) (@guaranteed B) -> ()
+sil @_TFC14devirt_access21BcfMS0_FT_S0_ : $@convention(method) (@owned B) -> @owned B
+sil @_TFC14devirt_access21BCfMS0_FT_S0_ : $@convention(thin) (@thick B.Type) -> @owned B
+
+//CHECK-LABEL: sil @Case1
+//CHECK: function_ref @_TFC14devirt_access21X4pingfS0_FT_Si
+//CHECK-NEXT: apply
+//CHECK: return
+sil @Case1 : $@convention(thin) (@owned X) -> Int {
+bb0(%0 : $X):
+  debug_value %0 : $X, let, name "a" // id: %1
+  strong_retain %0 : $X                           // id: %2
+  %3 = class_method %0 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %4
+  %4 = apply %3(%0) : $@convention(method) (@guaranteed X) -> Int // user: %6
+  strong_release %0 : $X                          // id: %5
+  return %4 : $Int                                // id: %6
+}
+
+//CHECK-LABEL: sil @Case2
+//CHECK: function_ref @_TFC14devirt_access21X4pingfS0_FT_Si
+// Y is an internal class, it has no subclasses and it is a wmo compilation,
+// therefore ping method invocation can be devirtualized.
+//CHECK-NOT: class_method
+//CHECK: apply
+//CHECK-NOT: class_method
+//CHECK: return
+sil @Case2 : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  debug_value %0 : $Y, let, name "a" // id: %1
+  strong_retain %0 : $Y                           // id: %2
+  %3 = upcast %0 : $Y to $X                       // users: %4, %5
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %5
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int // user: %7
+  strong_release %0 : $Y                          // id: %6
+  return %5 : $Int                                // id: %7
+}
+
+//CHECK-LABEL: sil @Case3
+//CHECK: class_method
+//CHECK: return
+sil @Case3 : $@convention(thin) (@owned A) -> Int {
+bb0(%0 : $A):
+  debug_value %0 : $A, let, name "a" // id: %1
+  strong_retain %0 : $A                           // id: %2
+  %3 = class_method %0 : $A, #A.ping!1 : (A) -> () -> Int, $@convention(method) (@guaranteed A) -> Int // user: %4
+  %4 = apply %3(%0) : $@convention(method) (@guaranteed A) -> Int // user: %6
+  strong_release %0 : $A                          // id: %5
+  return %4 : $Int                                // id: %6
+}
+
+//CHECK-LABEL: sil @Case4
+//CHECK: class_method
+//CHECK: return
+sil @Case4 : $@convention(thin) (@owned B) -> Int {
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "a" // id: %1
+  strong_retain %0 : $B                           // id: %2
+  %3 = class_method %0 : $B, #B.ping!1 : (B) -> () -> Int, $@convention(method) (@guaranteed B) -> Int // user: %4
+  %4 = apply %3(%0) : $@convention(method) (@guaranteed B) -> Int // user: %6
+  strong_release %0 : $B                          // id: %5
+  return %4 : $Int                                // id: %6
+}
+
+sil_vtable X {
+  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: _TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+}
+
+sil_vtable Y {
+  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: _TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+}
+
+sil_vtable A {
+  #A.ping!1: _TFC14devirt_access21A4pingfS0_FT_Si	// devirt_access2.A.ping (devirt_access2.A)() -> Swift.Int
+  #A.init!initializer.1: _TFC14devirt_access21AcfMS0_FT_S0_	// devirt_access2.A.init (devirt_access2.A.Type)() -> devirt_access2.A
+}
+
+sil_vtable B {
+  #A.ping!1: _TFC14devirt_access21B4pingfS0_FT_Si	// devirt_access2.B.ping (devirt_access2.B)() -> Swift.Int
+  #A.init!initializer.1: _TFC14devirt_access21BcfMS0_FT_S0_	// devirt_access2.B.init (devirt_access2.B.Type)() -> devirt_access2.B
+}

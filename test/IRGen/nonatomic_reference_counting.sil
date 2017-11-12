@@ -1,0 +1,225 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-sil-perf-optzns -O -Xllvm -swiftmergefunc-threshold=0 -emit-ir %s | %FileCheck %s
+
+// Check that IRGen lowers non-atomic reference counting instructions to
+// proper runtime calls.
+// Check that LLVM passes combine multiple retains/releases into
+// retain_n/release_n and invoke a proper runtime function. Non-atomic runtime
+// functions should be called only if all combined reference-counting
+// instructions are non-atomic.
+//
+// Take into account that on Linux unknown_retain/unknown_release are not supported
+// and native retain/release runtime functions are used instead.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class C {
+  deinit
+  init()
+}
+
+public protocol P : class {
+}
+
+// foo(C) -> C
+sil [noinline] @_TF28nonatomic_reference_counting3fooFCS_1CS0_ : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : $C):
+  return %0 : $C
+}
+
+sil @doSomething : $@convention(thin) () -> ()
+
+// CHECK-LABEL: define {{.*}}@test_strong_nonatomic_rr
+// CHECK: call {{.*}}@swift_rt_swift_nonatomic_retain
+// CHECK: call {{.*}}@swift_rt_swift_nonatomic_release
+// CHECK: ret
+sil @test_strong_nonatomic_rr: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain [nonatomic] %1 : $C
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_release [nonatomic] %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain|swift_rt_swift_nonatomic_retain)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease|swift_rt_swift_nonatomic_release)}}
+// CHECK: ret
+sil @test_unknown_nonatomic_rr: $@convention(thin) <T where T : P> (@owned T) -> () {
+bb0(%0 : $T):
+  strong_retain [nonatomic] %0 : $T
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_release [nonatomic] %0 : $T
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_strong_nonatomic_rr_n
+// CHECK: call {{.*}}@swift_rt_swift_nonatomic_retain_n
+// CHECK: call {{.*}}@swift_rt_swift_nonatomic_release_n
+// CHECK: ret
+sil @test_strong_nonatomic_rr_n: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain [nonatomic] %1 : $C
+  strong_retain [nonatomic] %1 : $C
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_release [nonatomic] %1 : $C
+  strong_release [nonatomic] %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: define {{.*}}@test_strong_mixed_rr_n
+// CHECK: call {{.*}}@swift_rt_swift_retain_n
+// CHECK: call {{.*}}@swift_rt_swift_release_n
+// CHECK: ret
+sil @test_strong_mixed_rr_n: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain [nonatomic] %1 : $C
+  strong_retain %1 : $C
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_release %1 : $C
+  strong_release [nonatomic] %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr_n
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain_n|swift_rt_swift_nonatomic_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease_n|swift_rt_swift_nonatomic_release_n)}}
+// CHECK: ret
+sil @test_unknown_nonatomic_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
+bb0(%0 : $T):
+  strong_retain [nonatomic] %0 : $T
+  strong_retain [nonatomic] %0 : $T
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_release [nonatomic] %0 : $T
+  strong_release [nonatomic] %0 : $T
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_unknown_mixed_rr_n
+// CHECK: call {{.*}}@{{(swift_unknownRetain_n|swift_rt_swift_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_unknownRelease_n|swift_rt_swift_release_n)}}
+// CHECK: ret
+sil @test_unknown_mixed_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
+bb0(%0 : $T):
+  strong_retain [nonatomic] %0 : $T
+  strong_retain %0 : $T
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_release %0 : $T
+  strong_release [nonatomic] %0 : $T
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil @test_unowned_nonatomic_rr: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = ref_to_unowned %0 : $C to $@sil_unowned C
+  unowned_retain [nonatomic] %1 : $@sil_unowned C
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  unowned_release [nonatomic] %1 : $@sil_unowned C
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_bridged_nonatomic_rr
+// CHECK: call {{.*}}@swift_nonatomic_bridgeObjectRetain
+// CHECK: call {{.*}}@swift_nonatomic_bridgeObjectRelease
+// CHECK: ret
+sil @test_bridged_nonatomic_rr: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+  strong_retain [nonatomic] %2 : $Builtin.BridgeObject
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_release [nonatomic] %2 : $Builtin.BridgeObject
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_bridged_nonatomic_rr_n
+// CHECK: call {{.*}}@swift_nonatomic_bridgeObjectRetain_n
+// CHECK: call {{.*}}@swift_nonatomic_bridgeObjectRelease_n
+// CHECK: ret
+sil @test_bridged_nonatomic_rr_n: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+  strong_retain [nonatomic] %2 : $Builtin.BridgeObject
+  strong_retain [nonatomic] %2 : $Builtin.BridgeObject
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  //%f = function_ref @_TF28nonatomic_reference_counting3fooFCS_1CS0_ : $@convention(thin) (@owned C) -> @owned C
+  //%r = apply %f (%0) : $@convention(thin) (@owned C) -> @owned C
+  strong_release [nonatomic] %2 : $Builtin.BridgeObject
+  strong_release [nonatomic] %2 : $Builtin.BridgeObject
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_bridged_mixed_rr_n
+// CHECK: call {{.*}}@swift_bridgeObjectRetain_n
+// CHECK: call {{.*}}@swift_bridgeObjectRelease_n
+// CHECK: ret
+sil @test_bridged_mixed_rr_n: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+  strong_retain [nonatomic] %2 : $Builtin.BridgeObject
+  strong_retain %2 : $Builtin.BridgeObject
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  //%f = function_ref @_TF28nonatomic_reference_counting3fooFCS_1CS0_ : $@convention(thin) (@owned C) -> @owned C
+  //%r = apply %f (%0) : $@convention(thin) (@owned C) -> @owned C
+  strong_release %2 : $Builtin.BridgeObject
+  strong_release [nonatomic] %2 : $Builtin.BridgeObject
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_nonatomic_pin_unpin
+// CHECK: call {{.*}}@swift_rt_swift_nonatomic_tryPin
+// CHECK: call {{.*}}@swift_rt_swift_nonatomic_unpin
+// CHECK: ret
+sil @test_nonatomic_pin_unpin: $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = unchecked_ref_cast %0 : $C to  $Builtin.NativeObject
+  %2 = strong_pin [nonatomic] %1 : $Builtin.NativeObject
+  %f = function_ref @doSomething : $@convention(thin) () -> ()
+  %r = apply %f () : $@convention(thin) () -> ()
+  strong_unpin [nonatomic] %2 : $Optional<Builtin.NativeObject>
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// C.__deallocating_deinit
+sil @_TFC28nonatomic_reference_counting1CD : $@convention(method) (@owned C) -> () {
+bb0(%0 : $C):
+  dealloc_ref %0 : $C
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil_vtable C {
+  #C.deinit!deallocator: _TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+}
+

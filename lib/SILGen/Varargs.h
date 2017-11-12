@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -62,12 +62,12 @@ public:
 };
 
 /// Begin a varargs emission sequence.
-VarargsInfo emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
+VarargsInfo emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                              CanType baseTy, CanType arrayTy,
                              unsigned numElements);
 
 /// Successfully end a varargs emission sequence.
-ManagedValue emitEndVarargs(SILGenFunction &gen, SILLocation loc,
+ManagedValue emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
                             VarargsInfo &&varargs); 
 
 } // end namespace Lowering

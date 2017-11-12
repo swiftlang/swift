@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -36,8 +36,8 @@ TYPEREPR(Attributed, TypeRepr)
 
 ABSTRACT_TYPEREPR(Ident, TypeRepr)
   ABSTRACT_TYPEREPR(ComponentIdent, IdentTypeRepr)
-	TYPEREPR(SimpleIdent, ComponentIdentTypeRepr)
-	TYPEREPR(GenericIdent, ComponentIdentTypeRepr)
+  TYPEREPR(SimpleIdent, ComponentIdentTypeRepr)
+  TYPEREPR(GenericIdent, ComponentIdentTypeRepr)
   TYPEREPR(CompoundIdent, IdentTypeRepr)
 
 TYPEREPR(Function, TypeRepr)
@@ -46,12 +46,14 @@ TYPEREPR(Dictionary, TypeRepr)
 TYPEREPR(Optional, TypeRepr)
 TYPEREPR(ImplicitlyUnwrappedOptional, TypeRepr)
 TYPEREPR(Tuple, TypeRepr)
-TYPEREPR(Named, TypeRepr)
-TYPEREPR(ProtocolComposition, TypeRepr)
+TYPEREPR(Composition, TypeRepr)
 TYPEREPR(Metatype, TypeRepr)
 TYPEREPR(Protocol, TypeRepr)
-TYPEREPR(InOut, TypeRepr)
+ABSTRACT_TYPEREPR(Specifier, TypeRepr)
+  TYPEREPR(InOut, SpecifierTypeRepr)
+  TYPEREPR(Shared, SpecifierTypeRepr)
 TYPEREPR(Fixed, TypeRepr)
+TYPEREPR(SILBox, TypeRepr)
 
 #undef ABSTRACT_TYPEREPR
 #undef TYPEREPR

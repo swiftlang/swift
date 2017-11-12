@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // C Primitive Types
@@ -42,11 +42,21 @@ public typealias CShort = Int16
 /// The C 'int' type.
 public typealias CInt = Int32
 
+#if os(Windows) && arch(x86_64)
+/// The C 'long' type.
+public typealias CLong = Int32
+#else
 /// The C 'long' type.
 public typealias CLong = Int
+#endif
 
+#if os(Windows) && arch(x86_64)
+/// The C 'long long' type.
+public typealias CLongLong = Int
+#else
 /// The C 'long long' type.
 public typealias CLongLong = Int64
+#endif
 
 /// The C 'float' type.
 public typealias CFloat = Float
@@ -59,7 +69,7 @@ public typealias CDouble = Double
 // FIXME: Is it actually UTF-32 on Darwin?
 //
 /// The C++ 'wchar_t' type.
-public typealias CWideChar = UnicodeScalar
+public typealias CWideChar = Unicode.Scalar
 
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
@@ -67,7 +77,7 @@ public typealias CWideChar = UnicodeScalar
 public typealias CChar16 = UInt16
 
 /// The C++11 'char32_t' type, which has UTF-32 encoding.
-public typealias CChar32 = UnicodeScalar
+public typealias CChar32 = Unicode.Scalar
 
 /// The C '_Bool' and C++ 'bool' type.
 public typealias CBool = Bool
@@ -76,117 +86,174 @@ public typealias CBool = Bool
 ///
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
-public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
-  var _rawValue: Builtin.RawPointer
+@_fixed_layout
+public struct OpaquePointer : Hashable {
+  @_versioned
+  internal var _rawValue: Builtin.RawPointer
 
-  /// Construct a `nil` instance.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
   @_transparent
-  public init() {
-    _rawValue = _nilRawPointer
+  internal init(_ v: Builtin.RawPointer) {
+    self._rawValue = v
   }
 
+  /// Creates an `OpaquePointer` from a given address in memory.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  init(_ v: Builtin.RawPointer) {
-    _rawValue = v
+  public init?(bitPattern: Int) {
+    if bitPattern == 0 { return nil }
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Construct a `COpaquePointer` from a given address in memory.
+  /// Creates an `OpaquePointer` from a given address in memory.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public init?(bitPattern: UInt) {
+    if bitPattern == 0 { return nil }
+    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+  }
+
+  /// Converts a typed `UnsafePointer` to an opaque C pointer.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public init<T>(_ from: UnsafePointer<T>) {
+    self._rawValue = from._rawValue
+  }
+
+  /// Converts a typed `UnsafePointer` to an opaque C pointer.
   ///
-  /// This is a fundamentally unsafe conversion.
+  /// The result is `nil` if `from` is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public init(bitPattern: Int) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+  public init?<T>(_ from: UnsafePointer<T>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 
-  /// Construct a `COpaquePointer` from a given address in memory.
+  /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public init<T>(_ from: UnsafeMutablePointer<T>) {
+    self._rawValue = from._rawValue
+  }
+
+  /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   ///
-  /// This is a fundamentally unsafe conversion.
+  /// The result is `nil` if `from` is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public init(bitPattern: UInt) {
-    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+  public init?<T>(_ from: UnsafeMutablePointer<T>?) {
+    guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
   }
 
-  /// Convert a typed `UnsafePointer` to an opaque C pointer.
-  @_transparent
-  public init<T>(_ source: UnsafePointer<T>) {
-    self._rawValue = source._rawValue
-  }
-
-  /// Convert a typed `UnsafeMutablePointer` to an opaque C pointer.
-  @_transparent
-  public init<T>(_ source: UnsafeMutablePointer<T>) {
-    self._rawValue = source._rawValue
-  }
-
-  /// Determine whether the given pointer is null.
-  @_transparent
-  var _isNull : Bool {
-    return self == nil
-  }
-
-  /// The hash value.
+  /// The pointer's hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
-  ///
-  /// - Note: The hash value is not guaranteed to be stable across
-  ///   different invocations of the same program.  Do not persist the
-  ///   hash value across program runs.
+  /// The hash value is not guaranteed to be stable across different
+  /// invocations of the same program.  Do not persist the hash value across
+  /// program runs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
-
-  /// Create an instance initialized with `nil`.
-  @_transparent public
-  init(nilLiteral: ()) {
-    _rawValue = _nilRawPointer
-  }
 }
 
-extension COpaquePointer : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+extension OpaquePointer : CustomDebugStringConvertible {
+  /// A textual representation of the pointer, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
-@warn_unused_result
-public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+extension Int {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(bitPattern pointer: OpaquePointer?) {
+    self.init(bitPattern: UnsafeRawPointer(pointer))
+  }
 }
 
-/// The family of C function pointer types.
-///
-/// This type has been removed. Instead of `CFunctionType<(T) -> U>`, a native
-/// function type with the C convention can be used, `@convention(c) (T) -> U`.
-@available(*, unavailable, message="use a function type '@convention(c) (T) -> U'")
-public struct CFunctionPointer<T> {}
+extension UInt {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(bitPattern pointer: OpaquePointer?) {
+    self.init(bitPattern: UnsafeRawPointer(pointer))
+  }
+}
 
-/// The corresponding Swift type to `va_list` in imported C APIs.
+extension OpaquePointer : Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+}
+
+/// A wrapper around a C `va_list` pointer.
+@_fixed_layout
 public struct CVaListPointer {
-  var value: UnsafeMutablePointer<Void>
+  @_versioned // FIXME(sil-serialize-all)
+  internal var value: UnsafeMutableRawPointer
 
+  @_inlineable // FIXME(sil-serialize-all)
   public // @testable
-  init(_fromUnsafeMutablePointer from: UnsafeMutablePointer<Void>) {
+  init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
     value = from
   }
 }
 
 extension CVaListPointer : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the pointer, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return value.debugDescription
   }
 }
 
-func _memcpy(
-  dest destination: UnsafeMutablePointer<Void>,
-  src: UnsafeMutablePointer<Void>,
+@_versioned
+@_inlineable
+internal func _memcpy(
+  dest destination: UnsafeMutableRawPointer,
+  src: UnsafeMutableRawPointer,
   size: UInt
 ) {
   let dest = destination._rawValue
   let src = src._rawValue
   let size = UInt64(size)._value
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+    dest, src, size,
+    /*alignment:*/ Int32()._value,
+    /*volatile:*/ false._value)
+}
+
+/// Copy `count` bytes of memory from `src` into `dest`.
+///
+/// The memory regions `source..<source + count` and
+/// `dest..<dest + count` may overlap.
+@_versioned
+@_inlineable
+internal func _memmove(
+  dest destination: UnsafeMutableRawPointer,
+  src: UnsafeRawPointer,
+  size: UInt
+) {
+  let dest = destination._rawValue
+  let src = src._rawValue
+  let size = UInt64(size)._value
+  Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
     /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)

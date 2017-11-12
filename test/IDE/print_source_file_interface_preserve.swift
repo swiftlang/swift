@@ -1,7 +1,7 @@
 public protocol Prot {}
 
 public struct Yoda<
-  Base : GeneratorType
+  Base : IteratorProtocol
 > : Prot {
     public func down<U>(
       p: Array<U>

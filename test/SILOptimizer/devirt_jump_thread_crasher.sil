@@ -1,0 +1,153 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// REQUIRES: objc_interop
+// FIXME: this test relies on standard library implementation details that are
+// only present with Objective-C runtime.
+
+// Check that this SIL compiles without crashes. See rdar://20345557
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class Base {
+}
+
+class Derived1: Base {}
+
+class Derived2: Base {}
+
+struct S {}
+
+enum MyOptional<T> {
+  case none
+  case some(T)
+}
+
+sil @method1 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Derived1) -> @out MyOptional<τ_0_0>
+sil @method2 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Base) -> @out MyOptional<τ_0_0>
+
+// CHECK: sil [serialized] @_TFCs27_ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVs19UnsafeBufferPointerPs9AnyObject__Q_Q_
+sil [serialized] @_TFCs27_ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVs19UnsafeBufferPointerPs9AnyObject__Q_Q_ : $@convention(method) <R> (@owned @callee_owned (S) -> @out R, @guaranteed Base) -> @out R {
+bb0(%0 : $*R, %1 : $@callee_owned (S) -> @out R, %2 : $Base):
+  %3 = alloc_stack $MyOptional<R>                   // users: %9, %12, %13, %15, %20, %26, %33, %42, %50, %54
+  checked_cast_br [exact] %2 : $Base to $Derived1, bb1, bb2 // id: %4
+
+bb1(%5 : $Derived1):                    // Preds: bb0
+  %6 = function_ref @method1 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Derived1) -> @out MyOptional<τ_0_0> // user: %9
+  strong_retain %1 : $@callee_owned (S) -> @out R // id: %7
+  strong_retain %2 : $Base // id: %8
+  %9 = apply %6<R>(%3, %1, %5) : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Derived1) -> @out MyOptional<τ_0_0>
+  br bb3                                          // id: %10
+
+bb2:                                              // Preds: bb0
+  checked_cast_br [exact] %2 : $Base to $Derived2, bb6, bb7 // id: %11
+
+bb3:                                              // Preds: bb1 bb6 bb8 bb10
+  switch_enum_addr %3 : $*MyOptional<R>, case #MyOptional.some!enumelt.1: bb4, case #MyOptional.none!enumelt: bb5 // id: %12
+
+bb4:                                              // Preds: bb3
+  %13 = unchecked_take_enum_data_addr %3 : $*MyOptional<R>, #MyOptional.some!enumelt.1 // user: %14
+  copy_addr [take] %13 to [initialization] %0 : $*R // id: %14
+  dealloc_stack %3 : $*MyOptional<R> // id: %15
+  strong_release %2 : $Base // id: %16
+  strong_release %1 : $@callee_owned (S) -> @out R // id: %17
+  %18 = tuple ()                                  // user: %19
+  return %18 : $()                                // id: %19
+
+bb5:                                              // Preds: bb3
+  dealloc_stack %3 : $*MyOptional<R> // id: %20
+  unreachable                                     // id: %21
+
+bb6(%22 : $Derived2):             // Preds: bb2
+  strong_retain %1 : $@callee_owned (S) -> @out R // id: %24
+  strong_retain %2 : $Base // id: %25
+  br bb3                                          // id: %27
+
+bb7:                                              // Preds: bb2
+  checked_cast_br [exact] %2 : $Base to $Base, bb8, bb9 // id: %28
+
+bb8(%29 : $Base):          // Preds: bb7
+  %30 = function_ref @method2 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Base) -> @out MyOptional<τ_0_0> // user: %33
+  strong_retain %1 : $@callee_owned (S) -> @out R // id: %31
+  strong_retain %2 : $Base // id: %32
+  %33 = apply %30<R>(%3, %1, %29) : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Base) -> @out MyOptional<τ_0_0>
+  br bb3                                          // id: %34
+
+bb9:                                              // Preds: bb7
+  strong_retain %1 : $@callee_owned (S) -> @out R // id: %35
+  checked_cast_br [exact] %2 : $Base to $Derived1, bb11, bb12 // id: %36
+
+bb10(%37 : $()):                                  // Preds: bb11 bb13
+  br bb3                                          // id: %38
+
+bb11(%39 : $Derived1):                  // Preds: bb9
+  strong_retain %39 : $Derived1         // id: %40
+  %41 = function_ref @method1 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Derived1) -> @out MyOptional<τ_0_0> // user: %42
+  %42 = apply %41<R>(%3, %1, %39) : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Derived1) -> @out MyOptional<τ_0_0> // user: %43
+  br bb10(%42 : $())                              // id: %43
+
+bb12:                                             // Preds: bb9
+  checked_cast_br [exact] %2 : $Base to $Base, bb14, bb15 // id: %44
+
+bb13(%45 : $()):                                  // Preds: bb14 bb15
+  br bb10(%45 : $())                              // id: %46
+
+bb14(%47 : $Base):         // Preds: bb12
+  strong_retain %47 : $Base // id: %48
+  %49 = function_ref @method2 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Base) -> @out MyOptional<τ_0_0> // user: %50
+  %50 = apply %49<R>(%3, %1, %47) : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Base) -> @out MyOptional<τ_0_0> // user: %51
+  br bb13(%50 : $())                              // id: %51
+
+bb15:                                             // Preds: bb12
+  strong_retain %2 : $Base // id: %52
+  %54 = tuple ()
+  br bb13(%54 : $())                              // id: %55
+}
+
+// CHECK-LABEL: sil @multiple_edits_in_adjacent_blocks
+// CHECK: bb0(%0 : $*Base):
+// CHECK: checked_cast_br %
+// CHECK: bb1:
+// CHECK: checked_cast_br [exact]
+// CHECK-NOT: checked_cast_br
+// CHECK: return
+sil @multiple_edits_in_adjacent_blocks : $@convention(method) (@in Base) -> () {
+bb0(%0 : $*Base):
+  %1 = load %0 : $*Base
+  checked_cast_br %1 : $Base to $Derived1, bb8, bb1
+
+bb1:
+  checked_cast_br [exact] %1 : $Base to $Derived2, bb2, bb5
+
+bb2(%6 : $Derived2):
+  %7 = upcast %6 : $Derived2 to $Base
+  debug_value %7 : $Base, let, name "self", argno 1
+  checked_cast_br [exact] %7 : $Base to $Base, bb3, bb6
+
+bb3(%10 : $Base):
+  debug_value %10 : $Base, let, name "self", argno 1
+  checked_cast_br %10 : $Base to $Derived1, bb4, bb7
+
+bb4(%13 : $Derived1):
+  debug_value %13 : $Derived1, let, name "scr"
+  br bb9
+
+bb5:
+  br bb9
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8(%14 : $Derived1):
+  br bb9
+
+bb9:
+  %20 = tuple ()
+  return %20 : $()
+}

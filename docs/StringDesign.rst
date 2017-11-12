@@ -4,27 +4,43 @@
 
 .. raw:: html
 
-    <style> 
-    
-    .repl, .emph, .look {color:rgb(47,175,187)}
-    .emph {font-weight:bold}
+    <style>
 
-    pre, .pre { font-family: Monaco, monospace; font-size:90% }
+    .repl,
+    .emph,
+    .look {
+      color:rgb(47,175,187)
+    }
+    .emph {
+      font-weight:bold
+    }
+
+    pre,
+    .pre {
+      font-family: Monaco, monospace; font-size:90%
+    }
 
     pre.literal-block {
       overflow: hidden;
     }
 
-    span.look, span.look1 {
+    span.look,
+    span.look1 {
       position: relative;
       border-bottom: .2em dotted rgb(255,165,165);
     }
 
-    span.aside { font-family: sans-serif; white-space: normal; }
+    span.aside {
+      font-family: sans-serif; white-space: normal;
+    }
 
-    span.look + span.aside, span.look1 + span.aside { display: none; }
+    span.look + span.aside,
+    span.look1 + span.aside {
+      display: none;
+    }
 
-    span.look:hover, span.look1:hover {
+    span.look:hover,
+    span.look1:hover {
       background-color:greenyellow;
     }
 
@@ -33,7 +49,8 @@
     }
 
     /* Main speech bubble*/
-    span.look:hover + span.aside, span.look1:hover + span.aside{
+    span.look:hover + span.aside,
+    span.look1:hover + span.aside {
       display: inline-block;
       position: relative;
       margin-top: -1000em;
@@ -47,13 +64,14 @@
       background: gray;
       -moz-border-radius:10px;
       -webkit-border-radius:10px;
-      border-radius:10px;    
+      border-radius:10px;
       color: #fff;
       z-index: 1;
     }
 
     /* Little triangle on the left */
-    span.look:hover + span.aside:after, span.look1:hover + span.aside:after {
+    span.look:hover + span.aside:after,
+    span.look1:hover + span.aside:after {
       content: "";
       position: absolute;
       bottom: 0.3em;
@@ -85,7 +103,7 @@ Swift String Design
 
 .. Admonition:: This Document
    :class: note
-                
+
    * contains interactive HTML commentary that does not
      currently appear in printed output.  Hover your mouse over
      elements with a dotted pink underline to view the hidden
@@ -100,9 +118,9 @@ Swift String Design
 .. warning:: This document was used in planning Swift 1.0; it has not been kept
   up to date and does not describe the current or planned behavior of Swift.
 
-.. contents:: 
+.. contents::
    :depth: 3
-              
+
 Introduction
 ============
 
@@ -116,9 +134,9 @@ Goals
 ``String`` should:
 
 * honor industry standards such as Unicode
-* when handling non-ASCII text, deliver “reasonably correct”
+* when handling non-ASCII text, deliver "reasonably correct"
   results to users thinking only in terms of ASCII
-* when handling ASCII text, provide “expected behavior” to users
+* when handling ASCII text, provide "expected behavior" to users
   thinking only in terms of ASCII
 * be hard to use incorrectly
 * be easy to use correctly
@@ -144,14 +162,14 @@ string usage while discovering its essential properties.
 ``String`` is a `First-Class Type`__
 ------------------------------------
 
-__ http://en.wikipedia.org/wiki/First-class_citizen
+__ https://en.wikipedia.org/wiki/First-class_citizen
 
 .. parsed-literal::
 
   |swift| var s = "Yo"
   `// s:` :emph:`String` `= "Yo"`
 
-Unlike, say, C's ``char*``, the meaning of a swift string is always
+Unlike, say, C's ``char*``, the meaning of a Swift string is always
 unambiguous.
 
 Strings are **Efficient**
@@ -165,7 +183,7 @@ optimizations, including:
 - In-place modification of uniquely-owned buffers
 
 As a result, copying_ and slicing__ strings, in particular, can be
-viewed by most programmers as being “almost free.”
+viewed by most programmers as being "almost free."
 
 __ sliceable_
 
@@ -176,12 +194,12 @@ Strings are **Mutable**
 
    The ability to change a string's value might not be worth noting
    except that *some languages make all strings immutable*, as a way
-   of working around problems that Swift has defined away—by making
+   of working around problems that Swift has defined away--by making
    strings pure values (see below).
-            
+
 .. parsed-literal::
   |swift| extension String {
-            func addEcho() { 
+            func addEcho() {
               self += self
             }
           }
@@ -197,12 +215,12 @@ Strings are **Value Types**
 Distinct string variables have independent values: when you pass
 someone a string they get a copy of the value, and when someone
 passes you a string *you own it*.  Nobody can change a string value
-“behind your back.”
+"behind your back."
 
 .. parsed-literal::
   |swift| class Cave {
             // Utter something in the cave
-            func say(msg: String) -> String {
+            func say(_ msg: String) -> String {
               :look1:`msg.addEcho()`\ :aside:`Modifying a parameter is safe because the callee sees a copy of the argument`
               self.lastSound = msg
               :look1:`return self.lastSound`\ :aside:`Returning a stored value is safe because the caller sees a copy of the value`
@@ -213,13 +231,13 @@ passes you a string *you own it*.  Nobody can change a string value
   |swift| var c = Cave()
   `// c: Cave = <Cave instance>`
   |swift| s = "Hey"
-  |swift| var t = :look1:`c.say(s)`\ :aside:`this call can't change s…`
+  |swift| var t = :look1:`c.say(s)`\ :aside:`this call can't change s...`
   `// t: String = "HeyHey"`
   |swift| s
-  `// s: String =` :look:`"Hey"`\ :aside:`…and it doesn't.`
-  |swift| :look1:`t.addEcho()`\ :aside:`this call can't change c.lastSound…`
+  `// s: String =` :look:`"Hey"`\ :aside:`...and it doesn't.`
+  |swift| :look1:`t.addEcho()`\ :aside:`this call can't change c.lastSound...`
   |swift| [s, c.lastSound, t]
-  `// r0: String[] = ["Hey",` :look:`"HeyHey"`\ :aside:`…and it doesn't.`\ `, "HeyHeyHeyHey"]`
+  `// r0: [String] = ["Hey",` :look:`"HeyHey"`\ :aside:`...and it doesn't.`\ `, "HeyHeyHeyHey"]`
 
 Strings are **Unicode-Aware**
 -----------------------------
@@ -231,18 +249,18 @@ Strings are **Unicode-Aware**
    specifies requires careful justification.  So far, we have found two
    possible points of deviation for Swift ``String``:
 
-   1. The `Unicode Text Segmentation Specification`_ says, “`do not
-      break between CR and LF`__.”  However, breaking extended
+   1. The `Unicode Text Segmentation Specification`_ says, "`do not
+      break between CR and LF`__."  However, breaking extended
       grapheme clusters between CR and LF may necessary if we wish
-      ``String`` to “behave normally” for users of pure ASCII.  This
+      ``String`` to "behave normally" for users of pure ASCII.  This
       point is still open for discussion.
 
       __ http://www.unicode.org/reports/tr29/#GB2
 
    2. The `Unicode Text Segmentation Specification`_ says,
-      “`do not break between regional indicator symbols`__.”  However, it also
-      says “(Sequences of more than two RI characters should be separated
-      by other characters, such as U+200B ZWSP).”  Although the
+      "`do not break between regional indicator symbols`__."  However, it also
+      says "(Sequences of more than two RI characters should be separated
+      by other characters, such as U+200B ZWSP)."  Although the
       parenthesized note probably has less official weight than the other
       admonition, breaking pairs of RI characters seems like the right
       thing for us to do given that Cocoa already forms strings with
@@ -278,9 +296,9 @@ Strings are **Locale-Agnostic**
 
 Strings neither carry their own locale information, nor provide
 behaviors that depend on a global locale setting.  Thus, for any pair
-of strings ``s1`` and ``s2``, “``s1 == s2``” yields the same result
+of strings ``s1`` and ``s2``, "``s1 == s2``" yields the same result
 regardless of system state.  Strings *do* provide a suitable
-foundation on which to build locale-aware interfaces.\ [#locales]_ 
+foundation on which to build locale-aware interfaces.\ [#locales]_
 
 Strings are **Containers**
 --------------------------
@@ -302,7 +320,7 @@ Strings are **Containers**
    |swift| var s = "Strings are awesome"
    `// s : String = "Strings are awesome"`
    |swift| var r = s.find("awe")
-   `// r : Range<StringIndex> = <"…are a̲w̲e̲some">`
+   `// r : Range<StringIndex> = <"...are a̲w̲e̲some">`
    |swift| s[r.start]
    `// r0 : Character =` :look:`Character("a")`\ :aside:`String elements have type Character (see below)`
 
@@ -316,8 +334,8 @@ Strings are Composed of ``Character``\ s
 cluster**, as specified by a default or tailored Unicode segmentation
 algorithm.  This term is `precisely defined`__ by the Unicode
 specification, but it roughly means `what the user thinks of when she
-hears “character”`__. For example, the pair of code points “LATIN
-SMALL LETTER N, COMBINING TILDE” forms a single grapheme cluster, “ñ”.
+hears "character"`__. For example, the pair of code points "LATIN
+SMALL LETTER N, COMBINING TILDE" forms a single grapheme cluster, "ñ".
 
 __ http://www.unicode.org/glossary/#grapheme_cluster
 __ http://useless-factor.blogspot.com/2007/08/unicode-implementers-guide-part-4.html
@@ -342,8 +360,8 @@ __ http://www.unicode.org/glossary/#extended_grapheme_cluster
 __ http://www.unicode.org/reports/tr29/#Default_Grapheme_Cluster_Table
 
 This segmentation offers naïve users of English, Chinese, French, and
-probably a few other languages what we think of as the “expected
-results.”  However, not every script_ can be segmented uniformly for
+probably a few other languages what we think of as the "expected
+results."  However, not every script_ can be segmented uniformly for
 all purposes.  For example, searching and collation require different
 segmentations in order to handle Indic scripts correctly.  To that
 end, strings support properties for more-specific segmentations:
@@ -357,13 +375,13 @@ end, strings support properties for more-specific segmentations:
    `Extended Grapheme Cluster: f`
    `Extended Grapheme Cluster: o`
    `Extended Grapheme Cluster: o`
-   |swift| for c in s.collationCharacters { 
+   |swift| for c in s.collationCharacters {
              print("Collation Grapheme Cluster: \(c)")
            }
    `Collation Grapheme Cluster: f`
    `Collation Grapheme Cluster: o`
    `Collation Grapheme Cluster: o`
-   |swift| for c in s.searchCharacters { 
+   |swift| for c in s.searchCharacters {
              print("Search Grapheme Cluster: \(c)")
            }
    `Search Grapheme Cluster: f`
@@ -371,7 +389,9 @@ end, strings support properties for more-specific segmentations:
    `Search Grapheme Cluster: o`
 
 Also, each such segmentation provides a unique ``IndexType``, allowing
-a string to be indexed directly with different indexing schemes::
+a string to be indexed directly with different indexing schemes
+
+.. code-block:: swift-console
 
    |swift| var i = s.searchCharacters.startIndex
    `// r2 : UInt8 = UInt8(83)`
@@ -386,15 +406,15 @@ Strings are **Sliceable**
 .. parsed-literal::
    |swift| s[r.start...r.end]
    `// r2 : String = "awe"`
-   |swift| s[\ :look1:`r.start...`\ ]\ :aside:`postfix slice operator means “through the end”`
+   |swift| s[\ :look1:`r.start...`\ ]\ :aside:`postfix slice operator means "through the end"`
    `// r3 : String = "awesome"`
-   |swift| s[\ :look1:`...r.start`\ ]\ :aside:`prefix slice operator means “from the beginning”`
+   |swift| s[\ :look1:`...r.start`\ ]\ :aside:`prefix slice operator means "from the beginning"`
    `// r4 : String = "Strings are "`
    |swift| :look1:`s[r]`\ :aside:`indexing with a range is the same as slicing`
    `// r5 : String = "awe"`
    |swift| s[r] = "hand"
    |swift| s
-   `// s : String = "Strings are` :look:`handsome`\ :aside:`slice replacement can resize the string`\ `"` 
+   `// s : String = "Strings are` :look:`handsome`\ :aside:`slice replacement can resize the string`\ `"`
 
 .. _extending:
 
@@ -475,7 +495,7 @@ Reference Manual
 
 Cocoa Bridging Strategy
 =======================
-.. 
+..
 
 
 Rationales
@@ -496,8 +516,8 @@ Why a Built-In String Type?
    "value semantics" in place of "C++ semantics". I know that is what
    you meant, but we need to tread carefully in the final document.
 
-``NSString`` and ``NSMutableString``\ —the string types provided by
-Cocoa—are full-featured classes with high-level functionality for
+``NSString`` and ``NSMutableString``\ --the string types provided by
+Cocoa--are full-featured classes with high-level functionality for
 writing fully-localized applications.  They have served Apple
 programmers well; so, why does Swift have its own string type?
 
@@ -506,7 +526,7 @@ programmers well; so, why does Swift have its own string type?
 * Error Prone Mutability
   Reference semantics don't line up with how people think about strings
 
-* 2 is too many string types.  
+* 2 is too many string types.
   two APIs
   duplication of effort
   documentation
@@ -579,9 +599,9 @@ How Would You Design It?
     5. CodePoint substring search is just byte string search
     6. Most programs that handle 8-bit files safely can handle UTF-8 safely
     7. UTF-8 sequences sort in code point order.
-    8. UTF-8 has no “byte order.”
+    8. UTF-8 has no "byte order."
 
-    __ http://research.swtch.com/2010/03/utf-8-bits-bytes-and-benefits.html
+    __ http://research.swtch.com/utf8
 
 * It would be efficient, taking advantage of state-of-the-art
   optimizations, including:
@@ -614,7 +634,7 @@ API Breadth
 The ``NSString`` interface clearly shows the effects of 20 years of
 evolution through accretion.  It is broad, with functionality
 addressing encodings, paths, URLs, localization, and more.  By
-contrast, the interface to Swift's ``String`` is much narrower.  
+contrast, the interface to Swift's ``String`` is much narrower.
 
 .. _TBD:
 
@@ -682,7 +702,7 @@ withRange:subrange]`` becomes ``str[subrange].doFoo(arg)``.
 
   * Deprecated Cocoa APIs are not considered
 
-  * A status of “*Remove*” below indicates a feature whose removal is
+  * A status of "*Remove*" below indicates a feature whose removal is
     anticipated.  Rationale is provided for these cases.
 
 Indexing
@@ -697,7 +717,7 @@ Indexing
     In Swift, by convention, ``x.length`` is used to represent
     the number of elements in a container, and since ``String`` is a
     container of abstract |Character|_\ s, ``length`` would have to
-    count those.  
+    count those.
 
     This meaning of ``length`` is unimplementable in O(1).  It can be
     cached, although not in the memory block where the characters are
@@ -708,7 +728,7 @@ Indexing
     even if ``length`` were provided, doing things with ``String``
     that depend on a specific numeric ``length`` is error-prone.
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
 
      \- (NSUInteger)\ **length**
@@ -725,12 +745,12 @@ Indexing
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSRange)\ **rangeOfComposedCharacterSequenceAtIndex:**\ (NSUInteger)index;
      \- (NSRange)\ **rangeOfComposedCharacterSequencesForRange:**\ (NSRange)range;
 
-:Swift: 
+:Swift:
   .. parsed-literal::
     typealias IndexType = ...
     func **indices**\ () -> Range<IndexType>
@@ -744,7 +764,7 @@ Indexing
          doSomethingWith(\ **someString[i]**\ )
        }
 
-       var (i,j) = **someString.indices().bounds**
+       var (i, j) = **someString.indices().bounds**
        while (i != j) {
          doSomethingElseWith(\ **someString[i]**\ )
          ++i
@@ -754,7 +774,7 @@ Indexing
 Slicing
 ~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (void)\ **getCharacters:**\ (unichar \*)\ **buffer range:**\ (NSRange)aRange;
 
@@ -766,7 +786,7 @@ Slicing
 Indexing
 ~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **substringToIndex:**\ (NSUInteger)to;
      \- (NSString \*)\ **substringFromIndex:**\ (NSUInteger)from;
@@ -781,7 +801,7 @@ Indexing
   .. Admonition:: Example
 
     .. parsed-literal::
-        s[beginning...ending] // [s substringWithRange: NSMakeRange( beginning, ending )]
+        s[beginning...ending] // [s substringWithRange: NSMakeRange(beginning, ending)]
         s[beginning...]       // [s substringFromIndex: beginning]
         s[...ending]          // [s substringToIndex: ending]
 
@@ -792,7 +812,7 @@ Indexing
 Comparison
 ~~~~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (BOOL)\ **isEqualToString:**\ (NSString \*)aString;
      \- (NSComparisonResult)\ **compare:**\ (NSString \*)string;
@@ -806,23 +826,23 @@ Comparison
      func **<=** (lhs: String, rhs: String) -> Bool
      func **>=** (lhs: String, rhs: String) -> Bool
 
-``NSString`` comparison is “literal” by default.  As the documentation
+``NSString`` comparison is "literal" by default.  As the documentation
 says of ``isEqualToString``,
 
-  “Ö” represented as the composed character sequence “O” and umlaut
-  would not compare equal to “Ö” represented as one Unicode character.
+  "Ö" represented as the composed character sequence "O" and umlaut
+  would not compare equal to "Ö" represented as one Unicode character.
 
 By contrast, Swift string's primary comparison interface uses
 Unicode's default collation_ algorithm, and is thus always
-“Unicode-correct.”  Unlike comparisons that depend on locale, it is
+"Unicode-correct."  Unlike comparisons that depend on locale, it is
 also stable across changes in system state.  However, *just like*
 ``NSString``\ 's ``isEqualToString`` and ``compare`` methods, it
-should not be expected to yield ideal (or even “proper”) results in
+should not be expected to yield ideal (or even "proper") results in
 all contexts.
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSComparisonResult)\ **compare:**\ (NSString \*)string \ **options:**\ (NSStringCompareOptions)mask;
      \- (NSComparisonResult)\ **compare:**\ (NSString \*)string \ **options:**\ (NSStringCompareOptions)mask \ **range:**\ (NSRange)compareRange;
@@ -833,7 +853,7 @@ all contexts.
 * As noted above__, instead of passing sub-range arguments, we expect
   Swift users to compose slicing_ with whole-string operations.
 
-  __ range_  
+  __ range_
 
 * Other details of these interfaces are distinguished by an
   ``NSStringCompareOptions`` mask, of which
@@ -867,7 +887,7 @@ all contexts.
 
   :``NSAnchoredSearch``: Not applicable to whole-string comparisons
   :``NSNumericSearch``: While it's legitimate to defer this
-                        functionality to Cocoa, it's (probably—see
+                        functionality to Cocoa, it's (probably--see
                         <rdar://problem/14724804>) locale-independent and
                         easy enough to implement in Swift.  TBD_
   :``NSDiacriticInsensitiveSearch``: Ditto; TBD_
@@ -882,7 +902,7 @@ all contexts.
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSComparisonResult)\ **localizedCompare:**\ (NSString \*)string;
      \- (NSComparisonResult)\ **localizedCaseInsensitiveCompare:**\ (NSString \*)string;
@@ -896,29 +916,29 @@ Searching
 
 .. Sidebar:: Rationale
 
-   Modern languages (Java, C#, Python, Ruby…) have standardized on
+   Modern languages (Java, C#, Python, Ruby...) have standardized on
    variants of ``startsWith``/\ ``endsWith``.  There's no reason Swift
    should deviate from de-facto industry standards here.
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (BOOL)\ **hasPrefix:**\ (NSString \*)aString;
      \- (BOOL)\ **hasSuffix:**\ (NSString \*)aString;
 
-:Swift: 
+:Swift:
   .. parsed-literal::
-     func **startsWith**\ (prefix: String)
-     func **endsWith**\ (suffix: String)
+     func **startsWith**\ (_ prefix: String)
+     func **endsWith**\ (_ suffix: String)
 
 ----
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSRange)\ **rangeOfString:**\ (NSString \*)aString;
 
 :Swift:
   .. parsed-literal::
-       func **find**\ (sought: String) -> Range<String.IndexType>
+       func **find**\ (_ sought: String) -> Range<String.IndexType>
 
   .. Note:: Most other languages provide something like
             ``s1.indexOf(s2)``, which returns only the starting index of
@@ -928,7 +948,7 @@ Searching
 
 ----
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSRange)\ **rangeOfCharacterFromSet:**\ (NSCharacterSet \*)aSet;
 
@@ -940,7 +960,7 @@ Searching
 
 :Swift:
   .. parsed-literal::
-       func **find**\ (match: (Character)->Bool) -> Range<String.IndexType>
+       func **find**\ (_ match: (Character) -> Bool) -> Range<String.IndexType>
 
   .. Admonition:: Usage Example
 
@@ -952,7 +972,7 @@ Searching
 
 -----
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSRange)\ **rangeOfString:**\ (NSString \*)aString \ **options:**\ (NSStringCompareOptions)mask;
      \- (NSRange)\ **rangeOfString:**\ (NSString \*)aString \ **options:**\ (NSStringCompareOptions)mask \ **range:**\ (NSRange)searchRange;
@@ -968,36 +988,36 @@ Searching
 Building
 ~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByAppendingString:**\ (NSString \*)aString;
 
 .. sidebar:: ``append``
 
    the ``append`` method is a consequence of ``String``\ 's
-   conformance to ``OutputStream``.  See the *Swift
+   conformance to ``TextOutputStream``.  See the *Swift
    formatting proposal* for details.
 
 :Swift:
   .. parsed-literal::
         func **+** (lhs: String, rhs: String) -> String
-        func [infix,assignment] **+=** (lhs: [inout] String, rhs: String)
-        func **append**\ (suffix: String)
+        func [infix, assignment] **+=** (lhs: [inout] String, rhs: String)
+        func **append**\ (_ suffix: String)
 
 
 Dynamic Formatting
 ~~~~~~~~~~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByAppendingFormat:**\ (NSString \*)format, ... NS_FORMAT_FUNCTION(1,2);
 
-:Swift: *Not directly provided*\ —see the *Swift formatting proposal*
+:Swift: *Not directly provided*\ --see the *Swift formatting proposal*
 
 Extracting Numeric Values
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (double)doubleValue;
      \- (float)floatValue;
@@ -1006,7 +1026,7 @@ Extracting Numeric Values
      \- (long long)longLongValue;
      \- (BOOL)boolValue;
 
-:Swift: Not in ``String``\ —It is up to other types to provide their
+:Swift: Not in ``String``\ --It is up to other types to provide their
    conversions to and from String.  See also this `rationale`__
 
    __ extending_
@@ -1014,15 +1034,15 @@ Extracting Numeric Values
 Splitting
 ~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSArray \*)\ **componentsSeparatedByString:**\ (NSString \*)separator;
      \- (NSArray \*)\ **componentsSeparatedByCharactersInSet:**\ (NSCharacterSet \*)separator;
 
 :Swift:
   .. parsed-literal::
-     func split(maxSplit: Int = Int.max()) -> String[]
-     func split(separator: Character, maxSplit: Int = Int.max()) -> String[]
+     func split(_ maxSplit: Int = Int.max()) -> [String]
+     func split(_ separator: Character, maxSplit: Int = Int.max()) -> [String]
 
   The semantics of these functions were taken from Python, which seems
   to be a fairly good representative of what modern languages are
@@ -1035,26 +1055,26 @@ Splitting
 
   .. parsed-literal::
 
-    func **split**\ <Seq: Sliceable, IsSeparator: Predicate 
+    func **split**\ <Seq: Sliceable, IsSeparator: Predicate
         where IsSeparator.Arguments == Seq.Element
-    >(seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
-      allowEmptySlices: Bool = false  ) -> Seq[]
+    >(_ seq: Seq, isSeparator: IsSeparator, maxSplit: Int = Int.max(),
+      allowEmptySlices: Bool = false) -> [Seq]
 
 Splitting
 ~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **commonPrefixWithString:**\ (NSString \*)aString \ **options:**\ (NSStringCompareOptions)mask;
 
 :Swift:
   .. parsed-literal::
-     func **commonPrefix**\ (other: String) -> String
+     func **commonPrefix**\ (_ other: String) -> String
 
 Upper/Lowercase
 ~~~~~~~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **uppercaseString**;
      \- (NSString \*)\ **uppercaseStringWithLocale:**\ (NSLocale \*)locale;
@@ -1070,11 +1090,11 @@ Upper/Lowercase
   .. parsed-literal::
      func **toUpper**\ () -> String
      func **toLower**\ () -> String
-     
+
 Capitalization
 ~~~~~~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **capitalizedString**;
      \- (NSString \*)\ **capitalizedStringWithLocale:**\ (NSLocale \*)locale;
@@ -1084,23 +1104,23 @@ Capitalization
 
 .. Note:: ``NSString`` capitalizes the first letter of each substring
           separated by spaces, tabs, or line terminators, which is in
-          no sense “Unicode-correct.”  In most other languages that
+          no sense "Unicode-correct."  In most other languages that
           support a ``capitalize`` method, it operates only on the
           first character of the string, and capitalization-by-word is
-          named something like “``title``.”  If Swift ``String``
+          named something like "``title``."  If Swift ``String``
           supports capitalization by word, it should be
           Unicode-correct, but how we sort this particular area out is
           still **TBD**.
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByTrimmingCharactersInSet:**\ (NSCharacterSet \*)set;
 
 :Swift:
   .. parsed-literal::
-       trim **trim**\ (match: (Character)->Bool) -> String
+       trim **trim**\ (match: (Character) -> Bool) -> String
 
   .. Admonition:: Usage Example
 
@@ -1112,17 +1132,17 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByPaddingToLength:**\ (NSUInteger)newLength \ **withString:**\ (NSString \*)padString \ **startingAtIndex:**\ (NSUInteger)padIndex;
 
 :Swift:
   .. parsed-literal:: *Not provided*.  It's not clear whether this is
-                      useful at all for non-ASCII strings, and 
+                      useful at all for non-ASCII strings, and
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (void)\ **getLineStart:**\ (NSUInteger \*)startPtr \ **end:**\ (NSUInteger \*)lineEndPtr \ **contentsEnd:**\ (NSUInteger \*)contentsEndPtr \ **forRange:**\ (NSRange)range;
 
@@ -1132,7 +1152,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSRange)\ **lineRangeForRange:**\ (NSRange)range;
 
@@ -1142,7 +1162,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (void)\ **getParagraphStart:**\ (NSUInteger \*)startPtr \ **end:**\ (NSUInteger \*)parEndPtr \ **contentsEnd:**\ (NSUInteger \*)contentsEndPtr \ **forRange:**\ (NSRange)range;
 
@@ -1152,7 +1172,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSRange)\ **paragraphRangeForRange:**\ (NSRange)range;
 
@@ -1162,7 +1182,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (void)\ **enumerateSubstringsInRange:**\ (NSRange)range \ **options:**\ (NSStringEnumerationOptions)opts \ **usingBlock:**\ (void (^)(NSString \*substring, NSRange substringRange, NSRange enclosingRange, BOOL \*stop))block;
 
@@ -1172,7 +1192,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (void)\ **enumerateLinesUsingBlock:**\ (void (^)(NSString \*line, BOOL \*stop))block;
 
@@ -1182,7 +1202,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)description;
 
@@ -1192,7 +1212,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSUInteger)hash;
 
@@ -1202,7 +1222,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSStringEncoding)fastestEncoding;
 
@@ -1212,7 +1232,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSStringEncoding)smallestEncoding;
 
@@ -1222,7 +1242,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSData \*)\ **dataUsingEncoding:**\ (NSStringEncoding)encoding \ **allowLossyConversion:**\ (BOOL)lossy;
 
@@ -1232,7 +1252,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSData \*)\ **dataUsingEncoding:**\ (NSStringEncoding)encoding;
 
@@ -1245,7 +1265,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (__strong const char \*)\ **cStringUsingEncoding:**\ (NSStringEncoding)encoding NS_RETURNS_INNER_POINTER;
 
@@ -1255,7 +1275,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (BOOL)\ **getCString:**\ (char \*)buffer \ **maxLength:**\ (NSUInteger)maxBufferCount \ **encoding:**\ (NSStringEncoding)encoding;
 
@@ -1265,7 +1285,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (BOOL)\ **getBytes:**\ (void \*)buffer \ **maxLength:**\ (NSUInteger)maxBufferCount \ **usedLength:**\ (NSUInteger \*)usedBufferCount \ **encoding:**\ (NSStringEncoding)encoding \ **options:**\ (NSStringEncodingConversionOptions)options \ **range:**\ (NSRange)range \ **remainingRange:**\ (NSRangePointer)leftover;
 
@@ -1275,7 +1295,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSUInteger)\ **maximumLengthOfBytesUsingEncoding:**\ (NSStringEncoding)enc;
 
@@ -1285,7 +1305,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSUInteger)\ **lengthOfBytesUsingEncoding:**\ (NSStringEncoding)enc;
 
@@ -1295,7 +1315,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)decomposedStringWithCanonicalMapping;
 
@@ -1305,7 +1325,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)precomposedStringWithCanonicalMapping;
 
@@ -1315,7 +1335,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)decomposedStringWithCompatibilityMapping;
 
@@ -1325,7 +1345,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)precomposedStringWithCompatibilityMapping;
 
@@ -1335,7 +1355,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByFoldingWithOptions:**\ (NSStringCompareOptions)options \ **locale:**\ (NSLocale \*)locale;
 
@@ -1345,7 +1365,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByReplacingOccurrencesOfString:**\ (NSString \*)target \ **withString:**\ (NSString \*)replacement \ **options:**\ (NSStringCompareOptions)options \ **range:**\ (NSRange)searchRange;
 
@@ -1355,7 +1375,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByReplacingOccurrencesOfString:**\ (NSString \*)target \ **withString:**\ (NSString \*)replacement;
 
@@ -1365,14 +1385,14 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (NSString \*)\ **stringByReplacingCharactersInRange:**\ (NSRange)range \ **withString:**\ (NSString \*)replacement;
 
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (__strong const char \*)UTF8String NS_RETURNS_INNER_POINTER;
 
@@ -1382,7 +1402,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (NSStringEncoding)defaultCStringEncoding;
 
@@ -1392,7 +1412,7 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (const NSStringEncoding \*)availableStringEncodings;
 
@@ -1402,32 +1422,32 @@ Capitalization
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (NSString \*)\ **localizedNameOfStringEncoding:**\ (NSStringEncoding)encoding;
 
 Constructors
 ~~~~~~~~~~~~
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)init;
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithString:**\ (NSString \*)aString;
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
     \+ (instancetype)string;
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
     \+ (instancetype)\ **stringWithString:**\ (NSString \*)string;
 
@@ -1435,7 +1455,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithCharactersNoCopy:**\ (unichar \*)characters \ **length:**\ (NSUInteger)length \ **freeWhenDone:**\ (BOOL)freeBuffer;
 
@@ -1445,7 +1465,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithCharacters:**\ (const unichar \*)characters \ **length:**\ (NSUInteger)length;
 
@@ -1455,7 +1475,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithUTF8String:**\ (const char \*)nullTerminatedCString;
 
@@ -1465,7 +1485,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithFormat:**\ (NSString \*)format, ... NS_FORMAT_FUNCTION(1,2);
 
@@ -1475,7 +1495,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithFormat:**\ (NSString \*)format \ **arguments:**\ (va_list)argList NS_FORMAT_FUNCTION(1,0);
 
@@ -1485,7 +1505,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithFormat:**\ (NSString \*)format \ **locale:**\ (id)locale, ... NS_FORMAT_FUNCTION(1,3);
 
@@ -1495,7 +1515,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithFormat:**\ (NSString \*)format \ **locale:**\ (id)locale \ **arguments:**\ (va_list)argList NS_FORMAT_FUNCTION(1,0);
 
@@ -1505,7 +1525,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithData:**\ (NSData \*)data \ **encoding:**\ (NSStringEncoding)encoding;
 
@@ -1515,7 +1535,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithBytes:**\ (const void \*)bytes \ **length:**\ (NSUInteger)len \ **encoding:**\ (NSStringEncoding)encoding;
 
@@ -1525,7 +1545,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithBytesNoCopy:**\ (void \*)bytes \ **length:**\ (NSUInteger)len \ **encoding:**\ (NSStringEncoding)encoding \ **freeWhenDone:**\ (BOOL)freeBuffer;
 
@@ -1535,7 +1555,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (instancetype)\ **stringWithCharacters:**\ (const unichar \*)characters \ **length:**\ (NSUInteger)length;
 
@@ -1545,7 +1565,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (instancetype)\ **stringWithUTF8String:**\ (const char \*)nullTerminatedCString;
 
@@ -1555,7 +1575,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (instancetype)\ **stringWithFormat:**\ (NSString \*)format, ... NS_FORMAT_FUNCTION(1,2);
 
@@ -1565,7 +1585,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (instancetype)\ **localizedStringWithFormat:**\ (NSString \*)format, ... NS_FORMAT_FUNCTION(1,2);
 
@@ -1575,7 +1595,7 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \- (instancetype)\ **initWithCString:**\ (const char \*)nullTerminatedCString \ **encoding:**\ (NSStringEncoding)encoding;
 
@@ -1585,15 +1605,15 @@ Not available (too error prone)
 
 ---------
 
-:Cocoa: 
+:Cocoa:
   .. parsed-literal::
      \+ (instancetype)\ **stringWithCString:**\ (const char \*)cString \ **encoding:**\ (NSStringEncoding)enc;
 
 
 Linguistic Analysis
 ~~~~~~~~~~~~~~~~~~~
-  
-:Cocoa: 
+
+:Cocoa:
   .. parsed-literal::
      \- (NSArray \*)\ **linguisticTagsInRange:**\ (NSRange)range \ **scheme:**\ (NSString \*)tagScheme \ **options:**\ (NSLinguisticTaggerOptions)opts \ **orthography:**\ (NSOrthography \*)orthography \ **tokenRanges:**\ (NSArray \*\*)tokenRanges;
      \- (void)\ **enumerateLinguisticTagsInRange:**\ (NSRange)range \ **scheme:**\ (NSString \*)tagScheme \ **options:**\ (NSLinguisticTaggerOptions)opts \ **orthography:**\ (NSOrthography \*)orthography \ **usingBlock:**\ (void (^)(NSString \*tag, NSRange tokenRange, NSRange sentenceRange, BOOL \*stop))block;
@@ -1712,7 +1732,7 @@ Why YAGNI
 * Derivation
 * ...
 
-.. [#agnostic] Unicode specifies default (“un-tailored”)
+.. [#agnostic] Unicode specifies default ("un-tailored")
    locale-independent collation_ and segmentation_ algorithms that
    make reasonable sense in most contexts.  Using these algorithms
    allows strings to be naturally compared and combined, generating
@@ -1748,6 +1768,6 @@ Why YAGNI
    been normalized, thus speeding up comparison operations.
 
 .. [#elements] Since ``String`` is locale-agnostic_, its elements are
-   determined using Unicode's default, “un-tailored” segmentation_
+   determined using Unicode's default, "un-tailored" segmentation_
    algorithm.
 

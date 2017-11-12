@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
-
-// XFAIL: linux
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false | %FileCheck %s
+//
+// FIXME: Enable sil-verify-all in both commands above:
+//        SIL Parsing fails on vtables: <rdar://problem/24060338> Identify problems with textual SIL and fix them.
 
 sil_stage raw // CHECK: sil_stage raw
 
@@ -9,6 +10,34 @@ import Swift
 
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
+
+class TestArrayStorage {
+  @sil_stored var count: Int32
+  init()
+}
+
+struct TestArray {
+  var storage : TestArrayStorage
+}
+
+struct TestArray2 {
+  var storage : TestArrayStorage
+  var someValue : Int32
+  var storage2 : TestArrayStorage
+}
+
+// CHECK-LABEL: sil_global @static_array : $TestArrayStorage = {
+// CHECK:         %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
+// CHECK-NEXT:  }
+sil_global @static_array : $TestArrayStorage = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = integer_literal $Builtin.Int64, 20
+  %3 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct $Int64 (%2 : $Builtin.Int64)
+  %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
+}
 
 // Linkage types.
 
@@ -29,17 +58,16 @@ bb0:
 // Type references
 
 // Some cyclic type references between SIL function bodies.
-class Class1 { 
-  var a : Class2 
+class Class1 {
+  var a : Class2
   init()
 }
-class Class2 { 
-  var b : Class1 
+class Class2 {
+  var b : Class1
   init()
 }
 
 sil @type_ref1 : $(Class1, Int) -> ()  // CHECK-LABEL: sil @type_ref1 : $@convention(thin) (Class1, Int)
-
 
 // Instructions
 
@@ -48,7 +76,7 @@ bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   br bb1                              // CHECK:   br bb1
 bb1:
-  %b = alloc_box $Int               // CHECK:   %2 = alloc_box $Int
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>               // CHECK:   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %c = integer_literal $Builtin.Word, 1
   // CHECK: integer_literal $Builtin.Word, -1
   %e = integer_literal $Builtin.Word, -1
@@ -61,41 +89,43 @@ bb0(%0 : $Int):
   br bb2
 bb1:
   // Forward reference MRVs.
-  store %0 to %6#1 : $*Int                   // CHECK:   store %0 to %6#1
-  strong_release %6#0 : $@box Int        // CHECK:   strong_release %6#0
+  store %0 to %7 : $*Int                     // CHECK:   store %0 to %7
+  strong_release %6 : $<τ_0_0> { var τ_0_0 } <Int>              // CHECK:   strong_release %6
 
   return %5 : $()                              // CHECK:   return %5 : $()
 bb2:
   %5 = tuple ()                                // CHECK:   %5 = tuple ()
-  %6 = alloc_box $Int                        // CHECK:   %6 = alloc_box $Int
+  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>                          // CHECK:   %6 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %7 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Int>, 0           // CHECK:   %7 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Int>
+
   br bb1                                       // CHECK:   br bb1
 }
 
-sil @named_tuple : $() -> (x: Builtin.Word, Builtin.Word) {
+sil @named_tuple : $() -> (Builtin.Word, Builtin.Word) {
   %0 = integer_literal $Builtin.Word, 42      // CHECK: integer_literal $Builtin.Word, 42
-  %9 = tuple $(x: Builtin.Word, Builtin.Word) (%0, %0)
-  %10 = return %9 : $(x: Builtin.Word, Builtin.Word)
+  %9 = tuple $(Builtin.Word, Builtin.Word) (%0, %0)
+  return %9 : $(Builtin.Word, Builtin.Word)
 }
 
 sil @return_int : $@convention(thin) (Int) -> Int { // CHECK: $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                          // CHECK: bb0(%0 : $Int):
   %1 = alloc_stack $Int                  // CHECK: alloc_stack $Int
-  store %0 to %1#1 : $*Int               // CHECK: store %0 to %1#1 : $*Int
-  %3 = load %1#1 : $*Int                 // CHECK: load {{.*}} : $*Int
-  dealloc_stack %1#0 : $*@local_storage Int // CHECK: dealloc_stack {{.*}} : $*@local_storage Int
+  store %0 to %1 : $*Int               // CHECK: store %0 to %1 : $*Int
+  %3 = load %1 : $*Int                 // CHECK: load {{.*}} : $*Int
+  dealloc_stack %1 : $*Int // CHECK: dealloc_stack {{.*}} : $*Int
   return %3 : $Int                       // CHECK: return {{.*}} : $Int
 }
 
 sil @call_fn_pointer : $@convention(thin) (() -> Int) -> Int {
 bb0(%0 : $() -> Int):
   %1 = alloc_stack $() -> Int            // CHECK: alloc_stack $() -> Int
-  store %0 to %1#1 : $*() -> Int         // CHECK: store %0 to %1#1 : $*() -> Int
-  %3 = load %1#1 : $*() -> Int             // CHECK: load %1#1 : $*() -> Int
+  store %0 to %1 : $*() -> Int         // CHECK: store %0 to %1 : $*() -> Int
+  %3 = load %1 : $*() -> Int             // CHECK: load %1 : $*() -> Int
   strong_retain %3 : $() -> Int                 // CHECK: strong_retain %3 : $() -> Int
   %5 = apply %3() : $() -> Int           // CHECK: apply %3() : $() -> Int
-  %6 = load %1#1 : $*() -> Int             // CHECK: load %1#1 : $*() -> Int
+  %6 = load %1 : $*() -> Int             // CHECK: load %1 : $*() -> Int
   strong_release %3 : $() -> Int                // CHECK: release {{.*}} : $() -> Int
-  dealloc_stack %1#0 : $*@local_storage () -> Int // CHECK: dealloc_stack %1#0 : $*@local_storage () -> Int
+  dealloc_stack %1 : $*() -> Int // CHECK: dealloc_stack %1 : $*() -> Int
   return %5 : $Int                       // CHECK: return %5 : $Int
 }
 
@@ -109,11 +139,11 @@ bb0:                                         // CHECK: bb0:
 
   // CHECK: integer_literal $Builtin.Word, 1
   %3 = integer_literal $Builtin.Word, 1
-  
+
   // CHECK: apply
   %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
   // CHECK: return
-  %5 = return %4 : $Int
+  return %4 : $Int
 }
 
 sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
@@ -130,13 +160,13 @@ bb0(%0 : $Bool):
   // CHECK: alloc_stack $Bool
   %1 = alloc_stack $Bool
   // CHECK: store
-  %2 = store %0 to %1#1 : $*Bool
+  store %0 to %1 : $*Bool
   // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@convention(method) (@inout Bool) -> Builtin.Int1
   %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $@convention(method) (@inout Bool) -> Builtin.Int1
   // CHECK: apply
-  %4 = apply %3(%1#1) : $@convention(method) (@inout Bool) -> Builtin.Int1
+  %4 = apply %3(%1) : $@convention(method) (@inout Bool) -> Builtin.Int1
   // CHECK: cond_br
-  %5 = cond_br %4, bb1, bb2
+  cond_br %4, bb1, bb2
 
 // CHECK: bb1:
 bb1:
@@ -149,7 +179,7 @@ bb1:
   // CHECK: apply
   %9 = apply %6(%8, %7) : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   // CHECK: dealloc_stack
-  %10 = dealloc_stack %1#0 : $*@local_storage Bool
+  dealloc_stack %1 : $*Bool
   // CHECK: br
   br bb3(%9 : $Int)
 
@@ -164,7 +194,7 @@ bb2:
   // CHECK: apply
   %15 = apply %12(%14, %13) : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   // CHECK: dealloc_stack
-  %16 = dealloc_stack %1#0 : $*@local_storage Bool
+  dealloc_stack %1 : $*Bool
   // CHECK: br
   br bb3(%15 : $Int)
 
@@ -180,19 +210,25 @@ protocol P {
 
 sil @existentials : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  // CHECK: open_existential_addr %0
-  %1 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P 
+  // CHECK: open_existential_addr mutable_access %0
+  %1 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
 
   // CHECK: witness_method ${{.*}}, #P.doIt!1
-  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) <T: P> (@inout T) -> ()
+  %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // Make sure we have the correct scope for generic parameters.
   // CHECK: witness_method $@opened("{{.*}}") P, #P.doIt!1
-  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) <T: P> (@inout T) -> ()
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   // CHECK: apply
-  %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@convention(witness_method) <T: P> (@inout T) -> ()
+  %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@convention(witness_method: P) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
-  %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
-  %6 = return %4 : $()                // CHECK: return 
+
+  // CHECK: open_existential_addr immutable_access
+  %5 = open_existential_addr immutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000001") P
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-000000000001") P, #P.doIt!1, %5 : $*@opened("01234567-89ab-cdef-0123-000000000001") P : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
+  %8 = apply %6<@opened("01234567-89ab-cdef-0123-000000000001") P>(%5) : $@convention(witness_method: P) <T: P> (@in_guaranteed T) -> ()
+
+  destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
+  return %4 : $()                // CHECK: return
 }
 
 
@@ -217,18 +253,18 @@ bb0:
   %O = unchecked_ref_cast %C : $C to $Builtin.UnknownObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
-  %2 = class_method %C : $C, #C.doIt!1 : C -> () -> () , $@convention(method) (@guaranteed C) -> ()
-  
+  %2 = class_method %C : $C, #C.doIt!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+
   // CHECK: alloc_ref $D
   %D = alloc_ref $D
-  
+
   // CHECK: upcast {{.*}} : $D to $C
   %a = upcast %D : $D to $C
 
 
   %5 = unconditional_checked_cast %C : $C to $D   // CHECK: unconditional_checked_cast
   %6 = tuple ()
-  %7 = return %6 : $()
+  return %6 : $()
 }
 
 sil @optional_upcasts : $@convention(thin) (Optional<D>) -> () {
@@ -236,7 +272,7 @@ bb0(%0: $Optional<D>):
   // CHECK: upcast {{.*}} : $Optional<D> to $Optional<C>
   %1 = upcast %0 : $Optional<D> to $Optional<C>
   %2 = tuple ()
-  %3 = return %2 : $()
+  return %2 : $()
 }
 
 
@@ -265,40 +301,41 @@ bb0(%0 : $*T):
   // C/HECK: witness_method $*T, #Runcible.associated_method!1
   %4 = witness_method $*T, #Runcible.associated_method!1 : $@cc(method) (@inout T) -> @thick T.U.Type
   %5 = apply %4(%0) : $@cc(method) (@inout T) -> @thick T.U.Type
-  %6 = store %5 to %3#1 : $*@thick T.U.Type
+  store %5 to %3 : $*@thick T.U.Type
   %7 = metatype $@thick T.Type
   // C/HECK: witness_method [volatile] $*T, #Runcible.static_method!1
   %8 = witness_method [volatile] $*T, #Runcible.static_method!1 : $(@thick T.Type) -> ()
   %9 = apply %8(%7) : $(@thick T.Type) -> ()
-  %10 = dealloc_stack %3#0 : $*@local_storage @thick T.U.Type
+  dealloc_stack %3 : $*@thick T.U.Type
   %11 = tuple ()
-  %12 = destroy_addr %0 : $*T
-  %13 = return %11 : $()
+  destroy_addr %0 : $*T
+  return %11 : $()
 }
 */
 
 protocol Bendable { }
 
-// CHECK: $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
-sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> () {
-bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
+// CHECK: $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
+sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible {
+bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
-  %2 = alloc_box $protocol<Bendable, Runcible>
-  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
-  %3 = copy_addr [take] %1 to [initialization] %2#1 : $*protocol<Bendable, Runcible>
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Bendable & Runcible>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Bendable & Runcible>, 0
+  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  copy_addr [take] %1 to [initialization] %2a : $*Bendable & Runcible
   // CHECK: alloc_stack
-  %4 = alloc_stack $protocol<Bendable, Runcible>
-  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
-  %5 = copy_addr %2#1 to [initialization] %4#1 : $*protocol<Bendable, Runcible>
+  %4 = alloc_stack $Bendable & Runcible
+  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
+  copy_addr %2a to [initialization] %4 : $*Bendable & Runcible
   %7 = tuple ()
   // CHECK: destroy_addr
-  %8 = destroy_addr %4#1 : $*protocol<Bendable, Runcible>
+  destroy_addr %4 : $*Bendable & Runcible
   // CHECK: dealloc_stack
-  %9 = dealloc_stack %4#0 : $*@local_storage protocol<Bendable, Runcible>
+  dealloc_stack %4 : $*Bendable & Runcible
   // CHECK: release
-  %10 = strong_release %2#0 : $@box protocol<Bendable, Runcible>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Bendable & Runcible>
   // CHECK: return
-  %11 = return %7 : $()
+  return %7 : $()
 }
 
 protocol ClassBound : class {
@@ -308,18 +345,19 @@ protocol ClassBound : class {
 // CHECK: $@convention(thin) (ClassBound) -> ()
 sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (ClassBound) -> () {
 bb0(%0 : $ClassBound):
-  %1 = alloc_box $ClassBound                // CHECK: alloc_box
-  %2 = store %0 to %1#1 : $*ClassBound      // CHECK: store
-  %3 = load %1#1 : $*ClassBound             // CHECK: load
-  %4 = strong_retain %3 : $ClassBound              // CHECK: strong_retain
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ClassBound>                // CHECK: alloc_box
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <ClassBound>, 0
+  store %0 to %1a : $*ClassBound      // CHECK: store
+  %3 = load %1a : $*ClassBound             // CHECK: load
+  strong_retain %3 : $ClassBound              // CHECK: strong_retain
   // CHECK: open_existential_ref {{%.*}} : $ClassBound to $@opened({{.*}}) ClassBound
   %5 = open_existential_ref %3 : $ClassBound to $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound
   // CHECK: witness_method
-  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method) <T: ClassBound> (T) -> ()
-  %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@convention(witness_method) <T: ClassBound> (T) -> ()
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
+  %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@convention(witness_method: ClassBound) <T: ClassBound> (T) -> ()
   %8 = tuple ()
-  %9 = strong_release %1#0 : $@box ClassBound
-  %10 = return %8 : $()
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <ClassBound>
+  return %8 : $()
 }
 
 struct Val {
@@ -329,9 +367,9 @@ struct Val {
 sil @_TV4todo3ValCfMS0_FT_S0_ : $@convention(thin) (@thin Val.Type) -> Val {
 bb0(%0 : $@thin Val.Type):
   %1 = alloc_stack $Val // CHECK: alloc_stack
-  %3 = load %1#1 : $*Val
-  dealloc_stack %1#0 : $*@local_storage Val
-  %4 = return %3 : $Val
+  %3 = load %1 : $*Val
+  dealloc_stack %1 : $*Val
+  return %3 : $Val
 }
 
 class Ref {
@@ -346,24 +384,25 @@ sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, V
 bb0(%0 : $Ref, %1 : $Val, %2 : $@thin Aleph.Type):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
   %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
-  %4 = return %3 : $Aleph  // CHECK: return
+  return %3 : $Aleph  // CHECK: return
 }
 
 // CHECK: $@convention(thin) (@thin Aleph.Type) -> Aleph
 sil @_TV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph {
 bb0(%0 : $@thin Aleph.Type):
   %1 = tuple ()
-  %2 = alloc_box $Aleph       // CHECK: alloc_box
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Aleph>       // CHECK: alloc_box
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Aleph>, 0
   // CHECK: struct_element_addr {{.*}} : $*Aleph, #Aleph.a
-  %5 = struct_element_addr %2#1 : $*Aleph, #Aleph.a
+  %5 = struct_element_addr %2a : $*Aleph, #Aleph.a
   %6 = load %5 : $*Ref
-  %8 = strong_release %6 : $Ref
-  %14 = load %2#1 : $*Aleph
+  strong_release %6 : $Ref
+  %14 = load %2a : $*Aleph
   // CHECK: struct_extract {{%.*}} : $Aleph, #Aleph.a
   %15 = struct_extract %14 : $Aleph, #Aleph.a
-  %16 = strong_retain %15 : $Ref
-  %17 = strong_release %2#0 : $@box Aleph
-  %18 = return %14 : $Aleph
+  strong_retain %15 : $Ref
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Aleph>
+  return %14 : $Aleph
 }
 
 enum Beth {
@@ -394,7 +433,7 @@ enum Gimel {
   case DataCase(Q)
 }
 
-sil @test_union_addr_empty_case : $(@out Gimel) -> () {
+sil @test_union_addr_empty_case : $() -> @out Gimel {
 bb0(%0 : $*Gimel):
   // CHECK: inject_enum_addr {{%.*}} : $*Gimel, #Gimel.EmptyCase!enumelt
   inject_enum_addr %0 : $*Gimel, #Gimel.EmptyCase!enumelt
@@ -402,7 +441,7 @@ bb0(%0 : $*Gimel):
   return %t : $()
 }
 
-sil @test_union_addr_data_case : $(@out Gimel, @in Q) -> () {
+sil @test_union_addr_data_case : $(@in Q) -> (@out Gimel) {
 bb0(%0 : $*Gimel, %1 : $*Q):
   // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt.1
   %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt.1
@@ -418,16 +457,17 @@ sil @_T5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float32)
 // CHECK: $@convention(thin) (Int, Float) -> ()
 sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@convention(thin) (Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float):
-  %2 = alloc_box $(Int, Float)
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Float)>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Int, Float)>, 0
   // CHECK: tuple ({{%.*}} : $Int, {{%.*}} : $Float)
   %3 = tuple (%0 : $Int, %1 : $Float)
-  %4 = store %3 to %2#1 : $*(Int, Float)
-  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int, Float), 0
-  %6 = tuple_element_addr %2#1 : $*(Int, Float), 0
+  store %3 to %2a : $*(Int, Float)
+  // CHECK: tuple_element_addr {{%.*}} : $*(Int, Float), 0
+  %6 = tuple_element_addr %2a : $*(Int, Float), 0
   // CHECK: load
   %7 = load %6 : $*Int
-  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int, Float), 1
-  %10 = tuple_element_addr %2#1 : $*(Int, Float), 1
+  // CHECK: tuple_element_addr {{%.*}} : $*(Int, Float), 1
+  %10 = tuple_element_addr %2a : $*(Int, Float), 1
   // CHECK: load
   %11 = load %10 : $*Float
   // CHECK: function_ref
@@ -441,8 +481,8 @@ bb0(%0 : $Int, %1 : $Float):
   // CHECK: apply
   %24 = apply %19(%17) : $@convention(thin) (Float) -> ()
   %25 = tuple ()
-  %26 = strong_release %2#0 : $@box (Int, Float)
-  %27 = return %25 : $()
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <(Int, Float)>
+  return %25 : $()
 }
 
 class M {
@@ -453,21 +493,23 @@ class M {
 // CHECK: $@convention(method) (Int, M) -> ()
 sil @_TC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, M) -> () {
 bb0(%0 : $Int, %1 : $M):
-  %2 = alloc_box $Int     // CHECK: alloc_box $Int
-  %3 = store %0 to %2#1 : $*Int
-  %4 = alloc_box $M         // CHECK: alloc_box $M
-  %5 = store %1 to %4#1 : $*M
-  %6 = load %2#1 : $*Int  // CHECK: load {{.*}} : $*Int
-  %7 = load %4#1 : $*M      // CHECK: load {{.*}} : $*M
-  %8 = strong_retain %7 : $M
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>     // CHECK: alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  store %0 to %2a : $*Int
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <M>         // CHECK: alloc_box $<τ_0_0> { var τ_0_0 } <M>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <M>, 0
+  store %1 to %4a : $*M
+  %6 = load %2a : $*Int  // CHECK: load {{.*}} : $*Int
+  %7 = load %4a : $*M      // CHECK: load {{.*}} : $*M
+  strong_retain %7 : $M
   // CHECK: ref_element_addr {{%.*}} : $M, #M.member
   %9 = ref_element_addr %7 : $M, #M.member
-  %10 = store %6 to %9 : $*Int
-  %11 = strong_release %7 : $M
+  store %6 to %9 : $*Int
+  strong_release %7 : $M
   %12 = tuple ()
-  %13 = strong_release %4#0 : $@box M
-  %14 = strong_release %2#0 : $@box Int
-  %15 = return %12 : $()
+  strong_release %4 : $<τ_0_0> { var τ_0_0 } <M>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Int>
+  return %12 : $()
 }
 
 class GenericClass<Q> {
@@ -491,10 +533,11 @@ class E : B { }
 // CHECK: $@convention(thin) (B) -> Builtin.Int1
 sil @_T4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1 {
 bb0(%0 : $B):
-  %1 = alloc_box $B                           // CHECK: alloc_box
-  %2 = store %0 to %1#1 : $*B
-  %3 = load %1#1 : $*B                        // CHECK: load
-  %4 = strong_retain %3 : $B
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>                           // CHECK: alloc_box
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
+  store %0 to %1a : $*B
+  %3 = load %1a : $*B                        // CHECK: load
+  strong_retain %3 : $B
   checked_cast_br %3 : $B to $E, yes, no     // CHECK: checked_cast_br
 yes(%5 : $E):
   %y = integer_literal $Builtin.Int1, 1
@@ -503,45 +546,58 @@ no:
   %n = integer_literal $Builtin.Int1, 0
   br isa(%n : $Builtin.Int1)
 isa(%6 : $Builtin.Int1):
-  %7 = strong_release %3 : $B
-  %8 = strong_release %1#0 : $@box B
-  %9 = return %6 : $Builtin.Int1
+  strong_release %3 : $B
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <B>
+  return %6 : $Builtin.Int1
 }
 
 sil @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp17utf8CodeUnitCountBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
 
 sil @_T5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  %2 = alloc_box $Builtin.RawPointer              // CHECK: alloc_box
-  %3 = alloc_box $Builtin.Word                   // CHECK: alloc_box
-  %4 = store %0 to %2#1 : $*Builtin.RawPointer
-  %5 = store %1 to %3#1 : $*Builtin.Word
-  %7 = load %2#1 : $*Builtin.RawPointer           // CHECK: load
-  %8 = load %3#1 : $*Builtin.Word                // CHECK: load
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>              // CHECK: alloc_box
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Word>                   // CHECK: alloc_box
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Word>, 0
+  store %0 to %2a : $*Builtin.RawPointer
+  store %1 to %3a : $*Builtin.Word
+  %7 = load %2a : $*Builtin.RawPointer           // CHECK: load
+  %8 = load %3a : $*Builtin.Word                // CHECK: load
   // CHECK: index_raw_pointer {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word
   %9 = index_raw_pointer %7 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = strong_release %3#0 : $@box Builtin.Word
-  %11 = strong_release %2#0 : $@box Builtin.RawPointer
-  %12 = return %9 : $Builtin.RawPointer
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Word>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
+  return %9 : $Builtin.RawPointer
 }
 
 sil_global @x : $Int
 sil @global_callee : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
 
+// CHECK-LABEL: sil @return_static_array
+sil @return_static_array : $@convention(thin) () -> TestArray {
+bb0:
+  // CHECK: %0 = global_value @static_array : $TestArrayStorage
+  %0 = global_value @static_array : $TestArrayStorage
+  %1 = struct $TestArray (%0 : $TestArrayStorage)
+  return %1 : $TestArray
+}
+
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()
 sil private @global_code : $() -> () {
 bb0:
+  // CHECK: alloc_global @x
+  alloc_global @x
   // CHECK: global_addr @x : $*Int
   %0 = global_addr @x : $*Int
   %1 = function_ref @global_callee : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
   %2 = metatype $@thin Int.Type
   %3 = integer_literal $Builtin.Int128, 0 // CHECK: integer_literal $Builtin.Int128, 0
   %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
-  %5 = store %4 to %0 : $*Int
+  store %4 to %0 : $*Int
   %6 = tuple ()
-  %7 = return %6 : $()
+  return %6 : $()
 }
 
 protocol SomeProtocol {
@@ -552,55 +608,59 @@ class SomeSubclass : SomeClass {}
 
 sil @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
 bb0(%0 : $SomeClass, %1 : $SomeSubclass):
-  %2 = alloc_box $SomeClass                       // CHECK: alloc_box
-  %3 = alloc_box $SomeSubclass                    // CHECK: alloc_box
-  %4 = store %0 to %2#1 : $*SomeClass
-  %5 = store %1 to %3#1 : $*SomeSubclass
-  %7 = load %2#1 : $*SomeClass                    // CHECK: load
-  %8 = strong_retain %7 : $SomeClass
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>                       // CHECK: alloc_box
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeSubclass>                    // CHECK: alloc_box
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <SomeSubclass>, 0
+  store %0 to %2a : $*SomeClass
+  store %1 to %3a : $*SomeSubclass
+  %7 = load %2a : $*SomeClass                    // CHECK: load
+  strong_retain %7 : $SomeClass
   // CHECK: value_metatype $@thick SomeClass.Type, {{%.*}} : $SomeClass
   %9 = value_metatype $@thick SomeClass.Type, %7 : $SomeClass
-  %11 = load %3#1 : $*SomeSubclass                // CHECK: load
-  %12 = strong_retain %11 : $SomeSubclass
+  %11 = load %3a : $*SomeSubclass                // CHECK: load
+  strong_retain %11 : $SomeSubclass
   // CHECK: value_metatype $@thick SomeSubclass.Type, {{%.*}} : $SomeSubclass
   %13 = value_metatype $@thick SomeSubclass.Type, %11 : $SomeSubclass
   %14 = upcast %13 : $@thick SomeSubclass.Type to $@thick SomeClass.Type  // CHECK: upcast
   %15 = tuple (%9 : $@thick SomeClass.Type, %14 : $@thick SomeClass.Type) // CHECK: tuple
-  %16 = strong_release %11 : $SomeSubclass
-  %17 = strong_release %7 : $SomeClass
-  %18 = strong_release %3#0 : $@box SomeSubclass
-  %19 = strong_release %2#0 : $@box SomeClass
-  %20 = return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
+  strong_release %11 : $SomeSubclass
+  strong_release %7 : $SomeClass
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <SomeSubclass>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
 }
 
 sil @test_value_metatype : $@convention(thin) <T> (@in T) -> (@thick T.Type, @thick T.Type) {
 bb0(%0 : $*T):
-  %1 = alloc_box $T                               // CHECK: alloc_box
-  %2 = copy_addr [take] %0 to [initialization] %1#1 : $*T
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // CHECK: alloc_box
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  copy_addr [take] %0 to [initialization] %1a : $*T
   %3 = metatype $@thick T.Type                       // CHECK: metatype
   %5 = alloc_stack $T                               // CHECK: alloc_stack
-  %6 = copy_addr %1#1 to [initialization] %5#1 : $*T
+  copy_addr %1a to [initialization] %5 : $*T
   // CHECK: value_metatype $@thick T.Type, {{%.*}} : $*T
-  %7 = value_metatype $@thick T.Type, %5#1 : $*T
+  %7 = value_metatype $@thick T.Type, %5 : $*T
   %8 = tuple (%3 : $@thick T.Type, %7 : $@thick T.Type) // CHECK: tuple
-  %9 = destroy_addr %5#1 : $*T
-  %10 = dealloc_stack %5#0 : $*@local_storage T
-  %11 = strong_release %1#0 : $@box T
-  %12 = return %8 : $(@thick T.Type, @thick T.Type)
+  destroy_addr %5 : $*T
+  dealloc_stack %5 : $*T
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <T>
+  return %8 : $(@thick T.Type, @thick T.Type)
 }
 
 sil @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
-  %1 = alloc_box $SomeProtocol                    // CHECK: alloc_box
-  %2 = copy_addr [take] %0 to [initialization] %1#1 : $*SomeProtocol
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeProtocol>                    // CHECK: alloc_box
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <SomeProtocol>, 0
+  copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
   %4 = alloc_stack $SomeProtocol                    // CHECK: alloc_stack
-  %5 = copy_addr %1#1 to [initialization] %4#1 : $*SomeProtocol
+  copy_addr %1a to [initialization] %4 : $*SomeProtocol
   // CHECK: existential_metatype $@thick SomeProtocol.Type, {{%.*}} : $*SomeProtocol
-  %6 = existential_metatype $@thick SomeProtocol.Type, %4#1 : $*SomeProtocol
-  %7 = destroy_addr %4#1 : $*SomeProtocol
-  %8 = dealloc_stack %4#0 : $*@local_storage SomeProtocol
-  %9 = strong_release %1#0 : $@box SomeProtocol
-  %10 = return %6 : $@thick SomeProtocol.Type
+  %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
+  destroy_addr %4 : $*SomeProtocol
+  dealloc_stack %4 : $*SomeProtocol
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <SomeProtocol>
+  return %6 : $@thick SomeProtocol.Type
 }
 
 // CHECK-LABEL: sil @test_unreachable
@@ -614,29 +674,29 @@ sil @test_unowned_retain : $@convention(thin) (SomeClass) -> () {
 bb0(%0 : $SomeClass):
   %1 = ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
 // CHECK: ref_to_unowned %0 : $SomeClass to $@sil_unowned SomeClass
-  %2 = unowned_retain %1 : $@sil_unowned SomeClass
+  unowned_retain %1 : $@sil_unowned SomeClass
 // CHECK: unowned_retain %1 : $@sil_unowned SomeClass
-  %3 = unowned_release %1 : $@sil_unowned SomeClass
+  unowned_release %1 : $@sil_unowned SomeClass
 // CHECK: unowned_release %1 : $@sil_unowned SomeClass
   %4 = unowned_to_ref %1 : $@sil_unowned SomeClass to $SomeClass
 // CHECK: unowned_to_ref %1 : $@sil_unowned SomeClass to $SomeClass
   %5 = tuple ()
-  %6 = return %5 : $()
+  return %5 : $()
 }
 
 // CHECK-LABEL: sil @test_basic_block_arguments
 sil @test_basic_block_arguments : $@convention(thin) (Builtin.Int1) -> Builtin.Word {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
-bb1:                                        
-  %2 = integer_literal $Builtin.Word, 5       
+bb1:
+  %2 = integer_literal $Builtin.Word, 5
   br bb3(%2 : $Builtin.Word)
 //CHECK: br bb3(%2 : $Builtin.Word)
-bb2:                                            
-  %4 = integer_literal $Builtin.Word, 6        
+bb2:
+  %4 = integer_literal $Builtin.Word, 6
   br bb3(%4 : $Builtin.Word)
 //CHECK: br bb3(%4 : $Builtin.Word)
-bb3(%6 : $Builtin.Word):                               
+bb3(%6 : $Builtin.Word):
 //CHECK: bb3(%6 : $Builtin.Word)
   return %6 : $Builtin.Word
 }
@@ -657,16 +717,18 @@ bb3(%4 : $Int):
 // CHECK-LABEL: sil @test_builtin
 sil @test_builtin : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
-  %2 = alloc_box $Builtin.Int1
-  %3 = alloc_box $Builtin.Int1
-  store %0 to %2#1 : $*Builtin.Int1
-  store %1 to %3#1 : $*Builtin.Int1
-  %8 = load %2#1 : $*Builtin.Int1
-  %9 = load %3#1 : $*Builtin.Int1
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
+  store %0 to %2a : $*Builtin.Int1
+  store %1 to %3a : $*Builtin.Int1
+  %8 = load %2a : $*Builtin.Int1
+  %9 = load %3a : $*Builtin.Int1
   // CHECK: builtin "cmp_eq_Int1"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.Int1) : $Builtin.Int1
   %10 = builtin "cmp_eq_Int1"(%8 : $Builtin.Int1, %9 : $Builtin.Int1) : $Builtin.Int1
-  strong_release %3#0 : $@box Builtin.Int1
-  strong_release %2#0 : $@box Builtin.Int1
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
   return %10 : $Builtin.Int1
 }
 
@@ -692,8 +754,8 @@ bb0:
 // CHECK-LABEL: sil @test_dealloc_box
 sil @test_dealloc_box : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $Class1
-  dealloc_box %0#0 : $@box Class1
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Class1>
+  dealloc_box %0 : $<τ_0_0> { var τ_0_0 } <Class1>
   %2 = tuple ()
   return %2 : $()
 }
@@ -709,21 +771,54 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @test_tail_elems
+sil @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
+  // CHECK: alloc_ref  [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] $Class1
+  %2 = alloc_ref [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] $Class1
+  // CHECK: dealloc_ref %2 : $Class1
+  dealloc_ref %2 : $Class1
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_tail_elems_dynamic
+sil @test_tail_elems_dynamic : $@convention(thin) (Builtin.Word, Builtin.Word, @thick Class1.Type) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $@thick Class1.Type):
+  // CHECK: alloc_ref_dynamic  [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] %2 : $@thick Class1
+  %3 = alloc_ref_dynamic [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] %2 : $@thick Class1.Type, $Class1
+  // CHECK: dealloc_ref %3 : $Class1
+  dealloc_ref %3 : $Class1
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @test_tail_addr
+sil @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1 {
+bb0(%0 : $Class1, %1 : $Builtin.Word):
+  // CHECK: [[T:%[0-9]+]] = ref_tail_addr %0 : $Class1, $Val
+  %2 = ref_tail_addr %0 : $Class1, $Val
+  // CHECK: tail_addr [[T]] : $*Val, %1 : $Builtin.Word, $Aleph
+  %3 = tail_addr %2 : $*Val, %1 : $Builtin.Word, $Aleph
+  return %0 : $Class1
+}
+
 
 // CHECK-LABEL: closure_test
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
+sil @closure0 : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, @inout Int) -> ()
 
 sil @closure_test : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $Int                           // users: %10, %8, %8, %7, %4
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>                           // users: %10, %8, %8, %7, %4
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
-  strong_retain %0#0 : $@box Int
-  %8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (@box Int, @inout Int) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, @inout Int) -> ()
+  strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  %8 = partial_apply %6(%0, %0a) : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, @inout Int) -> ()
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  strong_release %0#0 : $@box Int
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
 
   %11 = tuple ()
   return %11 : $()
@@ -756,9 +851,10 @@ sil @_T6switch1cFT_T_ : $@convention(thin) () -> ()
 // CHECK-LABEL: sil @test_switch_union : $@convention(thin) (MaybePair) -> ()
 sil @test_switch_union : $@convention(thin) (MaybePair) -> () {
 bb0(%0 : $MaybePair):
-  %1 = alloc_box $MaybePair
-  store %0 to %1#1 : $*MaybePair
-  %3 = load %1#1 : $*MaybePair
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <MaybePair>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <MaybePair>, 0
+  store %0 to %1a : $*MaybePair
+  %3 = load %1a : $*MaybePair
   %4 = tuple ()
   // CHECK: switch_enum %{{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: bb{{.*}}, case #MaybePair.Left!enumelt.1: bb
   switch_enum %3 : $MaybePair, case #MaybePair.Neither!enumelt: bb1, case #MaybePair.Left!enumelt.1: bb3
@@ -784,7 +880,7 @@ bb4(%y : $Int):
 bb5:
   %15 = function_ref @_T6switch1cFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
   %16 = apply %15() : $@convention(thin) () -> ()
-  strong_release %1#0 : $@box MaybePair
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <MaybePair>
   %18 = tuple ()
   return %18 : $()                                        // CHECK: return
 }
@@ -842,7 +938,7 @@ bb3:
 
 bb4:
   // CHECK: function_ref
-  %37 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> () 
+  %37 = function_ref @_T6switch1aFT_T_ : $@convention(thin) () -> ()
   %38 = apply %37() : $@convention(thin) () -> ()
   br bb6
 
@@ -894,13 +990,13 @@ bb0(%0 : $Builtin.Word):
   %1 = integer_literal $Builtin.Word, 0
   %2 = integer_literal $Builtin.Word, 1
   %3 = enum $IntEnum, #IntEnum.E1!enumelt
-  %4 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %3 : $IntEnum
+  %4 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %3 : $IntEnum
   %5 = integer_literal $Builtin.Word, 2
   %6 = enum $IntEnum, #IntEnum.E2!enumelt
-  %7 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %6 : $IntEnum
+  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %6 : $IntEnum
   %8 = enum $IntEnum, #IntEnum.E0!enumelt
-  %9 = enum $Optional<IntEnum>, #Optional.Some!enumelt.1, %8 : $IntEnum
-  %10 = enum $Optional<IntEnum>, #Optional.None!enumelt
+  %9 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %8 : $IntEnum
+  %10 = enum $Optional<IntEnum>, #Optional.none!enumelt
 
   // CHECK: select_value %{{.*}} : $Builtin.Word, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, case %{{.*}}: %{{.*}}, default %{{.*}} : $Optional<IntEnum>
   %11 = select_value %0 : $Builtin.Word, case %2: %4, case %5: %7, case %1: %9, default %10 : $Optional<IntEnum>
@@ -914,18 +1010,19 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> ()
-sil @test_init_existential : $@convention(thin) (@out Bendable, Spoon) -> () {
+// CHECK-LABEL: sil @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
+sil @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
-  %2 = alloc_box $Spoon
-  store %1 to %2#1 : $*Spoon
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Spoon>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Spoon>, 0
+  store %1 to %2a : $*Spoon
   // CHECK: init_existential_addr %{{.*}} : $*Bendable, $Spoon
   %4 = init_existential_addr %0 : $*Bendable, $Spoon
   // CHECK: deinit_existential_addr %{{.*}} : $*Bendable
   deinit_existential_addr %0 : $*Bendable
-  %5 = load %2#1 : $*Spoon
+  %5 = load %2a : $*Spoon
   store %5 to %4 : $*Spoon
-  strong_release %2#0 : $@box Spoon
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Spoon>
   %8 = tuple ()
   return %8 : $()
 }
@@ -933,13 +1030,14 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
 // CHECK-LABEL: sil @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
 sil @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
-  %1 = alloc_box $ConcreteClass
-  store %0 to %1#1 : $*ConcreteClass
-  %3 = load %1#1 : $*ConcreteClass
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ConcreteClass>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <ConcreteClass>, 0
+  store %0 to %1a : $*ConcreteClass
+  %3 = load %1a : $*ConcreteClass
   strong_retain %3 : $ConcreteClass
   // CHECK: init_existential_ref %{{.*}} : $ConcreteClass : $ConcreteClass, $ClassP
   %5 = init_existential_ref %3 : $ConcreteClass : $ConcreteClass, $ClassP
-  strong_release %1#0 : $@box ConcreteClass
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <ConcreteClass>
   return %5 : $ClassP
 }
 
@@ -956,14 +1054,14 @@ bb0:
   // CHECK: apply %{{.*}}() : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple ()
-  %3 = return %2 : $()
+  return %2 : $()
 }
 
 // CHECK-LABEL: sil [thunk] @test_thunk : $@convention(thin) () -> () {
 sil [thunk] @test_thunk : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
-  %1 = return %0 : $()
+  return %0 : $()
 }
 
 // CHECK-LABEL: sil @takes_unnamed_closure : $@convention(thin) (@callee_owned () -> Int) -> () -> () -> Int
@@ -977,7 +1075,7 @@ bb0(%0 : $Float):
   %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
   // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
   %2 = partial_apply %1(%0) : $@convention(thin) (Int, Float) -> ()
-  %3 = return %2 : $@callee_owned Int -> ()
+  return %2 : $@callee_owned Int -> ()
 }
 
 class X {
@@ -987,10 +1085,11 @@ class X {
 // CHECK-LABEL: sil @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
 sil @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
-  %1 = alloc_box $AnyObject
-  store %0 to %1#1 : $*AnyObject
-  %3 = alloc_box $Optional<() -> ()>
-  %4 = load %1#1 : $*AnyObject
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+  store %0 to %1a : $*AnyObject
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
+  %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
   %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject to $Builtin.UnknownObject
@@ -1008,13 +1107,15 @@ bb3:
 
 // CHECK-LABEL: sil @test_mark_fn_escape
 sil @test_mark_fn_escape : $() -> () {
-  %b = alloc_box $Int
-  %c = alloc_box $Int
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %c = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %ca = project_box %c : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
-  // CHECK: mark_function_escape {{.*}}#1 : $*Int
-  mark_function_escape %b#1 : $*Int
-  // CHECK: mark_function_escape {{.*}}#1 : $*Int, {{.*}}#1 : $*Int
-  mark_function_escape %b#1 : $*Int, %c#1 : $*Int
+  // CHECK: mark_function_escape {{.*}} : $*Int
+  mark_function_escape %ba : $*Int
+  // CHECK: mark_function_escape {{.*}} : $*Int, {{.*}} : $*Int
+  mark_function_escape %ba : $*Int, %ca : $*Int
 
   %28 = tuple ()
   return %28 : $()
@@ -1036,6 +1137,15 @@ bb0(%0 : $X):
   autorelease_value %0 : $X
   return %0 : $X
 // CHECK:      autorelease_value [[T0]] : $X
+// CHECK-NEXT: return [[T0]] : $X
+}
+
+// CHECK-LABEL: sil @test_set_deallocating
+sil @test_set_deallocating : $X -> X {
+bb0(%0 : $X):
+  set_deallocating %0 : $X
+  return %0 : $X
+// CHECK:      set_deallocating [[T0]] : $X
 // CHECK-NEXT: return [[T0]] : $X
 }
 
@@ -1064,35 +1174,35 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int32  // var x               // users: %17, %6
   %5 = alloc_stack $Int32  // var y               // users: %16, %7
-  store %0 to %4#1 : $*Int32
-  store %1 to %5#1 : $*Int32
+  store %0 to %4 : $*Int32
+  store %1 to %5 : $*Int32
   %8 = alloc_stack $Foo  // var self              // users: %15, %14, %9
-  store %2 to %8#1 : $*Foo
+  store %2 to %8 : $*Foo
   %10 = metatype $@thin Int32.Type
   %12 = integer_literal $Builtin.Int32, 0         // user: %13
   %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
-  destroy_addr %8#1 : $*Foo
-  dealloc_stack %8#0 : $*@local_storage Foo
-  dealloc_stack %5#0 : $*@local_storage Int32
-  dealloc_stack %4#0 : $*@local_storage Int32
+  destroy_addr %8 : $*Foo
+  dealloc_stack %8 : $*Foo
+  dealloc_stack %5 : $*Int32
+  dealloc_stack %4 : $*Int32
   return %13 : $Int32
 }
 
 sil @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Int32, Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value           // users: %16, %5
-  store %0 to %4#1 : $*Int32
+  store %0 to %4 : $*Int32
   %6 = alloc_stack $Int32  // var x               // users: %15, %8
   %7 = alloc_stack $Int32  // var y               // users: %14, %9
-  store %1 to %6#1 : $*Int32
-  store %2 to %7#1 : $*Int32
+  store %1 to %6 : $*Int32
+  store %2 to %7 : $*Int32
   %10 = alloc_stack $Foo  // var self             // users: %13, %12, %11
-  store %3 to %10#1 : $*Foo
-  destroy_addr %10#1 : $*Foo
-  dealloc_stack %10#0 : $*@local_storage Foo
-  dealloc_stack %7#0 : $*@local_storage Int32
-  dealloc_stack %6#0 : $*@local_storage Int32
-  dealloc_stack %4#0 : $*@local_storage Int32
+  store %3 to %10 : $*Foo
+  destroy_addr %10 : $*Foo
+  dealloc_stack %10 : $*Foo
+  dealloc_stack %7 : $*Int32
+  dealloc_stack %6 : $*Int32
+  dealloc_stack %4 : $*Int32
   %17 = tuple ()                                  // user: %18
   return %17 : $()
 }
@@ -1155,21 +1265,21 @@ sil @block_storage_type : $@convention(thin)  Int -> @convention(block) () -> ()
 entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
   %s = alloc_stack $@block_storage Int
-  // CHECK: [[PROJECT:%.*]] = project_block_storage [[STORAGE]]#1 : $*@block_storage Int
-  %c = project_block_storage %s#1 : $*@block_storage Int
+  // CHECK: [[PROJECT:%.*]] = project_block_storage [[STORAGE]] : $*@block_storage Int
+  %c = project_block_storage %s : $*@block_storage Int
   // CHECK: store %0 to [[PROJECT]]
   store %0 to %c : $*Int
   // CHECK: [[FUNC:%.*]] = function_ref
-  %f = function_ref @block_invoke : $@convention(c) (@inout @block_storage Int) -> ()
-  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]]#1 : $*@block_storage Int, invoke [[FUNC]] : $@convention(c) (@inout @block_storage Int) -> (), type $@convention(block) () -> ()
-  %b = init_block_storage_header %s#1 : $*@block_storage Int, invoke %f : $@convention(c) (@inout @block_storage Int) -> (), type $@convention(block) () -> ()
-  // CHECK: dealloc_stack [[STORAGE]]#0 : $*@local_storage @block_storage Int
-  dealloc_stack %s#0 : $*@local_storage @block_storage Int
+  %f = function_ref @block_invoke : $@convention(c) (@inout_aliasable @block_storage Int) -> ()
+  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]] : $*@block_storage Int, invoke [[FUNC]] : $@convention(c) (@inout_aliasable @block_storage Int) -> (), type $@convention(block) () -> ()
+  %b = init_block_storage_header %s : $*@block_storage Int, invoke %f : $@convention(c) (@inout_aliasable @block_storage Int) -> (), type $@convention(block) () -> ()
+  // CHECK: dealloc_stack [[STORAGE]] : $*@block_storage Int
+  dealloc_stack %s : $*@block_storage Int
   // CHECK: return [[BLOCK]] : $@convention(block) () -> ()
   return %b : $@convention(block) () -> ()
 }
 
-sil @block_invoke : $@convention(c) (@inout @block_storage Int) -> () {
+sil @block_invoke : $@convention(c) (@inout_aliasable @block_storage Int) -> () {
 entry(%0 : $*@block_storage Int):
   return undef : $()
 }
@@ -1206,7 +1316,7 @@ entry(%x : $Class1, %w : $Builtin.Word):
 sil [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
-  return %0 : $() 
+  return %0 : $()
 }
 
 // CHECK-LABEL: sil shared_external @test_shared_external_definition : $@convention(thin) () -> () {
@@ -1233,7 +1343,7 @@ bb0(%0 : $*Beth):
   return undef : $()
 }
 
-struct SomeError: ErrorType {
+struct SomeError: Error {
   var _domain: String { get }
   var _code: Int { get }
 }
@@ -1241,16 +1351,18 @@ struct SomeError: ErrorType {
 // CHECK-LABEL: sil @existential_box : $@convention(thin) (SomeError) -> () {
 sil @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
-  // CHECK: %1 = alloc_existential_box $ErrorType, $SomeError
-  %1 = alloc_existential_box $ErrorType, $SomeError
-  // CHECK: store %0 to %1#1 : $*SomeError
-  store %0 to %1#1 : $*SomeError
-  // CHECK: %3 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  %3 = open_existential_box %1#0 : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  destroy_addr %3 : $*@opened("01234567-89AB-CDEF-0123-333333333333") ErrorType
-  // CHECK: dealloc_existential_box %1#0 : $ErrorType, $SomeError
-  dealloc_existential_box %1#0 : $ErrorType, $SomeError
+  // CHECK: %1 = alloc_existential_box $Error, $SomeError
+  %1 = alloc_existential_box $Error, $SomeError
+  // CHECK: %2 = project_existential_box $SomeError in %1 : $Error
+  %2 = project_existential_box $SomeError in %1 : $Error
+  // CHECK: store %0 to %2 : $*SomeError
+  store %0 to %2 : $*SomeError
+  // CHECK: %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %4 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  // CHECK: destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  destroy_addr %4 : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  // CHECK: dealloc_existential_box %1 : $Error, $SomeError
+  dealloc_existential_box %1 : $Error, $SomeError
   return undef : $()
 }
 
@@ -1286,26 +1398,26 @@ entry:
 }
 
 
-// CHECK-LABEL: sil @error_result : $@convention(thin) () -> @error ErrorType
-sil @error_result : $@convention(thin) () -> @error ErrorType {
+// CHECK-LABEL: sil @error_result : $@convention(thin) () -> @error Error
+sil @error_result : $@convention(thin) () -> @error Error {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorType)
-sil @error_result2 : $@convention(thin) () -> (Int, @error ErrorType) {
+// CHECK-LABEL: sil @error_result2 : $@convention(thin) () -> (Int, @error Error)
+sil @error_result2 : $@convention(thin) () -> (Int, @error Error) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorType)
-sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error ErrorType) {
+// CHECK-LABEL: sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error Error)
+sil @error_result3 : $@convention(thin) () -> (@owned Class1, @error Error) {
 entry:
   unreachable
 }
 
-// CHECK-LABEL: sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType) {
+// CHECK-LABEL: sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error)
+sil @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error) {
 entry(%0 : $Class1):
   return %0 : $Class1
 }
@@ -1313,15 +1425,15 @@ entry(%0 : $Class1):
 // CHECK-LABEL: sil @try_apply : $@convention(thin) (@owned Class1) -> ()
 sil @try_apply : $@convention(thin) (@owned Class1) -> () {
 entry(%0 : $Class1):
-  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-  // CHECK: try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType), normal bb1, error bb2
-  try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType),
+  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error)
+  // CHECK: try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error), normal bb1, error bb2
+  try_apply %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error),
     normal bb1, error bb2
 bb1(%2 : $Class1):
   strong_release %2 : $Class1
   br bb3
-bb2(%3 : $ErrorType):
-  release_value %3 : $ErrorType
+bb2(%3 : $Error):
+  release_value %3 : $Error
   br bb3
 bb3:
   %4 = tuple ()
@@ -1331,36 +1443,37 @@ bb3:
 // CHECK-LABEL: sil @apply_nothrow : $@convention(thin) (@owned Class1) -> ()
 sil @apply_nothrow : $@convention(thin) (@owned Class1) -> () {
 entry(%0 : $Class1):
-  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-  // CHECK: apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
-  %2 = apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
+  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error)
+  // CHECK: apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error)
+  %2 = apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error Error)
   strong_release %2 : $Class1
   %3 = tuple ()
   return %3 : $()
 }
 
+struct Fork : Bendable {}
 
 sil @thin_convention : $@convention(thin) () -> ()
 sil @c_convention : $@convention(c) () -> ()
 sil @method_convention : $@convention(method) (Int) -> ()
 sil @objc_method_convention : $@convention(objc_method) (Int) -> ()
-sil @witness_method_convention : $@convention(witness_method) (Int) -> ()
+sil @witness_method_convention : $@convention(witness_method: Bendable) (Fork) -> ()
 
-// CHECK-LABEL: sil @conventions : $@convention(thin) (() -> (), @convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(method) () -> (), @convention(objc_method) () -> (), @convention(witness_method) () -> ()) -> () {
+// CHECK-LABEL: sil @conventions : $@convention(thin) (() -> (), @convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(method) () -> (), @convention(objc_method) () -> (), @convention(witness_method: Bendable) (Fork) -> ()) -> () {
 sil @conventions : $@convention(thin) (@convention(thick) () -> (),
                                        @convention(thin) () -> (),
                                        @convention(c) () -> (),
                                        @convention(block) () -> (),
                                        @convention(method) () -> (),
                                        @convention(objc_method) () -> (),
-                                       @convention(witness_method) () -> ()) -> () {
+                                       @convention(witness_method: Bendable) (Fork) -> ()) -> () {
 entry(%0 : $@convention(thick) () -> (),
       %1 : $@convention(thin) () -> (),
       %2 : $@convention(c) () -> (),
       %3 : $@convention(block) () -> (),
       %4 : $@convention(method) () -> (),
       %5 : $@convention(objc_method) () -> (),
-      %6 : $@convention(witness_method) () -> ()):
+      %6 : $@convention(witness_method: Bendable) (Fork) -> ()):
   return undef : $()
 }
 
@@ -1380,18 +1493,18 @@ bb0(%0 : $*Builtin.NativeObject):
   return %1 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @box_type : $@convention(thin) (@box Int, Int) -> () {
-sil @box_type : $@convention(thin) (@box Int, Int) -> () {
-// CHECK: bb0(%0 : $@box Int, %1 : $Int):
-bb0(%0 : $@box Int, %1 : $Int):
-  // CHECK-NEXT: strong_retain %0 : $@box Int
-  strong_retain %0 : $@box Int
-  // CHECK-NEXT: %3 = project_box %0 : $@box Int
-  %3 = project_box %0 : $@box Int
+// CHECK-LABEL: sil @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
+sil @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
+// CHECK: bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %1 : $Int):
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %1 : $Int):
+  // CHECK-NEXT: strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK-NEXT: %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // CHECK-NEXT: store %1 to %3 : $*Int
   store %1 to %3 : $*Int
-  // CHECK-NEXT: strong_release %0 : $@box Int
-  strong_release %0 : $@box Int
+  // CHECK-NEXT: strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
   return undef : $()
 }
 
@@ -1417,14 +1530,129 @@ else:
   %3void = tuple ()
 // CHECK-NEXT: return %5 : $()
   return %3void : $()
-} // CHECK: {{^}$}}
+}
+// CHECK: } // end sil function 'value_names'
 
+class Resource {}
+struct Value { var x: Resource }
+struct Storage { var y: Resource }
+class ParentClass { var storage: Storage; init() }
+struct ParentStruct { var storage: Storage }
+
+sil @init_storage : $@convention(thin) (@owned Value) -> @owned Storage
+sil @init_storage_indirect : $@convention(thin) (@owned Value) -> @out Storage
+
+sil @set_class_property : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
+sil @set_struct_property : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
+
+sil @init_storage_generic : $@convention(thin) <T, U> (@in T) -> @out U
+sil @set_class_property_generic : $@convention(thin) <V, W: AnyObject> (@in V, @guaranteed W) -> ()
+
+sil @mutate_value : $@convention(thin) (@inout Value) -> ()
+
+// CHECK-LABEL: sil @mark_uninitialized_behavior
+sil @mark_uninitialized_behavior : $@convention(thin) (@owned ParentClass, @inout ParentStruct) -> () {
+entry(%a : $ParentClass, %b : $*ParentStruct):
+  // CHECK: [[INIT_STORAGE:%.*]] = function_ref @init_storage
+  %c = function_ref @init_storage : $@convention(thin) (@owned Value) -> @owned Storage
+  // CHECK: [[SET_CLASS_PROP:%.*]] = function_ref @set_class_property
+  %d = function_ref @set_class_property : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
+  // CHECK: [[CLASS_STORAGE:%.*]] = ref_element_addr [[CLASS_SELF:%.*]] :
+  %e = ref_element_addr %a : $ParentClass, #ParentClass.storage
+  // CHECK: mark_uninitialized_behavior [[INIT_STORAGE]]([[CLASS_STORAGE]]) : $@convention(thin) (@owned Value) -> @owned Storage, [[SET_CLASS_PROP]]([[CLASS_SELF]]) : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
+  %f = mark_uninitialized_behavior %c(%e) : $@convention(thin) (@owned Value) -> @owned Storage,
+                                   %d(%a) : $@convention(thin) (@owned Value, @guaranteed ParentClass) -> ()
+
+  %g = function_ref @mutate_value : $@convention(thin) (@inout Value) -> ()
+  apply %g(%f) : $@convention(thin) (@inout Value) -> ()
+
+  // CHECK: [[INIT_STORAGE:%.*]] = function_ref @init_storage_indirect
+  %h = function_ref @init_storage_indirect : $@convention(thin) (@owned Value) -> @out Storage
+  // CHECK: [[SET_PROP:%.*]] = function_ref @set_struct_property
+  %i = function_ref @set_struct_property : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
+  // CHECK: [[STORAGE:%.*]] = struct_element_addr [[SELF:%.*]] :
+  %j = struct_element_addr %b : $*ParentStruct, #ParentStruct.storage
+  // CHECK: mark_uninitialized_behavior [[INIT_STORAGE]]([[STORAGE]]) : $@convention(thin) (@owned Value) -> @out Storage, [[SET_PROP]]([[SELF]]) : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
+  %k = mark_uninitialized_behavior %h(%j) : $@convention(thin) (@owned Value) -> @out Storage,
+                                   %i(%b) : $@convention(thin) (@owned Value, @inout ParentStruct) -> ()
+
+  // CHECK: [[INIT_STORAGE:%.*]] = function_ref @init_storage_generic
+  %l = function_ref @init_storage_generic : $@convention(thin) <T, U> (@in T) -> @out U
+  // CHECK: [[SET_PROP:%.*]] = function_ref @set_class_property_generic
+  %m = function_ref @set_class_property_generic : $@convention(thin) <V, W: AnyObject> (@in V, @guaranteed W) -> ()
+  // CHECK: mark_uninitialized_behavior [[INIT_STORAGE]]<Value, Storage>([[CLASS_STORAGE]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> @out τ_0_1, [[SET_PROP]]<Value, ParentClass>([[CLASS_SELF]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : AnyObject> (@in τ_0_0, @guaranteed τ_0_1) -> ()
+  %n = mark_uninitialized_behavior %l<Value, Storage>(%e) : $@convention(thin) <T, U> (@in T) -> @out U,
+                                   %m<Value, ParentClass>(%a) : $@convention(thin) <V, W: AnyObject> (@in V, @guaranteed W) -> ()
+
+  unreachable
+}
+
+// CHECK-LABEL: sil @test_pointer_to_address
+sil @test_pointer_to_address : $(Builtin.RawPointer, X) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $X):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to $*X
+  store %1 to %2 : $*X
+  // CHECK: [[T2:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to $*X
+  // CHECK-NEXT: store %1 to [[T2]] : $*X
+  %3 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*X
+  store %1 to %3 : $*X
+  // CHECK: [[T3:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [strict] $*X
+  // CHECK-NEXT: store %1 to [[T3]] : $*X
+  %28 = tuple ()
+  return %28 : $()
+}
+
+// CHECK-LABEL: sil @test_bind_memory
+sil @test_bind_memory : $(Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
+  // CHECK: bind_memory {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*X
+  %28 = tuple ()
+  return %28 : $()
+}
+
+// CHECK-LABEL: sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
+sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  end_lifetime %0 : $Builtin.NativeObject
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
+sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  return undef : $()
+}
+
+sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
+bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
+  (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%4, %5, %6) = destructure_struct %1 : $TestArray2
+  %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
+  return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+struct EmptyStruct {}
+
+sil @test_empty_destructure : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $EmptyStruct()
+  () = destructure_struct %0 : $EmptyStruct
+  %1 = tuple()
+  () = destructure_tuple %1 : $()
+  return %1 : $()
+}
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
-// CHECK: } 
+// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!setter.1: {{.*}} : _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+// CHECK: }
 sil_vtable Foo {
-  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+  // Override the linke to check if it is parsed correctly.
+  #Foo.subscript!getter.1: hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+  // The public linkage is the same as the function's linkage and should not be printed.
+  #Foo.subscript!setter.1: public _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 }

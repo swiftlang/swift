@@ -1,12 +1,12 @@
-//===--- Comment.h - Swift-specific comment parsing -----------------------===//
+//===--- Comment.h - Swift-specific comment parsing -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,55 +22,50 @@ class DocComment;
 struct RawComment;
 
 class DocComment {
-public:
-  struct CommentParts {
-    Optional<const llvm::markup::Paragraph *>Brief;
-    ArrayRef<const llvm::markup::MarkupASTNode *> BodyNodes;
-    ArrayRef<const llvm::markup::ParamField *> ParamFields;
-    Optional<const llvm::markup::ReturnsField *> ReturnsField;
-    Optional<const llvm::markup::ThrowsField *> ThrowsField;
-
-    bool isEmpty() const {
-      return !Brief.hasValue() && !ReturnsField.hasValue() && !ThrowsField.hasValue() && BodyNodes.empty() && ParamFields.empty();
-    }
-  };
-
-private:
   const Decl *D;
-  const llvm::markup::Document *Doc = nullptr;
-  const CommentParts Parts;
+  const swift::markup::Document *Doc = nullptr;
+  const swift::markup::CommentParts Parts;
 
 public:
-  DocComment(const Decl *D, llvm::markup::Document *Doc,
-             CommentParts Parts)
+  DocComment(const Decl *D, swift::markup::Document *Doc,
+             swift::markup::CommentParts Parts)
       : D(D), Doc(Doc), Parts(Parts) {}
 
   const Decl *getDecl() const { return D; }
 
-  const llvm::markup::Document *getDocument() const { return Doc; }
+  const swift::markup::Document *getDocument() const { return Doc; }
 
-  CommentParts getParts() const {
+  swift::markup::CommentParts getParts() const {
     return Parts;
   }
 
-  Optional<const llvm::markup::Paragraph *> getBrief() const {
+  ArrayRef<StringRef> getTags() const {
+    return llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end());
+  }
+
+  Optional<const swift::markup::Paragraph *> getBrief() const {
     return Parts.Brief;
   }
 
-  Optional<const llvm::markup::ReturnsField * >getReturnsField() const {
+  Optional<const swift::markup::ReturnsField * >getReturnsField() const {
     return Parts.ReturnsField;
   }
 
-  Optional<const llvm::markup::ThrowsField*> getThrowsField() const {
+  Optional<const swift::markup::ThrowsField*> getThrowsField() const {
     return Parts.ThrowsField;
   }
 
-  ArrayRef<const llvm::markup::ParamField *> getParamFields() const {
+  ArrayRef<const swift::markup::ParamField *> getParamFields() const {
     return Parts.ParamFields;
   }
 
-  ArrayRef<const llvm::markup::MarkupASTNode *> getBodyNodes() const {
+  ArrayRef<const swift::markup::MarkupASTNode *> getBodyNodes() const {
     return Parts.BodyNodes;
+  }
+
+  Optional<const markup::LocalizationKeyField *>
+  getLocalizationKeyField() const {
+    return Parts.LocalizationKeyField;
   }
 
   bool isEmpty() const {
@@ -79,7 +74,7 @@ public:
 
   // Only allow allocation using the allocator in MarkupContext or by
   // placement new.
-  void *operator new(size_t Bytes, llvm::markup::MarkupContext &MC,
+  void *operator new(size_t Bytes, swift::markup::MarkupContext &MC,
                      unsigned Alignment = alignof(DocComment));
   void *operator new(size_t Bytes, void *Mem) {
     assert(Mem);
@@ -91,9 +86,19 @@ public:
   void operator delete(void *Data) = delete;
 };
 
-Optional<DocComment *>getDocComment(llvm::markup::MarkupContext &Context,
-                                    const Decl *D);
+/// Get a parsed documentation comment for the declaration, if there is one.
+Optional<DocComment *>getSingleDocComment(swift::markup::MarkupContext &Context,
+                                          const Decl *D);
 
+/// Attempt to get a doc comment from the declaration, or other inherited
+/// sources, like from base classes or protocols.
+Optional<DocComment *> getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                             const Decl *D);
+
+/// Extract comments parts from the given Markup node.
+swift::markup::CommentParts
+extractCommentParts(swift::markup::MarkupContext &MC,
+                    swift::markup::MarkupASTNode *Node);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_COMMENT_H

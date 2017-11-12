@@ -1,0 +1,41 @@
+#!/bin/bash
+
+function usage {
+  echo "usage: $0 OVERLAY SDK TARGET"
+  echo "SDK: OSX,IOS,IOS_SIMULATOR,TVOS,TVOS_SIMULATOR,WATCHOS,WATCHOS_SIMULATOR"
+  echo "TARGET: macosx,iphoneos,iphonesimulator,appletvos,appletvsimulator,watchos,watchsimulator"
+  echo "example: ./utils/build-overlay AVFoundation OSX macosx"
+  exit 1
+}
+
+OVERLAY=$1; SDK=$2; TARGET=$3
+if [ ! "$OVERLAY" ]; then echo "Overlay param required"; usage; fi
+if [ ! "$SDK" ]; then echo "SDK param required"; usage; fi
+if [ ! "$TARGET" ]; then echo "TARGET param required"; usage; fi
+
+function absolute_path { if [[ "$1" == /* ]]; then echo "$1"; else echo "$PWD/$1"; fi }
+function dir_name { echo "${1%/*}"; }
+function file_name { echo "${1##*/}"; }
+script_absolute_path=$(absolute_path "${BASH_SOURCE[@]}")
+script_dir_name=$(dir_name "${script_absolute_path}")
+script_file_name=$(file_name "${script_absolute_path}")
+overlay_source_path="${script_dir_name}/../stdlib/public/SDK/$OVERLAY"
+build_dir="${script_dir_name}/../../build/${OVERLAY}-${SDK}"
+swift_source_root="${script_dir_name}/../../../"
+
+mkdir -p "$build_dir" && cd "$build_dir" || exit
+
+echo "OVERLAY: ${OVERLAY}"
+echo "SDK: ${SDK}"
+echo "TARGET: ${TARGET}"
+echo "script_absolute_path: ${script_absolute_path}"
+echo "script_dir_name: ${script_dir_name}"
+echo "script_file_name: ${script_file_name}"
+echo "overlay_source_path: ${overlay_source_path}"
+echo "swift_source_root: ${swift_source_root}"
+echo "build_dir: ${build_dir}"
+
+toolchain=$(xcode-select -p)
+cmake -G Ninja -DSWIFT_SOURCE_ROOT="${swift_source_root}" -DSWIFT_DEST_ROOT="${build_dir}/root" -DSWIFT_HOST_VARIANT_SDK="${SDK}" -DTOOLCHAIN_DIR="${toolchain}/Toolchains/XcodeDefault.xctoolchain" "${overlay_source_path}"
+NINJA_TARGET="swift${OVERLAY}-${TARGET}"
+ninja "${NINJA_TARGET}"

@@ -1,0 +1,22 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
+
+sil_stage canonical
+import c_layout
+
+// CHECK-LABEL: @_T0SC14HasNestedUnionV18__Unnamed_struct_sVN = linkonce_odr hidden global
+// CHECK-SAME:  i8* getelementptr inbounds
+// CHECK-SAME:  %swift.type* null,
+// CHECK-SAME:  [[INT:i[0-9]+]] 0,
+// CHECK-SAME:  @_T0SC14HasNestedUnionV18__Unnamed_struct_sVWV
+// CHECK-SAME:  [[INT]] 1,
+// CHECK-SAME:  @_T0SC14HasNestedUnionV18__Unnamed_struct_sVMn
+// CHECK-SAME:  [[INT]] 0,
+// CHECK-SAME:  [[INT]] 4 }
+
+sil @test0 : $() -> () {
+bb0:
+  %0 = metatype $@thick HasNestedUnion.Type
+
+  %ret = tuple ()
+  return %ret : $()
+}

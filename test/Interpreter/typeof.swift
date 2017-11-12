@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 protocol Fooable { static func foo() }
@@ -15,31 +15,31 @@ struct S : Fooable {
   static func foo() { print("Seeds?!") }
 }
 
-func classMetatype(b: B.Type) {
+func classMetatype(_ b: B.Type) {
   b.foo()
 }
 
-func structMetatype(s: S.Type) {
+func structMetatype(_ s: S.Type) {
   s.foo()
 }
 
-func archeMetatype<T : Fooable>(t: T.Type) {
+func archeMetatype<T : Fooable>(_ t: T.Type) {
   t.foo()
 }
 
-func archeMetatype2<T : Fooable>(t: T) {
-  t.dynamicType.foo()
+func archeMetatype2<T : Fooable>(_ t: T) {
+  type(of: t).foo()
 }
 
-func boxedExistentialMetatype(e: ErrorType) -> ErrorType.Type {
-  return e.dynamicType
+func boxedExistentialMetatype(_ e: Error) -> Error.Type {
+  return type(of: e)
 }
 
-enum Hangry : ErrorType {
+enum Hangry : Error {
   case Hungry, Angry
 }
 
-class Meltdown : ErrorType {
+class Meltdown : Error {
   var _domain : String {
     return "_domain"
   }
@@ -51,20 +51,24 @@ class Meltdown : ErrorType {
 
 class GrilledCheese : Meltdown {}
 
+func labeledTuple() -> (x: Int, y: Int, Double) {
+  return (x: 1, y: 1, 3.14159)
+}
+
 // CHECK: Beads?
-classMetatype(B().dynamicType)
+classMetatype(type(of: B()))
 // CHECK: Deeds?
-classMetatype(D().dynamicType)
+classMetatype(type(of: D()))
 
 // CHECK: Seeds?
-structMetatype(S().dynamicType)
+structMetatype(type(of: S()))
 
 // CHECK: Beads?
-archeMetatype(B().dynamicType)
+archeMetatype(type(of: B()))
 // FIXME: Deeds? <rdar://problem/14620454>
-archeMetatype(D().dynamicType)
+archeMetatype(type(of: D()))
 // CHECK: Seeds?
-archeMetatype(S().dynamicType)
+archeMetatype(type(of: S()))
 
 // CHECK: Beads?
 archeMetatype2(B())
@@ -81,3 +85,5 @@ print(boxedExistentialMetatype(Meltdown()))
 print(boxedExistentialMetatype(GrilledCheese()))
 // CHECK: GrilledCheese
 print(boxedExistentialMetatype(GrilledCheese() as Meltdown))
+// CHECK: (x: Int, y: Int, Double)
+print(type(of: labeledTuple()))

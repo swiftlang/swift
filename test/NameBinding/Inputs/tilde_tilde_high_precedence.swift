@@ -1,8 +1,9 @@
 // Part of operators.swift multi-file test.
 
-infix operator ~~ {
-  associativity none
-  precedence 200
+infix operator ~~ : HighPrecedence
+precedencegroup HighPrecedence {
+  associativity: none
+  higherThan: BitwiseShiftPrecedence
 }
 
 public func ~~(x: Int, y: Int) -> Bool {

@@ -1,0 +1,22 @@
+func testCollapseNestedIf() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {}
+  }
+}
+func testMultiConditionalNestedIf() {
+  let a = 3
+  if a > 2, a != 4, a < 10, a != 5 {}
+}
+func testLetNestedIf() {
+  let a: Int? = 3
+  if let b = a {
+    if b != 5 {}
+  }
+}
+func testCaseLetNestedIf() {
+  let a: Int? = 3
+  if case .some(let b) = a {
+    if b != 5 {}
+  }
+}

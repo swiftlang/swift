@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 var test1 =
@@ -181,7 +181,7 @@ struct Point2D {
 	var y: Float
 }
 
-let points: (Point2D, Point2D, Point2D) = ( Point2D(x: 1.0, y:1.0),
+let points: (Point2D, Point2D, Point2D) = (Point2D(x: 1.0, y: 1.0),
 											Point2D(x: 1.0, y: 1.0), 
 											Point2D(x: 1.0, y: 1.0))
 

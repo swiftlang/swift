@@ -1,0 +1,2 @@
+// RUN: not %target-sil-opt %s
+if(import Swift

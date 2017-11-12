@@ -2,20 +2,39 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
 
 extension String {
-  /// Construct an instance that is the concatenation of `count` copies
-  /// of `repeatedValue`.
-  public init(count: Int, repeatedValue c: Character) {
-    let s = String(c)
+  /// Creates a new string representing the given string repeated the specified
+  /// number of times.
+  ///
+  /// For example, you can use this initializer to create a string with ten
+  /// `"ab"` strings in a row.
+  ///
+  ///     let s = String(repeating: "ab", count: 10)
+  ///     print(s)
+  ///     // Prints "abababababababababab"
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The string to repeat.
+  ///   - count: The number of times to repeat `repeatedValue` in the resulting
+  ///     string.
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(repeating repeatedValue: String, count: Int) {
+    if count == 0 {
+      self = ""
+      return
+    }
+    precondition(count > 0, "Negative count not allowed")
+    let s = repeatedValue
     self = String(_storage: _StringBuffer(
         capacity: s._core.count * count,
         initialSize: 0,
@@ -25,71 +44,166 @@ extension String {
     }
   }
 
-  /// Construct an instance that is the concatenation of `count` copies
-  /// of `Character(repeatedValue)`.
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
-    self = String._fromWellFormedCodeUnitSequence(UTF32.self,
-        input: Repeat(count: count, repeatedValue: c.value))
-  }
-  
-  public var _lines : [String] {
-    return _split("\n")
-  }
-  
-  @warn_unused_result
-  public func _split(separator: UnicodeScalar) -> [String] {
-    let scalarSlices = unicodeScalars.split { $0 == separator }
-    return scalarSlices.map { String($0) }
-  }
-
-  /// `true` iff `self` contains no characters.
-  public var isEmpty : Bool {
+  /// A Boolean value indicating whether a string has no characters.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var isEmpty: Bool {
     return _core.count == 0
   }
 }
 
 extension String {
-  public init(_ _c: UnicodeScalar) {
-    self = String(count: 1, repeatedValue: _c)
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(_ _c: Unicode.Scalar) {
+    self = String._fromWellFormedCodeUnitSequence(
+      UTF32.self,
+      input: repeatElement(_c.value, count: 1))
   }
-
-  @warn_unused_result
-  func _isAll(@noescape predicate: (UnicodeScalar) -> Bool) -> Bool {
-    for c in unicodeScalars { if !predicate(c) { return false } }
-
-    return true
-  }
-
-  @warn_unused_result
-  func _isAlpha() -> Bool { return _isAll({ $0._isAlpha() }) }
-
-  @warn_unused_result
-  func _isDigit() -> Bool { return _isAll({ $0._isDigit() }) }
-
-  @warn_unused_result
-  func _isSpace() -> Bool { return _isAll({ $0._isSpace() }) }
 }
 
 #if _runtime(_ObjC)
 /// Determines if `theString` starts with `prefix` comparing the strings under
 /// canonical equivalence.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, _ prefix: AnyObject) -> Bool
+internal func _stdlib_NSStringHasPrefixNFD(
+  _ theString: AnyObject, _ prefix: AnyObject) -> Bool
+
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+@_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
+internal func _stdlib_NSStringHasPrefixNFDPointer(
+  _ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
 
 /// Determines if `theString` ends with `suffix` comparing the strings under
 /// canonical equivalence.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, _ suffix: AnyObject) -> Bool
+internal func _stdlib_NSStringHasSuffixNFD(
+  _ theString: AnyObject, _ suffix: AnyObject) -> Bool
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+@_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
+internal func _stdlib_NSStringHasSuffixNFDPointer(
+  _ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
 
 extension String {
-  /// Returns `true` iff `self` begins with `prefix`.
-  public func hasPrefix(prefix: String) -> Bool {
+  /// Returns a Boolean value indicating whether the string begins with the
+  /// specified prefix.
+  ///
+  /// The comparison is both case sensitive and Unicode safe. The
+  /// case-sensitive comparison will only match strings whose corresponding
+  /// characters have the same case.
+  ///
+  ///     let cafe = "Café du Monde"
+  ///
+  ///     // Case sensitive
+  ///     print(cafe.hasPrefix("café"))
+  ///     // Prints "false"
+  ///
+  /// The Unicode-safe comparison matches Unicode scalar values rather than the
+  /// code points used to compose them. The example below uses two strings
+  /// with different forms of the `"é"` character---the first uses the composed
+  /// form and the second uses the decomposed form.
+  ///
+  ///     // Unicode safe
+  ///     let composedCafe = "Café"
+  ///     let decomposedCafe = "Cafe\u{0301}"
+  ///
+  ///     print(cafe.hasPrefix(composedCafe))
+  ///     // Prints "true"
+  ///     print(cafe.hasPrefix(decomposedCafe))
+  ///     // Prints "true"
+  ///
+  /// - Parameter prefix: A possible prefix to test against this string.
+  /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public func hasPrefix(_ prefix: String) -> Bool {
+    let selfCore = self._core
+    let prefixCore = prefix._core
+    let prefixCount = prefixCore.count
+    if prefixCount == 0 {
+      return true
+    }
+    if let selfASCIIBuffer = selfCore.asciiBuffer,
+       let prefixASCIIBuffer = prefixCore.asciiBuffer {
+      if prefixASCIIBuffer.count > selfASCIIBuffer.count {
+        // Prefix is longer than self.
+        return false
+      }
+      return _swift_stdlib_memcmp(
+        selfASCIIBuffer.baseAddress!,
+        prefixASCIIBuffer.baseAddress!,
+        prefixASCIIBuffer.count) == (0 as CInt)
+    }
+    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
+      let lhsStr = _NSContiguousString(selfCore)
+      let rhsStr = _NSContiguousString(prefixCore)
+      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
+      }
+    }
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
-  /// Returns `true` iff `self` ends with `suffix`.
-  public func hasSuffix(suffix: String) -> Bool {
+  /// Returns a Boolean value indicating whether the string ends with the
+  /// specified suffix.
+  ///
+  /// The comparison is both case sensitive and Unicode safe. The
+  /// case-sensitive comparison will only match strings whose corresponding
+  /// characters have the same case.
+  ///
+  ///     let plans = "Let's meet at the café"
+  ///
+  ///     // Case sensitive
+  ///     print(plans.hasSuffix("Café"))
+  ///     // Prints "false"
+  ///
+  /// The Unicode-safe comparison matches Unicode scalar values rather than the
+  /// code points used to compose them. The example below uses two strings
+  /// with different forms of the `"é"` character---the first uses the composed
+  /// form and the second uses the decomposed form.
+  ///
+  ///     // Unicode safe
+  ///     let composedCafe = "café"
+  ///     let decomposedCafe = "cafe\u{0301}"
+  ///
+  ///     print(plans.hasSuffix(composedCafe))
+  ///     // Prints "true"
+  ///     print(plans.hasSuffix(decomposedCafe))
+  ///     // Prints "true"
+  ///
+  /// - Parameter suffix: A possible suffix to test against this string.
+  /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public func hasSuffix(_ suffix: String) -> Bool {
+    let selfCore = self._core
+    let suffixCore = suffix._core
+    let suffixCount = suffixCore.count
+    if suffixCount == 0 {
+      return true
+    }
+    if let selfASCIIBuffer = selfCore.asciiBuffer,
+       let suffixASCIIBuffer = suffixCore.asciiBuffer {
+      if suffixASCIIBuffer.count > selfASCIIBuffer.count {
+        // Suffix is longer than self.
+        return false
+      }
+      return _swift_stdlib_memcmp(
+        selfASCIIBuffer.baseAddress!
+          + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
+        suffixASCIIBuffer.baseAddress!,
+        suffixASCIIBuffer.count) == (0 as CInt)
+    }
+    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
+      let lhsStr = _NSContiguousString(selfCore)
+      let rhsStr = _NSContiguousString(suffixCore)
+      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
+      }
+    }
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
   }
@@ -101,109 +215,200 @@ extension String {
 
 // Conversions to string from other types.
 extension String {
-
-  // FIXME: can't just use a default arg for radix below; instead we
-  // need these single-arg overloads <rdar://problem/17775455>
-  
-  /// Create an instance representing `v` in base 10.
-  public init<T : _SignedIntegerType>(_ v: T) {
-    self = _int64ToString(v.toIntMax())
-  }
-  
-  /// Create an instance representing `v` in base 10.
-  public init<T : UnsignedIntegerType>(_ v: T)  {
-    self = _uint64ToString(v.toUIntMax())
-  }
-
-  /// Create an instance representing `v` in the given `radix` (base).
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
   ///
-  /// Numerals greater than 9 are represented as roman letters,
-  /// starting with `a` if `uppercase` is `false` or `A` otherwise.
-  public init<T : _SignedIntegerType>(
-    _ v: T, radix: Int, uppercase: Bool = false
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  /// 
+  ///     let v = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  // FIXME(integers): support a more general BinaryInteger protocol
+  // FIXME(integers): support larger bitwidths than 64
+  @_inlineable // FIXME(sil-serialize-all)
+  public init<T : FixedWidthInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _int64ToString(
-      v.toIntMax(), radix: Int64(radix), uppercase: uppercase)
+      Int64(value), radix: Int64(radix), uppercase: uppercase)
   }
   
-  /// Create an instance representing `v` in the given `radix` (base).
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
   ///
-  /// Numerals greater than 9 are represented as roman letters,
-  /// starting with `a` if `uppercase` is `false` or `A` otherwise.
-  public init<T : UnsignedIntegerType>(
-    _ v: T, radix: Int, uppercase: Bool = false
-  )  {
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  /// 
+  ///     let v = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  // FIXME(integers): tiebreaker between T : FixedWidthInteger and other obsoleted
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4)
+  public init<T : FixedWidthInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
+  ) where T : SignedInteger {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _int64ToString(
+      Int64(value), radix: Int64(radix), uppercase: uppercase)
+  }
+  
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  ///
+  ///     let v: UInt = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  // FIXME(integers): support a more general BinaryInteger protocol
+  @_inlineable // FIXME(sil-serialize-all)
+  public init<T : FixedWidthInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
+  ) where T : UnsignedInteger {
     _precondition(radix > 1, "Radix must be greater than 1")
     self = _uint64ToString(
-      v.toUIntMax(), radix: Int64(radix), uppercase: uppercase)
+      UInt64(value), radix: Int64(radix), uppercase: uppercase)
   }
-}
-
-// Conversions from string to other types.
-extension String {
-  /// If the string represents an integer that fits into an Int, returns
-  /// the corresponding integer.  This accepts strings that match the regular
-  /// expression "[-+]?[0-9]+" only.
-  @available(*, unavailable, message="Use Int() initializer")
-  public func toInt() -> Int? {
-    fatalError("unavailable function can't be called")
+  
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  /// 
+  ///     let v = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
+  public init<T : SignedInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
+  ) {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _int64ToString(
+      Int64(value), radix: Int64(radix), uppercase: uppercase)
   }
-}
-
-extension String {
-  /// Produce a substring of the given string from the given character
-  /// index to the end of the string.
-  func _substr(start: Int) -> String {
-    let rng = unicodeScalars
-    var startIndex = rng.startIndex
-    for _ in 0..<start {
-      ++startIndex
-    }
-    return String(rng[startIndex..<rng.endIndex])
-  }
-
-  /// Split the given string at the given delimiter character, returning 
-  /// the strings before and after that character (neither includes the character
-  /// found) and a boolean value indicating whether the delimiter was found.
-  public func _splitFirst(delim: UnicodeScalar)
-    -> (before: String, after: String, wasFound : Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if rng[i] == delim {
-        return (String(rng[rng.startIndex..<i]), 
-                String(rng[i.successor()..<rng.endIndex]), 
-                true)
-      }
-    }
-    return (self, "", false)
-  }
-
-  /// Split the given string at the first character for which the given
-  /// predicate returns true. Returns the string before that character, the 
-  /// character that matches, the string after that character, and a boolean value
-  /// indicating whether any character was found.
-  public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
-    -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
-  {
-    let rng = unicodeScalars
-    for i in rng.indices {
-      if predicate(rng[i]) {
-        return (String(rng[rng.startIndex..<i]),
-                rng[i], 
-                String(rng[i.successor()..<rng.endIndex]), 
-                true)
-      }
-    }
-    return (self, "🎃", String(), false)
-  }
-
-  /// Split the given string at each occurrence of a character for which
-  /// the given predicate evaluates true, returning an array of strings that
-  /// before/between/after those delimiters.
-  func _splitIf(predicate: (UnicodeScalar) -> Bool) -> [String] {
-    let scalarSlices = unicodeScalars.split(isSeparator: predicate)
-    return scalarSlices.map { String($0) }
+  
+  /// Creates a string representing the given value in base 10, or some other
+  /// specified base.
+  ///
+  /// The following example converts the maximal `Int` value to a string and
+  /// prints its length:
+  ///
+  ///     let max = String(Int.max)
+  ///     print("\(max) has \(max.count) digits.")
+  ///     // Prints "9223372036854775807 has 19 digits."
+  ///
+  /// Numerals greater than 9 are represented as Roman letters. These letters
+  /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
+  ///
+  ///     let v: UInt = 999_999
+  ///     print(String(v, radix: 2))
+  ///     // Prints "11110100001000111111"
+  ///
+  ///     print(String(v, radix: 16))
+  ///     // Prints "f423f"
+  ///     print(String(v, radix: 16, uppercase: true))
+  ///     // Prints "F423F"
+  ///
+  /// - Parameters:
+  ///   - value: The value to convert to a string.
+  ///   - radix: The base to use for the string representation. `radix` must be
+  ///     at least 2 and at most 36. The default is 10.
+  ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
+  ///     greater than 9, or `false` to use lowercase letters. The default is
+  ///     `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4, message: "Please use the version for FixedWidthInteger instead.")
+  public init<T : UnsignedInteger>(
+    _ value: T, radix: Int = 10, uppercase: Bool = false
+  ) {
+    _precondition(radix > 1, "Radix must be greater than 1")
+    self = _uint64ToString(
+      UInt64(value), radix: Int64(radix), uppercase: uppercase)
   }
 }

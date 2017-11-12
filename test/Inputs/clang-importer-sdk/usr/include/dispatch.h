@@ -2,15 +2,21 @@
 
 @protocol OS_dispatch_object <NSObject>
 @end
-typedef NSObject <OS_dispatch_object> *dispatch_object_t;
+@interface OS_dispatch_object: NSObject <OS_dispatch_object>
+@end
+typedef OS_dispatch_object *dispatch_object_t;
 
 @protocol OS_dispatch_queue <OS_dispatch_object>
 @end
-typedef NSObject <OS_dispatch_queue> *dispatch_queue_t;
+@interface OS_dispatch_queue: OS_dispatch_object <OS_dispatch_object>
+@end
+typedef OS_dispatch_queue *dispatch_queue_t;
 
 @protocol OS_dispatch_source <OS_dispatch_object>
 @end
-typedef NSObject <OS_dispatch_source> *dispatch_source_t;
+@interface OS_dispatch_source: OS_dispatch_object <OS_dispatch_object>
+@end
+typedef OS_dispatch_source *dispatch_source_t;
 
 typedef void (^dispatch_block_t)(void);
 

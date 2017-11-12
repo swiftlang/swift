@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 class C {
@@ -11,19 +11,19 @@ class D : C {
   func foo() { print("foo") }
 }
 
-func down<T : C>(x: C, _: T.Type) -> T {
+func down<T : C>(_ x: C, _: T.Type) -> T {
   return x as! T
 }
 
-func up<T : C>(x: T) -> C {
+func up<T : C>(_ x: T) -> C {
   return x
 }
 
-func isa<T : C>(x: C, _: T.Type) -> Bool {
+func isa<T : C>(_ x: C, _: T.Type) -> Bool {
   return x is T
 }
 
-func typeof<T>(x: T) -> T.Type {
+func typeof<T>(_ x: T) -> T.Type {
   return T.self
 }
 

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,12 +21,12 @@
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/TimeValue.h"
 #include "llvm/Support/YAMLTraits.h"
 
 #include <xpc/xpc.h>
 
 #include <algorithm>
+#include <chrono>
 #include <deque>
 #include <functional>
 #include <iomanip>
@@ -38,9 +38,9 @@ using namespace sourcekitd;
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Generic
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 static std::string trace_root_dir;
 
@@ -70,7 +70,8 @@ static void fsWriteFile(const char *Path, StringRef Text) {
 
 static void fsInitTraceRoot(path_t &RootDir, uint64_t Id) {
   RootDir = trace_root_dir;
-  std::string DirName = llvm::sys::TimeValue::now().str();
+  std::string DirName =
+    std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
   std::for_each(DirName.begin(), DirName.end(),
                 [] (char &C) { if (!isalnum(C)) C = '-'; });
   DirName += '-';
@@ -91,7 +92,7 @@ static void fsAddFileWithRevision(path_t &Path,
 typedef SourceKit::trace::OperationKind OperationKind;
 
 struct OperationInfo {
-  sys::TimeValue StartedAt;
+  std::chrono::system_clock::time_point StartedAt;
   OperationKind Kind;
   std::string SwiftArgs;
   trace::StringPairs OpArgs;
@@ -101,7 +102,7 @@ struct OperationInfo {
                 std::string &&SwiftArgs,
                 trace::StringPairs &&Files,
                 trace::StringPairs &&OpArgs)
-    : StartedAt(sys::TimeValue::now()),
+    : StartedAt(std::chrono::system_clock::now()),
       Kind(K), SwiftArgs(SwiftArgs), OpArgs(OpArgs), Files(Files) {}
 
   OperationInfo() = default;
@@ -118,16 +119,6 @@ struct OpRec {
   std::string SwiftArgs;
   trace::StringPairs OpArgs;
   trace::StringPairs FileMap;
-};
-
-template <typename U>
-struct llvm::yaml::SequenceTraits<std::vector<U>> {
-  static size_t size(IO &Io, std::vector<U> &Vec) {
-    return Vec.size();
-  }
-  static U &element(IO &Io, std::vector<U> &Vec, size_t Index) {
-    return Vec[Index];
-  }
 };
 
 template <>
@@ -150,9 +141,9 @@ struct llvm::yaml::MappingTraits<std::pair<U, V>> {
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // State
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 class State {
   typedef std::map<uint64_t, OperationInfo> OperationsType;
@@ -219,7 +210,7 @@ public:
     S->Operations.erase(OpId);
   }
 
-  static void persistAsync(bool WithActions) {
+  static void persistAsync() {
     llvm::sys::ScopedLock L(GlobalMutex);
     auto S = CurrentState;
     Queue.dispatch([S] {S->persist();});
@@ -307,9 +298,9 @@ void State::persist() {
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Init & trace
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 void initializeTracing() {
   const char *EnvOpt = ::getenv("SOURCEKIT_TRACE_ROOT");
@@ -380,7 +371,7 @@ void handleTraceMessageRequest(uint64_t Session, xpc_object_t Msg) {
 
 void persistTracingData() {
   if (isTracingEnabled()) {
-    State::persistAsync(true);
+    State::persistAsync();
   }
 }
 

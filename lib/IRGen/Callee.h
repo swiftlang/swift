@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,13 +21,8 @@
 #include <type_traits>
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/SIL/SILType.h"
-#include "CallingConvention.h"
-#include "Explosion.h"
 #include "IRGen.h"
-
-namespace llvm {
-  class PointerType;
-}
+#include "Signature.h"
 
 namespace swift {
   class Substitution;
@@ -36,148 +31,168 @@ namespace irgen {
   class Callee;
   class IRGenFunction;
 
-  /// Abstract information about how we can emit a call.
-  class AbstractCallee {
-    /// The best explosion level available for the call.
-    unsigned ExplosionLevel : 1;
-
-    /// The kind of extra data this call receives.
-    unsigned Data : 2;
-
-    /// The abstract calling convention.
-    unsigned Convention : 4;
-
-    /// The min uncurrying level available for the function.
-    unsigned MinUncurryLevel : 2;
-
-    /// The max uncurrying level available for the function.
-    unsigned MaxUncurryLevel : 9;
-
+  class CalleeInfo {
   public:
-    AbstractCallee(SILFunctionTypeRepresentation convention,
-                   ResilienceExpansion level,
-                   unsigned minUncurry, unsigned maxUncurry, ExtraData data)
-      : ExplosionLevel(unsigned(level)), Data(unsigned(data)),
-        Convention(unsigned(convention)),
-        MinUncurryLevel(minUncurry), MaxUncurryLevel(maxUncurry) {}
-
-    static AbstractCallee forIndirect() {
-      return AbstractCallee(SILFunctionTypeRepresentation::Thin,
-                            ResilienceExpansion::Minimal,
-                            /*min uncurry*/ 0, /*max uncurry*/ 0,
-                            ExtraData::Retainable);
-    }
-
-    SILFunctionTypeRepresentation getRepresentation() const {
-      return SILFunctionTypeRepresentation(Convention);
-    }
-
-    /// Returns the best explosion level at which we can emit this
-    /// call.  We assume that we can call it at lower levels.
-    ResilienceExpansion getBestExplosionLevel() const {
-      return ResilienceExpansion(ExplosionLevel);
-    }
-
-    /// Whether the function requires a data pointer.
-    bool needsDataPointer() const { return getExtraData() != ExtraData::None; }
-
-    /// Whether the function requires a data pointer.
-    ExtraData getExtraData() const { return ExtraData(Data); }
-
-    /// The maximum uncurrying level at which the function can be called.
-    unsigned getMaxUncurryLevel() const { return MaxUncurryLevel; }
-
-    /// The minimum uncurrying level at which the function can be called.
-    unsigned getMinUncurryLevel() const { return MinUncurryLevel; }
-  };
-
-  class Callee {
     /// The unsubstituted function type being called.
     CanSILFunctionType OrigFnType;
 
     /// The substituted result type of the function being called.
     CanSILFunctionType SubstFnType;
 
-    /// The pointer to the actual function.
-    llvm::Value *FnPtr;
-
-    /// The data pointer required by the function.  There's an
-    /// invariant that this never stores an llvm::ConstantPointerNull.
-    llvm::Value *DataPtr;
-
     /// The archetype substitutions under which the function is being
     /// called.
     std::vector<Substitution> Substitutions;
 
+    CalleeInfo(CanSILFunctionType origFnType,
+               CanSILFunctionType substFnType,
+               SubstitutionList substitutions)
+      : OrigFnType(origFnType), SubstFnType(substFnType),
+        Substitutions(substitutions.begin(), substitutions.end()) {
+    }
+  };
+
+  /// A function pointer value.
+  class FunctionPointer {
+    /// The actual function pointer.
+    llvm::Value *Value;
+
+    Signature Sig;
+
   public:
-    Callee() = default;
-
-    /// Prepare a callee for a known freestanding function that
-    /// requires no data pointer.
-    static Callee forFreestandingFunction(CanSILFunctionType origFnType,
-                                          CanSILFunctionType substFnType,
-                                          ArrayRef<Substitution> subs,
-                                          llvm::Constant *fn) {
-      return forKnownFunction(origFnType, substFnType, subs,
-                              fn, nullptr);
+    /// Construct a FunctionPointer for an arbitrary pointer value.
+    /// We may add more arguments to this; try to use the other
+    /// constructors/factories if possible.
+    explicit FunctionPointer(llvm::Value *value, const Signature &signature)
+        : Value(value), Sig(signature) {
+      // The function pointer should have function type.
+      assert(value->getType()->getPointerElementType()->isFunctionTy());
+      // TODO: maybe assert similarity to signature.getType()?
     }
 
-    /// Prepare a callee for a known instance method.  Methods never
-    /// require a data pointer.  The formal type here should
-    /// include the 'self' clause.
-    static Callee forMethod(CanSILFunctionType origFnType,
-                            CanSILFunctionType substFnType,
-                            ArrayRef<Substitution> subs,
-                            llvm::Constant *fn) {
-      return forKnownFunction(origFnType, substFnType, subs,
-                              fn, nullptr);
+    static FunctionPointer forDirect(IRGenModule &IGM,
+                                     llvm::Constant *value,
+                                     CanSILFunctionType fnType);
+
+    static FunctionPointer forDirect(llvm::Constant *value,
+                                     const Signature &signature) {
+      return FunctionPointer(value, signature);
     }
 
-    /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(CanSILFunctionType origFnType,
-                                   CanSILFunctionType substFnType,
-                                   ArrayRef<Substitution> subs,
-                                   llvm::Value *fn, llvm::Value *data) {
-      // Invariant on the function pointer.
-      assert(cast<llvm::PointerType>(fn->getType())
-               ->getElementType()->isFunctionTy());
+    static FunctionPointer forExplosionValue(IRGenFunction &IGF,
+                                             llvm::Value *fnPtr,
+                                             CanSILFunctionType fnType);
 
-      Callee result;
-      result.OrigFnType = origFnType;
-      result.SubstFnType = substFnType;
-      result.FnPtr = fn;
-      result.DataPtr = data;
-      result.Substitutions = subs;
-      return result;
+    /// Is this function pointer completely constant?  That is, can it
+    /// be safely moved to a different function context?
+    bool isConstant() const {
+      return (isa<llvm::Constant>(Value));
     }
-    
+
+    /// Return the actual function pointer.
+    llvm::Value *getPointer() const { return Value; }
+
+    /// Given that this value is known to have been constructed from
+    /// a direct function, return the function pointer.
+    llvm::Constant *getDirectPointer() const {
+      return cast<llvm::Constant>(Value);
+    }
+
+    llvm::FunctionType *getFunctionType() const {
+      return cast<llvm::FunctionType>(
+                                  Value->getType()->getPointerElementType());
+    }
+
+    const Signature &getSignature() const {
+      return Sig;
+    }
+
+    llvm::CallingConv::ID getCallingConv() const {
+      return Sig.getCallingConv();
+    }
+
+    llvm::AttributeList getAttributes() const {
+      return Sig.getAttributes();
+    }
+    llvm::AttributeList &getMutableAttributes() & {
+      return Sig.getMutableAttributes();
+    }
+
+    ForeignFunctionInfo getForeignInfo() const {
+      return Sig.getForeignInfo();
+    }
+
+    llvm::Value *getExplosionValue(IRGenFunction &IGF,
+                                   CanSILFunctionType fnType) const;
+  };
+
+  class Callee {
+    CalleeInfo Info;
+
+    /// The actual function pointer to invoke.
+    FunctionPointer Fn;
+
+    /// The first data pointer required by the function invocation.
+    llvm::Value *FirstData;
+
+    /// The second data pointer required by the function invocation.
+    llvm::Value *SecondData;
+
+  public:
+    Callee(const Callee &other) = delete;
+    Callee &operator=(const Callee &other) = delete;
+
+    Callee(Callee &&other) = default;
+    Callee &operator=(Callee &&other) = default;
+
+    Callee(CalleeInfo &&info, const FunctionPointer &fn,
+           llvm::Value *firstData = nullptr,
+           llvm::Value *secondData = nullptr);
+
     SILFunctionTypeRepresentation getRepresentation() const {
-      return OrigFnType->getRepresentation();
+      return Info.OrigFnType->getRepresentation();
     }
 
-    CanSILFunctionType getOrigFunctionType() const { return OrigFnType; }
-    CanSILFunctionType getSubstFunctionType() const { return SubstFnType; }
+    CanSILFunctionType getOrigFunctionType() const {
+      return Info.OrigFnType;
+    }
+    CanSILFunctionType getSubstFunctionType() const {
+      return Info.SubstFnType;
+    }
 
-    bool hasSubstitutions() const { return !Substitutions.empty(); }
-    ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
+    bool hasSubstitutions() const { return !Info.Substitutions.empty(); }
+    SubstitutionList getSubstitutions() const { return Info.Substitutions; }
 
-    llvm::Value *getFunction() const { return FnPtr; }
+    const FunctionPointer &getFunctionPointer() const { return Fn; }
 
     llvm::FunctionType *getLLVMFunctionType() {
-      return cast<llvm::FunctionType>(FnPtr->getType()->getPointerElementType());
+      return Fn.getFunctionType();
     }
 
-    /// Return the function pointer as an i8*.
-    llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const;
+    llvm::AttributeList getAttributes() const {
+      return Fn.getAttributes();
+    }
+    llvm::AttributeList &getMutableAttributes() & {
+      return Fn.getMutableAttributes();
+    }
 
-    /// Return the function pointer as an appropriate pointer-to-function.
-    llvm::Value *getFunctionPointer() const { return FnPtr; }
+    ForeignFunctionInfo getForeignInfo() const {
+      return Fn.getForeignInfo();
+    }
 
-    /// Is it possible that this function requires a non-null data pointer?
-    bool hasDataPointer() const { return DataPtr != nullptr; }
+    /// If this callee has a value for the Swift context slot, return
+    /// it; otherwise return non-null.
+    llvm::Value *getSwiftContext() const;
 
-    /// Return the data pointer as a %swift.refcounted*.
-    llvm::Value *getDataPointer(IRGenFunction &IGF) const;
+    /// Given that this callee is a block, return the block pointer.
+    llvm::Value *getBlockObject() const;
+
+    /// Given that this callee is an ObjC method, return the receiver
+    /// argument.  This might not be 'self' anymore.
+    llvm::Value *getObjCMethodReceiver() const;
+
+    /// Given that this callee is an ObjC method, return the receiver
+    /// argument.  This might not be 'self' anymore.
+    llvm::Value *getObjCMethodSelector() const;
   };
 
 } // end namespace irgen

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -13,12 +13,12 @@ class Foo : NSObject {
     super.init()
   }
 
-  @objc func applyBlock(f: Int -> (), withInt x: Int) {
+  @objc func applyBlock(_ f: (Int) -> (), withInt x: Int) {
     f(foo)
     f(x)
   }
 
-  @objc func applyBlock(f: Int -> (), withFoo x: Foo) {
+  @objc func applyBlock(_ f: (Int) -> (), withFoo x: Foo) {
     f(foo)
     f(x.foo)
   }

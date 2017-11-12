@@ -12,5 +12,5 @@ public struct C {
 public struct F { public init() {} }
 
 public var myS : S = S()
-public func consumeS(s: S) {}
+public func consumeS(_ s: S) {}
 

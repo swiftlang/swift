@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -37,22 +37,20 @@ class SILGenModule;
 /// Some kind of specialized emitter for a builtin function.
 class SpecializedEmitter {
 public:
-  /// A special function for emitting a call after the arguments
+  /// A special function for emitting a call before the arguments
   /// have already been emitted.
   using EarlyEmitter = ManagedValue (SILGenFunction &,
                                      SILLocation,
-                                     ArrayRef<Substitution>,
+                                     SubstitutionList,
                                      Expr *argument,
-                                     CanFunctionType formalApplyType,
                                      SGFContext);
 
   /// A special function for emitting a call after the arguments
   /// have already been emitted.
   using LateEmitter = ManagedValue (SILGenFunction &,
                                     SILLocation,
-                                    ArrayRef<Substitution>,
+                                    SubstitutionList,
                                     ArrayRef<ManagedValue>,
-                                    CanFunctionType formalApplyType,
                                     SGFContext);
 
   enum class Kind {

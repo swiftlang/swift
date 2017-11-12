@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil | FileCheck %s -check-prefix=CHECK-DEBUG
-// RUN: %target-swift-frontend -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil -O | FileCheck %s -check-prefix=CHECK-RELEASE
+// RUN: %target-swift-frontend -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -Xllvm -sil-print-debuginfo -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil | %FileCheck %s -check-prefix=CHECK-DEBUG
+// RUN: %target-swift-frontend -sdk %S/../SILGen/Inputs -I %S/../SILGen/Inputs -Xllvm -sil-print-debuginfo -enable-source-import -primary-file %s -emit-sil -emit-verbose-sil -O | %FileCheck %s -check-prefix=CHECK-RELEASE
 
 // XFAIL: linux
 
@@ -11,7 +11,7 @@ import gizmo
 class DesignatedStubs : Gizmo {
   override init() { super.init() }
 }
-// CHECK-DEBUG: string_literal utf8 "{{.*}}unimplemented_initializer.swift"
+// CHECK-DEBUG: string_literal utf8 "{{.*}}unimplemented_initializer.swift",
 
-// CHECK-RELEASE-NOT: unimplemented_initializer.swift"
+// CHECK-RELEASE-NOT: unimplemented_initializer.swift",
 

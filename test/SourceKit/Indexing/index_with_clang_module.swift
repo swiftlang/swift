@@ -1,5 +1,6 @@
+// REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=index %s -- %s -F %S/../Inputs/libIDE-mock-sdk \
-// RUN:         %mcp_opt %clang-importer-sdk | FileCheck %s
+// RUN:         %mcp_opt %clang-importer-sdk | %FileCheck %s
 
 import Foo
 
@@ -11,7 +12,7 @@ func foo(a: FooClassDerived) {
 // CHECK:      key.kind: source.lang.swift.import.module.clang
 // CHECK-NEXT: key.name: "Foo"
 // CHECK-NEXT: key.filepath: "{{.*[/\\]}}Foo{{.*}}.pcm"
-// CHECK-NEXT-NOT: key.hash:
+// CHECK-NOT: key.hash:
 
 // CHECK:      key.kind: source.lang.swift.ref.class
 // CHECK-NEXT: key.name: "FooClassDerived"

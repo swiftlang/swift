@@ -1,6 +1,6 @@
-// RUN: %swiftc_driver_plain -emit-executable "%S/Inputs/你好.swift" -o %t.out -emit-module -emit-module-path %t.swiftmodule -emit-objc-header-path %t.h -serialize-diagnostics -emit-dependencies -parseable-output -driver-skip-execution 2>&1 | FileCheck %s
+// RUN: %swiftc_driver_plain -emit-executable "%S/Inputs/你好.swift" -o %t.out -emit-module -emit-module-path %t.swiftmodule -emit-objc-header-path %t.h -serialize-diagnostics -emit-dependencies -parseable-output -driver-skip-execution 2>&1 | %FileCheck %s
 
-// XFAIL: linux
+// XFAIL: freebsd, linux
 
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
@@ -48,7 +48,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
-// CHECK-NEXT:   "command": "{{.*}}/swift{{c?}} -frontend -emit-module {{.*}}/你好-[[OUTPUT]].swiftmodule {{.*}} -o {{.*}}/parseable_output_unicode.swift.tmp.swiftmodule",
+// CHECK-NEXT:   "command": "{{.*}}/swift{{c?}} -frontend -merge-modules -emit-module {{.*}}/你好-[[OUTPUT]].swiftmodule {{.*}} -o {{.*}}/parseable_output_unicode.swift.tmp.swiftmodule",
 // CHECK-NEXT:   "inputs": [
 // CHECK-NEXT:     "{{.*}}/你好-[[OUTPUT]].o"
 // CHECK-NEXT:   ],

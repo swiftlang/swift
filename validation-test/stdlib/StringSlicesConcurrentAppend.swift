@@ -9,42 +9,47 @@ import Darwin
 import Glibc
 #endif
 
+
 var StringTestSuite = TestSuite("String")
 
 extension String {
-  var bufferID: UInt {
-    return unsafeBitCast(_core._owner, UInt.self)
-  }
   var capacityInBytes: Int {
     return _core.nativeBuffer!.capacity
   }
 }
 
-// Swift.String has an optimization that allows us to append to a shared string
-// buffer.  Make sure that it works correctly when two threads try to append to
-// different non-shared strings that point to the same shared buffer.
+// Swift.String used to hsve an optimization that allowed us to append to a
+// shared string buffer.  However, as lock-free programming invariably does, it
+// introduced a race condition [rdar://25398370 Data Race in StringBuffer.append
+// (found by TSan)].
+//
+// These tests verify that it works correctly when two threads try to append to
+// different non-shared strings that point to the same shared buffer.  They used
+// to verify that the first append could succeed without reallocation even if
+// the string was held by another thread, but that has been removed.  This could
+// still be an effective thread-safety test, though.
 
 enum ThreadID {
-  case Master
-  case Slave
+  case Primary
+  case Secondary
 }
 
-var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t> = nil
+var barrierVar: UnsafeMutablePointer<_stdlib_pthread_barrier_t>?
 var sharedString: String = ""
-var slaveString: String = ""
+var secondaryString: String = ""
 
 func barrier() {
-  var ret = _stdlib_pthread_barrier_wait(barrierVar)
+  var ret = _stdlib_pthread_barrier_wait(barrierVar!)
   expectTrue(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD)
 }
 
-func sliceConcurrentAppendThread(tid: ThreadID) {
+func sliceConcurrentAppendThread(_ tid: ThreadID) {
   for i in 0..<100 {
     barrier()
-    if tid == .Master {
+    if tid == .Primary {
       // Get a fresh buffer.
       sharedString = ""
-      sharedString.appendContentsOf("abc")
+      sharedString.append("abc")
       sharedString.reserveCapacity(16)
       expectLE(16, sharedString.capacityInBytes)
     }
@@ -57,16 +62,16 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     barrier()
 
     // Append to the private string.
-    if tid == .Master {
-      privateString.appendContentsOf("def")
+    if tid == .Primary {
+      privateString.append("def")
     } else {
-      privateString.appendContentsOf("ghi")
+      privateString.append("ghi")
     }
 
     barrier()
 
     // Verify that contents look good.
-    if tid == .Master {
+    if tid == .Primary {
       expectEqual("abcdef", privateString)
     } else {
       expectEqual("abcghi", privateString)
@@ -74,28 +79,23 @@ func sliceConcurrentAppendThread(tid: ThreadID) {
     expectEqual("abc", sharedString)
 
     // Verify that only one thread took ownership of the buffer.
-    if tid == .Slave {
-      slaveString = privateString
+    if tid == .Secondary {
+      secondaryString = privateString
     }
     barrier()
-    if tid == .Master {
-      expectTrue(
-        (privateString.bufferID == sharedString.bufferID) !=
-          (slaveString.bufferID == sharedString.bufferID))
-    }
   }
 }
 
 StringTestSuite.test("SliceConcurrentAppend") {
-  barrierVar = UnsafeMutablePointer.alloc(1)
-  barrierVar.initialize(_stdlib_pthread_barrier_t())
-  var ret = _stdlib_pthread_barrier_init(barrierVar, nil, 2)
+  barrierVar = UnsafeMutablePointer.allocate(capacity: 1)
+  barrierVar!.initialize(to: _stdlib_pthread_barrier_t())
+  var ret = _stdlib_pthread_barrier_init(barrierVar!, nil, 2)
   expectEqual(0, ret)
 
   let (createRet1, tid1) = _stdlib_pthread_create_block(
-    nil, sliceConcurrentAppendThread, .Master)
+    nil, sliceConcurrentAppendThread, .Primary)
   let (createRet2, tid2) = _stdlib_pthread_create_block(
-    nil, sliceConcurrentAppendThread, .Slave)
+    nil, sliceConcurrentAppendThread, .Secondary)
 
   expectEqual(0, createRet1)
   expectEqual(0, createRet2)
@@ -106,11 +106,11 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, joinRet1)
   expectEqual(0, joinRet2)
 
-  ret = _stdlib_pthread_barrier_destroy(barrierVar)
+  ret = _stdlib_pthread_barrier_destroy(barrierVar!)
   expectEqual(0, ret)
 
-  barrierVar.destroy()
-  barrierVar.dealloc(1)
+  barrierVar!.deinitialize()
+  barrierVar!.deallocate(capacity: 1)
 }
 
 runAllTests()

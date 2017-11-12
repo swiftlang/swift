@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // CHECK PARSING
 private // expected-note {{modifier already specified here}}
@@ -14,9 +14,19 @@ public // expected-error {{duplicate modifier}}
 internal // expected-error {{duplicate modifier}}
 func triplicateAttrChanged() {}
 
+private // expected-note 3 {{modifier already specified here}}
+public // expected-error {{duplicate modifier}}
+internal // expected-error {{duplicate modifier}}
+fileprivate // expected-error {{duplicate modifier}}
+func quadruplicateAttrChanged() {}
+
 private(set)
 public
 var customSetter = 0
+
+fileprivate(set)
+public
+var customSetter2 = 0
 
 private(set) // expected-note {{modifier already specified here}}
 public(set) // expected-error {{duplicate modifier}}
@@ -54,7 +64,7 @@ duplicateAttr(1) // expected-error{{argument passed to call that takes no argume
 
 // CHECK ALLOWED DECLS
 private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-9=}}
-private(set) infix operator ~~~ {} // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
+private(set) infix operator ~~~ // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
 
 private typealias MyInt = Int
 
@@ -78,7 +88,7 @@ private enum TestEnum {
 }
 
 private protocol TestProtocol {
-  private typealias Foo // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
+  private associatedtype Foo // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
   internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}} {{3-12=}}
   public func baz() // expected-error {{'public' modifier cannot be used in protocols}} {{3-10=}}
 }
@@ -110,6 +120,7 @@ public struct Properties {
   }
   private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to read-only properties}} {{3-16=}}
   public(set) var defaultVis = 0 // expected-error {{internal property cannot have a public setter}}
+  open(set) var defaultVis2 = 0 // expected-error {{internal property cannot have an open setter}}
 
   public(set) subscript(a a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
     get { return 0 }
@@ -136,6 +147,10 @@ private extension Properties {
     get { return 42 }
     set { }
   }
+  open(set) var extProp2: Int { // expected-error {{private property cannot have an open setter}}
+    get { return 42 }
+    set { }
+  }
 }
 
 internal protocol EmptyProto {}
@@ -148,7 +163,7 @@ internal struct InternalStruct {} // expected-note * {{declared here}}
 private struct PrivateStruct {} // expected-note * {{declared here}}
 
 protocol InternalProto { // expected-note * {{declared here}}
-  typealias Assoc // expected-note {{type declared here}}
+  associatedtype Assoc
 }
 public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}} {{1-8=}}
 internal extension InternalProto where Assoc == PublicStruct {}
@@ -159,7 +174,7 @@ private extension InternalProto where Assoc == InternalStruct {}
 private extension InternalProto where Assoc == PrivateStruct {}
 
 public protocol PublicProto {
-  typealias Assoc // expected-note * {{type declared here}}
+  associatedtype Assoc
 }
 public extension PublicProto {}
 public extension PublicProto where Assoc == PublicStruct {}
@@ -174,12 +189,14 @@ private extension PublicProto where Assoc == PrivateStruct {}
 
 extension PublicProto where Assoc == InternalStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
+  open func bar() {} // expected-error {{cannot declare an open instance method in an extension with internal requirements}} {{3-7=internal}}
 }
 extension InternalProto {
-  public func foo() {} // expected-warning {{declaring a public instance method for an internal protocol}} {{3-9=internal}}
+  public func foo() {} // no effect, but no warning
 }
 extension InternalProto where Assoc == PublicStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
+  open func bar() {} // expected-error {{cannot declare an open instance method in an extension with internal requirements}} {{3-7=internal}}
 }
 
 public struct GenericStruct<Param> {}
@@ -190,7 +207,7 @@ extension GenericStruct where Param: InternalProto {
 
 
 public protocol ProtoWithReqs {
-  typealias Assoc
+  associatedtype Assoc
   func foo()
 }
 

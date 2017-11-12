@@ -1,0 +1,838 @@
+//===--- Algorithms.swift.gyb ---------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
+// RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone -swift-version 4
+// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
+
+// REQUIRES: executable_test
+
+import Swift
+import StdlibUnittest
+
+%{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    defaultIndicesForTraversal,
+    sliceTypeName
+)
+
+}%
+
+//===--- Rotate -----------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+// In the stdlib, this would simply be MutableCollection
+public protocol MutableCollectionAlgorithms : MutableCollection
+  where SubSequence : MutableCollectionAlgorithms
+{
+  /// Rotates the elements of the collection so that the element
+  /// at `middle` ends up first.
+  ///
+  /// - Returns: The new index of the element that was first
+  ///   pre-rotation.
+  /// - Complexity: O(*n*)
+  @discardableResult
+  mutating func rotate(shiftingToStart middle: Index) -> Index
+}
+
+// In the stdlib, these conformances wouldn't be needed
+extension Array : MutableCollectionAlgorithms {  }
+extension ArraySlice : MutableCollectionAlgorithms {  }
+
+% for Traversal in TRAVERSALS:
+%   for RangeReplaceable in [ False, True ]:
+%     Slice = sliceTypeName(traversal=Traversal, mutable=True, rangeReplaceable=RangeReplaceable)
+extension ${Slice} : MutableCollectionAlgorithms {  }
+%   end
+% end
+
+/// In the stdlib, this would simply be MutableCollection
+extension MutableCollectionAlgorithms {
+  /// Swaps the elements of the two given subranges, up to the upper bound of
+  /// the smaller subrange. The returned indices are the ends of the two ranges
+  /// that were actually swapped.
+  ///
+  ///     Input:
+  ///     [a b c d e f g h i j k l m n o p]
+  ///      ^^^^^^^         ^^^^^^^^^^^^^
+  ///      lhs             rhs
+  ///
+  ///     Output:
+  ///     [i j k l e f g h a b c d m n o p]
+  ///             ^               ^
+  ///             p               q
+  ///
+  /// - Precondition: !lhs.isEmpty && !rhs.isEmpty
+  /// - Postcondition: For returned indices `(p, q)`:
+  ///   - distance(from: lhs.lowerBound, to: p) ==
+  ///       distance(from: rhs.lowerBound, to: q)
+  ///   - p == lhs.upperBound || q == rhs.upperBound
+  @inline(__always)
+  internal mutating func _swapNonemptySubrangePrefixes(
+    _ lhs: Range<Index>, _ rhs: Range<Index>
+  ) -> (Index, Index) {
+    _sanityCheck(!lhs.isEmpty)
+    _sanityCheck(!rhs.isEmpty)
+
+    var p = lhs.lowerBound
+    var q = rhs.lowerBound
+    repeat {
+      swapAt(p, q)
+      formIndex(after: &p)
+      formIndex(after: &q)
+    }
+    while p != lhs.upperBound && q != rhs.upperBound
+    return (p, q)
+  }
+
+  /// Rotates the elements of the collection so that the element
+  /// at `middle` ends up first.
+  ///
+  /// - Returns: The new index of the element that was first
+  ///   pre-rotation.
+  /// - Complexity: O(*n*)
+  @discardableResult
+  public mutating func rotate(shiftingToStart middle: Index) -> Index {
+    var m = middle, s = startIndex
+    let e = endIndex
+
+    // Handle the trivial cases
+    if s == m { return e }
+    if m == e { return s }
+
+    // We have two regions of possibly-unequal length that need to be
+    // exchanged.  The return value of this method is going to be the
+    // position following that of the element that is currently last
+    // (element j).
+    //
+    //   [a b c d e f g|h i j]   or   [a b c|d e f g h i j]
+    //   ^             ^     ^        ^     ^             ^
+    //   s             m     e        s     m             e
+    //
+    var ret = e // start with a known incorrect result.
+    while true {
+      // Exchange the leading elements of each region (up to the
+      // length of the shorter region).
+      //
+      //   [a b c d e f g|h i j]   or   [a b c|d e f g h i j]
+      //    ^^^^^         ^^^^^          ^^^^^ ^^^^^
+      //   [h i j d e f g|a b c]   or   [d e f|a b c g h i j]
+      //   ^     ^       ^     ^         ^    ^     ^       ^
+      //   s    s1       m    m1/e       s   s1/m   m1      e
+      //
+      let (s1, m1) = _swapNonemptySubrangePrefixes(s..<m, m..<e)
+
+      if m1 == e {
+        // Left-hand case: we have moved element j into position.  if
+        // we haven't already, we can capture the return value which
+        // is in s1.
+        //
+        // Note: the STL breaks the loop into two just to avoid this
+        // comparison once the return value is known.  I'm not sure
+        // it's a worthwhile optimization, though.
+        if ret == e { ret = s1 }
+
+        // If both regions were the same size, we're done.
+        if s1 == m { break }
+      }
+
+      // Now we have a smaller problem that is also a rotation, so we
+      // can adjust our bounds and repeat.
+      //
+      //    h i j[d e f g|a b c]   or    d e f[a b c|g h i j]
+      //         ^       ^     ^              ^     ^       ^
+      //         s       m     e              s     m       e
+      s = s1
+      if s == m { m = m1 }
+    }
+
+    return ret
+  }
+}
+
+extension MutableCollection where Self: BidirectionalCollection {
+
+  /// Reverses the elements of the collection, moving from each end until
+  /// `limit` is reached from either direction. The returned indices are the
+  /// start and end of the range of unreversed elements.
+  ///
+  ///     Input:
+  ///     [a b c d e f g h i j k l m n o p]
+  ///             ^
+  ///           limit
+  ///     Output:
+  ///     [p o n m e f g h i j k l d c b a]
+  ///             ^               ^
+  ///             f               l
+  ///
+  /// - Postcondition: For returned indices `(f, l)`:
+  ///   `f == limit || l == limit`
+  @inline(__always)
+  @discardableResult
+  internal mutating func _reverseUntil(_ limit: Index) -> (Index, Index) {
+    var f = startIndex
+    var l = endIndex
+    while f != limit && l != limit {
+      formIndex(before: &l)
+      swapAt(f, l)
+      formIndex(after: &f)
+    }
+    return (f, l)
+  }
+
+  /// Rotates the elements of the collection so that the element
+  /// at `middle` ends up first.
+  ///
+  /// - Returns: The new index of the element that was first
+  ///   pre-rotation.
+  /// - Complexity: O(*n*)
+  @discardableResult
+  public mutating func rotate(shiftingToStart middle: Index) -> Index {
+    // FIXME: this algorithm should be benchmarked on arrays against
+    // the forward Collection algorithm above to prove that it's
+    // actually faster.  The other one sometimes does more swaps, but
+    // has better locality properties.  Similarly, we've omitted a
+    // specialization of rotate for RandomAccessCollection that uses
+    // cycles per section 11.4 in "From Mathematics to Generic
+    // Programming" by A. Stepanov because it has *much* worse
+    // locality properties than either of the other implementations.
+    // Benchmarks should be performed for that algorithm too, just to
+    // be sure.
+    self[..<middle].reverse()
+    self[middle...].reverse()
+    let (p, q) = _reverseUntil(middle)
+    self[p..<q].reverse()
+    return middle == p ? q : p
+  }
+}
+
+/// Returns the greatest common denominator for `m` and `n`.
+internal func _gcd(_ m: Int, _ n: Int) -> Int {
+  var (m, n) = (m, n)
+  while n != 0 {
+    let t = m % n
+    m = n
+    n = t
+  }
+  return m
+}
+
+extension MutableCollection where Self: RandomAccessCollection {
+
+  /// Rotates elements through a cycle, using `sourceForIndex` to generate
+  /// the source index for each movement.
+  @inline(__always)
+  internal mutating func _rotateCycle(
+    start: Index,
+    sourceOffsetForIndex: (Index) -> IndexDistance
+  ) {
+    let tmp = self[start]
+    var i = start
+    var j = index(start, offsetBy: sourceOffsetForIndex(start))
+    while j != start {
+      self[i] = self[j]
+      i = j
+      j = index(j, offsetBy: sourceOffsetForIndex(j))
+    }
+    self[i] = tmp
+  }
+
+  /// Rotates the elements of the collection so that the element
+  /// at `middle` ends up first.
+  ///
+  /// - Returns: The new index of the element that was first
+  ///   pre-rotation.
+  /// - Complexity: O(*n*)
+  @discardableResult
+  public mutating func rotateRandomAccess(
+    shiftingToStart middle: Index) -> Index
+  {
+    if middle == startIndex { return endIndex }
+    if middle == endIndex { return startIndex }
+
+    // The distance to move an element that is moving ->
+    let plus = distance(from: startIndex, to: middle)
+    // The distance to move an element that is moving <-
+    let minus = distance(from: endIndex, to: middle)
+    // The new pivot point, aka the destination for the first element
+    let pivot = index(startIndex, offsetBy: -minus)
+
+    // If the difference moving forward and backward are relative primes,
+    // the entire rotation will be completed in one cycle. Otherwise, repeat
+    // cycle, moving the start point forward with each cycle.
+    let cycles = _gcd(numericCast(plus), -numericCast(minus))
+
+    for cycle in 1...cycles {
+      _rotateCycle(
+        start: index(startIndex, offsetBy: numericCast(cycle)),
+        sourceOffsetForIndex: { $0 < pivot ? plus : minus })
+    }
+    return pivot
+  }
+}
+
+//===--- ConcatenatedCollection -------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+// ConcatenatedCollection improves on a flattened array or other collection by
+// allowing random-access traversal if the underlying collections are
+// random-access.
+//
+// Q: Add a ConcatenatedSequence for consistency? Would be nice to be able to
+// call `let seqAB = concatenate(seqA, seqB)`.
+
+/// Represents a position in either the first or second collection of a
+/// `ConcatenatedCollection`.
+internal enum _ConcatenatedCollectionIndexRepresentation<
+  I1 : Comparable, I2 : Comparable
+> {
+  case first(I1)
+  case second(I2)
+}
+
+/// A position in a `ConcatenatedCollection` collection.
+public struct ConcatenatedCollectionIndex<
+  C1 : Collection, C2 : Collection
+> : Comparable {
+  /// Creates a new index into the first underlying collection.
+  internal init(first i: C1.Index) {
+    _position = .first(i)
+  }
+
+  /// Creates a new index into the second underlying collection.
+  internal init(second i: C2.Index) {
+    _position = .second(i)
+  }
+
+  internal let _position:
+    _ConcatenatedCollectionIndexRepresentation<C1.Index, C2.Index>
+
+  public static func < (
+    lhs: ConcatenatedCollectionIndex, rhs: ConcatenatedCollectionIndex
+  ) -> Bool {
+    switch (lhs._position, rhs._position) {
+    case (.first, .second):
+      return true
+    case (.second, .first):
+      return false
+    case let (.first(l), .first(r)):
+      return l < r
+    case let (.second(l), .second(r)):
+      return l < r
+    }
+  }
+
+  public static func == (
+    lhs: ConcatenatedCollectionIndex, rhs: ConcatenatedCollectionIndex
+  ) -> Bool {
+    switch (lhs._position, rhs._position) {
+    case let (.first(l), .first(r)):
+      return l == r
+    case let (.second(l), .second(r)):
+      return l == r
+    default:
+      return false
+    }
+  }
+}
+
+% for Traversal in TRAVERSALS:
+%   Collection = collectionForTraversal(Traversal)
+%   Self = "Concatenated" + Collection
+
+/// A concatenation of two collections with the same element type.
+public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection}
+  where C1.Element == C2.Element {
+
+  init(_base1: C1, base2: C2) {
+    self._base1 = _base1
+    self._base2 = base2
+  }
+
+  public typealias Index = ConcatenatedCollectionIndex<C1, C2>
+
+  public var startIndex: Index {
+    // If `_base1` is empty, then `_base2.startIndex` is either a valid position
+    // of an element or equal to `_base2.endIndex`.
+    return _base1.isEmpty
+      ? ConcatenatedCollectionIndex(second: _base2.startIndex)
+      : ConcatenatedCollectionIndex(first: _base1.startIndex)
+  }
+
+  public var endIndex: Index {
+    return ConcatenatedCollectionIndex(second: _base2.endIndex)
+  }
+
+  public subscript(i: Index) -> C1.Element {
+    switch i._position {
+    case let .first(i):
+      return _base1[i]
+    case let .second(i):
+      return _base2[i]
+    }
+  }
+
+  public func index(after i: Index) -> Index {
+    switch i._position {
+    case let .first(i):
+      _sanityCheck(i != _base1.endIndex)
+      let next = _base1.index(after: i)
+      return next == _base1.endIndex
+        ? ConcatenatedCollectionIndex(second: _base2.startIndex)
+        : ConcatenatedCollectionIndex(first: next)
+    case let .second(i):
+      return ConcatenatedCollectionIndex(second: _base2.index(after: i))
+    }
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func index(before i: Index) -> Index {
+    assert(i != startIndex, "Can't advance before startIndex")
+    switch i._position {
+    case let .first(i):
+      return ConcatenatedCollectionIndex(first: _base1.index(before: i))
+    case let .second(i):
+      return i == _base2.startIndex
+        ? ConcatenatedCollectionIndex(
+            first: _base1.index(before: _base1.endIndex))
+        : ConcatenatedCollectionIndex(second: _base2.index(before: i))
+    }
+  }
+%   end
+
+%   if Traversal is 'RandomAccess':
+  public func index(_ i: Index, offsetBy n: ${Self}.IndexDistance) -> Index {
+    if n == 0 { return i }
+    return n > 0 ? _offsetForward(i, by: n) : _offsetBackward(i, by: -n)
+  }
+
+  internal func _offsetForward(
+    _ i: Index, by n: ${Self}.IndexDistance
+  ) -> Index {
+    switch i._position {
+    case let .first(i):
+      let d: ${Self}.IndexDistance = numericCast(
+        _base1.distance(from: i, to: _base1.endIndex))
+      if n < d {
+        return ConcatenatedCollectionIndex(
+          first: _base1.index(i, offsetBy: numericCast(n)))
+      } else {
+        return ConcatenatedCollectionIndex(
+          second: _base2.index(_base2.startIndex, offsetBy: numericCast(n - d)))
+      }
+    case let .second(i):
+      return ConcatenatedCollectionIndex(
+        second: _base2.index(i, offsetBy: numericCast(n)))
+    }
+  }
+
+  internal func _offsetBackward(
+    _ i: Index, by n: ${Self}.IndexDistance
+  ) -> Index {
+    switch i._position {
+    case let .first(i):
+      return ConcatenatedCollectionIndex(
+        first: _base1.index(i, offsetBy: -numericCast(n)))
+    case let .second(i):
+      let d: ${Self}.IndexDistance = numericCast(
+        _base2.distance(from: _base2.startIndex, to: i))
+      if n <= d {
+        return ConcatenatedCollectionIndex(
+          second: _base2.index(i, offsetBy: -numericCast(n)))
+      } else {
+        return ConcatenatedCollectionIndex(
+          first: _base1.index(_base1.endIndex, offsetBy: -numericCast(n - d)))
+      }
+    }
+  }
+%   end
+
+  let _base1: C1
+  let _base2: C2
+}
+
+/// Returns a new collection that presents a view onto the elements of the
+/// first collection and then the elements of the second collection.
+func concatenate<
+  C1 : ${Collection}, C2 : ${Collection}
+>(_ first: C1, _ second: C2) -> ${Self}<C1, C2>
+where C1.Element == C2.Element {
+  return ${Self}(_base1: first, base2: second)
+}
+
+% end
+
+//===--- RotatedCollection ------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+/// A position in a rotated collection.
+public struct RotatedCollectionIndex<Base : Collection> : Comparable {
+  internal let _index:
+    ConcatenatedCollectionIndex<Base.SubSequence, Base.SubSequence>
+
+  public static func < (
+    lhs: RotatedCollectionIndex, rhs: RotatedCollectionIndex
+  ) -> Bool {
+    return lhs._index < rhs._index
+  }
+
+  public static func == (
+    lhs: RotatedCollectionIndex, rhs: RotatedCollectionIndex
+  ) -> Bool {
+    return lhs._index == rhs._index
+  }
+}
+
+% for Traversal in TRAVERSALS:
+%   Collection = collectionForTraversal(Traversal)
+%   Self = "Rotated" + Collection
+
+/// A rotated view onto a `${Collection}`.
+public struct ${Self}<
+  Base : ${Collection}
+> : ${Collection} {
+  let _concatenation: Concatenated${Collection}<
+    Base.SubSequence, Base.SubSequence>
+
+  init(_base: Base, shiftingToStart i: Base.Index) {
+    _concatenation = concatenate(_base[i...], _base[..<i])
+  }
+
+  public typealias Index = RotatedCollectionIndex<Base>
+
+  public var startIndex: Index {
+    return RotatedCollectionIndex(_index: _concatenation.startIndex)
+  }
+
+  public var endIndex: Index {
+    return RotatedCollectionIndex(_index: _concatenation.endIndex)
+  }
+
+  public subscript(i: Index) -> Base.SubSequence.Element {
+    return _concatenation[i._index]
+  }
+
+  public func index(after i: Index) -> Index {
+    return RotatedCollectionIndex(_index: _concatenation.index(after: i._index))
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func index(before i: Index) -> Index {
+    return RotatedCollectionIndex(
+      _index: _concatenation.index(before: i._index))
+  }
+%   end
+
+  public func index(_ i: Index, offsetBy n: ${Self}.IndexDistance) -> Index {
+    return RotatedCollectionIndex(
+      _index: _concatenation.index(i._index, offsetBy: n))
+  }
+
+  /// The shifted position of the base collection's `startIndex`.
+  public var shiftedStartIndex: Index {
+    return RotatedCollectionIndex(
+      _index: ConcatenatedCollectionIndex(
+        second: _concatenation._base2.startIndex)
+    )
+  }
+}
+
+extension ${Collection} {
+  /// Returns a view of this collection with the elements reordered such the
+  /// element at the given position ends up first.
+  ///
+  /// The subsequence of the collection up to `i` is shifted to after the
+  /// subsequence starting at `i`. The order of the elements within each
+  /// partition is otherwise unchanged.
+  ///
+  ///     let a = [10, 20, 30, 40, 50, 60, 70]
+  ///     let r = a.rotated(shiftingToStart: 3)
+  ///     // r.elementsEqual([40, 50, 60, 70, 10, 20, 30])
+  ///
+  /// - Parameter i: The position in the collection that should be first in the
+  ///   result. `i` must be a valid index of the collection.
+  /// - Returns: A rotated view on the elements of this collection, such that
+  ///   the element at `i` is first.
+  func rotated(shiftingToStart i: Index) -> ${Self}<Self> {
+    return ${Self}(_base: self, shiftingToStart: i)
+  }
+}
+
+% end
+
+//===--- Stable Partition -------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+extension BidirectionalCollection
+  where Self : MutableCollectionAlgorithms {
+
+  @discardableResult
+  mutating func stablePartition(
+    choosingStartGroupBy p: (Element) -> Bool
+  ) -> Index {
+    return _stablePartition(
+      distance: distance(from: startIndex, to: endIndex),
+      choosingStartGroupBy: p
+    )
+  }
+
+  mutating func _stablePartition(
+    distance n: IndexDistance,
+    choosingStartGroupBy p: (Element) -> Bool
+  ) -> Index {
+    assert(n >= 0)
+    assert(n == distance(from: startIndex, to: endIndex))
+    if n == 0 { return startIndex }
+    if n == 1 {
+      return p(self[startIndex]) ? endIndex : startIndex
+    }
+
+    // divide and conquer.
+    let d = n / numericCast(2)
+    let m = index(startIndex, offsetBy: d)
+
+    // TTTTTTTTT s FFFFFFF m ?????????????
+    let s = self[..<m]._stablePartition(
+      distance: numericCast(d), choosingStartGroupBy: p)
+
+    // TTTTTTTTT s FFFFFFF m TTTTTTT e FFFFFFFF
+    let e = self[m...]._stablePartition(
+      distance: numericCast(n - d), choosingStartGroupBy: p)
+
+    // TTTTTTTTT s TTTTTTT m  FFFFFFF e FFFFFFFF
+    return self[s..<e].rotate(shiftingToStart: m)
+  }
+}
+
+extension Collection {
+  func stablyPartitioned(
+    choosingStartGroupBy p: (Element) -> Bool
+  ) -> [Element] {
+    var a = Array(self)
+    a.stablePartition(choosingStartGroupBy: p)
+    return a
+  }
+}
+
+extension LazyCollectionProtocol
+  where Element == Elements.Element {
+  func stablyPartitioned(
+    choosingStartGroupBy p: (Element) -> Bool
+  ) -> LazyCollection<[Element]> {
+    return elements.stablyPartitioned(choosingStartGroupBy: p).lazy
+  }
+}
+
+extension Collection {
+  /// Returns the index of the first element in the collection
+  /// that matches the predicate.
+  ///
+  /// The collection must already be partitioned according to the
+  /// predicate, as if `self.partition(by: predicate)` had already
+  /// been called.
+  func partitionPoint(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index {
+    var n = distance(from: startIndex, to: endIndex)
+    var l = startIndex
+
+    while n > 0 {
+      let half = n / 2
+      let mid = index(l, offsetBy: half)
+      if try predicate(self[mid]) {
+        n = half
+      } else {
+        l = index(after: mid)
+        n -= half + 1
+      }
+    }
+    return l
+  }
+}
+
+//===--- Tests ------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+func address<T>(_ p: UnsafePointer<T>) -> UInt { return UInt(bitPattern: p )}
+
+var suite = TestSuite("Algorithms")
+
+suite.test("reverseSubrange") {
+  for l in 0..<10 {
+    let a = Array(0..<l)
+
+    for p in a.startIndex...a.endIndex {
+      let prefix = a[..<p]
+      for q in p...l {
+        let suffix = a[q...]
+
+        var b = a
+        b.reserveCapacity(b.count)  // guarantee unique storage
+        let id = address(b)
+
+        b[p..<q].reverse()
+        expectEqual(
+          b,
+          Array([prefix, ArraySlice(a[p..<q].reversed()), suffix].joined()))
+        expectEqual(address(b), id)
+      }
+    }
+  }
+}
+
+suite.test("rotate") {
+  for l in 0..<11 {
+    let a = Array(0..<l)
+
+    for p in a.startIndex...a.endIndex {
+      let prefix = a[..<p]
+      for q in p...l {
+        let suffix = a[q...]
+
+        for m in p...q {
+          var b = a
+          b.reserveCapacity(b.count)  // guarantee unique storage
+          let id = address(b)
+
+          let r = b[p..<q].rotate(shiftingToStart: m)
+          let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].joined())
+          expectEqual(b, rotated)
+          expectEqual(r, a.index(p, offsetBy: a[m..<q].count))
+          expectEqual(address(b), id)
+        }
+      }
+      var b = a
+      b.rotate(shiftingToStart: p)
+      expectEqual(b, Array(a.rotated(shiftingToStart: p)))
+    }
+  }
+}
+
+suite.test("rotateRandomAccess") {
+  for l in 0..<11 {
+    let a = Array(0..<l)
+
+    for p in a.startIndex...a.endIndex {
+      let prefix = a[..<p]
+      for q in p...l {
+        let suffix = a[q...]
+
+        for m in p...q {
+          var b = a
+          b.reserveCapacity(b.count)  // guarantee unique storage
+          let id = address(b)
+
+          let r = b[p..<q].rotateRandomAccess(shiftingToStart: m)
+          let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].joined())
+          expectEqual(b, rotated)
+          expectEqual(r, a.index(p, offsetBy: a[m..<q].count))
+          expectEqual(address(b), id)
+        }
+      }
+      var b = a
+      b.rotateRandomAccess(shiftingToStart: p)
+      expectEqual(b, Array(a.rotated(shiftingToStart: p)))
+    }
+  }
+}
+
+suite.test("concatenate") {
+  for x in 0...6 {
+    for y in 0...x {
+      let r1 = 0..<y
+      let r2 = y..<x
+      expectEqual(Array(0..<x), Array(concatenate(r1, r2)))
+    }
+  }
+
+  let c1 = concatenate([1, 2, 3, 4, 5], 6...10)
+  let c2 = concatenate(1...5, [6, 7, 8, 9, 10])
+  expectEqual(Array(1...10), Array(c1))
+  expectEqual(Array(1...10), Array(c2))
+
+  let h = "Hello, "
+  let w = "world!"
+  let hw = concatenate(h, w)
+  expectEqual("Hello, world!", String(hw))
+}
+
+suite.test("stablePartition") {
+  // FIXME: add test for stability
+  for l in 0..<13 {
+    let a = Array(0..<l)
+
+    for p in a.startIndex...a.endIndex {
+      let prefix = a[..<p]
+      for q in p...l {
+        let suffix = a[q...]
+
+        let subrange = a[p..<q]
+
+        for modulus in 1...5 {
+          let f = { $0 % modulus == 0 }
+          let notf = { !f($0) }
+
+          var b = a
+          b.reserveCapacity(b.count)  // guarantee unique storage
+          let id = address(b)
+
+          var r = b[p..<q].stablePartition(choosingStartGroupBy: f)
+          expectEqual(b[..<p], prefix)
+          expectEqual(b.suffix(from:q), suffix)
+          expectEqual(b[p..<r], ArraySlice(subrange.filter(f)))
+          expectEqual(b[r..<q], ArraySlice(subrange.filter(notf)))
+          expectEqual(address(b), id)
+
+          b = a
+          r = b[p..<q].stablePartition(choosingStartGroupBy: notf)
+          expectEqual(b[..<p], prefix)
+          expectEqual(b.suffix(from:q), suffix)
+          expectEqual(b[p..<r], ArraySlice(subrange.filter(notf)))
+          expectEqual(b[r..<q], ArraySlice(subrange.filter(f)))
+        }
+      }
+
+      for modulus in 1...5 {
+        let f = { $0 % modulus == 0 }
+        let notf = { !f($0) }
+        var b = a
+        var r = b.stablePartition(choosingStartGroupBy: f)
+        expectEqual(b[..<r], ArraySlice(a.filter(f)))
+        expectEqual(b[r...], ArraySlice(a.filter(notf)))
+
+        b = a
+        r = b.stablePartition(choosingStartGroupBy: notf)
+        expectEqual(b[..<r], ArraySlice(a.filter(notf)))
+        expectEqual(b[r...], ArraySlice(a.filter(f)))
+      }
+    }
+  }
+}
+
+suite.test("partitionPoint") {
+  for i in 0..<7 {
+    for j in i..<11 {
+      for k in i...j {
+        let p = (i..<j).partitionPoint { $0 >= k }
+        expectGE(p, i)
+        expectLE(p, j)
+        expectEqual(p, k)
+      }
+    }
+  }
+}
+
+runAllTests()
+

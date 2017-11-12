@@ -1,0 +1,6 @@
+func testStringConcatenation() {
+  let firstName = "Jason"
+  let number = 3
+  let closure: () -> String = { return "FOO" }
+  let _ = "Mr. \(firstName.debugDescription)\(closure())number: \(number)"
+}

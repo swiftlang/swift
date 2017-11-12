@@ -1,0 +1,118 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -o - -primary-file %s | %FileCheck %s
+// REQUIRES: CPU=x86_64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public protocol Kindable {
+  var kind: Int { get }
+}
+
+extension Int : Kindable {
+  public var kind: Int { get }
+}
+
+extension Float : Kindable {
+  public var kind: Int { get }
+}
+
+// CHECK: @_T0Si21existential_metatypes8KindableAAWP = external global i8*, align 8
+// CHECK: @_T0Sf21existential_metatypes8KindableAAWP = external global i8*, align 8
+
+sil @int_kind_getter : $@convention(method) (Int) -> Int {
+bb0(%0 : $Int):
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  return %3 : $Int
+}
+
+sil [transparent] [thunk] @int_kind_getter_witness : $@convention(witness_method: Kindable) (@in_guaranteed Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = load %0 : $*Int
+  %2 = function_ref @int_kind_getter : $@convention(method) (Int) -> Int
+  %3 = apply %2(%1) : $@convention(method) (Int) -> Int
+  return %3 : $Int
+}
+
+sil @float_kind_getter : $@convention(method) (Float) -> Int {
+bb0(%0 : $Float):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = struct $Int (%2 : $Builtin.Int64)
+  return %3 : $Int
+}
+
+sil [transparent] [thunk] @float_kind_getter_witness : $@convention(witness_method: Kindable) (@in_guaranteed Float) -> Int {
+bb0(%0 : $*Float):
+  %1 = load %0 : $*Float
+  %2 = function_ref @float_kind_getter : $@convention(method) (Float) -> Int
+  %3 = apply %2(%1) : $@convention(method) (Float) -> Int
+  return %3 : $Int
+}
+
+// CHECK: define{{( protected)?}} swiftcc void @test0()
+sil @test0 : $@convention(thin) () -> () {
+bb0:
+  // CHECK:      [[V:%.*]] = alloca { %swift.type*, i8** }, align 8
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.start
+  %0 = alloc_stack $@thick Kindable.Type, var, name "v"
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }, { %swift.type*, i8** }* [[V]], i32 0, i32 0
+  // CHECK-NEXT: store %swift.type* @_T0SiN, %swift.type** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }, { %swift.type*, i8** }* [[V]], i32 0, i32 1
+  %1 = metatype $@thin Int.Type
+  %2 = metatype $@thick Int.Type
+  %3 = init_existential_metatype %2 : $@thick Int.Type, $@thick Kindable.Type
+  // CHECK-NEXT: store i8** @_T0Si21existential_metatypes8KindableAAWP, i8*** [[T0]], align 8
+  store %3 to %0 : $*@thick Kindable.Type
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }, { %swift.type*, i8** }* [[V]], i32 0, i32 0
+  // CHECK-NEXT: store %swift.type* @_T0SfN, %swift.type** [[T0]], align 8
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { %swift.type*, i8** }, { %swift.type*, i8** }* [[V]], i32 0, i32 1
+  %5 = metatype $@thin Float.Type
+  %6 = metatype $@thick Float.Type
+  %7 = init_existential_metatype %6 : $@thick Float.Type, $@thick Kindable.Type
+  // CHECK-NEXT: store i8** @_T0Sf21existential_metatypes8KindableAAWP, i8*** [[T0]], align 8
+  store %7 to %0 : $*@thick Kindable.Type
+  %9 = tuple ()
+  // CHECK-NEXT: bitcast
+  // CHECK-NEXT: llvm.lifetime.end
+  dealloc_stack %0 : $*@thick Kindable.Type
+  // CHECK-NEXT: ret void
+  return %9 : $()
+}
+
+sil @use : $@convention(thin) (@thick Kindable.Type) -> () {
+bb0(%0 : $@thick Kindable.Type):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK: define{{( protected)?}} swiftcc void @test1(i64, i64)
+sil @test1 : $@convention(thin) (Optional<@thick Kindable.Type>) -> () {
+bb0(%0 : $Optional<@thick Kindable.Type>):
+  // CHECK:     [[TYPE:%.*]] = inttoptr i64 %0 to %swift.type*
+  // CHECK:     [[WITNESS:%.*]] = inttoptr i64 %1 to i8**
+  switch_enum %0 : $Optional<@thick Kindable.Type>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : $@thick Kindable.Type):
+  %5 = function_ref @use : $@convention(thin) (@thick Kindable.Type) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@thick Kindable.Type) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil_witness_table Int: Kindable module existential_metatypes {
+  method #Kindable.kind!getter.1: @int_kind_getter_witness
+}
+
+sil_witness_table Float: Kindable module existential_metatypes {
+  method #Kindable.kind!getter.1: @float_kind_getter_witness
+}

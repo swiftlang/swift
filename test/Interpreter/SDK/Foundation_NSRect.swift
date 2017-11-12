@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // iOS doesn't have NSRect. iOS and OS X CGRect is tested elsewhere.
@@ -6,7 +6,7 @@
 
 import Foundation
 
-func printRect(r: NSRect) {
+func printRect(_ r: NSRect) {
   // FIXME: Constraint checker takes too long to typecheck this as an
   // interpolation expression
   print("NSRect(", terminator: "")

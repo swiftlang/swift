@@ -23,7 +23,7 @@ compilation that results from having the entire module available makes
 it possible for the inliner to inline functions that it would
 otherwise not be able to inline in normal separate compilation. Other
 optimizations similarly benefit, for example generic specialization
-(since it has more opportunities for specializae) and function
+(since it has more opportunities for specialize) and function
 signature optimization (since it has more call sites to rewrite).
 
 
@@ -102,7 +102,7 @@ function individually based on those results.
 
 **TBD: Do we really need SCC transforms at all, or is it sufficient to
 simply have function transforms that are always passed an SCC, and
-have them ask for the results of an analyses for the entire SCC and
+have them ask for the results of an analysis for the entire SCC and
 then iterate over all functions in the SCC?**
 
 In some cases we have transforms that generate new work in a top-down

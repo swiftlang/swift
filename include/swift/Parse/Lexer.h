@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,13 +17,27 @@
 #ifndef SWIFT_LEXER_H
 #define SWIFT_LEXER_H
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Token.h"
-#include "swift/AST/DiagnosticEngine.h"
+#include "swift/Syntax/References.h"
+#include "swift/Syntax/Trivia.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
+
+namespace syntax {
+  struct RawTokenSyntax;
+  struct RawSyntaxInfo;
+}
+
+  /// Given a pointer to the starting byte of a UTF8 character, validate it and
+  /// advance the lexer past it.  This returns the encoded character or ~0U if
+  /// the encoding is invalid.
+  uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr, const char *End);
+
   class DiagnosticEngine;
   class InFlightDiagnostic;
   class LangOptions;
@@ -36,6 +50,21 @@ enum class CommentRetentionMode {
   ReturnAsTokens,
 };
 
+enum class TriviaRetentionMode {
+  WithoutTrivia,
+  WithTrivia,
+};
+
+/// Kinds of conflict marker which the lexer might encounter.
+enum class ConflictMarkerKind {
+  /// A normal or diff3 conflict marker, initiated by at least 7 "<"s,
+  /// separated by at least 7 "="s or "|"s, and terminated by at least 7 ">"s.
+  Normal,
+  /// A Perforce-style conflict marker, initiated by 4 ">"s,
+  /// separated by 4 "="s, and terminated by 4 "<"s.
+  Perforce
+};
+  
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
@@ -86,9 +115,23 @@ class Lexer {
 
   const CommentRetentionMode RetainComments;
 
+  const TriviaRetentionMode TriviaRetention;
+
   /// InSILBody - This is true when we're lexing the body of a SIL declaration
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
+
+  /// The current leading trivia for the next token.
+  ///
+  /// This is only preserved if this Lexer was constructed with
+  /// `TriviaRetentionMode::WithTrivia`.
+  syntax::TriviaList LeadingTrivia;
+
+  /// The current trailing trivia for the next token.
+  ///
+  /// This is only preserved if this Lexer was constructed with
+  /// `TriviaRetentionMode::WithTrivia`.
+  syntax::TriviaList TrailingTrivia;
   
 public:
   /// \brief Lexer state can be saved/restored to/from objects of this class.
@@ -102,12 +145,18 @@ public:
 
     State advance(unsigned Offset) const {
       assert(isValid());
-      return State(Loc.getAdvancedLoc(Offset));
+      return State(Loc.getAdvancedLoc(Offset), LeadingTrivia, TrailingTrivia);
     }
 
   private:
-    explicit State(SourceLoc Loc): Loc(Loc) {}
+    explicit State(SourceLoc Loc,
+                   syntax::TriviaList LeadingTrivia,
+                   syntax::TriviaList TrailingTrivia)
+      : Loc(Loc), LeadingTrivia(LeadingTrivia),
+        TrailingTrivia(TrailingTrivia) {}
     SourceLoc Loc;
+    syntax::TriviaList LeadingTrivia;
+    syntax::TriviaList TrailingTrivia;
     friend class Lexer;
   };
 
@@ -121,7 +170,8 @@ private:
   Lexer(const LangOptions &Options,
         const SourceManager &SourceMgr, DiagnosticEngine *Diags,
         unsigned BufferID, bool InSILMode,
-        CommentRetentionMode RetainComments);
+        CommentRetentionMode RetainComments,
+        TriviaRetentionMode TriviaRetention);
 
   /// @{
   /// Helper routines used in \c Lexer constructors.
@@ -140,14 +190,16 @@ public:
   ///   need to take a LangOptions explicitly.
   /// \param InSILMode - whether we're parsing a SIL source file.
   ///   Unlike language options, this does affect primitive lexing, which
-  ///   means that APIs like getLofForEndOfToken really ought to take
+  ///   means that APIs like getLocForEndOfToken really ought to take
   ///   this flag; it's just that we don't care that much about fidelity
   ///   when parsing SIL files.
   Lexer(const LangOptions &Options,
         const SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, bool InSILMode,
-        CommentRetentionMode RetainComments = CommentRetentionMode::None)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments) {
+        CommentRetentionMode RetainComments = CommentRetentionMode::None,
+        TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia)
+      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments,
+              TriviaRetention) {
     primeLexer();
   }
 
@@ -156,13 +208,17 @@ public:
         const SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, bool InSILMode,
         CommentRetentionMode RetainComments,
+        TriviaRetentionMode TriviaRetention,
         unsigned Offset, unsigned EndOffset)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments) {
+      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments,
+              TriviaRetention) {
     assert(Offset <= EndOffset && "invalid range");
     initSubLexer(
         *this,
-        State(getLocForStartOfBuffer().getAdvancedLoc(Offset)),
-        State(getLocForStartOfBuffer().getAdvancedLoc(EndOffset)));
+        State(getLocForStartOfBuffer().getAdvancedLoc(Offset),
+              LeadingTrivia, TrailingTrivia),
+        State(getLocForStartOfBuffer().getAdvancedLoc(EndOffset),
+              LeadingTrivia, TrailingTrivia));
   }
 
   /// \brief Create a sub-lexer that lexes from the same buffer, but scans
@@ -173,7 +229,8 @@ public:
   /// \param EndState end of the subrange
   Lexer(Lexer &Parent, State BeginState, State EndState)
       : Lexer(Parent.LangOpts, Parent.SourceMgr, Parent.Diags, Parent.BufferID,
-              Parent.InSILMode, Parent.RetainComments) {
+              Parent.InSILMode, Parent.RetainComments,
+              Parent.TriviaRetention) {
     initSubLexer(Parent, BeginState, EndState);
   }
 
@@ -187,6 +244,9 @@ public:
     if (Result.isNot(tok::eof))
       lexImpl();
   }
+
+  /// Lex a full token including leading and trailing trivia.
+  syntax::RawSyntaxInfo fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
@@ -217,19 +277,21 @@ public:
   }
 
   State getStateForEndOfTokenLoc(SourceLoc Loc) const {
-    return State(getLocForEndOfToken(SourceMgr, Loc));
+    return State(getLocForEndOfToken(SourceMgr, Loc), LeadingTrivia,
+                 TrailingTrivia);
   }
 
   /// \brief Restore the lexer state to a given one, that can be located either
   /// before or after the current position.
-  void restoreState(State S) {
+  void restoreState(State S, bool enableDiagnostics = false) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
+    LeadingTrivia = S.LeadingTrivia;
+    TrailingTrivia = S.TrailingTrivia;
     // Don't reemit diagnostics while readvancing the lexer.
-    auto TmpDiags = Diags;
-    Diags = nullptr;
+    llvm::SaveAndRestore<DiagnosticEngine*>
+      D(Diags, enableDiagnostics ? Diags : nullptr);
     lexImpl();
-    Diags = TmpDiags;
   }
 
   /// \brief Restore the lexer state to a given state that is located before
@@ -240,8 +302,17 @@ public:
     restoreState(S);
   }
 
+  /// \brief Retrieve the Token referred to by \c Loc.
+  ///
+  /// \param SM The source manager in which the given source location
+  /// resides.
+  ///
+  /// \param Loc The source location of the beginning of a token.
+  static Token getTokenAtLocation(const SourceManager &SM, SourceLoc Loc);
+
+
   /// \brief Retrieve the source location that points just past the
-  /// end of the token refered to by \c Loc.
+  /// end of the token referred to by \c Loc.
   ///
   /// \param SM The source manager in which the given source location
   /// resides.
@@ -255,8 +326,9 @@ public:
   /// resides.
   ///
   /// \param SR The source range
-  static CharSourceRange getCharSourceRangeFromSourceRange(const SourceManager &SM,
-                                                           const SourceRange &SR) {
+  static CharSourceRange
+  getCharSourceRangeFromSourceRange(const SourceManager &SM,
+                                    const SourceRange &SR) {
     return CharSourceRange(SM, SR.Start, getLocForEndOfToken(SM, SR.End));
   }
 
@@ -277,6 +349,8 @@ public:
   /// to the whitespace offset.
   static SourceLoc getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
                                          unsigned Offset);
+
+  static SourceLoc getLocForStartOfToken(SourceManager &SM, SourceLoc Loc);
 
   /// Retrieve the start location of the line containing the given location.
   /// the given location.
@@ -299,6 +373,10 @@ public:
   /// reserved word.
   static tok kindOfIdentifier(StringRef Str, bool InSILMode);
 
+  /// \brief Determines if the given string is a valid operator identifier,
+  /// without escaping characters.
+  static bool isOperator(StringRef string);
+
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
   }
@@ -308,13 +386,19 @@ public:
     enum : char { Literal, Expr } Kind;
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
-    unsigned Length;
-    
-    static StringSegment getLiteral(SourceLoc Loc, unsigned Length) {
+    unsigned Length, IndentToStrip;
+    bool IsFirstSegment, IsLastSegment;
+
+    static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
+                                    bool IsFirstSegment, bool IsLastSegment,
+                                    unsigned IndentToStrip) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.IsFirstSegment = IsFirstSegment;
+      Result.IsLastSegment = IsLastSegment;
+      Result.IndentToStrip = IndentToStrip;
       return Result;
     }
     
@@ -323,7 +407,14 @@ public:
       Result.Kind = Expr;
       Result.Loc = Loc;
       Result.Length = Length;
+      Result.IsFirstSegment = false;
+      Result.IsLastSegment = false;
+      Result.IndentToStrip = 0;
       return Result;
+    }
+
+    SourceLoc getEndLoc() {
+      return Loc.getAdvancedLoc(Length);
     }
   };
   
@@ -331,12 +422,16 @@ public:
   /// If a copy needs to be made, it will be allocated out of the provided
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
-                                           SmallVectorImpl<char> &Buffer);
+                                           SmallVectorImpl<char> &Buffer,
+                                           bool IsFirstSegment = false,
+                                           bool IsLastSegment = false,
+                                           unsigned IndentToStrip = 0);
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
-        Buffer);
+        Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
+        Segment.IndentToStrip);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
@@ -398,8 +493,13 @@ private:
     return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
 
-  void formToken(tok Kind, const char *TokStart);
+  void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
 
+  /// Advance to the end of the line but leave the current buffer pointer
+  /// at that newline character.
+  void skipUpToEndOfLine();
+
+  /// Advance past the next newline character.
   void skipToEndOfLine();
 
   /// Skip to the end of the line of a // comment.
@@ -409,23 +509,49 @@ private:
   void skipHashbang();
 
   void skipSlashStarComment();
+  void lexHash();
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
+  void lexTrivia(syntax::TriviaList &T, bool StopAtFirstNewline = false);
+  Optional<syntax::TriviaPiece> lexWhitespace(bool StopAtFirstNewline);
+  Optional<syntax::TriviaPiece> lexComment();
+  Optional<syntax::TriviaPiece> lexSingleLineComment(syntax::TriviaKind Kind);
+  Optional<syntax::TriviaPiece> lexBlockComment(syntax::TriviaKind Kind);
+  Optional<syntax::TriviaPiece> lexDocComment();
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics);
+                        char StopQuote, bool EmitDiagnostics,
+                        bool MultilineString = false);
   void lexStringLiteral();
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char*);
+
+  /// Try to lex conflict markers by checking for the presence of the start and
+  /// end of the marker in diff3 or Perforce style respectively.
+  bool tryLexConflictMarker();
 };
   
-  
+/// Given an ordered token \param Array , get the iterator pointing to the first
+/// token that is not before \param Loc .
+template<typename ArrayTy, typename Iterator = typename ArrayTy::iterator>
+Iterator token_lower_bound(ArrayTy &Array, SourceLoc Loc) {
+  return std::lower_bound(Array.begin(), Array.end(), Loc,
+    [](const Token &T, SourceLoc L) {
+      return T.getLoc().getOpaquePointerValue() < L.getOpaquePointerValue();
+  });
+}
+
+/// Given an ordered token array \param AllTokens , get the slice of the array
+/// where front() locates at \param StartLoc and back() locates at \param EndLoc .
+ArrayRef<Token> slice_token_array(ArrayRef<Token> AllTokens, SourceLoc StartLoc,
+                                  SourceLoc EndLoc);
+
 } // end namespace swift
 
 #endif

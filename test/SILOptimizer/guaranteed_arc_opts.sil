@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt -guaranteed-arc-opts %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+sil @kraken : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil @copyvalue_test1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.NativeObject, [[ARG2:%.*]] : $Builtin.NativeObject):
+// CHECK-NOT: copy_value [[ARG1]]
+// CHECK: copy_value [[ARG2]]
+// CHECK-NOT: destroy_value [[ARG1]]
+sil @copyvalue_test1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = copy_value %0 : $Builtin.NativeObject
+  copy_value %1 : $Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @copyvalue_test2 : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32) -> Builtin.NativeObject {
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.NativeObject
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: return [[ARG1]]
+sil @copyvalue_test2 : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32) -> Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.Int32):
+  %2 = copy_value %0 : $Builtin.NativeObject
+  %3 = integer_literal $Builtin.Int32, 0
+  store %3 to [trivial] %1 : $*Builtin.Int32
+  destroy_value %0 : $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil @copyvalue_test3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: destroy_value
+sil @copyvalue_test3 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  copy_value %0 : $Builtin.NativeObject
+  %1 = function_ref @kraken : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @copyvalue_test4 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: destroy_value
+sil @copyvalue_test4 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

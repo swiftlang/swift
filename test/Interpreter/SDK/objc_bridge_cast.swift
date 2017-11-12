@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -7,11 +7,11 @@
 
 import Foundation
 
-func genericForcedCast<T, U>(a: T) -> U {
+func genericForcedCast<T, U>(_ a: T) -> U {
   return a as! U
 }
 
-func genericConditionalCast<T, U>(a: T) -> U? {
+func genericConditionalCast<T, U>(_ a: T) -> U? {
   return a as? U
 }
 
@@ -104,11 +104,11 @@ func testConditionalValueToObjectBridging() {
     print("Not an NSCoding")
   }
 
-  // CHECK-NEXT: NSXMLParserDelegate
-  if let delegate = (genericConditionalCast(array) as NSXMLParserDelegate?) {
+  // CHECK-NEXT: XMLParserDelegate
+  if let delegate = (genericConditionalCast(array) as XMLParserDelegate?) {
     print("\(delegate)")
   } else {
-    print("Not an NSXMLParserDelegate")
+    print("Not an XMLParserDelegate")
   }
 
   // Conditional bridging (unrelated class)

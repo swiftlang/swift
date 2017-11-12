@@ -1,0 +1,16 @@
+class C {
+  var Prop1 : Int {
+    var a = 3 + 1
+    return a
+  }
+  fileprivate func new_name() -> Int {
+return 1 + 3
+}
+
+var Prop2 : Int {
+    get { return new_name() }
+    set {}
+  }
+}
+
+

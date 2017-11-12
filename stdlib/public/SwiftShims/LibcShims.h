@@ -1,12 +1,12 @@
-//===--- LibcShims.h - Access to POSIX for Swift's core stdlib -----------===//
+//===--- LibcShims.h - Access to POSIX for Swift's core stdlib --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,11 @@
 
 #include "SwiftStdint.h"
 #include "SwiftStddef.h"
+#include "Visibility.h"
+
+#if __has_feature(nullability)
+#pragma clang assume_nonnull begin
+#endif
 
 #ifdef __cplusplus
 namespace swift { extern "C" {
@@ -28,35 +33,133 @@ namespace swift { extern "C" {
 
 // This declaration is not universally correct.  We verify its correctness for
 // the current platform in the runtime code.
-typedef long int __swift_ssize_t;
+#if defined(__linux__) && defined (__arm__)
+typedef           int __swift_ssize_t;
+#elif defined(_WIN32)
+#if defined(_M_ARM) || defined(_M_IX86)
+typedef           int __swift_ssize_t;
+#elif defined(_M_X64)
+typedef long long int __swift_ssize_t;
+#else
+#error unsupported machine type
+#endif
+#else
+typedef      long int __swift_ssize_t;
+#endif
 
 // General utilities <stdlib.h>
 // Memory management functions
+SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_free(void *ptr);
 
 // Input/output <stdio.h>
-int _swift_stdlib_putchar(int c);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int _swift_stdlib_putchar_unlocked(int c);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
+                                           __swift_size_t nitems);
 
 // String handling <string.h>
-__attribute__((pure))
-__swift_size_t _swift_stdlib_strlen(const char *s);
- __attribute__((pure))
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_strlen(const char *s);
+
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_strlen_unsigned(const unsigned char *s);
+
+SWIFT_READONLY
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
 // <unistd.h>
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t _swift_stdlib_write(int fd, const void *buf,
                                     __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
-__swift_size_t _swift_stdlib_malloc_size(const void *ptr);
-__swift_uint32_t _swift_stdlib_arc4random(void);
-__swift_uint32_t _swift_stdlib_arc4random_uniform(__swift_uint32_t upper_bound);
+SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_malloc_size(const void *ptr);
+
+// Random number <random>
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_uint32_t _swift_stdlib_cxx11_mt19937(void);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_uint32_t
+_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
+
+// Math library functions
+static inline SWIFT_ALWAYS_INLINE
+float _swift_stdlib_remainderf(float _self, float _other) {
+  return __builtin_remainderf(_self, _other);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+float _swift_stdlib_squareRootf(float _self) {
+  return __builtin_sqrtf(_self);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _swift_stdlib_remainder(double _self, double _other) {
+  return __builtin_remainder(_self, _other);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+double _swift_stdlib_squareRoot(double _self) {
+  return __builtin_sqrt(_self);
+}
+
+// TLS - thread local storage
+
+#if defined(__ANDROID__)
+typedef int __swift_thread_key_t;
+#elif defined(__linux__)
+typedef unsigned int __swift_thread_key_t;
+#elif defined(__FreeBSD__)
+typedef int __swift_thread_key_t;
+#elif defined(_WIN32)
+typedef unsigned long __swift_thread_key_t;
+#elif defined(__HAIKU__)
+typedef int __swift_thread_key_t;
+#else
+typedef unsigned long __swift_thread_key_t;
+#endif
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int
+_swift_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
+                                void (* _Nullable destructor)(void * _Nullable));
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void * _Nullable _swift_stdlib_thread_getspecific(__swift_thread_key_t key);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int _swift_stdlib_thread_setspecific(__swift_thread_key_t key,
+                                     const void * _Nullable value);
+
+// TODO: Remove horrible workaround when importer does Float80 <-> long double.
+#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+static inline SWIFT_ALWAYS_INLINE
+void _swift_stdlib_remainderl(void *_self, const void *_other) {
+  long double *_f80self = (long double *)_self;
+  *_f80self = __builtin_remainderl(*_f80self, *(const long double *)_other);
+}
+
+static inline SWIFT_ALWAYS_INLINE
+void _swift_stdlib_squareRootl(void *_self) {
+  long double *_f80self = (long double *)_self;
+  *_f80self = __builtin_sqrtl(*_f80self);
+}
+#endif // Have Float80
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif
 
-#endif // SWIFT_STDLIB_SHIMS_LIBCSHIMS_H
+#if __has_feature(nullability)
+#pragma clang assume_nonnull end
+#endif
 
+#endif // SWIFT_STDLIB_SHIMS_LIBCSHIMS_H

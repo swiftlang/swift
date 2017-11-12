@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 // See also rdar://15626843.
 static var gvu1: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
@@ -92,7 +92,7 @@ struct InMemberFunc {
   }
 }
 
-struct S { // expected-note 3{{extended type declared here}}
+struct S { // expected-note 3{{extended type declared here}} expected-note{{did you mean 'S'?}}
   static var v1: Int = 0
   class var v2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 
@@ -116,7 +116,7 @@ extension S {
   class let el2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 }
 
-enum E { // expected-note 3{{extended type declared here}}
+enum E { // expected-note 3{{extended type declared here}} expected-note{{did you mean 'E'?}}
   static var v1: Int = 0
   class var v2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 
@@ -141,44 +141,44 @@ extension E {
   class let el2: Int = 0 // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
 }
 
-class C {
+class C { // expected-note{{did you mean 'C'?}}
   static var v1: Int = 0
-  class final var v3: Int = 0 // expected-error {{class stored properties not yet supported}}
-  class var v4: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final var v3: Int = 0 // expected-error {{class stored properties not supported}}
+  class var v4: Int = 0 // expected-error {{class stored properties not supported}}
 
   static var v5: Int { return 0 }
   class var v6: Int { return 0 }
   static final var v7: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 
   static let l1: Int = 0
-  class let l2: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
-  class final let l3: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class let l2: Int = 0 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  class final let l3: Int = 0 // expected-error {{class stored properties not supported}}
   static final let l4 = 2 // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
 extension C {
   static var ev1: Int = 0
-  class final var ev2: Int = 0 // expected-error {{class stored properties not yet supported}}
-  class var ev3: Int = 0 // expected-error {{class stored properties not yet supported}}
+  class final var ev2: Int = 0 // expected-error {{class stored properties not supported}}
+  class var ev3: Int = 0 // expected-error {{class stored properties not supported}}
 
   static var ev4: Int { return 0 }
   class var ev5: Int { return 0 }
   static final var ev6: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 
   static let el1: Int = 0
-  class let el2: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
-  class final let el3: Int = 0 // expected-error {{class stored properties not yet supported in classes; did you mean 'static'?}}
+  class let el2: Int = 0 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  class final let el3: Int = 0 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
   static final let el4: Int = 0 // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
-protocol P {
+protocol P {  // expected-note{{did you mean 'P'?}}
   // Both `static` and `class` property requirements are equivalent in protocols rdar://problem/17198298
   static var v1: Int { get }
   class var v2: Int { get } // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}}
   static final var v3: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
 
-  static let l1: Int // expected-error {{static stored properties not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
-  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}} expected-error {{class stored properties not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  static let l1: Int // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  class let l2: Int // expected-error {{class properties are only allowed within classes; use 'static' to declare a static property}} {{3-8=static}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
 }
 
 struct S1 {
@@ -201,26 +201,36 @@ enum E1 {
 }
 
 class C1 {
-  class var x: Int // expected-error {{class stored properties not yet supported}} expected-error {{'class var' declaration requires an initializer expression or getter/setter specifier}}
+  class var x: Int // expected-error {{class stored properties not supported}} expected-error {{'class var' declaration requires an initializer expression or getter/setter specifier}}
 }
 
 class C2 {
   var x: Int = 19
-  class var x: Int = 17 // expected-error{{class stored properties not yet supported}}
+  class var x: Int = 17 // expected-error{{class stored properties not supported}}
 
   func xx() -> Int { return self.x + C2.x }
 }
 
 class ClassHasVars {
-  static var computedStatic: Int { return 0 } // expected-note {{overridden declaration is here}}
+  static var computedStatic: Int { return 0 } // expected-note 3{{overridden declaration is here}}
+  final class var computedFinalClass: Int { return 0 } // expected-note 3{{overridden declaration is here}}
   class var computedClass: Int { return 0 }
   var computedInstance: Int { return 0 }
 }
 
 class ClassOverridesVars : ClassHasVars {
-  override static var computedStatic: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
+  override static var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
+  override static var computedFinalClass: Int { return 1 } // expected-error {{static var overrides a 'final' class var}}
   override class var computedClass: Int { return 1 }
   override var computedInstance: Int { return 1 }
+}
+class ClassOverridesVars2 : ClassHasVars {
+  override final class var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
+  override final class var computedFinalClass: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
+}
+class ClassOverridesVars3 : ClassHasVars {
+  override class var computedStatic: Int { return 1 } // expected-error {{cannot override static var}}
+  override class var computedFinalClass: Int { return 1 } // expected-error {{class var overrides a 'final' class var}}
 }
 
 struct S2 {
@@ -230,7 +240,7 @@ struct S2 {
   func xx() -> Int { return self.x + C2.x }
 }
 
-// rdar://problem/19887250
+// Mutating vs non-mutating conflict with static stored property witness - rdar://problem/19887250
 protocol Proto {
   static var name: String {get set}
 }
@@ -238,13 +248,19 @@ struct ProtoAdopter : Proto {
   static var name: String = "name" // no error, even though static setters aren't mutating
 }
 
+// Make sure the logic remains correct if we synthesized accessors for our stored property
+protocol ProtosEvilTwin {
+  static var name: String {get set}
+}
+
+extension ProtoAdopter : ProtosEvilTwin {}
 
 // rdar://18990358
-public struct Foo {
-  public static let S { a // expected-error{{computed property must have an explicit type}}
+public struct Foo { // expected-note {{to match this opening '{'}}}
+  public static let S { a // expected-error{{computed property must have an explicit type}} {{22-22=: <# Type #>}}
     // expected-error@-1{{type annotation missing in pattern}}
-    // expected-error@-2{{'let' declarations cannot be computed properties}}
+    // expected-error@-2{{'let' declarations cannot be computed properties}} {{17-20=var}}
     // expected-error@-3{{use of unresolved identifier 'a'}}
 }
 
-// expected-error@+1 {{expected declaration}}
+// expected-error@+1 {{expected '}' in struct}}

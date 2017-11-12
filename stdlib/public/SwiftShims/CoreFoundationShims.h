@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,6 +20,11 @@
 #define SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H
 
 #include "SwiftStdint.h"
+#include "Visibility.h"
+
+#ifdef __cplusplus
+namespace swift { extern "C" {
+#endif
 
 #ifdef __OBJC2__
 #if __LLP64__
@@ -50,46 +55,62 @@ typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint16_t _swift_shims_UniChar;
 
 // Buffer is nullable in case the string is zero-length.
-void _swift_stdlib_CFStringGetCharacters(_swift_shims_CFStringRef __nonnull theString,
-                           _swift_shims_CFRange range,
-                           _swift_shims_UniChar *__nullable buffer);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_CFStringGetCharacters(
+    _swift_shims_CFStringRef _Nonnull theString, _swift_shims_CFRange range,
+    _swift_shims_UniChar *_Nullable buffer);
 
-const _swift_shims_UniChar *__nullable _swift_stdlib_CFStringGetCharactersPtr(
-    _swift_shims_CFStringRef __nonnull theString);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const _swift_shims_UniChar *_Nullable _swift_stdlib_CFStringGetCharactersPtr(
+    _swift_shims_CFStringRef _Nonnull theString);
 
-_swift_shims_CFIndex
-    _swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef __nonnull theString);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+_swift_shims_CFIndex _swift_stdlib_CFStringGetLength(
+    _swift_shims_CFStringRef _Nonnull theString);
 
-_swift_shims_CFStringRef __nonnull _swift_stdlib_CFStringCreateWithSubstring(
-    _swift_shims_CFAllocatorRef __nullable alloc,
-    _swift_shims_CFStringRef __nonnull str, _swift_shims_CFRange range);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__attribute__((ns_returns_retained))
+_swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithSubstring(
+    _swift_shims_CFAllocatorRef _Nullable alloc,
+    _swift_shims_CFStringRef _Nonnull str, _swift_shims_CFRange range);
 
-_swift_shims_UniChar
-_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef __nonnull theString,
-                            _swift_shims_CFIndex idx);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+_swift_shims_UniChar _swift_stdlib_CFStringGetCharacterAtIndex(
+    _swift_shims_CFStringRef _Nonnull theString, _swift_shims_CFIndex idx);
 
-_swift_shims_CFStringRef __nonnull _swift_stdlib_CFStringCreateCopy(
-    _swift_shims_CFAllocatorRef __nullable alloc,
-    _swift_shims_CFStringRef __nonnull theString);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__attribute__((ns_returns_retained))
+_swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateCopy(
+    _swift_shims_CFAllocatorRef _Nullable alloc,
+    _swift_shims_CFStringRef _Nonnull theString);
 
-const char *__nullable _swift_stdlib_CFStringGetCStringPtr(
-    _swift_shims_CFStringRef __nonnull theString,
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const char *_Nullable _swift_stdlib_CFStringGetCStringPtr(
+    _swift_shims_CFStringRef _Nonnull theString,
     _swift_shims_CFStringEncoding encoding);
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 _swift_shims_CFComparisonResult
-_swift_stdlib_CFStringCompare(_swift_shims_CFStringRef __nonnull theString1,
-                _swift_shims_CFStringRef __nonnull theString2,
-                _swift_shims_CFStringCompareFlags compareOptions);
+_swift_stdlib_CFStringCompare(_swift_shims_CFStringRef _Nonnull theString1,
+                              _swift_shims_CFStringRef _Nonnull theString2,
+                              _swift_shims_CFStringCompareFlags compareOptions);
 
-_swift_shims_Boolean
-_swift_stdlib_CFStringFindWithOptions(_swift_shims_CFStringRef __nonnull theString,
-                        _swift_shims_CFStringRef __nonnull stringToFind,
-                        _swift_shims_CFRange rangeToSearch,
-                        _swift_shims_CFStringCompareFlags searchOptions,
-                        _swift_shims_CFRange *__nullable result);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+_swift_shims_Boolean _swift_stdlib_CFStringFindWithOptions(
+    _swift_shims_CFStringRef _Nonnull theString,
+    _swift_shims_CFStringRef _Nonnull stringToFind,
+    _swift_shims_CFRange rangeToSearch,
+    _swift_shims_CFStringCompareFlags searchOptions,
+    _swift_shims_CFRange *_Nullable result);
 
-_swift_shims_CFStringRef __nonnull _swift_stdlib_objcDebugDescription(id __nonnull nsObject);
+SWIFT_RUNTIME_STDLIB_INTERFACE
+_swift_shims_CFStringRef _Nonnull _swift_stdlib_objcDebugDescription(
+    id _Nonnull nsObject);
 #endif // __OBJC2__
+
+#ifdef __cplusplus
+}} // extern "C", namespace swift
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_COREFOUNDATIONSHIMS_H
 

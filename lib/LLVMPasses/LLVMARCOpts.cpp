@@ -1,12 +1,12 @@
-//===--- Passes.cpp - LLVM Reference Counting Optimizations ---------------===//
+//===--- LLVMARCOpts.cpp - LLVM Reference Counting Optimizations ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,7 +21,6 @@
 #include "ARCEntryPointBuilder.h"
 #include "LLVMARCOpts.h"
 #include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
@@ -102,6 +101,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
       case RT_BridgeRelease:
       case RT_AllocObject:
       case RT_FixLifetime:
+      case RT_EndBorrow:
       case RT_NoMemoryAccessed:
       case RT_RetainUnowned:
       case RT_CheckUnowned:
@@ -120,7 +120,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         NativeRefs.insert(ArgVal);
         for (auto &X : UnknownRetains[ArgVal]) {
           B.setInsertPoint(X);
-          B.createRetain(ArgVal);
+          B.createRetain(ArgVal, cast<CallInst>(X));
           X->eraseFromParent();
           ++NumUnknownRetainReleaseSRed;
           Changed = true;
@@ -146,7 +146,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
            UnknownRetains[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);
-          B.createRetain(ArgVal);
+          B.createRetain(ArgVal, &CI);
           CI.eraseFromParent();
           ++NumUnknownRetainReleaseSRed;
           Changed = true;
@@ -167,7 +167,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         NativeRefs.insert(ArgVal);
         for (auto &X : UnknownReleases[ArgVal]) {
           B.setInsertPoint(X);
-          B.createRelease(ArgVal);
+          B.createRelease(ArgVal, cast<CallInst>(X));
           X->eraseFromParent();
           ++NumUnknownRetainReleaseSRed;
           Changed = true;
@@ -193,7 +193,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
           UnknownReleases[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);
-          B.createRelease(ArgVal);
+          B.createRelease(ArgVal, &CI);
           CI.eraseFromParent();
           ++NumUnknownRetainReleaseSRed;
           Changed = true;
@@ -368,6 +368,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
     }
 
     case RT_FixLifetime:
+    case RT_EndBorrow:
     case RT_RetainUnowned:
     case RT_CheckUnowned:
     case RT_Unknown:
@@ -441,6 +442,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
       break;
 
     case RT_FixLifetime: // This only stops release motion. Retains can move over it.
+    case RT_EndBorrow:
       break;
 
     case RT_Retain:
@@ -545,17 +547,21 @@ static DtorKind analyzeDestructor(Value *P) {
 
   // We have to have a known heap metadata value, reject dynamically computed
   // ones, or places
-  GlobalVariable *GV = dyn_cast<GlobalVariable>(P->stripPointerCasts());
-  if (GV == 0 || GV->mayBeOverridden()) return DtorKind::Unknown;
+  // Also, make sure we have a definitive initializer for the global.
+  auto *GV = dyn_cast<GlobalVariable>(P->stripPointerCasts());
+  if (GV == nullptr || !GV->hasDefinitiveInitializer())
+    return DtorKind::Unknown;
 
   ConstantStruct *CS = dyn_cast_or_null<ConstantStruct>(GV->getInitializer());
-  if (CS == 0 || CS->getNumOperands() == 0) return DtorKind::Unknown;
+  if (CS == nullptr || CS->getNumOperands() == 0)
+    return DtorKind::Unknown;
 
   // FIXME: Would like to abstract the dtor slot (#0) out from this to somewhere
   // unified.
-  enum { DTorSlotOfHeapMeatadata = 0 };
-  Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMeatadata));
-  if (DtorFn == 0 || DtorFn->mayBeOverridden() || DtorFn->hasExternalLinkage())
+  enum { DTorSlotOfHeapMetadata = 0 };
+  auto *DtorFn = dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMetadata));
+  if (DtorFn == nullptr || DtorFn->isInterposable() ||
+      DtorFn->hasExternalLinkage())
     return DtorKind::Unknown;
 
   // Okay, we have a body, and we can trust it.  If the function is marked
@@ -586,6 +592,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_NoMemoryAccessed:
       case RT_AllocObject:
       case RT_FixLifetime:
+      case RT_EndBorrow:
       case RT_CheckUnowned:
         // Skip over random instructions that don't touch memory in the caller.
         continue;
@@ -594,7 +601,7 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
       case RT_Retain: {      // swift_retain(obj)
 
-        // Ignore retains of the "self" object, no ressurection is possible.
+        // Ignore retains of the "self" object, no resurrection is possible.
         Value *ThisRetainedObject = cast<CallInst>(I).getArgOperand(0);
         if (ThisRetainedObject->stripPointerCasts() ==
             ThisObject->stripPointerCasts())
@@ -628,12 +635,12 @@ static DtorKind analyzeDestructor(Value *P) {
         if (!I.mayHaveSideEffects()) continue;
 
         // store, memcpy, memmove *to* the object can be dropped.
-        if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+        if (auto *SI = dyn_cast<StoreInst>(&I)) {
           if (SI->getPointerOperand()->stripInBoundsOffsets() == ThisObject)
             continue;
         }
 
-        if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I)) {
+        if (auto *MI = dyn_cast<MemIntrinsic>(&I)) {
           if (MI->getDest()->stripInBoundsOffsets() == ThisObject)
             continue;
         }
@@ -642,9 +649,12 @@ static DtorKind analyzeDestructor(Value *P) {
         break;
       }
 
-      // Okay, the function has some side effects, if it doesn't capture the
-      // object argument, at least that is something.
-      return DtorFn->doesNotCapture(0) ? DtorKind::NoEscape : DtorKind::Unknown;
+      // Okay, the function has some side effects.
+      //
+      // TODO: We could in the future return more accurate information by
+      // checking if the function is able to capture the deinit parameter. We do
+      // not do that today.
+      return DtorKind::Unknown;
     }
   }
 
@@ -715,6 +725,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_Release:
     case RT_Retain:
     case RT_FixLifetime:
+    case RT_EndBorrow:
     case RT_CheckUnowned:
       // It is perfectly fine to eliminate various retains and releases of this
       // object: we are zapping all accesses or none.
@@ -745,7 +756,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // object is being stored *to*, not itself being stored (which would be an
       // escape point).  Since stores themselves don't have any uses, we can
       // short-cut the classification scheme above.
-      if (StoreInst *SI = dyn_cast<StoreInst>(User)) {
+      if (auto *SI = dyn_cast<StoreInst>(User)) {
         // If this is a store *to* the object, we can zap it.
         if (UI.getUse().getOperandNo() == StoreInst::getPointerOperandIndex()) {
           InvolvedInstructions.insert(SI);
@@ -754,7 +765,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
         // Otherwise, using the object as a source (or size) is an escape.
         return false;
       }
-      if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(User)) {
+      if (auto *MI = dyn_cast<MemIntrinsic>(User)) {
         // If this is a memset/memcpy/memmove *to* the object, we can zap it.
         if (UI.getUse().getOperandNo() == 0) {
           InvolvedInstructions.insert(MI);
@@ -835,7 +846,7 @@ static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
       
       // Replace the trailing release with a check_unowned.
       B.setInsertPoint(ThisRelease);
-      B.createCheckUnowned(RetainedObject);
+      B.createCheckUnowned(RetainedObject, ThisRelease);
       Retain->eraseFromParent();
       ThisRelease->eraseFromParent();
       ++NumRetainReleasePairs;
@@ -856,7 +867,7 @@ static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
 }
 
 /// Removes redundant check_unowned calls if they check the same reference and
-/// there is no instruction inbetween which could decrement the reference count.
+/// there is no instruction in between which could decrement the reference count.
 static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
   DenseSet<Value *> checkedValues;
   for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {

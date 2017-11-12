@@ -1,0 +1,66 @@
+//===--- DropWhile.swift --------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, make changes to DropWhile.swift.gyb and run
+// scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+import TestsUtils
+
+let sequenceCount = 4096
+let dropCount = 1024
+let suffixCount = sequenceCount - dropCount
+let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
+%{
+# Name and Expression pairs for Sequences to test.
+
+Sequences = [
+  ('CountableRange', '0..<sequenceCount'),
+  ('Sequence',
+    'sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }'),
+  ('AnySequence',
+    'AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })'),
+  ('AnySeqCntRange', 'AnySequence(0..<sequenceCount)'),
+  ('AnySeqCRangeIter', 'AnySequence((0..<sequenceCount).makeIterator())'),
+  ('AnyCollection', 'AnyCollection(0..<sequenceCount)'),
+  ('Array', 'Array(0..<sequenceCount)'),
+]
+def lazy ((Name, Expr)) : return (Name + 'Lazy', '(' + Expr + ').lazy')
+
+Sequences = Sequences + map(lazy, Sequences)
+}%
+
+public let DropWhile = [
+% for (Name, Expr) in Sequences:
+  BenchmarkInfo(
+    name: "DropWhile${Name}",
+    runFunction: run_DropWhile${Name},
+    tags: [.validation, .api${', .Array' if Name == 'Array' else ''}]),
+% end
+]
+
+% for (Name, Expr) in Sequences:
+@inline(never)
+public func run_DropWhile${Name}(_ N: Int) {
+  let s = ${Expr}
+  for _ in 1...20*N {
+    var result = 0
+    for element in s.drop(while: {$0 < dropCount} ) {
+      result += element
+    }
+    CheckResults(result == sumCount)
+  }
+}
+% end

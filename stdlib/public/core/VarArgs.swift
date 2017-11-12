@@ -2,41 +2,42 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
-// Excluded due to use of dynamic casting and Builtin.autorelease, neither
-// of which correctly work without the ObjC Runtime right now.
-// See rdar://problem/18801510
-
-/// Instances of conforming types can be encoded, and appropriately
-/// passed, as elements of a C `va_list`.
+/// A type whose instances can be encoded, and appropriately passed, as
+/// elements of a C `va_list`.
 ///
-/// This protocol is useful in presenting C "varargs" APIs natively in
-/// Swift.  It only works for APIs that have a `va_list` variant, so
-/// for example, it isn't much use if all you have is:
+/// You use this protocol to present a native Swift interface to a C "varargs"
+/// API. For example, a program can import a C API like the one defined here:
 ///
-///     int f(int n, ...)
+/// ~~~c
+/// int c_api(int, va_list arguments)
+/// ~~~
 ///
-/// Given a version like this, though,
+/// To create a wrapper for the `c_api` function, write a function that takes
+/// `CVarArg` arguments, and then call the imported C function using the
+/// `withVaList(_:_:)` function:
 ///
-///     int f(int, va_list arguments)
-///
-/// you can write:
-///
-///     func swiftF(x: Int, arguments: CVarArgType...) -> Int {
-///       return withVaList(arguments) { f(x, $0) }
+///     func swiftAPI(_ x: Int, arguments: CVarArg...) -> Int {
+///         return withVaList(arguments) { c_api(x, $0) }
 ///     }
-public protocol CVarArgType {
+///
+/// Swift only imports C variadic functions that use a `va_list` for their
+/// arguments. C functions that use the `...` syntax for variadic arguments
+/// are not imported, and therefore can't be called using `CVarArg` arguments.
+///
+/// - Note: Declaring conformance to the `CVarArg` protocol for types defined
+///   outside the standard library is not supported.
+public protocol CVarArg {
   // Note: the protocol is public, but its requirement is stdlib-private.
-  // That's because there are APIs operating on CVarArgType instances, but
-  // defining conformances to CVarArgType outside of the standard library is
+  // That's because there are APIs operating on CVarArg instances, but
+  // defining conformances to CVarArg outside of the standard library is
   // not supported.
 
   /// Transform `self` into a series of machine words that can be
@@ -47,51 +48,96 @@ public protocol CVarArgType {
 /// Floating point types need to be passed differently on x86_64
 /// systems.  CoreGraphics uses this to make CGFloat work properly.
 public // SPI(CoreGraphics)
-protocol _CVarArgPassedAsDouble : CVarArgType {}
+protocol _CVarArgPassedAsDouble : CVarArg {}
 
 /// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
-protocol _CVarArgAlignedType : CVarArgType {
-  /// Return the required alignment in bytes of 
+protocol _CVarArgAligned : CVarArg {
+  /// Returns the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   var _cVarArgAlignment: Int { get }
 }
 
 #if arch(x86_64)
-let _x86_64CountGPRegisters = 6
-let _x86_64CountSSERegisters = 8
-let _x86_64SSERegisterWords = 2
-let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
+@_versioned
+internal let _x86_64CountGPRegisters = 6
+// Note to future visitors concerning the following SSE register count.
+//
+// AMD64-ABI section 3.5.7 says -- as recently as v0.99.7, Nov 2014 -- to make
+// room in the va_list register-save area for 16 SSE registers (XMM0..15). This
+// may seem surprising, because the calling convention of that ABI only uses the
+// first 8 SSE registers for argument-passing; why save the other 8?
+//
+// According to a comment in X86_64ABIInfo::EmitVAArg, in clang's TargetInfo,
+// the AMD64-ABI spec is itself in error on this point ("NOTE: 304 is a typo").
+// This comment (and calculation) in clang has been there since varargs support
+// was added in 2009, in rev be9eb093; so if you're about to change this value
+// from 8 to 16 based on reading the spec, probably the bug you're looking for
+// is elsewhere.
+@_versioned
+internal let _x86_64CountSSERegisters = 8
+@_versioned
+internal let _x86_64SSERegisterWords = 2
+@_versioned
+internal let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
 #endif
 
-/// Invoke `f` with a C `va_list` argument derived from `args`.
-public func withVaList<R>(args: [CVarArgType],
-  @noescape _ f: CVaListPointer -> R) -> R {
-  let builder = VaListBuilder()
+/// Invokes the given closure with a C `va_list` argument derived from the
+/// given array of arguments.
+///
+/// The pointer passed as an argument to `body` is valid only during the
+/// execution of `withVaList(_:_:)`. Do not store or return the pointer for
+/// later use.
+///
+/// - Parameters:
+///   - args: An array of arguments to convert to a C `va_list` pointer.
+///   - body: A closure with a `CVaListPointer` parameter that references the
+///     arguments passed as `args`. If `body` has a return value, that value
+///     is also used as the return value for the `withVaList(_:)` function.
+///     The pointer argument is valid only for the duration of the function's
+///     execution.
+/// - Returns: The return value, if any, of the `body` closure parameter.
+@_inlineable // FIXME(sil-serialize-all)
+public func withVaList<R>(_ args: [CVarArg],
+  _ body: (CVaListPointer) -> R) -> R {
+  let builder = _VaListBuilder()
   for a in args {
     builder.append(a)
   }
-  return withVaList(builder, f)
+  return _withVaList(builder, body)
 }
 
-/// Invoke `f` with a C `va_list` argument derived from `builder`.
-public func withVaList<R>(builder: VaListBuilder,
-  @noescape _ f: CVaListPointer -> R) -> R {
-  let result = f(builder.va_list())
+/// Invoke `body` with a C `va_list` argument derived from `builder`.
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _withVaList<R>(
+  _ builder: _VaListBuilder,
+  _ body: (CVaListPointer) -> R
+) -> R {
+  let result = body(builder.va_list())
   _fixLifetime(builder)
   return result
 }
 
-/// Returns a `CVaListPointer` built from `args` that's backed by
-/// autoreleased storage.
+#if _runtime(_ObjC)
+// Excluded due to use of dynamic casting and Builtin.autorelease, neither
+// of which correctly work without the ObjC Runtime right now.
+// See rdar://problem/18801510
+
+/// Returns a `CVaListPointer` that is backed by autoreleased storage, built
+/// from the given array of arguments.
 ///
-/// - Warning: This function is best avoided in favor of
-///   `withVaList`, but occasionally (i.e. in a `class` initializer) you
-///   may find that the language rules don't allow you to use
-/// `withVaList` as intended.
-@warn_unused_result
-public func getVaList(args: [CVarArgType]) -> CVaListPointer {
-  let builder = VaListBuilder()
+/// You should prefer `withVaList(_:_:)` instead of this function. In some
+/// uses, such as in a `class` initializer, you may find that the language
+/// rules do not allow you to use `withVaList(_:_:)` as intended.
+///
+/// - Parameter args: An array of arguments to convert to a C `va_list`
+///   pointer.
+/// - Returns: A pointer that can be used with C functions that take a
+///   `va_list` argument.
+@_inlineable // FIXME(sil-serialize-all)
+public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
+  let builder = _VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -100,293 +146,252 @@ public func getVaList(args: [CVarArgType]) -> CVaListPointer {
   Builtin.autorelease(builder)
   return builder.va_list()
 }
+#endif
 
-@warn_unused_result
-public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Int] {
+@_inlineable // FIXME(sil-serialize-all)
+public func _encodeBitsAsWords<T>(_ x: T) -> [Int] {
   let result = [Int](
-    count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self),
-    repeatedValue: 0)
+    repeating: 0,
+    count: (MemoryLayout<T>.size + MemoryLayout<Int>.size - 1) / MemoryLayout<Int>.size)
+  _sanityCheck(result.count > 0)
   var tmp = x
-  _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous),
+  // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
+  _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
-          size: UInt(sizeof(T.self)))
+          size: UInt(MemoryLayout<T>.size))
   return result
 }
 
-// CVarArgType conformances for the integer types.  Everything smaller
-// than a CInt must be promoted to CInt or CUnsignedInt before
+// CVarArg conformances for the integer types.  Everything smaller
+// than an Int32 must be promoted to Int32 or CUnsignedInt before
 // encoding.
 
 // Signed types
-extension Int : CVarArgType {
+extension Int : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension Int64 : CVarArgType, _CVarArgAlignedType {
+extension Bool : CVarArg {
+  public var _cVarArgEncoding: [Int] {
+    return _encodeBitsAsWords(Int32(self ? 1:0))
+  }
+}
+
+extension Int64 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 
-  /// Return the required alignment in bytes of 
+  /// Returns the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(self)
+    return MemoryLayout.alignment(ofValue: self)
   }
 }
 
-extension Int32 : CVarArgType {
+extension Int32 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension Int16 : CVarArgType {
+extension Int16 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(Int32(self))
   }
 }
 
-extension Int8 : CVarArgType {
+extension Int8 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CInt(self))
+    return _encodeBitsAsWords(Int32(self))
   }
 }
 
 // Unsigned types
-extension UInt : CVarArgType {
+extension UInt : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension UInt64 : CVarArgType, _CVarArgAlignedType {
+extension UInt64 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 
-  /// Return the required alignment in bytes of 
+  /// Returns the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(self)
+    return MemoryLayout.alignment(ofValue: self)
   }
 }
 
-extension UInt32 : CVarArgType {
+extension UInt32 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension UInt16 : CVarArgType {
+extension UInt16 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
-extension UInt8 : CVarArgType {
+extension UInt8 : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
 
-extension COpaquePointer : CVarArgType {
+extension OpaquePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension UnsafePointer : CVarArgType {
+extension UnsafePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension UnsafeMutablePointer : CVarArgType {
+extension UnsafeMutablePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer : CVarArgType {
+#if _runtime(_ObjC)
+extension AutoreleasingUnsafeMutablePointer : CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
+#endif
 
-extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension Float : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(Double(self))
   }
 
-  /// Return the required alignment in bytes of 
+  /// Returns the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(Double(self))
+    return MemoryLayout.alignment(ofValue: Double(self))
   }
 }
 
-extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
+extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 
-  /// Return the required alignment in bytes of 
+  /// Returns the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(self)
+    return MemoryLayout.alignment(ofValue: self)
   }
 }
 
-#if !arch(x86_64)
+#if arch(x86_64)
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
-final public class VaListBuilder {
+@_fixed_layout // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+final internal class _VaListBuilder {
 
-  func append(arg: CVarArgType) {
-    // Write alignment padding if necessary.
-    // This is needed on architectures where the ABI alignment of some 
-    // supported vararg type is greater than the alignment of Int.
-    // FIXME: this implementation is not portable because
-    // alignof differs from the ABI alignment on some architectures
-#if os(watchOS) && arch(arm)   // FIXME: rdar://21203036 should be arch(armv7k)
-    if let arg = arg as? _CVarArgAlignedType {
-      let alignmentInWords = arg._cVarArgAlignment / sizeof(Int)
-      let misalignmentInWords = count % alignmentInWords
-      if misalignmentInWords != 0 {
-        let paddingInWords = alignmentInWords - misalignmentInWords
-        appendWords([Int](count: paddingInWords, repeatedValue: -1))
-      }
-    }
-#endif
+  @_fixed_layout // FIXME(sil-serialize-all)
+  @_versioned
+  internal struct Header {
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    internal init() {}
 
-    // Write the argument's value itself.
-    appendWords(arg._cVarArgEncoding)
+    @_versioned // FIXME(sil-serialize-all)
+    internal var gp_offset = CUnsignedInt(0)
+    @_versioned // FIXME(sil-serialize-all)
+    internal var fp_offset =
+      CUnsignedInt(_x86_64CountGPRegisters * MemoryLayout<Int>.stride)
+    @_versioned // FIXME(sil-serialize-all)
+    internal var overflow_arg_area: UnsafeMutablePointer<Int>?
+    @_versioned // FIXME(sil-serialize-all)
+    internal var reg_save_area: UnsafeMutablePointer<Int>?
   }
 
-  @warn_unused_result
-  func va_list() -> CVaListPointer {
-    return CVaListPointer(_fromUnsafeMutablePointer: storage)
-  }
-
-  // Manage storage that is accessed as Words 
-  // but possibly more aligned than that.
-  // FIXME: this should be packaged into a better storage type
-
-  func appendWords(words: [Int]) {
-    let newCount = count + words.count
-    if newCount > allocated {
-      let oldAllocated = allocated
-      let oldStorage = storage
-      let oldCount = count
-
-      allocated = max(newCount, allocated * 2)
-      storage = allocStorage(wordCount: allocated)
-      // count is updated below
-
-      if oldStorage != nil {
-        storage.moveInitializeFrom(oldStorage, count:oldCount)
-        deallocStorage(wordCount: oldAllocated, 
-          storage: oldStorage)
-      }
-    }
-
-    for word in words {
-      storage[count++] = word
-    }
-  }
-
-  @warn_unused_result
-  func rawSizeAndAlignment(wordCount: Int) -> (Builtin.Word, Builtin.Word) {
-    return ((wordCount * strideof(Int.self))._builtinWordValue, 
-      requiredAlignmentInBytes._builtinWordValue)
-  }
-
-  @warn_unused_result
-  func allocStorage(wordCount wordCount: Int) -> UnsafeMutablePointer<Int> {
-    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
-    let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
-    return UnsafeMutablePointer<Int>(rawStorage)
-  }
-
-  func deallocStorage(
-    wordCount wordCount: Int,
-    storage: UnsafeMutablePointer<Int>
-  ) {
-    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
-    Builtin.deallocRaw(storage._rawValue, rawSize, rawAlignment)
-  }
-
-  deinit {
-    if storage != nil {
-      deallocStorage(wordCount: allocated, storage: storage)
-    }
-  }
-
-  // FIXME: alignof differs from the ABI alignment on some architectures
-  let requiredAlignmentInBytes = alignof(Double.self)
-  var count = 0
-  var allocated = 0
-  var storage: UnsafeMutablePointer<Int> = nil
-}
-
-#else
-
-/// An object that can manage the lifetime of storage backing a
-/// `CVaListPointer`.
-final public class VaListBuilder {
-
-  struct Header {
-    var gp_offset = CUnsignedInt(0)
-    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * strideof(Int.self))
-    var overflow_arg_area: UnsafeMutablePointer<Int> = nil
-    var reg_save_area: UnsafeMutablePointer<Int> = nil
-  }
-
-  init() {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {
     // prepare the register save area
-    storage = Array(count: _x86_64RegisterSaveWords, repeatedValue: 0)
+    storage = ContiguousArray(repeating: 0, count: _x86_64RegisterSaveWords)
   }
 
-  func append(arg: CVarArgType) {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {}
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func append(_ arg: CVarArg) {
     var encoded = arg._cVarArgEncoding
 
     if arg is _CVarArgPassedAsDouble
@@ -395,12 +400,15 @@ final public class VaListBuilder {
            + (sseRegistersUsed * _x86_64SSERegisterWords)
       for w in encoded {
         storage[startIndex] = w
-        ++startIndex
+        startIndex += 1
       }
-      ++sseRegistersUsed
+      sseRegistersUsed += 1
     }
-    else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
-      storage[gpRegistersUsed++] = encoded[0]
+    else if encoded.count == 1
+      && !(arg is _CVarArgPassedAsDouble)
+      && gpRegistersUsed < _x86_64CountGPRegisters {
+      storage[gpRegistersUsed] = encoded[0]
+      gpRegistersUsed += 1
     }
     else {
       for w in encoded {
@@ -409,24 +417,151 @@ final public class VaListBuilder {
     }
   }
 
-  @warn_unused_result
-  func va_list() -> CVaListPointer {
-    header.reg_save_area = storage._baseAddressIfContiguous
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func va_list() -> CVaListPointer {
+    header.reg_save_area = storage._baseAddress
     header.overflow_arg_area
-      = storage._baseAddressIfContiguous + _x86_64RegisterSaveWords
+      = storage._baseAddress + _x86_64RegisterSaveWords
     return CVaListPointer(
-             _fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
+             _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
                Builtin.addressof(&self.header)))
   }
 
-  var gpRegistersUsed = 0
-  var sseRegistersUsed = 0
+  @_versioned // FIXME(sil-serialize-all)
+  internal var gpRegistersUsed = 0
+  @_versioned // FIXME(sil-serialize-all)
+  internal var sseRegistersUsed = 0
 
+  @_versioned // FIXME(sil-serialize-all)
   final  // Property must be final since it is used by Builtin.addressof.
-  var header = Header()
-  var storage: [Int]
+  internal var header = Header()
+  @_versioned // FIXME(sil-serialize-all)
+  internal var storage: ContiguousArray<Int>
+}
+
+#else
+
+/// An object that can manage the lifetime of storage backing a
+/// `CVaListPointer`.
+@_fixed_layout // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+final internal class _VaListBuilder {
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init() {}
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func append(_ arg: CVarArg) {
+    // Write alignment padding if necessary.
+    // This is needed on architectures where the ABI alignment of some
+    // supported vararg type is greater than the alignment of Int, such
+    // as non-iOS ARM. Note that we can't use alignof because it
+    // differs from ABI alignment on some architectures.
+#if arch(arm) && !os(iOS)
+    if let arg = arg as? _CVarArgAligned {
+      let alignmentInWords = arg._cVarArgAlignment / MemoryLayout<Int>.size
+      let misalignmentInWords = count % alignmentInWords
+      if misalignmentInWords != 0 {
+        let paddingInWords = alignmentInWords - misalignmentInWords
+        appendWords([Int](repeating: -1, count: paddingInWords))
+      }
+    }
+#endif
+
+    // Write the argument's value itself.
+    appendWords(arg._cVarArgEncoding)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func va_list() -> CVaListPointer {
+    // Use Builtin.addressof to emphasize that we are deliberately escaping this
+    // pointer and assuming it is safe to do so.
+    let emptyAddr = UnsafeMutablePointer<Int>(
+      Builtin.addressof(&_VaListBuilder.alignedStorageForEmptyVaLists))
+    return CVaListPointer(_fromUnsafeMutablePointer: storage ?? emptyAddr)
+  }
+
+  // Manage storage that is accessed as Words
+  // but possibly more aligned than that.
+  // FIXME: this should be packaged into a better storage type
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func appendWords(_ words: [Int]) {
+    let newCount = count + words.count
+    if newCount > allocated {
+      let oldAllocated = allocated
+      let oldStorage = storage
+      let oldCount = count
+
+      allocated = max(newCount, allocated * 2)
+      let newStorage = allocStorage(wordCount: allocated)
+      storage = newStorage
+      // count is updated below
+
+      if let allocatedOldStorage = oldStorage {
+        newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)
+        deallocStorage(wordCount: oldAllocated, storage: allocatedOldStorage)
+      }
+    }
+
+    let allocatedStorage = storage!
+    for word in words {
+      allocatedStorage[count] = word
+      count += 1
+    }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func rawSizeAndAlignment(
+    _ wordCount: Int
+  ) -> (Builtin.Word, Builtin.Word) {
+    return ((wordCount * MemoryLayout<Int>.stride)._builtinWordValue,
+      requiredAlignmentInBytes._builtinWordValue)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func allocStorage(wordCount: Int) -> UnsafeMutablePointer<Int> {
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
+    let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
+    return UnsafeMutablePointer<Int>(rawStorage)
+  }
+
+  @_versioned // FIXME(sil-serialize-all)
+  internal func deallocStorage(
+    wordCount: Int,
+    storage: UnsafeMutablePointer<Int>
+  ) {
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
+    Builtin.deallocRaw(storage._rawValue, rawSize, rawAlignment)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  deinit {
+    if let allocatedStorage = storage {
+      deallocStorage(wordCount: allocated, storage: allocatedStorage)
+    }
+  }
+
+  // FIXME: alignof differs from the ABI alignment on some architectures
+  @_versioned // FIXME(sil-serialize-all)
+  internal let requiredAlignmentInBytes = MemoryLayout<Double>.alignment
+  @_versioned // FIXME(sil-serialize-all)
+  internal var count = 0
+  @_versioned // FIXME(sil-serialize-all)
+  internal var allocated = 0
+  @_versioned // FIXME(sil-serialize-all)
+  internal var storage: UnsafeMutablePointer<Int>?
+
+  @_versioned // FIXME(sil-serialize-all)
+  internal static var alignedStorageForEmptyVaLists: Double = 0
 }
 
 #endif
-
-#endif // _runtime(_ObjC)

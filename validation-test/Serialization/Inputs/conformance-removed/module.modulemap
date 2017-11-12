@@ -1,0 +1,3 @@
+module ObjCLib {
+  header "ObjCLib.h"
+}

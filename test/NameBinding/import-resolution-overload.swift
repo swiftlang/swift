@@ -1,12 +1,11 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_intFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_boolFunctions.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift
-// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify
 
 // RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump 2>&1
-// RUN: FileCheck %s < %t.astdump
+// RUN: %FileCheck %s < %t.astdump
 
 import overload_intFunctions
 import overload_boolFunctions
@@ -15,8 +14,8 @@ import var overload_vars.scopedVar
 import func overload_boolFunctions.scopedFunction
 
 struct LocalType {}
-func something(obj: LocalType) -> LocalType { return obj } // expected-note {{found this candidate}}
-func something(a: Int, _ b: Int, _ c: Int) -> () {} // expected-note {{found this candidate}}
+func something(_ obj: LocalType) -> LocalType { return obj } // expected-note {{found this candidate}}
+func something(_ a: Int, _ b: Int, _ c: Int) -> () {} // expected-note {{found this candidate}}
 
 var _ : Bool = something(true)
 var _ : Int = something(1)
@@ -57,7 +56,7 @@ extension HasFooSub {
 }
 
 // CHECK-LABEL: func_decl "testHasFooSub(_:)"
-func testHasFooSub(hfs: HasFooSub) -> Int {
+func testHasFooSub(_ hfs: HasFooSub) -> Int {
   // CHECK: return_stmt
   // CHECK-NOT: func_decl
   // CHECK: member_ref_expr{{.*}}decl=overload_vars.(file).HasFoo.foo
@@ -69,7 +68,7 @@ extension HasBar {
 }
 
 // CHECK-LABEL: func_decl "testHasBar(_:)"
-func testHasBar(hb: HasBar) -> Int {
+func testHasBar(_ hb: HasBar) -> Int {
   // CHECK: return_stmt
   // CHECK-NOT: func_decl
   // CHECK: member_ref_expr{{.*}}decl=overload_vars.(file).HasBar.bar

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,7 +15,7 @@
 //  statically.
 //
 //  These classes are useful only for creating TypeInfo
-//  implementations; unlike the similiarly-named FixedTypeInfo, they
+//  implementations; unlike the similarly-named FixedTypeInfo, they
 //  do not provide a supplemental API.
 //
 //===----------------------------------------------------------------------===//
@@ -23,11 +23,22 @@
 #ifndef SWIFT_IRGEN_NONFIXEDTYPEINFO_H
 #define SWIFT_IRGEN_NONFIXEDTYPEINFO_H
 
+#include "Address.h"
 #include "GenOpaque.h"
 #include "IndirectTypeInfo.h"
 
 namespace swift {
 namespace irgen {
+
+/// Emits the generic implementation for getEnumTagSinglePayload.
+llvm::Value *emitGetEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address enumAddr, SILType T);
+
+/// Emits the generic implementation for storeEnumTagSinglePayload.
+void emitStoreEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases, Address enumAddr,
+                                   SILType T);
 
 /// An abstract CRTP class designed for types whose storage size,
 /// alignment, and stride need to be fetched from the value witness
@@ -57,39 +68,34 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return false; }
 
-  ContainedAddress allocateStack(IRGenFunction &IGF,
+  StackAddress allocateStack(IRGenFunction &IGF,
                                  SILType T,
+                                 bool isInEntryBlock,
                                  const llvm::Twine &name) const override {
-    // Make a fixed-size buffer.
-    Address buffer = IGF.createFixedSizeBufferAlloca(name);
-
-    // Allocate an object of the appropriate type within it.
-    llvm::Value *address = emitAllocateBufferCall(IGF, T, buffer);
-    return { buffer, getAsBitCastAddress(IGF, address) };
+    // Allocate memory on the stack.
+    auto alloca = emitDynamicAlloca(IGF, T, isInEntryBlock);
+    assert((isInEntryBlock && alloca.SavedSP == nullptr) ||
+           (!isInEntryBlock && alloca.SavedSP != nullptr) &&
+               "stacksave/restore operations can only be skipped in the entry "
+               "block");
+    IGF.Builder.CreateLifetimeStart(alloca.Alloca);
+    return { getAsBitCastAddress(IGF, alloca.Alloca), alloca.SavedSP };
   }
 
-  void deallocateStack(IRGenFunction &IGF, Address buffer,
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
-    emitDeallocateBufferCall(IGF, T, buffer);
+    IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
+    emitDeallocateDynamicAlloca(IGF, stackAddress);
+  }
+
+  void destroyStack(IRGenFunction &IGF, StackAddress stackAddress,
+                    SILType T) const override {
+    emitDestroyCall(IGF, T, stackAddress.getAddress());
+    deallocateStack(IGF, stackAddress, T);
   }
 
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, SILType T) const {
-    return IGF.emitValueWitnessTableRefForLayout(T);
-  }
-
-  std::pair<llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMask(IRGenFunction &IGF, SILType T) const override {
-    auto size = emitLoadOfSize(IGF, T);
-    auto align = emitLoadOfAlignmentMask(IGF, T);
-    return { size, align };
-  }
-
-  std::tuple<llvm::Value*,llvm::Value*,llvm::Value*>
-  getSizeAndAlignmentMaskAndStride(IRGenFunction &IGF, SILType T) const override {
-    auto size = emitLoadOfSize(IGF, T);
-    auto align = emitLoadOfAlignmentMask(IGF, T);
-    auto stride = emitLoadOfStride(IGF, T);
-    return std::make_tuple(size, align, stride);
+    return IGF.emitValueWitnessTableRef(T);
   }
 
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override {
@@ -134,8 +140,20 @@ public:
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
     return nullptr;
   }
-};
 
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr,
+                                       SILType T) const override {
+    return emitGetEnumTagSinglePayload(IGF, numEmptyCases, enumAddr, T);
+  }
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T) const override {
+    emitStoreEnumTagSinglePayload(IGF, whichCase, numEmptyCases, enumAddr, T);
+  }
+};
 }
 }
 

@@ -5,18 +5,18 @@
 import Foundation
 import StdlibUnittest
 
-var NSURLSessionConfigurationUsage = TestSuite("NSURLSessionConfigurationUsage")
+var URLSessionConfigurationUsage = TestSuite("URLSessionConfigurationUsage")
 
-// NSURLSessionConfiguration.protocolClasses is a prominent example of an
+// URLSessionConfiguration.protocolClasses is a prominent example of an
 // NSArray<Class> * in Foundation. Make sure it works.
-NSURLSessionConfigurationUsage.test("protocolClasses") {
-  if let protocols = NSURLSessionConfiguration
-    .defaultSessionConfiguration()
+URLSessionConfigurationUsage.test("protocolClasses") {
+  if let protocols = URLSessionConfiguration
+    .default
     .protocolClasses {
 
     for proto in protocols {
-      // The protocol classes should all be subclasses of NSURLProtocol.
-      _ = proto as! NSURLProtocol.Type
+      // The protocol classes should all be subclasses of URLProtocol.
+      _ = proto as! URLProtocol.Type
     }
   }
 }
@@ -29,17 +29,17 @@ var ArrayOfClassObjectBridging = TestSuite("ArrayOfClassObjectBridging")
 ArrayOfClassObjectBridging.test("bridging class object array to NSArray") {
   let classes: [NSObject.Type] = [NSObject.self, NSString.self, NSArray.self]
 
-  let classesBridged: NSArray = classes
+  let classesBridged: NSArray = classes as NSArray
 
   expectTrue(classesBridged.count == 3)
-  expectTrue(classesBridged[0] === NSObject.self)
-  expectTrue(classesBridged[1] === NSString.self)
-  expectTrue(classesBridged[2] === NSArray.self)
+  expectTrue(classesBridged[0] as AnyObject === NSObject.self)
+  expectTrue(classesBridged[1] as AnyObject === NSString.self)
+  expectTrue(classesBridged[2] as AnyObject === NSArray.self)
 }
 
 ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [AnyObject]") {
   let classes: [NSObject.Type] = [NSObject.self, NSString.self, NSArray.self]
-  let classesBridged: NSArray = classes
+  let classesBridged: NSArray = classes as NSArray
   let classesUnbridgedAsAnyObject = classesBridged as [AnyObject]
 
   expectTrue(classesUnbridgedAsAnyObject.count == 3)
@@ -50,7 +50,7 @@ ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [AnyObject
 
 ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [AnyClass]") {
   let classes: [NSObject.Type] = [NSObject.self, NSString.self, NSArray.self]
-  let classesBridged: NSArray = classes
+  let classesBridged: NSArray = classes as NSArray
 
   if let classesUnbridgedAsAnyClass = classesBridged as? [AnyClass] {
     expectTrue(classesUnbridgedAsAnyClass.count == 3)
@@ -64,7 +64,7 @@ ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [AnyClass]
 
 ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [NSObject.Type]") {
   let classes: [NSObject.Type] = [NSObject.self, NSString.self, NSArray.self]
-  let classesBridged: NSArray = classes
+  let classesBridged: NSArray = classes as NSArray
 
   if let classesUnbridgedAsNSObjectType = classesBridged as? [NSObject.Type] {
     expectTrue(classesUnbridgedAsNSObjectType.count == 3)

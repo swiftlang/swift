@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,10 +18,12 @@
 #define SWIFT_AST_CONCRETEDECLREF_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/TrailingObjects.h"
 #include <cstring>
 
 namespace swift {
@@ -36,19 +38,21 @@ class ValueDecl;
 class ConcreteDeclRef {
   /// A specialized declaration reference, which provides substitutions
   /// that fully specialize a generic declaration.
-  class SpecializedDeclRef {
+  class SpecializedDeclRef final :
+      private llvm::TrailingObjects<SpecializedDeclRef, Substitution> {
+    friend TrailingObjects;
+
     /// The declaration.
     ValueDecl *TheDecl;
 
     /// The number of substitutions, which are tail allocated.
     unsigned NumSubstitutions;
 
-    SpecializedDeclRef(ValueDecl *decl, ArrayRef<Substitution> substitutions)
+    SpecializedDeclRef(ValueDecl *decl, SubstitutionList substitutions)
       : TheDecl(decl), NumSubstitutions(substitutions.size())
     {
-      std::memcpy(reinterpret_cast<Substitution *>(this + 1),
-                  substitutions.data(),
-                  sizeof(Substitution) * substitutions.size());
+      std::uninitialized_copy(substitutions.begin(), substitutions.end(),
+                              getTrailingObjects<Substitution>());
     }
 
   public:
@@ -56,14 +60,13 @@ class ConcreteDeclRef {
     ValueDecl *getDecl() const { return TheDecl; }
 
     /// Retrieve the substitutions.
-    ArrayRef<Substitution> getSubstitutions() const {
-      return llvm::makeArrayRef(reinterpret_cast<const Substitution *>(this+1),
-                                NumSubstitutions);
+    SubstitutionList getSubstitutions() const {
+      return {getTrailingObjects<Substitution>(), NumSubstitutions};
     }
     
     /// Allocate a new specialized declaration reference.
     static SpecializedDeclRef *create(ASTContext &ctx, ValueDecl *decl,
-                                      ArrayRef<Substitution> substitutions);
+                                      SubstitutionList substitutions);
   };
 
   llvm::PointerUnion<ValueDecl *, SpecializedDeclRef *> Data;
@@ -90,8 +93,12 @@ public:
   /// given declaration. This array will be copied into the ASTContext by the
   /// constructor.
   ConcreteDeclRef(ASTContext &ctx, ValueDecl *decl,
-                  ArrayRef<Substitution> substitutions)
-    : Data(SpecializedDeclRef::create(ctx, decl, substitutions)) { }
+                  SubstitutionList substitutions) {
+    if (substitutions.empty())
+      Data = decl;
+    else
+      Data = SpecializedDeclRef::create(ctx, decl, substitutions);
+  }
 
   /// Determine whether this declaration reference refers to anything.
   explicit operator bool() const { return !Data.isNull(); }
@@ -104,13 +111,17 @@ public:
     return Data.get<SpecializedDeclRef *>()->getDecl();
   }
 
+  /// Retrieve a reference to the declaration this one overrides.
+  ConcreteDeclRef
+  getOverriddenDecl(ASTContext &ctx) const;
+
   /// Determine whether this reference specializes the declaration to which
   /// it refers.
   bool isSpecialized() const { return Data.is<SpecializedDeclRef *>(); }
 
   /// For a specialized reference, return the set of substitutions applied to
   /// the declaration reference.
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     if (!isSpecialized())
       return { };
     

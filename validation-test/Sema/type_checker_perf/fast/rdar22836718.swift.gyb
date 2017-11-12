@@ -1,0 +1,9 @@
+// RUN: %scale-test --begin 5 --end 10 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+let _ = [
+%for i in range(0, N):
+  Float(${i})/Float(${i}/${i+1}),
+%end
+]

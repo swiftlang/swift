@@ -1,0 +1,62 @@
+module SwiftShims {
+  header "AssertionReporting.h"
+  header "CoreFoundationShims.h"
+  header "FoundationShims.h"
+  header "GlobalObjects.h"
+  header "HeapObject.h"
+  header "KeyPath.h"
+  header "LibcShims.h"
+  header "RefCount.h"
+  header "RuntimeShims.h"
+  header "RuntimeStubs.h"
+  header "SwiftStdbool.h"
+  header "SwiftStddef.h"
+  header "SwiftStdint.h"
+  header "System.h"
+  header "UnicodeShims.h"
+  header "Visibility.h"
+  export *
+}
+
+// Various headers used to build overlays on Apple platforms.
+// Note: These deliberately do not use "export *" to avoid circularity issues
+// (overlay -> shims -> framework -> overlay)
+// FIXME: These are only needed when building each overlay; they declare no
+// types and therefore would not strictly need to be present in an installed
+// Swift.
+// FIXME: These are not used at all on non-Apple platforms.
+module _SwiftDispatchOverlayShims {
+  header "DispatchOverlayShims.h"
+}
+
+module _SwiftObjectiveCOverlayShims {
+  header "ObjectiveCOverlayShims.h"
+}
+
+module _SwiftOSOverlayShims {
+  header "OSOverlayShims.h"
+}
+
+module _SwiftSafariServicesOverlayShims {
+  header "SafariServicesOverlayShims.h"
+}
+
+module _SwiftUIKitOverlayShims {
+  header "UIKitOverlayShims.h"
+}
+
+module _SwiftXCTestOverlayShims {
+  header "XCTestOverlayShims.h"
+}
+
+module _SwiftXPCOverlayShims {
+  header "XPCOverlayShims.h"
+}
+
+module _SwiftCoreFoundationOverlayShims {
+  header "CoreFoundationOverlayShims.h"
+}
+
+module _SwiftFoundationOverlayShims {
+  header "FoundationOverlayShims.h"
+}

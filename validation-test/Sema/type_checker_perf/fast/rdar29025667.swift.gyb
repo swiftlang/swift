@@ -1,0 +1,11 @@
+// RUN: %scale-test --begin 2 --end 7 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+let s: String? = nil
+
+let _:[String: Any] = [
+%for i in range(0, N):
+  "${i}":  s ?? "",
+%end
+]

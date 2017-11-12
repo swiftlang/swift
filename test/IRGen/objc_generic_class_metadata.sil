@@ -1,0 +1,89 @@
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import Foundation
+import objc_generics
+
+// CHECK-LABEL: @"OBJC_METACLASS_$__TtC27objc_generic_class_metadata8Subclass" = hidden global %objc_class
+// CHECK:         %objc_class* @"OBJC_METACLASS_$_NSObject"
+// CHECK:         %objc_class* @"OBJC_METACLASS_$_GenericClass"
+// CHECK-LABEL: @_T027objc_generic_class_metadata8SubclassCMf = internal global
+// CHECK:         %objc_class* @"OBJC_METACLASS_$__TtC27objc_generic_class_metadata8Subclass"
+// CHECK:         %objc_class* @"OBJC_CLASS_$_GenericClass"
+class Subclass: GenericClass<NSString> {}
+
+sil_vtable Subclass {}
+
+sil @metatype_sink : $@convention(thin) <T> (@thick T.Type) -> ()
+sil @objc_class_sink : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
+
+// CHECK-LABEL: define swiftcc void @objc_generic_class_metatypes()
+sil @objc_generic_class_metatypes : $@convention(thin) () -> () {
+entry:
+  %z = function_ref @metatype_sink : $@convention(thin) <T> (@thick T.Type) -> ()
+  %y = function_ref @objc_class_sink : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
+
+  // All instances of the generic ObjC class are erased to the same metadata
+  // at runtime.
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T0So12GenericClassCMa()
+  %a = metatype $@thick GenericClass<NSString>.Type
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
+  apply %z<GenericClass<NSString>>(%a) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
+  %b = metatype $@thick GenericClass<NSObject>.Type
+  apply %z<GenericClass<NSObject>>(%b) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+  // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
+  // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
+  // CHECK: call swiftcc void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
+  %c = metatype $@objc_metatype GenericClass<NSString>.Type
+  apply %y<GenericClass<NSString>>(%c) : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
+
+  // Check that generic classes are erased at depth.
+  // CHECK: [[TUPLE_METADATA:%.*]] = call %swift.type* @_T0SaySo12GenericClassC_SitGMa()
+  %d = metatype $@thick Array<(GenericClass<NSString>, Int)>.Type
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
+  apply %z<Array<(GenericClass<NSString>, Int)>>(%d) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %e = metatype $@thick Array<(GenericClass<NSObject>, Int)>.Type
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
+  apply %z<Array<(GenericClass<NSObject>, Int)>>(%e) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+  return undef : $()
+}
+
+sil @_T027objc_generic_class_metadata8SubclassCSQyACGSQySo8NSStringCG5thing_tcfcTo : $@convention(objc_method) (Optional<NSString>, @owned Subclass) -> @owned Optional<Subclass> {
+entry(%0: $Optional<NSString>, %1: $Subclass):
+  unreachable
+}
+
+sil @_T027objc_generic_class_metadata8SubclassCSQyACGSaySo8NSStringCG13arrayOfThings_tcfcTo : $@convention(objc_method) (NSArray, @owned Subclass) -> @owned Optional<Subclass> {
+entry(%0: $NSArray, %1: $Subclass):
+  unreachable
+}
+
+sil @_T027objc_generic_class_metadata8SubclassCACycfcTo : $@convention(objc_method) (@owned Subclass) -> @owned Subclass {
+entry(%0: $Subclass):
+  unreachable
+}
+
+sil @_T027objc_generic_class_metadata8SubclassCSQyACGs10DictionaryVySC13GenericOptionVypGSg7options_tcfcTo : $@convention(objc_method) (@owned Subclass, @owned NSDictionary) -> @owned Subclass {
+entry(%0: $Subclass, %1: $NSDictionary):
+  unreachable
+}
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0So12GenericClassCMa()
+// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
+// CHECK:         call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0SaySo12GenericClassC_SitGMa()
+// CHECK:         [[TUPLE:%.*]] = call %swift.type* @_T0So12GenericClassC_SitMa()
+// CHECK:         call %swift.type* @_T0SaMa(%swift.type* [[TUPLE]])
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T0So12GenericClassC_SitMa()
+// CHECK:         [[CLASS:%.*]] = call %swift.type* @_T0So12GenericClassCMa()
+// CHECK:         call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* [[CLASS]], %swift.type* @_T0SiN,

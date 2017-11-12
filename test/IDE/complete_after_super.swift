@@ -1,106 +1,106 @@
 // RUN: sed -n -e '/VERIFY_BEGIN/,/VERIFY_END$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -verify -parse %t_no_errors.swift
+// RUN: %target-swift-frontend -verify -typecheck %t_no_errors.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_NO_DOT_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NO_DOT_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NO_DOT_1 < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_DOT_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_DOT_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_DOT_1 < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_INIT_PAREN_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_INIT_PAREN_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_INIT_PAREN_1 < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SUPER_NO_DOT_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SUPER_NO_DOT_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SUPER_NO_DOT_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SUPER_DOT_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SUPER_DOT_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SUPER_DOT_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SUPER_NO_DOT_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SUPER_NO_DOT_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SUPER_NO_DOT_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SUPER_DOT_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SUPER_DOT_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SUPER_DOT_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_NO_DOT_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_B_NO_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NO_DOT_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_B_NO_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NO_DOT_2 < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_DOT_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_B_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_DOT_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_B_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_DOT_2 < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SUPER_NO_DOT_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_B_NO_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SUPER_NO_DOT_2 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_B_NO_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SUPER_NO_DOT_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SUPER_DOT_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_B_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SUPER_DOT_2 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_B_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SUPER_DOT_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SUPER_NO_DOT_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_B_NO_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SUPER_NO_DOT_2 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_B_NO_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SUPER_NO_DOT_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SUPER_DOT_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_B_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SUPER_DOT_2 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_B_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SUPER_DOT_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=CLOSURE_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CLOSURE_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_2 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
-// RUN: FileCheck %s -check-prefix=CLOSURE_2 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CLOSURE_2 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CAPTURE_1 > %t.super.txt
-// RUN: FileCheck %s -check-prefix=CLOSURE_CAPTURE_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CLOSURE_CAPTURE_1 < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_SUPER_DECLS < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // NO_CONSTRUCTORS-NOT: init(
 
@@ -127,7 +127,7 @@ class SuperBaseA {
   // Don't declare constructors.
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -138,7 +138,7 @@ class SuperBaseA {
     }
   }
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseStaticVar: Int = 0
 
   class var baseStaticProp: Int {
@@ -169,7 +169,7 @@ extension SuperBaseA {
 
   func baseExtFunc0() {}
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseExtStaticVar: Int = 0
 
   class func baseExtStaticFunc0() {}
@@ -293,7 +293,7 @@ class SuperBaseB {
   init(int: Int) {}
 
   func baseFunc0() {}
-  func baseFunc1(a: Int) {}
+  func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
     get {
@@ -304,7 +304,7 @@ class SuperBaseB {
     }
   }
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseStaticVar: Int = 0
 
   class var baseStaticProp: Int {
@@ -335,7 +335,7 @@ extension SuperBaseB {
 
   func baseExtFunc0() {}
 
-  // expected-error@+1 {{class stored properties not yet supported}}
+  // expected-error@+1 {{class stored properties not supported}}
   class var baseExtStaticVar: Int = 0
 
   class var baseExtStaticProp: Int {
@@ -412,7 +412,7 @@ class SemanticContextBase1 {
   init() {}
   init(a: Int) {}
   func instanceFunc1() {}
-  func instanceFunc1(a: Int) {}
+  func instanceFunc1(_ a: Int) {}
 }
 
 class SemanticContextDerived1 : SemanticContextBase1 {
@@ -445,7 +445,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
-  func instanceFunc1(a: Int) {
+  func instanceFunc1(_ a: Int) {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}

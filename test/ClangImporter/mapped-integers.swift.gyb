@@ -1,0 +1,23 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/mapped-integers.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/mapped-integers.swift
+
+import ctypes
+
+func testUnsignedIntegers() {
+%for size in [8, 16, 32, 64]:
+%for (prefix, suffix) in [('UInt', ''), ('uint', '_t'), ('u_int', '_t')]:
+  let unqual_${prefix}${size}${suffix}: UInt${size} = ${prefix}${size}${suffix}_test
+  let qual_${prefix}${size}${suffix}: ctypes.${prefix}${size}${suffix} = 0 // expected-error {{no type named '${prefix}${size}${suffix}' in module 'ctypes'}}
+%end
+%end
+}
+
+func testSignedIntegers() {
+%for size in [8, 16, 32, 64]:
+%for (prefix, suffix) in [('SInt', ''), ('int', '_t')]:
+  let unqual_${prefix}${size}${suffix}: Int${size} = ${prefix}${size}${suffix}_test
+  let qual_${prefix}${size}${suffix}: ctypes.${prefix}${size}${suffix} = 0 // expected-error {{no type named '${prefix}${size}${suffix}' in module 'ctypes'}}
+%end
+%end
+}

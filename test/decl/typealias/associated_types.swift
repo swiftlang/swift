@@ -1,17 +1,21 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 protocol BaseProto {
-  typealias AssocTy
+  associatedtype AssocTy
 }
-var a: BaseProto.AssocTy = 4 // expected-error{{cannot use associated type 'AssocTy' outside of its protocol}}
+var a: BaseProto.AssocTy = 4
+// expected-error@-1{{associated type 'AssocTy' can only be used with a concrete type or generic parameter base}}
 
+var a = BaseProto.AssocTy.self
+// expected-error@-1{{associated type 'AssocTy' can only be used with a concrete type or generic parameter base}}
 
 protocol DerivedProto : BaseProto {
   func associated() -> AssocTy // no-warning
 
-  func existential() -> BaseProto.AssocTy // expected-error{{cannot use associated type 'AssocTy' outside of its protocol}}
+  func existential() -> BaseProto.AssocTy
+  // expected-error@-1{{associated type 'AssocTy' can only be used with a concrete type or generic parameter base}}
 }
 
 
-func generic<T: BaseProto>(assoc: T.AssocTy) {} // no-warning
+func generic<T: BaseProto>(_: T, _ assoc: T.AssocTy) {} // no-warning
 

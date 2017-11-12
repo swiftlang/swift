@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,27 +31,27 @@
 ///
 /// To add new lazy sequence operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
-/// `LazySequenceType`s.  For example, given an eager `scan`
+/// `LazySequenceProtocol`s.  For example, given an eager `scan`
 /// method defined as follows
 ///
-///     extension SequenceType {
+///     extension Sequence {
 ///       /// Returns an array containing the results of
 ///       ///
-///       ///   p.reduce(initial, combine: combine)
+///       ///   p.reduce(initial, nextPartialResult)
 ///       ///
 ///       /// for each prefix `p` of `self`, in order from shortest to
 ///       /// longest.  For example:
 ///       ///
-///       ///     (1..<6).scan(0, combine: +) // [0, 1, 3, 6, 10, 15]
+///       ///     (1..<6).scan(0, +) // [0, 1, 3, 6, 10, 15]
 ///       ///
-///       /// - Complexity: O(N)
+///       /// - Complexity: O(n)
 ///       func scan<ResultElement>(
-///         initial: ResultElement,
-///         @noescape combine: (ResultElement, Generator.Element)->ResultElement
+///         _ initial: ResultElement,
+///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {
-///           result.append(combine(result.last!, x))
+///           result.append(nextPartialResult(result.last!, x))
 ///         }
 ///         return result
 ///       }
@@ -60,63 +60,63 @@
 /// we can build a sequence that lazily computes the elements in the
 /// result of `scan`:
 ///
-///     struct LazyScanGenerator<Base: GeneratorType, ResultElement>
-///       : GeneratorType {
+///     struct LazyScanIterator<Base : IteratorProtocol, ResultElement>
+///       : IteratorProtocol {
 ///       mutating func next() -> ResultElement? {
 ///         return nextElement.map { result in
-///           nextElement = base.next().map { combine(result, $0) }
+///           nextElement = base.next().map { nextPartialResult(result, $0) }
 ///           return result
 ///         }
 ///       }
 ///       private var nextElement: ResultElement? // The next result of next().
-///       private var base: Base                  // The underlying generator.
-///       private let combine: (ResultElement, Base.Element)->ResultElement
+///       private var base: Base                  // The underlying iterator.
+///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
-///     struct LazyScanSequence<Base: SequenceType, ResultElement>
-///       : LazySequenceType // Chained operations on self are lazy, too
+///     struct LazyScanSequence<Base: Sequence, ResultElement>
+///       : LazySequenceProtocol // Chained operations on self are lazy, too
 ///     {
-///       func generate() -> LazyScanGenerator<Base.Generator, ResultElement> {
-///         return LazyScanGenerator(
-///           nextElement: initial, base: base.generate(), combine: combine)
+///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
+///         return LazyScanIterator(
+///           nextElement: initial, base: base.makeIterator(), nextPartialResult)
 ///       }
 ///       private let initial: ResultElement
 ///       private let base: Base
-///       private let combine:
-///         (ResultElement, Base.Generator.Element)->ResultElement
+///       private let nextPartialResult:
+///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
 ///     
-///     extension LazySequenceType {
+///     extension LazySequenceProtocol {
 ///       /// Returns a sequence containing the results of
 ///       ///
-///       ///   p.reduce(initial, combine: combine)
+///       ///   p.reduce(initial, nextPartialResult)
 ///       ///
 ///       /// for each prefix `p` of `self`, in order from shortest to
 ///       /// longest.  For example:
 ///       ///
-///       ///     Array((1..<6).lazy.scan(0, combine: +)) // [0, 1, 3, 6, 10, 15]
+///       ///     Array((1..<6).lazy.scan(0, +)) // [0, 1, 3, 6, 10, 15]
 ///       ///
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
-///         initial: ResultElement,
-///         combine: (ResultElement, Generator.Element)->ResultElement
+///         _ initial: ResultElement,
+///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
-///           initial: initial, base: self, combine: combine)
+///           initial: initial, base: self, nextPartialResult)
 ///       }
 ///     }
 ///
-/// - See also: `LazySequence`, `LazyCollectionType`, `LazyCollection`
+/// - See also: `LazySequence`, `LazyCollectionProtocol`, `LazyCollection`
 ///
 /// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically
-///   known to conform to `LazySequenceType`.  Thus, side-effects such
+///   known to conform to `LazySequenceProtocol`.  Thus, side-effects such
 ///   as the accumulation of `result` below are never unexpectedly
 ///   dropped or deferred:
 ///
-///       extension SequenceType where Generator.Element == Int {
+///       extension Sequence where Element == Int {
 ///         func sum() -> Int {
 ///           var result = 0
 ///           _ = self.map { result += $0 }
@@ -127,12 +127,13 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
-public protocol LazySequenceType : SequenceType {
-  /// A `SequenceType` that can contain the same elements as this one,
+public protocol LazySequenceProtocol : Sequence {
+  /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  typealias Elements: SequenceType = Self
+  associatedtype Elements : Sequence = Self
+  where Elements.Iterator.Element == Iterator.Element
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -141,25 +142,19 @@ public protocol LazySequenceType : SequenceType {
   /// of `self` can prevent result types from growing an extra
   /// `LazySequence` layer.  For example,
   ///
-  /// _prext_ example neeeded
+  /// _prext_ example needed
   ///
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
-  var elements: Elements {get} 
-  
-  var array: [Generator.Element] {get}
-}
-
-extension LazySequenceType {
-  @available(*, unavailable, message="please construct an Array from your lazy sequence: Array(...)")
-  public var array: [Generator.Element] { fatalError("unavailable") }
+  var elements: Elements { get }
 }
 
 /// When there's no special associated `Elements` type, the `elements`
 /// property is provided.
-extension LazySequenceType where Elements == Self {
+extension LazySequenceProtocol where Elements == Self {
   /// Identical to `self`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var elements: Self { return self }
 }
 
@@ -167,48 +162,43 @@ extension LazySequenceType where Elements == Self {
 /// on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
-/// - See also: `LazySequenceType`
-public struct LazySequence<Base : SequenceType>
-  : LazySequenceType, _SequenceWrapperType {
+/// - See also: `LazySequenceProtocol`
+@_fixed_layout // FIXME(sil-serialize-all)
+public struct LazySequence<Base : Sequence>
+  : LazySequenceProtocol, _SequenceWrapper {
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
   /// lazily.
-  public init(_ base: Base) {
-    self._base = base
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_base: Base) {
+    self._base = _base
   }
-  
+
   public var _base: Base
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.
+  @_inlineable // FIXME(sil-serialize-all)
   public var elements: Base { return _base }
-
-  @available(*, unavailable, renamed="Base")
-  public typealias S = Void
 }
 
-extension SequenceType {
-  /// A sequence containing the same elements as a `Base` sequence,
-  /// but on which some operations such as `map` and `filter` are
+extension Sequence {
+  /// A sequence containing the same elements as this sequence,
+  /// but on which some operations, such as `map` and `filter`, are
   /// implemented lazily.
-  ///
-  /// - See also: `LazySequenceType`, `LazySequence`
+  @_inlineable // FIXME(sil-serialize-all)
   public var lazy: LazySequence<Self> {
-    return LazySequence(self)
+    return LazySequence(_base: self)
   }
 }
 
 /// Avoid creating multiple layers of `LazySequence` wrapper.
-/// Anything conforming to `LazySequenceType` is already lazy.
-extension LazySequenceType {
+/// Anything conforming to `LazySequenceProtocol` is already lazy.
+extension LazySequenceProtocol {
   /// Identical to `self`.
+  @_inlineable // FIXME(sil-serialize-all)
   public var lazy: Self {
     return self
   }
 }
-
-@available(*, unavailable, message="Please use the sequence's '.lazy' property")
-public func lazy<Base : SequenceType>(s: Base) -> LazySequence<Base> {
-  fatalError("unavailable")
-}
-

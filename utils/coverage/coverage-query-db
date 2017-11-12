@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+# utils/coverage/coverage-query-db - Find covering tests using coverage
+# database
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+import argparse
+import subprocess
+import sys
+
+
+def covering_func(args):
+    return subprocess.call([
+        'sqlite3', args.coverage_db,
+        "select distinct test_string.string "
+        "from strings as function_string, strings as src_string, "
+        "    coverage, strings as test_string "
+        "where src_string.string = '{0}' and "
+        "    function_string.string like '%{1}%' and "
+        "    src_string.id = coverage.src and "
+        "    test_string.id = coverage.test and "
+        "    function_string.id = coverage.function;".format(
+            args.src_file,
+            args.function_str
+        )
+    ])
+
+
+def covering_line(args):
+    return subprocess.call([
+        'sqlite3', args.coverage_db,
+        "select distinct test_string.string "
+        "from strings as src_string, coverage, "
+        "     strings as test_string "
+        "where src_string.string = '{0}' and "
+        "      istart < {1} and {1} < iend and "
+        "      src_string.id = coverage.src and "
+        "      test_string.id = coverage.test;".format(
+            args.src_file,
+            args.line_number
+        )
+    ])
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        'Find covering tests using coverage database')
+
+    subparsers = parser.add_subparsers()
+
+    covering_func_parser = subparsers.add_parser(
+        'covering_func',
+        help='Find tests that cover any part of a given function'
+    )
+    covering_func_parser.add_argument(
+        '--coverage-db',
+        help='coverage database to query (e.g. coverage.db)',
+        required=True)
+    covering_func_parser.add_argument(
+        '--src-file',
+        help='src file name containing the specified function '
+             '(e.g. DocComment.cpp)',
+        required=True)
+    covering_func_parser.add_argument(
+        '--function-str',
+        help='find tests that cover any part of a function containing this '
+             'string in its signature',
+        required=True)
+    covering_func_parser.set_defaults(which='covering_func')
+
+    covering_line_parser = subparsers.add_parser(
+        'covering_line',
+        help='Find tests that cover a given line'
+    )
+    covering_line_parser.add_argument(
+        '--coverage-db',
+        help='coverage database to query (e.g. coverage.db)',
+        required=True)
+    covering_line_parser.add_argument(
+        '--src-file',
+        help='src file name containing the specified line number '
+             '(e.g. DocComment.cpp)',
+        required=True)
+    covering_line_parser.add_argument(
+        '--line-number',
+        help='find tests that cover this line number',
+        required=True)
+    covering_line_parser.set_defaults(which='covering_line')
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
+    return globals()[args.which](args)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

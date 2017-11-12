@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 849,
+  key.length: 859,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
     {
@@ -361,7 +361,17 @@
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 666,
-      key.length: 59
+      key.length: 13
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.doccomment.field,
+      key.offset: 679,
+      key.length: 8
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.doccomment,
+      key.offset: 687,
+      key.length: 38
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,
@@ -412,6 +422,16 @@
       key.kind: source.lang.swift.syntaxtype.comment,
       key.offset: 813,
       key.length: 36
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 850,
+      key.length: 1
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.number,
+      key.offset: 854,
+      key.length: 4
     }
   ]
 }

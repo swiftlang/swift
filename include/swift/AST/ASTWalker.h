@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,6 +25,25 @@ class Stmt;
 class Pattern;
 class TypeRepr;
 struct TypeLoc;
+class ParameterList;
+enum class AccessKind: unsigned char;
+
+enum class SemaReferenceKind : uint8_t {
+  ModuleRef = 0,
+  DeclRef,
+  DeclMemberRef,
+  DeclConstructorRef,
+  TypeRef,
+  EnumElementRef,
+  SubscriptRef,
+};
+
+struct ReferenceMetaData {
+  SemaReferenceKind Kind;
+  llvm::Optional<AccessKind> AccKind;
+  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind) :
+    Kind(Kind), AccKind(AccKind) {}
+};
 
 /// \brief An abstract class used to traverse an AST.
 class ASTWalker {
@@ -44,7 +63,7 @@ public:
     ParentTy(Expr *E) : Kind(ParentKind::Expr), Ptr(E) {}
     ParentTy(Pattern *P) : Kind(ParentKind::Pattern), Ptr(P) {}
     ParentTy(TypeRepr *T) : Kind(ParentKind::TypeRepr), Ptr(T) {}
-    ParentTy() = default;
+    ParentTy() : Kind(ParentKind::Module), Ptr(nullptr) { }
 
     bool isNull() const { return Ptr == nullptr; }
     ParentKind getKind() const {
@@ -179,14 +198,26 @@ public:
   virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }
 
   /// This method configures whether the walker should explore into the generic
-  /// params in an AbstractFunctionDecl.
-  virtual bool shouldWalkIntoFunctionGenericParams() { return false; }
+  /// params in AbstractFunctionDecl and NominalTypeDecl.
+  virtual bool shouldWalkIntoGenericParams() { return false; }
+
+  /// walkToParameterListPre - This method is called when first visiting a
+  /// ParameterList, before walking into its parameters.  If it returns false,
+  /// the subtree is skipped.
+  ///
+  virtual bool walkToParameterListPre(ParameterList *PL) { return true; }
+
+  /// walkToParameterListPost - This method is called after visiting the
+  /// children of a parameter list.  If it returns false, the remaining
+  /// traversal is terminated and returns failure.
+  virtual bool walkToParameterListPost(ParameterList *PL) { return true; }
+
 
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;
   virtual ~ASTWalker() = default;
-  
+
   virtual void anchor();
 };
 

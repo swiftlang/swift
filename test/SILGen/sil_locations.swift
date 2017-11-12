@@ -1,35 +1,35 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
 
 // FIXME: Not sure if this an ideal source info for the branch - 
 // it points to if, not the last instruction in the block.
 func ifexpr() -> Int {
-  var x : Int = 0; 
+  var x : Int = 0
   if true {
-    x++; 
+    x+=1
   }
-  return x;
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations6ifexprFT_Si
-  // CHECK: apply {{.*}} line:[[@LINE-5]]:6
-  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-6]]:6
-  // CHECK: br [[FALSE_BB]] // {{.*}} line:[[@LINE-5]]:3
-  // CHECK: return {{.*}} // {{.*}} line:[[@LINE-5]]:3:return
+  return x
+  // CHECK-LABEL: sil hidden @_T013sil_locations6ifexprSiyF
+  // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-5]]:6
+  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:6
+  // CHECK: br [[FALSE_BB]], loc "{{.*}}":[[@LINE-5]]:3
+  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-5]]:3, {{.*}}:return
 }
 
 func ifelseexpr() -> Int {
-  var x : Int = 0; 
+  var x : Int = 0
   if true {
-    x++; 
+    x+=1
   } else {
-    x--;
+    x-=1
   }
-  return x;
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations10ifelseexprFT_Si
-  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-7]]:6
+  return x
+  // CHECK-LABEL: sil hidden @_T013sil_locations10ifelseexprSiyF
+  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-7]]:6
   // CHECK: [[TRUE_BB]]:
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-7]]:3
+  // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE-7]]:3
   // CHECK: [[FALSE_BB]]:
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-7]]:3
-  // CHECK: return {{.*}} // {{.*}} line:[[@LINE-7]]:3:return
+  // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE-7]]:3
+  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-7]]:3, {{.*}}:return
 }
 
 // The source locations are handled differently here - since 
@@ -37,66 +37,55 @@ func ifelseexpr() -> Int {
 // in the branch.
 func ifexpr_return() -> Int {
   if true {
-    return 5; 
+    return 5
   }
-  return 6;
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations13ifexpr_returnFT_Si
-  // CHECK: apply {{.*}} line:[[@LINE-5]]:6
-  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-6]]:6
+  return 6
+  // CHECK-LABEL: sil hidden @_T013sil_locations13ifexpr_returnSiyF
+  // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-5]]:6
+  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:6
   // CHECK: [[TRUE_BB]]:
-  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-7]]:5:return
+  // CHECK: br bb{{[0-9]+}}({{%.*}}), loc "{{.*}}":[[@LINE-7]]:5, {{.*}}:return
   // CHECK: [[FALSE_BB]]:
-  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-7]]:3:return
-  // CHECK: return {{.*}} // {{.*}} line:[[@LINE+1]]:1:cleanup
+  // CHECK: br bb{{[0-9]+}}({{%.*}}), loc "{{.*}}":[[@LINE-7]]:3, {{.*}}:return
+  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE+1]]:1, {{.*}}:cleanup
 }
 
 func ifexpr_rval() -> Int {
-  var x = true ? 5 : 6;
-  return x;
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations11ifexpr_rvalFT_Si
-  // CHECK: apply {{.*}} line:[[@LINE-3]]:11
-  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-4]]:11
+  var x = true ? 5 : 6
+  return x
+  // CHECK-LABEL: sil hidden @_T013sil_locations11ifexpr_rvalSiyF
+  // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-3]]:11
+  // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-4]]:11
   // CHECK: [[TRUE_BB]]:
-  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-6]]:18
+  // CHECK: br bb{{[0-9]+}}({{%.*}}), loc "{{.*}}":[[@LINE-6]]:18
   // CHECK: [[FALSE_BB]]:
-  // CHECK: br bb{{[0-9]+}}({{%.*}}) // {{.*}} line:[[@LINE-8]]:22
-}
-
-// TODO: missing info on the first branch.
-func forstmt_empty_cond(i: Int) -> Int {
-  for var i=0;;++i {}
-    // CHECK-LABEL: sil hidden  @{{.*}}forstmt_empty_cond{{.*}}
-    // CHECK: apply {{.*}} line:[[@LINE-2]]:13
-    // CHECK: br [[TRUE_BB:bb[0-9]+]]
-    // CHECK: [[TRUE_BB:bb[0-9]+]]:
-    // CHECK: br [[TRUE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-5]]:21
+  // CHECK: br bb{{[0-9]+}}({{%.*}}), loc "{{.*}}":[[@LINE-8]]:22
 }
 
 // --- Test function calls.
-func simpleDirectCallTest(i: Int) -> Int {
+func simpleDirectCallTest(_ i: Int) -> Int {
   return simpleDirectCallTest(i)
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations20simpleDirectCallTest
-  // CHECK: function_ref @_TF13sil_locations20simpleDirectCallTest{{.*}} line:[[@LINE-2]]:10
+  // CHECK-LABEL: sil hidden @_T013sil_locations20simpleDirectCallTestS2iF
+  // CHECK: function_ref @_T013sil_locations20simpleDirectCallTestS2iF : {{.*}}, loc "{{.*}}":[[@LINE-2]]:10
   // CHECK: {{%.*}} apply {{%.*}} line:[[@LINE-3]]:10
 }
 
-func templateTest<T>(value: T) -> T {
+func templateTest<T>(_ value: T) -> T {
   return value
 }
 func useTemplateTest() -> Int {
   return templateTest(5);
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations15useTemplateTestFT_Si
-
-  // CHECK: function_ref @_TFSiC{{.*}} line:87
+  // CHECK-LABEL: sil hidden @_T013sil_locations15useTemplateTestSiyF
+  // CHECK: function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":77
 }
 
-func foo(x: Int) -> Int {
-  func bar(y: Int) -> Int {
+func foo(_ x: Int) -> Int {
+  func bar(_ y: Int) -> Int {
     return x + y
   }
   return bar(1)
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations3foo
-  // CHECK: [[CLOSURE:%[0-9]+]] = function_ref {{.*}} line:[[@LINE-2]]:10
+  // CHECK-LABEL: sil hidden @_T013sil_locations3foo{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[CLOSURE:%[0-9]+]] = function_ref {{.*}}, loc "{{.*}}":[[@LINE-2]]:10
   // CHECK: apply [[CLOSURE:%[0-9]+]]
 }
 
@@ -104,63 +93,65 @@ class LocationClass {
   func mem() {}
 }
 func testMethodCall() {
-  var l: LocationClass;
+  var l: LocationClass
   l.mem();
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations14testMethodCallFT_T_
+  // CHECK-LABEL: sil hidden @_T013sil_locations14testMethodCallyyF
   
-  // CHECK: class_method {{.[0-9]+}} : $LocationClass, #LocationClass.mem!1 {{.*}} line:[[@LINE-3]]:5
+  // CHECK: class_method {{.[0-9]+}} : $LocationClass, #LocationClass.mem!1 {{.*}}, loc "{{.*}}":[[@LINE-3]]:5
 }
 
 func multipleReturnsImplicitAndExplicit() {
-  var x = 5+3;
+  var x = 5+3
   if x > 10 {
-    return;
+    return
   }
-  x++;
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations34multipleReturnsImplicitAndExplicitFT_T_
+  x += 1
+  // CHECK-LABEL: sil hidden @_T013sil_locations34multipleReturnsImplicitAndExplicityyF
   // CHECK: cond_br
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE-5]]:5:return
-  // CHECK: br bb{{[0-9]+}} // {{.*}} line:[[@LINE+2]]:1:imp_return
-  // CHECK: return {{.*}} // {{.*}} line:[[@LINE+1]]:1:cleanup
+  // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE-5]]:5, {{.*}}:return
+  // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE+2]]:1, {{.*}}:imp_return
+  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE+1]]:1, {{.*}}:cleanup
 }
 
 func simplifiedImplicitReturn() -> () {
   var y = 0 
-  // CHECK-LABEL: sil hidden  @_TF13sil_locations24simplifiedImplicitReturnFT_T_
-  // CHECK: return {{.*}} // {{.*}} line:[[@LINE+1]]:1:imp_return
+  // CHECK-LABEL: sil hidden @_T013sil_locations24simplifiedImplicitReturnyyF
+  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE+1]]:1, {{.*}}:imp_return
 }
 
 func switchfoo() -> Int { return 0 }
 func switchbar() -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_TF13sil_locations10testSwitchFT_T_
+// CHECK-LABEL: sil hidden @_T013sil_locations10testSwitchyyF
 func testSwitch() {
   var x:Int
   x = 0
   switch (switchfoo(), switchbar()) {
-  // CHECK: store {{.*}}  // {{.*}} line:[[@LINE+1]]
+  // CHECK: store {{.*}}, loc "{{.*}}":[[@LINE+1]]
   case (1,2):
-  // CHECK: integer_literal $Builtin.Int2048, 2    // {{.*}} line:[[@LINE-1]]:11
+  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-1]]:11
   // FIXME: Location info is missing.
   // CHECK: cond_br
   //
     var z: Int = 200
-  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box $Int     // {{.*}} line:[[@LINE-1]]:9
-  // CHECK: integer_literal $Builtin.Int2048, 200  // {{.*}} line:[[@LINE-2]]:18
+  // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box ${ var Int }, var, name "z"{{.*}}line:[[@LINE-1]]:9
+  // CHECK: integer_literal $Builtin.Int2048, 200, loc "{{.*}}":[[@LINE-2]]:18
     x = z
-  // CHECK:  strong_release [[VAR_Z]]{{.*}}        // {{.*}} line:[[@LINE-1]]:9:cleanup
+  // CHECK:  destroy_value [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
   case (3, let y):
-    x++
+    x += 1
+  default:
+    ()
   }
 }
 
 func testIf() {
   if true {
-    var y:Int;
+    var y:Int
   } else {
-    var x:Int;
+    var x:Int
   }
-  // CHECK-LABEL: sil hidden @_TF13sil_locations6testIfFT_T_
+  // CHECK-LABEL: sil hidden @_T013sil_locations6testIfyyF
   //
   // FIXME: Missing location info here.
   // CHECK: function_ref
@@ -168,30 +159,27 @@ func testIf() {
   // 
   //
   //
-  // CHECK: br {{.*}}                                            // {{.*}} line:[[@LINE-13]]:6
-
-
-
+  // CHECK: br {{.*}}, loc "{{.*}}":[[@LINE-13]]:6
 }
 
 func testFor() {
-  for (var i:Int = 0; i<10; i++) {
-    var y: Int = 300;
-    y++;
+  for i in 0..<10 {
+    var y: Int = 300
+    y+=1
     if true {
-      break;
+      break
     }
-    y--;
-    continue;
+    y-=1
+    continue
   }
 
-  // CHECK-LABEL: sil hidden @_TF13sil_locations7testForFT_T_
-  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box $Int                 // {{.*}} line:[[@LINE-10]]:9
-  // CHECK: integer_literal $Builtin.Int2048, 300                        // {{.*}} line:[[@LINE-11]]:18
-  // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $@box Int
-  // CHECK: br bb{{.*}}                                                  // {{.*}} line:[[@LINE-10]]:7
-  // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $@box Int
-  // CHECK: br bb{{.*}}                                                  // {{.*}} line:[[@LINE-9]]:5
+  // CHECK-LABEL: sil hidden @_T013sil_locations7testForyyF
+  // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box ${ var Int }, var, name "y", loc "{{.*}}":[[@LINE-10]]:9
+  // CHECK: integer_literal $Builtin.Int2048, 300, loc "{{.*}}":[[@LINE-11]]:18
+  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
+  // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-10]]:7
+  // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
+  // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-9]]:5
   
   
 }
@@ -200,73 +188,63 @@ func testTuples() {
   var t = (2,3)
   var tt = (2, (4,5))
   var d = "foo"
-  // CHECK-LABEL: sil hidden @_TF13sil_locations10testTuplesFT_T_
-
-
-  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-6]]:11
-  // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-7]]:12
-  // CHECK: integer_literal $Builtin.Int2048, 3                      {{.*}} line:[[@LINE-8]]:14
-  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-8]]:12
-  // CHECK: tuple_element_addr                                       {{.*}} line:[[@LINE-9]]:16  
+  // CHECK-LABEL: sil hidden @_T013sil_locations10testTuplesyyF
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:11
+  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-5]]:12
+  // CHECK: integer_literal $Builtin.Int2048, 3, loc "{{.*}}":[[@LINE-6]]:14
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-6]]:12
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16  
 }
 
-// Test tuple emploding/exploding.
+// Test tuple imploding/exploding.
 protocol Ordinable {
   func ord() -> Int
 }
 
-func b<T : Ordinable>(seq: T) -> (Int) -> Int {
+func b<T : Ordinable>(_ seq: T) -> (Int) -> Int {
   return {i in i + seq.ord() }
 }
 
 func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   return {x}
-  // CHECK-LABEL: sil hidden @_TF13sil_locations14captures_tuple
+  // CHECK-LABEL: sil hidden @_T013sil_locations14captures_tuple{{[_0-9a-zA-Z]*}}F
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-3]]:27
+  // CHECK: copy_addr [take] {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
+  // CHECK: function_ref {{.*}}, loc "{{.*}}":[[@LINE-4]]:10
 
-
-  // CHECK: tuple_element_addr                                    {{.*}} line:[[@LINE-5]]:27
-  // CHECK: copy_addr [take]                                      {{.*}} line:[[@LINE-6]]:27
-  // CHECK: function_ref                                          {{.*}} line:[[@LINE-6]]:10
-
-  
-  // CHECK-LABEL: sil shared @_TFF13sil_locations14captures_tuple
-  // CHECK: copy_addr                                             {{.*}} line:[[@LINE-10]]:11
+  // CHECK-LABEL: sil private @_T013sil_locations14captures_tuple{{.*}}fU_
+  // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:11
 }
 
-func interpolated_string(x: Int, y: String) -> String {
+func interpolated_string(_ x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
-  // CHECK-LABEL: sil hidden @_TF13sil_locations19interpolated_string
-
-
-
-  // CHECK: retain_value{{.*}}                                         {{.*}} line:[[@LINE-5]]:37
-
-
+  // CHECK-LABEL: sil hidden @_T013sil_locations19interpolated_string{{[_0-9a-zA-Z]*}}F
+  // CHECK: copy_value{{.*}}, loc "{{.*}}":[[@LINE-2]]:37
 }
 
 
-func int(x: Int) {}
+func int(_ x: Int) {}
 func tuple() -> (Int, Float) { return (1, 1.0) }  
-func tuple_element(x: (Int, Float)) {
+func tuple_element(_ x: (Int, Float)) {
   int(tuple().0)
-  // CHECK-LABEL: sil hidden @_TF13sil_locations13tuple_element
+  // CHECK-LABEL: sil hidden @_T013sil_locations13tuple_element{{[_0-9a-zA-Z]*}}F
 
-  // CHECK: apply                                                    {{.*}} line:[[@LINE-3]]:7
-  // CHECK: tuple_extract{{.*}}, 0                                   {{.*}} line:[[@LINE-4]]:7
-  // CHECK: tuple_extract{{.*}}, 1                                   {{.*}} line:[[@LINE-5]]:7
-  // CHECK: apply                                                    {{.*}} line:[[@LINE-6]]:3
+  // CHECK: apply {{.*}} line:[[@LINE-3]]:7
+  // CHECK: tuple_extract{{.*}}, 0, {{.*}}line:[[@LINE-4]]:7
+  // CHECK: tuple_extract{{.*}}, 1, {{.*}}line:[[@LINE-5]]:7
+  // CHECK: apply {{.*}} line:[[@LINE-6]]:3
      
 }
 
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
-  // CHECK-LABEL: sil hidden @_TF13sil_locations10containers
-  // CHECK: apply {{%.*}}<(String, Int)>({{%.*}})            {{.*}} line:[[@LINE-2]]:22
+  // CHECK-LABEL: sil hidden @_T013sil_locations10containers{{[_0-9a-zA-Z]*}}F
+  // CHECK: apply {{%.*}}<(String, Int)>({{%.*}}), loc "{{.*}}":[[@LINE-2]]:22
   
-  // CHECK: string_literal utf8 "Ankeny"                             {{.*}} line:[[@LINE-4]]:23
+  // CHECK: string_literal utf8 "Ankeny", loc "{{.*}}":[[@LINE-4]]:23
 
-  // CHECK: integer_literal $Builtin.Int2048, 1                      {{.*}} line:[[@LINE-6]]:33
-  // CHECK: integer_literal $Builtin.Int2048, 2                      {{.*}} line:[[@LINE-7]]:48
+  // CHECK: integer_literal $Builtin.Int2048, 1, loc "{{.*}}":[[@LINE-6]]:33
+  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-7]]:48
 
   
   
@@ -277,7 +255,7 @@ func a() {}
 func b() -> Int { return 0 }
 protocol P { func p() }
 struct X : P { func p() {} }
-func test_isa_2(p: P) {
+func test_isa_2(_ p: P) {
   switch (p, b()) {
   case (is X, b()):
     a()
@@ -287,14 +265,14 @@ func test_isa_2(p: P) {
   
 
 
-  // CHECK-LABEL: sil hidden @_TF13sil_locations10test_isa_2
-  // CHECK: alloc_stack $(P, Int)                                  {{.*}} line:[[@LINE-10]]:10
-  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 0                 {{.*}} line:[[@LINE-11]]:10
-  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 1                 {{.*}} line:[[@LINE-12]]:10
-  // CHECK: load                                                     {{.*}} line:[[@LINE-12]]:8
+  // CHECK-LABEL: sil hidden @_T013sil_locations10test_isa_2{{[_0-9a-zA-Z]*}}F
+  // CHECK: alloc_stack $(P, Int), loc "{{.*}}":[[@LINE-10]]:10
+  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 0, loc "{{.*}}":[[@LINE-11]]:10
+  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 1, loc "{{.*}}":[[@LINE-12]]:10
+  // CHECK: load {{.*}}, loc "{{.*}}":[[@LINE-12]]:8
   //
-  // CHECK: checked_cast_addr_br                                     {{.*}} line:[[@LINE-14]]:9
-  // CHECK: load                                                     {{.*}} line:[[@LINE-15]]:9
+  // CHECK: checked_cast_addr_br {{.*}}, loc "{{.*}}":[[@LINE-14]]:9
+  // CHECK: load {{.*}}, loc "{{.*}}":[[@LINE-15]]:9
     
 }
 
@@ -306,7 +284,7 @@ enum SinglePayloadAddressOnly {
   case x(Runcible)
   case y
 }
-func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
+func printSinglePayloadAddressOnly(_ v:SinglePayloadAddressOnly) {
   switch v {
   case .x(let runcible):
     runcible.runce()
@@ -315,33 +293,33 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   }
   
   
-  // CHECK_LABEL: sil hidden @_TF13sil_locations29printSinglePayloadAddressOnly
+  // CHECK_LABEL: sil hidden @_T013sil_locations29printSinglePayloadAddressOnly{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0
-  // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]] // {{.*}} line:[[@LINE-10]]:3
+  // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]], {{.*}}line:[[@LINE-10]]:3
   // CHECK: [[FALSE_BB]]:
 
 }
 
 
 func testStringForEachStmt() {
-  var i = 0;
+  var i = 0
   for index in 1..<20 {
-    i++
+    i += 1
     if i == 15 {
       break
     }
   }
   
-  // CHECK-LABEL: sil hidden @_TF13sil_locations21testStringForEachStmtFT_T_
-  // CHECK: br         {{.*}} line:[[@LINE-8]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-9]]:3
+  // CHECK-LABEL: sil hidden @_T013sil_locations21testStringForEachStmtyyF
+  // CHECK: br {{.*}} line:[[@LINE-8]]:3
+  // CHECK: switch_enum {{.*}} line:[[@LINE-9]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-8]]:8
   // Break branch:
-  // CHECK: br         {{.*}} line:[[@LINE-9]]:7
+  // CHECK: br {{.*}} line:[[@LINE-9]]:7
   // Looping back branch:
-  // CHECK: br         {{.*}} line:[[@LINE-9]]:3
+  // CHECK: br {{.*}} line:[[@LINE-9]]:3
   // Condition is false branch:
-  // CHECK: br         {{.*}} line:[[@LINE-16]]:3
+  // CHECK: br {{.*}} line:[[@LINE-16]]:3
   
   
   
@@ -350,10 +328,10 @@ func testStringForEachStmt() {
 
 
 func testForStmt() {
-  var i = 0;
-  var m = 0;
-  for (i = 0; i < 10; ++i) {
-    m++
+  
+  var m = 0
+  for i in 0..<10 {
+    m += 1
     if m == 15 {
       break
     } else {
@@ -363,58 +341,58 @@ func testForStmt() {
   }
 
 
-  // CHECK-LABEL: sil hidden @_TF13sil_locations11testForStmtFT_T_
-  // CHECK: br         {{.*}} line:[[@LINE-12]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-13]]:15
-  // CHECK: cond_br {{.*}} line:[[@LINE-12]]:8
-  // Break branch:
-  // CHECK: br         {{.*}} line:[[@LINE-13]]:7
-  // Continue branch:
-  // CHECK: br         {{.*}} line:[[@LINE-13]]:7
-  // Looping back branch:
-  // CHECK: br         {{.*}} line:[[@LINE-12]]:3
-  // Condition is false branch:
-  // CHECK: br         {{.*}} line:[[@LINE-22]]:3
 
+  
+
+  
+  
+  
+  
+  
+  
+  
+
+  
+  
 }
 
 
 func testRepeatWhile() {
-  var m = 0;
+  var m = 0
   repeat {
-    m++
+    m += 1
   } while (m < 200)
   
   
-  // CHECK-LABEL: sil hidden @_TF13sil_locations15testRepeatWhileFT_T_
-  // CHECK: br         {{.*}} line:[[@LINE-6]]:3
+  // CHECK-LABEL: sil hidden @_T013sil_locations15testRepeatWhileyyF
+  // CHECK: br {{.*}} line:[[@LINE-6]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-5]]:11
   // Loop back branch:
-  // CHECK: br         {{.*}} line:[[@LINE-7]]:11  
+  // CHECK: br {{.*}} line:[[@LINE-7]]:11  
 }
 
 
 
 func testWhile() {
-  var m = 0;
+  var m = 0
   while m < 100 {
-    m++
+    m += 1
     if m > 5 {
       break
     }
-    m++
+    m += 1
   }
   
-  // CHECK-LABEL: sil hidden @_TF13sil_locations9testWhileFT_T_
-  // CHECK: br         {{.*}} line:[[@LINE-9]]:3
+  // CHECK-LABEL: sil hidden @_T013sil_locations9testWhileyyF
+  // CHECK: br {{.*}} line:[[@LINE-9]]:3
   // While loop conditional branch:
   // CHECK: cond_br {{.*}} line:[[@LINE-11]]:9
   // If stmt condition branch:
   // CHECK: cond_br {{.*}} line:[[@LINE-11]]:8
   // Break branch:
-  // CHECK: br         {{.*}} line:[[@LINE-12]]:7
+  // CHECK: br {{.*}} line:[[@LINE-12]]:7
   // Looping back branch:
-  // CHECK: br         {{.*}} line:[[@LINE-11]]:3
+  // CHECK: br {{.*}} line:[[@LINE-11]]:3
 
 
   

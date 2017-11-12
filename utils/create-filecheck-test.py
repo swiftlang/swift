@@ -5,10 +5,10 @@
 # the amount of time required for creating complicated FileCheck
 # Tests.
 
-import sys
 import argparse
-import textwrap
 import re
+import sys
+import textwrap
 
 parser = argparse.ArgumentParser(description=textwrap.dedent("""
 Takes an input SIL fragment and changes all SSA variables into FileCheck

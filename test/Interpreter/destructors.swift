@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 class C {
@@ -15,9 +15,19 @@ class D : C {
   }
 }
 
-C()
+@inline(never)
+func createC() -> C {
+  return C()
+}
+
+@inline(never)
+func createD() -> C {
+  return D()
+}
+
 // CHECK: boom! roasted
-D()
+createC()
 // CHECK-NEXT: i can't decide between a fat joke and a dumb joke
 // CHECK-NEXT: boom! roasted
+createD()
 

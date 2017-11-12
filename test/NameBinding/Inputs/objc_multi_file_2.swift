@@ -16,19 +16,19 @@ extension UIImage : ImagePresentingView {
   }
 }
 
-public class SuperA : NSObject {
+open class SuperA : NSObject {
   public init(foo: Int) {
     super.init()
   }
 }
 
-public class SuperB : NSObject {
+open class SuperB : NSObject {
   public init(foo: String) { super.init() }
   public init(bar: String) { super.init() }
   public convenience init(wibble: String) { self.init(foo: wibble) }
 }
 
-public class SubB : SuperB {
+open class SubB : SuperB {
   public override init(bar: String) { super.init(bar: bar) }
 }
 

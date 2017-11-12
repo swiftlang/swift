@@ -1,7 +1,7 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P0 {
-  typealias Assoc1 : PSimple // expected-note{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
+  associatedtype Assoc1 : PSimple // expected-note{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
   // expected-note@-1{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
   // expected-note@-2{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
   // expected-note@-3{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
@@ -31,7 +31,7 @@ struct X0c : P0 { // okay: Assoc1 == Int
 
 struct X0d : P0 { // okay: Assoc1 == Int
   func f0(_: Int) { }
-  func g0(_: Double) { } // viable, but no correspinding f0
+  func g0(_: Double) { } // viable, but no corresponding f0
   func g0(_: Int) { }
 }
 
@@ -80,41 +80,41 @@ protocol P1 {
 }
 
 extension P1 {
-  final func f0(x: Int) { }
-  final func g0(x: Int) { }
+  func f0(_ x: Int) { }
+  func g0(_ x: Int) { }
 }
 
 struct X0j : P0, P1 { }
 
 protocol P2 {
-  typealias P2Assoc
+  associatedtype P2Assoc
 
-  func h0(x: P2Assoc)
+  func h0(_ x: P2Assoc)
 }
 
 extension P2 where Self.P2Assoc : PSimple {
-  final func f0(x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  final func g0(x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  func f0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
+  func g0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
 }
 
 struct X0k : P0, P2 {
-  func h0(x: Int) { }
+  func h0(_ x: Int) { }
 }
 
 struct X0l : P0, P2 { // expected-error{{type 'X0l' does not conform to protocol 'P0'}}
-  func h0(x: Float) { }
+  func h0(_ x: Float) { }
 }
 
 // Prefer declarations in the type to those in protocol extensions
 struct X0m : P0, P2 {
-  func f0(x: Double) { }
-  func g0(x: Double) { }
-  func h0(x: Double) { }
+  func f0(_ x: Double) { }
+  func g0(_ x: Double) { }
+  func h0(_ x: Double) { }
 }
 
 // Inference from properties.
 protocol PropertyP0 {
-  typealias Prop : PSimple // expected-note{{unable to infer associated type 'Prop' for protocol 'PropertyP0'}}
+  associatedtype Prop : PSimple // expected-note{{unable to infer associated type 'Prop' for protocol 'PropertyP0'}}
   var property: Prop { get }
 }
 
@@ -128,8 +128,12 @@ struct XProp0b : PropertyP0 { // expected-error{{type 'XProp0b' does not conform
 
 // Inference from subscripts
 protocol SubscriptP0 {
-  typealias Index
-  typealias Element : PSimple // expected-note{{unable to infer associated type 'Element' for protocol 'SubscriptP0'}}
+  associatedtype Index
+  // expected-note@-1 2 {{protocol requires nested type 'Index'; do you want to add it?}}
+
+  associatedtype Element : PSimple
+  // expected-note@-1 {{unable to infer associated type 'Element' for protocol 'SubscriptP0'}}
+  // expected-note@-2 2 {{protocol requires nested type 'Element'; do you want to add it?}}
 
   subscript (i: Index) -> Element { get }
 }
@@ -138,14 +142,27 @@ struct XSubP0a : SubscriptP0 {
   subscript (i: Int) -> Int { get { return i } }
 }
 
-struct XSubP0b : SubscriptP0 { // expected-error{{type 'XSubP0b' does not conform to protocol 'SubscriptP0'}}
+struct XSubP0b : SubscriptP0 {
+// expected-error@-1{{type 'XSubP0b' does not conform to protocol 'SubscriptP0'}}
   subscript (i: Int) -> Float { get { return Float(i) } } // expected-note{{inferred type 'Float' (by matching requirement 'subscript') is invalid: does not conform to 'PSimple'}}
+}
+
+struct XSubP0c : SubscriptP0 {
+// expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
+  subscript (i: Index) -> Element { get { } } // expected-error{{reference to invalid associated type 'Element' of type 'XSubP0c'}}
+}
+
+struct XSubP0d : SubscriptP0 {
+// expected-error@-1 {{type 'XSubP0d' does not conform to protocol 'SubscriptP0'}}
+  subscript (i: XSubP0d.Index) -> XSubP0d.Element { get { } }
 }
 
 // Inference from properties and subscripts
 protocol CollectionLikeP0 {
-  typealias Index
-  typealias Element
+  associatedtype Index
+  // expected-note@-1 {{protocol requires nested type 'Index'; do you want to add it?}}
+  associatedtype Element
+  // expected-note@-1 {{protocol requires nested type 'Element'; do you want to add it?}}
 
   var startIndex: Index { get }
   var endIndex: Index { get }
@@ -164,15 +181,23 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
   subscript (r: Range<Int>) -> SomeSlice<T> { get { return SomeSlice() } }
 }
 
-// rdar://problem/21304164
-public protocol Thenable {
-    typealias T // expected-note{{protocol requires nested type 'T'}}
-    func then(success: (_: T) -> T) -> Self
+struct XCollectionLikeP0b : CollectionLikeP0 {
+// expected-error@-1 {{type 'XCollectionLikeP0b' does not conform to protocol 'CollectionLikeP0'}}
+  var startIndex: XCollectionLikeP0b.Index
+  // There was an error @-1 ("'startIndex' used within its own type"),
+  // but it disappeared and doesn't seem like much of a loss.
+  var startElement: XCollectionLikeP0b.Element
 }
 
-public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
-    public func then(success: (t: T, _: CorePromise<T>) -> T) -> Self {
-        return self.then() { (t: T) -> T in
+// rdar://problem/21304164
+public protocol Thenable {
+    associatedtype T // expected-note{{protocol requires nested type 'T'}}
+    func then(_ success: (_: T) -> T) -> Self
+}
+
+public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>' does not conform to protocol 'Thenable'}}
+    public func then(_ success: @escaping (_ t: U, _: CorePromise<U>) -> U) -> Self {
+        return self.then() { (t: U) -> U in // expected-error{{contextual closure type '(U, CorePromise<U>) -> U' expects 2 arguments, but 1 was used in closure body}}
             return success(t: t, self)
         }
     }
@@ -180,19 +205,19 @@ public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>
 
 // rdar://problem/21559670
 protocol P3 {
-  typealias Assoc = Int
-  typealias Assoc2
-  func foo(x: Assoc2) -> Assoc?
+  associatedtype Assoc = Int
+  associatedtype Assoc2
+  func foo(_ x: Assoc2) -> Assoc?
 }
 
 protocol P4 : P3 { }
 
 extension P4 {
-  func foo(x: Int) -> Float? { return 0 }
+  func foo(_ x: Int) -> Float? { return 0 }
 }
 
 extension P3 where Assoc == Int {
-  func foo(x: Int) -> Assoc? { return nil }
+  func foo(_ x: Int) -> Assoc? { return nil }
 }
 
 
@@ -200,7 +225,7 @@ struct X4 : P4 { }
 
 // rdar://problem/21738889
 protocol P5 {
-  typealias A = Int
+  associatedtype A = Int
 }
 
 struct X5<T : P5> : P5 {
@@ -208,15 +233,15 @@ struct X5<T : P5> : P5 {
 }
 
 protocol P6 : P5 {
-  typealias A : P5 = X5<Self>
+  associatedtype A : P5 = X5<Self>
 }
 
 extension P6 where A == X5<Self> { }
 
 // rdar://problem/21774092
 protocol P7 {
-  typealias A
-  typealias B
+  associatedtype A
+  associatedtype B
   func f() -> A
   func g() -> B
 }
@@ -231,43 +256,43 @@ struct Y7<T> : P7 {
   func f() -> Int { return 0 }
 }
 
-struct MyAnySequence<Element> : MySequenceType {
+struct MyAnySequence<Element> : MySequence {
   typealias SubSequence = MyAnySequence<Element>
-  func generate() -> MyAnyGenerator<Element> {
-    return MyAnyGenerator<Element>()
+  func makeIterator() -> MyAnyIterator<Element> {
+    return MyAnyIterator<Element>()
   }
 }
 
-struct MyAnyGenerator<T> : MyGeneratorType {
+struct MyAnyIterator<T> : MyIteratorType {
   typealias Element = T
 }
 
-protocol MyGeneratorType {
-  typealias Element
+protocol MyIteratorType {
+  associatedtype Element
 }
 
-protocol MySequenceType {
-  typealias Generator : MyGeneratorType
-  typealias SubSequence
+protocol MySequence {
+  associatedtype Iterator : MyIteratorType
+  associatedtype SubSequence
 
   func foo() -> SubSequence
-  func generate() -> Generator
+  func makeIterator() -> Iterator
 }
 
-extension MySequenceType {
-  func foo() -> MyAnySequence<Generator.Element> {
+extension MySequence {
+  func foo() -> MyAnySequence<Iterator.Element> {
     return MyAnySequence()
   }
 }
 
-struct SomeStruct<Element> : MySequenceType {
+struct SomeStruct<Element> : MySequence {
   let element: Element
   init(_ element: Element) {
     self.element = element
   }
 
-  func generate() -> MyAnyGenerator<Element> {
-    return MyAnyGenerator<Element>()
+  func makeIterator() -> MyAnyIterator<Element> {
+    return MyAnyIterator<Element>()
   }
 }
 
@@ -279,7 +304,7 @@ protocol P9 : P8 {
 }
 
 protocol P10 {
-  typealias A
+  associatedtype A
 
   func foo() -> A
 }
@@ -306,8 +331,8 @@ func testZ10() -> Z10.A {
 
 // rdar://problem/21926788
 protocol P11 {
-  typealias A
-  typealias B
+  associatedtype A
+  associatedtype B
   func foo() -> B
 }
 
@@ -326,3 +351,52 @@ extension P12 {
 struct X12 : P12 {
   typealias A = String
 }
+
+// Infinite recursion -- we would try to use the extension
+// initializer's argument type of 'Dough' as a candidate for
+// the associated type
+protocol Cookie {
+  associatedtype Dough
+  // expected-note@-1 {{protocol requires nested type 'Dough'; do you want to add it?}}
+
+  init(t: Dough)
+}
+
+extension Cookie {
+  init(t: Dough?) {}
+}
+
+struct Thumbprint : Cookie {}
+// expected-error@-1 {{type 'Thumbprint' does not conform to protocol 'Cookie'}}
+
+// Looking through typealiases
+protocol Vector {
+  associatedtype Element
+  typealias Elements = [Element]
+
+  func process(elements: Elements)
+}
+
+struct Int8Vector : Vector {
+  func process(elements: [Int8]) { }
+}
+
+// SR-4486
+protocol P13 {
+  associatedtype Arg // expected-note{{protocol requires nested type 'Arg'; do you want to add it?}}
+  func foo(arg: Arg)
+}
+
+struct S13 : P13 { // expected-error{{type 'S13' does not conform to protocol 'P13'}}
+  func foo(arg: inout Int) {}
+}
+
+// "Infer" associated type from generic parameter.
+protocol P14 {
+  associatedtype Value
+}
+
+struct P14a<Value>: P14 { }
+
+struct P14b<Value> { }
+extension P14b: P14 { }

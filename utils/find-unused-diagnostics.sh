@@ -5,7 +5,7 @@
 #
 
 # Gather all diagnostic identifiers.
-ALL_DIAGS=$(grep -E --only-matching --no-filename 'ERROR\([a-z_]+,' include/swift/AST/Diagnostics.def | sed -e 's/ERROR(//' -e 's/,//')
+ALL_DIAGS=$(grep -E --only-matching --no-filename 'ERROR\([a-z_]+,' include/swift/AST/Diagnostics*.def | sed -e 's/ERROR(//' -e 's/,//')
 
 # Now look for all potential identifiers in the source files.
 ALL_SOURCES=$(find lib include tools -name \*.cpp -or -name \*.h)

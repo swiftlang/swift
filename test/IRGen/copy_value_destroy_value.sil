@@ -1,0 +1,45 @@
+// RUN: %target-swift-frontend -parse-sil -emit-ir %s | %FileCheck %s
+// REQUIRES: OS=macosx
+
+// Make sure that we are using type lowering and that we are handling the return
+// value correctly.
+
+sil_stage canonical
+
+import Builtin
+
+struct Foo {
+  var t1 : Builtin.Int32
+  var c1 : Builtin.NativeObject
+  var t2 : Builtin.Int32
+  var c2 : Builtin.NativeObject
+  var t3 : Builtin.Int32
+}
+
+// CHECK: define{{( protected)?}} swiftcc void @trivial(
+// CHECK-NEXT: entry
+// CHECK-NEXT: ret void
+sil @trivial : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = copy_value %0 : $Builtin.Int32
+  destroy_value %1 : $Builtin.Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK: define{{( protected)?}} swiftcc void @non_trivial(
+// CHECK: [[GEP1:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %1, i32 0, i32 2
+// CHECK-NEXT: [[VAL1:%.*]] = load %swift.refcounted*, %swift.refcounted** [[GEP1]], align 8
+// CHECK: [[GEP2:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %1, i32 0, i32 5
+// CHECK-NEXT: [[VAL2:%.*]] = load %swift.refcounted*, %swift.refcounted** [[GEP2]], align 8
+// CHECK: call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[VAL1]])
+// CHECK: call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[VAL2]])
+// CHECK: call void @swift_rt_swift_release(%swift.refcounted* [[VAL1]])
+// CHECK: call void @swift_rt_swift_release(%swift.refcounted* [[VAL2]])
+sil @non_trivial : $@convention(thin) (Foo) -> () {
+bb0(%0 : $Foo):
+  %1 = copy_value %0 : $Foo
+  destroy_value %1 : $Foo
+  %2 = tuple()
+  return %2 : $()
+}

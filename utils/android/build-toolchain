@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#
+# android/build-toolchain
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+set -e
+
+SWIFT_PATH="$( cd "$(dirname $0)/../../.." && pwd )" 
+
+ANDROID_NDK_PATH="${ANDROID_NDK_PATH:?Please set the Android NDK path in the ANDROID_NDK_PATH environment variable}"
+ANDROID_ICU_PATH=${SWIFT_PATH}/libiconv-libicu-android
+
+[ -e ${ANDROID_ICU_PATH} ] || exit 1
+
+SWIFT_ANDROID_TOOLCHAIN_PATH="${SWIFT_PATH}/swift-android-toolchain"
+
+rm -rf ${SWIFT_ANDROID_TOOLCHAIN_PATH}
+
+${SWIFT_PATH}/swift/utils/build-script \
+    -R \
+    --android \
+    --android-ndk ${ANDROID_NDK_PATH} \
+    --android-api-level 21 \
+    --android-icu-uc "${ANDROID_ICU_PATH}/armeabi-v7a" \
+    --android-icu-uc-include "${ANDROID_ICU_PATH}/armeabi-v7a/icu/source/common" \
+    --android-icu-i18n "${ANDROID_ICU_PATH}/armeabi-v7a" \
+    --android-icu-i18n-include "${ANDROID_ICU_PATH}/armeabi-v7a/icu/source/i18n" \
+    --libdispatch --install-libdispatch \
+    --foundation --install-foundation \
+    --llbuild --install-llbuild \
+    --lldb --install-lldb \
+    --swiftpm --install-swiftpm \
+    --xctest --install-xctest \
+    --install-swift \
+    '--swift-install-components=autolink-driver;compiler;clang-builtin-headers;stdlib;swift-remote-mirror;sdk-overlay;dev' \
+    --install-prefix=/usr \
+    --install-destdir=${SWIFT_ANDROID_TOOLCHAIN_PATH}
+
+${SWIFT_PATH}/swift-corelibs-libdispatch/build-android
+${SWIFT_PATH}/swift-corelibs-foundation/build-android
+

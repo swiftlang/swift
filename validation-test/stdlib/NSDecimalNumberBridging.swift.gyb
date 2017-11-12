@@ -1,0 +1,25 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
+
+import Foundation
+import StdlibUnittest
+
+let NSDecimalNumberTests = TestSuite("NSDecimalNumber")
+
+NSDecimalNumberTests.test("AnyHashable containing Foundation.Decimal") {
+  let values = [
+    NSDecimalNumber(string: "10.0"),
+    NSDecimalNumber(string: "20.0"),
+    NSDecimalNumber(string: "20.0"),
+  ]
+  let anyHashables = values.map(AnyHashable.init)
+  expectEqual(Decimal.self, type(of: anyHashables[0].base))
+  expectEqual(Decimal.self, type(of: anyHashables[1].base))
+  expectEqual(Decimal.self, type(of: anyHashables[2].base))
+  expectNotEqual(anyHashables[0], anyHashables[1])
+  expectEqual(anyHashables[1], anyHashables[2])
+}
+
+runAllTests()
+

@@ -30,7 +30,7 @@ class and its superclasses.
 There are three kinds of delegation:
 
 * **super**: runs an initializer belonging to a superclass (in ObjC,
-  ``[super init…]``; in Swift, ``super.init(...)``).
+  ``[super init...]``; in Swift, ``super.init(...)``).
 
 * **peer**:  runs an initializer belonging to the current class (ObjC
   does not have syntax for this, although it is supported by the
@@ -38,7 +38,7 @@ There are three kinds of delegation:
 
 * **dispatched**: given a signature, runs the initializer with that
   signature that is either defined or inherited by the most-derived
-  class (in ObjC, ``[self init…]``; not currently supported by Swift)
+  class (in ObjC, ``[self init...]``; not currently supported by Swift)
 
 We can also distinguish two ways to originally invoke an initializer:
 
@@ -50,18 +50,18 @@ We can also distinguish two ways to originally invoke an initializer:
 Either kind of dispatched initialization poses a soundness problem
 because there may not be a sound initializer with any given signature
 in the most-derived class.  In ObjC, initializers are normal instance
-methods and are therefore inherited like normal, but this isn’t really
+methods and are therefore inherited like normal, but this isn't really
 quite right; initialization is different from a normal method in that
-it’s not inherently sensible to require subclasses to provide
+it's not inherently sensible to require subclasses to provide
 initializers at all the signatures that their superclasses provide.
 
 Subobject initializers
 ~~~~~~~~~~~~~~~~~~~~~~
 The defining class of a subobject initializer is central to its
 behavior.  It can be soundly inherited by a class C only if is trivial
-to initialize the ivars of C, but it’s convenient to ignore that and
+to initialize the ivars of C, but it's convenient to ignore that and
 assume that subobjects will always trivially wrap and delegate to
-superclass subobject initializers. 
+superclass subobject initializers.
 
 A subobject initializer must either (1) delegate to a peer subobject
 initializer or (2) take responsibility for initializing all ivars of
@@ -75,7 +75,7 @@ initializer of a class C if and only if it is defined by C.
 
 Complete object initializers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The defining class of a complete object initializer doesn’t really
+The defining class of a complete object initializer doesn't really
 matter.  In principle, complete object initializers could just as well
 be freestanding functions to which a metatype is passed.  It can make
 sense to inherit a complete object initializer.
@@ -90,11 +90,11 @@ A complete object initializer soundly acts like a complete object
 initializer of a class C if and only if it delegates to an initializer
 which soundly acts like a complete object initializer of C.
 
-These rules are not obvious to check statically because they’re
+These rules are not obvious to check statically because they're
 dependent on the dynamic value of the most-derived class C.  Therefore
 any ability to check them depends on restricting C somehow relative to
 the defining class of the initializer.  Since, statically, we only
-know the defining class of the initializer, we can’t establish
+know the defining class of the initializer, we can't establish
 soundness solely at the definition site; instead we have to prevent
 unsound initializers from being called.
 
@@ -116,7 +116,7 @@ Virtual initializers
 The above condition is not sufficient to make indirect initialization
 sound, because it relies on the ability to simply not use an
 initializer in cases where its delegation behavior isn't known to be
-sound, and we can’t do that to arbitrary code.  For that, we would
+sound, and we can't do that to arbitrary code.  For that, we would
 need true virtual initializers.
 
 A virtual initializer is a contract much more like that of a standard
@@ -135,7 +135,7 @@ doing so is safe.
 Complete object initializers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Introduce the notion of a complete object initializer, which is
-written as an initializer with ``Self`` as its return type [#], e.g.::
+written as an initializer with ``Self`` as its return type [#]_, e.g.::
 
   init() -> Self {
     // ...
@@ -201,9 +201,9 @@ examples::
   }
 
   class B3 : A {
-    var counter: Int 
+    var counter: Int
 
-    init withInitialCount(initialCount: Int)  { // subobject initializer
+    init withInitialCount(initialCount: Int) { // subobject initializer
       counter = initialCount
       super.init(withTitle: "Unnamed")
     }
@@ -214,7 +214,7 @@ examples::
       self.init(withInitialCount: initialCount)
     }
 
-    // does not inherit A's init(), because init withTitle(String) is not 
+    // does not inherit A's init(), because init withTitle(String) is not
     // overridden.
   }
 
@@ -270,7 +270,7 @@ metatype of the class. For example::
     init() { }
   }
 
-  func f(meta: D.Type) {
+  func f(_ meta: D.Type) {
     meta() // error: no guarantee that an arbitrary of subclass D has an init()
   }
 
@@ -282,8 +282,8 @@ attribute, are guaranteed to be available in every subclass of
     @virtual init() { }
   }
 
-  func f(meta: D.Type) {
-    meta() // okay: every sublass of D guaranteed to have an init()
+  func f(_ meta: D.Type) {
+    meta() // okay: every subclass of D guaranteed to have an init()
   }
 
 Note that ``@virtual`` places a requirement on all subclasses to
@@ -299,8 +299,8 @@ every subclass. For example::
   class E2 : D {
     var title: String
 
-    @virtual init() { 
-      title = "Unnamed" 
+    @virtual init() {
+      title = "Unnamed"
       super.init()
     }
 
@@ -310,11 +310,11 @@ every subclass. For example::
   class E3 : D {
     var title: String
 
-    @virtual init() -> Self { 
+    @virtual init() -> Self {
       self.init(withTitle: "Unnamed")
     }
 
-    init withTitle(title: String) { 
+    init withTitle(title: String) {
       self.title = title
       super.init()
     }
@@ -378,7 +378,7 @@ a trivial ``NSDocument``::
 
 In Swift, there would be no way to create an object of type
 ``MyDocument``. However, the frameworks will allocate an instance of
-``MyDocument`` and then send an message such as
+``MyDocument`` and then send a message such as
 ``initWithContentsOfURL:ofType:error:`` to the object. This will find
 ``-[NSDocument initWithContentsOfURL:ofType:error:]``, which delegates
 to ``-[NSDocument init]``, leaving ``MyDocument``'s stored properties
@@ -393,4 +393,4 @@ diagnostic indicating that the initializer needs to be
 implemented.
 
 .. [#] Syntax suggestion from Joe Groff.
-       
+

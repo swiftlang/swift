@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,9 +20,10 @@
 
 // FIXME: Portability ?
 #include <Block.h>
-#include <dispatch/dispatch.h>
 
-#ifdef LLVM_ON_WIN32
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <dlfcn.h>
@@ -79,8 +80,8 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
 }
 
 std::string sourcekitd::getRuntimeLibPath() {
-  // FIXME: Move to a llvm API. Note that libclang does the same thing.
-#ifdef LLVM_ON_WIN32
+  // FIXME: Move to an LLVM API. Note that libclang does the same thing.
+#if defined(_WIN32)
 #error Not implemented
 #else
   // This silly cast below avoids a C++ warning.
@@ -94,24 +95,23 @@ std::string sourcekitd::getRuntimeLibPath() {
 }
 
 void sourcekitd::set_interrupted_connection_handler(
-                          sourcekitd_interrupted_connection_handler_t handler) {
+                          llvm::function_ref<void()> handler) {
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // sourcekitd_request_sync
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  Semaphore sema(0);
 
   sourcekitd_response_t ReturnedResp;
   sourcekitd::handleRequest(req, [&](sourcekitd_response_t resp) {
     ReturnedResp = resp;
-    dispatch_semaphore_signal(sema);
+    sema.signal();
   });
 
-  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-  dispatch_release(sema);
+  sema.wait();
   return ReturnedResp;
 }
 
@@ -123,7 +123,7 @@ void sourcekitd_send_request(sourcekitd_object_t req,
   sourcekitd_request_retain(req);
   receiver = Block_copy(receiver);
   WorkQueue::dispatchConcurrent([=]{
-    sourcekitd::handleRequest(req, [&](sourcekitd_response_t resp) {
+    sourcekitd::handleRequest(req, [=](sourcekitd_response_t resp) {
       // The receiver accepts ownership of the response.
       receiver(resp);
       Block_release(receiver);

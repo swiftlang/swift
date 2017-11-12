@@ -1,6 +1,6 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
-func canonical_empty_protocol() -> protocol<> {
+func canonical_empty_protocol() -> Any {
   return 1
 }
 
@@ -22,45 +22,47 @@ protocol P4 : P3 {
   func f(_: Double) -> Double
 }
 
-typealias Any = protocol<>
-typealias Any2 = protocol< >
+typealias Any1 = protocol<> // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
+typealias Any2 = protocol< > // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
 
-// Okay to inherit a typealias for a protocol<> type.
+// Okay to inherit a typealias for Any type.
 protocol P5 : Any { }
+protocol P6 : protocol<> { } // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
+typealias P7 = Any & Any1
 
 extension Int : P5 { }
 
-typealias Bogus = protocol<P1, Int> // expected-error{{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
+typealias Bogus = P1 & Int // expected-error{{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
 
 func testEquality() {
   // Remove duplicates from protocol-conformance types.
-  let x1 : (_ : protocol<P2, P4>) -> ()
-  let x2 : (_ : protocol<P3, P4, P2, P1>) -> ()
+  let x1 : (_ : P2 & P4) -> ()
+  let x2 : (_ : P3 & P4 & P2 & P1) -> ()
   x1 = x2
   _ = x1
 
   // Singleton protocol-conformance types, after duplication, are the same as
   // simply naming the protocol type.
-  let x3 : (_ : protocol<P2, P1>) -> ()
+  let x3 : (_ : P2 & P1) -> ()
   let x4 : (_ : P2) -> ()
   x3 = x4
   _ = x3
-  
+
   // Empty protocol-conformance types are empty.
   let x5 : (_ : Any) -> ()
   let x6 : (_ : Any2) -> ()
   x5 = x6
   _ = x5
 
-  let x7 : (_ : protocol<P1, P3>) -> ()
-  let x8 : (_ : protocol<P2>) -> ()
-  x7 = x8 // expected-error{{cannot assign value of type '(P2) -> ()' to type '(protocol<P1, P3>) -> ()'}}
+  let x7 : (_ : P1 & P3) -> ()
+  let x8 : (_ : P2) -> ()
+  x7 = x8 // expected-error{{cannot assign value of type '(P2) -> ()' to type '(P1 & P3) -> ()'}}
   _ = x7
 }
 
 // Name lookup into protocol-conformance types
 func testLookup() {
-  let x1 : protocol<P2, P1, P4>
+  let x1 : P2 & P1 & P4
   x1.p1()
   x1.p2()
   x1.p3()
@@ -78,28 +80,28 @@ protocol SuperREPLPrintable : REPLPrintable {
 }
 
 protocol FooProtocol {
-  func format(kind: UnicodeScalar, layout: String) -> String
+  func format(_ kind: Unicode.Scalar, layout: String) -> String
 }
 
 struct SuperPrint : REPLPrintable, FooProtocol, SuperREPLPrintable {
   func replPrint() {}
   func superReplPrint() {}
-  func format(kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: Unicode.Scalar, layout: String) -> String {}
 }
 
 struct Struct1 {}
 extension Struct1 : REPLPrintable, FooProtocol {
   func replPrint() {}
-  func format(kind: UnicodeScalar, layout: String) -> String {}
+  func format(_ kind: Unicode.Scalar, layout: String) -> String {}
 }
 
-func accept_manyPrintable(_: protocol<REPLPrintable, FooProtocol>) {}
+func accept_manyPrintable(_: REPLPrintable & FooProtocol) {}
 
-func return_superPrintable() -> protocol<FooProtocol, SuperREPLPrintable> {}
+func return_superPrintable() -> FooProtocol & SuperREPLPrintable {}
 
 func testConversion() {
   // Conversions for literals.
-  var x : protocol<REPLPrintable, FooProtocol> = Struct1()
+  var x : REPLPrintable & FooProtocol = Struct1()
   accept_manyPrintable(Struct1())
 
   // Conversions for nominal types that conform to a number of protocols.
@@ -108,17 +110,65 @@ func testConversion() {
   accept_manyPrintable(sp)
 
   // Conversions among existential types.
-  var x2 : protocol<SuperREPLPrintable, FooProtocol>
-  x2 = x // expected-error{{value of type 'protocol<FooProtocol, REPLPrintable>' does not conform to 'protocol<FooProtocol, SuperREPLPrintable>' in assignment}}
+  var x2 : protocol<SuperREPLPrintable, FooProtocol> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{12-53=SuperREPLPrintable & FooProtocol}}
+  x2 = x // expected-error{{value of type 'FooProtocol & REPLPrintable' does not conform to 'FooProtocol & SuperREPLPrintable' in assignment}}
   x = x2
 
   // Subtyping
-  var _ : () -> protocol<FooProtocol, SuperREPLPrintable> = return_superPrintable
+  var _ : () -> FooProtocol & SuperREPLPrintable = return_superPrintable
 
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
-  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable($0) }
+  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable() } // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{17-53=FooProtocol & REPLPrintable}}
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>=17
+var x : protocol<P5>= 17 // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{9-22=P5=}} expected-error {{'=' must have consistent whitespace on both sides}}
+var y : protocol<P5, P7>= 17 // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{9-26=P5 & P7=}} expected-error {{'=' must have consistent whitespace on both sides}}
+var z : protocol<P5, P7>?=17 // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{9-27=(P5 & P7)?=}}
 
+typealias A1 = protocol<> // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}} {{16-26=Any}}
+typealias A2 = protocol<>? // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}} {{16-27=Any?}}
+typealias B1 = protocol<P1,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-31=P1 & P2}}
+typealias B2 = protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-32=P1 & P2}}
+typealias B3 = protocol<P1 ,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-32=P1 & P2}}
+typealias B4 = protocol<P1 , P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{16-33=P1 & P2}}
+typealias C1 = protocol<Any, P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{16-33=P1}}
+typealias C2 = protocol<P1, Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{16-33=P1}}
+typealias D = protocol<P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
+typealias E = protocol<Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=Any}}
+typealias F = protocol<Any, Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-33=Any}}
+typealias G = protocol<P1>.Type // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
+typealias H = protocol<P1>! // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=P1!}}
+typealias J = protocol<P1, P2>.Protocol // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-31=(P1 & P2)}}
+typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{15-32=(P1 & P2)?}}
+
+typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type 'P1.Protocol' cannot be used within a protocol-constrained type}}
+typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'P1.Type' cannot be used within a protocol-constrained type}}
+typealias T03 = P1? & P2 // expected-error {{non-protocol, non-class type 'P1?' cannot be used within a protocol-constrained type}}
+typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type 'P2!' cannot be used within a protocol-constrained type}} expected-error {{implicitly unwrapped optionals}} {{24-25=?}}
+typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
+typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}
+typealias T07 = P1 & protocol<P2, P3> // expected-error {{protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{22-38=P2 & P3}}
+func fT07(x: T07) -> P1 & P2 & P3 { return x } // OK, 'P1 & protocol<P2, P3>' is parsed as 'P1 & P2 & P3'.
+let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}}
+
+struct S01: P5 & P6 {}
+struct S02: P5? & P6 {} // expected-error {{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
+struct S03: Optional<P5> & P6 {} // expected-error {{non-protocol, non-class type 'Optional<P5>' cannot be used within a protocol-constrained type}}
+struct S04<T : P5 & (P6)> {}
+struct S05<T> where T : P5? & P6 {} // expected-error 2{{non-protocol, non-class type 'P5?' cannot be used within a protocol-constrained type}}
+
+// SR-3124 - Protocol Composition Often Migrated Incorrectly
+struct S3124<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{17-34=P1 & P3>}}
+func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-error {{'where' clause}}
+func f3124_2<U : protocol<P1>>(x: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{18-31=P1>}}
+
+// Make sure we correctly form compositions in expression context
+func takesP1AndP2(_: [AnyObject & P1 & P2]) {}
+
+takesP1AndP2([AnyObject & P1 & P2]())
+takesP1AndP2([Swift.AnyObject & P1 & P2]())
+takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
+takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
+takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{use of unresolved identifier 'DoesNotExist'}}
+takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift' has no member named 'DoesNotExist'}}

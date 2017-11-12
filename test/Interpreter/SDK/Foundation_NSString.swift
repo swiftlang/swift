@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -13,7 +13,7 @@ print(hello)
 var helloStr: String = hello as String
 print(String(helloStr._core[NSRange(location: 1, length: 5).toRange()!]))
 
-var upperHello = hello.uppercaseString
+var upperHello = hello.uppercased
 // CHECK: HELLO, WORLD!
 print(upperHello)
 
@@ -42,14 +42,14 @@ print(array[1] as! NSString, terminator: "")
 print("!")
 
 // Selectors
-assert(NSString.instancesRespondToSelector("init"))
-assert(!NSString.instancesRespondToSelector("wobble"))
+assert(NSString.instancesRespond(to: "init"))
+assert(!NSString.instancesRespond(to: "wobble"))
 
 // Array of strings
 var array2 : NSArray = [hello, hello]
 
 // Switch on strings
-switch ("world" as NSString).uppercaseString {
+switch ("world" as NSString).uppercased {
 case "WORLD":
   print("Found it\n", terminator: "")
 
@@ -135,16 +135,24 @@ testComparisons()
 // Test overlain variadic methods.
 // CHECK-LABEL: Variadic methods:
 print("Variadic methods:")
+// Check that it works with bridged Strings.
 // CHECK-NEXT: x y
 print(NSString(format: "%@ %@", "x", "y"))
+// Check that it works with bridged Arrays and Dictionaries.
+// CHECK-NEXT: (
+// CHECK-NEXT:   x
+// CHECK-NEXT: ) {
+// CHECK-NEXT:   y = z;
+// CHECK-NEXT: }
+print(NSString(format: "%@ %@", ["x"], ["y": "z"]))
 // CHECK-NEXT: 1{{.*}}024,25
 print(NSString(
   format: "%g",
-  locale: NSLocale(localeIdentifier: "fr_FR"),
+  locale: Locale(identifier: "fr_FR"),
   1024.25
 ))
 // CHECK-NEXT: x y z
-print(("x " as NSString).stringByAppendingFormat("%@ %@", "y", "z"))
+print(("x " as NSString).appendingFormat("%@ %@", "y", "z"))
 // CHECK-NEXT: a b c
 let s = NSMutableString(string: "a ")
 s.appendFormat("%@ %@", "b", "c")
@@ -153,6 +161,6 @@ print(s)
 let m = NSMutableString.localizedStringWithFormat("<%@ %@>", "q", "r")
 // CHECK-NEXT: <q r>
 print(m)
-m.appendString(" lever")
+m.append(" lever")
 // CHECK-NEXT: <q r> lever
 print(m)

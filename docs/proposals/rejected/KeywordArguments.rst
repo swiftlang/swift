@@ -10,7 +10,7 @@ Summary
 We make the following incremental language changes:
 
 - We make it so that selector-style declaration syntax declares a
-  **selector name** for a method. ``func foo(x:T) bar(y:U)`` declares a method
+  **selector name** for a method. ``func foo(_ x:T) bar(y:U)`` declares a method
   named with a new selector reference syntax, ``self.foo:bar:``. This method
   cannot be referenced as ``foo``; it can only be referenced as
   ``self.foo:bar:``, or with keyword application syntax,
@@ -19,9 +19,9 @@ We make the following incremental language changes:
 - We change keywords in parens, as in ``(a: x, b: y)`` to be a feature of
   apply syntax, instead of a feature of tuple literals. Name lookup changes to
   resolve keywords according to the function declaration rather than to the
-  context tuple type. For tuple-style declarations ``func foo(a: Int, b: Int)``,
+  context tuple type. For tuple-style declarations ``func foo(_ a: Int, b: Int)``,
   keywords are optional and can be reordered. For selector-style declarations
-  ``func foo(a: Int) bar(b: Int)``, the keywords are required and must appear
+  ``func foo(_ a: Int) bar(b: Int)``, the keywords are required and must appear
   in order.
 
 - With keyword arguments no longer reliant on tuple types, we simplify the
@@ -79,14 +79,14 @@ A tuple-style declaration matches a named application if:
 
 - The base name matches the name of the declaration::
 
-    func foo(x: Int, y: Int) {}
+    func foo(_ x: Int, y: Int) {}
     foo(1, 2) // matches
     bar(1, 2) // doesn't match
 
 - Positional arguments, that is, arguments without keywords, must be convertible
   to the type of the corresponding positional parameter of the declaration::
 
-    func foo(x: Int, y: Int) {}
+    func foo(_ x: Int, y: Int) {}
     foo(1, 2) // matches
     foo("one", 2) // doesn't match
     foo(1, "two") // doesn't match
@@ -98,7 +98,7 @@ A tuple-style declaration matches a named application if:
   multiple times, and the same argument cannot be provided positionally and
   by keyword. All keyword arguments must follow all positional arguments::
 
-    func foo(x: Int, y: String, z: UnicodeScalar) {}
+    func foo(_ x: Int, y: String, z: UnicodeScalar) {}
     foo(1, "two", '3')          // matches
     foo(1, "two", z: '3')       // matches
     foo(1, y: "two", '3')       // invalid, positional arg after keyword arg
@@ -111,7 +111,7 @@ A tuple-style declaration matches a named application if:
   As an exception, a trailing closure argument always positionally matches
   the last declared parameter, and can appear after keyword arguments::
 
-    func foo(x: Int, y: String, f: () -> ()
+    func foo(_ x: Int, y: String, f: () -> ()
     foo(y: "two", x: 1) { } // matches
 
 - If the final declared keyword parameter takes a variadic argument, the keyword
@@ -119,7 +119,7 @@ A tuple-style declaration matches a named application if:
   non-keyworded arguments. All arguments up to either the next keyword or
   the end of the argument list become that keyword's argument::
 
-    func foo(x: Int, y: String, z: UnicodeScalar...) {}
+    func foo(_ x: Int, y: String, z: UnicodeScalar...) {}
     foo(1, "two", '3', '4', '5')       // matches, z = ['3', '4', '5']
     foo(1, "two", z: '3', '4', '5')    // same
     foo(1, z: '3', '4', '5', y: "two") // same
@@ -140,7 +140,7 @@ A selector-style declaration matches a named application if:
 - The expression must provide keywords for all of its arguments but the first.
   It must *not* provide a keyword for the first argument::
 
-    func foo(x: Int) bar(y: String) bas(z: UnicodeScalar) {}
+    func foo(_ x: Int) bar(y: String) bas(z: UnicodeScalar) {}
     foo(1, "two", '3')              // doesn't match; no keywords
     foo(x: 1, bar: "two", bas: '3') // doesn't match; first keyword provided
     foo(1, bar: "two", bas: '3')    // matches
@@ -151,12 +151,12 @@ A selector-style declaration matches a named application if:
   to selector pieces with the same name. The argument values must be convertible
   to the declared types of each selector piece's parameter::
 
-    func foo(x: Int) bar(y: String) bas(z: UnicodeScalar) {}
+    func foo(_ x: Int) bar(y: String) bas(z: UnicodeScalar) {}
     foo(1, bar: "two", bas: '3') // matches
     foo(1, bas: '3', bar: "two") // doesn't match; wrong selector piece order
     foo(1, bar: '2', bas: "three") // doesn't match; wrong types
 
-    func foo(x: Int) foo(y: String) foo(z: UnicodeScalar) {}
+    func foo(_ x: Int) foo(y: String) foo(z: UnicodeScalar) {}
     foo(1, foo: "two", foo: '3') // matches
 
 - If the final selector piece declares a variadic parameter, then the keyword
@@ -165,7 +165,7 @@ A selector-style declaration matches a named application if:
   (Because of strict keyword ordering, additional keywords may not follow.)
   For example::
 
-    func foo(x: Int) bar(y: String...) {}
+    func foo(_ x: Int) bar(y: String...) {}
 
     foo(1, bar: "two", "three", "four") // matches, y = ["two", "three", "four"]
 
@@ -173,7 +173,7 @@ A selector-style declaration matches a named application if:
   can be called using trailing closure syntax omitting the keyword. The keyword
   is still required when trailing closure syntax is not used. For example::
 
-    func foo(x: Int) withBlock(f: () -> ())
+    func foo(_ x: Int) withBlock(f: () -> ())
 
     foo(1, withBlock: { }) // matches
     foo(1, { }) // doesn't match
@@ -182,8 +182,8 @@ A selector-style declaration matches a named application if:
   Trailing closure syntax can introduce ambiguities when selector-style
   functions differ only in their final closure selector piece::
 
-    func foo(x: Int) onCompletion(f: () -> ())
-    func foo(x: Int) onError(f: () -> ())
+    func foo(_ x: Int) onCompletion(f: () -> ())
+    func foo(_ x: Int) onError(f: () -> ())
 
     foo(1) { } // error: ambiguous
 
@@ -199,8 +199,8 @@ they are not part of the declaration's ABI. Two tuple-style declarations that
 differ only in keyword names are considered duplicates::
 
   // Error: Duplicate definition of foo(Int, Int) -> ()
-  func foo(a: Int, b: Int) {}
-  func foo(x: Int, y: Int) {}
+  func foo(_ a: Int, b: Int) {}
+  func foo(_ x: Int, y: Int) {}
 
 Selector-Style Declarations
 ```````````````````````````
@@ -210,17 +210,17 @@ declaration order.  Selector-style declarations can be overloaded by selector
 name, by selector order, and by type::
 
   // OK, no duplicates
-  func foo(x: Int) bar(y: Int) bas(z: Int)
-  func foo(x: Int) bar(y: Int) zim(z: Int)
-  func foo(x: Int) bas(y: Int) bar(z: Int)
-  func foo(x: Int) bar(y: Int) bas(z: Float)
+  func foo(_ x: Int) bar(y: Int) bas(z: Int)
+  func foo(_ x: Int) bar(y: Int) zim(z: Int)
+  func foo(_ x: Int) bas(y: Int) bar(z: Int)
+  func foo(_ x: Int) bar(y: Int) bas(z: Float)
 
 Tuple- and selector-style declarations are not considered duplicates, even if
 they can match the same keywords with the same types::
 
   // OK, not duplicates
-  func foo(x: Int, bar: Int)
-  func foo(x: Int) bar(x: Int)
+  func foo(_ x: Int, bar: Int)
+  func foo(_ x: Int) bar(x: Int)
 
 Unapplied Name Lookup
 ---------------------
@@ -229,8 +229,8 @@ An unapplied declaration reference ``identifier`` or member reference
 ``obj.identifier`` finds any tuple-style declaration whose name matches the
 referenced name. It never finds selector-style declarations::
 
-  func foo(a: Int, b: Int) {}
-  func foo(a: Int) bar(b: Int) {}
+  func foo(_ a: Int, b: Int) {}
+  func foo(_ a: Int) bar(b: Int) {}
 
   var f = foo // Finds foo(Int, Int) -> (), not foo:bar:
 
@@ -249,10 +249,10 @@ expression finds any selector-style declarations whose selector pieces match the
 named selector pieces in order::
 
   class C {
-    func foo(a: Int) bar(b: Int) bas(c: Int)
-    func foo(a: Int) bas(b: Int) bar(c: Int)
+    func foo(_ a: Int) bar(b: Int) bas(c: Int)
+    func foo(_ a: Int) bas(b: Int) bar(c: Int)
 
-    func foo(a: Int, bar: Int, bas: Int)
+    func foo(_ a: Int, bar: Int, bas: Int)
   }
 
   var c: C

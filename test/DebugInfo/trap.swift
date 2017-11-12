@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -O -parse-stdlib -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 import Swift
 // CHECK: define{{.*}}1f
-func f(x : Int64) -> Int64 {
+func f(_ x : Int64) -> Int64 {
   if x < 23 {
     // CHECK-DAG: call void @llvm.trap(), !dbg ![[LOC1:.*]]
     // CHECK-DAG: ![[LOC1]] = !DILocation(line: [[@LINE+1]],

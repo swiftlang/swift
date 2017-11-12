@@ -1,5 +1,5 @@
 The modules in the 'stdlib/private' directory contain APIs that are
-considered private to the Swift project.  Don't use them outside of the
+considered private to the Swift project. Don't use them outside of the
 repositories related to the Swift project.
 
 These APIs are used for building Swift build and test automation tools,

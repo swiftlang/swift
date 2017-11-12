@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -28,12 +28,15 @@ class ASTContext;
 enum class VersionComparison { GreaterThanEqual };
 
 enum class AvailabilitySpecKind {
-    /// A version constraint of the form PlatformName X.Y.Z
-    VersionConstraint,
+    /// A platform-version constraint of the form "PlatformName X.Y.Z"
+    PlatformVersionConstraint,
 
-    /// A wildcard constraint, spelled '*', that is be equivalent
+    /// A wildcard constraint, spelled '*', that is equivalent
     /// to CurrentPlatformName >= MinimumDeploymentTargetVersion
-    OtherPlatform
+    OtherPlatform,
+
+    /// A language-version constraint of the form "swift X.Y.Z"
+    LanguageVersionConstraint,
 };
 
 /// The root class for specifications of API availability in availability
@@ -56,8 +59,8 @@ public:
 };
 
 /// \brief An availability specification that guards execution based on the
-/// run-time platform and version, e.g., OSX >= 10.10.
-class VersionConstraintAvailabilitySpec : public AvailabilitySpec {
+/// run-time platform and version, e.g., OS X >= 10.10.
+class PlatformVersionConstraintAvailabilitySpec : public AvailabilitySpec {
   PlatformKind Platform;
   SourceLoc PlatformLoc;
 
@@ -65,14 +68,14 @@ class VersionConstraintAvailabilitySpec : public AvailabilitySpec {
   SourceRange VersionSrcRange;
 
 public:
-  VersionConstraintAvailabilitySpec(PlatformKind Platform,
-                                    SourceLoc PlatformLoc,
-                                    clang::VersionTuple Version,
-                                    SourceRange VersionSrcRange)
-      : AvailabilitySpec(AvailabilitySpecKind::VersionConstraint),
-        Platform(Platform),
-        PlatformLoc(PlatformLoc), Version(Version),
-        VersionSrcRange(VersionSrcRange) {}
+  PlatformVersionConstraintAvailabilitySpec(PlatformKind Platform,
+                                            SourceLoc PlatformLoc,
+                                            clang::VersionTuple Version,
+                                            SourceRange VersionSrcRange)
+    : AvailabilitySpec(AvailabilitySpecKind::PlatformVersionConstraint),
+      Platform(Platform),
+      PlatformLoc(PlatformLoc), Version(Version),
+      VersionSrcRange(VersionSrcRange) {}
 
   /// The required platform.
   PlatformKind getPlatform() const { return Platform; }
@@ -87,7 +90,50 @@ public:
   void print(raw_ostream &OS, unsigned Indent) const;
   
   static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::VersionConstraint;
+    return Spec->getKind() == AvailabilitySpecKind::PlatformVersionConstraint;
+  }
+
+  void *
+  operator new(size_t Bytes, ASTContext &C,
+               unsigned Alignment = alignof(PlatformVersionConstraintAvailabilitySpec)){
+    return AvailabilitySpec::operator new(Bytes, C, Alignment);
+  }
+};
+
+/// \brief An availability specification that guards execution based on the
+/// compile-time language version, e.g., swift >= 3.0.1.
+class LanguageVersionConstraintAvailabilitySpec : public AvailabilitySpec {
+  SourceLoc SwiftLoc;
+
+  clang::VersionTuple Version;
+  SourceRange VersionSrcRange;
+
+public:
+  LanguageVersionConstraintAvailabilitySpec(SourceLoc SwiftLoc,
+                                            clang::VersionTuple Version,
+                                            SourceRange VersionSrcRange)
+    : AvailabilitySpec(AvailabilitySpecKind::LanguageVersionConstraint),
+      SwiftLoc(SwiftLoc), Version(Version),
+      VersionSrcRange(VersionSrcRange) {}
+
+  SourceLoc getSwiftLoc() const { return SwiftLoc; }
+
+  // The platform version to compare against.
+  clang::VersionTuple getVersion() const { return Version; }
+  SourceRange getVersionSrcRange() const { return VersionSrcRange; }
+
+  SourceRange getSourceRange() const;
+
+  void print(raw_ostream &OS, unsigned Indent) const;
+
+  static bool classof(const AvailabilitySpec *Spec) {
+    return Spec->getKind() == AvailabilitySpecKind::LanguageVersionConstraint;
+  }
+
+  void *
+  operator new(size_t Bytes, ASTContext &C,
+               unsigned Alignment = alignof(LanguageVersionConstraintAvailabilitySpec)){
+    return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };
 
@@ -97,7 +143,7 @@ public:
 /// to new platforms. Because new platforms typically branch from
 /// existing platforms, the wildcard allows an #available() check to do the
 /// "right" thing (executing the guarded branch) on the new platform without
-/// requiring a modification to every availablity guard in the program. Note
+/// requiring a modification to every availability guard in the program. Note
 /// that we still do compile-time availability checking with '*', so the
 /// compiler will still catch references to potentially unavailable symbols.
 class OtherPlatformAvailabilitySpec : public AvailabilitySpec {
@@ -114,6 +160,12 @@ public:
 
   static bool classof(const AvailabilitySpec *Spec) {
     return Spec->getKind() == AvailabilitySpecKind::OtherPlatform;
+  }
+
+  void *
+  operator new(size_t Bytes, ASTContext &C,
+               unsigned Alignment = alignof(OtherPlatformAvailabilitySpec)) {
+    return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };
 

@@ -2,18 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
-// In Swift's AST-level type system, function types are allowed to be equivalent
-// or have a subtyping relationship even if the SIL-level lowering of the
-// calling convention is different. The routines in this file implement thunking
-// between lowered function types.
+// Swift function types can be equivalent or have a subtyping relationship even
+// if the SIL-level lowering of the calling convention is different. The
+// routines in this file implement thunking between lowered function types.
 //
 //
 // Re-abstraction thunks
@@ -49,7 +48,7 @@
 // parameter of the base with a concrete type, the derived class can override
 // methods in the base that involved generic types. In the derived class, a
 // method override that involves substituted types will have a different
-// SIL lowering than the base method. In this case, the overriden vtable entry
+// SIL lowering than the base method. In this case, the overridden vtable entry
 // will point to a thunk which transforms parameters and results and invokes
 // the derived method.
 //
@@ -61,8 +60,11 @@
 // Witness thunks
 // ==============
 //
-// Currently protocol witness methods are called with an additional generic
-// parameter bound to the Self type, and thus always require a thunk.
+// Protocol witness methods are called with an additional generic parameter
+// bound to the Self type, and thus always require a thunk. Thunks are also
+// required for conditional conformances, since the extra requirements aren't
+// part of the protocol and so any witness tables need to be loaded from the
+// original protocol's witness table and passed into the real witness method.
 //
 // Thunks for class method witnesses dispatch through the vtable allowing
 // inherited witnesses to be overridden in subclasses. Hence a witness thunk
@@ -81,10 +83,11 @@
 
 #include "SILGen.h"
 #include "Scope.h"
-#include "swift/Basic/Fallthrough.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -93,9 +96,19 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
+
+/// A helper function that pulls an element off the front of an array.
+template <class T>
+static const T &claimNext(ArrayRef<T> &array) {
+  assert(!array.empty() && "claiming next from empty array!");
+  const T &result = array.front();
+  array = array.slice(1);
+  return result;
+}
 
 namespace {
   /// An abstract class for transforming first-class SIL values.
@@ -107,6 +120,14 @@ namespace {
   public:
     Transform(SILGenFunction &SGF, SILLocation loc) : SGF(SGF), Loc(loc) {}
     virtual ~Transform() = default;
+
+    /// Transform an arbitrary value.
+    RValue transform(RValue &&input,
+                     AbstractionPattern inputOrigType,
+                     CanType inputSubstType,
+                     AbstractionPattern outputOrigType,
+                     CanType outputSubstType,
+                     SGFContext ctxt);
 
     /// Transform an arbitrary value.
     ManagedValue transform(ManagedValue input,
@@ -139,29 +160,30 @@ namespace {
                                    CanAnyFunctionType outputSubstType,
                                    const TypeLowering &expectedTL);
   };
-};
+} // end anonymous namespace
+;
 
-static ArrayRef<ProtocolConformance*>
-collectExistentialConformances(Module *M, Type fromType, Type toType) {
-  assert(!fromType->isAnyExistentialType());
+static ArrayRef<ProtocolConformanceRef>
+collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) {
+  assert(!fromType.isAnyExistentialType());
+
+  auto layout = toType.getExistentialLayout();
+  auto protocols = layout.getProtocols();
   
-  SmallVector<ProtocolDecl *, 4> protocols;
-  toType->getAnyExistentialTypeProtocols(protocols);
-  
-  SmallVector<ProtocolConformance *, 4> conformances;
+  SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
-    ProtocolConformance *conformance =
-    M->lookupConformance(fromType, proto, nullptr).getPointer();
-    conformances.push_back(conformance);
+    auto conformance =
+      M->lookupConformance(fromType, proto->getDecl());
+    conformances.push_back(*conformance);
   }
   
   return M->getASTContext().AllocateCopy(conformances);
 }
 
-static CanArchetypeType getOpenedArchetype(Type openedType) {
-  while (auto metatypeTy = openedType->getAs<MetatypeType>())
-    openedType = metatypeTy->getInstanceType();
-  return cast<ArchetypeType>(openedType->getCanonicalType());
+static ArchetypeType *getOpenedArchetype(CanType openedType) {
+  while (auto metatypeTy = dyn_cast<MetatypeType>(openedType))
+    openedType = metatypeTy.getInstanceType();
+  return cast<ArchetypeType>(openedType);
 }
 
 static ManagedValue emitTransformExistential(SILGenFunction &SGF,
@@ -173,7 +195,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
   assert(inputType != outputType);
 
   SILGenFunction::OpaqueValueState state;
-  CanArchetypeType openedArchetype;
+  ArchetypeType *openedArchetype = nullptr;
 
   if (inputType->isAnyExistentialType()) {
     CanType openedType = ArchetypeType::getAnyOpened(inputType);
@@ -182,25 +204,25 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     // Unwrap zero or more metatype levels
     openedArchetype = getOpenedArchetype(openedType);
 
-    state = SGF.emitOpenExistential(loc, input,
-                                    openedArchetype, loweredOpenedType);
+    state = SGF.emitOpenExistential(loc, input, openedArchetype,
+                                    loweredOpenedType, AccessKind::Read);
     inputType = openedType;
   }
 
   // Build conformance table
-  Type fromInstanceType = inputType;
-  Type toInstanceType = outputType;
+  CanType fromInstanceType = inputType;
+  CanType toInstanceType = outputType;
   
   // Look through metatypes
-  while (fromInstanceType->is<AnyMetatypeType>() &&
-         toInstanceType->is<ExistentialMetatypeType>()) {
-    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()
-        ->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()
-        ->getInstanceType();
+  while (isa<MetatypeType>(fromInstanceType) &&
+         isa<ExistentialMetatypeType>(toInstanceType)) {
+    fromInstanceType = cast<MetatypeType>(fromInstanceType)
+      .getInstanceType();
+    toInstanceType = cast<ExistentialMetatypeType>(toInstanceType)
+      .getInstanceType();
   }
 
-  ArrayRef<ProtocolConformance *> conformances =
+  ArrayRef<ProtocolConformanceRef> conformances =
       collectExistentialConformances(SGF.SGM.M.getSwiftModule(),
                                      fromInstanceType,
                                      toInstanceType);
@@ -218,10 +240,89 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                      return input;
                    });
   
-  if (openedArchetype)
-    state.destroy(SGF, loc);
-
   return input;
+}
+
+/// Apply this transformation to an arbitrary value.
+RValue Transform::transform(RValue &&input,
+                            AbstractionPattern inputOrigType,
+                            CanType inputSubstType,
+                            AbstractionPattern outputOrigType,
+                            CanType outputSubstType,
+                            SGFContext ctxt) {
+  // Fast path: we don't have a tuple.
+  auto inputTupleType = dyn_cast<TupleType>(inputSubstType);
+  if (!inputTupleType) {
+    assert(!isa<TupleType>(outputSubstType) &&
+           "transformation introduced a tuple?");
+    auto result = transform(std::move(input).getScalarValue(),
+                            inputOrigType, inputSubstType,
+                            outputOrigType, outputSubstType, ctxt);
+    return RValue(SGF, Loc, outputSubstType, result);
+  }
+
+  // Okay, we have a tuple.  The output type will also be a tuple unless
+  // there's a subtyping conversion that erases tuples, but that's currently
+  // not allowed by the typechecker, which considers existential erasure to
+  // be a conversion relation, not a subtyping one.  Anyway, it would be
+  // possible to support that here, but since it's not currently required...
+  assert(isa<TupleType>(outputSubstType) &&
+         "subtype constraint erasing tuple is not currently implemented");
+  auto outputTupleType = cast<TupleType>(outputSubstType);
+  assert(inputTupleType->getNumElements() == outputTupleType->getNumElements());
+
+  // Pull the r-value apart.
+  SmallVector<RValue, 8> inputElts;
+  std::move(input).extractElements(inputElts);
+
+  // Emit into the context initialization if it's present and possible
+  // to split.
+  SmallVector<InitializationPtr, 4> eltInitsBuffer;
+  MutableArrayRef<InitializationPtr> eltInits;
+  auto tupleInit = ctxt.getEmitInto();
+  if (!ctxt.getEmitInto()
+      || !ctxt.getEmitInto()->canSplitIntoTupleElements()) {
+    tupleInit = nullptr;
+  } else {
+    eltInits = tupleInit->splitIntoTupleElements(SGF, Loc, outputTupleType,
+                                                 eltInitsBuffer);
+  }
+
+  // At this point, if tupleInit is non-null, we must emit all of the
+  // elements into their corresponding contexts.
+  assert(tupleInit == nullptr ||
+         eltInits.size() == inputTupleType->getNumElements());
+
+  SmallVector<ManagedValue, 8> outputExpansion;
+  for (auto eltIndex : indices(inputTupleType->getElementTypes())) {
+    // Determine the appropriate context for the element.
+    SGFContext eltCtxt;
+    if (tupleInit) eltCtxt = SGFContext(eltInits[eltIndex].get());
+
+    // Recurse.
+    RValue outputElt = transform(std::move(inputElts[eltIndex]),
+                                 inputOrigType.getTupleElementType(eltIndex),
+                                 inputTupleType.getElementType(eltIndex),
+                                 outputOrigType.getTupleElementType(eltIndex),
+                                 outputTupleType.getElementType(eltIndex),
+                                 eltCtxt);
+
+    // Force the r-value into its context if necessary.
+    assert(!outputElt.isInContext() || tupleInit != nullptr);
+    if (tupleInit && !outputElt.isInContext()) {
+      std::move(outputElt).forwardInto(SGF, Loc, eltInits[eltIndex].get());
+    } else {
+      std::move(outputElt).getAll(outputExpansion);
+    }
+  }
+
+  // If we emitted into context, be sure to finish the overall initialization.
+  if (tupleInit) {
+    tupleInit->finishInitialization(SGF);
+    return RValue::forInContext();
+  }
+
+  return RValue(SGF, outputExpansion, outputTupleType);
 }
 
 // Single @objc protocol value metatypes can be converted to the ObjC
@@ -236,11 +337,13 @@ static bool isProtocolClass(Type t) {
           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC);
 };
 
-static ManagedValue emitManagedLoad(SILGenFunction &gen, SILLocation loc,
+static ManagedValue emitManagedLoad(SILGenFunction &SGF, SILLocation loc,
                                     ManagedValue addr,
                                     const TypeLowering &addrTL) {
-  auto loadedValue = gen.B.createLoad(loc, addr.forward(gen));
-  return gen.emitManagedRValueWithCleanup(loadedValue, addrTL);
+  // SEMANTIC ARC TODO: When the verifier is finished, revisit this.
+  auto loadedValue = addrTL.emitLoad(SGF.B, loc, addr.forward(SGF),
+                                     LoadOwnershipQualifier::Take);
+  return SGF.emitManagedRValueWithCleanup(loadedValue, addrTL);
 }
 
 /// Apply this transformation to an arbitrary value.
@@ -278,9 +381,12 @@ ManagedValue Transform::transform(ManagedValue v,
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
   if (outputOTK != OTK_None && inputOTK == OTK_None) {
-    return SGF.emitInjectOptional(Loc, v,
-                                  inputSubstType, outputSubstType,
-                                  expectedTL, ctxt);
+    return SGF.emitInjectOptional(Loc, expectedTL, ctxt,
+                                  [&](SGFContext objectCtxt) {
+      return transform(v, inputOrigType, inputSubstType,
+                       outputOrigType.getAnyOptionalObjectType(),
+                       outputObjectType, objectCtxt);
+    });
   }
 
   // If the value is IUO, but the desired formal type isn't optional, force it.
@@ -298,12 +404,9 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // Optional-to-optional conversion.
-  if (inputOTK != OTK_None && outputOTK != OTK_None &&
-      (inputOTK != outputOTK ||
-       inputObjectType != outputObjectType)) {
+  if (inputOTK != OTK_None && outputOTK != OTK_None) {
     // If the conversion is trivial, just cast.
-    if (SGF.SGM.Types.checkForABIDifferences(v.getType().getSwiftRValueType(),
-                                             loweredResultTy.getSwiftRValueType())
+    if (SGF.SGM.Types.checkForABIDifferences(v.getType(), loweredResultTy)
           == TypeConverter::ABIDifference::Trivial) {
       SILValue result = v.getValue();
       if (v.getType().isAddress())
@@ -313,14 +416,17 @@ ManagedValue Transform::transform(ManagedValue v,
       return ManagedValue(result, v.getCleanup());
     }
 
-    auto transformOptionalPayload = [&](SILGenFunction &gen,
+    auto transformOptionalPayload = [&](SILGenFunction &SGF,
                                         SILLocation loc,
                                         ManagedValue input,
-                                        SILType loweredResultTy) -> ManagedValue {
+                                        SILType loweredResultTy,
+                                        SGFContext context) -> ManagedValue {
       return transform(input,
-                       AbstractionPattern::getOpaque(), inputObjectType,
-                       AbstractionPattern::getOpaque(), outputObjectType,
-                       SGFContext());
+                       inputOrigType.getAnyOptionalObjectType(),
+                       inputObjectType,
+                       outputOrigType.getAnyOptionalObjectType(),
+                       outputObjectType,
+                       context);
     };
 
     return SGF.emitOptionalToOptional(Loc, v, loweredResultTy,
@@ -349,10 +455,11 @@ ManagedValue Transform::transform(ManagedValue v,
 
   //  - metatypes
   if (auto outputMetaType = dyn_cast<MetatypeType>(outputSubstType)) {
-    auto inputMetaType = cast<MetatypeType>(inputSubstType);
-    return transformMetatype(v,
-                             inputOrigType, inputMetaType,
-                             outputOrigType, outputMetaType);
+    if (auto inputMetaType = dyn_cast<MetatypeType>(inputSubstType)) {
+      return transformMetatype(v,
+                               inputOrigType, inputMetaType,
+                               outputOrigType, outputMetaType);
+    }
   }
 
   // Subtype conversions:
@@ -364,18 +471,20 @@ ManagedValue Transform::transform(ManagedValue v,
     auto class2 = outputSubstType->getClassOrBoundGenericClass();
 
     // CF <-> Objective-C via toll-free bridging.
-    if (class1->isForeign() != class2->isForeign()) {
-       return ManagedValue(SGF.B.createUncheckedRefCast(Loc,
-                                                        v.getValue(),
-                                                        loweredResultTy),
-                           v.getCleanup());
+    if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
+        (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType)) {
+      return SGF.B.createUncheckedRefCast(Loc, v, loweredResultTy);
     }
 
-    // Upcast to a superclass.
-    return ManagedValue(SGF.B.createUpcast(Loc,
-                                           v.getValue(),
-                                           loweredResultTy),
-                        v.getCleanup());
+    if (outputSubstType->isExactSuperclassOf(inputSubstType)) {
+      // Upcast to a superclass.
+      return SGF.B.createUpcast(Loc, v, loweredResultTy);
+    } else {
+      // Unchecked-downcast to a covariant return type.
+      assert(inputSubstType->isExactSuperclassOf(outputSubstType)
+             && "should be inheritance relationship between input and output");
+      return SGF.B.createUncheckedRefCast(Loc, v, loweredResultTy);
+    }
   }
 
   //  - upcasts from an archetype
@@ -384,10 +493,7 @@ ManagedValue Transform::transform(ManagedValue v,
       if (archetypeType->getSuperclass()) {
         // Replace the cleanup with a new one on the superclass value so we
         // always use concrete retain/release operations.
-        return ManagedValue(SGF.B.createUpcast(Loc,
-                                               v.getValue(),
-                                               loweredResultTy),
-                            v.getCleanup());
+        return SGF.B.createUpcast(Loc, v, loweredResultTy);
       }
     }
   }
@@ -422,6 +528,48 @@ ManagedValue Transform::transform(ManagedValue v,
     return emitTransformExistential(SGF, Loc, v,
                                     inputSubstType, outputSubstType,
                                     ctxt);
+  }
+
+  // - upcasting class-constrained existentials or metatypes thereof
+  if (inputSubstType->isAnyExistentialType()) {
+    auto instanceType = inputSubstType;
+    while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
+      instanceType = metatypeType.getInstanceType();
+
+    auto layout = instanceType.getExistentialLayout();
+    if (layout.superclass) {
+      CanType openedType = ArchetypeType::getAnyOpened(inputSubstType);
+      SILType loweredOpenedType = SGF.getLoweredType(openedType);
+
+      // Unwrap zero or more metatype levels
+      auto openedArchetype = getOpenedArchetype(openedType);
+
+      auto state = SGF.emitOpenExistential(Loc, v, openedArchetype,
+                                           loweredOpenedType,
+                                           AccessKind::Read);
+      auto payload = SGF.manageOpaqueValue(state, Loc, SGFContext());
+      return transform(payload,
+                       AbstractionPattern::getOpaque(),
+                       openedType,
+                       outputOrigType,
+                       outputSubstType,
+                       ctxt);
+    }
+  }
+
+  // - T : Hashable to AnyHashable
+  if (isa<StructType>(outputSubstType) &&
+      outputSubstType->getAnyNominal() ==
+        SGF.getASTContext().getAnyHashableDecl()) {
+    auto *protocol = SGF.getASTContext().getProtocol(
+        KnownProtocolKind::Hashable);
+    auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
+        inputSubstType, protocol);
+    auto result = SGF.emitAnyHashableErasure(Loc, v, inputSubstType,
+                                             *conformance, ctxt);
+    if (result.isInContext())
+      return ManagedValue::forInContext();
+    return std::move(result).getAsSingleValue(SGF, Loc);
   }
 
   // Should have handled the conversion in one of the cases above.
@@ -462,39 +610,50 @@ ManagedValue Transform::transformMetatype(ManagedValue meta,
 ///
 /// If the tuple is in memory, the result elements will also be in
 /// memory.
-typedef std::pair<ManagedValue, const TypeLowering *> ManagedValueAndType;
-static void explodeTuple(SILGenFunction &gen,
-                         SILLocation loc,
+static void explodeTuple(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue managedTuple,
-                         SmallVectorImpl<ManagedValueAndType> &out) {
-  // None of the operations we do here can fail, so we can atomically
-  // disable the tuple's cleanup and then create cleanups for all the
-  // elements.
-  SILValue tuple = managedTuple.forward(gen);
+                         SmallVectorImpl<ManagedValue> &out) {
+
+  assert(managedTuple.getOwnershipKind() == ValueOwnershipKind::Trivial
+         || managedTuple.hasCleanup());
+
+  // For non-address types, borrow the tuple before extracting and copying its
+  // elements. Creating a scope here ensures that the end_borrow is inserted
+  // correctly and prevents any other cleanup activity from taking meanwhile. We
+  // allow the incoming managedTuple to be destroyed later in its original
+  // scope.
+  //
+  // SEMANTIC SIL TODO: Once we support a SIL "destructure" instruction, we can
+  // remove this borrow scope and all element copies. Instead directly forward
+  // managedTuple into its destructure.
+  Scope destructureScope(SGF, loc);
+  ManagedValue tuple =
+      managedTuple.getType().isAddress()
+          ? ManagedValue::forUnmanaged(managedTuple.forward(SGF))
+          : managedTuple.borrow(SGF, loc);
 
   auto tupleSILType = tuple.getType();
   auto tupleType = tupleSILType.castTo<TupleType>();
 
-  out.reserve(tupleType->getNumElements());
+  llvm::SmallVector<ManagedValue, 16> elements;
+  elements.reserve(tupleType->getNumElements());
 
   for (auto index : indices(tupleType.getElementTypes())) {
     // We're starting with a SIL-lowered tuple type, so the elements
     // must also all be SIL-lowered.
     SILType eltType = tupleSILType.getTupleElementType(index);
 
-    auto &eltTL = gen.getTypeLowering(eltType);
-
-    ManagedValue elt;
     if (tupleSILType.isAddress()) {
-      auto addr = gen.B.createTupleElementAddr(loc, tuple, index, eltType);
-      elt = gen.emitManagedBufferWithCleanup(addr, eltTL);
+      elements.push_back(
+          SGF.B.createTupleElementAddr(loc, tuple, index, eltType));
     } else {
-      auto value = gen.B.createTupleExtract(loc, tuple, index, eltType);
-      elt = gen.emitManagedRValueWithCleanup(value, eltTL);
+      ManagedValue extract =
+          SGF.B.createTupleExtract(loc, tuple, index, eltType);
+      elements.push_back(extract.copy(SGF, loc));
     }
-
-    out.push_back(ManagedValueAndType(elt, &eltTL));
   }
+  out.resize(elements.size());
+  destructureScope.popPreservingValues(elements, out);
 }
 
 /// Apply this transformation to all the elements of a tuple value,
@@ -507,7 +666,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
                                        SGFContext ctxt) {
   const TypeLowering &outputTL =
     SGF.getTypeLowering(outputOrigType, outputSubstType);
-  assert(outputTL.isAddressOnly() == inputTuple.getType().isAddress() &&
+  assert((outputTL.isAddressOnly() == inputTuple.getType().isAddress() ||
+          !SGF.silConv.useLoweredAddresses()) &&
          "expected loadable inputs to have been loaded");
 
   // If there's no representation difference, we're done.
@@ -522,12 +682,12 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 
   // If the tuple is address only, we need to do the operation in memory.
   SILValue outputAddr;
-  if (outputTL.isAddressOnly())
+  if (outputTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
     outputAddr = SGF.getBufferForExprResult(Loc, outputTL.getLoweredType(),
                                             ctxt);
 
   // Explode the tuple into individual managed values.
-  SmallVector<ManagedValueAndType, 4> inputElts;
+  SmallVector<ManagedValue, 4> inputElts;
   explodeTuple(SGF, Loc, inputTuple, inputElts);
 
   // Track all the managed elements whether or not we're actually
@@ -535,8 +695,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   SmallVector<ManagedValue, 4> outputElts;
 
   for (auto index : indices(inputType->getElementTypes())) {
-    auto &inputEltTL = *inputElts[index].second;
-    ManagedValue inputElt = inputElts[index].first;
+    auto &inputEltTL = SGF.getTypeLowering(inputElts[index].getType());
+    ManagedValue inputElt = inputElts[index];
     if (inputElt.getType().isAddress() && !inputEltTL.isAddressOnly()) {
       inputElt = emitManagedLoad(SGF, Loc, inputElt, inputEltTL);
     }
@@ -553,7 +713,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     if (outputAddr) {
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
-      auto &outputEltTL = SGF.getTypeLowering(outputEltAddr.getType());
+      auto &outputEltTL = SGF.getTypeLowering(outputEltAddr->getType());
       assert(outputEltTL.isAddressOnly() == inputEltTL.isAddressOnly());
       auto cleanup =
         SGF.enterDormantTemporaryCleanup(outputEltAddr, outputEltTL);
@@ -571,7 +731,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // later assembly into a tuple.
     if (!outputEltTemp) {
       assert(outputElt);
-      assert(!inputEltTL.isAddressOnly());
+      assert(!inputEltTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses());
       outputElts.push_back(outputElt);
       continue;
     }
@@ -581,7 +741,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     auto outputEltAddr = temp.getManagedAddress();
 
     // That might involve storing directly.
-    if (outputElt) {
+    if (!outputElt.isInContext()) {
       outputElt.forwardInto(SGF, Loc, outputEltAddr.getValue());
       temp.finishInitialization(SGF);
     }
@@ -607,60 +767,68 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   return SGF.emitManagedRValueWithCleanup(outputTuple, outputTL);
 }
 
-static ManagedValue manageParam(SILGenFunction &gen,
+static ManagedValue manageParam(SILGenFunction &SGF,
                                 SILLocation loc,
                                 SILValue paramValue,
                                 SILParameterInfo info,
                                 bool allowPlusZero) {
   switch (info.getConvention()) {
-  // A deallocating parameter can always be accessed directly.
-  case ParameterConvention::Direct_Deallocating:
-    return ManagedValue::forUnmanaged(paramValue);
+  case ParameterConvention::Indirect_In_Guaranteed:
+    if (SGF.silConv.useLoweredAddresses()) {
+      // FIXME: Avoid a behavior change while guaranteed self is disabled by
+      // default.
+      if (allowPlusZero) {
+        return ManagedValue::forUnmanaged(paramValue);
+      } else {
+        auto copy = SGF.emitTemporaryAllocation(loc, paramValue->getType());
+        SGF.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
+        return SGF.emitManagedBufferWithCleanup(copy);
+      }
+    }
+    LLVM_FALLTHROUGH;
   case ParameterConvention::Direct_Guaranteed:
     if (allowPlusZero)
-      return ManagedValue::forUnmanaged(paramValue);
-    SWIFT_FALLTHROUGH;
+      return SGF.emitManagedBeginBorrow(loc, paramValue);
+    LLVM_FALLTHROUGH;
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
-    gen.getTypeLowering(paramValue.getType())
-          .emitRetainValue(gen.B, loc, paramValue);
-    SWIFT_FALLTHROUGH;
+    paramValue = SGF.getTypeLowering(paramValue->getType())
+        .emitCopyValue(SGF.B, loc, paramValue);
+    LLVM_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
-    return gen.emitManagedRValueWithCleanup(paramValue);
+    return SGF.emitManagedRValueWithCleanup(paramValue);
 
-  case ParameterConvention::Indirect_In_Guaranteed:
-    // FIXME: Avoid a behavior change while guaranteed self is disabled by
-    // default.
-    if (allowPlusZero) {
-      return ManagedValue::forUnmanaged(paramValue);
-    } else {
-      auto copy = gen.emitTemporaryAllocation(loc, paramValue.getType());
-      gen.B.createCopyAddr(loc, paramValue, copy, IsNotTake, IsInitialization);
-      return gen.emitManagedBufferWithCleanup(copy);
-    }
-  case ParameterConvention::Indirect_Inout:
-    return ManagedValue::forLValue(paramValue);
   case ParameterConvention::Indirect_In:
-    return gen.emitManagedBufferWithCleanup(paramValue);
-  case ParameterConvention::Indirect_Out:
-    llvm_unreachable("shouldn't be handled out-parameters here");
+  case ParameterConvention::Indirect_In_Constant:
+    if (SGF.silConv.useLoweredAddresses())
+      return SGF.emitManagedBufferWithCleanup(paramValue);
+    return SGF.emitManagedRValueWithCleanup(paramValue);
+
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    return ManagedValue::forLValue(paramValue);
   }
   llvm_unreachable("bad parameter convention");
 }
 
-static void collectParams(SILGenFunction &gen,
-                          SILLocation loc,
-                          SmallVectorImpl<ManagedValue> &params,
-                          bool allowPlusZero) {
-  auto paramTypes =
-    gen.F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
+void SILGenFunction::collectThunkParams(SILLocation loc,
+                                        SmallVectorImpl<ManagedValue> &params,
+                                        bool allowPlusZero) {
+  // Add the indirect results.
+  for (auto resultTy : F.getConventions().getIndirectSILResultTypes()) {
+    auto paramTy = F.mapTypeIntoContext(resultTy);
+    SILArgument *arg = F.begin()->createFunctionArgument(paramTy);
+    (void)arg;
+  }
+
+  // Add the parameters.
+  auto paramTypes = F.getLoweredFunctionType()->getParameters();
   for (auto param : paramTypes) {
-    auto paramTy = gen.F.mapTypeIntoContext(param.getSILType());
-    auto paramValue = new (gen.SGM.M) SILArgument(gen.F.begin(),
-                                                  paramTy);
-                                      
-    params.push_back(manageParam(gen, loc, paramValue, param, allowPlusZero));
+    auto paramTy = F.mapTypeIntoContext(F.getConventions().getSILType(param));
+    auto paramValue = F.begin()->createFunctionArgument(paramTy);
+    auto paramMV = manageParam(*this, loc, paramValue, param, allowPlusZero);
+    params.push_back(paramMV);
   }
 }
 
@@ -671,6 +839,16 @@ static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
   if (result.isInContext()) return;
   result.forwardInto(SGF, loc, temp.getAddress());
   temp.finishInitialization(SGF);
+}
+
+/// If the type is a single-element tuple, return the element type.
+static CanType getSingleTupleElement(CanType type) {
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (tupleType->getNumElements() == 1)
+      return tupleType.getElementType(0);
+  }
+
+  return type;
 }
 
 namespace {
@@ -705,7 +883,7 @@ namespace {
         if (inputOrigType.isTuple() &&
             inputOrigType.getNumTupleElements() == 1) {
           inputOrigType = inputOrigType.getTupleElementType(0);
-          inputSubstType = cast<TupleType>(inputSubstType).getElementType(0);
+          inputSubstType = getSingleTupleElement(inputSubstType);
           return translate(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType);
         }
@@ -713,14 +891,14 @@ namespace {
         if (outputOrigType.isTuple() &&
             outputOrigType.getNumTupleElements() == 1) {
           outputOrigType = outputOrigType.getTupleElementType(0);
-          outputSubstType = cast<TupleType>(outputSubstType).getElementType(0);
+          outputSubstType = getSingleTupleElement(outputSubstType);
           return translate(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType);
         }
       }
 
       // Special-case: tuples containing inouts.
-      if (inputTupleType && inputTupleType->hasInOut()) {
+      if (inputTupleType && inputTupleType->hasInOutElement()) {
         // Non-materializable tuple types cannot be bound as generic
         // arguments, so none of the remaining transformations apply.
         // Instead, the outermost tuple layer is exploded, even when
@@ -743,41 +921,76 @@ namespace {
         }
 
         // Tuple types are subtypes of their optionals
-        OptionalTypeKind outputOTK;
-        if (auto outputObjectType = outputSubstType.getAnyOptionalObjectType(outputOTK)) {
-          // The input is exploded and the output is an optional tuple.
-          // Translate values and collect them into a single optional
-          // payload.
-          auto outputTupleType = cast<TupleType>(outputObjectType);
+        if (auto outputObjectType =
+              outputSubstType.getAnyOptionalObjectType()) {
+          auto outputOrigObjectType = outputOrigType.getAnyOptionalObjectType();
 
-          return translateAndImplodeIntoOptional(inputOrigType,
-                                                 inputTupleType,
-                                                 outputTupleType,
-                                                 outputOTK);
+          if (auto outputTupleType = dyn_cast<TupleType>(outputObjectType)) {
+            // The input is exploded and the output is an optional tuple.
+            // Translate values and collect them into a single optional
+            // payload.
 
-          // FIXME: optional of Any (ugh...)
+            auto result =
+                translateAndImplodeIntoOptional(inputOrigType,
+                                                inputTupleType,
+                                                outputOrigObjectType,
+                                                outputTupleType);
+            Outputs.push_back(result);
+            return;
+          }
+
+          // Tuple types are subtypes of optionals of Any, too.
+          assert(outputObjectType->isAny());
+
+          // First, construct the existential.
+          auto result =
+              translateAndImplodeIntoAny(inputOrigType,
+                                         inputTupleType,
+                                         outputOrigObjectType,
+                                         outputObjectType);
+
+          // Now, convert it to an optional.
+          translateSingle(outputOrigObjectType, outputObjectType,
+                          outputOrigType, outputSubstType,
+                          result, claimNextOutputType());
+          return;
+        }
+
+        if (outputSubstType->isAny()) {
+          claimNextOutputType();
+
+          auto result =
+              translateAndImplodeIntoAny(inputOrigType,
+                                         inputTupleType,
+                                         outputOrigType,
+                                         outputSubstType);
+          Outputs.push_back(result);
+          return;
         }
 
         if (outputTupleType) {
           // The input is exploded and the output is not. Translate values
           // and store them to a result tuple in memory.
-          assert(outputOrigType.isOpaque() &&
+          assert(outputOrigType.isTypeParameter() &&
                  "Output is not a tuple and is not opaque?");
 
-          auto output = claimNextOutputType();
-          auto &outputTL = SGF.getTypeLowering(output.getSILType());
-          auto temp = SGF.emitTemporary(Loc, outputTL);
-          translateAndImplodeInto(inputOrigType,
-                                  inputTupleType,
-                                  outputOrigType,
-                                  outputTupleType,
-                                  *temp.get());
+          auto outputTy = SGF.getSILType(claimNextOutputType());
+          auto &outputTL = SGF.getTypeLowering(outputTy);
+          if (SGF.silConv.useLoweredAddresses()) {
+            auto temp = SGF.emitTemporary(Loc, outputTL);
+            translateAndImplodeInto(inputOrigType, inputTupleType,
+                                    outputOrigType, outputTupleType, *temp);
 
-          Outputs.push_back(temp->getManagedAddress());
+            Outputs.push_back(temp->getManagedAddress());
+          } else {
+            auto result = translateAndImplodeIntoValue(
+                inputOrigType, inputTupleType, outputOrigType, outputTupleType,
+                outputTL.getLoweredType());
+            Outputs.push_back(result);
+          }
           return;
         }
 
-        // FIXME: Tuple-to-Any conversions
         llvm_unreachable("Unhandled conversion from exploded tuple");
       }
 
@@ -786,7 +999,7 @@ namespace {
         if (inputTupleType) {
           // The input is exploded and the output is not. Translate values
           // and store them to a result tuple in memory.
-          assert(inputOrigType.isOpaque() &&
+          assert(inputOrigType.isTypeParameter() &&
                  "Input is not a tuple and is not opaque?");
 
           return translateAndExplodeOutOf(inputOrigType,
@@ -810,149 +1023,137 @@ namespace {
     }
 
   private:
+    /// Take a tuple that has been exploded in the input and turn it into
+    /// a tuple value in the output.
+    ManagedValue translateAndImplodeIntoValue(AbstractionPattern inputOrigType,
+                                              CanTupleType inputType,
+                                              AbstractionPattern outputOrigType,
+                                              CanTupleType outputType,
+                                              SILType loweredOutputTy) {
+      assert(loweredOutputTy.is<TupleType>());
+
+      SmallVector<ManagedValue, 4> elements;
+      assert(outputType->getNumElements() == inputType->getNumElements());
+      for (unsigned i : indices(outputType->getElementTypes())) {
+        auto inputOrigEltType = inputOrigType.getTupleElementType(i);
+        auto inputEltType = inputType.getElementType(i);
+        auto outputOrigEltType = outputOrigType.getTupleElementType(i);
+        auto outputEltType = outputType.getElementType(i);
+        SILType loweredOutputEltTy = loweredOutputTy.getTupleElementType(i);
+
+        ManagedValue elt;
+        if (auto inputEltTupleType = dyn_cast<TupleType>(inputEltType)) {
+          elt = translateAndImplodeIntoValue(inputOrigEltType,
+                                             inputEltTupleType,
+                                             outputOrigEltType,
+                                             cast<TupleType>(outputEltType),
+                                             loweredOutputEltTy);
+        } else {
+          elt = claimNextInput();
+
+          // Load if necessary.
+          if (elt.getType().isAddress()) {
+            elt = SGF.emitLoad(Loc, elt.forward(SGF),
+                               SGF.getTypeLowering(elt.getType()),
+                               SGFContext(), IsTake);
+          }
+        }
+
+        if (elt.getType() != loweredOutputEltTy)
+          elt = translatePrimitive(inputOrigEltType, inputEltType,
+                                   outputOrigEltType, outputEltType,
+                                   elt);
+
+        elements.push_back(elt);
+      }
+
+      SmallVector<SILValue, 4> forwarded;
+      for (auto &elt : elements)
+        forwarded.push_back(elt.forward(SGF));
+
+      auto tuple = SGF.B.createTuple(Loc, loweredOutputTy, forwarded);
+      return SGF.emitManagedRValueWithCleanup(tuple);
+    }
+
     /// Handle a tuple that has been exploded in the input but wrapped in
     /// an optional in the output.
-    void translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
-                                         CanTupleType inputTupleType,
-                                         CanTupleType outputTupleType,
-                                         OptionalTypeKind OTK) {
-      assert(!inputTupleType->hasInOut() &&
-             !outputTupleType->hasInOut());
+    ManagedValue
+    translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
+                                    CanTupleType inputTupleType,
+                                    AbstractionPattern outputOrigType,
+                                    CanTupleType outputTupleType) {
+      assert(!inputTupleType->hasInOutElement() &&
+             !outputTupleType->hasInOutElement());
       assert(inputTupleType->getNumElements() ==
              outputTupleType->getNumElements());
 
-      // Collect the tuple elements, which should all be maximally abstracted
-      // to go in the optional payload.
-      auto opaque = AbstractionPattern::getOpaque();
-      auto &loweredTL = SGF.getTypeLowering(opaque, outputTupleType);
+      // Collect the tuple elements.
+      auto &loweredTL = SGF.getTypeLowering(outputOrigType, outputTupleType);
       auto loweredTy = loweredTL.getLoweredType();
-      auto optionalTy = claimNextOutputType().getSILType();
-      auto someDecl = SGF.getASTContext().getOptionalSomeDecl(OTK);
-      if (loweredTL.isLoadable()) {
-        // Implode into a maximally-abstracted value.
-        std::function<ManagedValue (CanTupleType, CanTupleType, CanTupleType)>
-        translateAndImplodeIntoValue
-          = [&](CanTupleType lowered, CanTupleType input, CanTupleType output) -> ManagedValue {
-            SmallVector<ManagedValue, 4> elements;
-            assert(output->getNumElements() == input->getNumElements());
-            for (unsigned i = 0, e = output->getNumElements(); i < e; ++i) {
-              auto inputTy = input.getElementType(i);
-              auto outputTy = output.getElementType(i);
-              ManagedValue arg;
-              if (auto outputTuple = dyn_cast<TupleType>(outputTy)) {
-                auto inputTuple = cast<TupleType>(inputTy);
-                arg = translateAndImplodeIntoValue(
-                                    cast<TupleType>(lowered.getElementType(i)),
-                                    inputTuple, outputTuple);
-              } else {
-                arg = claimNextInput();
-                
-              }
-              
-              if (arg.getType().isAddress())
-                arg = SGF.emitLoad(Loc, arg.forward(SGF),
-                                   SGF.getTypeLowering(arg.getType()),
-                                   SGFContext(), IsTake);
+      auto optionalTy = SGF.getSILType(claimNextOutputType());
+      auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
+      if (loweredTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+        auto payload =
+          translateAndImplodeIntoValue(inputOrigType, inputTupleType,
+                                       outputOrigType, outputTupleType,
+                                       loweredTy);
 
-              if (arg.getType().getSwiftRValueType() != lowered.getElementType(i))
-                arg = translatePrimitive(AbstractionPattern(inputTy), inputTy,
-                                         opaque, outputTy,
-                                         arg);
-
-              elements.push_back(arg);
-            }
-            SmallVector<SILValue, 4> forwarded;
-            for (auto element : elements)
-              forwarded.push_back(element.forward(SGF));
-            
-            auto tuple = SGF.B.createTuple(Loc,
-                                       SILType::getPrimitiveObjectType(lowered),
-                                       forwarded);
-            return SGF.emitManagedRValueWithCleanup(tuple);
-          };
-        
-        auto payload = translateAndImplodeIntoValue(
-                                cast<TupleType>(loweredTy.getSwiftRValueType()),
-                                inputTupleType,
-                                outputTupleType);
-        optionalTy = SGF.F.mapTypeIntoContext(optionalTy);
-        auto optional = SGF.B.createEnum(Loc, payload.getValue(),
-                                         someDecl, optionalTy);
-        Outputs.push_back(ManagedValue(optional, payload.getCleanup()));
-        return;
+        return SGF.B.createEnum(Loc, payload, someDecl, optionalTy);
       } else {
-        // Implode into a maximally-abstracted indirect buffer.
         auto optionalBuf = SGF.emitTemporaryAllocation(Loc, optionalTy);
         auto tupleBuf = SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl,
                                                      loweredTy);
         
-        auto tupleTemp = SGF.useBufferAsTemporary(Loc, tupleBuf, loweredTL);
+        auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, loweredTL);
 
-        std::function<void (CanTupleType,
-                            CanTupleType,
-                            CanTupleType,
-                            TemporaryInitialization&)>
-        translateAndImplodeIntoBuffer
-          = [&](CanTupleType lowered,
-                CanTupleType input,
-                CanTupleType output,
-                TemporaryInitialization &buf) {
-            auto tupleAddr = buf.getAddress();
-            SmallVector<CleanupHandle, 4> cleanups;
-            
-            for (unsigned i = 0, e = output->getNumElements(); i < e; ++i) {
-              auto inputTy = input.getElementType(i);
-              auto outputTy = output.getElementType(i);
-              auto loweredOutputTy
-                = SILType::getPrimitiveAddressType(lowered.getElementType(i));
-              auto &loweredOutputTL = SGF.getTypeLowering(loweredOutputTy);
-              auto eltAddr = SGF.B.createTupleElementAddr(Loc, tupleAddr, i,
-                                                          loweredOutputTy);
-              CleanupHandle eltCleanup
-                = SGF.enterDormantTemporaryCleanup(eltAddr, loweredOutputTL);
-              
-              if (eltCleanup.isValid()) cleanups.push_back(eltCleanup);
-              TemporaryInitialization eltInit(eltAddr, eltCleanup);
-              
-              if (auto outputTuple = dyn_cast<TupleType>(outputTy)) {
-                auto inputTuple = cast<TupleType>(inputTy);
-                translateAndImplodeIntoBuffer(
-                             cast<TupleType>(loweredOutputTy.getSwiftRValueType()),
-                             inputTuple, outputTuple, eltInit);
-              } else {
-                auto arg = claimNextInput();
-                auto &argTL = SGF.getTypeLowering(arg.getType());
-                if (arg.getType().isAddress() && argTL.isLoadable())
-                  arg = SGF.emitLoad(Loc, arg.forward(SGF),
-                                     argTL, SGFContext(), IsTake);
-                
-                if (arg.getType().getSwiftRValueType()
-                      != loweredOutputTy.getSwiftRValueType()) {
-                  arg = translatePrimitive(AbstractionPattern(inputTy), inputTy,
-                                           opaque, outputTy,
-                                           arg);
-                }
-                
-                emitForceInto(SGF, Loc, arg, eltInit);
-              }
-            }
-            
-            // Deactivate the element cleanups and activate the tuple cleanup.
-            for (auto cleanup : cleanups)
-              SGF.Cleanups.forwardCleanup(cleanup);
-            buf.finishInitialization(SGF);
-          };
-        translateAndImplodeIntoBuffer(
-                                cast<TupleType>(loweredTy.getSwiftRValueType()),
-                                inputTupleType,
-                                outputTupleType,
-                                *tupleTemp.get());
+        translateAndImplodeInto(inputOrigType, inputTupleType,
+                                outputOrigType, outputTupleType,
+                                *tupleTemp);
+
         SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
+
         auto payload = tupleTemp->getManagedAddress();
-        Outputs.push_back(ManagedValue(optionalBuf, payload.getCleanup()));
+        return ManagedValue(optionalBuf, payload.getCleanup());
       }
     }
-  
+
+    /// Handle a tuple that has been exploded in the input but wrapped
+    /// in an existential in the output.
+    ManagedValue
+    translateAndImplodeIntoAny(AbstractionPattern inputOrigType,
+                               CanTupleType inputTupleType,
+                               AbstractionPattern outputOrigType,
+                               CanType outputSubstType) {
+      auto existentialTy = SGF.getLoweredType(outputOrigType, outputSubstType);
+      auto existentialBuf = SGF.emitTemporaryAllocation(Loc, existentialTy);
+
+      auto opaque = AbstractionPattern::getOpaque();
+      auto &concreteTL = SGF.getTypeLowering(opaque, inputTupleType);
+
+      auto tupleBuf =
+        SGF.B.createInitExistentialAddr(Loc, existentialBuf,
+                                        inputTupleType,
+                                        concreteTL.getLoweredType(),
+                                        /*conformances=*/{});
+
+      auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, concreteTL);
+      translateAndImplodeInto(inputOrigType, inputTupleType,
+                              opaque, inputTupleType,
+                              *tupleTemp);
+
+      auto payload = tupleTemp->getManagedAddress();
+      if (SGF.silConv.useLoweredAddresses()) {
+        return ManagedValue(existentialBuf, payload.getCleanup());
+      }
+      // We are under opaque value(s) mode - load the any and init an opaque
+      auto loadedPayload = SGF.emitManagedLoadCopy(Loc, payload.getValue());
+      auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
+      SILValue loadedOpaque = SGF.B.createInitExistentialValue(
+          Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
+          /*Conformances=*/{});
+      return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
+    }
+
     /// Handle a tuple that has been exploded in both the input and
     /// the output.
     void translateParallelExploded(AbstractionPattern inputOrigType,
@@ -965,8 +1166,8 @@ namespace {
       // when witness method thunks re-abstract a non-mutating
       // witness for a mutating requirement. The inout self is just
       // loaded to produce a value in this case.
-      assert(inputSubstType->hasInOut() ||
-             !outputSubstType->hasInOut());
+      assert(inputSubstType->hasInOutElement() ||
+             !outputSubstType->hasInOutElement());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -985,14 +1186,14 @@ namespace {
                                   AbstractionPattern outputOrigType,
                                   CanTupleType outputSubstType,
                                   ManagedValue inputTupleAddr) {
-      assert(inputOrigType.isOpaque());
+      assert(inputOrigType.isTypeParameter());
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasInOut() &&
-             !outputSubstType->hasInOut());
+      assert(!inputSubstType->hasInOutElement() &&
+             !outputSubstType->hasInOutElement());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
-      SmallVector<ManagedValueAndType, 4> inputEltAddrs;
+      SmallVector<ManagedValue, 4> inputEltAddrs;
       explodeTuple(SGF, Loc, inputTupleAddr, inputEltAddrs);
       assert(inputEltAddrs.size() == outputSubstType->getNumElements());
 
@@ -1001,8 +1202,9 @@ namespace {
         auto inputEltSubstType = inputSubstType.getElementType(index);
         auto outputEltOrigType = outputOrigType.getTupleElementType(index);
         auto outputEltSubstType = outputSubstType.getElementType(index);
-        auto inputEltAddr = inputEltAddrs[index].first;
-        assert(inputEltAddr.getType().isAddress());
+        auto inputEltAddr = inputEltAddrs[index];
+        assert(inputEltAddr.getType().isAddress() ||
+               !SGF.silConv.useLoweredAddresses());
 
         if (auto outputEltTupleType = dyn_cast<TupleType>(outputEltSubstType)) {
           assert(outputEltOrigType.isTuple());
@@ -1032,9 +1234,9 @@ namespace {
                                  CanTupleType outputSubstType,
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
-      assert(outputOrigType.isOpaque());
-      assert(!inputSubstType->hasInOut() &&
-             !outputSubstType->hasInOut());
+      assert(outputOrigType.matchesTuple(outputSubstType));
+      assert(!inputSubstType->hasInOutElement() &&
+             !outputSubstType->hasInOutElement());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1074,6 +1276,64 @@ namespace {
       tupleInit.finishInitialization(SGF);
     }
 
+    // Translate into a temporary.
+    void translateIndirect(AbstractionPattern inputOrigType,
+                           CanType inputSubstType,
+                           AbstractionPattern outputOrigType,
+                           CanType outputSubstType, ManagedValue input,
+                           SILType resultTy) {
+      auto &outputTL = SGF.getTypeLowering(resultTy);
+      auto temp = SGF.emitTemporary(Loc, outputTL);
+      translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
+                          outputSubstType, input, *temp);
+      Outputs.push_back(temp->getManagedAddress());
+    }
+
+    // Translate into an owned argument.
+    void translateIntoOwned(AbstractionPattern inputOrigType,
+                            CanType inputSubstType,
+                            AbstractionPattern outputOrigType,
+                            CanType outputSubstType, ManagedValue input) {
+      auto output = translatePrimitive(inputOrigType, inputSubstType,
+                                       outputOrigType, outputSubstType, input);
+
+      // If our output is guaranteed or unowned, we need to create a copy here.
+      if (output.getOwnershipKind() != ValueOwnershipKind::Owned)
+        output = output.copyUnmanaged(SGF, Loc);
+
+      Outputs.push_back(output);
+    }
+
+    // Translate into a guaranteed argument.
+    void translateIntoGuaranteed(AbstractionPattern inputOrigType,
+                                 CanType inputSubstType,
+                                 AbstractionPattern outputOrigType,
+                                 CanType outputSubstType, ManagedValue input) {
+      auto output = translatePrimitive(inputOrigType, inputSubstType,
+                                       outputOrigType, outputSubstType, input);
+
+      // If our output value is not guaranteed, we need to:
+      //
+      // 1. Unowned - Copy + Borrow.
+      // 2. Owned - Borrow.
+      // 3. Trivial - do nothing.
+      //
+      // This means we can first transition unowned => owned and then handle
+      // the new owned value using the same code path as values that are
+      // initially owned.
+      if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
+        assert(!output.hasCleanup());
+        output = SGF.emitManagedRetain(Loc, output.getValue());
+      }
+
+      // If the output is unowned or owned, create a borrow.
+      if (output.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
+        output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
+      }
+
+      Outputs.push_back(output);
+    }
+
     /// Translate a single value and add it as an output.
     void translateSingle(AbstractionPattern inputOrigType,
                          CanType inputSubstType,
@@ -1082,7 +1342,7 @@ namespace {
                          ManagedValue input,
                          SILParameterInfo result) {
       // Easy case: we want to pass exactly this value.
-      if (input.getType() == result.getSILType()) {
+      if (input.getType() == SGF.getSILType(result)) {
         Outputs.push_back(input);
         return;
       }
@@ -1091,38 +1351,49 @@ namespace {
       // Direct translation is relatively easy.
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
-      case ParameterConvention::Direct_Deallocating:
-      case ParameterConvention::Direct_Guaranteed: {
-        auto output = translatePrimitive(inputOrigType, inputSubstType,
-                                         outputOrigType, outputSubstType,
-                                         input);
-        assert(output.getType() == result.getSILType());
-        Outputs.push_back(output);
+        translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
+                           outputSubstType, input);
+        assert(Outputs.back().getType() == SGF.getSILType(result));
         return;
-      }
-
-      case ParameterConvention::Indirect_Out:
-        llvm_unreachable("Unsupported translation");
-
+      case ParameterConvention::Direct_Guaranteed:
+        translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
+                                outputSubstType, input);
+        return;
       case ParameterConvention::Indirect_Inout: {
         // If it's inout, we need writeback.
         llvm::errs() << "inout writeback in abstraction difference thunk "
                         "not yet implemented\n";
         llvm::errs() << "input value ";
-        input.getValue().dump();
-        llvm::errs() << "output type " << result.getSILType() << "\n";
+        input.getValue()->dump();
+        llvm::errs() << "output type " << SGF.getSILType(result) << "\n";
         abort();
       }
       case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Guaranteed: {
-        // We need to translate into a temporary.
-        auto &outputTL = SGF.getTypeLowering(result.getSILType());
-        auto temp = SGF.emitTemporary(Loc, outputTL);
-        translateSingleInto(inputOrigType, inputSubstType,
-                            outputOrigType, outputSubstType,
-                            input, *temp.get());
-        Outputs.push_back(temp->getManagedAddress());
+      case ParameterConvention::Indirect_In_Constant: {
+        if (SGF.silConv.useLoweredAddresses()) {
+          translateIndirect(inputOrigType, inputSubstType, outputOrigType,
+                            outputSubstType, input, SGF.getSILType(result));
+          return;
+        }
+        translateIntoOwned(inputOrigType, inputSubstType, outputOrigType,
+                           outputSubstType, input);
+        assert(Outputs.back().getType() == SGF.getSILType(result));
         return;
+      }
+      case ParameterConvention::Indirect_In_Guaranteed: {
+        if (SGF.silConv.useLoweredAddresses()) {
+          translateIndirect(inputOrigType, inputSubstType, outputOrigType,
+                            outputSubstType, input, SGF.getSILType(result));
+          return;
+        }
+        translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
+                                outputSubstType, input);
+        assert(Outputs.back().getType() == SGF.getSILType(result));
+        return;
+      }
+      case ParameterConvention::Indirect_InoutAliasable: {
+        llvm_unreachable("abstraction difference in aliasable argument not "
+                         "allowed");
       }
       }
 
@@ -1161,146 +1432,1139 @@ namespace {
     }
 
     ManagedValue claimNextInput() {
-      assert(!Inputs.empty());
-      auto next = Inputs.front();
-      Inputs = Inputs.slice(1);
-      return next;
+      return claimNext(Inputs);
     }
 
     SILParameterInfo claimNextOutputType() {
-      assert(!OutputTypes.empty());
-      auto next = OutputTypes.front();
-      OutputTypes = OutputTypes.slice(1);
-      return next;
+      return claimNext(OutputTypes);
     }
   };
-}
+} // end anonymous namespace
 
 /// Forward arguments according to a function type's ownership conventions.
-static void forwardFunctionArguments(SILGenFunction &gen,
+static void forwardFunctionArguments(SILGenFunction &SGF,
                                      SILLocation loc,
                                      CanSILFunctionType fTy,
                                      ArrayRef<ManagedValue> managedArgs,
                                      SmallVectorImpl<SILValue> &forwardedArgs) {
-  auto argTypes = fTy->getParametersWithoutIndirectResult();
+  auto argTypes = fTy->getParameters();
   for (auto index : indices(managedArgs)) {
     auto &arg = managedArgs[index];
     auto argTy = argTypes[index];
-    forwardedArgs.push_back(argTy.isConsumed() ? arg.forward(gen)
-                                               : arg.getValue());
+    if (argTy.isConsumed()) {
+      forwardedArgs.push_back(arg.forward(SGF));
+      continue;
+    }
+
+    if (isGuaranteedParameter(argTy.getConvention())) {
+      forwardedArgs.push_back(
+          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
+      continue;
+    }
+
+    forwardedArgs.push_back(arg.getValue());
   }
 }
 
-/// Create a temporary result buffer, reuse an existing result address, or
-/// return null, based on the calling convention of a function type.
-static SILValue getThunkInnerResultAddr(SILGenFunction &gen,
-                                        SILLocation loc,
-                                        CanSILFunctionType fTy,
-                                        SILValue outerResultAddr) {
-  if (fTy->hasIndirectResult()) {
-    auto resultType = fTy->getIndirectResult().getSILType();
-    resultType = gen.F.mapTypeIntoContext(resultType);
-    
-    // Re-use the original result if possible.
-    if (outerResultAddr && outerResultAddr.getType() == resultType)
-      return outerResultAddr;
-    else
-      return gen.emitTemporaryAllocation(loc, resultType);
-  }
-  return {};
-}
+namespace {
 
-/// Transform the result of the inner function into the expected result type
-/// and convention of a thunk.
+/// A helper class to translate the inner results to the outer results.
 ///
-/// \param fTy Lowered type of the inner function called by the thunk
-/// \param inputResultOrigType Abstraction pattern for result of inner function
-/// \param inputResultSubstType Formal type of result of inner function
-/// \param outputResultOrigType Abstraction pattern for result of thunk
-/// \param outputResultSubstType Formal type of result of thunk
-/// \param innerResultValue Result of inner function call
-/// \param innerResultAddr Indirect out return parameter of inner function call
-/// \param outerResultAddr Indirect out return parameter of the thunk
-static SILValue getThunkResult(SILGenFunction &gen,
-                               SILLocation loc,
-                               CanSILFunctionType fTy,
-                               AbstractionPattern inputResultOrigType,
-                               CanType inputResultSubstType,
-                               AbstractionPattern outputResultOrigType,
-                               CanType outputResultSubstType,
-                               SILValue innerResultValue,
-                               SILValue innerResultAddr,
-                               SILValue outerResultAddr) {
-  // Convert the direct result to +1 if necessary.
-  auto resultTy = gen.F.mapTypeIntoContext(fTy->getSemanticResultSILType());
-  auto &innerResultTL = gen.getTypeLowering(resultTy);
-  if (!fTy->hasIndirectResult()) {
-    switch (fTy->getResult().getConvention()) {
+/// Creating a result-translation plan involves three basic things:
+///   - building SILArguments for each of the outer indirect results
+///   - building a list of SILValues for each of the inner indirect results
+///   - building a list of Operations to perform which will reabstract
+///     the inner results to match the outer.
+class ResultPlanner {
+  SILGenFunction &SGF;
+  SILLocation Loc;
+
+  /// A single result-translation operation.
+  struct Operation {
+    enum Kind {
+      /// Take the last N direct outer results, tuple them, and make that a
+      /// new direct outer result.
+      ///
+      /// Valid: NumElements, OuterResult
+      TupleDirect,
+
+      /// Take the last direct outer result, inject it into an optional
+      /// type, and make that a new direct outer result.
+      ///
+      /// Valid: SomeDecl, OuterResult
+      InjectOptionalDirect,
+
+      /// Finish building an optional Some in the given address.
+      ///
+      /// Valid: SomeDecl, OuterResultAddr
+      InjectOptionalIndirect,
+
+      /// Take the next direct inner result and just make it a direct
+      /// outer result.
+      ///
+      /// Valid: InnerResult, OuterResult.
+      DirectToDirect,
+
+      /// Take the next direct inner result and store it into an
+      /// outer result address.
+      ///
+      /// Valid: InnerDirect, OuterResultAddr.
+      DirectToIndirect,
+
+      /// Take from an indirect inner result and make it the next outer
+      /// direct result.
+      ///
+      /// Valid: InnerResultAddr, OuterResult.
+      IndirectToDirect,
+
+      /// Take from an indirect inner result into an outer indirect result.
+      ///
+      /// Valid: InnerResultAddr, OuterResultAddr.
+      IndirectToIndirect,
+
+      /// Take a value out of the source inner result address, reabstract
+      /// it, and initialize the destination outer result address.
+      ///
+      /// Valid: reabstraction info, InnerAddress, OuterAddress.
+      ReabstractIndirectToIndirect,
+
+      /// Take a value out of the source inner result address, reabstract
+      /// it, and add it as the next direct outer result.
+      ///
+      /// Valid: reabstraction info, InnerAddress, OuterResult.
+      ReabstractIndirectToDirect,
+
+      /// Take the next direct inner result, reabstract it, and initialize
+      /// the destination outer result address.
+      ///
+      /// Valid: reabstraction info, InnerResult, OuterAddress.
+      ReabstractDirectToIndirect,
+
+      /// Take the next direct inner result, reabstract it, and add it as
+      /// the next direct outer result.
+      ///
+      /// Valid: reabstraction info, InnerResult, OuterResult.
+      ReabstractDirectToDirect,
+    };
+
+    Operation(Kind kind) : TheKind(kind) {}
+
+    Kind TheKind;
+
+    // Reabstraction information.  Only valid for reabstraction kinds.
+    AbstractionPattern InnerOrigType = AbstractionPattern::getInvalid();
+    AbstractionPattern OuterOrigType = AbstractionPattern::getInvalid();
+    CanType InnerSubstType, OuterSubstType;
+
+    union {
+      SILValue InnerResultAddr;
+      SILResultInfo InnerResult;
+      unsigned NumElements;
+      EnumElementDecl *SomeDecl;
+    };
+
+    union {
+      SILValue OuterResultAddr;
+      SILResultInfo OuterResult;
+    };
+  };
+
+  struct PlanData {
+    ArrayRef<SILResultInfo> OuterResults;
+    ArrayRef<SILResultInfo> InnerResults;
+    SmallVectorImpl<SILValue> &InnerIndirectResultAddrs;
+    size_t NextOuterIndirectResultIndex;
+  };
+
+  SmallVector<Operation, 8> Operations;
+public:
+  ResultPlanner(SILGenFunction &SGF, SILLocation loc) : SGF(SGF), Loc(loc) {}
+
+  void plan(AbstractionPattern innerOrigType, CanType innerSubstType,
+            AbstractionPattern outerOrigType, CanType outerSubstType,
+            CanSILFunctionType innerFnType, CanSILFunctionType outerFnType,
+            SmallVectorImpl<SILValue> &innerIndirectResultAddrs) {
+    // Assert that the indirect results are set up like we expect.
+    assert(innerIndirectResultAddrs.empty());
+    assert(SGF.F.begin()->args_size()
+           >= SILFunctionConventions(outerFnType, SGF.SGM.M)
+                  .getNumIndirectSILResults());
+
+    innerIndirectResultAddrs.reserve(
+        SILFunctionConventions(innerFnType, SGF.SGM.M)
+            .getNumIndirectSILResults());
+
+    PlanData data = {outerFnType->getResults(), innerFnType->getResults(),
+                     innerIndirectResultAddrs, 0};
+
+    // Recursively walk the result types.
+    plan(innerOrigType, innerSubstType, outerOrigType, outerSubstType, data);
+
+    // Assert that we consumed and produced all the indirect result
+    // information we needed.
+    assert(data.OuterResults.empty());
+    assert(data.InnerResults.empty());
+    assert(data.InnerIndirectResultAddrs.size() ==
+           SILFunctionConventions(innerFnType, SGF.SGM.M)
+               .getNumIndirectSILResults());
+    assert(data.NextOuterIndirectResultIndex
+           == SILFunctionConventions(outerFnType, SGF.SGM.M)
+                  .getNumIndirectSILResults());
+  }
+
+  SILValue execute(SILValue innerResult);
+
+private:
+  void execute(ArrayRef<SILValue> innerDirectResults,
+               SmallVectorImpl<SILValue> &outerDirectResults);
+  void executeInnerTuple(SILValue innerElement,
+                         SmallVector<SILValue, 4> &innerDirectResults);
+
+  void plan(AbstractionPattern innerOrigType, CanType innerSubstType,
+            AbstractionPattern outerOrigType, CanType outerSubstType,
+            PlanData &planData);
+
+  void planIntoIndirectResult(AbstractionPattern innerOrigType,
+                              CanType innerSubstType,
+                              AbstractionPattern outerOrigType,
+                              CanType outerSubstType,
+                              PlanData &planData,
+                              SILValue outerResultAddr);
+  void planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
+                                   CanTupleType innerSubstType,
+                                   AbstractionPattern outerOrigType,
+                                   CanType outerSubstType,
+                                   PlanData &planData,
+                                   SILValue outerResultAddr);
+  void planScalarIntoIndirectResult(AbstractionPattern innerOrigType,
+                                    CanType innerSubstType,
+                                    AbstractionPattern outerOrigType,
+                                    CanType outerSubstType,
+                                    PlanData &planData,
+                                    SILResultInfo innerResult,
+                                    SILValue outerResultAddr);
+
+  void planIntoDirectResult(AbstractionPattern innerOrigType,
+                            CanType innerSubstType,
+                            AbstractionPattern outerOrigType,
+                            CanType outerSubstType,
+                            PlanData &planData,
+                            SILResultInfo outerResult);
+  void planScalarIntoDirectResult(AbstractionPattern innerOrigType,
+                                  CanType innerSubstType,
+                                  AbstractionPattern outerOrigType,
+                                  CanType outerSubstType,
+                                  PlanData &planData,
+                                  SILResultInfo innerResult,
+                                  SILResultInfo outerResult);
+  void planTupleIntoDirectResult(AbstractionPattern innerOrigType,
+                                 CanTupleType innerSubstType,
+                                 AbstractionPattern outerOrigType,
+                                 CanType outerSubstType,
+                                 PlanData &planData,
+                                 SILResultInfo outerResult);
+
+  void planFromIndirectResult(AbstractionPattern innerOrigType,
+                              CanType innerSubstType,
+                              AbstractionPattern outerOrigType,
+                              CanType outerSubstType,
+                              PlanData &planData,
+                              SILValue innerResultAddr);
+  void planTupleFromIndirectResult(AbstractionPattern innerOrigType,
+                                   CanTupleType innerSubstType,
+                                   AbstractionPattern outerOrigType,
+                                   CanTupleType outerSubstType,
+                                   PlanData &planData,
+                                   SILValue innerResultAddr);
+  void planTupleFromDirectResult(AbstractionPattern innerOrigType,
+                                 CanTupleType innerSubstType,
+                                 AbstractionPattern outerOrigType,
+                                 CanTupleType outerSubstType,
+                                 PlanData &planData, SILResultInfo innerResult);
+  void planScalarFromIndirectResult(AbstractionPattern innerOrigType,
+                                    CanType innerSubstType,
+                                    AbstractionPattern outerOrigType,
+                                    CanType outerSubstType,
+                                    SILValue innerResultAddr,
+                                    SILResultInfo outerResult,
+                                    SILValue optOuterResultAddr);
+
+  /// Claim the next inner result from the plan data.
+  SILResultInfo claimNextInnerResult(PlanData &data) {
+    return claimNext(data.InnerResults);
+  }
+
+  /// Claim the next outer result from the plan data.  If it's indirect,
+  /// grab its SILArgument.
+  std::pair<SILResultInfo, SILValue> claimNextOuterResult(PlanData &data) {
+    SILResultInfo result = claimNext(data.OuterResults);
+
+    SILValue resultAddr;
+    if (SGF.silConv.isSILIndirect(result)) {
+      resultAddr =
+          SGF.F.begin()->getArgument(data.NextOuterIndirectResultIndex++);
+    }
+
+    return { result, resultAddr };
+  }
+
+  /// Create a temporary address suitable for passing to the given inner
+  /// indirect result and add it as an inner indirect result.
+  SILValue addInnerIndirectResultTemporary(PlanData &data,
+                                           SILResultInfo innerResult) {
+    assert(SGF.silConv.isSILIndirect(innerResult) ||
+           !SGF.silConv.useLoweredAddresses());
+    auto temporary =
+        SGF.emitTemporaryAllocation(Loc, SGF.getSILType(innerResult));
+    data.InnerIndirectResultAddrs.push_back(temporary);
+    return temporary;
+  }
+
+  /// Cause the next inner indirect result to be emitted directly into
+  /// the given outer result address.
+  void addInPlace(PlanData &data, SILValue outerResultAddr) {
+    data.InnerIndirectResultAddrs.push_back(outerResultAddr);
+    // Does not require an Operation.
+  }
+
+  Operation &addOperation(Operation::Kind kind) {
+    Operations.emplace_back(kind);
+    return Operations.back();
+  }
+
+  void addDirectToDirect(SILResultInfo innerResult, SILResultInfo outerResult) {
+    auto &op = addOperation(Operation::DirectToDirect);
+    op.InnerResult = innerResult;
+    op.OuterResult = outerResult;
+  }
+
+  void addDirectToIndirect(SILResultInfo innerResult,
+                           SILValue outerResultAddr) {
+    auto &op = addOperation(Operation::DirectToIndirect);
+    op.InnerResult = innerResult;
+    op.OuterResultAddr = outerResultAddr;
+  }
+
+  void addIndirectToDirect(SILValue innerResultAddr,
+                           SILResultInfo outerResult) {
+    auto &op = addOperation(Operation::IndirectToDirect);
+    op.InnerResultAddr = innerResultAddr;
+    op.OuterResult = outerResult;
+  }
+
+  void addIndirectToIndirect(SILValue innerResultAddr,
+                             SILValue outerResultAddr) {
+    auto &op = addOperation(Operation::IndirectToIndirect);
+    op.InnerResultAddr = innerResultAddr;
+    op.OuterResultAddr = outerResultAddr;
+  }
+
+  void addTupleDirect(unsigned numElements, SILResultInfo outerResult) {
+    auto &op = addOperation(Operation::TupleDirect);
+    op.NumElements = numElements;
+    op.OuterResult = outerResult;
+  }
+
+  void addInjectOptionalDirect(EnumElementDecl *someDecl,
+                               SILResultInfo outerResult) {
+    auto &op = addOperation(Operation::InjectOptionalDirect);
+    op.SomeDecl = someDecl;
+    op.OuterResult = outerResult;
+  }
+
+  void addInjectOptionalIndirect(EnumElementDecl *someDecl,
+                                 SILValue outerResultAddr) {
+    auto &op = addOperation(Operation::InjectOptionalIndirect);
+    op.SomeDecl = someDecl;
+    op.OuterResultAddr = outerResultAddr;
+  }
+
+  void addReabstractDirectToDirect(AbstractionPattern innerOrigType,
+                                   CanType innerSubstType,
+                                   AbstractionPattern outerOrigType,
+                                   CanType outerSubstType,
+                                   SILResultInfo innerResult,
+                                   SILResultInfo outerResult) {
+    auto &op = addOperation(Operation::ReabstractDirectToDirect);
+    op.InnerResult = innerResult;
+    op.OuterResult = outerResult;
+    op.InnerOrigType = innerOrigType;
+    op.InnerSubstType = innerSubstType;
+    op.OuterOrigType = outerOrigType;
+    op.OuterSubstType = outerSubstType;
+  }
+
+  void addReabstractDirectToIndirect(AbstractionPattern innerOrigType,
+                                     CanType innerSubstType,
+                                     AbstractionPattern outerOrigType,
+                                     CanType outerSubstType,
+                                     SILResultInfo innerResult,
+                                     SILValue outerResultAddr) {
+    auto &op = addOperation(Operation::ReabstractDirectToIndirect);
+    op.InnerResult = innerResult;
+    op.OuterResultAddr = outerResultAddr;
+    op.InnerOrigType = innerOrigType;
+    op.InnerSubstType = innerSubstType;
+    op.OuterOrigType = outerOrigType;
+    op.OuterSubstType = outerSubstType;
+  }
+
+  void addReabstractIndirectToDirect(AbstractionPattern innerOrigType,
+                                     CanType innerSubstType,
+                                     AbstractionPattern outerOrigType,
+                                     CanType outerSubstType,
+                                     SILValue innerResultAddr,
+                                     SILResultInfo outerResult) {
+    auto &op = addOperation(Operation::ReabstractIndirectToDirect);
+    op.InnerResultAddr = innerResultAddr;
+    op.OuterResult = outerResult;
+    op.InnerOrigType = innerOrigType;
+    op.InnerSubstType = innerSubstType;
+    op.OuterOrigType = outerOrigType;
+    op.OuterSubstType = outerSubstType;
+  }
+
+  void addReabstractIndirectToIndirect(AbstractionPattern innerOrigType,
+                                       CanType innerSubstType,
+                                       AbstractionPattern outerOrigType,
+                                       CanType outerSubstType,
+                                       SILValue innerResultAddr,
+                                       SILValue outerResultAddr) {
+    auto &op = addOperation(Operation::ReabstractIndirectToIndirect);
+    op.InnerResultAddr = innerResultAddr;
+    op.OuterResultAddr = outerResultAddr;
+    op.InnerOrigType = innerOrigType;
+    op.InnerSubstType = innerSubstType;
+    op.OuterOrigType = outerOrigType;
+    op.OuterSubstType = outerSubstType;
+  }
+};
+
+} // end anonymous namespace
+
+/// Plan the reabstraction of a call result.
+void ResultPlanner::plan(AbstractionPattern innerOrigType,
+                         CanType innerSubstType,
+                         AbstractionPattern outerOrigType,
+                         CanType outerSubstType,
+                         PlanData &planData) {
+  // The substituted types must match up in tuple-ness and arity.
+  assert(isa<TupleType>(innerSubstType) == isa<TupleType>(outerSubstType) ||
+         (isa<TupleType>(innerSubstType) &&
+          (outerSubstType->isAny() ||
+           outerSubstType->getAnyOptionalObjectType())));
+  assert(!isa<TupleType>(outerSubstType) ||
+         cast<TupleType>(innerSubstType)->getNumElements() ==
+           cast<TupleType>(outerSubstType)->getNumElements());
+
+  // If the inner abstraction pattern is a tuple, that result will be expanded.
+  if (innerOrigType.isTuple()) {
+    auto innerSubstTupleType = cast<TupleType>(innerSubstType);
+
+    // If the outer abstraction pattern is also a tuple, that result will also
+    // be expanded, in parallel with the inner pattern.
+    if (outerOrigType.isTuple()) {
+      auto outerSubstTupleType = cast<TupleType>(outerSubstType);
+      assert(innerSubstTupleType->getNumElements()
+               == outerSubstTupleType->getNumElements());
+
+      // Otherwise, recursively descend into the tuples.
+      for (auto eltIndex : indices(innerSubstTupleType.getElementTypes())) {
+        plan(innerOrigType.getTupleElementType(eltIndex),
+             innerSubstTupleType.getElementType(eltIndex),
+             outerOrigType.getTupleElementType(eltIndex),
+             outerSubstTupleType.getElementType(eltIndex),
+             planData);
+      }
+      return;      
+    }
+
+    // Otherwise, the next outer result must be either opaque or optional.
+    // In either case, it corresponds to a single result.
+    auto outerResult = claimNextOuterResult(planData);
+
+    // Base the plan on whether the single result is direct or indirect.
+    if (SGF.silConv.isSILIndirect(outerResult.first)) {
+      assert(outerResult.second);
+      planTupleIntoIndirectResult(innerOrigType, innerSubstTupleType,
+                                  outerOrigType, outerSubstType,
+                                  planData, outerResult.second);
+    } else {
+      planTupleIntoDirectResult(innerOrigType, innerSubstTupleType,
+                                outerOrigType, outerSubstType,
+                                planData, outerResult.first);
+    }
+    return;
+  }
+
+  // Otherwise, the inner pattern is a scalar; claim the next inner result.
+  SILResultInfo innerResult = claimNextInnerResult(planData);
+
+  assert((!outerOrigType.isTuple() || innerResult.isFormalIndirect()) &&
+         "outer pattern is a tuple, inner pattern is not, but inner result is "
+         "not indirect?");
+
+  // If the inner result is a tuple, we need to expand from a temporary.
+  if (innerResult.isFormalIndirect() && outerOrigType.isTuple()) {
+    if (SGF.silConv.isSILIndirect(innerResult)) {
+      SILValue innerResultAddr =
+          addInnerIndirectResultTemporary(planData, innerResult);
+      planTupleFromIndirectResult(
+          innerOrigType, cast<TupleType>(innerSubstType), outerOrigType,
+          cast<TupleType>(outerSubstType), planData, innerResultAddr);
+    } else {
+      assert(!SGF.silConv.useLoweredAddresses() &&
+             "Formal Indirect Results that are not SIL Indirect are only "
+             "allowed in opaque values mode");
+      planTupleFromDirectResult(innerOrigType, cast<TupleType>(innerSubstType),
+                                outerOrigType, cast<TupleType>(outerSubstType),
+                                planData, innerResult);
+    }
+    return;
+  }
+
+  // Otherwise, the outer pattern is a scalar; claim the next outer result.
+  auto outerResult = claimNextOuterResult(planData);
+
+  // If the outer result is indirect, plan to emit into that.
+  if (SGF.silConv.isSILIndirect(outerResult.first)) {
+    assert(outerResult.second);
+    planScalarIntoIndirectResult(innerOrigType, innerSubstType,
+                                 outerOrigType, outerSubstType,
+                                 planData, innerResult, outerResult.second);
+
+  } else {
+    planScalarIntoDirectResult(innerOrigType, innerSubstType,
+                               outerOrigType, outerSubstType,
+                               planData, innerResult, outerResult.first);
+  }
+}
+
+/// Plan the emission of a call result into an outer result address.
+void ResultPlanner::planIntoIndirectResult(AbstractionPattern innerOrigType,
+                                           CanType innerSubstType,
+                                           AbstractionPattern outerOrigType,
+                                           CanType outerSubstType,
+                                           PlanData &planData,
+                                           SILValue outerResultAddr) {
+  // outerOrigType can be a tuple if we're also injecting into an optional.
+
+  // If the inner pattern is a tuple, expand it.
+  if (innerOrigType.isTuple()) {
+    planTupleIntoIndirectResult(innerOrigType, cast<TupleType>(innerSubstType),
+                                outerOrigType, outerSubstType,
+                                planData, outerResultAddr);
+
+  // Otherwise, it's scalar.
+  } else {
+    // Claim the next inner result.
+    SILResultInfo innerResult = claimNextInnerResult(planData);
+
+    planScalarIntoIndirectResult(innerOrigType, innerSubstType,
+                                 outerOrigType, outerSubstType,
+                                 planData, innerResult, outerResultAddr);
+  }
+}
+
+/// Plan the emission of a call result into an outer result address,
+/// given that the inner abstraction pattern is a tuple.
+void
+ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
+                                           CanTupleType innerSubstType,
+                                           AbstractionPattern outerOrigType,
+                                           CanType outerSubstType,
+                                           PlanData &planData,
+                                           SILValue outerResultAddr) {
+  assert(innerOrigType.isTuple());
+  // outerOrigType can be a tuple if we're doing something like
+  // injecting into an optional tuple.
+
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+
+  // If the outer type is not a tuple, it must be optional.
+  if (!outerSubstTupleType) {
+    // Figure out what kind of optional it is.
+    CanType outerSubstObjectType =
+      outerSubstType.getAnyOptionalObjectType();
+    if (outerSubstObjectType) {
+      auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
+
+      // Prepare the value slot in the optional value.
+      SILType outerObjectType =
+        outerResultAddr->getType().getAnyOptionalObjectType();
+      SILValue outerObjectResultAddr
+        = SGF.B.createInitEnumDataAddr(Loc, outerResultAddr, someDecl,
+                                       outerObjectType);
+
+      // Emit into that address.
+      planTupleIntoIndirectResult(innerOrigType, innerSubstType,
+                                  outerOrigType.getAnyOptionalObjectType(),
+                                  outerSubstObjectType,
+                                  planData, outerObjectResultAddr);
+
+      // Add an operation to finish the enum initialization.
+      addInjectOptionalIndirect(someDecl, outerResultAddr);
+      return;
+    }
+
+    assert(outerSubstType->isAny());
+
+    // Prepare the value slot in the existential.
+    auto opaque = AbstractionPattern::getOpaque();
+    SILValue outerConcreteResultAddr
+      = SGF.B.createInitExistentialAddr(Loc, outerResultAddr, innerSubstType,
+                                        SGF.getLoweredType(opaque, innerSubstType),
+                                        /*conformances=*/{});
+
+    // Emit into that address.
+    planTupleIntoIndirectResult(innerOrigType, innerSubstType,
+                                innerOrigType, innerSubstType,
+                                planData, outerConcreteResultAddr);
+    return;
+  }
+
+  assert(innerSubstType->getNumElements()
+           == outerSubstTupleType->getNumElements());
+
+  for (auto eltIndex : indices(innerSubstType.getElementTypes())) {
+    // Project the address of the element.
+    SILValue outerEltResultAddr =
+      SGF.B.createTupleElementAddr(Loc, outerResultAddr, eltIndex);
+
+    // Plan to emit into that location.
+    planIntoIndirectResult(innerOrigType.getTupleElementType(eltIndex),
+                           innerSubstType.getElementType(eltIndex),
+                           outerOrigType.getTupleElementType(eltIndex),
+                           outerSubstTupleType.getElementType(eltIndex),
+                           planData, outerEltResultAddr);
+  }
+}
+
+/// Plan the emission of a call result as a single outer direct result.
+void
+ResultPlanner::planIntoDirectResult(AbstractionPattern innerOrigType,
+                                    CanType innerSubstType,
+                                    AbstractionPattern outerOrigType,
+                                    CanType outerSubstType,
+                                    PlanData &planData,
+                                    SILResultInfo outerResult) {
+  assert(!outerOrigType.isTuple() || !SGF.silConv.useLoweredAddresses());
+
+  // If the inner pattern is a tuple, expand it.
+  if (innerOrigType.isTuple()) {
+    planTupleIntoDirectResult(innerOrigType, cast<TupleType>(innerSubstType),
+                              outerOrigType, outerSubstType,
+                              planData, outerResult);
+
+  // Otherwise, it's scalar.
+  } else {
+    // Claim the next inner result.
+    SILResultInfo innerResult = claimNextInnerResult(planData);
+
+    planScalarIntoDirectResult(innerOrigType, innerSubstType,
+                               outerOrigType, outerSubstType,
+                               planData, innerResult, outerResult);
+  }
+}
+
+/// Plan the emission of a call result as a single outer direct result,
+/// given that the inner abstraction pattern is a tuple.
+void
+ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
+                                         CanTupleType innerSubstType,
+                                         AbstractionPattern outerOrigType,
+                                         CanType outerSubstType,
+                                         PlanData &planData,
+                                         SILResultInfo outerResult) {
+  assert(innerOrigType.isTuple());
+
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+
+  // If the outer type is not a tuple, it must be optional or we are under
+  // opaque value mode
+  if (!outerSubstTupleType) {
+    CanType outerSubstObjectType =
+      outerSubstType.getAnyOptionalObjectType();
+
+    if (outerSubstObjectType) {
+      auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
+      SILType outerObjectType =
+          SGF.getSILType(outerResult).getAnyOptionalObjectType();
+      SILResultInfo outerObjectResult(outerObjectType.getSwiftRValueType(),
+                                      outerResult.getConvention());
+
+      // Plan to leave the tuple elements as a single direct outer result.
+      planTupleIntoDirectResult(innerOrigType, innerSubstType,
+                                outerOrigType.getAnyOptionalObjectType(),
+                                outerSubstObjectType, planData,
+                                outerObjectResult);
+
+      // Take that result and inject it into an optional.
+      addInjectOptionalDirect(someDecl, outerResult);
+      return;
+    } else {
+      assert(!SGF.silConv.useLoweredAddresses() &&
+             "inner type was a tuple but outer type was neither a tuple nor "
+             "optional nor are we under opaque value mode");
+      assert(outerSubstType->isAny());
+
+      auto opaque = AbstractionPattern::getOpaque();
+      auto anyType = SGF.getLoweredType(opaque, outerSubstType);
+      auto outerResultAddr = SGF.emitTemporaryAllocation(Loc, anyType);
+
+      SILValue outerConcreteResultAddr = SGF.B.createInitExistentialAddr(
+          Loc, outerResultAddr, innerSubstType,
+          SGF.getLoweredType(opaque, innerSubstType), /*conformances=*/{});
+
+      planTupleIntoIndirectResult(innerOrigType, innerSubstType, innerOrigType,
+                                  innerSubstType, planData,
+                                  outerConcreteResultAddr);
+
+      addReabstractIndirectToDirect(innerOrigType, innerSubstType,
+                                    outerOrigType, outerSubstType,
+                                    outerConcreteResultAddr, outerResult);
+      return;
+    }
+  }
+
+  // Otherwise, the outer type is a tuple.
+  assert(innerSubstType->getNumElements()
+           == outerSubstTupleType->getNumElements());
+
+  // Create direct outer results for each of the elements.
+  for (auto eltIndex : indices(innerSubstType.getElementTypes())) {
+    auto outerEltType =
+        SGF.getSILType(outerResult).getTupleElementType(eltIndex);
+    SILResultInfo outerEltResult(outerEltType.getSwiftRValueType(),
+                                 outerResult.getConvention());
+
+    planIntoDirectResult(innerOrigType.getTupleElementType(eltIndex),
+                         innerSubstType.getElementType(eltIndex),
+                         outerOrigType.getTupleElementType(eltIndex),
+                         outerSubstTupleType.getElementType(eltIndex),
+                         planData, outerEltResult);
+  }
+
+  // Bind them together into a single tuple.
+  addTupleDirect(innerSubstType->getNumElements(), outerResult);
+}
+
+/// Plan the emission of a call result as a single outer direct result,
+/// given that the inner abstraction pattern is not a tuple.
+void ResultPlanner::planScalarIntoDirectResult(AbstractionPattern innerOrigType,
+                                               CanType innerSubstType,
+                                               AbstractionPattern outerOrigType,
+                                               CanType outerSubstType,
+                                               PlanData &planData,
+                                               SILResultInfo innerResult,
+                                               SILResultInfo outerResult) {
+  assert(!innerOrigType.isTuple());
+  assert(!outerOrigType.isTuple());
+
+  // If the inner result is indirect, plan to emit from that.
+  if (SGF.silConv.isSILIndirect(innerResult)) {
+    SILValue innerResultAddr =
+      addInnerIndirectResultTemporary(planData, innerResult);
+    planScalarFromIndirectResult(innerOrigType, innerSubstType,
+                                 outerOrigType, outerSubstType,
+                                 innerResultAddr, outerResult, SILValue());
+    return;
+  }
+
+  // Otherwise, we have two direct results.
+
+  // If there's no abstraction difference, it's just returned directly.
+  if (SGF.getSILType(innerResult) == SGF.getSILType(outerResult)) {
+    addDirectToDirect(innerResult, outerResult);
+
+  // Otherwise, we need to reabstract.
+  } else {
+    addReabstractDirectToDirect(innerOrigType, innerSubstType,
+                                outerOrigType, outerSubstType,
+                                innerResult, outerResult);
+  }
+}
+
+/// Plan the emission of a call result into an outer result address,
+/// given that the inner abstraction pattern is not a tuple.
+void
+ResultPlanner::planScalarIntoIndirectResult(AbstractionPattern innerOrigType,
+                                            CanType innerSubstType,
+                                            AbstractionPattern outerOrigType,
+                                            CanType outerSubstType,
+                                            PlanData &planData,
+                                            SILResultInfo innerResult,
+                                            SILValue outerResultAddr) {
+  assert(!innerOrigType.isTuple());
+  assert(!outerOrigType.isTuple());
+
+  bool hasAbstractionDifference =
+    (innerResult.getType() != outerResultAddr->getType().getSwiftRValueType());
+
+  // If the inner result is indirect, we need some memory to emit it into.
+  if (SGF.silConv.isSILIndirect(innerResult)) {
+    // If there's no abstraction difference, that can just be
+    // in-place into the outer result address.
+    if (!hasAbstractionDifference) {
+      addInPlace(planData, outerResultAddr);
+
+    // Otherwise, we'll need a temporary.
+    } else {
+      SILValue innerResultAddr =
+        addInnerIndirectResultTemporary(planData, innerResult);
+      addReabstractIndirectToIndirect(innerOrigType, innerSubstType,
+                                      outerOrigType, outerSubstType,
+                                      innerResultAddr, outerResultAddr);
+    }
+
+  // Otherwise, the inner result is direct.
+  } else {
+    // If there's no abstraction difference, we just need to store.
+    if (!hasAbstractionDifference) {
+      addDirectToIndirect(innerResult, outerResultAddr);
+
+    // Otherwise, we need to reabstract and store.
+    } else {
+      addReabstractDirectToIndirect(innerOrigType, innerSubstType,
+                                    outerOrigType, outerSubstType,
+                                    innerResult, outerResultAddr);      
+    }
+  }
+}
+
+/// Plan the emission of a call result from an inner result address.
+void ResultPlanner::planFromIndirectResult(AbstractionPattern innerOrigType,
+                                           CanType innerSubstType,
+                                           AbstractionPattern outerOrigType,
+                                           CanType outerSubstType,
+                                           PlanData &planData,
+                                           SILValue innerResultAddr) {
+  assert(!innerOrigType.isTuple());
+
+  if (outerOrigType.isTuple()) {
+    planTupleFromIndirectResult(innerOrigType, cast<TupleType>(innerSubstType),
+                                outerOrigType, cast<TupleType>(outerSubstType),
+                                planData, innerResultAddr);
+  } else {
+    auto outerResult = claimNextOuterResult(planData);
+    planScalarFromIndirectResult(innerOrigType, innerSubstType,
+                                 outerOrigType, outerSubstType,
+                                 innerResultAddr,
+                                 outerResult.first, outerResult.second);
+  }
+}
+
+/// Plan the emission of a call result from an inner result address, given
+/// that the outer abstraction pattern is a tuple.
+void
+ResultPlanner::planTupleFromIndirectResult(AbstractionPattern innerOrigType,
+                                           CanTupleType innerSubstType,
+                                           AbstractionPattern outerOrigType,
+                                           CanTupleType outerSubstType,
+                                           PlanData &planData,
+                                           SILValue innerResultAddr) {
+  assert(!innerOrigType.isTuple());
+  assert(innerSubstType->getNumElements() == outerSubstType->getNumElements());
+  assert(outerOrigType.isTuple());
+
+  for (auto eltIndex : indices(innerSubstType.getElementTypes())) {
+    // Project the address of the element.
+    SILValue innerEltResultAddr =
+      SGF.B.createTupleElementAddr(Loc, innerResultAddr, eltIndex);
+
+    // Plan to expand from that location.
+    planFromIndirectResult(innerOrigType.getTupleElementType(eltIndex),
+                           innerSubstType.getElementType(eltIndex),
+                           outerOrigType.getTupleElementType(eltIndex),
+                           outerSubstType.getElementType(eltIndex),
+                           planData, innerEltResultAddr);
+  }
+}
+
+void ResultPlanner::planTupleFromDirectResult(AbstractionPattern innerOrigType,
+                                              CanTupleType innerSubstType,
+                                              AbstractionPattern outerOrigType,
+                                              CanTupleType outerSubstType,
+                                              PlanData &planData,
+                                              SILResultInfo innerResult) {
+
+  assert(!innerOrigType.isTuple());
+  auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+
+  assert(outerSubstTupleType && "Outer type must be a tuple");
+  assert(innerSubstType->getNumElements() ==
+         outerSubstTupleType->getNumElements());
+
+  // Create direct outer results for each of the elements.
+  for (auto eltIndex : indices(innerSubstType.getElementTypes())) {
+    AbstractionPattern newOuterOrigType =
+        outerOrigType.getTupleElementType(eltIndex);
+    AbstractionPattern newInnerOrigType =
+        innerOrigType.getTupleElementType(eltIndex);
+    if (newOuterOrigType.isTuple()) {
+      planTupleFromDirectResult(
+          newInnerOrigType,
+          cast<TupleType>(innerSubstType.getElementType(eltIndex)),
+          newOuterOrigType,
+          cast<TupleType>(outerSubstTupleType.getElementType(eltIndex)),
+          planData, innerResult);
+      continue;
+    }
+
+    auto outerResult = claimNextOuterResult(planData);
+    auto elemType = outerSubstTupleType.getElementType(eltIndex);
+    SILResultInfo eltResult(elemType, outerResult.first.getConvention());
+    planScalarIntoDirectResult(
+        newInnerOrigType, innerSubstType.getElementType(eltIndex),
+        newOuterOrigType, outerSubstTupleType.getElementType(eltIndex),
+        planData, eltResult, outerResult.first);
+  }
+}
+
+/// Plan the emission of a call result from an inner result address,
+/// given that the outer abstraction pattern is not a tuple.
+void
+ResultPlanner::planScalarFromIndirectResult(AbstractionPattern innerOrigType,
+                                            CanType innerSubstType,
+                                            AbstractionPattern outerOrigType,
+                                            CanType outerSubstType,
+                                            SILValue innerResultAddr,
+                                            SILResultInfo outerResult,
+                                            SILValue optOuterResultAddr) {
+  assert(!innerOrigType.isTuple());
+  assert(!outerOrigType.isTuple());
+  assert(SGF.silConv.isSILIndirect(outerResult) == bool(optOuterResultAddr));
+
+  bool hasAbstractionDifference =
+    (innerResultAddr->getType().getSwiftRValueType() != outerResult.getType());
+
+  // The outer result can be indirect, and it doesn't necessarily have an
+  // abstraction difference.  Note that we should only end up in this path
+  // in cases where simply forwarding the outer result address wasn't possible.
+
+  if (SGF.silConv.isSILIndirect(outerResult)) {
+    assert(optOuterResultAddr);
+    if (!hasAbstractionDifference) {
+      addIndirectToIndirect(innerResultAddr, optOuterResultAddr);
+    } else {
+      addReabstractIndirectToIndirect(innerOrigType, innerSubstType,
+                                      outerOrigType, outerSubstType,
+                                      innerResultAddr, optOuterResultAddr);
+    }
+  } else {
+    if (!hasAbstractionDifference) {
+      addIndirectToDirect(innerResultAddr, outerResult);
+    } else {
+      addReabstractIndirectToDirect(innerOrigType, innerSubstType,
+                                    outerOrigType, outerSubstType,
+                                    innerResultAddr, outerResult);
+    }
+  }
+}
+
+void ResultPlanner::executeInnerTuple(
+    SILValue innerElement, SmallVector<SILValue, 4> &innerDirectResults) {
+  auto innerTupleType = innerElement->getType().getAs<TupleType>();
+  assert(innerTupleType && "Only supports tuple inner types");
+  ManagedValue ownedInnerResult =
+      SGF.emitManagedRValueWithCleanup(innerElement);
+  // Then borrow the managed direct result.
+  ManagedValue borrowedInnerResult = ownedInnerResult.borrow(SGF, Loc);
+  for (unsigned i : indices(innerTupleType.getElementTypes())) {
+    ManagedValue elt = SGF.B.createTupleExtract(Loc, borrowedInnerResult, i);
+    auto eltType = elt.getType();
+    if (eltType.is<TupleType>()) {
+      executeInnerTuple(elt.getValue(), innerDirectResults);
+      continue;
+    }
+    innerDirectResults.push_back(elt.copyUnmanaged(SGF, Loc).forward(SGF));
+  }
+}
+
+SILValue ResultPlanner::execute(SILValue innerResult) {
+  // The code emission here assumes that we don't need to have
+  // active cleanups for all the result values we're not actively
+  // transforming.  In other words, it's not "exception-safe".
+
+  // Explode the inner direct results.
+  SmallVector<SILValue, 4> innerDirectResults;
+  auto innerResultTupleType = innerResult->getType().getAs<TupleType>();
+  if (!innerResultTupleType) {
+    innerDirectResults.push_back(innerResult);
+  } else {
+    {
+      Scope S(SGF.Cleanups, CleanupLocation::get(Loc));
+
+      // First create an rvalue cleanup for our direct result.
+      assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
+             innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
+      executeInnerTuple(innerResult, innerDirectResults);
+      // Then allow the cleanups to be emitted in the proper reverse order.
+    }
+  }
+
+  // Translate the result values.
+  SmallVector<SILValue, 4> outerDirectResults;
+  execute(innerDirectResults, outerDirectResults);
+
+  // Implode the outer direct results.
+  SILValue outerResult;
+  if (outerDirectResults.size() == 1) {
+    outerResult = outerDirectResults[0];
+  } else {
+    outerResult = SGF.B.createTuple(Loc, outerDirectResults);
+  }
+
+  return outerResult;
+}
+
+void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
+                            SmallVectorImpl<SILValue> &outerDirectResults) {
+  // A helper function to claim an inner direct result.
+  auto claimNextInnerDirectResult = [&](SILResultInfo result) -> ManagedValue {
+    auto resultValue = claimNext(innerDirectResults);
+    assert(resultValue->getType() == SGF.getSILType(result));
+    auto &resultTL = SGF.getTypeLowering(result.getType());
+    switch (result.getConvention()) {
+    case ResultConvention::Indirect:
+      assert(!SGF.silConv.isSILIndirect(result)
+             && "claiming indirect result as direct!");
+      LLVM_FALLTHROUGH;
     case ResultConvention::Owned:
-      break;
     case ResultConvention::Autoreleased:
-      innerResultValue =
-        gen.B.createStrongRetainAutoreleased(loc, innerResultValue);
-      break;
+      return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
     case ResultConvention::UnownedInnerPointer:
       // FIXME: We can't reasonably lifetime-extend an inner-pointer result
       // through a thunk. We don't know which parameter to the thunk was
       // originally 'self'.
-      gen.SGM.diagnose(loc.getSourceLoc(), diag::not_implemented,
+      SGF.SGM.diagnose(Loc.getSourceLoc(), diag::not_implemented,
                        "reabstraction of returns_inner_pointer function");
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ResultConvention::Unowned:
-      innerResultTL.emitRetainValue(gen.B, loc, innerResultValue);
-      break;
+      return SGF.emitManagedRetain(Loc, resultValue, resultTL);
     }
-  }
-  
-  // Control the result value.  The real result value is in the
-  // indirect output if it exists.
-  ManagedValue innerResult;
-  if (innerResultAddr) {
-    innerResult = gen.emitManagedBufferWithCleanup(innerResultAddr,
-                                                   innerResultTL);
-  } else {
-    innerResult = gen.emitManagedRValueWithCleanup(innerResultValue,
-                                                   innerResultTL);
+    llvm_unreachable("bad result convention!");
+  };
+
+  // A helper function to add an outer direct result.
+  auto addOuterDirectResult = [&](ManagedValue resultValue,
+                                  SILResultInfo result) {
+    assert(resultValue.getType()
+           == SGF.F.mapTypeIntoContext(SGF.getSILType(result)));
+    outerDirectResults.push_back(resultValue.forward(SGF));
+  };
+
+  auto emitReabstract =
+      [&](Operation &op, bool innerIsIndirect, bool outerIsIndirect) {
+    // Set up the inner result.
+    ManagedValue innerResult;
+    if (innerIsIndirect) {
+      innerResult = SGF.emitManagedBufferWithCleanup(op.InnerResultAddr);
+    } else {
+      innerResult = claimNextInnerDirectResult(op.InnerResult);
+    }
+
+    // Set up the context into which to emit the outer result.
+    SGFContext outerResultCtxt;
+    Optional<TemporaryInitialization> outerResultInit;
+    if (outerIsIndirect) {
+      outerResultInit.emplace(op.OuterResultAddr, CleanupHandle::invalid());
+      outerResultCtxt = SGFContext(&*outerResultInit);
+    }
+
+    // Perform the translation.
+    auto translated =
+      SGF.emitTransformedValue(Loc, innerResult,
+                               op.InnerOrigType, op.InnerSubstType,
+                               op.OuterOrigType, op.OuterSubstType,
+                               outerResultCtxt);
+
+    // If the outer is indirect, force it into the context.
+    if (outerIsIndirect) {
+      if (!translated.isInContext()) {
+        translated.forwardInto(SGF, Loc, op.OuterResultAddr);
+      }
+
+    // Otherwise, it's a direct result.
+    } else {
+      addOuterDirectResult(translated, op.OuterResult);
+    }
+  };
+
+  // Execute each operation.
+  for (auto &op : Operations) {
+    switch (op.TheKind) {
+    case Operation::DirectToDirect: {
+      auto result = claimNextInnerDirectResult(op.InnerResult);
+      addOuterDirectResult(result, op.OuterResult);
+      continue;
+    }
+
+    case Operation::DirectToIndirect: {
+      auto result = claimNextInnerDirectResult(op.InnerResult);
+      SGF.B.emitStoreValueOperation(Loc, result.forward(SGF),
+                                    op.OuterResultAddr,
+                                    StoreOwnershipQualifier::Init);
+      continue;
+    }
+
+    case Operation::IndirectToDirect: {
+      auto resultAddr = op.InnerResultAddr;
+      auto &resultTL = SGF.getTypeLowering(resultAddr->getType());
+      auto result = SGF.emitManagedRValueWithCleanup(
+          resultTL.emitLoad(SGF.B, Loc, resultAddr,
+                            LoadOwnershipQualifier::Take),
+          resultTL);
+      addOuterDirectResult(result, op.OuterResult);
+      continue;
+    }
+
+    case Operation::IndirectToIndirect: {
+      // The type could be address-only; just take.
+      SGF.B.createCopyAddr(Loc, op.InnerResultAddr, op.OuterResultAddr,
+                           IsTake, IsInitialization);
+      continue;
+    }
+
+    case Operation::ReabstractIndirectToIndirect:
+      emitReabstract(op, /*indirect source*/ true, /*indirect dest*/ true);
+      continue;
+    case Operation::ReabstractIndirectToDirect:
+      emitReabstract(op, /*indirect source*/ true, /*indirect dest*/ false);
+      continue;
+    case Operation::ReabstractDirectToIndirect:
+      emitReabstract(op, /*indirect source*/ false, /*indirect dest*/ true);
+      continue;
+    case Operation::ReabstractDirectToDirect:
+      emitReabstract(op, /*indirect source*/ false, /*indirect dest*/ false);
+      continue;
+
+    case Operation::TupleDirect: {
+      auto firstEltIndex = outerDirectResults.size() - op.NumElements;
+      auto elts = makeArrayRef(outerDirectResults).slice(firstEltIndex);
+      auto tupleType = SGF.F.mapTypeIntoContext(SGF.getSILType(op.OuterResult));
+      auto tuple = SGF.B.createTuple(Loc, tupleType, elts);
+      outerDirectResults.resize(firstEltIndex);
+      outerDirectResults.push_back(tuple);
+      continue;
+    }
+
+    case Operation::InjectOptionalDirect: {
+      SILValue value = outerDirectResults.pop_back_val();
+      auto tupleType = SGF.F.mapTypeIntoContext(SGF.getSILType(op.OuterResult));
+      SILValue optValue = SGF.B.createEnum(Loc, value, op.SomeDecl, tupleType);
+      outerDirectResults.push_back(optValue);
+      continue;
+    }
+
+    case Operation::InjectOptionalIndirect:
+      SGF.B.createInjectEnumAddr(Loc, op.OuterResultAddr, op.SomeDecl);
+      continue;
+    }
+    llvm_unreachable("bad operation kind");
   }
 
-  if (outerResultAddr) {
-    if (innerResultAddr == outerResultAddr) {
-      // If we emitted directly, there's nothing more to do.
-      // Let the caller claim the result.
-      assert(inputResultSubstType == outputResultSubstType);
-      innerResult.forwardCleanup(gen);
-      innerResult = {};
-    } else {
-      // Otherwise we'll have to copy over.
-      TemporaryInitialization init(outerResultAddr, CleanupHandle::invalid());
-      auto translated = gen.emitTransformedValue(loc, innerResult,
-                                                 inputResultOrigType,
-                                                 inputResultSubstType,
-                                                 outputResultOrigType,
-                                                 outputResultSubstType,
-                                                 /*emitInto*/ SGFContext(&init));
-      emitForceInto(gen, loc, translated, init);
-    }
-    
-    // Use the () from the call as the result of the outer function if
-    // it's available.
-    if (innerResultAddr) {
-      return innerResultValue;
-    } else {
-      auto voidTy = gen.SGM.Types.getEmptyTupleType();
-      return gen.B.createTuple(loc, voidTy, {});
-    }
-  } else {
-    auto translated = gen.emitTransformedValue(loc, innerResult,
-                                               inputResultOrigType,
-                                               inputResultSubstType,
-                                               outputResultOrigType,
-                                               outputResultSubstType);
-    return translated.forward(gen);
-  }
+  assert(innerDirectResults.empty() && "didn't consume all inner results?");
 }
 
 /// Build the body of a transformation thunk.
@@ -1308,34 +2572,27 @@ static SILValue getThunkResult(SILGenFunction &gen,
 /// \param inputOrigType Abstraction pattern of function value being thunked
 /// \param inputSubstType Formal AST type of function value being thunked
 /// \param outputOrigType Abstraction pattern of the thunk
-/// \param outputSubstType Formal AST type of the thuk
-static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
+/// \param outputSubstType Formal AST type of the thunk
+static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                            AbstractionPattern inputOrigType,
                            CanAnyFunctionType inputSubstType,
                            AbstractionPattern outputOrigType,
                            CanAnyFunctionType outputSubstType) {
   PrettyStackTraceSILFunction stackTrace("emitting reabstraction thunk in",
-                                         &gen.F);
-  auto thunkType = gen.F.getLoweredFunctionType();
+                                         &SGF.F);
+  auto thunkType = SGF.F.getLoweredFunctionType();
 
-  FullExpr scope(gen.Cleanups, CleanupLocation::get(loc));
-
-  SILValue outerResultAddr;
-  if (thunkType->hasIndirectResult()) {
-    auto resultType = thunkType->getIndirectResult().getSILType();
-    resultType = gen.F.mapTypeIntoContext(resultType);
-    outerResultAddr = new (gen.SGM.M) SILArgument(gen.F.begin(), resultType);
-  }
+  FullExpr scope(SGF.Cleanups, CleanupLocation::get(loc));
 
   SmallVector<ManagedValue, 8> params;
   // TODO: Could accept +0 arguments here when forwardFunctionArguments/
   // emitApply can.
-  collectParams(gen, loc, params, /*allowPlusZero*/ false);
+  SGF.collectThunkParams(loc, params, /*allowPlusZero*/ false);
 
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
-  auto argTypes = fnType->getParametersWithoutIndirectResult();
+  auto argTypes = fnType->getParameters();
 
   // Translate the argument values.  Function parameters are
   // contravariant: we want to switch the direction of transformation
@@ -1350,7 +2607,7 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   // other direction (the thunk receives an Int like a T, and passes it
   // like a normal Int when calling the inner function).
   SmallVector<ManagedValue, 8> args;
-  TranslateArguments(gen, loc, params, args, argTypes)
+  TranslateArguments(SGF, loc, params, args, argTypes)
     .translate(outputOrigType.getFunctionInputType(),
                outputSubstType.getInput(),
                inputOrigType.getFunctionInputType(),
@@ -1358,61 +2615,209 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
 
   SmallVector<SILValue, 8> argValues;
 
-  // Create an indirect result buffer if required.
-  SILValue innerResultAddr = getThunkInnerResultAddr(gen, loc,
-                                                     fnType, outerResultAddr);
-  if (innerResultAddr)
-    argValues.push_back(innerResultAddr);
+  // Plan the results.  This builds argument values for all the
+  // inner indirect results.
+  ResultPlanner resultPlanner(SGF, loc);
+  resultPlanner.plan(inputOrigType.getFunctionResultType(),
+                     inputSubstType.getResult(),
+                     outputOrigType.getFunctionResultType(),
+                     outputSubstType.getResult(),
+                     fnType, thunkType, argValues);
 
   // Add the rest of the arguments.
-  forwardFunctionArguments(gen, loc, fnType, args, argValues);
+  forwardFunctionArguments(SGF, loc, fnType, args, argValues);
 
-  SILValue innerResultValue =
-    gen.emitApplyWithRethrow(loc, fnValue.forward(gen),
-                             /*substFnType*/ fnValue.getType(),
-                             /*substitutions*/ {},
-                             argValues);
+  auto fun = fnType->isCalleeGuaranteed() ? fnValue.borrow(SGF, loc).getValue()
+                                          : fnValue.forward(SGF);
+  SILValue innerResult =
+      SGF.emitApplyWithRethrow(loc, fun,
+                               /*substFnType*/ fnValue.getType(),
+                               /*substitutions*/ {}, argValues);
 
-  // Translate the result value.
-  auto inputResultOrigType = inputOrigType.getFunctionResultType();
-  auto inputResultSubstType = inputSubstType.getResult();
-  auto outputResultOrigType = outputOrigType.getFunctionResultType();
-  auto outputResultSubstType = outputSubstType.getResult();
-  SILValue outerResultValue = getThunkResult(gen, loc, fnType,
-                                             inputResultOrigType,
-                                             inputResultSubstType,
-                                             outputResultOrigType,
-                                             outputResultSubstType,
-                                             innerResultValue,
-                                             innerResultAddr,
-                                             outerResultAddr);
+  // Reabstract the result.
+  SILValue outerResult = resultPlanner.execute(innerResult);
+
   scope.pop();
-  gen.B.createReturn(loc, outerResultValue);
+  SGF.B.createReturn(loc, outerResult);
+}
+
+/// Build a generic signature and environment for a re-abstraction thunk.
+///
+/// Most thunks share the generic environment with their original function.
+/// The one exception is if the thunk type involves an open existential,
+/// in which case we "promote" the opened existential to a new generic parameter.
+///
+/// \param SGF - the parent function
+/// \param openedExistential - the opened existential to promote to a generic
+//  parameter, if any
+/// \param inheritGenericSig - whether to inherit the generic signature from the
+/// parent function.
+/// \param genericEnv - the new generic environment
+/// \param contextSubs - map old archetypes to new archetypes
+/// \param interfaceSubs - map interface types to old archetypes
+static CanGenericSignature
+buildThunkSignature(SILGenFunction &SGF,
+                    bool inheritGenericSig,
+                    ArchetypeType *openedExistential,
+                    GenericEnvironment *&genericEnv,
+                    SubstitutionMap &contextSubs,
+                    SubstitutionMap &interfaceSubs,
+                    ArchetypeType *&newArchetype) {
+  auto *mod = SGF.F.getModule().getSwiftModule();
+  auto &ctx = mod->getASTContext();
+
+  // If there's no opened existential, we just inherit the generic environment
+  // from the parent function.
+  if (openedExistential == nullptr) {
+    auto genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature();
+    genericEnv = SGF.F.getGenericEnvironment();
+    auto subsArray = SGF.F.getForwardingSubstitutions();
+    interfaceSubs = genericSig->getSubstitutionMap(subsArray);
+    contextSubs = interfaceSubs;
+    return genericSig;
+  }
+
+  GenericSignatureBuilder builder(ctx);
+
+  // Add the existing generic signature.
+  int depth = 0;
+  if (inheritGenericSig) {
+    if (auto genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature()) {
+      builder.addGenericSignature(genericSig);
+      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+    }
+  }
+
+  // Add a new generic parameter to replace the opened existential.
+  auto *newGenericParam = GenericTypeParamType::get(depth, 0, ctx);
+
+  builder.addGenericParameter(newGenericParam);
+  Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
+                             openedExistential->getOpenedExistentialType());
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+  builder.addRequirement(newRequirement, source, nullptr);
+
+  GenericSignature *genericSig =
+    std::move(builder).computeGenericSignature(SourceLoc(),
+                                    /*allowConcreteGenericParams=*/true);
+  genericEnv = genericSig->createGenericEnvironment();
+
+  newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
+    ->castTo<ArchetypeType>();
+
+  // Calculate substitutions to map the caller's archetypes to the thunk's
+  // archetypes.
+  if (auto calleeGenericSig = SGF.F.getLoweredFunctionType()
+          ->getGenericSignature()) {
+    contextSubs = calleeGenericSig->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        return genericEnv->mapTypeIntoContext(type);
+      },
+      MakeAbstractConformanceForGenericType());
+  }
+
+  // Calculate substitutions to map interface types to the caller's archetypes.
+  interfaceSubs = genericSig->getSubstitutionMap(
+    [&](SubstitutableType *type) -> Type {
+      if (type->isEqual(newGenericParam))
+        return openedExistential;
+      return SGF.F.mapTypeIntoContext(type);
+    },
+    MakeAbstractConformanceForGenericType());
+
+  return genericSig->getCanonicalSignature();
 }
 
 /// Build the type of a function transformation thunk.
 CanSILFunctionType SILGenFunction::buildThunkType(
-                                         ManagedValue fn,
-                                         CanSILFunctionType expectedType,
-                                         CanSILFunctionType &substFnType,
-                                         SmallVectorImpl<Substitution> &subs) {
-  auto sourceType = fn.getType().castTo<SILFunctionType>();
-
+    CanSILFunctionType &sourceType,
+    CanSILFunctionType &expectedType,
+    CanType &inputSubstType,
+    CanType &outputSubstType,
+    GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs) {
   assert(!expectedType->isPolymorphic());
   assert(!sourceType->isPolymorphic());
+
   // Can't build a thunk without context, so we require ownership semantics
   // on the result type.
   assert(expectedType->getExtInfo().hasContext());
 
-  // Just use the generic signature from the context.
-  // This isn't necessarily optimal.
-  auto generics = F.getContextGenericParams();
-  auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
-  if (generics) {
-    for (auto archetype : generics->getAllNestedArchetypes()) {
-      subs.push_back({ archetype, archetype, { } });
+  // This may inherit @noescape from the expectedType. The @noescape attribute
+  // is only stripped when using this type to materialize a new decl.
+  auto extInfo = expectedType->getExtInfo()
+    .withRepresentation(SILFunctionType::Representation::Thin);
+
+  // Does the thunk type involve archetypes other than opened existentials?
+  bool hasArchetypes = false;
+  // Does the thunk type involve an open existential type?
+  CanArchetypeType openedExistential;
+  auto archetypeVisitor = [&](CanType t) {
+    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
+      if (archetypeTy->getOpenedExistentialType()) {
+        assert((openedExistential == CanArchetypeType() ||
+                openedExistential == archetypeTy) &&
+               "one too many open existentials");
+        openedExistential = archetypeTy;
+      } else
+        hasArchetypes = true;
     }
+  };
+
+  // Use the generic signature from the context if the thunk involves
+  // generic parameters.
+  CanGenericSignature genericSig;
+  SubstitutionMap contextSubs;
+  ArchetypeType *newArchetype = nullptr;
+
+  if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
+    expectedType.visit(archetypeVisitor);
+    sourceType.visit(archetypeVisitor);
+
+    genericSig = buildThunkSignature(*this,
+                                     hasArchetypes,
+                                     openedExistential,
+                                     genericEnv,
+                                     contextSubs,
+                                     interfaceSubs,
+                                     newArchetype);
   }
+
+  // Utility function to apply contextSubs, and also replace the
+  // opened existential with the new archetype.
+  auto substIntoThunkContext = [&](CanType t) -> CanType {
+    return t.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (CanType(type) == openedExistential)
+          return newArchetype;
+        return Type(type).subst(contextSubs);
+      },
+      LookUpConformanceInSubstitutionMap(contextSubs),
+      SubstFlags::AllowLoweredTypes)
+        ->getCanonicalType();
+  };
+
+  sourceType = cast<SILFunctionType>(
+    substIntoThunkContext(sourceType));
+  expectedType = cast<SILFunctionType>(
+    substIntoThunkContext(expectedType));
+
+  if (inputSubstType) {
+    inputSubstType = cast<AnyFunctionType>(
+      substIntoThunkContext(inputSubstType));
+  }
+
+  if (outputSubstType) {
+    outputSubstType = cast<AnyFunctionType>(
+      substIntoThunkContext(outputSubstType));
+  }
+
+  // If our parent function was pseudogeneric, this thunk must also be
+  // pseudogeneric, since we have no way to pass generic parameters.
+  if (genericSig)
+    if (F.getLoweredFunctionType()->isPseudogeneric())
+      extInfo = extInfo.withIsPseudogeneric();
 
   // Add the function type as the parameter.
   SmallVector<SILParameterInfo, 4> params;
@@ -1422,56 +2827,58 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                     sourceType->getExtInfo().hasContext()
                       ? DefaultThickCalleeConvention
                       : ParameterConvention::Direct_Unowned});
-  
-  auto extInfo = expectedType->getExtInfo()
-    .withRepresentation(SILFunctionType::Representation::Thin);
-  
+
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
-  auto &Types = SGM.M.Types;
   for (auto &param : params) {
+    auto paramIfaceTy = GenericEnvironment::mapTypeOutOfContext(
+        genericEnv, param.getType());
     interfaceParams.push_back(
-      SILParameterInfo(Types.getInterfaceTypeOutOfContext(param.getType(), generics),
+      SILParameterInfo(paramIfaceTy->getCanonicalType(genericSig),
                        param.getConvention()));
   }
-  
-  auto interfaceResult = SILResultInfo(
-    Types.getInterfaceTypeOutOfContext(expectedType->getResult().getType(), generics),
-    expectedType->getResult().getConvention());
+
+  SmallVector<SILYieldInfo, 4> interfaceYields;
+  for (auto &yield : expectedType->getYields()) {
+    auto yieldIfaceTy = GenericEnvironment::mapTypeOutOfContext(
+        genericEnv, yield.getType());
+    auto interfaceYield =
+      yield.getWithType(yieldIfaceTy->getCanonicalType(genericSig));
+    interfaceYields.push_back(interfaceYield);
+  }
+
+  SmallVector<SILResultInfo, 4> interfaceResults;
+  for (auto &result : expectedType->getResults()) {
+    auto resultIfaceTy = GenericEnvironment::mapTypeOutOfContext(
+        genericEnv, result.getType());
+    auto interfaceResult =
+      result.getWithType(resultIfaceTy->getCanonicalType(genericSig));
+    interfaceResults.push_back(interfaceResult);
+  }
 
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
+    auto errorResult = expectedType->getErrorResult();
+    auto errorIfaceTy = GenericEnvironment::mapTypeOutOfContext(
+        genericEnv, errorResult.getType());
     interfaceErrorResult = SILResultInfo(
-      Types.getInterfaceTypeOutOfContext(expectedType->getErrorResult().getType(), generics),
-      expectedType->getErrorResult().getConvention());
+        errorIfaceTy->getCanonicalType(genericSig),
+        expectedType->getErrorResult().getConvention());
   }
   
   // The type of the thunk function.
-  auto thunkType = SILFunctionType::get(genericSig, extInfo,
-                                        ParameterConvention::Direct_Unowned,
-                                        interfaceParams, interfaceResult,
-                                        interfaceErrorResult,
-                                        getASTContext());
-
-  // Define the substituted function type for partial_apply's purposes.
-  if (!generics) {
-    substFnType = thunkType;
-  } else {
-    substFnType = SILFunctionType::get(nullptr, extInfo,
-                                       ParameterConvention::Direct_Unowned,
-                                       params,
-                                       expectedType->getResult(),
-                                       expectedType->getOptionalErrorResult(),
-                                       getASTContext());
-  }
-
-  return thunkType;
+  return SILFunctionType::get(genericSig, extInfo,
+                              expectedType->getCoroutineKind(),
+                              ParameterConvention::Direct_Unowned,
+                              interfaceParams, interfaceYields,
+                              interfaceResults, interfaceErrorResult,
+                              getASTContext());
 }
 
 /// Create a reabstraction thunk.
-static ManagedValue createThunk(SILGenFunction &gen,
+static ManagedValue createThunk(SILGenFunction &SGF,
                                 SILLocation loc,
                                 ManagedValue fn,
                                 AbstractionPattern inputOrigType,
@@ -1479,6 +2886,7 @@ static ManagedValue createThunk(SILGenFunction &gen,
                                 AbstractionPattern outputOrigType,
                                 CanAnyFunctionType outputSubstType,
                                 const TypeLowering &expectedTL) {
+  auto sourceType = fn.getType().castTo<SILFunctionType>();
   auto expectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
 
   // We can't do bridging here.
@@ -1487,35 +2895,54 @@ static ManagedValue createThunk(SILGenFunction &gen,
          "bridging in re-abstraction thunk?");
 
   // Declare the thunk.
-  SmallVector<Substitution, 4> substitutions;
-  CanSILFunctionType substFnType;
-  auto thunkType = gen.buildThunkType(fn, expectedType,
-                                  substFnType, substitutions);
-  auto thunk = gen.SGM.getOrCreateReabstractionThunk(
-                                       gen.F.getContextGenericParams(),
+  SubstitutionMap interfaceSubs;
+  GenericEnvironment *genericEnv = nullptr;
+  auto toType = expectedType;
+  auto thunkType = SGF.buildThunkType(sourceType, toType,
+                                      inputSubstType,
+                                      outputSubstType,
+                                      genericEnv,
+                                      interfaceSubs);
+  auto thunk = SGF.SGM.getOrCreateReabstractionThunk(
+                                       genericEnv,
                                        thunkType,
-                                       fn.getType().castTo<SILFunctionType>(),
-                                       expectedType,
-                                       gen.F.isFragile());
+                                       sourceType,
+                                       toType,
+                                       SGF.F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {
-    // Borrow the context archetypes from the enclosing function.
-    thunk->setContextGenericParams(gen.F.getContextGenericParams());
-    SILGenFunction thunkSGF(gen.SGM, *thunk);
+    thunk->setGenericEnvironment(genericEnv);
+    SILGenFunction thunkSGF(SGF.SGM, *thunk);
     auto loc = RegularLocation::getAutoGeneratedLocation();
     buildThunkBody(thunkSGF, loc,
-                   inputOrigType, inputSubstType,
-                   outputOrigType, outputSubstType);
+                   inputOrigType,
+                   inputSubstType,
+                   outputOrigType,
+                   outputSubstType);
+  }
+
+  CanSILFunctionType substFnType = thunkType;
+
+  SmallVector<Substitution, 4> subs;
+  if (auto genericSig = thunkType->getGenericSignature()) {
+    genericSig->getSubstitutions(interfaceSubs, subs);
+    substFnType = thunkType->substGenericArgs(SGF.F.getModule(),
+                                              interfaceSubs);
   }
 
   // Create it in our current function.
-  auto thunkValue = gen.B.createFunctionRef(loc, thunk);
-  auto thunkedFn = gen.B.createPartialApply(loc, thunkValue,
-                              SILType::getPrimitiveObjectType(substFnType),
-                                            substitutions, fn.forward(gen),
-                              SILType::getPrimitiveObjectType(expectedType));
-  return gen.emitManagedRValueWithCleanup(thunkedFn, expectedTL);
+  auto thunkValue = SGF.B.createFunctionRef(loc, thunk);
+  SingleValueInstruction *thunkedFn =
+    SGF.B.createPartialApply(loc, thunkValue,
+                             SILType::getPrimitiveObjectType(substFnType),
+                             subs, fn.forward(SGF),
+                             SILType::getPrimitiveObjectType(expectedType));
+  if (expectedType->isNoEscape()) {
+    thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
+                                            expectedTL.getLoweredType());
+  }
+  return SGF.emitManagedRValueWithCleanup(thunkedFn, expectedTL);
 }
 
 ManagedValue Transform::transformFunction(ManagedValue fn,
@@ -1539,8 +2966,10 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   }
 
   // Check if we require a re-abstraction thunk.
-  if (SGF.SGM.Types.checkForABIDifferences(fnType, expectedFnType) ==
-        TypeConverter::ABIDifference::NeedsThunk) {
+  if (SGF.SGM.Types.checkForABIDifferences(
+                              SILType::getPrimitiveObjectType(fnType),
+                              SILType::getPrimitiveObjectType(expectedFnType))
+        == TypeConverter::ABIDifference::NeedsThunk) {
     assert(expectedFnType->getExtInfo().hasContext()
            && "conversion thunk will not be thin!");
     return createThunk(SGF, Loc, fn,
@@ -1552,8 +2981,9 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   // We do not, conversion is trivial.
   auto expectedEI = expectedFnType->getExtInfo();
   auto newEI = expectedEI.withRepresentation(fnType->getRepresentation());
-  auto newFnType = adjustFunctionType(expectedFnType, newEI,
-                                      fnType->getCalleeConvention());
+  auto newFnType =
+      adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
+                         fnType->getWitnessMethodConformanceOrNone());
   // Apply any ABI-compatible conversions before doing thin-to-thick.
   if (fnType != newFnType) {
     SILType resTy = SILType::getPrimitiveObjectType(newFnType);
@@ -1590,6 +3020,18 @@ SILGenFunction::emitOrigToSubstValue(SILLocation loc, ManagedValue v,
                               ctxt);
 }
 
+/// Given a value with the abstraction patterns of the original formal
+/// type, give it the abstraction patterns of the substituted formal type.
+RValue SILGenFunction::emitOrigToSubstValue(SILLocation loc, RValue &&v,
+                                            AbstractionPattern origType,
+                                            CanType substType,
+                                            SGFContext ctxt) {
+  return emitTransformedValue(loc, std::move(v),
+                              origType, substType,
+                              AbstractionPattern(substType), substType,
+                              ctxt);
+}
+
 /// Given a value with the abstraction patterns of the substituted
 /// formal type, give it the abstraction patterns of the original
 /// formal type.
@@ -1602,6 +3044,39 @@ SILGenFunction::emitSubstToOrigValue(SILLocation loc, ManagedValue v,
                               AbstractionPattern(substType), substType,
                               origType, substType,
                               ctxt);
+}
+
+/// Given a value with the abstraction patterns of the substituted
+/// formal type, give it the abstraction patterns of the original
+/// formal type.
+RValue SILGenFunction::emitSubstToOrigValue(SILLocation loc, RValue &&v,
+                                            AbstractionPattern origType,
+                                            CanType substType,
+                                            SGFContext ctxt) {
+  return emitTransformedValue(loc, std::move(v),
+                              AbstractionPattern(substType), substType,
+                              origType, substType,
+                              ctxt);
+}
+
+ManagedValue
+SILGenFunction::emitMaterializedRValueAsOrig(Expr *expr,
+                                             AbstractionPattern origType) {  
+  // Create a temporary.
+  auto &origTL = getTypeLowering(origType, expr->getType());
+  auto temporary = emitTemporary(expr, origTL);
+
+  // Emit the reabstracted r-value.
+  auto result =
+    emitRValueAsOrig(expr, origType, origTL, SGFContext(temporary.get()));
+
+  // Force the result into the temporary.
+  if (!result.isInContext()) {
+    temporary->copyOrInitValueInto(*this, expr, result, /*init*/ true);
+    temporary->finishInitialization(*this);
+  }
+
+  return temporary->getManagedAddress();
 }
 
 ManagedValue
@@ -1624,7 +3099,8 @@ SILGenFunction::emitTransformedValue(SILLocation loc, ManagedValue v,
                                      SGFContext ctxt) {
   return emitTransformedValue(loc, v,
                               AbstractionPattern(inputType), inputType,
-                              AbstractionPattern(outputType), outputType);
+                              AbstractionPattern(outputType), outputType,
+                              ctxt);
 }
 
 ManagedValue
@@ -1641,12 +3117,27 @@ SILGenFunction::emitTransformedValue(SILLocation loc, ManagedValue v,
                                          outputSubstType, ctxt);
 }
 
+RValue
+SILGenFunction::emitTransformedValue(SILLocation loc, RValue &&v,
+                                     AbstractionPattern inputOrigType,
+                                     CanType inputSubstType,
+                                     AbstractionPattern outputOrigType,
+                                     CanType outputSubstType,
+                                     SGFContext ctxt) {
+  return Transform(*this, loc).transform(std::move(v),
+                                         inputOrigType,
+                                         inputSubstType,
+                                         outputOrigType,
+                                         outputSubstType, ctxt);
+}
+
 //===----------------------------------------------------------------------===//
 // vtable thunks
 //===----------------------------------------------------------------------===//
 
 void
 SILGenFunction::emitVTableThunk(SILDeclRef derived,
+                                SILFunction *implFn,
                                 AbstractionPattern inputOrigType,
                                 CanAnyFunctionType inputSubstType,
                                 CanAnyFunctionType outputSubstType) {
@@ -1658,63 +3149,61 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   cleanupLoc.markAutoGenerated();
   Scope scope(Cleanups, cleanupLoc);
 
-  auto implFn = SGM.getFunction(derived, NotForDefinition);
   auto fTy = implFn->getLoweredFunctionType();
   
-  ArrayRef<Substitution> subs;
-  if (auto context = fd->getGenericParamsOfContext()) {
-    F.setContextGenericParams(context);
+  SubstitutionList subs;
+  if (auto *genericEnv = fd->getGenericEnvironment()) {
+    F.setGenericEnvironment(genericEnv);
     subs = getForwardingSubstitutions();
-    fTy = fTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
+    fTy = fTy->substGenericArgs(SGM.M, subs);
+
+    inputSubstType = cast<FunctionType>(
+        cast<GenericFunctionType>(inputSubstType)
+            ->substGenericArgs(subs)->getCanonicalType());
+    outputSubstType = cast<FunctionType>(
+        cast<GenericFunctionType>(outputSubstType)
+            ->substGenericArgs(subs)->getCanonicalType());
   }
 
   // Emit the indirect return and arguments.
-  SILValue indirectReturn;
   auto thunkTy = F.getLoweredFunctionType();
-  if (thunkTy->hasIndirectResult()) {
-    auto resultType = thunkTy->getSemanticResultSILType();
-    resultType = F.mapTypeIntoContext(resultType);
-    indirectReturn = new (SGM.M) SILArgument(F.begin(), resultType);
-  }
 
   SmallVector<ManagedValue, 8> thunkArgs;
-  collectParams(*this, loc, thunkArgs, /*allowPlusZero*/ true);
+  collectThunkParams(loc, thunkArgs, /*allowPlusZero*/ true);
 
   SmallVector<ManagedValue, 8> substArgs;
-  // If the thunk and implementation share an indirect result type, use it
-  // directly.
 
   AbstractionPattern outputOrigType(outputSubstType);
 
   // Reabstract the arguments.
-  TranslateArguments(*this, loc, thunkArgs, substArgs,
-                     fTy->getParametersWithoutIndirectResult())
+  TranslateArguments(*this, loc, thunkArgs, substArgs, fTy->getParameters())
     .translate(inputOrigType.getFunctionInputType(),
                inputSubstType.getInput(),
                outputOrigType.getFunctionInputType(),
                outputSubstType.getInput());
   
   // Collect the arguments to the implementation.
-  SILValue substIndirectReturn
-    = getThunkInnerResultAddr(*this, loc, fTy, indirectReturn);
   SmallVector<SILValue, 8> args;
-  if (substIndirectReturn)
-    args.push_back(substIndirectReturn);
+
+  // First, indirect results.
+  ResultPlanner resultPlanner(*this, loc);
+  resultPlanner.plan(outputOrigType.getFunctionResultType(),
+                     outputSubstType.getResult(),
+                     inputOrigType.getFunctionResultType(),
+                     inputSubstType.getResult(),
+                     fTy, thunkTy, args);
+
+  // Then, the arguments.
   forwardFunctionArguments(*this, loc, fTy, substArgs, args);
 
+  // Create the call.
   auto implRef = B.createFunctionRef(loc, implFn);
   SILValue implResult = emitApplyWithRethrow(loc, implRef,
                                 SILType::getPrimitiveObjectType(fTy),
                                 subs, args);
 
   // Reabstract the return.
-  SILValue result = getThunkResult(*this, loc, fTy,
-                                   outputOrigType.getFunctionResultType(),
-                                   outputSubstType.getResult(),
-                                   inputOrigType.getFunctionResultType(),
-                                   inputSubstType.getResult(),
-                                   implResult, substIndirectReturn,
-                                   indirectReturn);
+  SILValue result = resultPlanner.execute(implResult);
   
   scope.pop();
   B.createReturn(loc, result);
@@ -1724,71 +3213,85 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
-static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
-                                         ProtocolConformance *conformance,
-                                         SILDeclRef requirement,
-                                         SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs,
-                                         ArrayRef<ManagedValue> origParams) {
-  if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
-    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
-      auto reqFn = cast<FuncDecl>(requirement.getDecl());
-      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
-      return gen.maybeEmitMaterializeForSetThunk(conformance, reqFn, witnessFn,
-                                                 witnessSubs, origParams);
-    }
-  }
+enum class WitnessDispatchKind {
+  Static,
+  Dynamic,
+  Class
+};
 
-  return false;
-}
-
-static SILValue getWitnessFunctionRef(SILGenFunction &gen,
-                                      ProtocolConformance *conformance,
-                                      SILDeclRef witness,
-                                      bool isFree,
-                                   SmallVectorImpl<ManagedValue> &witnessParams,
-                                   SILLocation loc) {
-  SILGenModule &SGM = gen.SGM;
-  
+static WitnessDispatchKind
+getWitnessDispatchKind(Type selfType, SILDeclRef witness, bool isFree) {
   // Free functions are always statically dispatched...
   if (isFree)
-    return gen.emitGlobalFunctionRef(loc, witness);
+    return WitnessDispatchKind::Static;
 
   // If we have a non-class, non-objc method or a class, objc method that is
   // final, we do not dynamic dispatch.
-  ClassDecl *C = conformance->getType()->getClassOrBoundGenericClass();
+  ClassDecl *C = selfType->getClassOrBoundGenericClass();
   if (!C)
-    return gen.emitGlobalFunctionRef(loc, witness);
+    return WitnessDispatchKind::Static;
 
-  bool isFinal = C->isFinal();
-  bool isExtension = false;
-
-  isFinal |= witness.getDecl()->isFinal();
-  if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
-    isFinal |= fnDecl->hasForcedStaticDispatch();
-    
-  if (DeclContext *dc = witness.getDecl()->getDeclContext())
-    isExtension = isa<ExtensionDecl>(dc);
+  auto *decl = witness.getDecl();
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (witness.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
-    return gen.emitDynamicMethodRef(loc, witness,
-                                    SGM.Types.getConstantInfo(witness));
-  
+  if (decl->isDynamic()
+      && witness.kind != SILDeclRef::Kind::Allocator)
+    return WitnessDispatchKind::Dynamic;
+
+  bool isFinal = (decl->isFinal() || C->isFinal());
+  if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
+    isFinal |= fnDecl->hasForcedStaticDispatch();
+
+  bool isExtension = isa<ExtensionDecl>(decl->getDeclContext());
+
   // If we have a final method or a method from an extension that is not
-  // objective c, emit a static reference.
+  // Objective-C, emit a static reference.
   // A natively ObjC method witness referenced this way will end up going
   // through its native thunk, which will redispatch the method after doing
   // bridging just like we want.
   if (isFinal || isExtension || witness.isForeignToNativeThunk()
       // Hack--We emit a static thunk for ObjC allocating constructors.
-      || (witness.getDecl()->hasClangNode()
-          && witness.kind == SILDeclRef::Kind::Allocator))
-    return gen.emitGlobalFunctionRef(loc, witness);
+      || (decl->hasClangNode() && witness.kind == SILDeclRef::Kind::Allocator))
+    return WitnessDispatchKind::Static;
 
   // Otherwise emit a class method.
-  SILValue selfPtr = witnessParams.back().getValue();
-  return gen.B.createClassMethod(loc, selfPtr, witness);
+  return WitnessDispatchKind::Class;
+}
+
+static CanSILFunctionType
+getWitnessFunctionType(SILGenModule &SGM,
+                       SILDeclRef witness,
+                       WitnessDispatchKind witnessKind) {
+  switch (witnessKind) {
+  case WitnessDispatchKind::Static:
+  case WitnessDispatchKind::Dynamic:
+    return SGM.Types.getConstantInfo(witness).SILFnType;
+  case WitnessDispatchKind::Class:
+    return SGM.Types.getConstantOverrideType(witness);
+  }
+
+  llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
+}
+
+static SILValue
+getWitnessFunctionRef(SILGenFunction &SGF,
+                      SILDeclRef witness,
+                      CanSILFunctionType witnessFTy,
+                      WitnessDispatchKind witnessKind,
+                      SmallVectorImpl<ManagedValue> &witnessParams,
+                      SILLocation loc) {
+  switch (witnessKind) {
+  case WitnessDispatchKind::Static:
+    return SGF.emitGlobalFunctionRef(loc, witness);
+  case WitnessDispatchKind::Dynamic:
+    return SGF.emitDynamicMethodRef(loc, witness, witnessFTy);
+  case WitnessDispatchKind::Class: {
+    SILValue selfPtr = witnessParams.back().getValue();
+    return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
+  }
+  }
+
+  llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
 static CanType dropLastElement(CanType type) {
@@ -1796,33 +3299,29 @@ static CanType dropLastElement(CanType type) {
   return TupleType::get(elts, type->getASTContext())->getCanonicalType();
 }
 
-void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
+void SILGenFunction::emitProtocolWitness(Type selfType,
+                                         AbstractionPattern reqtOrigTy,
+                                         CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs,
+                                         SubstitutionList witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
-  
+
   SILLocation loc(witness.getDecl());
   FullExpr scope(Cleanups, CleanupLocation::get(loc));
-  
+  FormalEvaluationScope formalEvalScope(*this);
+
+  auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
   auto thunkTy = F.getLoweredFunctionType();
-  
-  // Emit the indirect return and arguments.
-  SILValue reqtResultAddr;
-  if (thunkTy->hasIndirectResult()) {
-    auto resultType = thunkTy->getIndirectResult().getSILType();
-    resultType = F.mapTypeIntoContext(resultType);
-    reqtResultAddr = new (SGM.M) SILArgument(F.begin(), resultType);
-  }
 
   SmallVector<ManagedValue, 8> origParams;
   // TODO: Should be able to accept +0 values here, once
   // forwardFunctionArguments/emitApply are able to.
-  collectParams(*this, loc, origParams, /*allowPlusZero*/ false);
-  
+  collectThunkParams(loc, origParams, /*allowPlusZero*/ false);
+
   // Handle special abstraction differences in "self".
   // If the witness is a free function, drop it completely.
   // WAY SPECULATIVE TODO: What if 'self' comprised multiple SIL-level params?
@@ -1831,33 +3330,18 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
 
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
-  CanAnyFunctionType witnessFormalTy = witnessInfo.LoweredType;
-  CanAnyFunctionType witnessSubstTy = witnessFormalTy;
+  CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
   if (!witnessSubs.empty()) {
     witnessSubstTy = cast<FunctionType>(
-      cast<PolymorphicFunctionType>(witnessSubstTy)
-        ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
+      cast<GenericFunctionType>(witnessSubstTy)
+        ->substGenericArgs(witnessSubs)
         ->getCanonicalType());
   }
-  CanType witnessSubstInputTy = witnessSubstTy.getInput();
-  
-  // Get the type of the requirement, so we can use it as an
-  // abstraction pattern.
-  auto reqtInfo = getConstantInfo(requirement);
+  CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())
+      ->getCanonicalType();
+  CanType reqtSubstResultTy = F.mapTypeIntoContext(reqtSubstTy.getResult())
+      ->getCanonicalType();
 
-  // Ugh...
-  CanAnyFunctionType reqtSubstTy = reqtInfo.FormalType;
-  reqtSubstTy = cast<AnyFunctionType>(
-    cast<PolymorphicFunctionType>(reqtSubstTy)
-      ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
-                         conformance->getType())
-      ->getCanonicalType());
-  reqtSubstTy = SGM.Types.getLoweredASTFunctionType(reqtSubstTy,
-                                                    requirement.uncurryLevel,
-                                                    requirement);
-  CanType reqtSubstInputTy = reqtSubstTy.getInput();
-
-  AbstractionPattern reqtOrigTy(reqtInfo.LoweredType);
   AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
@@ -1866,25 +3350,22 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     reqtSubstInputTy = dropLastElement(reqtSubstInputTy);
   }
 
-  // Open-code certain protocol witness "thunks".
-  if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
-                                   witness, witnessSubs, origParams))
-    return;
-
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
+  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto witnessFTy = origWitnessFTy;
+  if (!witnessSubs.empty())
+    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
+
   SmallVector<ManagedValue, 8> witnessParams;
-  auto witnessSubstSILTy
-    = SGM.Types.getLoweredType(witnessSubstTy);
-  auto witnessSubstFTy = witnessSubstSILTy.castTo<SILFunctionType>();
-  
+
   if (!isFree) {
     // If the requirement has a self parameter passed as an indirect +0 value,
     // and the witness takes it as a non-inout value, we must load and retain
     // the self pointer coming in.  This happens when class witnesses implement
     // non-mutating protocol requirements.
     auto reqConvention = thunkTy->getSelfParameter().getConvention();
-    auto witnessConvention =witnessSubstFTy->getSelfParameter().getConvention();
+    auto witnessConvention = witnessFTy->getSelfParameter().getConvention();
     
     bool inoutDifference;
     
@@ -1896,93 +3377,47 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
       ManagedValue &selfParam = origParams.back();
       SILValue selfAddr = selfParam.getUnmanagedValue();
       selfParam = emitLoad(loc, selfAddr,
-                           getTypeLowering(conformance->getType()),
+                           getTypeLowering(selfType),
                            SGFContext(),
                            IsNotTake);
     }
   }
 
+  AbstractionPattern witnessOrigTy(witnessInfo.LoweredType);
   TranslateArguments(*this, loc,
                      origParams, witnessParams,
-                     witnessSubstFTy->getParametersWithoutIndirectResult())
+                     witnessFTy->getParameters())
     .translate(reqtOrigInputTy,
                reqtSubstInputTy,
-               AbstractionPattern(witnessSubstInputTy),
-               witnessSubstInputTy);
+               witnessOrigTy.getFunctionInputType(),
+               witnessSubstTy.getInput());
 
-  // Create an indirect result buffer if needed.
-  SILValue witnessSubstResultAddr
-    = getThunkInnerResultAddr(*this, loc, witnessSubstFTy, reqtResultAddr);
-  
-  SILValue witnessFnRef = getWitnessFunctionRef(*this, conformance,
-                                                witness, isFree,
+  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
+                                                origWitnessFTy,
+                                                witnessKind,
                                                 witnessParams, loc);
 
-  auto witnessFTy = witnessFnRef.getType().getAs<SILFunctionType>();
-  
-  if (!witnessSubs.empty())
-    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
-                                              witnessSubs);
-
-  auto witnessSILTy = SILType::getPrimitiveObjectType(witnessFTy);
-
-  // If the witness is generic, re-abstract to its original signature.
-  // TODO: Implement some sort of "abstraction path" mechanism to efficiently
-  // compose these two abstraction changes.
-  // Invoke the witness function calling a class method if we have a class and
-  // calling the static function otherwise.
-  // TODO: Collect forwarding substitutions from outer context of method.
-
-  auto witnessResultAddr = witnessSubstResultAddr;
-  AbstractionPattern witnessOrigTy(witnessFormalTy);
-  if (witnessFTy != witnessSubstFTy) {
-    SmallVector<ManagedValue, 8> genParams;
-    TranslateArguments(*this, loc,
-                       witnessParams, genParams,
-                       witnessFTy->getParametersWithoutIndirectResult())
-      .translate(AbstractionPattern(witnessSubstInputTy),
-                 witnessSubstInputTy,
-                 witnessOrigTy.getFunctionInputType(),
-                 witnessSubstInputTy);
-    witnessParams = std::move(genParams);
-    
-    witnessResultAddr
-      = getThunkInnerResultAddr(*this, loc, witnessFTy, witnessSubstResultAddr);
-  }
-  
   // Collect the arguments.
   SmallVector<SILValue, 8> args;
-  if (witnessResultAddr)
-    args.push_back(witnessResultAddr);
+
+  //   - indirect results
+  ResultPlanner resultPlanner(*this, loc);
+  resultPlanner.plan(witnessOrigTy.getFunctionResultType(),
+                     witnessSubstTy.getResult(),
+                     reqtOrigTy.getFunctionResultType(),
+                     reqtSubstResultTy,
+                     witnessFTy, thunkTy, args);
+
+  //   - the rest of the arguments
   forwardFunctionArguments(*this, loc, witnessFTy, witnessParams, args);
   
+  // Perform the call.
+  SILType witnessSILTy = SILType::getPrimitiveObjectType(witnessFTy);
   SILValue witnessResultValue =
     emitApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs, args);
 
-  // Reabstract the result value:
-  
-  // If the witness is generic, reabstract to the concrete witness signature.
-  if (witnessFTy != witnessSubstFTy) {
-    witnessResultValue = getThunkResult(*this, loc,
-                                        witnessFTy,
-                                        witnessOrigTy.getFunctionResultType(),
-                                        witnessSubstTy.getResult(),
-                                        AbstractionPattern(witnessSubstTy.getResult()), // XXX ugly
-                                        witnessSubstTy.getResult(),
-                                        witnessResultValue,
-                                        witnessResultAddr,
-                                        witnessSubstResultAddr);
-  }
-  // Reabstract to the original requirement signature.
-  SILValue reqtResultValue = getThunkResult(*this, loc,
-                                            witnessSubstFTy,
-                                            AbstractionPattern(witnessSubstTy.getResult()), // XXX ugly
-                                            witnessSubstTy.getResult(),
-                                            reqtOrigTy.getFunctionResultType(),
-                                            reqtSubstTy.getResult(),
-                                            witnessResultValue,
-                                            witnessSubstResultAddr,
-                                            reqtResultAddr);
+  // Reabstract the result value.
+  SILValue reqtResultValue = resultPlanner.execute(witnessResultValue);
 
   scope.pop();
   B.createReturn(loc, reqtResultValue);

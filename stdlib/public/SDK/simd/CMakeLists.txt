@@ -1,5 +1,20 @@
-add_swift_library(swiftsimd IS_SDK_OVERLAY
-  simd.swift.gyb
+cmake_minimum_required(VERSION 3.4.3)
+include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-  SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all -Xfrontend -parse-stdlib
-  SWIFT_MODULE_DEPENDS Darwin)
+add_swift_library(swiftsimd ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+  simd.swift.gyb
+  Quaternion.swift.gyb
+
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  SWIFT_COMPILE_FLAGS -parse-stdlib
+  SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin # auto-updated
+
+  DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_SIMD_OSX}
+  DEPLOYMENT_VERSION_IOS ${SWIFTLIB_DEPLOYMENT_VERSION_SIMD_IOS}
+  DEPLOYMENT_VERSION_TVOS ${SWIFTLIB_DEPLOYMENT_VERSION_SIMD_TVOS}
+  DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_DEPLOYMENT_VERSION_SIMD_WATCHOS}
+)

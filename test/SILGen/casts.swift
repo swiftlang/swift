@@ -1,58 +1,74 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class B { }
 class D : B { }
 
-// CHECK-LABEL: sil hidden @_TF5casts6upcast
+// CHECK-LABEL: sil hidden @_T05casts6upcast{{[_0-9a-zA-Z]*}}F
 func upcast(d: D) -> B {
   // CHECK: {{%.*}} = upcast
   return d
 }
-// CHECK-LABEL: sil hidden @_TF5casts8downcast
+// CHECK-LABEL: sil hidden @_T05casts8downcast{{[_0-9a-zA-Z]*}}F
 func downcast(b: B) -> D {
   // CHECK: {{%.*}} = unconditional_checked_cast
   return b as! D
 }
 
-// CHECK-LABEL: sil hidden @_TF5casts3isa
+// CHECK-LABEL: sil hidden @_T05casts3isa{{[_0-9a-zA-Z]*}}F
 func isa(b: B) -> Bool {
-  // CHECK: checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
-  // CHECK: [[YES]]({{%.*}}):
+  // CHECK: bb0([[ARG:%.*]] : @owned $B):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[COPIED_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   checked_cast_br [[COPIED_BORROWED_ARG]] : $B to $D, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  //
+  // CHECK: [[YES]]([[CASTED_VALUE:%.*]] : @owned $D):
   // CHECK:   integer_literal {{.*}} -1
-  // CHECK: [[NO]]:
+  // CHECK:   destroy_value [[CASTED_VALUE]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  //
+  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : @owned $B):
+  // CHECK:   destroy_value [[ORIGINAL_VALUE]]
   // CHECK:   integer_literal {{.*}} 0
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   return b is D
 }
 
-// CHECK-LABEL: sil hidden @_TF5casts16upcast_archetype
+// CHECK-LABEL: sil hidden @_T05casts16upcast_archetype{{[_0-9a-zA-Z]*}}F
 func upcast_archetype<T : B>(t: T) -> B {
   // CHECK: {{%.*}} = upcast
   return t
 }
 
-// CHECK-LABEL: sil hidden @_TF5casts25upcast_archetype_metatype
+// CHECK-LABEL: sil hidden @_T05casts25upcast_archetype_metatype{{[_0-9a-zA-Z]*}}F
 func upcast_archetype_metatype<T : B>(t: T.Type) -> B.Type {
   // CHECK: {{%.*}} = upcast
   return t
 }
 
-// CHECK-LABEL: sil hidden @_TF5casts18downcast_archetype
+// CHECK-LABEL: sil hidden @_T05casts18downcast_archetype{{[_0-9a-zA-Z]*}}F
 func downcast_archetype<T : B>(b: B) -> T {
   // CHECK: {{%.*}} = unconditional_checked_cast
   return b as! T
 }
 
-// CHECK-LABEL: sil hidden @_TF5casts12is_archetype
+// This is making sure that we do not have the default propagating behavior in
+// the address case.
+//
+// CHECK-LABEL: sil hidden @_T05casts12is_archetype{{[_0-9a-zA-Z]*}}F
 func is_archetype<T : B>(b: B, _: T) -> Bool {
-  // CHECK: checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
-  // CHECK: [[YES]]({{%.*}}):
+  // CHECK: bb0([[ARG1:%.*]] : @owned $B, [[ARG2:%.*]] : @owned $T):
+  // CHECK:   checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK: [[YES]]([[CASTED_ARG:%.*]] : @owned $T):
   // CHECK:   integer_literal {{.*}} -1
-  // CHECK: [[NO]]:
+  // CHECK:   destroy_value [[CASTED_ARG]]
+  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : @owned $B):
+  // CHCEK:   destroy_value [[CASTED_ARG]]
   // CHECK:   integer_literal {{.*}} 0
   return b is T
 }
+// CHECK: } // end sil function '_T05casts12is_archetype{{[_0-9a-zA-Z]*}}F'
 
-// CHECK: sil hidden @_TF5casts20downcast_conditional
+// CHECK: sil hidden @_T05casts20downcast_conditional{{[_0-9a-zA-Z]*}}F
 // CHECK:   checked_cast_br {{%.*}} : $B to $D
 // CHECK:   bb{{[0-9]+}}({{.*}} : $Optional<D>)
 func downcast_conditional(b: B) -> D? {
@@ -62,26 +78,26 @@ func downcast_conditional(b: B) -> D? {
 protocol P {}
 struct S : P {}
 
-// CHECK: sil hidden @_TF5casts32downcast_existential_conditional
-// CHECK: bb0([[IN:%.*]] : $*P):
+// CHECK: sil hidden @_T05casts32downcast_existential_conditional{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[IN:%.*]] : @trivial $*P):
 // CHECK:   [[COPY:%.*]] = alloc_stack $P
-// CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]#1
+// CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]
 // CHECK:   [[TMP:%.*]] = alloc_stack $S
-// CHECK:   checked_cast_addr_br take_always P in [[COPY]]#1 : $*P to S in [[TMP]]#1 : $*S, bb1, bb2
+// CHECK:   checked_cast_addr_br take_always P in [[COPY]] : $*P to S in [[TMP]] : $*S, bb1, bb2
 //   Success block.
 // CHECK: bb1:
-// CHECK:   [[T0:%.*]] = load [[TMP]]#1 : $*S
-// CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, [[T0]] : $S
-// CHECK:   dealloc_stack [[TMP]]#0
+// CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*S
+// CHECK:   [[T1:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, [[T0]] : $S
+// CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T1]] : $Optional<S>)
 //   Failure block.
 // CHECK: bb2:
-// CHECK:   [[T0:%.*]] = enum $Optional<S>, #Optional.None!enumelt
-// CHECK:   dealloc_stack [[TMP]]#0
+// CHECK:   [[T0:%.*]] = enum $Optional<S>, #Optional.none!enumelt
+// CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T0]] : $Optional<S>)
 //   Continuation block.
-// CHECK: bb3([[RESULT:%.*]] : $Optional<S>):
-// CHECK:   dealloc_stack [[COPY]]#0
+// CHECK: bb3([[RESULT:%.*]] : @trivial $Optional<S>):
+// CHECK:   dealloc_stack [[COPY]]
 // CHECK:   destroy_addr [[IN]] : $*P
 // CHECK:   return [[RESULT]]
 func downcast_existential_conditional(p: P) -> S? {

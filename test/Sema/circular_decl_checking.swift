@@ -1,9 +1,9 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class HasFunc {
-  func HasFunc(_: HasFunc) { // expected-error {{use of undeclared type 'HasFunc'}}
+  func HasFunc(_: HasFunc) {
   }
-  func HasFunc() -> HasFunc { // expected-error {{use of undeclared type 'HasFunc'}}
+  func HasFunc() -> HasFunc {
     return HasFunc()
   }
   func SomethingElse(_: SomethingElse) { // expected-error {{use of undeclared type 'SomethingElse'}}
@@ -24,34 +24,36 @@ class HasGenericFunc {
 }
 
 class HasProp {
-  var HasProp: HasProp { // expected-error {{'HasProp' used within its own type}} expected-error 2 {{use of undeclared type 'HasProp'}}
-    return HasProp()
+  var HasProp: HasProp {
+    return HasProp() // expected-error {{cannot call value of non-function type 'HasProp'}}{{19-21=}}
   }
-  var SomethingElse: SomethingElse? { // expected-error {{'SomethingElse' used within its own type}} expected-error 2 {{use of undeclared type 'SomethingElse'}}
+  var SomethingElse: SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil
   }
 }
 
 protocol SomeProtocol {}
 protocol ReferenceSomeProtocol {
-  var SomeProtocol: SomeProtocol { get }  // expected-error {{'SomeProtocol' used within its own type}} expected-error 2 {{use of undeclared type 'SomeProtocol'}}
+  var SomeProtocol: SomeProtocol { get } 
 }
 
-func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error {{use of undeclared type 'TopLevelFunc'}}'
+func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error 2 {{use of undeclared type 'TopLevelFunc'}}'
 func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{inheritance from non-protocol, non-class type 'TopLevelGenericFunc'}}
 func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // expected-error {{use of undeclared type 'TopLevelGenericFunc2'}}
-var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undeclared type 'TopLevelVar'}}
+var TopLevelVar: TopLevelVar? { return nil } // expected-error {{use of undeclared type 'TopLevelVar'}}
 
 
-protocol AProtocol {
-  typealias e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+// FIXME: The first error is redundant, isn't correct in what it states, and
+// also should be emitted on the inheritance clause.
+protocol AProtocol { // expected-error {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
+  associatedtype e : e // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 
 
 
 // <rdar://problem/15604574> Protocol conformance checking needs to be delayed
 protocol P15604574 {
-  typealias FooResult
+  associatedtype FooResult
   func foo() -> FooResult
 }
 
@@ -63,6 +65,17 @@ class X {
 
 // <rdar://problem/17144076> recursive typealias causes a segfault in the type checker
 struct SomeStruct<A> {
-  typealias A = A // expected-error {{type alias 'A' circularly references itself}}
+  typealias A = A // expected-error {{type alias 'A' references itself}}
+  // expected-note@-1 {{type declared here}}
 }
 
+// <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias
+protocol rdar27680407Proto {
+  associatedtype T // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+
+  init(value: T)
+}
+
+struct rdar27680407Struct : rdar27680407Proto { // expected-error {{type 'rdar27680407Struct' does not conform to protocol 'rdar27680407Proto'}}
+  init(value: rdar27680407Struct.T) {}
+}

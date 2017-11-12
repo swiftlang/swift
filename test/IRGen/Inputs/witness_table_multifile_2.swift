@@ -9,3 +9,6 @@ struct X : P {
 }
 
 func go() -> P { return X("hello") }
+
+protocol ProtocolOnlyUsedAsAType {
+}

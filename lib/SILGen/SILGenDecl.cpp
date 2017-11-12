@@ -2,34 +2,36 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
 #include "Initialization.h"
 #include "RValue.h"
-#include "Scope.h"
+#include "SILGen.h"
 #include "SILGenDynamicCast.h"
+#include "Scope.h"
+#include "SwitchCaseFullExpr.h"
+#include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/AST/AST.h"
-#include "swift/AST/Mangle.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>
+
 using namespace swift;
-using namespace Mangle;
 using namespace Lowering;
 
 void Initialization::_anchor() {}
@@ -43,16 +45,14 @@ namespace {
   public:
     BlackHoleInitialization() {}
 
-    SILValue getAddressOrNull() const override { return SILValue(); }
-
-    bool canSplitIntoSubelementAddresses() const override {
+    bool canSplitIntoTupleElements() const override {
       return true;
     }
     
     MutableArrayRef<InitializationPtr>
-    getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                  SmallVectorImpl<InitializationPtr> &buf,
-                                  SILLocation Loc) override {
+    splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
+                           CanType type,
+                           SmallVectorImpl<InitializationPtr> &buf) override {
       // "Destructure" an ignored binding into multiple ignored bindings.
       for (auto fieldType : cast<TupleType>(type)->getElementTypes()) {
         (void) fieldType;
@@ -61,37 +61,67 @@ namespace {
       return buf;
     }
 
-    void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                             SILLocation loc, SILGenFunction &gen) override {
+    void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                             ManagedValue value, bool isInit) override {
       /// This just ignores the provided value.
+    }
+
+    void finishUninitialized(SILGenFunction &SGF) override {
+      // do nothing
     }
   };
 } // end anonymous namespace
 
-void TupleInitialization::copyOrInitValueInto(ManagedValue valueMV,
-                                              bool isInit, SILLocation loc,
-                                              SILGenFunction &SGF) {
-  // A scalar value is being copied into the tuple, break it into elements
-  // and assign/init each element in turn.
-  SILValue value = valueMV.forward(SGF);
-  auto sourceType = cast<TupleType>(valueMV.getSwiftType());
+static void copyOrInitValueIntoHelper(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue value, bool isInit,
+    ArrayRef<InitializationPtr> subInitializations,
+    llvm::function_ref<ManagedValue(ManagedValue, unsigned, SILType)> func) {
+  auto sourceType = value.getType().castTo<TupleType>();
   auto sourceSILType = value.getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
     SILType fieldTy = sourceSILType.getTupleElementType(i);
-    auto &fieldTL = SGF.getTypeLowering(fieldTy);
-        
-    SILValue member;
-    if (value.getType().isAddress()) {
-      member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
-      if (!fieldTL.isAddressOnly())
-        member = SGF.B.createLoad(loc, member);
-    } else {
-      member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
-    }
-        
-    auto elt = SGF.emitManagedRValueWithCleanup(member, fieldTL);
-        
-    SubInitializations[i]->copyOrInitValueInto(elt, isInit, loc, SGF);
+    ManagedValue elt = func(value, i, fieldTy);
+    subInitializations[i]->copyOrInitValueInto(SGF, loc, elt, isInit);
+    subInitializations[i]->finishInitialization(SGF);
+  }
+}
+
+void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              ManagedValue value, bool isInit) {
+  // In the object case, we perform a borrow + extract + copy sequence. This is
+  // because we do not have a destructure operation.
+  if (value.getType().isObject()) {
+    value = value.borrow(SGF, loc);
+    return copyOrInitValueIntoHelper(
+        SGF, loc, value, isInit, SubInitializations,
+        [&](ManagedValue aggregate, unsigned i,
+            SILType fieldType) -> ManagedValue {
+          auto elt = SGF.B.createTupleExtract(loc, aggregate, i, fieldType);
+          return SGF.B.createCopyValue(loc, elt);
+        });
+  }
+
+  // In the address case, we can support takes directly, so forward the cleanup
+  // of the aggregate and create takes of the underlying addresses.
+  value = ManagedValue::forUnmanaged(value.forward(SGF));
+  return copyOrInitValueIntoHelper(
+      SGF, loc, value, isInit, SubInitializations,
+      [&](ManagedValue aggregate, unsigned i,
+          SILType fieldType) -> ManagedValue {
+        ManagedValue elt =
+            SGF.B.createTupleElementAddr(loc, value, i, fieldType);
+        if (!fieldType.isAddressOnly(SGF.F.getModule())) {
+          return SGF.B.createLoadTake(loc, elt);
+        }
+
+        return SGF.emitManagedRValueWithCleanup(elt.getValue());
+      });
+}
+
+void TupleInitialization::finishUninitialized(SILGenFunction &SGF) {
+  for (auto &subInit : SubInitializations) {
+    subInit->finishUninitialized(SGF);
   }
 }
 
@@ -100,13 +130,20 @@ namespace {
     SILValue closure;
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitStrongReleaseAndFold(l, closure);
+    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+      SGF.B.emitDestroyValueOperation(l, closure);
+    }
+    void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+      llvm::errs() << "CleanupClosureConstant\n"
+                   << "State:" << getState() << "\n"
+                   << "closure:" << closure << "\n";
+#endif
     }
   };
-}
+} // end anonymous namespace
 
-ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
+SubstitutionList SILGenFunction::getForwardingSubstitutions() {
   return F.getForwardingSubstitutions();
 }
 
@@ -117,53 +154,103 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
 
 MutableArrayRef<InitializationPtr>
 SingleBufferInitialization::
-getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                              SmallVectorImpl<InitializationPtr> &buf,
-                              SILLocation Loc) {
+splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
+                       SmallVectorImpl<InitializationPtr> &buf) {
+  assert(SplitCleanups.empty() && "getting sub-initializations twice?");
+  auto address = getAddressForInPlaceInitialization(SGF, loc);
+  return splitSingleBufferIntoTupleElements(SGF, loc, type, address,
+                                            buf, SplitCleanups);
+}
+
+MutableArrayRef<InitializationPtr>
+SingleBufferInitialization::
+splitSingleBufferIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
+                                   CanType type, SILValue baseAddr,
+                                   SmallVectorImpl<InitializationPtr> &buf,
+                     TinyPtrVector<CleanupHandle::AsPointer> &splitCleanups) {
   // Destructure the buffer into per-element buffers.
-  auto tupleTy = cast<TupleType>(type);
-  SILValue baseAddr = getAddress();
-  for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
-    auto fieldType = tupleTy.getElementType(i);
-    SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
-    SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
-                                                      baseAddr, i,
-                                                      fieldTy);
-    
-    buf.push_back(InitializationPtr(new
-                                    KnownAddressInitialization(fieldAddr)));
+  for (auto i : indices(cast<TupleType>(type)->getElementTypes())) {
+    // Project the element.
+    SILValue eltAddr = SGF.B.createTupleElementAddr(loc, baseAddr, i);
+
+    // Create an initialization to initialize the element.
+    auto &eltTL = SGF.getTypeLowering(eltAddr->getType());
+    auto eltInit = SGF.useBufferAsTemporary(eltAddr, eltTL);
+
+    // Remember the element cleanup.
+    auto eltCleanup = eltInit->getInitializedCleanup();
+    if (eltCleanup.isValid())
+      splitCleanups.push_back(eltCleanup);
+
+    buf.emplace_back(eltInit.release());
   }
-  finishInitialization(gen);
+
   return buf;
 }
 
 void SingleBufferInitialization::
-copyOrInitValueIntoSingleBuffer(ManagedValue explodedElement, bool isInit,
-                                SILValue BufferAddress,
-                                SILLocation loc, SILGenFunction &gen) {
+copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF, SILLocation loc,
+                                ManagedValue value, bool isInit,
+                                SILValue destAddr) {
   if (!isInit) {
-    assert(explodedElement.getValue() != BufferAddress && "copying in place?!");
-    explodedElement.copyInto(gen, BufferAddress, loc);
+    assert(value.getValue() != destAddr && "copying in place?!");
+    value.copyInto(SGF, destAddr, loc);
     return;
   }
   
   // If we didn't evaluate into the initialization buffer, do so now.
-  if (explodedElement.getValue() != BufferAddress) {
-    explodedElement.forwardInto(gen, loc, BufferAddress);
+  if (value.getValue() != destAddr) {
+    value.forwardInto(SGF, loc, destAddr);
   } else {
     // If we did evaluate into the initialization buffer, disable the
     // cleanup.
-    explodedElement.forwardCleanup(gen);
+    value.forwardCleanup(SGF);
   }
 }
 
-void KnownAddressInitialization::anchor() const {
+void SingleBufferInitialization::finishInitialization(SILGenFunction &SGF) {
+  // Forward all of the split element cleanups, assuming we made any.
+  for (CleanupHandle eltCleanup : SplitCleanups)
+    SGF.Cleanups.forwardCleanup(eltCleanup);
 }
 
-void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
+bool KnownAddressInitialization::isInPlaceInitializationOfGlobal() const {
+  return isa<GlobalAddrInst>(address);
+}
+
+bool TemporaryInitialization::isInPlaceInitializationOfGlobal() const {
+  return isa<GlobalAddrInst>(Addr);
+}
+
+void TemporaryInitialization::finishInitialization(SILGenFunction &SGF) {
+  SingleBufferInitialization::finishInitialization(SGF);
   if (Cleanup.isValid())
-    gen.Cleanups.setCleanupState(Cleanup, CleanupState::Active);
+    SGF.Cleanups.setCleanupState(Cleanup, CleanupState::Active);
+}
+
+namespace {
+class EndBorrowCleanup : public Cleanup {
+  SILValue original;
+  SILValue borrowed;
+
+public:
+  EndBorrowCleanup(SILValue original, SILValue borrowed)
+      : original(original), borrowed(borrowed) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    SGF.B.createEndBorrow(l, borrowed, original);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndBorrowCleanup "
+                 << "State:" << getState() << "\n"
+                 << "original:" << original << "\n"
+                 << "borrowed:" << borrowed << "\n";
+#endif
+  }
 };
+} // end anonymous namespace
 
 namespace {
 class ReleaseValueCleanup : public Cleanup {
@@ -171,11 +258,19 @@ class ReleaseValueCleanup : public Cleanup {
 public:
   ReleaseValueCleanup(SILValue v) : v(v) {}
 
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    if (v.getType().isAddress())
-      gen.B.emitDestroyAddrAndFold(l, v);
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    if (v->getType().isAddress())
+      SGF.B.createDestroyAddr(l, v);
     else
-      gen.B.emitReleaseValueOperation(l, v);
+      SGF.B.emitDestroyValueOperation(l, v);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "ReleaseValueCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -187,8 +282,16 @@ class DeallocStackCleanup : public Cleanup {
 public:
   DeallocStackCleanup(SILValue addr) : Addr(addr) {}
 
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.createDeallocStack(l, Addr);
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    SGF.B.createDeallocStack(l, Addr);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocStackCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Addr:" << Addr << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -200,8 +303,28 @@ class DestroyLocalVariable : public Cleanup {
 public:
   DestroyLocalVariable(VarDecl *var) : Var(var) {}
 
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.destroyLocalVariable(l, Var);
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    SGF.destroyLocalVariable(l, Var);
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DestroyLocalVariable\n"
+                 << "State:" << getState() << "\n"
+                 << "Decl: ";
+    Var->print(llvm::errs());
+    llvm::errs() << "\n";
+    if (isActive()) {
+      auto loc = SGF.VarLocs[Var];
+      assert((loc.box || loc.value) && "One of box or value should be set");
+      if (loc.box) {
+        llvm::errs() << "Box: " << loc.box << "\n";
+      } else {
+        llvm::errs() << "Value: " << loc.value << "\n";
+      }
+    }
+    llvm::errs() << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -213,8 +336,17 @@ class DeallocateUninitializedLocalVariable : public Cleanup {
 public:
   DeallocateUninitializedLocalVariable(VarDecl *var) : Var(var) {}
 
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.deallocateUninitializedLocalVariable(l, Var);
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    SGF.deallocateUninitializedLocalVariable(l, Var);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocateUninitializedLocalVariable\n"
+                 << "State:" << getState() << "\n";
+    // TODO: Make sure we dump var.
+    llvm::errs() << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -238,7 +370,8 @@ public:
   /// Sets up an initialization for the allocated box. This pushes a
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
-  LocalVariableInitialization(VarDecl *decl, bool NeedsMarkUninit,
+  LocalVariableInitialization(VarDecl *decl,
+                              Optional<MarkUninitializedInst::Kind> kind,
                               unsigned ArgNo, SILGenFunction &SGF)
       : decl(decl), SGF(SGF) {
     assert(decl->getDeclContext()->isLocalContext() &&
@@ -246,21 +379,26 @@ public:
     assert(decl->hasStorage() && "can't emit storage for a computed variable");
     assert(!SGF.VarLocs.count(decl) && "Already have an entry for this decl?");
 
-    SILType lType = SGF.getLoweredType(decl->getType()->getRValueType());
+    auto boxType = SGF.SGM.Types
+      .getContextBoxTypeForCapture(decl,
+                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.F.getGenericEnvironment(),
+                     /*mutable*/ true);
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox = SGF.B.createAllocBox(decl, lType, ArgNo);
-    auto box = SILValue(allocBox, 0);
-    auto addr = SILValue(allocBox, 1);
+    SILValue allocBox =
+        SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
 
     // Mark the memory as uninitialized, so DI will track it for us.
-    if (NeedsMarkUninit)
-      addr = SGF.B.createMarkUninitializedVar(decl, addr);
+    if (kind)
+      allocBox = SGF.B.createMarkUninitialized(decl, allocBox, kind.getValue());
+
+    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
-    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, box);
+    SGF.VarLocs[decl] = SILGenFunction::VarLoc::get(addr, allocBox);
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -277,12 +415,26 @@ public:
     assert(DidFinish && "did not call VarInit::finishInitialization!");
   }
 
-  SILValue getAddressOrNull() const override {
+  SILValue getAddress() const {
     assert(SGF.VarLocs.count(decl) && "did not emit var?!");
-    return SGF.VarLocs[decl].value;
+    return SGF.VarLocs[decl].value;    
+  }
+
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
+    return getAddress();
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return isa<GlobalAddrInst>(getAddress());
+  }
+
+  void finishUninitialized(SILGenFunction &SGF) override {
+    LocalVariableInitialization::finishInitialization(SGF);
   }
 
   void finishInitialization(SILGenFunction &SGF) override {
+    SingleBufferInitialization::finishInitialization(SGF);
     assert(!DidFinish &&
            "called LocalVariableInitialization::finishInitialization twice!");
     SGF.Cleanups.setCleanupState(DeallocCleanup, CleanupState::Dead);
@@ -306,12 +458,14 @@ class LetValueInitialization : public Initialization {
   /// The cleanup we pushed to destroy the local variable.
   CleanupHandle DestroyCleanup;
 
+  /// Cleanups we introduced when splitting.
+  TinyPtrVector<CleanupHandle::AsPointer> SplitCleanups;
+
   bool DidFinish = false;
 
 public:
-  LetValueInitialization(VarDecl *vd, SILGenFunction &gen) : vd(vd)
-  {
-    auto &lowering = gen.getTypeLowering(vd->getType());
+  LetValueInitialization(VarDecl *vd, SILGenFunction &SGF) : vd(vd) {
+    auto &lowering = SGF.getTypeLowering(vd->getType());
     
     // Decide whether we need a temporary stack buffer to evaluate this 'let'.
     // There are three cases we need to handle here: parameters, initialized (or
@@ -333,22 +487,23 @@ public:
     } else {
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only.
-      needsTemporaryBuffer = lowering.isAddressOnly();
+      needsTemporaryBuffer =
+          lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses();
     }
    
     if (needsTemporaryBuffer) {
-      address = gen.emitTemporaryAllocation(vd, lowering.getLoweredType());
+      address = SGF.emitTemporaryAllocation(vd, lowering.getLoweredType());
       if (isUninitialized)
-        address = gen.B.createMarkUninitializedVar(vd, address);
-      DestroyCleanup = gen.enterDormantTemporaryCleanup(address, lowering);
-      gen.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
+        address = SGF.B.createMarkUninitializedVar(vd, address);
+      DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, lowering);
+      SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
     } else if (!lowering.isTrivial()) {
       // Push a cleanup to destroy the let declaration.  This has to be
       // inactive until the variable is initialized: if control flow exits the
       // before the value is bound, we don't want to destroy the value.
-      gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(
+      SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
                                                     CleanupState::Dormant, vd);
-      DestroyCleanup = gen.Cleanups.getTopCleanup();
+      DestroyCleanup = SGF.Cleanups.getTopCleanup();
     } else {
       DestroyCleanup = CleanupHandle::invalid();
     }
@@ -358,14 +513,22 @@ public:
     assert(DidFinish && "did not call LetValueInit::finishInitialization!");
   }
 
-  bool hasAddress() const { return address.isValid(); }
+  bool hasAddress() const { return (bool)address; }
+
+  bool canPerformInPlaceInitialization() const override {
+    return hasAddress();
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return isa<GlobalAddrInst>(address);
+  }
   
-  // SingleBufferInitializations always have an address.
-  SILValue getAddressForInPlaceInitialization() const override {
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
     // Emit into the buffer that 'let's produce for address-only values if
     // we have it.
-    if (hasAddress()) return address;
-    return SILValue();
+    assert(hasAddress());
+    return address;
   }
 
   /// Return true if we can get the addresses of elements with the
@@ -374,83 +537,78 @@ public:
   /// Let-value initializations cannot be broken into constituent pieces if a
   /// scalar value needs to be bound.  If there is an address in play, then we
   /// can initialize the address elements of the tuple though.
-  bool canSplitIntoSubelementAddresses() const override {
+  bool canSplitIntoTupleElements() const override {
     return hasAddress();
   }
   
   MutableArrayRef<InitializationPtr>
-  getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
-                                SmallVectorImpl<InitializationPtr> &buf,
-                                SILLocation Loc) override {
-    // Destructure the buffer into per-element buffers.
-    auto tupleTy = cast<TupleType>(type);
-    SILValue baseAddr = getAddress();
-    for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
-      auto fieldType = tupleTy.getElementType(i);
-      SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
-      SILValue fieldAddr = gen.B.createTupleElementAddr(Loc,
-                                                        baseAddr, i,
-                                                        fieldTy);
-      
-      buf.push_back(InitializationPtr(new
-                                      KnownAddressInitialization(fieldAddr)));
-    }
-    finishInitialization(gen);
-    return buf;
+  splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
+                         SmallVectorImpl<InitializationPtr> &buf) override {
+    assert(SplitCleanups.empty());
+    auto address = getAddressForInPlaceInitialization(SGF, loc);
+    return SingleBufferInitialization
+       ::splitSingleBufferIntoTupleElements(SGF, loc, type, address, buf,
+                                            SplitCleanups);
   }
 
-  SILValue getAddressOrNull() const override {
-    return address;
-  }
-
-  void bindValue(SILValue value, SILGenFunction &gen) {
-    assert(!gen.VarLocs.count(vd) && "Already emitted this vardecl?");
+  void bindValue(SILValue value, SILGenFunction &SGF) {
+    assert(!SGF.VarLocs.count(vd) && "Already emitted this vardecl?");
     // If we're binding an address to this let value, then we can use it as an
     // address later.  This happens when binding an address only parameter to
     // an argument, for example.
-    if (value.getType().isAddress())
+    if (value->getType().isAddress())
       address = value;
-    gen.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
+    SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
     // Emit a debug_value[_addr] instruction to record the start of this value's
     // lifetime.
     SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
-    if (address.isValid())
-      gen.B.createDebugValueAddr(PrologueLoc, value);
+    if (address)
+      SGF.B.createDebugValueAddr(PrologueLoc, value);
     else
-      gen.B.createDebugValue(PrologueLoc, value);
+      SGF.B.createDebugValue(PrologueLoc, value);
   }
   
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &gen) override {
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
     // If this let value has an address, we can handle it just like a single
     // buffer value.
     if (hasAddress())
       return SingleBufferInitialization::
-           copyOrInitValueIntoSingleBuffer(explodedElement, isInit,
-                                           getAddress(), loc, gen);
+        copyOrInitValueIntoSingleBuffer(SGF, loc, value, isInit, address);
     
     // Otherwise, we bind the value.
     if (isInit) {
       // Disable the rvalue expression cleanup, since the let value
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
-      bindValue(explodedElement.forward(gen), gen);
+      bindValue(value.forward(SGF), SGF);
     } else {
       // Disable the expression cleanup of the copy, since the let value
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
-      bindValue(explodedElement.copyUnmanaged(gen, loc).forward(gen), gen);
+      bindValue(value.copyUnmanaged(SGF, loc).forward(SGF), SGF);
     }
   }
 
-  void finishInitialization(SILGenFunction &gen) override {
+  void finishUninitialized(SILGenFunction &SGF) override {
+    LetValueInitialization::finishInitialization(SGF);
+  }
+
+  void finishInitialization(SILGenFunction &SGF) override {
     assert(!DidFinish &&
            "called LetValueInit::finishInitialization twice!");
-    assert(gen.VarLocs.count(vd) && "Didn't bind a value to this let!");
+    assert(SGF.VarLocs.count(vd) && "Didn't bind a value to this let!");
+
+    // Deactivate any cleanups we made when splitting the tuple.
+    for (auto cleanup : SplitCleanups)
+      SGF.Cleanups.forwardCleanup(cleanup);
+
+    // Activate the destroy cleanup.
     if (DestroyCleanup != CleanupHandle::invalid())
-      gen.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
+      SGF.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
+
     DidFinish = true;
   }
 };
@@ -463,23 +621,27 @@ class ReferenceStorageInitialization : public Initialization {
   InitializationPtr VarInit;
 public:
   ReferenceStorageInitialization(InitializationPtr &&subInit)
-    : VarInit(std::move(subInit)) {}
+    : VarInit(std::move(subInit)) {
+    assert(VarInit->canPerformInPlaceInitialization());
+  }
 
-  SILValue getAddressOrNull() const override { return SILValue(); }
-
-
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &gen) override {
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
+    auto address = VarInit->getAddressForInPlaceInitialization(SGF, loc);
     // If this is not an initialization, copy the value before we translateIt,
     // translation expects a +1 value.
     if (isInit)
-      explodedElement.forwardInto(gen, loc, VarInit->getAddress());
+      value.forwardInto(SGF, loc, address);
     else
-      explodedElement.copyInto(gen, VarInit->getAddress(), loc);
+      value.copyInto(SGF, address, loc);
+  }
+
+  void finishUninitialized(SILGenFunction &SGF) override {
+    ReferenceStorageInitialization::finishInitialization(SGF);
   }
   
-  void finishInitialization(SILGenFunction &gen) override {
-    VarInit->finishInitialization(gen);
+  void finishInitialization(SILGenFunction &SGF) override {
+    VarInit->finishInitialization(SGF);
   }
 };
 } // end anonymous namespace
@@ -498,17 +660,14 @@ public:
 
   JumpDest getFailureDest() const { return failureDest; }
 
-  SILValue getAddressOrNull() const override { return SILValue(); }
-
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &SGF) override = 0;
-
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override = 0;
 
   void bindVariable(SILLocation loc, VarDecl *var, ManagedValue value,
                     CanType formalValueType, SILGenFunction &SGF) {
     // Initialize the variable value.
-    InitializationPtr init = SGF.emitInitializationForVarDecl(var);
-    RValue(SGF, loc, formalValueType, value).forwardInto(SGF, init.get(), loc);
+    InitializationPtr init = SGF.emitInitializationForVarDecl(var, var->isLet());
+    RValue(SGF, loc, formalValueType, value).forwardInto(SGF, loc, init.get());
   }
 
 };
@@ -521,14 +680,14 @@ public:
   ExprPatternInitialization(ExprPattern *P, JumpDest patternFailDest)
     : RefutablePatternInitialization(patternFailDest), P(P) {}
 
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &SGF) override;
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override;
 };
 } // end anonymous namespace
 
 void ExprPatternInitialization::
-copyOrInitValueInto(ManagedValue value, bool isInit,
-                    SILLocation loc, SILGenFunction &SGF) {
+copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                    ManagedValue value, bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(P));
@@ -561,8 +720,8 @@ public:
     : RefutablePatternInitialization(patternFailDest), ElementDecl(ElementDecl),
       subInitialization(std::move(subInitialization)) {}
     
-  void copyOrInitValueInto(ManagedValue value, bool isInit,
-                           SILLocation loc, SILGenFunction &SGF) override {
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
     assert(isInit && "Only initialization is supported for refutable patterns");
     emitEnumMatch(value, ElementDecl, subInitialization.get(), getFailureDest(),
                   loc, SGF);
@@ -574,137 +733,151 @@ public:
   
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
-      subInitialization.get()->finishInitialization(SGF);
+      subInitialization->finishInitialization(SGF);
   }
 };
 } // end anonymous namespace
 
-static bool shouldDisableCleanupOnFailurePath(ManagedValue value,
-                                              EnumElementDecl *elementDecl,
-                                              SILGenFunction &SGF) {
-  // If the enum is trivial, then there is no cleanup to disable.
-  if (value.isPlusZeroRValueOrTrivial()) return false;
-  
-  // Check all of the members of the enum.  If any have a non-trivial payload,
-  // then we can't disable the cleanup.
-  for (auto elt : elementDecl->getParentEnum()->getAllElements()) {
-    // Ignore the element that will be handled.
-    if (elt == elementDecl) continue;
-    
-    // Elements without payloads are trivial.
-    if (!elt->hasArgumentType()) continue;
+void EnumElementPatternInitialization::emitEnumMatch(
+    ManagedValue value, EnumElementDecl *eltDecl, Initialization *subInit,
+    JumpDest failureDest, SILLocation loc, SILGenFunction &SGF) {
 
-    auto eltTy = value.getType().getEnumElementType(elt, SGF.SGM.M);
-    if (!eltTy.isTrivial(SGF.SGM.M))
-      return false;
-  }
-  return true;
-}
-
-void EnumElementPatternInitialization::
-emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
-              Initialization *subInit, JumpDest failureDest,
-              SILLocation loc, SILGenFunction &SGF) {
-  
-  SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
-  auto destination = std::make_pair(ElementDecl, contBB);
-  
-  
-  // Get a destination that runs all of the cleanups needed when existing on the
-  // failure path.  If the enum we're testing is non-trivial, there will be a
-  // cleanup in this stack that will release its value.
+  // Create all of the blocks early so we can maintain a consistent ordering
+  // (and update less tests). Break this at your fingers parallel.
   //
-  // However, if the tested case is the only non-trivial case in the enum, then
-  // the destruction on the failure path will be a no-op, so we can disable the
-  // cleanup on that path.  This is an important micro-optimization for
-  // Optional, since the .None case doesn't need to be cleaned up.
-  bool ShouldDisableCleanupOnFailure =
-    shouldDisableCleanupOnFailurePath(value, ElementDecl, SGF);
-  
-  if (ShouldDisableCleanupOnFailure)
-    SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Dormant);
-  
-  auto defaultBB = SGF.Cleanups.emitBlockForCleanups(failureDest, loc);
+  // *NOTE* This needs to be in reverse order to preserve the textual SIL.
+  auto *contBlock = SGF.createBasicBlock();
+  auto *someBlock = SGF.createBasicBlock();
+  auto *defaultBlock = SGF.createBasicBlock();
+  auto *originalBlock = SGF.B.getInsertionBB();
 
-  // Restore it if we disabled it.
-  if (ShouldDisableCleanupOnFailure)
-    SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Active);
-  
-  if (value.getType().isAddress())
-    SGF.B.createSwitchEnumAddr(loc, value.getValue(), defaultBB, destination);
-  else
-    SGF.B.createSwitchEnum(loc, value.getValue(), defaultBB, destination);
-  
-  SGF.B.setInsertionPoint(contBB);
-  
-  // If the enum case has no bound value, we're done.
-  if (!ElementDecl->hasArgumentType()) {
-    assert(subInit == nullptr &&
-           "Cannot have a subinit when there is no value to match against");
-    return;
-  }
-  
-  // Otherwise, the bound value for the enum case is available.
-  SILType eltTy = value.getType().getEnumElementType(ElementDecl, SGF.SGM.M);
-  auto &eltTL = SGF.getTypeLowering(eltTy);
-  
-  // If the case value is provided to us as a BB argument as long as the enum
-  // is not address-only.
-  SILValue eltValue;
-  if (!value.getType().isAddress())
-    eltValue = new (SGF.F.getModule()) SILArgument(contBB, eltTy);
+  SwitchEnumBuilder switchBuilder(SGF.B, loc, value);
 
-  if (subInit == nullptr) {
-    // If there is no subinitialization, then we are done matching.  Don't
-    // bother projecting out the address-only element value only to ignore it.
-    return;
-  }
-  
-  if (value.getType().isAddress()) {
-    // If the enum is address-only, take from the enum we have and load it if
-    // the element value is loadable.
-    assert((eltTL.isTrivial() || value.hasCleanup())
-           && "must be able to consume value");
-    eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, value.forward(SGF),
-                                                     ElementDecl, eltTy);
-    // Load a loadable data value.
-    if (eltTL.isLoadable())
-      eltValue = SGF.B.createLoad(loc, eltValue);
+  // Handle the none case.
+  //
+  // *NOTE*: Since we are performing an initialization here, it is *VERY*
+  // important that we emit the negative case first. The reason why is that
+  // currently the initialization has a dormant cleanup in a scope that may be
+  // after the failureDest depth. Once we run the positive case, this
+  // initialization will be enabled. Thus if we run the negative case /after/
+  // the positive case, a cleanup will be emitted for the initialization on the
+  // negative path... but the actual initialization happened on the positive
+  // path, causing a use (the destroy on the negative path) to be created that
+  // does not dominate its definition (in the positive path).
+  auto handler = [&SGF, &loc, &failureDest](ManagedValue mv,
+                                            SwitchCaseFullExpr &expr) {
+    expr.exit();
+    SGF.Cleanups.emitBranchAndCleanups(failureDest, loc);
+  };
+
+  // If we have a binary enum, do not emit a true default case. This ensures
+  // that we do not emit a destroy_value on a .None.
+  bool inferredBinaryEnum = false;
+  auto *enumDecl = value.getType().getEnumOrBoundGenericEnum();
+  if (auto *otherDecl = enumDecl->getOppositeBinaryDecl(eltDecl)) {
+    inferredBinaryEnum = true;
+    switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler);
   } else {
-    // Otherwise, we're consuming this as a +1 value.
-    value.forward(SGF);
+    switchBuilder.addDefaultCase(
+        defaultBlock, nullptr, handler,
+        SwitchEnumBuilder::DefaultDispatchTime::BeforeNormalCases);
   }
-  
-  // Now we have a +1 value.
-  auto eltMV = SGF.emitManagedRValueWithCleanup(eltValue, eltTL);
 
-  // If the payload is indirect, project it out of the box.
-  if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
-    SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue());
-    auto &boxedTL = SGF.getTypeLowering(boxedValue.getType());
-    if (boxedTL.isLoadable())
-      boxedValue = SGF.B.createLoad(loc, boxedValue);
+  // Always insert the some case at the front of the list. In the default case,
+  // this will not matter, but in the case where we have a binary enum, we want
+  // to preserve the old ordering of .some/.none. to make it easier to update
+  // tests.
+  switchBuilder.addCase(
+      eltDecl, someBlock, contBlock,
+      [&SGF, &loc, &eltDecl, &subInit, &value](ManagedValue mv,
+                                               SwitchCaseFullExpr &expr) {
+        // If the enum case has no bound value, we're done.
+        if (!eltDecl->hasAssociatedValues()) {
+          assert(
+              subInit == nullptr &&
+              "Cannot have a subinit when there is no value to match against");
+          expr.exitAndBranch(loc);
+          return;
+        }
 
-    // We must treat the boxed value as +0 since it may be shared. Copy it if
-    // nontrivial.
-    // TODO: Should be able to hand it off at +0 in some cases.
-    eltMV = ManagedValue::forUnmanaged(boxedValue);
-    eltMV = eltMV.copyUnmanaged(SGF, loc);
+        if (subInit == nullptr) {
+          // If there is no subinitialization, then we are done matching.  Don't
+          // bother projecting out the any elements value only to ignore it.
+          expr.exitAndBranch(loc);
+          return;
+        }
+
+        // Otherwise, the bound value for the enum case is available.
+        SILType eltTy = value.getType().getEnumElementType(eltDecl, SGF.SGM.M);
+        auto &eltTL = SGF.getTypeLowering(eltTy);
+
+        if (mv.getType().isAddress()) {
+          // If the enum is address-only, take from the enum we have and load it
+          // if
+          // the element value is loadable.
+          assert((eltTL.isTrivial() || mv.hasCleanup()) &&
+                 "must be able to consume value");
+          mv = SGF.B.createUncheckedTakeEnumDataAddr(loc, mv, eltDecl, eltTy);
+          // Load a loadable data value.
+          if (eltTL.isLoadable())
+            mv = SGF.B.createLoadTake(loc, mv);
+        }
+
+        // If the payload is indirect, project it out of the box.
+        if (eltDecl->isIndirect() || eltDecl->getParentEnum()->isIndirect()) {
+          SILValue boxedValue = SGF.B.createProjectBox(loc, mv.getValue(), 0);
+          auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
+          // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
+          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses())
+            boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
+                                          LoadOwnershipQualifier::Take);
+
+          // We must treat the boxed value as +0 since it may be shared. Copy it
+          // if nontrivial.
+          //
+          // TODO: Should be able to hand it off at +0 in some cases.
+          mv = ManagedValue::forUnmanaged(boxedValue);
+          mv = mv.copyUnmanaged(SGF, loc);
+        }
+
+        // Reabstract to the substituted type, if needed.
+        CanType substEltTy =
+            value.getType()
+                .getSwiftRValueType()
+                ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
+                                  eltDecl->getArgumentInterfaceType())
+                ->getCanonicalType();
+
+        AbstractionPattern origEltTy =
+            (eltDecl == SGF.getASTContext().getOptionalSomeDecl()
+                 ? AbstractionPattern(substEltTy)
+                 : SGF.SGM.M.Types.getAbstractionPattern(eltDecl));
+
+        mv = SGF.emitOrigToSubstValue(loc, mv, origEltTy, substEltTy);
+
+        // Pass the +1 value down into the sub initialization.
+        subInit->copyOrInitValueInto(SGF, loc, mv, /*is an init*/ true);
+        expr.exitAndBranch(loc);
+      });
+
+  std::move(switchBuilder).emit();
+
+  // If we inferred a binary enum, put the asked for case first so we preserve
+  // the current code structure. This just ensures that less test updates are
+  // needed.
+  if (inferredBinaryEnum) {
+    if (auto *switchEnum =
+            dyn_cast<SwitchEnumInst>(originalBlock->getTerminator())) {
+      switchEnum->swapCase(0, 1);
+    } else {
+      auto *switchEnumAddr =
+          cast<SwitchEnumAddrInst>(originalBlock->getTerminator());
+      switchEnumAddr->swapCase(0, 1);
+    }
   }
-  
-  // Reabstract to the substituted type, if needed.
-  CanType substEltTy =
-    value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                      ElementDecl, nullptr,
-                                      ElementDecl->getArgumentInterfaceType())
-      ->getCanonicalType();
-  
-  eltMV = SGF.emitOrigToSubstValue(loc, eltMV,
-                             AbstractionPattern(ElementDecl->getArgumentType()),
-                             substEltTy);
 
-  // Pass the +1 value down into the sub initialization.
-  subInit->copyOrInitValueInto(eltMV, /*is an init*/true, loc, SGF);
+  // Reset the insertion point to the end of contBlock.
+  SGF.B.setInsertionPoint(contBlock);
 }
 
 namespace {
@@ -718,30 +891,31 @@ public:
   : RefutablePatternInitialization(patternFailDest), pattern(pattern),
     subInitialization(std::move(subInitialization)) {}
     
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &SGF) override;
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override;
   
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
-      subInitialization.get()->finishInitialization(SGF);
+      subInitialization->finishInitialization(SGF);
   }
 };
 } // end anonymous namespace
 
 void IsPatternInitialization::
-copyOrInitValueInto(ManagedValue value, bool isInit,
-                    SILLocation loc, SILGenFunction &SGF) {
+copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                    ManagedValue value, bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
   
   // Try to perform the cast to the destination type, producing an optional that
   // indicates whether we succeeded.
   auto destType = OptionalType::get(pattern->getCastTypeLoc().getType());
-  
-  value = emitConditionalCheckedCast(SGF, loc, value, pattern->getType(),
-                                     destType, pattern->getCastKind(),
-                                     SGFContext())
-            .getAsSingleValue(SGF, loc);
-  
+
+  value =
+      emitConditionalCheckedCast(SGF, loc, value, pattern->getType(), destType,
+                                 pattern->getCastKind(), SGFContext(),
+                                 ProfileCounter(), ProfileCounter())
+          .getAsSingleValue(SGF, loc);
+
   // Now that we have our result as an optional, we can use an enum projection
   // to do all the work.
   EnumElementPatternInitialization::
@@ -757,14 +931,14 @@ public:
                             JumpDest patternFailDest)
     : RefutablePatternInitialization(patternFailDest), pattern(pattern) {}
 
-  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
-                           SILLocation loc, SILGenFunction &SGF) override;
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override;
 };
 } // end anonymous namespace
 
 void BoolPatternInitialization::
-copyOrInitValueInto(ManagedValue value, bool isInit,
-                    SILLocation loc, SILGenFunction &SGF) {
+copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                    ManagedValue value, bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   // Extract the i1 from the Bool struct.
@@ -793,6 +967,10 @@ namespace {
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
 /// Initialization representing the needed initializations.
+///
+/// It is important that any Initialization created for a pattern that might
+/// not have an immediate initializer implement finishUninitialized.  Note
+/// that this only applies to irrefutable patterns.
 struct InitializationForPattern
   : public PatternVisitor<InitializationForPattern, InitializationPtr>
 {
@@ -831,7 +1009,7 @@ struct InitializationForPattern
       return InitializationPtr(new BlackHoleInitialization());
     }
 
-    return SGF.emitInitializationForVarDecl(P->getDecl());
+    return SGF.emitInitializationForVarDecl(P->getDecl(), P->getDecl()->isLet());
   }
 
   // Bind a tuple pattern by aggregating the component variables into a
@@ -872,15 +1050,12 @@ struct InitializationForPattern
   InitializationPtr visitExprPattern(ExprPattern *P) {
     return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));
   }
-  InitializationPtr visitNominalTypePattern(NominalTypePattern *P) {
-    P->dump();
-    llvm_unreachable("pattern not supported in let/else yet");
-  }
 };
 
 } // end anonymous namespace
 
-InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
+InitializationPtr
+SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
   // If this is a computed variable, we don't need to do anything here.
   // We'll generate the getter and setter when we see their FuncDecls.
   if (!vd->hasStorage())
@@ -903,7 +1078,7 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
 
   // If this is a 'let' initialization for a non-global, set up a
   // let binding, which stores the initialization value into VarLocs directly.
-  if (vd->isLet() && vd->getDeclContext()->isLocalContext() &&
+  if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
       !isa<ReferenceStorageType>(varType))
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
@@ -917,6 +1092,7 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
   InitializationPtr Result;
   if (!vd->getDeclContext()->isLocalContext()) {
     auto *silG = SGM.getSILGlobalVariable(vd, NotForDefinition);
+    B.createAllocGlobal(vd, silG);
     SILValue addr = B.createGlobalAddr(vd, silG);
     if (isUninitialized)
       addr = B.createMarkUninitializedVar(vd, addr);
@@ -924,7 +1100,11 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
     Result = InitializationPtr(new KnownAddressInitialization(addr));
   } else {
-    Result = emitLocalVariableWithCleanup(vd, isUninitialized);
+    Optional<MarkUninitializedInst::Kind> uninitKind;
+    if (isUninitialized) {
+      uninitKind = MarkUninitializedInst::Kind::Var;
+    }
+    Result = emitLocalVariableWithCleanup(vd, uninitKind);
   }
 
   // If we're initializing a weak or unowned variable, this requires a change in
@@ -947,7 +1127,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get());
   } else {
-    initialization->finishInitialization(*this);
+    initialization->finishUninitialized(*this);
   }
 }
 
@@ -960,12 +1140,19 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
   }
 }
 
+void SILGenFunction::visitVarDecl(VarDecl *D) {
+  // We handle emitting the variable storage when we see the pattern binding.
+  // Here we just emit the behavior witness table, if any.
+  
+  if (D->hasBehavior())
+    SGM.emitPropertyBehavior(D);
+}
+
 /// Emit a check that returns 1 if the running OS version is in
 /// the specified version range and 0 otherwise. The returned SILValue
 /// (which has type Builtin.Int1) represents the result of this check.
 SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
                                                  const VersionRange &range) {
-
   // Emit constants for the checked version range.
   clang::VersionTuple Vers = range.getLowerEndpoint();
   unsigned major = Vers.getMajor();
@@ -999,8 +1186,10 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 /// specified JumpDest.  The insertion point is left in the block where the
 /// condition has matched and any bound variables are in scope.
 ///
-void SILGenFunction::emitStmtCondition(StmtCondition Cond,
-                                       JumpDest FailDest, SILLocation loc) {
+void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
+                                       SILLocation loc,
+                                       ProfileCounter NumTrueTaken,
+                                       ProfileCounter NumFalseTaken) {
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
@@ -1031,15 +1220,23 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
     }
     case StmtConditionElement::CK_Availability:
       // Check the running OS version to determine whether it is in the range
-      // specified by E.
-      auto *avail = elt.getAvailability();
-      booleanTestValue = emitOSVersionRangeCheck(loc,
-                                                 avail->getAvailableRange());
+      // specified by elt.
+      VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
+      assert(!OSVersion.isEmpty());
+
+      if (OSVersion.isAll()) {
+        // If there's no check for the current platform, this condition is
+        // trivially true.
+        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+        booleanTestValue = B.createIntegerLiteral(loc, i1, true);
+      } else {
+        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion);
+      }
       break;
     }
 
     // Now that we have a boolean test as a Builtin.i1, emit the branch.
-    assert(booleanTestValue.getType().
+    assert(booleanTestValue->getType().
            castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
            "Sema forces conditions to have Builtin.i1 type");
     
@@ -1047,8 +1244,9 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
     // on success we fall through to a new block.
     SILBasicBlock *ContBB = createBasicBlock();
     auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
-    B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB);
-    
+    B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB,
+                       NumTrueTaken, NumFalseTaken);
+
     // Finally, emit the continue block and keep emitting the rest of the
     // condition.
     B.emitBlock(ContBB);
@@ -1063,8 +1261,7 @@ SILGenFunction::emitPatternBindingInitialization(Pattern *P,
 
 /// Enter a cleanup to deallocate the given location.
 CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
-  assert(temp.getType().isLocalStorage() &&
-         "must deallocate container operand, not address operand!");
+  assert(temp->getType().isAddress() &&  "dealloc must have an address type");
   Cleanups.pushCleanup<DeallocStackCleanup>(temp);
   return Cleanups.getTopCleanup();
 }
@@ -1089,23 +1286,35 @@ namespace {
         concreteFormalType(concreteFormalType),
         repr(repr) {}
     
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l) override {
       switch (repr) {
       case ExistentialRepresentation::None:
       case ExistentialRepresentation::Class:
       case ExistentialRepresentation::Metatype:
         llvm_unreachable("cannot cleanup existential");
       case ExistentialRepresentation::Opaque:
-        gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        if (SGF.silConv.useLoweredAddresses()) {
+          SGF.B.createDeinitExistentialAddr(l, existentialAddr);
+        } else {
+          SGF.B.createDeinitExistentialValue(l, existentialAddr);
+        }
         break;
       case ExistentialRepresentation::Boxed:
-        gen.B.createDeallocExistentialBox(l, concreteFormalType,
+        SGF.B.createDeallocExistentialBox(l, concreteFormalType,
                                           existentialAddr);
         break;
       }
     }
+
+    void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeinitExistentialCleanup\n"
+                   << "State:" << getState() << "\n"
+                   << "Value:" << existentialAddr << "\n";
+#endif
+    }
   };
-}
+} // end anonymous namespace
 
 /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
 /// of the specified value.
@@ -1134,17 +1343,11 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
 void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func: {
-    // We'll emit all the members of an enum when we visit the enum.
-    if (isa<EnumDecl>(d->getDeclContext()))
-      break;
     emitFunction(cast<FuncDecl>(d));
     break;
   }
   case DeclKind::Constructor: {
     auto C = cast<ConstructorDecl>(d);
-    // We'll emit all the members of an enum when we visit the enum.
-    if (isa<EnumDecl>(d->getDeclContext()))
-      break;
     // For factories, we don't need to emit a special thunk; the normal
     // foreign-to-native thunk is sufficient.
     if (C->isFactoryInit())
@@ -1153,31 +1356,17 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     emitConstructor(C);
     break;
   }
-  case DeclKind::Enum: {
-    auto ed = cast<EnumDecl>(d);
-    // Emit the enum cases and derived conformance methods for the type.
-    for (auto member : ed->getMembers()) {
-      if (auto elt = dyn_cast<EnumElementDecl>(member))
-        emitEnumConstructor(elt);
-      else if (auto func = dyn_cast<FuncDecl>(member))
-        emitFunction(func);
-      else if (auto ctor = dyn_cast<ConstructorDecl>(member))
-        emitConstructor(ctor);
-    }
-    // Emit derived global decls.
-    for (auto derived : ed->getDerivedGlobalDecls()) {
-      emitFunction(cast<FuncDecl>(derived));
-    }
-    SWIFT_FALLTHROUGH;
-  }
+  case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class: {
     // Emit witness tables.
-    for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances(
-                    ConformanceLookupKind::All,
-                    nullptr, /*sorted=*/true)) {
-      if (Types.protocolRequiresWitnessTable(c->getProtocol()) &&
-          c->isComplete() && isa<NormalProtocolConformance>(c))
+    auto nom = cast<NominalTypeDecl>(d);
+    for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
+                                            nullptr, /*sorted=*/true)) {
+      auto *proto = c->getProtocol();
+      if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
+          isa<NormalProtocolConformance>(c) &&
+          c->isComplete())
         emitExternalWitnessTable(c);
     }
     break;
@@ -1189,9 +1378,6 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
 
   case DeclKind::Var:
     // Imported static vars are handled solely in IRGen.
-    break;
-
-  case DeclKind::Module:
     break;
 
   case DeclKind::IfConfig:
@@ -1210,29 +1396,40 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::Module:
+  case DeclKind::MissingMember:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }
 
 /// Create a LocalVariableInitialization for the uninitialized var.
-InitializationPtr
-SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit,
-                                             unsigned ArgNo) {
+InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
+    VarDecl *vd, Optional<MarkUninitializedInst::Kind> kind, unsigned ArgNo) {
   return InitializationPtr(
-      new LocalVariableInitialization(vd, NeedsMarkUninit, ArgNo, *this));
+      new LocalVariableInitialization(vd, kind, ArgNo, *this));
 }
 
 /// Create an Initialization for an uninitialized temporary.
 std::unique_ptr<TemporaryInitialization>
 SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
-  return useBufferAsTemporary(loc, addr, tempTL);
+  return useBufferAsTemporary(addr, tempTL);
+}
+
+std::unique_ptr<TemporaryInitialization>
+SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
+                                          const TypeLowering &tempTL) {
+  SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
+  CleanupHandle cleanup =
+      enterDormantFormalAccessTemporaryCleanup(addr, loc, tempTL);
+  return std::unique_ptr<TemporaryInitialization>(
+      new TemporaryInitialization(addr, cleanup));
 }
 
 /// Create an Initialization for an uninitialized buffer.
 std::unique_ptr<TemporaryInitialization>
-SILGenFunction::useBufferAsTemporary(SILLocation loc,
-                                     SILValue addr,
+SILGenFunction::useBufferAsTemporary(SILValue addr,
                                      const TypeLowering &tempTL) {
   CleanupHandle cleanup = enterDormantTemporaryCleanup(addr, tempTL);
   return std::unique_ptr<TemporaryInitialization>(
@@ -1249,6 +1446,90 @@ SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
   return Cleanups.getCleanupsDepth();
 }
 
+namespace {
+
+struct FormalAccessReleaseValueCleanup : Cleanup {
+  FormalEvaluationContext::stable_iterator Depth;
+
+  FormalAccessReleaseValueCleanup() : Depth() {}
+
+  void setState(SILGenFunction &SGF, CleanupState newState) override {
+    if (newState == CleanupState::Dead) {
+      getEvaluation(SGF).setFinished();
+    }
+
+    state = newState;
+  }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    getEvaluation(SGF).finish(SGF);
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FormalAccessReleaseValueCleanup "
+                 << "State:" << getState() << "\n"
+                 << "Value:" << getValue(SGF) << "\n";
+#endif
+  }
+
+  OwnedFormalAccess &getEvaluation(SILGenFunction &SGF) const {
+    auto &evaluation = *SGF.FormalEvalContext.find(Depth);
+    assert(evaluation.getKind() == FormalAccess::Owned);
+    return static_cast<OwnedFormalAccess &>(evaluation);
+  }
+
+  SILValue getValue(SILGenFunction &SGF) const {
+    return getEvaluation(SGF).getValue();
+  }
+};
+
+} // end anonymous namespace
+
+ManagedValue
+SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
+                                                         SILValue addr) {
+  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  auto &lowering = getTypeLowering(addr->getType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(addr);
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, addr);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return ManagedValue(addr, handle);
+}
+
+ManagedValue
+SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
+                                                         SILValue value) {
+  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  auto &lowering = getTypeLowering(value->getType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(value);
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, value);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return ManagedValue(value, handle);
+}
+
+CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
+    SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
+  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  if (tempTL.isTrivial())
+    return CleanupHandle::invalid();
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  Cleanups.setCleanupState(handle, CleanupState::Dormant);
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, addr);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return handle;
+}
+
 void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   assert(vd->getDeclContext()->isLocalContext() &&
          "can't emit a local var for a non-local var decl");
@@ -1261,17 +1542,17 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
   if (loc.box) {
-    B.emitStrongReleaseAndFold(silLoc, loc.box);
+    B.emitDestroyValueOperation(silLoc, loc.box);
     return;
   }
 
   // For 'let' bindings, we emit a release_value or destroy_addr, depending on
   // whether we have an address or not.
   SILValue Val = loc.value;
-  if (!Val.getType().isAddress())
-    B.emitReleaseValueOperation(silLoc, Val);
+  if (!Val->getType().isAddress())
+    B.emitDestroyValueOperation(silLoc, Val);
   else
-    B.emitDestroyAddrAndFold(silLoc, Val);
+    B.createDestroyAddr(silLoc, Val);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
@@ -1285,546 +1566,8 @@ void SILGenFunction::deallocateUninitializedLocalVariable(SILLocation silLoc,
   auto loc = VarLocs[vd];
 
   // Ignore let values captured without a memory location.
-  if (!loc.value.getType().isAddress()) return;
+  if (!loc.value->getType().isAddress()) return;
 
   assert(loc.box && "captured var should have been given a box");
-  B.createDeallocBox(silLoc, loc.value.getType().getObjectType(),
-                     loc.box);
-}
-
-namespace {
-
-// Is this a free function witness satisfying a static method requirement?
-static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
-                                                     ValueDecl *witness) {
-  if (!witness->getDeclContext()->isTypeContext()) {
-    assert(!requirement->isInstanceMember()
-           && "free function satisfying instance method requirement?!");
-    return IsFreeFunctionWitness;
-  }
-
-  return IsNotFreeFunctionWitness;
-}
-
-/// Emit a witness table for a protocol conformance.
-class SILGenConformance : public SILWitnessVisitor<SILGenConformance> {
-public:
-  SILGenModule &SGM;
-  NormalProtocolConformance *Conformance;
-  std::vector<SILWitnessTable::Entry> Entries;
-  SILLinkage Linkage;
-
-  SILGenConformance(SILGenModule &SGM, NormalProtocolConformance *C)
-    // We only need to emit witness tables for base NormalProtocolConformances.
-    : SGM(SGM), Conformance(C->getRootNormalConformance()),
-      Linkage(SGM.Types.getLinkageForProtocolConformance(Conformance,
-                                                         ForDefinition))
-  {
-    // Not all protocols use witness tables.
-    if (!SGM.Types.protocolRequiresWitnessTable(Conformance->getProtocol()))
-      Conformance = nullptr;
-  }
-
-  SILWitnessTable *emit() {
-    // Nothing to do if this wasn't a normal conformance.
-    if (!Conformance)
-      return nullptr;
-
-    visitProtocolDecl(Conformance->getProtocol());
-
-    // Check if we already have a declaration or definition for this witness
-    // table.
-    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false).first) {
-      // If we have a definition already, just return it.
-      //
-      // FIXME: I am not sure if this is possible, if it is not change this to an
-      // assert.
-      if (wt->isDefinition())
-        return wt;
-
-      // If we have a declaration, convert the witness table to a definition.
-      if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries, SGM.makeModuleFragile);
-
-        // Since we had a declaration before, its linkage should be external,
-        // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
-        // with both being shared since we do not have a shared_external
-        // linkage.
-        assert(stripExternalFromLinkage(wt->getLinkage()) == Linkage &&
-               "Witness table declaration has inconsistent linkage with"
-               " silgen definition.");
-
-        // And then override the linkage with the new linkage.
-        wt->setLinkage(Linkage);
-        return wt;
-      }
-    }
-
-    // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage, SGM.makeModuleFragile,
-                                   Conformance, Entries);
-  }
-
-  void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
-    // Only include the witness if the base protocol requires it.
-    if (!SGM.Types.protocolRequiresWitnessTable(baseProtocol))
-      return;
-
-    auto foundBaseConformance
-      = Conformance->getInheritedConformances().find(baseProtocol);
-    assert(foundBaseConformance != Conformance->getInheritedConformances().end()
-           && "no inherited conformance for base protocol");
-
-    auto conformance = foundBaseConformance->second;
-
-    Entries.push_back(SILWitnessTable::BaseProtocolWitness{
-      baseProtocol,
-      conformance,
-    });
-
-    // Emit the witness table for the base conformance if it is shared.
-    if (SGM.Types.getLinkageForProtocolConformance(
-                                        conformance->getRootNormalConformance(),
-                                        NotForDefinition)
-          == SILLinkage::Shared)
-      SGM.getWitnessTable(conformance->getRootNormalConformance());
-  }
-
-  void addMethod(FuncDecl *fd) {
-    // Find the witness in the conformance.
-    ConcreteDeclRef witness = Conformance->getWitness(fd, nullptr);
-    addMethod(fd, witness.getDecl(), witness.getSubstitutions());
-  }
-
-  void addMethod(FuncDecl *fd, ValueDecl *witnessDecl,
-                 ArrayRef<Substitution> WitnessSubstitutions) {
-    // Emit the witness thunk and add it to the table.
-
-    // If this is a non-present optional requirement, emit a MissingOptional.
-    if (!witnessDecl) {
-      assert(fd->getAttrs().hasAttribute<OptionalAttr>() &&
-             "Non-optional protocol requirement lacks a witness?");
-      Entries.push_back(SILWitnessTable::MissingOptionalWitness{ fd });
-      return;
-    }
-
-
-    // TODO: multiple resilience expansions?
-    // TODO: multiple uncurry levels?
-    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func,
-                              ResilienceExpansion::Minimal);
-    // Free function witnesses have an implicit uncurry layer imposed on them by
-    // the inserted metatype argument.
-    auto isFree = isFreeFunctionWitness(fd, witnessDecl);
-    unsigned witnessUncurryLevel = isFree ? requirementRef.uncurryLevel - 1
-                                          : requirementRef.uncurryLevel;
-
-    SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func,
-                          SILDeclRef::ConstructAtBestResilienceExpansion,
-                          witnessUncurryLevel);
-
-    SILFunction *witnessFn =
-      SGM.emitProtocolWitness(Conformance, Linkage, requirementRef, witnessRef,
-                              isFree, WitnessSubstitutions);
-    Entries.push_back(
-                    SILWitnessTable::MethodWitness{requirementRef, witnessFn});
-  }
-
-  void addConstructor(ConstructorDecl *cd) {
-    SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator,
-                              ResilienceExpansion::Minimal);
-
-    ConcreteDeclRef witness = Conformance->getWitness(cd, nullptr);
-    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Allocator,
-                          SILDeclRef::ConstructAtBestResilienceExpansion,
-                          requirementRef.uncurryLevel);
-    SILFunction *witnessFn =
-      SGM.emitProtocolWitness(Conformance, Linkage, requirementRef, witnessRef,
-                              IsNotFreeFunctionWitness,
-                              witness.getSubstitutions());
-    Entries.push_back(
-      SILWitnessTable::MethodWitness{requirementRef, witnessFn});
-  }
-
-  /// Override SILWitnessVisitor::visitAbstractStorageDecl() since
-  /// we need the conformance for the top-level declaration d to be
-  /// passed down into our own version of addMethod().
-  void visitAbstractStorageDecl(AbstractStorageDecl *d) {
-    // Find the witness in the conformance.
-    ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
-    auto *witnessSD = cast<AbstractStorageDecl>(witness.getDecl());
-    addMethod(d->getGetter(), witnessSD->getGetter(),
-              witness.getSubstitutions());
-    if (d->isSettable(d->getDeclContext()))
-      addMethod(d->getSetter(), witnessSD->getSetter(),
-                witness.getSubstitutions());
-    if (auto materializeForSet = d->getMaterializeForSetFunc())
-      addMethod(materializeForSet, witnessSD->getMaterializeForSetFunc(),
-                witness.getSubstitutions());
-  }
-
-  void addAssociatedType(AssociatedTypeDecl *td,
-                         ArrayRef<ProtocolDecl *> protos) {
-    // Find the substitution info for the witness type.
-    const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
-
-    // Emit the record for the type itself.
-    Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
-                                witness.getReplacement()->getCanonicalType()});
-
-    // Emit records for the protocol requirements on the type.
-    assert(protos.size() == witness.getConformances().size()
-           && "number of conformances in assoc type substitution do not match "
-              "number of requirements on assoc type");
-    // The conformances should be all null or all nonnull.
-    assert(witness.getConformances().empty()
-           || (witness.getConformances()[0]
-                 ? std::all_of(witness.getConformances().begin(),
-                               witness.getConformances().end(),
-                               [&](const ProtocolConformance *C) -> bool {
-                                 return C;
-                               })
-                 : std::all_of(witness.getConformances().begin(),
-                               witness.getConformances().end(),
-                               [&](const ProtocolConformance *C) -> bool {
-                                 return !C;
-                               })));
-
-    for (auto *protocol : protos) {
-      // Only reference the witness if the protocol requires it.
-      if (!SGM.Types.protocolRequiresWitnessTable(protocol))
-        continue;
-
-      ProtocolConformance *conformance = nullptr;
-      // If the associated type requirement is satisfied by an associated type,
-      // these will all be null.
-      if (witness.getConformances()[0]) {
-        auto foundConformance = std::find_if(witness.getConformances().begin(),
-                                        witness.getConformances().end(),
-                                        [&](ProtocolConformance *c) {
-                                          return c->getProtocol() == protocol;
-                                        });
-        assert(foundConformance != witness.getConformances().end());
-        conformance = *foundConformance;
-      }
-
-      Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        td, protocol, conformance
-      });
-    }
-  }
-};
-
-} // end anonymous namespace
-
-static SILWitnessTable *
-getWitnessTableToInsertAfter(SILGenModule &SGM,
-                             NormalProtocolConformance *insertAfter) {
-  while (insertAfter) {
-    // If the table was emitted, emit after it.
-    auto found = SGM.emittedWitnessTables.find(insertAfter);
-    if (found != SGM.emittedWitnessTables.end())
-      return found->second;
-
-    // Otherwise, try inserting after the table we would transitively be
-    // inserted after.
-    auto foundDelayed = SGM.delayedConformances.find(insertAfter);
-    if (foundDelayed != SGM.delayedConformances.end())
-      insertAfter = foundDelayed->second.insertAfter;
-    else
-      break;
-  }
-
-  return nullptr;
-}
-
-SILWitnessTable *
-SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
-  auto normal = conformance->getRootNormalConformance();
-
-  // If we've already emitted this witness table, return it.
-  auto found = emittedWitnessTables.find(normal);
-  if (found != emittedWitnessTables.end())
-    return found->second;
-
-  SILWitnessTable *table = SILGenConformance(*this, normal).emit();
-  emittedWitnessTables.insert({normal, table});
-
-  // If we delayed emission of this witness table, move it to its rightful
-  // place within the module.
-  auto foundDelayed = delayedConformances.find(normal);
-  if (foundDelayed != delayedConformances.end()) {
-    M.witnessTables.remove(table);
-    auto insertAfter = getWitnessTableToInsertAfter(*this,
-                                              foundDelayed->second.insertAfter);
-    if (!insertAfter) {
-      M.witnessTables.push_front(table);
-    } else {
-      M.witnessTables.insertAfter(insertAfter->getIterator(), table);
-    }
-  } else {
-    // We would have marked a delayed conformance as "last emitted" when it
-    // was delayed.
-    lastEmittedConformance = normal;
-  }
-  return table;
-}
-
-/// FIXME: This should just be a call down to Types.getLoweredType(), but I
-/// really don't want to thread an old-type/interface-type pair through all
-/// of TypeLowering.
-static SILType
-getWitnessFunctionType(SILModule &M,
-                       AbstractionPattern origRequirementTy,
-                       CanAnyFunctionType witnessSubstTy,
-                       CanAnyFunctionType witnessSubstIfaceTy,
-                       unsigned uncurryLevel) {
-  // Lower the types to uncurry and get ExtInfo.
-  AbstractionPattern origLoweredTy = origRequirementTy;
-  if (auto origFTy = origRequirementTy.getAs<AnyFunctionType>())
-    origLoweredTy =
-      AbstractionPattern(M.Types.getLoweredASTFunctionType(origFTy,
-                                                           uncurryLevel,
-                                                           None));
-  auto witnessLoweredTy
-    = M.Types.getLoweredASTFunctionType(witnessSubstTy, uncurryLevel, None);
-  auto witnessLoweredIfaceTy
-    = M.Types.getLoweredASTFunctionType(witnessSubstIfaceTy, uncurryLevel, None);
-
-  // Convert to SILFunctionType.
-  auto fnTy = getNativeSILFunctionType(M, origLoweredTy,
-                                       witnessLoweredTy,
-                                       witnessLoweredIfaceTy);
-  return SILType::getPrimitiveObjectType(fnTy);
-}
-
-SILFunction *
-SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
-                                  SILLinkage linkage,
-                                  SILDeclRef requirement,
-                                  SILDeclRef witness,
-                                  IsFreeFunctionWitness_t isFree,
-                                  ArrayRef<Substitution> witnessSubs) {
-  // Get the type of the protocol requirement and the original type of the
-  // witness.
-  // FIXME: Rework for interface types.
-  auto requirementInfo = Types.getConstantInfo(requirement);
-  auto requirementTy
-    = cast<PolymorphicFunctionType>(requirementInfo.FormalType);
-  unsigned witnessUncurryLevel = witness.uncurryLevel;
-
-  // Substitute the 'self' type into the requirement to get the concrete
-  // witness type.
-  auto witnessSubstTy = cast<AnyFunctionType>(
-    requirementTy
-      ->substGenericArgs(conformance->getDeclContext()->getParentModule(),
-                         conformance->getType())
-      ->getCanonicalType());
-
-  GenericParamList *conformanceParams = conformance->getGenericParams();
-
-  // If the requirement is generic, reparent its generic parameter list to
-  // the generic parameters of the conformance.
-  CanType methodTy = witnessSubstTy.getResult();
-  if (auto pft = dyn_cast<PolymorphicFunctionType>(methodTy)) {
-    auto &reqtParams = pft->getGenericParams();
-    // Preserve the depth of generic arguments by adding an empty outer generic
-    // param list if the conformance is concrete.
-    GenericParamList *outerParams = conformanceParams;
-    if (!outerParams)
-      outerParams = GenericParamList::getEmpty(getASTContext());
-    auto methodParams
-      = reqtParams.cloneWithOuterParameters(getASTContext(), outerParams);
-    methodTy = CanPolymorphicFunctionType::get(pft.getInput(), pft.getResult(),
-                                               methodParams,
-                                               pft->getExtInfo());
-  }
-
-  // If the conformance is generic, its generic parameters apply to
-  // the witness as its outer generic param list.
-  if (conformanceParams) {
-    witnessSubstTy = CanPolymorphicFunctionType::get(witnessSubstTy.getInput(),
-                                                   methodTy,
-                                                   conformanceParams,
-                                                   witnessSubstTy->getExtInfo());
-  } else {
-    witnessSubstTy = CanFunctionType::get(witnessSubstTy.getInput(),
-                                          methodTy,
-                                          witnessSubstTy->getExtInfo());
-  }
-
-  // If the witness is a free function, consider the self argument
-  // uncurry level.
-  if (isFree)
-    ++witnessUncurryLevel;
-
-  // The witness SIL function has the type of the AST-level witness, at the
-  // abstraction level of the original protocol requirement.
-  assert(requirement.uncurryLevel == witnessUncurryLevel &&
-         "uncurry level of requirement and witness do not match");
-
-  // Work out the interface type for the witness.
-  auto reqtIfaceTy
-    = cast<GenericFunctionType>(requirementInfo.FormalInterfaceType);
-  // Substitute the 'self' type into the requirement to get the concrete witness
-  // type, leaving the other generic parameters open.
-  CanAnyFunctionType witnessSubstIfaceTy = cast<AnyFunctionType>(
-    reqtIfaceTy->partialSubstGenericArgs(conformance->getDeclContext()->getParentModule(),
-                                         conformance->getInterfaceType())
-               ->getCanonicalType());
-
-  // If the conformance is generic, its generic parameters apply to the witness.
-  GenericSignature *sig
-    = conformance->getGenericSignature();
-  if (sig) {
-    if (auto gft = dyn_cast<GenericFunctionType>(witnessSubstIfaceTy)) {
-      SmallVector<GenericTypeParamType*, 4> allParams(sig->getGenericParams().begin(),
-                                                      sig->getGenericParams().end());
-      allParams.append(gft->getGenericParams().begin(),
-                       gft->getGenericParams().end());
-      SmallVector<Requirement, 4> allReqts(sig->getRequirements().begin(),
-                                           sig->getRequirements().end());
-      allReqts.append(gft->getRequirements().begin(),
-                      gft->getRequirements().end());
-      GenericSignature *witnessSig = GenericSignature::get(allParams, allReqts);
-
-      witnessSubstIfaceTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(witnessSig,
-                                 gft.getInput(), gft.getResult(),
-                                 gft->getExtInfo())
-          ->getCanonicalType());
-    } else {
-      assert(isa<FunctionType>(witnessSubstIfaceTy));
-      witnessSubstIfaceTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(sig,
-                                 witnessSubstIfaceTy.getInput(),
-                                 witnessSubstIfaceTy.getResult(),
-                                 witnessSubstIfaceTy->getExtInfo())
-          ->getCanonicalType());
-    }
-  }
-  // Lower the witness type with the requirement's abstraction level.
-  // FIXME: We should go through TypeConverter::getLoweredType once we settle
-  // on interface types.
-  /*
-  SILType witnessSILType = Types.getLoweredType(
-                                              AbstractionPattern(requirementTy),
-                                              witnessSubstTy,
-                                              requirement.uncurryLevel);
-   */
-  SILType witnessSILType = getWitnessFunctionType(M,
-                                              AbstractionPattern(requirementTy),
-                                              witnessSubstTy,
-                                              witnessSubstIfaceTy,
-                                              requirement.uncurryLevel);
-
-  // Mangle the name of the witness thunk.
-  llvm::SmallString<128> nameBuffer;
-  {
-    llvm::raw_svector_ostream nameStream(nameBuffer);
-    nameStream << "_TTW";
-    Mangler mangler(nameStream);
-    mangler.mangleProtocolConformance(conformance);
-
-    if (auto ctor = dyn_cast<ConstructorDecl>(requirement.getDecl())) {
-      mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                      ResilienceExpansion::Minimal,
-                                      requirement.uncurryLevel);
-    } else {
-      assert(isa<FuncDecl>(requirement.getDecl())
-             && "need to handle mangling of non-Func SILDeclRefs here");
-      auto requiredDecl = cast<FuncDecl>(requirement.getDecl());
-      mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
-                           requirement.uncurryLevel);
-    }
-  }
-
-  // Collect the context generic parameters for the witness.
-  GenericParamList *witnessContextParams = conformanceParams;
-  // If the requirement is generic, reparent its parameters to the conformance
-  // parameters.
-  if (auto reqtParams = requirementInfo.InnerGenericParams) {
-    // Preserve the depth of generic arguments by adding an empty outer generic
-    // param list if the conformance is concrete.
-    GenericParamList *outerParams = conformanceParams;
-    if (!outerParams)
-      outerParams = GenericParamList::getEmpty(getASTContext());
-
-    witnessContextParams
-      = reqtParams->cloneWithOuterParameters(getASTContext(), outerParams);
-  }
-
-  // If the thunked-to function is set to be always inlined, do the
-  // same with the witness, on the theory that the user wants all
-  // calls removed if possible, e.g. when we're able to devirtualize
-  // the witness method call. Otherwise, use the default inlining
-  // setting on the theory that forcing inlining off should only
-  // effect the user's function, not otherwise invisible thunks.
-  Inline_t InlineStrategy = InlineDefault;
-  if (witness.isAlwaysInline())
-    InlineStrategy = AlwaysInline;
-
-  auto *f = SILFunction::create(M, linkage, nameBuffer,
-                                witnessSILType.castTo<SILFunctionType>(),
-                                witnessContextParams,
-                                SILLocation(witness.getDecl()),
-                                IsNotBare,
-                                IsTransparent,
-                                makeModuleFragile ? IsFragile : IsNotFragile,
-                                IsThunk,
-                                SILFunction::NotRelevant,
-                                InlineStrategy);
-
-  f->setDebugScope(new (M)
-                   SILDebugScope(RegularLocation(witness.getDecl()), *f));
-
-  // Create the witness.
-  SILGenFunction(*this, *f)
-    .emitProtocolWitness(conformance, requirement, witness, witnessSubs,isFree);
-
-  f->verify();
-
-  return f;
-}
-
-SILFunction * SILGenModule::
-getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
-                              CanSILFunctionType thunkType,
-                              CanSILFunctionType fromType,
-                              CanSILFunctionType toType,
-                              IsFragile_t Fragile) {
-  // Mangle the reabstraction thunk.
-  llvm::SmallString<256> buffer;
-  {
-    llvm::raw_svector_ostream stream(buffer);
-    Mangler mangler(stream);
-
-    // This is actually the SIL helper function.  For now, IR-gen
-    // makes the actual thunk.
-    stream << "_TTR";
-    if (auto generics = thunkType->getGenericSignature()) {
-      stream << 'G';
-      mangler.setModuleContext(M.getSwiftModule());
-      mangler.mangleGenericSignature(generics,
-                                     ResilienceExpansion::Minimal);
-    }
-
-    // Substitute context parameters out of the "from" and "to" types.
-    auto fromInterfaceType
-      = Types.getInterfaceTypeOutOfContext(fromType, thunkContextParams);
-    auto toInterfaceType
-      = Types.getInterfaceTypeOutOfContext(toType, thunkContextParams);
-
-    mangler.mangleType(fromInterfaceType,
-                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
-    mangler.mangleType(toInterfaceType,
-                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
-  }
-
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-  return M.getOrCreateSharedFunction(loc,
-                                     buffer.str(),
-                                     thunkType,
-                                     IsBare, IsTransparent,
-                                     Fragile, IsReabstractionThunk);
+  B.createDeallocBox(silLoc, loc.box);
 }

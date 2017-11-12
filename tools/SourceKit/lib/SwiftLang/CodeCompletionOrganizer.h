@@ -1,12 +1,12 @@
-//===--- CodeCompletionOrganizer.h - -----------------------------*- C++ -*-==//
+//===--- CodeCompletionOrganizer.h - ----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -29,7 +29,7 @@ struct Options {
   bool useImportDepth = true;
   bool groupOverloads = false;
   bool groupStems = false;
-  bool includeExactMatch = false;
+  bool includeExactMatch = true;
   bool addInnerResults = false;
   bool addInnerOperators = true;
   bool addInitsToTopLevel = false;
@@ -39,14 +39,12 @@ struct Options {
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
   unsigned minFuzzyLength = 2;
+  unsigned showTopNonLiteralResults = 3;
 
-  // Options for combining priorities. The defaults are chosen so that a fuzzy
-  // match just breaks ties within a semantic context.  If semanticContextWeight
-  // isn't modified, a fuzzyMatchWeight of N means that a perfect match is worth
-  // the same as the worst possible match N/10 "contexts" ahead of it.
-  unsigned semanticContextWeight = 10 * Completion::numSemanticContexts;
-  unsigned fuzzyMatchWeight = 9;
-  unsigned popularityBonus = 9;
+  // Options for combining priorities.
+  unsigned semanticContextWeight = 15;
+  unsigned fuzzyMatchWeight = 10;
+  unsigned popularityBonus = 2;
 };
 
 struct SwiftCompletionInfo {
@@ -75,7 +73,8 @@ class CodeCompletionOrganizer {
   Impl &impl;
   const Options &options;
 public:
-  CodeCompletionOrganizer(const Options &options, CompletionKind kind);
+  CodeCompletionOrganizer(const Options &options, CompletionKind kind,
+                          bool hasExpectedTypes);
   ~CodeCompletionOrganizer();
 
   static void
@@ -86,7 +85,8 @@ public:
   ///
   /// Precondition: \p completions should be sorted with preSortCompletions().
   void addCompletionsWithFilter(ArrayRef<Completion *> completions,
-                                StringRef filterText, Completion *&exactMatch);
+                                StringRef filterText, const FilterRules &rules,
+                                Completion *&exactMatch);
 
   void groupAndSort(const Options &options);
 

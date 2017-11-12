@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,6 +31,9 @@ def pos_EQ : Joined<["-"], "pos=">, Alias<pos>;
 def line : Separate<["-"], "line">,
   HelpText<"line">;
 def line_EQ : Joined<["-"], "line=">, Alias<line>;
+
+def using_swift_args : Flag<["-"], "using-swift-args">,
+  HelpText<"Interpret the compiler arguments as Swift compiler arguments">;
 
 def replace : Separate<["-"], "replace">,
   HelpText<"replace text ('text')">;
@@ -58,8 +61,67 @@ def req_opts : CommaJoined<["-"], "req-opts=">,
   HelpText<"Pass the comma separated options in <arg> as request specific options">,
   MetaVarName<"<arg>">;
 
+def rename_spec : Separate<["-"], "rename-spec">,
+  HelpText<"The JSON format rename spec file (req=syntactic-rename)">;
+def rename_spec_EQ : Joined<["-"], "rename-spec=">, Alias<rename_spec>;
+
 def check_interface_is_ascii : Flag<["-"], "check-interface-ascii">,
   HelpText<"Check that the module interface text is ASCII">;
 
 def json_request_path: Separate<["-"], "json-request-path">,
   HelpText<"path to read a request in JSON format">;
+
+def dont_print_request : Flag<["-"], "dont-print-request">,
+  HelpText<"Don't print the request">;
+
+def print_response_as_json : Flag<["-"], "print-response-as-json">,
+  HelpText<"Print the response as JSON output">;
+
+def print_raw_response : Flag<["-"], "print-raw-response">,
+  HelpText<"Dump the response to stdout">;
+
+def group_name : Separate<["-"], "group-name">,
+  HelpText<"Module group name to print">;
+
+def simplified_demangling : Flag<["-"], "simplified-demangling">,
+  HelpText<"Use simplified demangling for the 'demangle' request">;
+
+def synthesized_extension : Flag<["-"], "synthesized-extension">,
+  HelpText<"Print synthesized extensions when generating interface">;
+
+def cursor_action : Flag<["-"], "cursor-action">,
+  HelpText<"Print available actions on the code element under cursor">;
+
+def interested_usr : Separate<["-"], "interested-usr">,
+  HelpText<"Interested USR to calculate the containing group">;
+
+def async : Flag<["-"], "async">,
+  HelpText<"Perform request asynchronously">;
+
+def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
+def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
+
+def swift_version : Separate<["-"], "swift-version">, HelpText<"the swift version to use">;
+def swift_version_EQ : Joined<["-"], "swift-version=">, Alias<swift_version>;
+
+def swift_name : Separate<["-"], "swift-name">,
+  HelpText<"Swift name to translate from">;
+
+def objc_name : Separate<["-"], "objc-name">,
+  HelpText<"Objective-C name to translate from">;
+
+def name : Separate<["-"], "name">,
+  HelpText<"The preferred name when performing semantic refactoring">;
+
+def objc_selector : Separate<["-"], "objc-selector">,
+  HelpText<"Objective-C selector name to translate from">;
+
+def cancel_on_subsequent_request : Separate<["-"], "cancel-on-subsequent-request">,
+  HelpText<"Whether to cancel if there is a subsequent request using the same AST">;
+def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-request=">,
+  Alias<cancel_on_subsequent_request>;
+
+def help : Flag<["-", "--"], "help">,
+  HelpText<"Display available options">;
+
+def h : Flag<["-"], "h">, Alias<help>;

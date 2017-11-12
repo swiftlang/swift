@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,12 +19,14 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InlineAsm.h"
 #include "swift/Basic/LLVM.h"
 #include "Address.h"
 #include "IRGen.h"
 
 namespace swift {
 namespace irgen {
+class FunctionPointer;
 
 typedef llvm::IRBuilder<> IRBuilderBase;
 
@@ -38,9 +40,29 @@ class IRBuilder : public IRBuilderBase {
   /// ordering.
   llvm::BasicBlock *ClearedIP;
 
+#ifndef NDEBUG
+  /// Whether debug information is requested. Only used in assertions.
+  bool DebugInfo;
+#endif
+
+  // Set calling convention of the call instruction using
+  // the same calling convention as the callee function.
+  // This ensures that they are always compatible.
+  void setCallingConvUsingCallee(llvm::CallInst *Call) {
+    auto CalleeFn = Call->getCalledFunction();
+    if (CalleeFn) {
+      auto CC = CalleeFn->getCallingConv();
+      Call->setCallingConv(CC);
+    }
+  }
+
 public:
-  IRBuilder(llvm::LLVMContext &Context)
-    : IRBuilderBase(Context), ClearedIP(nullptr) {}
+  IRBuilder(llvm::LLVMContext &Context, bool DebugInfo)
+    : IRBuilderBase(Context), ClearedIP(nullptr)
+#ifndef NDEBUG
+    , DebugInfo(DebugInfo)
+#endif
+    {}
 
   /// Determines if the current location is apparently reachable.  The
   /// invariant we maintain is that the insertion point of the builder
@@ -114,7 +136,7 @@ public:
     void insert(llvm::Instruction *I) {
       assert(isValid() && "inserting at invalid location!");
       assert(I->getParent() == nullptr);
-      if (llvm::BasicBlock *block = After.dyn_cast<llvm::BasicBlock*>()) {
+      if (auto *block = After.dyn_cast<llvm::BasicBlock*>()) {
         block->getInstList().push_front(I);
       } else {
         llvm::Instruction *afterInsn = After.get<llvm::Instruction*>();
@@ -166,12 +188,18 @@ public:
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr) = delete;
   
   using IRBuilderBase::CreateStructGEP;
-  Address CreateStructGEP(Address address, unsigned index, Size size,
+  Address CreateStructGEP(Address address, unsigned index, Size offset,
                           const llvm::Twine &name = "") {
     llvm::Value *addr = CreateStructGEP(
         address.getType()->getElementType(), address.getAddress(),
         index, name);
-    return Address(addr, address.getAlignment().alignmentAtOffset(size));
+    return Address(addr, address.getAlignment().alignmentAtOffset(offset));
+  }
+  Address CreateStructGEP(Address address, unsigned index,
+                          const llvm::StructLayout *layout,
+                          const llvm::Twine &name = "") {
+    Size offset = Size(layout->getElementOffset(index));
+    return CreateStructGEP(address, index, offset, name);
   }
 
   /// Given a pointer to an array element, GEP to the array element
@@ -200,6 +228,19 @@ public:
     return Address(addr, address.getAlignment());
   }
 
+  /// Cast the given address to be a pointer to the given element type,
+  /// preserving the original address space.
+  Address CreateElementBitCast(Address address, llvm::Type *type,
+                               const llvm::Twine &name = "") {
+    // Do nothing if the type doesn't change.
+    auto origPtrType = address.getType();
+    if (origPtrType->getElementType() == type) return address;
+
+    // Otherwise, cast to a pointer to the correct type.
+    auto ptrType = type->getPointerTo(origPtrType->getAddressSpace());
+    return CreateBitCast(address, ptrType, name);
+  }
+
   /// Insert the given basic block after the IP block and move the
   /// insertion point to it.  Only valid if the IP is valid.
   void emitBlock(llvm::BasicBlock *BB);
@@ -210,6 +251,55 @@ public:
                         size.getValue(),
                         std::min(dest.getAlignment(),
                                  src.getAlignment()).getValue());
+  }
+  
+  using IRBuilderBase::CreateLifetimeStart;
+  llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
+    return CreateLifetimeStart(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+  
+  using IRBuilderBase::CreateLifetimeEnd;
+  llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
+    return CreateLifetimeEnd(buf.getAddress(),
+                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+  }
+
+  // We're intentionally not allowing direct use of
+  // llvm::IRBuilder::CreateCall in order to push code towards using
+  // FunctionPointer.
+
+  llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) = delete;
+
+  llvm::CallInst *CreateCall(llvm::FunctionType *FTy, llvm::Constant *Callee,
+                             ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
+    auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
+  }
+
+  llvm::CallInst *CreateCall(llvm::Constant *Callee,
+                             ArrayRef<llvm::Value *> Args,
+                             const Twine &Name = "",
+                             llvm::MDNode *FPMathTag = nullptr) {
+    // assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on
+    // call");
+    auto Call = IRBuilderBase::CreateCall(Callee, Args, Name, FPMathTag);
+    setCallingConvUsingCallee(Call);
+    return Call;
+  }
+
+  llvm::CallInst *CreateCall(const FunctionPointer &fn,
+                             ArrayRef<llvm::Value *> args);
+
+  llvm::CallInst *CreateAsmCall(llvm::InlineAsm *asmBlock,
+                                ArrayRef<llvm::Value *> args) {
+    return IRBuilderBase::CreateCall(asmBlock, args);
   }
 };
 

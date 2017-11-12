@@ -8,15 +8,15 @@
   <meta name="description"
       content="Swift Language Reference Manual.">
   <link rel="stylesheet" href="_static/swift.css" type="text/css">
-    
+
   <script type="text/javascript" src="toc.js"></script>
 
 </head>
-  
+
 <body>
 
 <h1>Swift Language Reference</h1>
-  
+
 <p>
 <!-- The Table of Contents is automatically inserted in this <div>.
  Do not delete this <div>. -->
@@ -26,7 +26,7 @@
   <!-- ********************************************************************* -->
   <h2 id="decl">Declarations</h2>
   <!-- ********************************************************************* -->
-  
+
   <pre class="grammar">
     decl ::= <a href="#decl-class">decl-class</a>
     decl ::= <a href="#decl-constructor">decl-constructor</a>
@@ -52,23 +52,23 @@
   <pre class="grammar">
     top-level ::= <a href="#brace-item-list">brace-item</a>*
   </pre>
-  
+
   <p>The top level of a swift source file is grammatically identical to the
   contents of a func decl.  Some declarations, however, are restricted to
   module scope.
   </p>
-  
+
   <!-- _____________________________________________________________________ -->
   <h4 id="brace-item-list">Brace Enclosed Items</h4>
-  
+
   <pre class="grammar">
     brace-item-list ::= '{' brace-item* '}'
-    
+
     brace-item      ::= <a href="#decl">decl</a>
     brace-item      ::= <a href="#expr">expr</a>
     brace-item      ::= <a href="#stmt">stmt</a>
   </pre>
-  
+
   <p>The brace item list provides a sequencing operation which evaluates the
   members of its body in order.  Function bodies and the bodies of control
   flow statements use braces.  Also, the <a
@@ -79,10 +79,10 @@
   <!-- ===================================================================== -->
   <h3 id="decl-import">import Declarations</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     decl-import ::=  <a href="#attribute-list">attribute-list</a> 'import' import-kind? import-path
-    
+
     import-kind ::= 'typealias'
     import-kind ::= 'struct'
     import-kind ::= 'class'
@@ -90,52 +90,52 @@
     import-kind ::= 'protocol'
     import-kind ::= 'var'
     import-kind ::= 'func'
-    
+
     import-path ::= <a href="#any-identifier">any-identifier</a> ('.' <a href="#any-identifier">any-identifier</a>)*
-  </pre>  
-  
+  </pre>
+
   <p>'import' declarations allow named values and types to be accessed with
   local names, even when they are defined in other modules and namespaces.  See
   the section on <a href="#namebind">name binding</a> for more
   information on how these work.  import declarations are only allowed at
   module scope.</p>
-  
+
   <p>'import' directives only impact a single source file: imports in one
   swift file do not affect name lookup in another file. import directives can
   only occur at the top level of a file, not within a function or namespace.</p>
-  
-  <p>An import without an explicit import-kind names a module; all of the 
+
+  <p>An import without an explicit import-kind names a module; all of the
   module's members are imported into the current scope. The module's name is
   also imported into the current scope in order to allow qualified access to
   the module's members, which can be useful for disambiguation.</p>
-  
+
   <p>If an import-kind is provided, the last element of the import path is
   taken to be the name of a decl <em>within</em> the module named by the rest of
   the path. Only that name is introduced into the current scope; the name of the
   module itself is <em>not</em> accessible, nor any other decls within the
   module.</p>
-  
-  <p>Different import-kinds perform different filters on the decls within a 
+
+  <p>Different import-kinds perform different filters on the decls within a
   module:</p>
-  
+
   <ul>
     <li><code>typealias</code> can be used to import any concrete type (struct,
     class, enum, or another typealias). It cannot be used to import protocols,
     which are often used for more than just their existential type.</li>
-    
+
     <li><code>struct</code>, <code>class</code>, <code>enum</code> can be used
     to import any type whose <i>canonical type</i> is a struct, class,
     or enum, respectively. (This allows "Int" to be imported as a struct, for
     example, even though its definition in the standard library may be a
     typealias for another struct type.)</li>
-    
+
     <li><code>protocol</code> is used to import a protocol</li>
-    
+
     <li><code>var</code> is used to import a module-scoped variable</li>
-    
+
     <li><code>func</code> will import all overloads of a function</li>
   </ul>
-  
+
   <pre class="example">
     <i>// Import all of the top level symbols and types in a module.</i>
     import Swift
@@ -150,7 +150,7 @@
   <!-- ===================================================================== -->
   <h3 id="decl-extension">extension Declarations</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     decl-extension ::= 'extension' <a href="#type-identifier">type-identifier</a> <a href="#inheritance">inheritance</a>? '{' <a href="#decl">decl</a>* '}'
   </pre>
@@ -159,14 +159,14 @@
      types, even in other source files and modules.  There are different
      semantic rules for each type that is extended.
   </p>
-  
+
   <!-- _____________________________________________________________________ -->
   <h4 id="decl-extension-enum-struct"><a href="#decl-enum">enum</a>, <a
     href="#decl-struct">struct</a>, and <a href="#decl-class">class</a>
     declaration extensions</h4>
 
   <p>FIXME: Write this section.</p>
-  
+
   <!-- ===================================================================== -->
   <h3 id="decl-let">let Declarations</h3>
   <!-- ===================================================================== -->
@@ -263,45 +263,45 @@
     variable name.
 
   <p>Here are some examples of func definitions:</p>
-  
+
   <pre class="example">
     <i>// Implicitly returns (), aka <a href="#stdlib-Void">Void</a></i>
     func a() {}
 
     <i>// Same as 'a'</i>
     func a1() -&gt; Void {}
-    
+
     <i>// Function pointers to a function expression.</i>
     var a2 = func ()-&gt;() {}
     var a3 = func () {}
     var a4 = func {}
 
     <i>// Really simple function</i>
-    func c(arg : Int) -&gt; Int { return arg+4 }
+    func c(_ arg : Int) -&gt; Int { return arg+4 }
 
     <i>// Simple operators.</i>
     func [infix_left=190] +  (lhs : Int, rhs : Int) -&gt; Int
     func [infix_left=160] == (lhs : Int, rhs : Int) -&gt; Bool
 
     <i>// Curried function with multiple return values:</i>
-    func d(a : Int) (b : Int) -&gt; (res1 : Int, res2 : Int) {
+    func d(_ a : Int) (b : Int) -&gt; (res1 : Int, res2 : Int) {
       return (a,b)
     }
-    
+
     <i>// A more realistic example on a trivial type.</i>
-    struct bankaccount { 
+    struct bankaccount {
       amount : Int
-    
+
      static func bankaccount() -> bankaccount {
         // Custom 'constructor' logic goes here.
       }
-      func deposit(arg : Int) {
+      func deposit(_ arg : Int) {
         amount = amount + arg
       }
-    
+
       static func someMetatypeMethod() {}
     }
-    
+
     <i>// Dot syntax on metatype.</i>
     bankaccount.someMetatypeMethod()
 
@@ -320,7 +320,7 @@
       case LeadPipe
     }
 
-    func accuseSuspect(suspect:PersonOfInterest)
+    func accuseSuspect(_ suspect:PersonOfInterest)
         inRoom(room:Room)
         withWeapon(weapon:Weapon) {
       print("It was \(suspect) in the \(room) with the \(weapon)")
@@ -333,13 +333,13 @@
   <!-- ===================================================================== -->
   <h3 id="decl-typealias">typealias Declarations</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
     We use the keyword "typealias" instead of "typedef" because it really is an
     alias for an existing type, not a "definition" of a new type.
   </div>
 
-  
+
   <pre class="grammar">
     decl-typealias ::= typealias-head '=' <a href="#type">type</a>
     <a name="typealias-head"></a>typealias-head ::= 'typealias' <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>?
@@ -347,32 +347,32 @@
 
   <p>'typealias' makes a named alias of a type, like a typedef in C.  From that
   point on, the alias may be used in all situations the specified name is. If an <a href="#inheritance">inheritance</a> clause is provided, it specifies protocols to which the aliased type shall conform.</p>
-  
+
   <p>Here are some examples of type aliases:</p>
-  
+
   <pre class="example">
     <i>// location is an alias for a tuple of ints.</i>
     typealias location = (x : Int, y : Int)
-      
+
     <i>// pair_fn is a function that takes two ints and returns a tuple.</i>
     typealias pair_fn = (Int) -&gt; (Int) -&gt; (first : Int, second : Int)
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="decl-enum">enum Declarations</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     decl-enum ::= <a href="#attribute-list">attribute-list</a> 'enum' <a href="#identifier">identifier</a> <a href="#generic-params">generic-params</a>? <a href="#inheritance">inheritance</a>? enum-body
     enum-body ::= '{' decl* '}'
-    
+
     decl-enum-element ::= <a href="#attribute-list">attribute-list</a> 'case' enum-case (',' enum-case)*
     enum-case ::= <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>? ('->' <a href="#type">type</a>)?
   </pre>
-  
+
   <p>An <tt>enum</tt> declaration creates a <a href="#type-enum">enum type</a>.
   Here are some examples of enum declarations:</p>
-  
+
   <pre class="example">
     <i>// Declares three enums.</i>
     enum DataSearchFlags {
@@ -385,48 +385,48 @@
     enum DataSearchFlags {
       case None, Backward, Anchored
     }
-    
+
     <i>// Declare discriminated union with enum decl.</i>
     enum SomeInts {
       case None
       case One(Int)
       case Two(Int, Int)
     }
-    
-    func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
+
+    func f1(_ searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
     func test1() {
       f1(DataSearchFlags.None)  <i>// Use of constructor with qualified identifier</i>
       f1(.None)                 <i>// Use of constructor with context sensitive type inference</i>
-    
-      <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
+
+      <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i>
       var a : DataSearchFlags = .None
     }
-    
+
     enum SomeMoreInts {
       case None           <i>// Doesn't conflict with previous "None".</i>
       case One(Int)
       case Two(Int, Int)
     }
-    
-    func f2(a : SomeMoreInts)
-    
+
+    func f2(_ a : SomeMoreInts)
+
     func test2() {
       <i>// Constructors for enum element can be used in the obvious way.</i>
       f2(.None)
       f2(.One(4))
       f2(.Two(1, 2))
-    
+
       <i>// Constructor for None has type "SomeMoreInts".</i>
       var a : SomeMoreInts = SomeMoreInts.None
-    
+
       <i>// Constructor for One has type "(Int) -&gt; SomeMoreInts".</i>
       var b : (Int) -&gt; SomeMoreInts = SomeMoreInts.One
-    
+
       <i>// Constructor for Two has type "(Int,Int) -&gt; SomeMoreInts".</i>
       var c : (Int,Int) -&gt; SomeMoreInts = SomeMoreInts.Two
     }
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="decl-struct">struct Declarations</h3>
   <!-- ===================================================================== -->
@@ -442,7 +442,7 @@
   <p>The body of a 'struct' is a list of decls. Stored (non-computed) 'var'
      decls declare members with storage in the struct. Other declarations act
      like they would in an <a href="#decl-extension">extension</a> of the
-     struct type.</p>  
+     struct type.</p>
 
   <p>Here are a few simple examples:</p>
 
@@ -450,17 +450,17 @@
     struct S1 {
       var a : Int, b : Int
     }
-    
+
     struct S2 {
       var a : Int
       func f() -> Int { return b }
       var b : Int
     }
   </pre>
-  
+
 
   <p>Here are some more realistic examples of structs:</p>
-  
+
   <pre class="example">
     struct Point { x : Int, y : Int }
     struct Size { width : Int, height : Int }
@@ -469,18 +469,18 @@
       size : Size
 
       typealias CoordinateType = Int
-    
+
       func area() -> Int { return size.width*size.height }
     }
-    
+
     func test4() {
       var a : Point
       var b = Point.Point(1, 2)    // Silly but fine.
       var c = Point(y = 1, x = 2)  // Using metatype.
-    
+
       var x1 = Rect(a, Size(42, 123))
       var x2 = Rect(size = Size(width = 42, height=123), origin = a)
-    
+
       var x1_area = x1.width*x1.height
       var x1_area2 = x1.area()
     }
@@ -495,7 +495,7 @@
     to store the "isa"/vtable in the struct so that virtual method dispatch
     could be implemented, and this has additional storage costs. None of these
     tradeoffs make sense for the intended use cases we have in mind for structs
-    (Ints, Floats, Points, Rects, UUIDs, IP addresses, C struct interop, etc, 
+    (Ints, Floats, Points, Rects, UUIDs, IP addresses, C struct interop, etc,
     etc). Said differently: we're trying to force a hard wall
     between types that need indirect access by their nature and those types
     that need direct access by their nature. The former are called classes. The
@@ -512,7 +512,7 @@
   </pre>
 
   <p>A class declares a reference type referring to an object which can contain
-     data members and have methods.  Classes support single inheritance; 
+     data members and have methods.  Classes support single inheritance;
      a parent class should be listed as the first type in the
      inheritance list.</p>
 
@@ -543,44 +543,44 @@
   <!-- ===================================================================== -->
   <h3 id="decl-protocol">Protocol Declarations</h3>
   <!-- ===================================================================== -->
-  
+
  <pre class="grammar">
     decl-protocol ::= <a href="#attribute-list">attribute-list</a> 'protocol' <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' protocol-member* '}'
   </pre>
-  
+
   <p>A protocol declaration describes an abstract interface implemented by
      another type.  It consists of a set of declarations, which may be instance
      methods or properties. A type <i>conforms</i> to a protocol if it
      provides declarations that correspond to each of the declarations in
      a protocol.</p>
-  
+
   <p>Here are some examples of protocols:</p>
-  
+
   <pre class="example">
     protocol Document {
       var title : String
     }
  </pre>
-  
+
   <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-func">'func' protocol elements</h4>
-  
+
   <pre class="grammar">
     protocol-member ::= <a href="#decl-func">decl-func</a>
 </pre>
-  
+
   <p>'func' members of a protocol define a value of function type that may be
   accessed with dot syntax on a value of the protocol's type.  The function
   gets an implicit "self" argument of the protocol type or (for a type
   function) of the metatype of the protocol.</p>
-  
+
  <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-var">'var' protocol elements</h4>
-  
+
   <pre class="grammar">
     protocol-member ::= <a href="#decl-var">decl-var</a>
   </pre>
-  
+
   <p>'var' members of a protocol define "property" values that may be accessed
   with dot syntax on a value of the protocol's type. The actual
   variables may have no storage, and will always be accessed by a getter
@@ -589,11 +589,11 @@
 
   <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-subscript">'subscript' protocol elements</h4>
-  
+
   <pre class="grammar">
     protocol-member ::= <a href="#subscript-head">subscript-head</a>
   </pre>
-  
+
   <p>'subscript' members of a protocol define subscripting operations
   that may be accessed with the subscript operator ('[]') applied to a
   value of the protocol's type. </p>
@@ -607,7 +607,7 @@
 
    <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-typealias">'typealias' protocol elements (associated types)</h4>
-  
+
   <pre class="grammar">
     protocol-member ::= <a href="#typealias-head">typealias-head</a> ('=' <a href="#type">type</a>)?
   </pre>
@@ -625,8 +625,8 @@
 
   <pre class="example">
     protocol SequenceType {
-      typename Generator : GeneratorType
-      func generate() -> Generator
+      typename Iterator : IteratorProtocol
+      func makeIterator() -> Iterator
     }
   </pre>
 
@@ -635,13 +635,13 @@
   <!-- ===================================================================== -->
   <h3 id="decl-constructor">constructor Declarations</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     decl-constructor ::= <a href="#attribute-list">attribute-list</a> 'init' <a href="#generic-params">generic-params</a>? constructor-signature <a href="#brace-item-list">brace-item-list</a>
 
     constructor-signature ::= <a href="#pattern-tuple">pattern-tuple</a> constructor-result?
     constructor-signature ::= <a href="#identifier">identifier-or-any</a> <a href="#selector-tuple">selector-tuple</a> constructor-result?
-    
+
     constructor-result ::= '->' 'Self'
   </pre>
 
@@ -655,9 +655,9 @@
      implicitly declared.  Default construction doesn't work right for structs
      or enums.  We haven't decided what the restrictions are if a member
      isn't default-constructible.</p>
-  
+
   <p>A simple example:</p>
-  
+
   <pre class="example">
     struct X {
       var member : Int
@@ -695,7 +695,7 @@
   <!-- ===================================================================== -->
   <h3 id="decl-deinit">deinitializer Declarations</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     decl-deinit ::= <a href="#attribute-list">attribute-list</a> 'deinit' <a href="#brace-item-list">brace-item-list</a>
   </pre>
@@ -713,7 +713,7 @@
      allow deinitializers in extensions once we have ivars in extensions.</p>
 
   <p>A simple example:</p>
-  
+
   <pre class="example">
     class X {
       var fd : Int
@@ -739,14 +739,14 @@
     attribute      ::= attribute-autoclosure
     attribute      ::= attribute-noreturn
   </pre>
-  
+
   <p>An attribute list is written as a sequence of attributes, each of which has
      a leading '@' sign.  Attributes can be optionally comma separated.
      Attributes may not be repeated within a list.</p>
-  
+
   <!-- _____________________________________________________________________ -->
   <h4 id="attribute-infix">Infix Attributes</h4>
-    
+
   <pre class="grammar">
     attribute-infix ::= 'infix_left'  '=' <a href="#integer_literal">integer_literal</a>
     attribute-infix ::= 'infix_right' '=' <a href="#integer_literal">integer_literal</a>
@@ -758,11 +758,11 @@
   <a href="#operator"><tt>operator</tt></a>.  The name indicates the
   associativity of the operator, either left associative, right associative, or
   non-associative.</p>
-  
+
   <p>FIXME: Implement these restrictions.</p>
 
   <!-- _____________________________________________________________________ -->
-  <h4 id="attribute-resilence">Resilience Attribute</h4>
+  <h4 id="attribute-resilience">Resilience Attribute</h4>
 
   <pre class="grammar">
     attribute-resilience ::= 'resilient'
@@ -771,7 +771,7 @@
   </pre>
 
   <p>See the resilience design.</p>
-  
+
   <!-- _____________________________________________________________________ -->
   <h4 id="attribute-inout"><tt>inout</tt> Attribute</h4>
 
@@ -786,7 +786,7 @@
   </p>
 
   <p><tt>inout</tt> indicates that the argument will be passed as an "in-out"
-    parameter. The caller must pass an lvalue decorated with the <tt>&</tt>
+    parameter. The caller must pass an lvalue decorated with the <tt>&amp;</tt>
     prefix operator as the argument. Semantically, the value of the argument
     is passed "in" to the callee to a local value, and that local value is
     stored back "out" to the lvalue when the callee exits. This is normally
@@ -803,7 +803,7 @@
     For example, the following code:
 
   <pre class=example>
-    func foo(inout x: Int) -> () -> Int {
+    func foo(x: inout Int) -> () -> Int {
       func bar() -> Int {
         x += 1
         return x
@@ -837,30 +837,30 @@
   </pre>
 
   <p>The type being annotated must be <a href="#materializable">materializable</a>.
-    The type after annotation is never materializable.</tt>
+    The type after annotation is never materializable.
 
   <p>FIXME: we probably need a const-like variant, which permits
     r-values (and avoids writeback when the l-value is not physical).
     We may also need some way of representing <q>this will be
     consumed by the nth curry</q>.
   </p>
-  
+
   <!-- _____________________________________________________________________ -->
   <h4 id="attribute-autoclosure">autoclosure Attribute</h4>
-  
+
   <pre class="grammar">
     attribute-autoclosure ::= 'autoclosure'
   </pre>
-  
+
   <p>The <tt>autoclosure</tt> attribute modifies a <a
   href="#type-function">function type</a>, changing the behavior of any
-  assignment into (or initialization of) a value with the function type. 
+  assignment into (or initialization of) a value with the function type.
   Instead of requiring that the rvalue and lvalue have the same function type,
-  an "auto closing" function type requires its initializer expression to have 
-  the same type as the function's result type, and it implicitly binds a 
+  an "auto closing" function type requires its initializer expression to have
+  the same type as the function's result type, and it implicitly binds a
   closure over this expression.  This is typically useful for function arguments
   that want to capture computation that can be run lazily.</p>
-  
+
   <p><tt>autoclosure</tt> is only valid in a <tt>type</tt> of a
   syntactic function type that is defined to take a syntactic empty tuple.
   </p>
@@ -869,15 +869,15 @@
   <i>// An auto closure value.  This captures an implicit closure over the</i>
   <i>// specified expression, instead of the expression itself.</i>
   var a : @autoclosure () -&gt; Int = 4
-  
+
   <i>// Definition of an 'assert' function.  Assertions and logging routines</i>
   <i>// often want to conditionally evaluate their argument.</i>
-  func assert(condition : @autoclosure () -> Bool)
-    
+  func assert(_ condition : @autoclosure () -> Bool)
+
   <i>// Definition of the || operator - it captures its right hand side as</i>
   <i>// an autoclosure so it can short-circuit evaluate it.</i>
   func [infix_left=110] || (lhs: Bool, rhs: @autoclosure ()->Bool) -&gt; Bool
-    
+
   <i>// Example uses of these functions:</i>
   assert(i &lt; j)
   if (a == 0 || b == 42) { ... }
@@ -890,31 +890,31 @@
     attribute-noreturn ::= 'noreturn'
   </pre>
 
-  <p>Attribute <tt>noreturn</tt> is only valid in the attribute list of a 
-	function declaration or in the attribute list of a <tt>type</tt> 
-	that describes a syntactic function type.
+  <p>Attribute <tt>noreturn</tt> is only valid in the attribute list of a
+  function declaration or in the attribute list of a <tt>type</tt>
+  that describes a syntactic function type.
   </p>
 
-  <p><tt>noreturn</tt> indicates to the compiler that the function will not 
-	return to the caller. This attribute should be used to suppress the 
-	uninitialized variable, missing return warnings and errors. The compiler is
-	also allowed to more aggressively optimize the code in presence of this 
-	attribute.
+  <p><tt>noreturn</tt> indicates to the compiler that the function will not
+  return to the caller. This attribute should be used to suppress the
+  uninitialized variable, missing return warnings and errors. The compiler is
+  also allowed to more aggressively optimize the code in presence of this
+  attribute.
   </p>
 
-  <p>If a function with no a <tt>noreturn</tt> attribute contains a 
-	<tt>return</tt> statement, an error will be raised. 
+  <p>If a function with no a <tt>noreturn</tt> attribute contains a
+  <tt>return</tt> statement, an error will be raised.
   </p>
 
-  
+
   <!-- ********************************************************************* -->
   <h2 id="type">Types</h2>
   <!-- ********************************************************************* -->
-  
+
   <pre class="grammar">
     type ::= <a href="#attribute-list">attribute-list</a> <a href="#type-function">type-function</a>
     type ::= <a href="#attribute-list">attribute-list</a> <a href="#type-array">type-array</a>
-    
+
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
     type-simple ::= <a href="#type-composition">type-composition</a>
@@ -929,22 +929,22 @@
 
   <!-- _____________________________________________________________________ -->
   <h3>Metatypes</h3>
-  
+
   <p id="metatype">Each type has a corresponding <i>metatype</i>, with the same
     name as the type, that is injected into the standard name lookup scope when
-    a type is <a href="#decl">declared</a>.  This allows access to '<a 
+    a type is <a href="#decl">declared</a>.  This allows access to '<a
     href="#decl-func">static functions</a>' through dot syntax.  For example:</p>
-  
+
   <pre class="example">
     // Declares a type 'foo' as well as its metatype.
     struct foo {
       static func bar() {}
     }
-    
+
     // Declares x to be of type foo.  A reference to a name in type context
     // refers to the type itself.
     var x : foo
-    
+
     // Accesses a static function on the foo metatype.  In a value context, the
     // name of its type refers to its metatype.
     foo.bar()
@@ -955,7 +955,7 @@
 
   <p>A type may be <i>fully-typed</i>.  A type is fully-typed <i>unless</i> one
     of the following conditions hold:</p>
-    
+
   <ol>
     <li>It is a function type whose result or input type is not
         fully-typed.</li>
@@ -966,7 +966,7 @@
         fully-typed unless it syntactically contains a tuple element with
         no explicit type annotation.</li>
   </ol>
-  
+
   <p>A type being 'fully-typed' informally means that the type is specified
      directly from its type annotation without needing contextual or other
      information to resolve its type.</p>
@@ -979,12 +979,12 @@
     a <a href="#attribute-inout"><tt>inout</tt></a> attribute or 2) a
     tuple with a non-materializable element type.  In general, variables
     must have materializable type.</p>
-  
-  
+
+
   <!-- ===================================================================== -->
   <h3 id="type-identifier">Named Types</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     type-identifier ::= type-identifier-component ('.' type-identifier-component)*
     type-identifier-component ::= <a href="#identifier">identifier</a> <a href="#generic-args">generic-args</a>?
@@ -998,10 +998,10 @@
     typealias location = (x : Int, y : Int)
     var x : location      <i>// use of a named type.</i>
   </pre>
-  
+
   <p>Type names may use dot syntax to refer to names types declared in other
   modules or types nested within other types.</p>
-  
+
   <pre class="example">
     <i>// Direct reference to a member of another module.</i>
     var x : Swift.Int
@@ -1017,11 +1017,11 @@
     <i>// A variable of a generic instance type.</i>
     var map : Dict&lt;String, Int&gt;
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="type-tuple">Tuple Types</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
     Tuples are everywhere in Swift: even the argument list of a function is a
     tuple of those arguments.
@@ -1063,7 +1063,7 @@
   var o = (1, 2, 3)              <i>// Type = (Int, Int, Int)</i>
 
   <i>// Function argument and result is a tuple type.</i>
-  func foo(x : Int, y : Int) -&gt; (val : Int, err : Int)
+  func foo(_ x : Int, y : Int) -&gt; (val : Int, err : Int)
 
   <i>// enum and struct declarations with tuple values.</i>
   struct S {
@@ -1076,7 +1076,7 @@
   }
   </pre>
 
-  
+
   <!-- ===================================================================== -->
   <h3 id="type-function">Function Types</h3>
   <!-- ===================================================================== -->
@@ -1093,13 +1093,13 @@
 
   <p>The result type of a function type must
      be <a href="#materializable">materializable</a>.  The argument type of a
-     function is always required to be parenthesized (a tuple).  The  behavior
-     of function types may be modified with the <a 
+     function is always required to be parenthesized (a tuple).  The behavior
+     of function types may be modified with the <a
       href="#attribute-autoclosure"><tt>autoclosure</tt> attribute</a>.</p>
 
-  <p>Because of the grammar structure, a nested function type like 
+  <p>Because of the grammar structure, a nested function type like
      "(a) -&gt; (b) -&gt; c" is parsed as "(a) -&gt; ((b) -&gt; c)".  This means
-     that if 
+     that if
      you declare this that you can pass it one argument to get a function that
      "takes b and returns c" or you can pass two arguments to "get a c".  This
      is known as <a href="http://en.wikipedia.org/wiki/Currying">currying</a>.
@@ -1115,7 +1115,7 @@
 
     <i>// Declare a function that returns a function:</i>
     var x : (Int) -&gt; (Int) -&gt; Int
-    
+
     <i>// y has type (Int) -&gt; Int</i>
     var y = x(1)
 
@@ -1123,33 +1123,33 @@
     // the function had no side effects).</i>
     var z1 = x(1)(2)
     var z2 = y(2)
-    
+
     <i>// An auto closure value.  This captures an implicit closure over the</i>
     <i>// specified expression, instead of the expression itself.</i>
     var a : @autoclosure () -> Int = 4
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="type-enum">Enum Types</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
-    'enum' types are known as <a 
+    'enum' types are known as <a
       href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
       types</a> (ADTs) by the broader programming language community.
     We name them 'enum' after C enums, because ADTs
     fulfill many of the same roles as enums in the C tradition.
   </div>
-  
+
   <p>an enum type is a simple discriminated union: the runtime representation
   of a value of enum type only has one of the specified elements at a time.</p>
 
   <p>All of the element types of an enum type must
   be <a href="#materializable">materializable</a>.</p>
-  
+
   <p>an enum type is defined by a <a href="#decl-enum">enum decl</a>.
 
-  <p>Values of enum type may not be default initialized unless the user 
+  <p>Values of enum type may not be default initialized unless the user
   provides a no-argument constructor.</p>
 
   <p>The enum metatype has a member corresponding to each declared element.
@@ -1187,19 +1187,19 @@
     the only case where C's rule of "declaration follows use" really makes
     sense.  There's precedent for this in many languages, including Java and C#.
   </div>
-  
+
   <pre class="grammar">
     type-array ::= <a href="#type">type-simple</a>
     type-array ::= <a href="#type">type-array</a> '[' ']'
     type-array ::= <a href="#type">type-array</a> '[' <a href="#expr">expr</a> ']'
   </pre>
-  
+
   <p>Array types include a base type and an optional size.  Array types indicate
-  a linear sequence of elements stored consequtively memory.  Array elements may
+  a linear sequence of elements stored consecutively memory.  Array elements may
   be efficiently indexed in constant time.  All array indexes are bounds checked
   and out of bound accesses are diagnosed with either a compile time or
   runtime failure (TODO: runtime failure mode not specified).</p>
-  
+
   <p>While they look syntactically very similar, an array type with a size has
   very different semantics than an array without.  In the former case, the type
   indicates a declaration of actual storage space.  In the later case, the type
@@ -1213,22 +1213,22 @@
 
   <p>The element type of an array type must
     be <a href="#materializable">materializable</a>.</p>
-  
+
   <p>FIXME: Int[][] not valid because the element type isn't sized.  We need
   some constraint to reject this, or do we?</p>
-  
+
   <p>Some example array types:</p>
-  
+
   <pre class="example">
     <i>// A simple array declaration:</i>
     var a : Int[4]
-    
+
     <i>// A reference to another array:</i>
     var b : Int[] = a
-        
+
     <i>// Declare a two dimensional array:</i>
     var c : Int[4][4]
-    
+
     <i>// Declare a reference to another array, two dimensional:</i>
     var d : Int[4][]
 
@@ -1239,12 +1239,12 @@
     <i>// Without parens, this is a function that returns a fixed size array:</i>
     var fn_returning_array : (Int) -&gt; Int[42]
     var h : Int[42] = fn_returning_array(4)
-    
+
     <i>// You can even have arrays of tuples and other things, these work right
     // through composition:</i>
     var array_of_tuples : (a : Int, b : Int)[42]
     var tuple_of_arrays : (a : Int[42], b : Int[42])
-    
+
     array_of_tuples[12].a = array_of_tuples[13].b
     tuple_of_arrays.a[12] = array_of_tuples.b[13]
   </pre>
@@ -1255,7 +1255,7 @@
     type-metatype ::= type-simple '.' 'Type'
   </pre>
 
-  <p>Every type has an associated metatype <tt>T.dynamicType</tt>.  A value of the metatype
+<p>Every type has an associated metatype <tt>type(of: T)</tt>.  A value of the metatype
     type is a reference to a global object which describes the type.
     Most metatype types are singleton and therefore require no
     storage, but metatypes associated with <a href="#decl-class">class
@@ -1267,7 +1267,7 @@
     <div class="commentary">
       Similar constructs exist in Haskell (<a
       href="http://hackage.haskell.org/packages/archive/base/latest/doc/html/Data-Maybe.html">Maybe</a>),
-      the Boost library (<a 
+      the Boost library (<a
       href="http://www.boost.org/doc/libs/1_54_0/libs/optional/doc/html/index.html">Optional</a>),
       and C++14 (<a href="http://en.cppreference.com/w/cpp/utility/optional">optional</a>).
     </div>
@@ -1276,9 +1276,9 @@
       type-optional ::= type-simple '?'-postfix
     </pre>
 
-    <p>An optional type is syntactic sugar for the library type 
-    Optional&lt;T&gt;. This is a <a href="#decl-enum">enum</a> with two 
-    cases: None and Some, used to represent a value that may or may not be 
+    <p>An optional type is syntactic sugar for the library type
+    Optional&lt;T&gt;. This is a <a href="#decl-enum">enum</a> with two
+    cases: None and Some, used to represent a value that may or may not be
     present.</p>
 
     <p>Swift provides a number of special, builtin behaviors involving
@@ -1295,9 +1295,10 @@
           <code>T?</code>.</li>
       </ul>
       To support these intrinsic use cases, the library is required to
-      provide four functions with these exact signatures:
+      provide functions with these exact signatures:
       <ul>
-        <li><code>func _preconditionOptionalHasValue<T>(inout v : T?)</code>
+        <li><code>func _doesOptionalHaveValueAsBool<T>(v : T?) -> Bool</code></li>
+        <li><code>func _diagnoseUnexpectedNilOptional()</code></li>
         <li><code>func _getOptionalValue<T>(v : T?) -> T</code></li>
       </ul>
     </p>
@@ -1308,31 +1309,29 @@
     </p>
 
     <p>Some example optional types:</p>
-  
+
     <pre class="example">
       <i>// A simple optional declaration:</i>
       var a : Int? // equivalent to Optional&lt;Int&gt;
-    
+
       <i>// An empty optional:</i>
       var b : Int? = .None
-        
+
       <i>// Declare an array of optionals:</i>
-      var c : Int?[] = new Int?[4]
+      var c : [Int?] = [10, nil, 42]
     </pre>
 
   <!-- _____________________________________________________________________ -->
   <h3 id="type-composition">Protocol Composition Types</h3>
   <pre class="grammar">
-   type-composition ::= 'protocol' '&lt;' type-composition-list? '&gt;'
-
-   type-composition-list ::= <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
+   type-composition ::= <a href="#type-identifier">type-identifier</a> ('&amp;' <a href="#type-identifier">type-identifier</a>)*
   </pre>
 
   <p>A protocol composition type composes together a number of
   protocols to describe a type that meets the requirements of each of
-  those protocols. A protocol composition type <code>protocol&lt;A,
-  B&gt;</code> is similar to an explicitly-defined protocol that
-  inherits both <code>A</code> and <code>B</code></p>
+  those protocols. A protocol composition type <code>A &amp; B</code>
+  is similar to an explicitly-defined protocol that inherits both
+  <code>A</code> and <code>B</code></p>
 
 <pre class="example">
 protocol C : A, B { }
@@ -1346,19 +1345,18 @@ protocol C : A, B { }
     name to a composition without requiring types to explicitly
     conform to that name.
   </div>
-  
-  <p>Each of the types named in the
-  <code>type-composition-list</code> shall refer to either a protocol
-  or to a protocol composition. The list may be empty, in which case
-  every type conforms to the empty protocol composition. This is how
-  the <code>Any</code> type is defined in the standard library.</p>
+
+  <p>Each of the types named in the <code>type-composition</code> shall
+  refer to either a protocol or to a protocol composition. The empty
+  protocol composition is the keyword <code>Any</code> and every
+  type conforms to it.
 
  <pre class="example">
     <i>// A value that represents any type</i>
-    var any : protocol&lt;&gt; = 17
+    var any : Any = 17
 
     <i>// A value that conforms to both the Document and Enumerator protocols</i>
-    var doc : protocol&lt;Document,Enumerator&gt;
+    var doc : Document &amp; Enumerator
     doc.isEmpty()       <i>// uses Enumerator.isEmpty()</i>
     doc.title = "Hello" <i>// uses Document.title</i>
 </pre>
@@ -1386,7 +1384,7 @@ ill-formed if the type does not conform to the protocol.</p>
       func bumpVersion()
     }
 
-    func print(doc : Document) { <i>/* ... */</i> }
+    func print(_ doc : Document) { <i>/* ... */</i> }
 
     var myDocument : VersionedDocument;
     print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
@@ -1409,7 +1407,7 @@ ill-formed if the type does not conform to the protocol.</p>
     restrictions and disambiguations in the grammar permit the parser
     to decide all other aspects of parsing, such as where statements
     must be divided.<br><br>
-    
+
     Semicolons in C are generally just clutter.  Swift generally tries
     to define away the need for them.
   </div>
@@ -1422,7 +1420,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-basic    ::= expr-sequence <a href="#expr-cast">expr-cast</a>?
 
     expr-sequence ::= <a href="#expr-unary">expr-unary</a> <a href="#expr-binary">expr-binary</a>*
-    
+
     expr-primary  ::= <a href="#expr-literal">expr-literal</a>
     expr-primary  ::= <a href="#expr-identifier">expr-identifier</a>
     expr-primary  ::= <a href="#expr-super">expr-super</a>
@@ -1471,10 +1469,10 @@ ill-formed if the type does not conform to the protocol.</p>
     identifiers?  This would allow "foo Swift.+ bar".  Is ADL or something
     like it enough?<br><br>
   </div>
-  
+
   <pre class="grammar">
     expr-binary ::= op-binary-or-ternary <a href="#expr-unary">expr-unary</a> expr-cast?
-    
+
     op-binary-or-ternary ::= <a href="#operator">operator-binary</a>
     op-binary-or-ternary ::= '='
     op-binary-or-ternary ::= '?'-infix <a href="#expr">expr-sequence</a> ':'
@@ -1494,7 +1492,7 @@ ill-formed if the type does not conform to the protocol.</p>
   expression is ill-formed.</p>
 
   <p>A simple example is:</p>
-  
+
   <pre class="example">
     4 + 5 * 123
   </pre>
@@ -1587,7 +1585,7 @@ ill-formed if the type does not conform to the protocol.</p>
             : "\(i)")
     }
   </pre>
-  
+
   <h4 id="expr-cast">Cast operators</h4>
 
   <p>Cast expressions influence the types of their subexpressions. They can appear
@@ -1601,7 +1599,7 @@ ill-formed if the type does not conform to the protocol.</p>
       associativity none
     }
   </pre>
-  
+
   <p>The right operand of all operators is parsed as a type.</p>
 
   <ul>
@@ -1613,7 +1611,7 @@ ill-formed if the type does not conform to the protocol.</p>
     the type of the operand is checked at runtime, and if it is
     castable to <tt>T</tt>, the <tt>Optional</tt> result contains
     the result of the cast. If the cast fails, the result contains
-    <tt>.None</tt>. The latter is only permissible when 
+    <tt>.None</tt>. The latter is only permissible when
     <tt>T</tt> is a subtype of the compile-time type of <tt>x</tt>.
     An example:
 
@@ -1644,21 +1642,21 @@ ill-formed if the type does not conform to the protocol.</p>
     ((B as D) as D2)
     (b is D) ? (b as D)! : D()
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="expr-unary">Unary Operators</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     expr-unary   ::= <a href="#operator">operator-prefix</a>* <a href="#expr">expr-postfix</a>
   </pre>
-    
+
   <p>If an operator is used as a unary operator, but name resolution
   does not find at least one function that takes a single argument, the
   expression is ill-formed.</p>
 
   <p>Simple examples:</p>
-  
+
   <pre class="example">
     i = -j
   </pre>
@@ -1666,7 +1664,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-literal">Literals</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
     The type of a literal is inferred from its context, to allow things like "4"
     to be compatible with any width integer type without 'promotion' rules or
@@ -1699,7 +1697,7 @@ ill-formed if the type does not conform to the protocol.</p>
      'StringLiteralType', respectively.
      If a literal is used and these types are not defined, then the code is
      malformed.</p>
-  
+
   <p>A literal is compatible with its inferred type if that type implements an
      informal protocol required by literals.  This informal protocol requires
      that the type have an unambiguous "type" function defined whose
@@ -1712,7 +1710,7 @@ ill-formed if the type does not conform to the protocol.</p>
      the source code. '<tt>__FILE__</tt>' expands to a string literal;
      '<tt>__LINE__</tt>' and '<tt>__COLUMN__</tt>' each expand to an integer
      literal.</p>
-     
+
   <pre class="example">
     <i>// File foo.swift</i>
 
@@ -1720,14 +1718,14 @@ ill-formed if the type does not conform to the protocol.</p>
     var line = __LINE__  <i>// line : Int = 4</i>
     var col = __COLUMN__ <i>// column : Int = 11</i>
   </pre>
-     
+
   <p>If '<tt>__FILE__</tt>', '<tt>__LINE__</tt>', and/or '<tt>__COLUMN__</tt>'
     are used as default argument values in a function declaration, they
     instead expand to the source location of each function call that
     instantiates the default argument.</p>
 
   <pre class="example">
-    func log(message:String,
+    func log(_ message:String,
              file:String = __FILE__,
              line:Int = __LINE__) {
       print("\(file):\(line): \(message)")
@@ -1741,16 +1739,16 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-identifier">Identifiers</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     expr-identifier ::= <a href="#identifier">identifier</a> <a href="#generic-args">generic-args</a>?
   </pre>
-  
+
   <p>A raw identifier refers to a value found via <a
      href="#namebind_value_lookup_unqual">unqualified value lookup</a>, and has
      the type of the declaration returned by name lookup and overload
-     resolution.  Value declarations are installed with <a 
-     href="#decl-var">var</a> and the syntactic sugar forms like <a 
+     resolution.  Value declarations are installed with <a
+     href="#decl-var">var</a> and the syntactic sugar forms like <a
      href="decl-func">func</a> declarations.</p>
 
   <p>If an identifier refers to a generic type, an instance of that generic may
@@ -1761,7 +1759,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <i>// A generic struct.</i>
     struct Dict&lt;K,V&gt; {
       init() {}
-      static func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
+      static func fromKeysAndValues(_ keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
     }
 
     <i>// Construct an instance of the generic struct.</i>
@@ -1773,7 +1771,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   <h4 id="expr-generic-disambiguation">Generic disambiguation</h4>
-  
+
   <p>Note that <tt>&lt;</tt> and <tt>&gt;</tt> are used as both angle brackets in
   <a href="#expr-identifier">generic identifiers</a> and as characters in
   <a href="#expr-binary">binary operator</a> names. Because of this, there are
@@ -1804,7 +1802,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="example">
     <i>// An operator that operates on metatypes.</i>
     infix func +-+ &lt;T, U&gt;(t:T.Type, u:U.Type) -&gt; Foo { }
-    
+
     var foo = (Dict&lt;String, Int&gt;) +-+ (Array&lt;UnicodeScalar&gt;)
     print(foo)
   </pre>
@@ -1814,7 +1812,7 @@ ill-formed if the type does not conform to the protocol.</p>
   can also be corrected by adding or removing parentheses.
 
   <pre class="example">
-    func foo(x:Bool, y:Bool)
+    func foo(_ x:Bool, y:Bool)
     var a,b,c,d,e : Int
 
     foo(a &lt; b, c &gt; (d + e)) // ERROR: Misparses as (a&lt;b,c&gt;)(d + e)
@@ -1825,7 +1823,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-super">Super</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     expr-super ::= expr-super-method
     expr-super ::= expr-super-subscript
@@ -1890,15 +1888,15 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     <i>// Takes a closure that it calls to determine an ordering relation.</i>
-    func magic(val : Int, predicate : (a : Int, b : Int) -> Bool)
-    
+    func magic(_ val : Int, predicate : (a : Int, b : Int) -> Bool)
+
     func f() {
       <i>// Compare one way.  Closure is inferred to return Bool and take two ints</i>
       <i>// from the argument context.  This same information infers that $0 and $1</i>
       <i>// both have type 'Int'.</i>
       magic(42, { $0 &lt; $1 })
-    
-      <i>// Compare the other way way.</i>
+
+      <i>// Compare the other way.</i>
       magic(42, { $1 &lt; $0 })
 
       <i>// Provide parameter names, but infer the types.</i>
@@ -1914,10 +1912,10 @@ ill-formed if the type does not conform to the protocol.</p>
       })
 
       <i>// Error, not enough context to infer the type of $0.</i>
-      var x = { $0 } 
+      var x = { $0 }
     }
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="expr-anon-closure-arg">Anonymous Closure Arguments</h3>
   <!-- ===================================================================== -->
@@ -1930,11 +1928,11 @@ ill-formed if the type does not conform to the protocol.</p>
   expression is a reference to an anonymous closure argument that is formed when
   the containing expression is <a href="#typecheck_anon">coerced into a closure
   context</a>.  All other dollar identifiers are invalid.</p>
-  
+
   <p>This can only be used in the body of a closure (<a
      href="#expr-closure">expr-closure</a>) that does not have explicitly-specified parameters.
   </p>
-  
+
 
   <!-- ===================================================================== -->
   <h3 id="expr-delayed-identifier">Delayed Identifier Resolution</h3>
@@ -1944,23 +1942,23 @@ ill-formed if the type does not conform to the protocol.</p>
     The ".bar" syntax was picked because it is related to the syntax of a fully
     qualified "foo.bar" reference.
   </div>
-  
+
   <pre class="grammar">
     expr-delayed-identifier ::= '.' <a href="#identifier">identifier</a> <a href="#expr-paren">expr-paren</a>?
   </pre>
-  
-  <p>A delayed identifier expression refers to a case of an <a 
+
+  <p>A delayed identifier expression refers to a case of an <a
     href="type-enum">enum</a> type or a type member of a nominal
     type, without knowing which type it is referring to.  The
     expression is resolved to a member of a concrete type through
     context-sensitive type inference. When it is followed by an <a
     href="#expr-paren">expr-paren</a>, the member must either be an
     enum case that carries a value or a (type) member function.</p>
-  
+
   <pre class="example">
     enum Direction { case Up, Down }
-    func search(val : Int, direction : Direction)
-    
+    func search(_ val : Int, direction : Direction)
+
     func f() {
       search(42, .Up)
       search(17, .Down)
@@ -1970,7 +1968,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-paren">Parenthesized Expressions</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     expr-paren      ::= '(' ')'
     expr-paren      ::= '(' expr-paren-element (',' expr-paren-element)* ')'
@@ -1980,11 +1978,11 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>Parentheses expressions contain an (optionally empty) list of optionally
      named values.  Parentheses in an expression context denote one of two
      things: 1) grouping parentheses, or 2) a tuple literal.</p>
-  
+
   <p>Grouping parentheses occur when there is exactly one value in the list and
      that value does not have a name.  In this case, the type of the parenthesis
      expression is the type of the single value.</p>
-  
+
   <p>All other cases are tuple literals.  The type of the expression is a tuple
      type whose elements and order match that of the initializer.  If there are
      any named elements, those elements become names for the tuple type.  A
@@ -1992,26 +1990,26 @@ ill-formed if the type does not conform to the protocol.</p>
   </p>
 
   <p>Some examples:</p>
-  
+
   <pre class="example">
     <i>// Simple grouping parenthesis.</i>
     var a = (4)             <i>// Type = Int</i>
     var b = (4+a)           <i>// Type = Int</i>
-    
+
     <i>// Tuple literals.</i>
     var c = ()               <i>// Type = ()</i>
     var d = (4, 5)           <i>// Type = (Int, Int)</i>
     var e = (c, d)           <i>// Type = ((), (Int, Int))</i>
-    
+
     var f = (x : 4, y : 5)   <i>// Type = (x : Int, y : Int)</i>
     var g = (4, y : 5, 6)    <i>// Type = (Int, y : Int, Int)</i>
-    
+
     <i>// Named arguments to functions.</i>
-    func foo(a : Int, b : Int)
+    func foo(_ a : Int, b : Int)
     foo(b = 4, a = 1)
   </pre>
 
-  
+
   <!-- ===================================================================== -->
   <h3 id="expr-dot">Dot Expressions</h3>
   <!-- ===================================================================== -->
@@ -2019,7 +2017,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="grammar">
     expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#integer_literal">integer_literal</a>
   </pre>
-    
+
   <p>If the base expression has <a href="#type-tuple">tuple type</a>, then the
   magic identifier "[0-9]+" accesses the specified anonymous member of the
   tuple.  Otherwise, this form is invalid.</p>
@@ -2062,7 +2060,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-subscript">Subscript Expressions</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
     There is no "built-in" semantics for subscripting. Rather, all
     subscripting semantics is implemented via subscript declarations
@@ -2088,7 +2086,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-new">New Expressions</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
     It's not really clear what the behavior of multiple bounds should be.
 
@@ -2098,12 +2096,12 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="grammar">
     expr-new        ::= 'new' <a href="#type">type-identifier</a> expr-new-bounds
-  
+
     expr-new-bounds ::= expr-new-bound
     expr-new-bounds ::= expr-new-bounds expr-new-bound
     expr-new-bound  ::= '[' <a href="#expr">expr?</a> ']'
   </pre>
-    
+
   <p>Allocates and initializes a new array of objects. The first clause must
     be an expression; subsequent bounds, if present, must be constant under
     the <a href="#type-array">usual rules for array types</a>. The opening
@@ -2112,7 +2110,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-call">Function Application</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     expr-call ::= <a href="#expr">expr-postfix</a> <a href="#expr-paren">expr-paren</a>
   </pre>
@@ -2129,13 +2127,13 @@ ill-formed if the type does not conform to the protocol.</p>
   constructors for that type.</p>
 
  <p>Simple examples:</p>
-  
+
   <pre class="example">
     <i>// Application of an empty tuple to the function f.</i>
     f()
     <i>// Application of 4 to the function f.</i>
     g(4)
-    
+
     <i>// Application of 4 to the function returned by h().</i>
     var h : (Int) -&gt; (Int) -&gt; Int
     ...
@@ -2156,7 +2154,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <a href="#expr-call">expr-call</a>, if functions meant to be used
     with trailing closures are written as curried functions, e.g.,
     <pre>
-func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
+func map<T, U>(_ array : T[])(fn : (T) -> U) -> U[] { ... }
     </pre>
     There are two problems with this (admittedly simpler) design.
     First, functions imported from C, C++, and Objective-C won't ever
@@ -2256,18 +2254,18 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <p>The postfix '!' forces an optional value to its stored value
   (i.e., the <code>x</code> in <code>.Some(x)</code>), failing at
   runtime if the optional is <code>.None</code>.
-  
+
   <!-- ********************************************************************* -->
   <h2 id = "stmt">Statements</h2>
   <!-- ********************************************************************* -->
 
   <div class="commentary">
-    Statements can only exist in contexts that are themselves a stmt.  
+    Statements can only exist in contexts that are themselves a stmt.
     Statements have no type, they just induce control flow changes.  We choose
     to use constructs that will be familiar to a broad range of C/Java
     programmers.
   </div>
-  
+
   <pre class="grammar">
     stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
@@ -2277,7 +2275,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     stmt ::= <a href="#stmt-for-each">stmt-for-each</a>
     stmt ::= <a href="#stmt-switch">stmt-switch</a>
     stmt ::= stmt-control-transfer
-    
+
     stmt-control-transfer ::= <a href="#stmt-return">stmt-return</a>
     stmt-control-transfer ::= <a href="#stmt-break">stmt-break</a>
     stmt-control-transfer ::= <a href="#stmt-continue">stmt-continue</a>
@@ -2288,8 +2286,8 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   top-level code.</p>
 
   <pre class="example">
-    <i>// A function with some statements.</i> 
-    func fib(v : Int) -&gt; Int {
+    <i>// A function with some statements.</i>
+    func fib(_ v : Int) -&gt; Int {
       if v &lt; 2 {
         return v
       }
@@ -2300,7 +2298,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   <h3 id="stmt-semicolon">Semicolon Statement</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
     Allowing semicolons as statements causes us to allow semicolons as statement
     separators as well.  This, in turn, means that we don't reject code that has
@@ -2311,25 +2309,25 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <pre class="grammar">
     stmt-semicolon ::= ';'
   </pre>
-  
+
   <p>The semicolon statement has no effect.</p>
-  
+
   <!-- ===================================================================== -->
   <h3 id="stmt-return">'return' Statement</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     stmt-return ::= 'return' <a href="#expr">expr</a>
     stmt-return ::= 'return'
   </pre>
-  
-  <p>The return statement sets the return value of the current <a 
+
+  <p>The return statement sets the return value of the current <a
      href="#decl-func">func declaration</a> or <a href="#expr-closure">closure
      expression</a> and transfers control out of the function.  It sets the
      return value by converting the specified expression result (or '()' if
      none is specified) to the return type of the 'func'.
   </p>
-  
+
   <p>The stmt-return grammar is ambiguous: "{ return 4 }" could be parsed as
      {"return" "4"} or as a single statement.  Ambiguity here is resolved toward
      the first production, because control flow can't transfer to an
@@ -2340,7 +2338,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   <h3 id="stmt-if">'if' Statement</h3>
   <!-- ===================================================================== -->
-  
+
   <div class="commentary">
     We require braces around the body of an 'if' for two reasons: first, it
     eliminates the need for parentheses around the condition by making them
@@ -2353,7 +2351,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     stmt-if-else ::= 'else' <a href="#brace-item-list">brace-item-list</a>
     stmt-if-else ::= 'else' stmt-if
   </pre>
-  
+
   <p>'if' statements provide a simple control transfer operations that evaluates
   the condition, gets the 'boolValue' property of the result if the result
   not a 'Bool', then determines the direction of the branch based on the result.
@@ -2361,14 +2359,14 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   returns a 'Builtin.Int1'.)  It is an error if the type of the expression is
   context-dependent or some non-Bool type.
   </p>
-  
+
   <p>Some examples include:</p>
-  
+
   <pre class="example">
     if true {
       /*...*/
     }
-    
+
     if X == 4 {
     } else {
     }
@@ -2378,30 +2376,30 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     } else {
     }
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="stmt-while">'while' Statement</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     stmt-while ::= 'while' <a href="#expr">expr-basic</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
-  
+
   <p>'while' statements provide simple loop construct which (on each iteration
-  of the loop) evalutes the condition, gets the 'boolValue' property of
+  of the loop) evaluates the condition, gets the 'boolValue' property of
   the result if the result not a 'Bool', then determines whether to keep
   looping. (Internally, the standard library type 'Bool' has a boolValue
   property that yields a 'Builtin.Int1'.)  It is an error if the type of
   the expression is context-dependent or some non-Bool type.
   </p>
-  
+
   <p>Some examples include:</p>
-  
+
   <pre class="example">
     while true {
       /*...*/
     }
-    
+
     while X == 4 {
       X = 3
     }
@@ -2410,11 +2408,11 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   <h3 id="stmt-repeat-while">'repeat-while' Statement</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     stmt-repeat-while ::= 'repeat' <a href="#brace-item-list">brace-item-list</a> 'while' '<a href="#expr">expr</a>
   </pre>
-  
+
   <p>'repeat-while' statements provide simple loop construct which (on each
   iteration of the loop) evaluates the body, then evaluates the condition,
   getting the 'boolValue' property of the result if the result not a 'Bool',
@@ -2423,14 +2421,14 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   an error if the type of the expression is context-dependent or some non-Bool
   type.
   </p>
-  
+
   <p>Some examples include:</p>
-  
+
   <pre class="example">
     repeat {
       /*...*/
     } while true
-    
+
     repeat {
       X = 3
     } while X == 4
@@ -2439,7 +2437,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   <h3 id="stmt-for-c-style">C-Style 'for' Statement</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     stmt-for-c-style    ::= 'for'     stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' stmt-for-c-style-inc? <a href="#brace-item-list">brace-item-list</a>
     stmt-for-c-style    ::= 'for' '(' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' stmt-for-c-style-inc? ')' <a href="#brace-item-list">brace-item-list</a>
@@ -2447,16 +2445,16 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     stmt-for-c-style-init ::= expr (',' expr)*
     stmt-for-c-style-inc ::= expr-basic (',' expr-basic)*
   </pre>
-  
+
   <p>C-Style 'for' statements provide simple loop construct which evaluates the
-  first part (the initializer) before entering the loop, then evalutes the
+  first part (the initializer) before entering the loop, then evaluates the
   second condition as a logic value to determines whether to keep looping.
   The third condition is executed at the end of the loop.  All three are
   evaluated in a new scope that surrounds the for statement.
   </p>
-  
+
   <p>Some examples include:</p>
-  
+
   <pre class="example">
     for i = 0; i != 10; ++i {
       /*...*/
@@ -2474,11 +2472,11 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   <h3 id="stmt-for-each">'for-each' Statement</h3>
   <!-- ===================================================================== -->
-  
+
   <pre class="grammar">
     stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr-basic</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
-  
+
   <p>Enumerator-based 'for' statements provide enumeration over the values in a
  container. The <tt>expr</tt> is either a container or an enumerator; and
  respectively, it either conforms to the formal Enumeration or formal Enumerator
@@ -2491,7 +2489,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
      runs.</p>
 
   <p>Some examples include:</p>
-  
+
   <pre class="example">
     for i in 0...100 {
       print(String(i));
@@ -2503,11 +2501,11 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>
   <!-- ********************************************************************* -->
-  
+
   <!-- ********************************************************************* -->
   <h2>Objects</h2>
   <!-- ********************************************************************* -->
-  
+
   <!-- ********************************************************************* -->
   <h2>Generics</h2>
   <!-- ********************************************************************* -->
@@ -2539,7 +2537,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   as some set of requirements that specify the capabilities that any
   corresponding generic argument might have. For example, the generic
   parameter <code>T : CustomStringConvertible</code> requires that any generic
-  argument substituted for the generic parameter <code>T</code> 
+  argument substituted for the generic parameter <code>T</code>
   conform to the protocol <code>CustomStringConvertible</code>. Similarly, a generic
   parameter <code>U : SomeClass</code> requires that any generic
   argument substituted for the generic parameter <code>U</code>
@@ -2552,7 +2550,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   CustomStringConvertible&gt;</code>, which is equivalent to <code>&lt;T :
   CustomStringConvertible&gt;</code>), as well as same-type requirements that
   require two types to be identical (e.g., <code>&lt;T : Collection, U
-  : Collection where T.Element == U.Element&gt;</code>). 
+  : Collection where T.Element == U.Element&gt;</code>).
 
   <!-- ===================================================================== -->
   <h3 id="generic-args">Generic Arguments</h3>
@@ -2588,8 +2586,8 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
 
   <p>Name binding in swift is performed in different ways depending on what
   language entity is being considered:</p>
-  
-  <p>Value names (for <a 
+
+  <p>Value names (for <a
   href="#decl-var">var</a> and <a href="#decl-func">func</a> declarations) and
   type names (for <a href="#decl-typealias">typealias</a>, <a
   href="#decl-enum">enum</a>, and <a href="#decl-struct">struct</a>
@@ -2598,22 +2596,22 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   </p>
 
   <p>tuple element names</p>
-  
+
   <p>scope within enum decls</p>
-  
+
   <p>Context sensitive member references are resolved <a
     href="#typecheck_context">during type checking</a>.</p>
-  
+
   <h3 id="namebind_scope">Scopes for Type and Value Names</h3>
 
-  
+
   <h3 id="namebind_value_lookup_unqual">Name Lookup Unqualified Value Names</h3>
   <h3 id="namebind_value_lookup_dot">"dot" Name Lookup Value Names</h3>
-  
+
   <h3 id="namebind_typevalue_lookup">Name Lookup for Type and Value Names</h3>
-    
+
   <p>Basic algo:</p>
-    
+
   <ul>
   <li>Search the current scope tree for a local name.  Local names cannot be
       forward referenced.</li>
@@ -2635,11 +2633,11 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   members of a type.</p>
 
   <h3 id="namebind_dot">Name Lookup for Dot Expressions</h3>
-    
+
   <p>
   <a href="#expr-dot">Dot Expressions</a> bind to name of tuple elements.
   </p>
-  
+
   <!-- ********************************************************************* -->
   <h2 id="typecheck">Type Checking</h2>
   <!-- ********************************************************************* -->
@@ -2647,15 +2645,15 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <p>
   Binary expressions, function application, etc.
   </p>
-  
+
   <h3 id="typecheck_conversions">Standard Conversions</h3>
-  
+
   <!--
    Consider foo(4, 5) when foo is declared to take ((Int,Int=3), Int=6).  This
    could be parsed as either ((4,5), 6) or ((4,3),5), but the later one is
    the "right" answer.
   -->
-  
+
   <h3 id="typecheck_anon">Anonymous Argument Resolution</h3>
   <h3 id="typecheck_context">Context Sensitive Type Resolution</h3>
 
@@ -2666,7 +2664,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   src="http://jigsaw.w3.org/css-validator/images/vcss-blue" alt="Valid CSS"></a>
   <a href="http://validator.w3.org/check/referer"><img
     src="http://www.w3.org/Icons/valid-html401-blue" alt="Valid HTML 4.01"></a>
-  
+
   <a href="mailto:sabre@nondot.org">Chris Lattner</a><br>
 </address>
 

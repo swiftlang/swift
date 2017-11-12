@@ -1,6 +1,5 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Debug
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Debug -Onone
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Release -O
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Unchecked -Ounchecked
 //
@@ -11,14 +10,6 @@
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 
 //===---
@@ -27,16 +18,16 @@ import ObjectiveC
 
 func testTrapsAreNoreturn(i: Int) -> Int {
   // Don't need a return statement in 'case' statements because these functions
-  // are @noreturn.
+  // never return.
   switch i {
   case 2:
-    preconditionFailure("can not happen")
+    preconditionFailure("cannot happen")
   case 3:
-    _preconditionFailure("can not happen")
+    _preconditionFailure("cannot happen")
   case 4:
-    _debugPreconditionFailure("can not happen")
+    _debugPreconditionFailure("cannot happen")
   case 5:
-    _sanityCheckFailure("can not happen")
+    _sanityCheckFailure("cannot happen")
 
   default:
     return 0
@@ -46,7 +37,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
 var Assert = TestSuite("Assert")
 
 Assert.test("assert")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "assertions are disabled in Release and Unchecked mode"))
   .crashOutputMatches("this should fail")
@@ -59,7 +50,7 @@ Assert.test("assert")
 }
 
 Assert.test("assert/StringInterpolation")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "assertions are disabled in Release and Unchecked mode"))
   .crashOutputMatches("this should fail")
@@ -73,7 +64,7 @@ Assert.test("assert/StringInterpolation")
 }
 
 Assert.test("assertionFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
@@ -83,7 +74,7 @@ Assert.test("assertionFailure")
 }
 
 Assert.test("assertionFailure/StringInterpolation")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
@@ -94,7 +85,7 @@ Assert.test("assertionFailure/StringInterpolation")
 }
 
 Assert.test("precondition")
-  .xfail(.Custom(
+  .xfail(.custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -106,7 +97,7 @@ Assert.test("precondition")
 }
 
 Assert.test("precondition/StringInterpolation")
-  .xfail(.Custom(
+  .xfail(.custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -119,7 +110,7 @@ Assert.test("precondition/StringInterpolation")
 }
 
 Assert.test("preconditionFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -129,7 +120,7 @@ Assert.test("preconditionFailure")
 }
 
 Assert.test("preconditionFailure/StringInterpolation")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -154,8 +145,12 @@ Assert.test("fatalError/StringInterpolation")
   fatalError("this \(should) fail")
 }
 
+// FIXME: swift-3-indexing-model: add tests for fatalError() that use non-ASCII
+// characters, and that use NSString-backed String.
+// We had to rewrite a part of fatalError() in the indexing effort.
+
 Assert.test("_precondition")
-  .xfail(.Custom(
+  .xfail(.custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -167,7 +162,7 @@ Assert.test("_precondition")
 }
 
 Assert.test("_preconditionFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -177,7 +172,7 @@ Assert.test("_preconditionFailure")
 }
 
 Assert.test("_debugPrecondition")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "debug preconditions are disabled in Release and Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
@@ -189,7 +184,7 @@ Assert.test("_debugPrecondition")
 }
 
 Assert.test("_debugPreconditionFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isDebugAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")
@@ -199,7 +194,7 @@ Assert.test("_debugPreconditionFailure")
 }
 
 Assert.test("_sanityCheck")
-  .xfail(.Custom(
+  .xfail(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "sanity checks are disabled in this build of stdlib"))
   .crashOutputMatches("this should fail")
@@ -211,7 +206,7 @@ Assert.test("_sanityCheck")
 }
 
 Assert.test("_sanityCheckFailure")
-  .skip(.Custom(
+  .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches("this should fail")

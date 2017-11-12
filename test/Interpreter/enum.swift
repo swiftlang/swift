@@ -1,6 +1,6 @@
-// RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift -Xfrontend -enable-experimental-patterns %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 enum Singleton {
@@ -27,14 +27,14 @@ enum MultiPayloadTrivial {
 
 var s = Singleton.x(1, "a")
 switch s {
-case .x(let int, let char):
+case .x(var int, var char):
   // CHECK: 1
   print(int)
   // CHECK: a
   print(char)
 }
 
-func printNoPayload(v: NoPayload) {
+func printNoPayload(_ v: NoPayload) {
   switch v {
   case .x:
     print("NoPayload.x")
@@ -52,7 +52,7 @@ printNoPayload(.y)
 // CHECK: NoPayload.z
 printNoPayload(.z)
 
-func printSinglePayloadTrivial(v: SinglePayloadTrivial) {
+func printSinglePayloadTrivial(_ v: SinglePayloadTrivial) {
   switch v {
   case .x(let char, let int):
     print("SinglePayloadTrivial.x(\(char), \(int))")
@@ -70,7 +70,7 @@ printSinglePayloadTrivial(.y)
 // CHECK: SinglePayloadTrivial.z
 printSinglePayloadTrivial(.z)
 
-func printMultiPayloadTrivial(v: MultiPayloadTrivial) {
+func printMultiPayloadTrivial(_ v: MultiPayloadTrivial) {
   switch v {
   case .x(let char, let int):
     print("MultiPayloadTrivial.x(\(char), \(int))")
@@ -107,7 +107,7 @@ enum SinglePayloadAddressOnly {
   case y
 }
 
-func printSinglePayloadAddressOnly(v: SinglePayloadAddressOnly) {
+func printSinglePayloadAddressOnly(_ v: SinglePayloadAddressOnly) {
   switch v {
   case .x(let runcible):
     runcible.runce()
@@ -129,7 +129,7 @@ enum MultiPayloadAddressOnly {
   case z
 }
 
-func printMultiPayloadAddressOnly(v: MultiPayloadAddressOnly) {
+func printMultiPayloadAddressOnly(_ v: MultiPayloadAddressOnly) {
   switch v {
   case .x(let runcible):
     runcible.runce()
@@ -152,14 +152,14 @@ enum TrivialGeneric<T, U> {
   case x(T, U)
 }
 
-func unwrapTrivialGeneric<T, U>(tg: TrivialGeneric<T, U>) -> (T, U) {
+func unwrapTrivialGeneric<T, U>(_ tg: TrivialGeneric<T, U>) -> (T, U) {
   switch tg {
   case .x(let t, let u):
     return (t, u)
   }
 }
 
-func wrapTrivialGeneric<T, U>(t: T, _ u: U) -> TrivialGeneric<T, U> {
+func wrapTrivialGeneric<T, U>(_ t: T, _ u: U) -> TrivialGeneric<T, U> {
   return .x(t, u)
 }
 
@@ -186,7 +186,7 @@ enum Ensemble<S : Runcible, H : Runcible> {
   case x(S, H)
 }
 
-func concreteEnsemble(e: Ensemble<Spoon, Hat>) {
+func concreteEnsemble(_ e: Ensemble<Spoon, Hat>) {
   switch e {
   case .x(let spoon, let hat):
     spoon.runce()
@@ -194,7 +194,7 @@ func concreteEnsemble(e: Ensemble<Spoon, Hat>) {
   }
 }
 
-func genericEnsemble<T : Runcible, U : Runcible>(e: Ensemble<T, U>) {
+func genericEnsemble<T : Runcible, U : Runcible>(_ e: Ensemble<T, U>) {
   switch e {
   case .x(let t, let u):
     t.runce()
@@ -223,7 +223,7 @@ enum Optionable<T> {
   init(_ x:T) { self = .Mere(x) }
 }
 
-func tryRunce<T : Runcible>(x: Optionable<T>) {
+func tryRunce<T : Runcible>(_ x: Optionable<T>) {
   switch x {
   case .Mere(let r):
     r.runce()
@@ -272,7 +272,7 @@ optionableInts()
 
 enum Suit { case Spades, Hearts, Diamonds, Clubs }
 
-func print(suit: Suit) {
+func print(_ suit: Suit) {
   switch suit {
   case .Spades:
     print("♠")
@@ -286,7 +286,7 @@ func print(suit: Suit) {
 }
 
 func optionableSuits() {
-  var optionables: [Optionable<Suit>] = [
+  let optionables: [Optionable<Suit>] = [
     .Mere(.Spades),
     .Mere(.Diamonds),
     .Nought,
@@ -309,7 +309,7 @@ func optionableSuits() {
 // CHECK: ♡
 optionableSuits()
 
-func optionableRuncibles<T : Runcible>(x: T) {
+func optionableRuncibles<T : Runcible>(_ x: T) {
   let optionables: [Optionable<T>] = [
     .Mere(x),
     .Nought,
@@ -356,15 +356,15 @@ class Rdar15383966 : ClassProtocol
 }
 
 
-func generic<T>(x: T?) { }
-func generic_over_classes<T : ClassProtocol>(x: T?) { }
-func nongeneric(x: Rdar15383966?) { }
+func generic<T>(_ x: T?) { }
+func generic_over_classes<T : ClassProtocol>(_ x: T?) { }
+func nongeneric(_ x: Rdar15383966?) { }
 
 func test_generic()
 {
     var x: Rdar15383966? = Rdar15383966(1)
     generic(x)
-    x = .None
+    x = .none
     generic(x)
 }
 // CHECK: X(1)
@@ -375,7 +375,7 @@ func test_nongeneric()
 {
     var x: Rdar15383966? = Rdar15383966(2)
     nongeneric(x)
-    x = .None
+    x = .none
     nongeneric(x)
 }
 // CHECK: X(2)
@@ -386,7 +386,7 @@ func test_generic_over_classes()
 {
     var x: Rdar15383966? = Rdar15383966(3)
     generic_over_classes(x)
-    x = .None
+    x = .none
     generic_over_classes(x)
 }
 // CHECK: X(3)
@@ -408,14 +408,14 @@ enum MultiPayloadSpareBitAggregates {
   case z(S)
 }
 
-func test_spare_bit_aggregate(x: MultiPayloadSpareBitAggregates) {
+func test_spare_bit_aggregate(_ x: MultiPayloadSpareBitAggregates) {
   switch x {
   case .x(let i32, let i64):
     print(".x(\(i32), \(i64))")
   case .y(let a, let b):
     print(".y(\(a.id), \(b.id))")
-  case .z(S(a: let a, b: let b)):
-    print(".z(\(a), \(b))")
+  case .z(let s):
+    print(".z(\(s))")
   }
 }
 
@@ -428,7 +428,7 @@ test_spare_bit_aggregate(.x(22, 44))
 // CHECK-DAG: ~X(222)
 // CHECK-DAG: ~X(444)
 test_spare_bit_aggregate(.y(Rdar15383966(222), Rdar15383966(444)))
-// CHECK: .z(333, 666)
+// CHECK: .z(S(a: 333, b: 666))
 test_spare_bit_aggregate(.z(S(333, 666)))
 
 print("---")
@@ -439,8 +439,8 @@ struct OptionalTuple<T> {
     self.value = value
   }
 }
-func test_optional_generic_tuple<T>(a: OptionalTuple<T>) -> T {
-  print("optional pair is same size as pair: \(sizeofValue(a) == sizeof(T)*2)")
+func test_optional_generic_tuple<T>(_ a: OptionalTuple<T>) -> T {
+  print("optional pair is same size as pair: \(MemoryLayout.size(ofValue: a) == MemoryLayout<T>.size*2)")
   return a.value!.0
 }
 print("Int result: \(test_optional_generic_tuple(OptionalTuple<Int>((5, 6))))")
@@ -467,13 +467,13 @@ print((NoPayload.x as NoPayload?) == NoPayload.y)
 class Foo {}
 
 struct Oof {
-  weak var foo: Foo? = nil
+  weak var foo: Foo?
 }
 
 protocol Boo {}
 
 struct Goof {
-  var boo: Boo? = nil
+  var boo: Boo?
 }
 
 let oofs = [Oof()]
@@ -499,7 +499,7 @@ enum EitherOr<T, U> {
 }
 
 @inline(never)
-func presentEitherOr<T, U>(e: EitherOr<T, U>) {
+func presentEitherOr<T, U>(_ e: EitherOr<T, U>) {
   switch e {
   case .Left(let l):
     print("Left(\(l))")
@@ -513,7 +513,7 @@ func presentEitherOr<T, U>(e: EitherOr<T, U>) {
 }
 
 @inline(never)
-func presentEitherOrsOf<T, U>(t t: T, u: U) {
+func presentEitherOrsOf<T, U>(t: T, u: U) {
   presentEitherOr(EitherOr<T, U>.Left(t))
   presentEitherOr(EitherOr<T, U>.Middle)
   presentEitherOr(EitherOr<T, U>.Center)
@@ -553,5 +553,101 @@ presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)
 // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: (), u: "foo")
 
+// SR-5148
+enum Payload {
+    case email
+}
+enum Test {
+    case a
+    indirect case b(Payload)
+}
+
+@inline(never)
+func printA() {
+    print("an a")
+}
+
+@inline(never)
+func printB() {
+    print("an b")
+}
+
+@inline(never)
+func testCase(_ testEmail: Test) {
+  switch testEmail {
+    case .a:
+      printA()
+    case .b:
+      printB()
+  }
+}
+
+@inline(never)
+func createTestB() -> Test  {
+  return Test.b(.email)
+}
+
+@inline(never)
+func createTestA() -> Test  {
+  return Test.a
+}
+
+// CHECK-NEXT: an b
+testCase(createTestB())
+// CHECK-NEXT: b(a.Payload.email)
+print(createTestB())
+// CHECK-NEXT: a
+print(createTestA())
 // CHECK-NEXT: done
 print("done")
+
+public enum MyOptional<T> {
+  case Empty
+  case SecondEmpty
+  case Some(T)
+}
+
+public class StopSpecialization {
+  public func generate<T>(_ e: T) -> MyOptional<T> {
+    return MyOptional.Some(e)
+  }
+  public func generate2<T>(_ e: T) -> MyOptional<T> {
+    return MyOptional.Empty
+  }
+}
+
+@inline(never)
+func test(_ s : StopSpecialization, _ N: Int) -> Bool {
+  let x = s.generate(N)
+  switch x {
+    case .SecondEmpty:
+      return false
+    case .Empty:
+      return false
+    case .Some(_):
+      return true
+  }
+}
+
+@inline(never)
+func test2(_ s : StopSpecialization, _ N: Int) -> Bool {
+  let x = s.generate2(N)
+  switch x {
+    case .SecondEmpty:
+      return false
+    case .Empty:
+      return true
+    case .Some(_):
+      return false
+  }
+}
+
+@inline(never)
+func run() {
+// CHECK: true
+  print(test(StopSpecialization(), 12))
+// CHECK: true
+  print(test2(StopSpecialization(), 12))
+}
+
+run()

@@ -13,19 +13,19 @@
     {
       key.kind: source.lang.swift.decl.var.global,
       key.name: "gCubeVertexData",
-      key.usr: "s:v9big_array15gCubeVertexDataGSaSf_",
+      key.usr: "s:9big_array15gCubeVertexDataSaySfGvp",
       key.line: 1,
       key.column: 5,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
-          key.usr: "s:F9big_arrayg15gCubeVertexDataGSaSf_",
+          key.usr: "s:9big_array15gCubeVertexDataSaySfGvg",
           key.line: 1,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
-          key.usr: "s:F9big_arrays15gCubeVertexDataGSaSf_",
+          key.usr: "s:9big_array15gCubeVertexDataSaySfGvs",
           key.line: 1,
           key.column: 5
         }

@@ -1,0 +1,26 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+struct X {
+  var y: Builtin.Int32
+  var z: Builtin.Int32
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @invariant_load
+sil @invariant_load : $@convention(thin) (Builtin.RawPointer) -> () {
+entry(%p : $Builtin.RawPointer):
+  %a = pointer_to_address %p : $Builtin.RawPointer to [invariant] $*X
+  // CHECK: load i32, {{.*}} !invariant.load
+  // CHECK: load i32, {{.*}} !invariant.load
+  %x = load [trivial] %a : $*X
+  %yp = struct_element_addr %a : $*X, #X.y
+  // CHECK: load i32, {{.*}} !invariant.load
+  %y = load [trivial] %yp : $*Builtin.Int32
+  %zp = struct_element_addr %a : $*X, #X.z
+  // CHECK: load i32, {{.*}} !invariant.load
+  %z = load [trivial] %zp : $*Builtin.Int32
+  return undef : $()
+}

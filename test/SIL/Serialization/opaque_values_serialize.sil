@@ -1,0 +1,115 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// FIXME: <rdar://problem/29281364> sil-opt -verify is broken
+// RUN: %target-sil-opt %s -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -emit-sib -o %t/tmp.sib -module-name opaqueval
+// RUN: %target-sil-opt %t/tmp.sib -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval
+// RUN: %target-sil-opt %t/tmp.2.sib -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -emit-sorted-sil -verify -module-name opaqueval | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol Foo {
+  func foo()
+}
+
+struct S : Foo {
+  func foo()
+  init()
+}
+
+// CHECK-LABEL: sil [serialized] @castOpaque : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:  unconditional_checked_cast_value [[ARG]] : $Int to $Foo
+// CHECK-LABEL: } // end sil function 'castOpaque'
+sil [serialized] @castOpaque : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %c = unconditional_checked_cast_value %0 : $Int to $Foo
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [serialized] @condCastOpaque : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:  checked_cast_value_br [[ARG]] : $Int to $Int
+// CHECK-LABEL: } // end sil function 'condCastOpaque'
+sil [serialized] @condCastOpaque : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  checked_cast_value_br %0 : $Int to $Int, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2(%i : $Int):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [serialized] @initDeinitExistentialValue : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:  [[IE:%.*]] = init_existential_value [[ARG]] : $T, $T, $Any
+// CHECK:  deinit_existential_value [[IE]] : $Any
+// CHECK-LABEL: } // end sil function 'initDeinitExistentialValue'
+sil [serialized] @initDeinitExistentialValue : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $T):
+  %i = init_existential_value %0 : $T, $T, $Any
+  deinit_existential_value %i : $Any
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [serialized] @openExistentialBoxValue : $@convention(thin) (@in Error) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK:  open_existential_box_value [[ARG]] : $Error to $@opened({{.*}}) Error
+// CHECK-LABEL: } // end sil function 'openExistentialBoxValue'
+sil [serialized] @openExistentialBoxValue : $@convention(thin) (@in Error) -> () {
+bb0(%0 : $Error):
+  %o = open_existential_box_value %0 : $Error to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C495") Error
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [serialized] @openExistentialValue : $@convention(thin) (@in Foo) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Foo):
+// CHECK:  open_existential_value [[ARG]] : $Foo to $@opened({{.*}}) Foo
+// CHECK-LABEL: } // end sil function 'openExistentialValue'
+sil [serialized] @openExistentialValue : $@convention(thin) (@in Foo) -> () {
+bb0(%0 : $Foo):
+  %o = open_existential_value %0 : $Foo to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C496") Foo
+  %t = tuple ()
+  return %t : $()
+}
+
+// Test @in/@out serialization.
+// ----
+
+// CHECK-LABEL: sil hidden [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
+sil hidden [serialized] @serialize_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $T):
+bb0(%0 : $T):
+  // CHECK: return %0 : $T
+  return %0 : $T
+}
+// CHECK-LABEL: } // end sil function 'serialize_identity'
+
+// Test @in_guaranteed serialization.
+// ----
+
+sil @doWithS : $@convention(method) (S) -> ()
+
+// CHECK-LABEL: sil hidden [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
+sil hidden [transparent] [serialized] [thunk] @serialize_mutating : $@convention(witness_method: Foo) (@in_guaranteed S) -> () {
+// CHECK: bb0(%0 : $S):
+bb0(%0 : $S):
+  %f = function_ref @doWithS : $@convention(method) (S) -> ()
+  // CHECK: apply %{{.*}}(%0) : $@convention(method) (S) -> ()
+  %a = apply %f(%0) : $@convention(method) (S) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+// CHECK-LABEL: } // end sil function 'serialize_mutating'

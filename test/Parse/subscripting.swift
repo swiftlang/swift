@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct X { }
 
@@ -59,8 +59,7 @@ struct X4 {
 
 struct Y1 {
   var stored: Int
-  // FIXME: diagnostic spew is horrible here
-  subscript(_: i, j: Int) -> Int { // expected-error 3{{use of undeclared type 'i'}}
+  subscript(_: i, j: Int) -> Int { // expected-error {{use of undeclared type 'i'}}
     get {
       return stored + j
     }
@@ -70,12 +69,21 @@ struct Y1 {
   }
 }
 
+// Mutating getters on constants (https://bugs.swift.org/browse/SR-845)
+struct Y2 {
+  subscript(_: Int) -> Int {
+    mutating get { return 0 }
+  }
+}
+
+let y2 = Y2() // expected-note{{change 'let' to 'var' to make it mutable}}{{1-4=var}}
+_ = y2[0] // expected-error{{cannot use mutating getter on immutable value: 'y2' is a 'let' constant}}
+
 // Parsing errors
-// FIXME: Recovery here is horrible
 struct A0 {
-  subscript // expected-error{{expected '(' for subscript parameters}}
-    i : Int // expected-error{{expected declaration}}
-     -> Int { 
+  subscript // expected-error {{expected '(' for subscript parameters}}
+    i : Int
+     -> Int {
     get {
       return stored
     }
@@ -83,11 +91,15 @@ struct A0 {
       stored = value
     }
   }
+  
+  subscript -> Int { // expected-error {{expected '(' for subscript parameters}} {{12-12=()}}
+    return 1
+  }
 }
 
 struct A1 {
   subscript (i : Int) // expected-error{{expected '->' for subscript element type}}
-     Int {  // expected-error{{expected declaration}}
+     Int {
     get {
       return stored
     }
@@ -99,7 +111,7 @@ struct A1 {
 
 struct A2 {
   subscript (i : Int) -> // expected-error{{expected subscripting element type}}
-     {  // expected-error{{expected declaration}}
+     {
     get {
       return stored
     }
@@ -111,7 +123,7 @@ struct A2 {
 
 struct A3 {
   subscript(i : Int) // expected-error {{expected '->' for subscript element type}}
-  { // expected-error {{expected declaration}}
+  {
     get {
       return i
     }
@@ -119,7 +131,7 @@ struct A3 {
 }
 
 struct A4 {
-  subscript(i : Int) { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{21-21=;}} expected-error {{expected declaration}}
+  subscript(i : Int) { // expected-error {{expected '->' for subscript element type}}
     get {
       return i
     }
@@ -127,11 +139,11 @@ struct A4 {
 }
 
 struct A5 {
-  subscript(i : Int) -> Int // expected-error {{expected '{' for subscripting}}
+  subscript(i : Int) -> Int // expected-error {{expected '{' in subscript to specify getter and setter implementation}}
 }
 
 struct A6 {
-  subscript(i: Int)(j: Int) -> Int { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{20-20=;}} expected-error {{expected declaration}}
+  subscript(i: Int)(j: Int) -> Int { // expected-error {{expected '->' for subscript element type}}
     get {
       return i + j
     }
@@ -155,13 +167,31 @@ struct A7b {
 }
 
 struct A8 {
-  subscript(i : Int) -> Int // expected-error{{expected '{' for subscripting}}
-    get { // expected-error{{expected declaration}}
+  subscript(i : Int) -> Int // expected-error{{expected '{' in subscript to specify getter and setter implementation}}
+    get {
       return stored
     }
     set {
       stored = value
     }
   }
-} // expected-error{{extraneous '}' at top level}} {{1-3=}}
 
+struct A9 {
+  subscript x() -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
+    return 0
+  }
+}
+
+struct A10 {
+  subscript x(i: Int) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
+    return 0
+  }
+}
+
+struct A11 {
+  subscript x y : Int -> Int { // expected-error {{expected '(' for subscript parameters}}
+    return 0
+  }
+}
+
+} // expected-error{{extraneous '}' at top level}} {{1-3=}}

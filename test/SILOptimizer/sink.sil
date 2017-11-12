@@ -1,0 +1,250 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -code-sinking | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class X
+{
+  private func ping() -> Int
+  @objc deinit
+  init()
+}
+
+class Y : X
+{
+  @objc deinit
+  override init()
+}
+
+
+sil @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int
+sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X
+sil @_TFC14devirt_access21XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X
+sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @owned Y
+sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y
+
+
+//CHECK-LABEL: sil @trivial_sink
+//CHECK: bb1:
+//CHECK-NEXT: upcast
+//CHECK-NEXT: class_method
+//CHECK-NEXT: apply
+//CHECK: return
+sil @trivial_sink : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  debug_value %0 : $Y
+  strong_retain %0 : $Y
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+bb1:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  strong_release %0 : $Y
+  return %5 : $Int
+}
+
+//CHECK-LABEL: sil @no_sink
+//CHECK: upcast
+//CHECK-NEXT: class_method
+//CHECK-NEXT: cond_br
+//CHECK: return
+sil @no_sink : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  debug_value %0 : $Y
+  strong_retain %0 : $Y
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  strong_release %0 : $Y
+  br bb3
+
+bb2:
+  %9 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  strong_release %0 : $Y
+  br bb3
+
+bb3:
+  return undef : $Int
+}
+
+//CHECK-LABEL: sil @cf_sink
+//CHECK: bb1:
+//CHECK-NEXT: upcast
+//CHECK-NEXT: class_method
+//CHECK-NEXT: apply
+//CHECK-NOT: upcast
+//CHECK: return
+sil @cf_sink : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  debug_value %0 : $Y
+  strong_retain %0 : $Y
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  strong_release %0 : $Y
+  br bb3
+
+bb2:
+  strong_release %0 : $Y
+  br bb3
+
+bb3:
+  return undef : $Int
+}
+
+
+//CHECK-LABEL: sil @sink_multi_blocks
+//CHECK: bb4:
+//CHECK-NEXT: upcast
+//CHECK-NEXT: class_method
+//CHECK-NEXT: apply
+//CHECK-NOT: upcast
+//CHECK: return
+sil @sink_multi_blocks : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  debug_value %0 : $Y
+  strong_retain %0 : $Y
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  strong_release %0 : $Y
+  return %5 : $Int
+}
+
+
+//CHECK-LABEL: sil @sink_loop
+//CHECK: bb1:
+//CHECK-NEXT: apply
+//CHECK-NEXT: br bb1
+//CHECK: return
+sil @sink_loop : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  debug_value %0 : $Y
+  strong_retain %0 : $Y
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+// This is a loop!
+bb1:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+bb2:
+  strong_release %0 : $Y
+  return undef : $Int
+}
+
+
+//CHECK-LABEL: sil @sink_nested_loop
+//CHECK: bb0
+//CHECK-NEXT: upcast
+//CHECK-NEXT: class_method
+//CHECK-NEXT: br bb1
+//CHECK: return
+sil @sink_nested_loop : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+bb1:
+  br bb2
+
+// This is a loop!
+bb2:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  cond_br undef, bb2, bb3
+
+bb3:
+  cond_br undef, bb3, bb1
+
+bb4:
+  strong_release %0 : $Y
+  return undef : $Int
+}
+
+sil @takeY : $@convention(thin) (@guaranteed Y) -> ()
+
+//CHECK-LABEL: sil @dont_sink_stack_allocs
+//CHECK: alloc_ref [stack] $X
+//CHECK: alloc_ref [stack] $Y
+//CHECK: dealloc_ref [stack] %{{[0-9]+}}  : $Y
+//CHECK: dealloc_ref [stack] %{{[0-9]+}}  : $X
+//CHECK: return
+sil @dont_sink_stack_allocs : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $X
+  %1 = alloc_ref [stack] $Y
+  %f = function_ref @takeY : $@convention(thin) (@guaranteed Y) -> ()
+  %a = apply %f(%1) : $@convention(thin) (@guaranteed Y) -> ()
+  br bb1
+
+bb1:
+  strong_release %1 : $Y
+  dealloc_ref [stack] %1  : $Y
+  strong_release %0 : $X
+  dealloc_ref [stack] %0  : $X
+
+  %4 = tuple ()
+  return %4 : $()
+}
+
+public protocol P : class {
+  func foo() -> Int32
+  func boo() -> Int32
+}
+
+// Check that open_existential is not moved after its uses and still
+// dominates them after a run of a code sinking pass.
+// CHECK-LABEL: sil @dont_sink_open_existential
+// CHECK-NOT: metatype
+// CHECK-NOT: witness_method
+// CHECK: open_existential_ref
+// CHECK: metatype
+sil @dont_sink_open_existential : $@convention(thin) (@owned P) -> () {
+bb0(%0 : $P):
+  %1 = open_existential_ref %0 : $P to $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P
+  %2 = metatype $@thick (@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P).Type
+  %3 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P, #P.foo!1, %1 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  br bb1
+
+bb1:
+  %4 = apply %3<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60") P>(%1) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
+  strong_release %0 : $P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil_vtable X {
+  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: _TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+}
+
+sil_vtable Y {
+  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: _TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+}
+

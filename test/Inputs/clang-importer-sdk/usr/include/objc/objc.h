@@ -4,12 +4,19 @@
 #define OBJC_ARC_UNAVAILABLE __attribute__((unavailable("not available in automatic reference counting mode")))
 #define NS_AUTOMATED_REFCOUNT_UNAVAILABLE OBJC_ARC_UNAVAILABLE
 
+#ifdef __LP64__
 typedef unsigned long NSUInteger;
 typedef long NSInteger;
+#else
+typedef unsigned int NSUInteger;
+typedef int NSInteger;
+#endif
+
 typedef __typeof__(__objc_yes) BOOL;
 
 typedef struct objc_selector    *SEL;
 SEL sel_registerName(const char *str);
+BOOL sel_isEqual(SEL sel1, SEL sel2);
 
 void NSDeallocateObject(id object) NS_AUTOMATED_REFCOUNT_UNAVAILABLE;
 

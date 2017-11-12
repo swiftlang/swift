@@ -1,4 +1,4 @@
-public class Base {
+open class Base {
   func internalMethod() {}
-  public internal(set) var prop = 0
+  open internal(set) var prop = 0
 }

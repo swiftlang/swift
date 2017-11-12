@@ -1,12 +1,12 @@
-//===- PrintingDiagnosticConsumer.cpp - Print Text Diagnostics ------------===//
+//===--- PrintingDiagnosticConsumer.cpp - Print Text Diagnostics ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,6 +17,8 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -29,7 +31,7 @@ namespace {
     raw_ostream &Underlying;
   public:
     explicit ColoredStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~ColoredStream() { flush(); }
+    ~ColoredStream() override { flush(); }
 
     raw_ostream &changeColor(Colors color, bool bold = false,
                              bool bg = false) override {
@@ -65,11 +67,10 @@ llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
   return loc.Value;
 }
 
-void
-PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                             DiagnosticKind Kind, 
-                                             StringRef Text,
-                                             const DiagnosticInfo &Info) {
+void PrintingDiagnosticConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Kind) {
@@ -79,9 +80,13 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     case DiagnosticKind::Warning: 
       SMKind = llvm::SourceMgr::DK_Warning; 
       break;
-      
-    case DiagnosticKind::Note: 
-      SMKind = llvm::SourceMgr::DK_Note; 
+
+    case DiagnosticKind::Note:
+      SMKind = llvm::SourceMgr::DK_Note;
+      break;
+
+    case DiagnosticKind::Remark:
+      SMKind = llvm::SourceMgr::DK_Remark;
       break;
   }
 
@@ -103,6 +108,14 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   ColoredStream coloredErrs{Stream};
   raw_ostream &out = ForceColors ? coloredErrs : Stream;
   const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
+  
+  // Actually substitute the diagnostic arguments into the diagnostic text.
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+  }
+  
   auto Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);
   rawSM.PrintMessage(out, Msg);
 }
@@ -117,7 +130,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
   // location to pull out the source line.
   SmallVector<std::pair<unsigned, unsigned>, 4> ColRanges;
   std::pair<unsigned, unsigned> LineAndCol;
-  const char *BufferID = "<unknown>";
+  StringRef BufferID = "<unknown>";
   std::string LineStr;
 
   if (Loc.isValid()) {

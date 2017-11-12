@@ -1,12 +1,12 @@
-//===--- ThreadSafeRefCntPtr.h - ---------------------------------*- C++ -*-==//
+//===--- ThreadSafeRefCntPtr.h - --------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,6 +16,8 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Mutex.h"
 #include <atomic>
+#include <type_traits>
+#include <utility>
 
 namespace SourceKit {
 
@@ -134,7 +136,7 @@ public:
 
   T* get() const { return Obj; }
 
-  explicit operator bool() const { return Obj; }
+  explicit operator bool() const { return get(); }
 
   void swap(llvm::IntrusiveRefCntPtr<T> &other) {
     llvm::sys::ScopedLock L(*getMutex(this));

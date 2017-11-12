@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -15,7 +15,7 @@ extension NSString {
   }
 }
 
-// CHECK-LABEL: define private void @runtime_registration
+// CHECK-LABEL: define{{( protected)?}} private void @runtime_registration
 // CHECK:         [[GET_CLASS_PROP:%.*]] = call i8* @sel_registerName({{.*}}(classProp)
 // CHECK:         call i8* @class_replaceMethod(%objc_class* @"OBJC_METACLASS_$_NSString", i8* [[GET_CLASS_PROP]]
 // CHECK:         [[SET_CLASS_PROP:%.*]] = call i8* @sel_registerName({{.*}}(setClassProp:)

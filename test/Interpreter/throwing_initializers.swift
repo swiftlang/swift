@@ -3,48 +3,37 @@
 
 import StdlibUnittest
 
+
 var ThrowingInitTestSuite = TestSuite("ThrowingInit")
 
-enum E : ErrorType {
+enum E : Error {
   case X
 }
 
-func unwrap(b: Bool) throws -> Int {
+func unwrap(_ b: Bool) throws -> Int {
   if b {
     throw E.X
   }
   return 0
 }
 
-class Canary {
-  static var count: Int = 0
-
-  init() {
-    Canary.count++
-  }
-
-  deinit {
-    Canary.count--
-  }
-}
-
 class Bear {
-  let x: Canary
+  let x: LifetimeTracked
 
   /* Designated */
   init(n: Int) {
-    x = Canary()
+    x = LifetimeTracked(0)
   }
 
   init(n: Int, before: Bool) throws {
     if before {
       throw E.X
     }
-    self.x = Canary()
+    self.x = LifetimeTracked(0)
   }
 
   init(n: Int, after: Bool) throws {
-    self.x = Canary()
+    self.x = LifetimeTracked(0)
     if after {
       throw E.X
     }
@@ -54,7 +43,7 @@ class Bear {
     if before {
       throw E.X
     }
-    self.x = Canary()
+    self.x = LifetimeTracked(0)
     if after {
       throw E.X
     }
@@ -114,11 +103,11 @@ class Bear {
 }
 
 class PolarBear : Bear {
-  let y: Canary
+  let y: LifetimeTracked
 
   /* Designated */
   override init(n: Int) {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
   }
 
@@ -126,17 +115,17 @@ class PolarBear : Bear {
     if before {
       throw E.X
     }
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
   }
 
   init(n: Int, during: Bool) throws {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     try super.init(n: n, before: during)
   }
 
   init(n: Int, before: Bool, during: Bool) throws {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     if before {
       throw E.X
     }
@@ -144,7 +133,7 @@ class PolarBear : Bear {
   }
 
   override init(n: Int, after: Bool) throws {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
     if after {
       throw E.X
@@ -152,7 +141,7 @@ class PolarBear : Bear {
   }
 
   init(n: Int, during: Bool, after: Bool) throws {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     try super.init(n: n, before: during)
     if after {
       throw E.X
@@ -163,7 +152,7 @@ class PolarBear : Bear {
     if before {
       throw E.X
     }
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     super.init(n: n)
     if after {
       throw E.X
@@ -174,7 +163,7 @@ class PolarBear : Bear {
     if before {
       throw E.X
     }
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     try super.init(n: n, before: during)
     if after {
       throw E.X
@@ -183,50 +172,50 @@ class PolarBear : Bear {
 }
 
 class GuineaPig<T> : Bear {
-  let y: Canary
+  let y: LifetimeTracked
   let t: T
 
   init(t: T, during: Bool) throws {
-    self.y = Canary()
+    self.y = LifetimeTracked(0)
     self.t = t
     try super.init(n: 0, before: during)
   }
 }
 
 struct Chimera {
-  let x: Canary
-  let y: Canary
+  let x: LifetimeTracked
+  let y: LifetimeTracked
 
   init(before: Bool) throws {
     if before {
       throw E.X
     }
-    x = Canary()
-    y = Canary()
+    x = LifetimeTracked(0)
+    y = LifetimeTracked(0)
   }
 
   init(during: Bool) throws {
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       throw E.X
     }
-    y = Canary()
+    y = LifetimeTracked(0)
   }
 
   init(before: Bool, during: Bool) throws {
     if before {
       throw E.X
     }
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       throw E.X
     }
-    y = Canary()
+    y = LifetimeTracked(0)
   }
 
   init(after: Bool) throws {
-    x = Canary()
-    y = Canary()
+    x = LifetimeTracked(0)
+    y = LifetimeTracked(0)
     if after {
       throw E.X
     }
@@ -236,19 +225,19 @@ struct Chimera {
     if before {
       throw E.X
     }
-    x = Canary()
-    y = Canary()
+    x = LifetimeTracked(0)
+    y = LifetimeTracked(0)
     if after {
       throw E.X
     }
   }
 
   init(during: Bool, after: Bool) throws {
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       throw E.X
     }
-    y = Canary()
+    y = LifetimeTracked(0)
     if after {
       throw E.X
     }
@@ -258,22 +247,28 @@ struct Chimera {
     if before {
       throw E.X
     }
-    x = Canary()
+    x = LifetimeTracked(0)
     if during {
       throw E.X
     }
-    y = Canary()
+    y = LifetimeTracked(0)
     if after {
       throw E.X
     }
   }
 }
 
-func mustThrow<T>(f: () throws -> T) {
+func mustThrow<T>(_ f: () throws -> T) {
   do {
-    try f()
+    _ = try f()
     preconditionFailure("Didn't throw")
   } catch {}
+}
+
+ThrowingInitTestSuite.test("DesignatedInitSuccess_Root") {
+  _ = try! Bear(n: 0, before: false)
+  _ = try! Bear(n: 0, after: false)
+  _ = try! Bear(n: 0, before: false, after: false)
 }
 
 ThrowingInitTestSuite.test("DesignatedInitFailure_Root") {
@@ -281,8 +276,15 @@ ThrowingInitTestSuite.test("DesignatedInitFailure_Root") {
   mustThrow { try Bear(n: 0, after: true) }
   mustThrow { try Bear(n: 0, before: true, after: false) }
   mustThrow { try Bear(n: 0, before: false, after: true) }
+}
 
-  expectEqual(0, Canary.count)
+ThrowingInitTestSuite.test("DesignatedInitSuccess_Derived") {
+  _ = try! PolarBear(n: 0, before: false)
+  _ = try! PolarBear(n: 0, during: false)
+  _ = try! PolarBear(n: 0, before: false, during: false)
+  _ = try! PolarBear(n: 0, during: false, after: false)
+  _ = try! PolarBear(n: 0, before: false, after: false)
+  _ = try! PolarBear(n: 0, before: false, during: false, after: false)
 }
 
 ThrowingInitTestSuite.test("DesignatedInitFailure_Derived") {
@@ -298,14 +300,27 @@ ThrowingInitTestSuite.test("DesignatedInitFailure_Derived") {
   mustThrow { try PolarBear(n: 0, before: true, during: false, after: false) }
   mustThrow { try PolarBear(n: 0, before: false, during: true, after: false) }
   mustThrow { try PolarBear(n: 0, before: false, during: false, after: true) }
+}
 
-  expectEqual(Canary.count, 0)
+ThrowingInitTestSuite.test("DesignatedInitSuccess_DerivedGeneric") {
+  _ = try! GuineaPig(t: LifetimeTracked(0), during: false)
 }
 
 ThrowingInitTestSuite.test("DesignatedInitFailure_DerivedGeneric") {
-  mustThrow { try GuineaPig<Canary>(t: Canary(), during: true) }
+  mustThrow { try GuineaPig(t: LifetimeTracked(0), during: true) }
+}
 
-  expectEqual(Canary.count, 0)
+ThrowingInitTestSuite.test("ConvenienceInitSuccess_Root") {
+  _ = try! Bear(before: false)
+  _ = try! Bear(before2: false)
+  _ = try! Bear(before: false, before2: false)
+  _ = try! Bear(during: false)
+  _ = try! Bear(before: false, during: false)
+  _ = try! Bear(after: false)
+  _ = try! Bear(before: false, after: false)
+  _ = try! Bear(during: false, after: false)
+  _ = try! Bear(before: false, during: false, after: false)
+  _ = try! Bear(before: false, before2: false, during: false, after: false)
 }
 
 ThrowingInitTestSuite.test("ConvenienceInitFailure_Root") {
@@ -328,8 +343,19 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Root") {
   mustThrow { try Bear(before: false, before2: true, during: false, after: false) }
   mustThrow { try Bear(before: false, before2: false, during: true, after: false) }
   mustThrow { try Bear(before: false, before2: false, during: false, after: true) }
+}
 
-  expectEqual(Canary.count, 0)
+ThrowingInitTestSuite.test("ConvenienceInitSuccess_Derived") {
+  _ = try! PolarBear(before: false)
+  _ = try! PolarBear(before2: false)
+  _ = try! PolarBear(before: false, before2: false)
+  _ = try! PolarBear(during: false)
+  _ = try! PolarBear(before: false, during: false)
+  _ = try! PolarBear(after: false)
+  _ = try! PolarBear(before: false, after: false)
+  _ = try! PolarBear(during: false, after: false)
+  _ = try! PolarBear(before: false, during: false, after: false)
+  _ = try! PolarBear(before: false, before2: false, during: false, after: false)
 }
 
 ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
@@ -352,8 +378,16 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
   mustThrow { try PolarBear(before: false, before2: true, during: false, after: false) }
   mustThrow { try PolarBear(before: false, before2: false, during: true, after: false) }
   mustThrow { try PolarBear(before: false, before2: false, during: false, after: true) }
+}
 
-  expectEqual(Canary.count, 0)
+ThrowingInitTestSuite.test("InitSuccess_Struct") {
+  _ = try! Chimera(before: false)
+  _ = try! Chimera(during: false)
+  _ = try! Chimera(before: false, during: false)
+  _ = try! Chimera(after: false)
+  _ = try! Chimera(before: false, after: false)
+  _ = try! Chimera(during: false, after: false)
+  _ = try! Chimera(before: false, during: false, after: false)
 }
 
 ThrowingInitTestSuite.test("InitFailure_Struct") {
@@ -369,8 +403,38 @@ ThrowingInitTestSuite.test("InitFailure_Struct") {
   mustThrow { try Chimera(before: true, during: false, after: false) }
   mustThrow { try Chimera(before: false, during: true, after: false) }
   mustThrow { try Chimera(before: false, during: false, after: true) }
-
-  expectEqual(Canary.count, 0)
 }
+
+// Specific regression tests:
+
+// <https://bugs.swift.org/browse/SR-1714> - try? self.init(...)` in init? causes overrelease
+class ThrowAndFailRoot {
+  let x = LifetimeTracked(0)
+}
+
+class ThrowAndFailDerived: ThrowAndFailRoot {
+  let name: String
+  let y = LifetimeTracked(0)
+
+  init(name: String) throws {
+    self.name = name
+    super.init()
+    if name.isEmpty {
+      struct EmptyError: Error {}
+      throw EmptyError()
+    }
+  }
+
+  convenience init?(b: Bool) {
+    try? self.init(name: b ? "Bob" : "")
+  }
+}
+
+ThrowingInitTestSuite.test("ThrowsAndFailableTest") {
+  _ = ThrowAndFailDerived(b: true)!
+  if let x = ThrowAndFailDerived(b: false) { preconditionFailure() }
+}
+
+// <https://bugs.swift.org/browse/SR-3132> - Invalid pointer dequeued from free list. Runtime crash on some weird code
 
 runAllTests()

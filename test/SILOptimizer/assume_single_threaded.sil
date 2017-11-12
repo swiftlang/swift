@@ -1,0 +1,51 @@
+// RUN: %target-swift-frontend -emit-sil -assume-parsing-unqualified-ownership-sil %s -assume-single-threaded | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -assume-parsing-unqualified-ownership-sil %s -O -assume-single-threaded | %FileCheck %s
+
+// Check that all reference counting instructions are converted to [nonatomic]
+// if -assume-single-threaded is used.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class C {
+  deinit
+  init()
+}
+
+
+// CHECK-LABEL: sil{{.*}}@test_atomic_to_nonatomic_retain
+// CHECK: strong_retain [nonatomic]
+// CHECK: return
+sil @test_atomic_to_nonatomic_retain: $@convention(thin) () -> @owned C {
+bb0:
+  %1 = alloc_ref $C
+  strong_retain %1 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil{{.*}}@test_atomic_to_nonatomic_release
+// CHECK: strong_release [nonatomic]
+// CHECK: return
+sil @test_atomic_to_nonatomic_release: $@convention(thin) (C) -> C {
+bb0(%0 : $C):
+  strong_release %0 : $C
+  return %0 : $C
+}
+
+
+
+// C.__deallocating_deinit
+sil @_TFC28nonatomic_reference_counting1CD : $@convention(method) (@owned C) -> () {
+bb0(%0 : $C):
+  dealloc_ref %0 : $C
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil_vtable C {
+  #C.deinit!deallocator: _TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+}
+

@@ -2,31 +2,40 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Dominance.h"
-#include "llvm/Support/GenericDomTree.h"
 #include "llvm/Support/GenericDomTreeConstruction.h"
 
 using namespace swift;
 
-template class llvm::DominatorTreeBase<SILBasicBlock>;
-template class llvm::DominatorBase<SILBasicBlock>;
+template class llvm::DominatorTreeBase<SILBasicBlock, false>;
+template class llvm::DominatorTreeBase<SILBasicBlock, true>;
 template class llvm::DomTreeNodeBase<SILBasicBlock>;
 
-/// Compute the immmediate-dominators map.
+namespace llvm {
+namespace DomTreeBuilder {
+template void Calculate<SILDomTree, swift::SILFunction>(
+    SILDomTree &DT, swift::SILFunction &F);
+template void Calculate<SILPostDomTree, swift::SILFunction>(
+    SILPostDomTree &DT, swift::SILFunction &F);
+} // namespace DomTreeBuilder
+} // namespace llvm
+
+/// Compute the immediate-dominators map.
 DominanceInfo::DominanceInfo(SILFunction *F)
-    : DominatorTreeBase(/*isPostDom*/ false) {
-      assert(!F->isExternalDeclaration() &&
-             "Make sure the function is a definition and not a declaration.");
+    : DominatorTreeBase() {
+  assert(!F->isExternalDeclaration() &&
+         "Make sure the function is a definition and not a declaration.");
   recalculate(*F);
 }
 
@@ -40,12 +49,26 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
 
   // Otherwise, they're in the same block, and we just need to check
   // whether B comes after A.  This is a non-strict computation.
-  SILInstruction *f = &*aBlock->begin();
-  while (b != f) {
-    b = b->getPrevNode();
-    if (a == b) return true;
+  auto aIter = a->getIterator();
+  auto bIter = b->getIterator();
+  auto fIter = aBlock->begin();
+  while (bIter != fIter) {
+    --bIter;
+    if (aIter == bIter)
+      return true;
   }
 
+  return false;
+}
+
+/// Does value A properly dominate instruction B?
+bool DominanceInfo::properlyDominates(SILValue a, SILInstruction *b) {
+  if (auto *Inst = a->getDefiningInstruction()) {
+    return properlyDominates(Inst, b);
+  }
+  if (auto *Arg = dyn_cast<SILArgument>(a)) {
+    return dominates(Arg->getParent(), b->getParent());
+  }
   return false;
 }
 
@@ -55,7 +78,7 @@ void DominanceInfo::verify() const {
   DominanceInfo OtherDT(F);
 
   // And compare.
-  if (errorOccuredOnComparison(OtherDT)) {
+  if (errorOccurredOnComparison(OtherDT)) {
     llvm::errs() << "DominatorTree is not up to date!\nComputed:\n";
     print(llvm::errs());
     llvm::errs() << "\nActual:\n";
@@ -64,11 +87,11 @@ void DominanceInfo::verify() const {
   }
 }
 
-/// Compute the immmediate-post-dominators map.
+/// Compute the immediate-post-dominators map.
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
-  : DominatorTreeBase(/*isPostDom*/ true) {
+   : PostDominatorTreeBase() {
   assert(!F->isExternalDeclaration() &&
-         "Can not construct a post dominator tree for a declaration");
+         "Cannot construct a post dominator tree for a declaration");
   recalculate(*F);
 }
 
@@ -102,7 +125,7 @@ void PostDominanceInfo::verify() const {
   PostDominanceInfo OtherDT(F);
 
   // And compare.
-  if (errorOccuredOnComparison(OtherDT)) {
+  if (errorOccurredOnComparison(OtherDT)) {
     llvm::errs() << "PostDominatorTree is not up to date!\nComputed:\n";
     print(llvm::errs());
     llvm::errs() << "\nActual:\n";

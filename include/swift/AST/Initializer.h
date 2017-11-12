@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Decl.h"
 
 namespace swift {
 class PatternBindingDecl;
@@ -69,26 +70,36 @@ public:
 class PatternBindingInitializer : public Initializer {
   PatternBindingDecl *Binding;
 
+  // created lazily for 'self' lookup from lazy property initializer
+  ParamDecl *SelfParam;
+
   friend class ASTContext; // calls reset on unused contexts
 
   void reset(DeclContext *parent) {
     setParent(parent);
     Binding = nullptr;
+    SelfParam = nullptr;
   }
 
 public:
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
-      Binding(nullptr) {
+      Binding(nullptr), SelfParam(nullptr) {
+    SpareBits = 0;
   }
  
 
-  void setBinding(PatternBindingDecl *binding) {
+  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
     setParent(binding->getDeclContext());
     Binding = binding;
+    SpareBits = bindingIndex;
   }
   
   PatternBindingDecl *getBinding() const { return Binding; }
+
+  unsigned getBindingIndex() const { return SpareBits; }
+
+  ParamDecl *getImplicitSelfDecl();
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
@@ -108,14 +119,20 @@ class SerializedPatternBindingInitializer : public SerializedLocalDeclContext {
   PatternBindingDecl *Binding;
 
 public:
-  SerializedPatternBindingInitializer(PatternBindingDecl *Binding)
+  SerializedPatternBindingInitializer(PatternBindingDecl *Binding,
+                                      unsigned bindingIndex)
     : SerializedLocalDeclContext(LocalDeclContextKind::PatternBindingInitializer,
                                  Binding->getDeclContext()),
-      Binding(Binding) {}
+      Binding(Binding) {
+    SpareBits = bindingIndex;
+  }
 
   PatternBindingDecl *getBinding() const {
     return Binding;
   }
+
+  unsigned getBindingIndex() const { return SpareBits; }
+
 
   static bool classof(const DeclContext *DC) {
     if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
@@ -145,10 +162,7 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(DeclContext *parent) {
-    assert(parent->isLocalContext());
-    setParent(parent);
-  }
+  void changeFunction(AbstractFunctionDecl *parent);
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

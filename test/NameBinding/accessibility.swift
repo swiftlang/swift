@@ -1,13 +1,10 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 
-// RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I %S/Inputs -sdk "" -enable-access-control -verify
-// RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I %S/Inputs -sdk "" -disable-access-control -D DEFINE_VAR_FOR_SCOPED_IMPORT -D ACCESS_DISABLED
-
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_accessibility.swift -D DEFINE_VAR_FOR_SCOPED_IMPORT -enable-testing
-// RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -enable-access-control -verify
-// RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -disable-access-control -D ACCESS_DISABLED
-// RUN: not %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -D TESTABLE 2>&1 | FileCheck -check-prefix=TESTABLE %s
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -enable-access-control -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -disable-access-control -D ACCESS_DISABLED
+// RUN: not %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -D TESTABLE 2>&1 | %FileCheck -check-prefix=TESTABLE %s
 
 #if TESTABLE
 @testable import has_accessibility
@@ -16,9 +13,9 @@ import has_accessibility
 #endif
 
 // This deliberately has the wrong import kind.
-import var has_accessibility.zz // expected-error {{no such decl in module}}
+import var has_accessibility.zz // expected-error {{variable 'zz' does not exist in module 'has_accessibility'}}
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 markUsed(has_accessibility.x)
 markUsed(has_accessibility.y) // expected-error {{module 'has_accessibility' has no member named 'y'}}
@@ -43,19 +40,28 @@ markUsed(b)
 markUsed(c) // expected-error {{use of unresolved identifier 'c'}}
 
 Foo.x()
-Foo.y() // expected-error {{type 'Foo' has no member 'y'}}
-Foo.z() // expected-error {{type 'Foo' has no member 'z'}}
+Foo.y() // expected-error {{'y' is inaccessible due to 'internal' protection level}}
+Foo.z() // expected-error {{'z' is inaccessible due to 'private' protection level}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
-// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: type 'Foo' has no member 'z'
+// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: 'z' is inaccessible due to 'private' protection level
 Foo.a()
 Foo.b()
-Foo.c() // expected-error {{type 'Foo' has no member 'c'}}
+Foo.c() // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
-_ = Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
+_ = Foo() // expected-error {{'Foo' initializer is inaccessible due to 'internal' protection level}}
+
+// <rdar://problem/27982012> QoI: Poor diagnostic for inaccessible initializer
+struct rdar27982012 {
+  var x: Int
+  private init(_ x: Int) { self.x = x } // expected-note {{'init' declared here}}
+}
+
+_ = { rdar27982012($0.0) }((1, 2)) // expected-error {{initializer is inaccessible due to 'private' protection level}}
+
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-PrivateInit() // expected-error {{'PrivateInit' cannot be constructed because it has no accessible initializers}}
-// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' cannot be constructed because it has no accessible initializers
+_ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
+// TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
 
 var s = StructWithPrivateSetter()
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}
@@ -69,9 +75,9 @@ class Sub : Base {
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 
-    method() // expected-error {{use of unresolved identifier 'method'}}
-    self.method() // expected-error {{value of type 'Sub' has no member 'method'}}
-    super.method() // expected-error {{value of type 'Base' has no member 'method'}}
+    method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
+    self.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
+    super.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
@@ -96,21 +102,23 @@ protocol MethodProto {
 }
 
 extension OriginallyEmpty : MethodProto {}
+#if !ACCESS_DISABLED
 extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-#if !ACCESS_DISABLED
+
 extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform to protocol 'MethodProto'}}
 #endif
 
 
 protocol TypeProto {
-  typealias TheType // expected-note * {{protocol requires nested type 'TheType'}}
+  associatedtype TheType // expected-note * {{protocol requires nested type 'TheType'}}
 }
 
 extension OriginallyEmpty {}
+#if !ACCESS_DISABLED
 extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-#if !ACCESS_DISABLED
+
 extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}}
 #endif
 
@@ -119,18 +127,6 @@ extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to 
 private func privateInBothFiles() {} // no-warning
 private func privateInPrimaryFile() {} // expected-error {{invalid redeclaration}}
 func privateInOtherFile() {} // expected-note {{previously declared here}}
-#endif
-
-
-#if !ACCESS_DISABLED
-// rdar://problem/21408035
-private class PrivateBox<T> { // expected-note 2 {{type declared here}}
-  typealias ValueType = T
-  typealias AlwaysFloat = Float
-}
-
-let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared private because its type uses a private type}}
-let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared private because its type uses a private type}}
 #endif
 
 
@@ -144,7 +140,32 @@ struct ConformerByLocalType : TypeProto {
 }
 
 private struct PrivateConformerByLocalType : TypeProto {
-  private struct TheType {} // okay
+  struct TheType {} // okay
+}
+
+private struct PrivateConformerByLocalTypeBad : TypeProto {
+  private struct TheType {} // expected-error {{struct 'TheType' must be as accessible as its enclosing type because it matches a requirement in protocol 'TypeProto'}} {{3-10=fileprivate}}
 }
 #endif
 
+public protocol Fooable {
+  func foo() // expected-note * {{protocol requires function 'foo()'}}
+}
+
+#if !ACCESS_DISABLED
+internal struct FooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'FooImpl' does not conform to protocol 'Fooable'}}
+public struct PublicFooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'PublicFooImpl' does not conform to protocol 'Fooable'}}
+// TESTABLE-NOT: method 'foo()'
+
+internal class TestableSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
+public class TestablePublicSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
+// TESTABLE-NOT: undeclared type 'InternalBase'
+#endif
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'y' declared here
+// <unknown>:0: error: unexpected note produced: 'z' declared here
+// <unknown>:0: error: unexpected note produced: 'init()' declared here
+// <unknown>:0: error: unexpected note produced: 'method()' declared here
+// <unknown>:0: error: unexpected note produced: 'method' declared here
+// <unknown>:0: error: unexpected note produced: 'method' declared here

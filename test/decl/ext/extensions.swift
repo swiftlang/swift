@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 extension extension_for_invalid_type_1 { // expected-error {{use of undeclared type 'extension_for_invalid_type_1'}}
   func f() { }
@@ -46,6 +46,20 @@ extension S1 {} // no-error
 extension S1.Type {} // expected-error {{cannot extend a metatype 'S1.Type'}}
 extension S1.NestedStruct {} // no-error
 
+struct S1_2 {
+  // expected-error @+4 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-error @+3 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-note @+2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  enum Type {}
+}
+struct S1_3 {
+  enum `Type` {} // no-error
+}
+
+extension S1_2.Type {} // expected-error {{cannot extend a metatype 'S1_2.Type'}}
+extension S1_3.`Type` {} // no-error
+
 typealias TA_S1 = S1
 extension TA_S1 {} // no-error
 
@@ -86,7 +100,7 @@ var x = c.p1
 c.p1 = 1
 
 protocol P3 {
-  typealias Assoc
+  associatedtype Assoc
   func foo() -> Assoc
 }
 
@@ -98,4 +112,16 @@ extension X3.Assoc { // expected-error{{'Assoc' is not a member type of 'X3'}}
 
 extension X3 {
   func foo() -> Int { return 0 }
+}
+
+// Make sure the test case from https://bugs.swift.org/browse/SR-3847 doesn't
+// cause problems when the later extension is incorrectly nested inside another
+// declaration.
+extension C1.NestedStruct {
+  static let originalValue = 0
+}
+struct WrapperContext {
+  extension C1.NestedStruct { // expected-error {{declaration is only valid at file scope}}
+    static let propUsingMember = originalValue // expected-error {{use of unresolved identifier 'originalValue'}}
+  }
 }

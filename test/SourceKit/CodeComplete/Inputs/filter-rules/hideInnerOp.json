@@ -1,0 +1,7 @@
+[
+  {
+    key.kind: source.codecompletion.identifier,
+    key.hide: 1,
+    key.names: [".", "?.", "("]
+  }
+]

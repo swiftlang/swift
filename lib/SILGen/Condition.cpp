@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -134,7 +134,7 @@ SILBasicBlock *Condition::complete(SILGenFunction &SGF) {
   // Kill the continuation block if it's not being used.  Case-exits
   // only leave themselves post-terminator if they use the
   // continuation block, so we're in an acceptable insertion state.
-  if (ContBB->pred_empty() && ContBB->bbarg_empty()) {
+  if (ContBB->pred_empty() && ContBB->args_empty()) {
     SGF.eraseBasicBlock(ContBB);
     return SGF.B.hasValidInsertionPoint() ? SGF.B.getInsertionBB() : nullptr;
   }
@@ -144,36 +144,37 @@ SILBasicBlock *Condition::complete(SILGenFunction &SGF) {
   return ContBB;
 }
 
-ConditionalValue::ConditionalValue(SILGenFunction &gen, SGFContext C,
+ConditionalValue::ConditionalValue(SILGenFunction &SGF, SGFContext C,
                                    SILLocation loc,
                                    const TypeLowering &valueTL)
-  : gen(gen), tl(valueTL), contBB(gen.createBasicBlock()), loc(loc)
+  : SGF(SGF), tl(valueTL), contBB(SGF.createBasicBlock()), loc(loc)
 {
   if (tl.isAddressOnly()) {
     // If the result type is address-only, get a result buffer for it.
-    result = gen.getBufferForExprResult(loc, tl.getLoweredType(), C);
+    result = SGF.getBufferForExprResult(loc, tl.getLoweredType(), C);
   } else {
     // Otherwise, add a BB arg to the continuation block to receive loadable
     // result.
-    result = new (gen.F.getModule()) SILArgument(contBB, tl.getLoweredType());
+    result = contBB->createPHIArgument(tl.getLoweredType(),
+                                       ValueOwnershipKind::Owned);
   }
 }
 
 SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
   if (bb) {
-    assert(!gen.B.hasValidInsertionPoint() && "already in a branch");
-    gen.B.emitBlock(bb);
+    assert(!SGF.B.hasValidInsertionPoint() && "already in a branch");
+    SGF.B.emitBlock(bb);
   }
   
   assert(!scope.hasValue() && "already have a scope");
   // Start a scope for the current branch.
-  scope.emplace(gen.Cleanups, CleanupLocation::get(loc));
+  scope.emplace(SGF.Cleanups, CleanupLocation::get(loc));
 
   // Code emitted in the branch can emit into our buffer for address-only
   // conditionals.
   if (tl.isAddressOnly()) {
     assert(!currentInitialization && "already have an initialization?!");
-    currentInitialization = gen.useBufferAsTemporary(loc, result, tl);
+    currentInitialization = SGF.useBufferAsTemporary(result, tl);
     return SGFContext(currentInitialization.get());
   }
 
@@ -188,22 +189,22 @@ void ConditionalValue::exitBranch(RValue &&condResult) {
     // Transfer the result into our buffer if it wasn't emitted in-place
     // already.
     assert(currentInitialization && "no current initialization?!");
-    std::move(condResult).forwardInto(gen, currentInitialization.release(),
-                                      loc);
+    std::move(condResult).forwardInto(SGF, loc,
+                                      currentInitialization.release());
     scope.reset();
-    gen.B.createBranch(loc, contBB);
+    SGF.B.createBranch(loc, contBB);
   } else {
-    SILValue resultVal = std::move(condResult).forwardAsSingleValue(gen, loc);
+    SILValue resultVal = std::move(condResult).forwardAsSingleValue(SGF, loc);
     // Branch with the result as a BB argument.
     scope.reset();
-    gen.B.createBranch(loc, contBB, resultVal);
+    SGF.B.createBranch(loc, contBB, resultVal);
   }
 }
 
 ManagedValue ConditionalValue::complete() {
-  assert(!gen.B.hasValidInsertionPoint() && "still in a branch");
+  assert(!SGF.B.hasValidInsertionPoint() && "still in a branch");
   assert(!scope && "still in a branch scope");
   assert(!currentInitialization && "still in a branch initialization");
-  gen.B.emitBlock(contBB);
-  return gen.emitManagedRValueWithCleanup(result);
+  SGF.B.emitBlock(contBB);
+  return SGF.emitManagedRValueWithCleanup(result);
 }

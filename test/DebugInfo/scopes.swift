@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -g -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -g -emit-ir %s | %FileCheck %s
 
 class UIViewController {
 }

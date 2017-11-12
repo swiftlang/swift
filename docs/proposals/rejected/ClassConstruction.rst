@@ -7,7 +7,7 @@
 .. warning:: This proposal was rejected, though it helped in the design of the
   final Swift 1 initialization model.
 
-Objective-C's “designated inititalizers” pattern seems at first to
+Objective-C's "designated initializers pattern seems at first to
 create a great deal of complication.  However, designated initializers
 are simply the only sane response to Objective-C's initialization rules,
 which are the root cause of the complication.
@@ -33,14 +33,14 @@ of its subclasses.  This leads to a soundness problem:
   @interface Subclass : Superclass
   - (void)subclassMethod
   @end
-    
+
   @implementation Subclass : Superclass
   char\* **name**\ ;                      // never initialized
-    
+
   - (void)print { printf(\ **name**\ ); } // oops
   @end
 
-  mySubclassInstance = [ [Subclass alloc] initSuperClass ]
+  mySubclassInstance = [[Subclass alloc] initSuperClass]
 
 Because there is no way to hide a superclass' ``init`` method from
 clients, ensuring that subclass instances are properly initialized
@@ -78,7 +78,7 @@ Exceptions to the Rule
 
 I exaggerated a little in the previous section: because overriding
 *every* superclass initializer in *every* subclass is so tedious, the
-Objective C community has identified some situations where you don't
+Objective-C community has identified some situations where you don't
 really need to override every ``init`` method:
 
 1. When you know the default zero-initialization of a class' instance
@@ -116,9 +116,9 @@ Proposal
 ========
 
 I suggest we define Swift initialization to be as simple and
-easily-understood as possible, and avoid “interesting” interactions
+easily-understood as possible, and avoid "interesting" interactions
 with the more complicated Objective-C initialization process.  If we
-do this, we can treat Objective-C base classes as “sealed and safe”
+do this, we can treat Objective-C base classes as "sealed and safe"
 for the purpose of initialization, and help programmers reason
 effectively about initialization and their class invariants.
 
@@ -132,8 +132,8 @@ Here are the proposed rules:
   default, part of the public interface of a subclass defined in
   Objective-C.
 
-* ``self.init(…)`` calls in Swift never dispatch virtually.  We have a
-  safe model for “virtual initialization:” ``init`` methods can call
+* ``self.init(...)`` calls in Swift never dispatch virtually.  We have a
+  safe model for "virtual initialization:" ``init`` methods can call
   overridable methods after all instance variables and superclasses
   are initialized.  Allowing *virtual* constructor delegation would
   undermine that safety.
@@ -150,7 +150,7 @@ Here are the proposed rules:
      It allows superclasses to break their subclasses by adding
      ``init`` methods.
 
-     
+
 Summary
 =======
 

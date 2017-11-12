@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,9 +14,9 @@
 
 #include "swift/Frontend/Frontend.h"
 
-#include "llvm/Support/TimeValue.h"
 #include "llvm/Support/YAMLTraits.h"
 
+#include <chrono>
 #include <xpc/xpc.h>
 
 using namespace sourcekitd;
@@ -25,15 +25,17 @@ using namespace llvm;
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // General
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
-static std::atomic<uint64_t> operation_id(0);
-static uint64_t tracing_session = llvm::sys::TimeValue::now().msec();
+static auto tracing_session = std::chrono::system_clock::now();
 
 uint64_t trace::getTracingSession() {
-  return tracing_session;
+  using namespace std::chrono;
+  time_point<system_clock, milliseconds> msec =
+    time_point_cast<milliseconds>(tracing_session);
+  return msec.time_since_epoch().count();
 }
 
 static void append(xpc_object_t Contents, uint64_t Value) {
@@ -61,16 +63,6 @@ static void append(xpc_object_t Contents, const StringPairs &Files) {
                 });
 }
 
-template <typename U>
-struct llvm::yaml::SequenceTraits<std::vector<U>> {
-  static size_t size(IO &Io, std::vector<U> &Vector) {
-    return Vector.size();
-  }
-  static U &element(IO &Io, std::vector<U> &Vector, size_t Index) {
-    return Vector[Index];
-  }
-};
-
 template <>
 struct llvm::yaml::MappingTraits<SwiftArguments> {
   static void mapping(IO &Io, SwiftArguments &Args) {
@@ -81,7 +73,7 @@ struct llvm::yaml::MappingTraits<SwiftArguments> {
 };
 
 static std::string serializeCompilerArguments(const SwiftArguments &Args) {
-  // Serialize comiler instance
+  // Serialize compiler instance
   std::string OptionsAsYaml;
   llvm::raw_string_ostream OptionsStream(OptionsAsYaml);
   llvm::yaml::Output YamlOutput(OptionsStream);
@@ -92,9 +84,9 @@ static std::string serializeCompilerArguments(const SwiftArguments &Args) {
 
 
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Trace consumer
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 
 class XpcTraceConsumer : public SourceKit::trace::TraceConsumer {
 public:
@@ -104,16 +96,16 @@ public:
   virtual void operationFinished(uint64_t OpId) override;
 
   // Trace start of SourceKit operation
-  virtual void opertationStarted(uint64_t OpId, OperationKind OpKind,
-                                 const SwiftInvocation &Inv,
-                                 const StringPairs &OpArgs) override;
+  virtual void operationStarted(uint64_t OpId, OperationKind OpKind,
+                                const SwiftInvocation &Inv,
+                                const StringPairs &OpArgs) override;
 };
 
 // Trace start of SourceKit operation
-void XpcTraceConsumer::opertationStarted(uint64_t OpId,
-                                         OperationKind OpKind,
-                                         const SwiftInvocation &Inv,
-                                         const StringPairs &OpArgs) {
+void XpcTraceConsumer::operationStarted(uint64_t OpId,
+                                        OperationKind OpKind,
+                                        const SwiftInvocation &Inv,
+                                        const StringPairs &OpArgs) {
   xpc_object_t Contents = xpc_array_create(nullptr, 0);
   append(Contents, ActionKind::OperationStarted);
   append(Contents, OpId);

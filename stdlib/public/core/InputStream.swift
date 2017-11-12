@@ -2,29 +2,34 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
 
-/// Returns `Character`s read from standard input through the end of the
-/// current line or until EOF is reached, or `nil` if EOF has already been
-/// reached.
+/// Returns a string read from standard input through the end of the current
+/// line or until EOF is reached.
 ///
-/// If `stripNewline` is `true`, newline characters and character
-/// combinations will be stripped from the result.  This is the default.
+/// Standard input is interpreted as `UTF-8`. Invalid bytes are replaced by
+/// Unicode [replacement characters][rc].
 ///
-/// Standard input is interpreted as `UTF-8`.  Invalid bytes
-/// will be replaced by Unicode [replacement characters](http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character).
-@warn_unused_result
-public func readLine(stripNewline stripNewline: Bool = true) -> String? {
-  var linePtr: UnsafeMutablePointer<CChar> = nil
-  var readBytes = swift_stdlib_readLine_stdin(&linePtr)
+/// [rc]:
+/// http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+///
+/// - Parameter strippingNewline: If `true`, newline characters and character
+///   combinations are stripped from the result; otherwise, newline characters
+///   or character combinations are preserved. The default is `true`.
+/// - Returns: The string of characters read from standard input. If EOF has
+///   already been reached when `readLine()` is called, the result is `nil`.
+@_inlineable // FIXME(sil-serialize-all)
+public func readLine(strippingNewline: Bool = true) -> String? {
+  var linePtrVar: UnsafeMutablePointer<UInt8>?
+  var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
   if readBytes == -1 {
     return nil
   }
@@ -33,15 +38,17 @@ public func readLine(stripNewline stripNewline: Bool = true) -> String? {
   if readBytes == 0 {
     return ""
   }
-  if stripNewline {
+
+  let linePtr = linePtrVar!
+  if strippingNewline {
     // FIXME: Unicode conformance.  To fix this, we need to reimplement the
     // code we call above to get a line, since it will only stop on LF.
     //
     // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
     //
     // Recognize only LF and CR+LF combinations for now.
-    let cr = CChar(_ascii8("\r"))
-    let lf = CChar(_ascii8("\n"))
+    let cr = UInt8(ascii: "\r")
+    let lf = UInt8(ascii: "\n")
     if readBytes == 1 && linePtr[0] == lf {
       return ""
     }
@@ -60,9 +67,8 @@ public func readLine(stripNewline stripNewline: Bool = true) -> String? {
   }
   let result = String._fromCodeUnitSequenceWithRepair(UTF8.self,
     input: UnsafeMutableBufferPointer(
-      start: UnsafeMutablePointer<UTF8.CodeUnit>(linePtr),
+      start: linePtr,
       count: readBytes)).0
   _swift_stdlib_free(linePtr)
   return result
 }
-

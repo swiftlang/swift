@@ -1,0 +1,65 @@
+module OmitNeedlessWords {
+  export *
+  header "OmitNeedlessWords.h"
+}
+
+module ImportedProtocols {
+  export *
+  module SubModule {
+    requires objc
+    header "ImportedProtocols.h"
+  }
+}
+
+module Newtype {
+  export *
+  header "Newtype.h"
+}
+
+module NewtypeObjC {
+  header "NewtypeObjC.h"
+  export *
+}
+
+module ImportAsMember {
+  export *
+
+  module A {
+    header "ImportAsMember.h"
+  }
+
+  module B {
+    header "ImportAsMemberB.h"
+  }
+
+  module C {
+    requires objc
+    header "ImportAsMemberC.h"
+  }
+
+  module APINotes {
+    header "ImportAsMemberAPINotes.h"
+  }
+
+  module Class {
+    requires objc
+    header "ImportAsMemberClass.h"
+  }
+}
+
+module IAMError {
+  export *
+  requires objc
+  header "ImportAsMemberError.h"
+}
+
+module InferImportAsMember {
+  export *
+  header "InferImportAsMember.h"
+}
+
+module CompatibilityAlias {
+  header "CompatibilityAlias.h"
+  export *
+}
+

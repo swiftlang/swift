@@ -2,7 +2,7 @@
 
 // Make sure we can code complete at the beginning of the file.
 // rdar://14585108
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=A | FileCheck %s -check-prefix=A
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=A | %FileCheck %s -check-prefix=A
 // A: Begin completions
 // A-DAG: Keyword[func]/None: func{{; name=.+$}}
 // A-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}

@@ -2,8 +2,8 @@
 
 .. OptimizerEffects:
 
-Optimizer Effects: Summarizing and specifing function side effects
-==================================================================
+Optimizer Effects: Summarizing and specifying function side effects
+===================================================================
 
 .. contents::
 
@@ -20,10 +20,10 @@ Introduction
 This document formalizes the effects that functions have on program
 state for the purpose of facilitating compiler optimization. By
 modeling more precise function effects, the optimizer can make more
-assumptions leading to more agressive transformation of the program.
+assumptions leading to more aggressive transformation of the program.
 
 Function effects may be deduced by the compiler during program
-analyis. However, in certain situations it is helpful to directly
+analysis. However, in certain situations it is helpful to directly
 communicate function effects to the compiler via function attributes
 or types. These source level annotations may or may not be statically
 enforceable.
@@ -124,7 +124,7 @@ storage objects referenced by this struct. The set of storage objects can
 further provide storage for subobjects.::
 
   class ArrayStorage<T> {
-    func getElement(index: Int) -> T {} // Return a 'subobject'.
+    func getElement(_ index: Int) -> T {} // Return a 'subobject'.
   }
 
   struct Array<T> {
@@ -185,17 +185,17 @@ state.
       var storage: ArrayStorage
 
       @preserve_unique
-      mutating func replaceRange<
-        C: CollectionType where C.Generator.Element == T
+      mutating func replaceSubrange<
+        C : CollectionType where C.Iterator.Element == T
       >(
-        subRange: Range<Int>, with newElements: C
+        _ subRange: Range<Int>, with newElements: C
       ) { ... }
 
       // We could also mark the following function as @preserve_unique
       // but we have an attribute for this function that better describes it
       // allowing for more optimization. (See @get_subobject)
       @preserve_unique
-      func getElement(index: Int) -> T {
+      func getElement(_ index: Int) -> T {
         return storage.elementAt(index)
       }
     }
@@ -203,11 +203,11 @@ state.
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
     @self_effects(preserve_unique, nocapture, norelease)
-    func replaceRange<> {}
+    func replace<> {}
 
 ``@get_subobject``
 
-  A method marked ``@get_subobject`` must fullfill all of ``@preserve_unique``'s
+  A method marked ``@get_subobject`` must fulfill all of ``@preserve_unique``'s
   guarantees. Furthermore, it must return a 'subobject' that is stored by the
   set of storage objects or a value stored in the CoW struct itself. It must be
   guaranteed that the 'subobject' returned is kept alive as long the current
@@ -219,7 +219,7 @@ state.
       var size : Int
 
       @get_subobject
-      func getElement(index: Int) -> T {
+      func getElement(_ index: Int) -> T {
         return storage.elementAt(index)
       }
 
@@ -233,7 +233,7 @@ state.
     @effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject)
-    func getElement(index: Int) -> T {}
+    func getElement(_ index: Int) -> T {}
 
 .. note::
 
@@ -245,7 +245,7 @@ state.
 
 ``@get_subobject_non_bridged``
 
-  A method marked ``@get_subobject`` must fullfill all of ``@preserve_unique``'s
+  A method marked ``@get_subobject`` must fulfill all of ``@preserve_unique``'s
   guarantees. Furthermore, it must return a 'subobject' that is stored by the
   set of storage objects or a value stored in the CoW struct itself. It must be
   guaranteed that the 'subobject' returned is kept alive as long the current
@@ -261,7 +261,7 @@ state.
       var size : Int
 
       @get_subobject_non_bridged
-      func getElement(index: Int) -> T {
+      func getElement(_ index: Int) -> T {
         return storage.elementAt(index)
       }
 
@@ -275,12 +275,12 @@ state.
     @nonbridged_effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject)
-    func getElement(index: Int) -> T {}
+    func getElement(_ index: Int) -> T {}
 
 
 ``@get_subobject_addr``
 
-  A method marked ``@get_subobject_addr`` must fullfill all of
+  A method marked ``@get_subobject_addr`` must fulfill all of
   ``@preserve_unique``'s guarantees. Furthermore, it must return the address of
   a 'subobject' that is stored by the set of storage objects. It is guaranteed
   that the 'subobject' at the address returned is kept alive as long the current
@@ -291,7 +291,7 @@ state.
       var storage: ArrayStorage
 
       @get_subobject_addr
-      func getElementAddr(index: Int) -> UnsafeMutablePointer<T> {
+      func getElementAddr(_ index: Int) -> UnsafeMutablePointer<T> {
         return storage.elementAddrAt(index)
       }
 
@@ -300,11 +300,11 @@ state.
     @effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject_addr)
-    func getElementAddr(index: Int) -> T {}
+    func getElementAddr(_ index: Int) -> T {}
 
 ``@initialize_subobject``
 
-  A method marked ``@initialize_subobject`` must fullfill all of
+  A method marked ``@initialize_subobject`` must fulfill all of
   ``@preserve_unique``'s guarantees. The method must only store its arguments
   into *uninitialized* storage. The only effect to non-self state is the capture
   of the method's arguments.::
@@ -313,7 +313,7 @@ state.
       var storage: ArrayStorage
 
       @initialize_subobject
-      func appendAssumingUniqueStorage(elt: T) {
+      func appendAssumingUniqueStorage(_ elt: T) {
         storage.append(elt)
       }
     }
@@ -332,7 +332,7 @@ state.
 
 ``@set_subobject``
 
-  A method marked ``@set_subobject`` must fullfill all of
+  A method marked ``@set_subobject`` must fulfill all of
   ``@preserve_unique``'s guarantees. The method must only store its arguments
   into *initialized* storage. The only effect to non-self state is the capture
   of the method's arguments and the release of objects of the method arguments'
@@ -342,8 +342,8 @@ state.
       var storage: ArrayStorage
 
       @set_subobject
-      func setElement(elt: T, atIndex: Int) {
-        storage.set(elt, atIndex)
+      func setElement(_ elt: T, at index: Int) {
+        storage.set(elt, index)
       }
     }
 
@@ -386,7 +386,7 @@ Example:::
     }
 
     @preserveunique
-    func getElementAddr(index: Int) -> UnsafeMutablePointer<T> {
+    func getElementAddr(_ index: Int) -> UnsafeMutablePointer<T> {
       return storage.elementAddrAt(index)
     }
 
@@ -400,7 +400,7 @@ Example:::
 
 When the optimizer optimizes a loop:::
 
-  func memset(inout A: [Int], value: Int) {
+  func memset(A: inout [Int], value: Int) {
     for i in 0 .. A.size {
       A[i] = value
       f()
@@ -409,11 +409,11 @@ When the optimizer optimizes a loop:::
 
 It will see the following calls because methods with attributes are not inlined.::
 
-  func memset(inout A: [Int], value: Int) {
+  func memset(A: inout [Int], value: Int) {
     for i in 0 .. A.size {
       makeUnique(&A)
       addr = getElementAddr(i, &A)
-      addr.memory = value
+      addr.pointee = value
       f()
     }
   }
@@ -427,14 +427,14 @@ the object named by 'A' and therefore cannot modify it.
 Why do we need ``@get_subobject``, ``@initialize_subobject``, and
 ``@set_subobject``?
 
-We want to be able to hoist ``makeunique`` calls when the array is not identfied
+We want to be able to hoist ``makeunique`` calls when the array is not identified
 by a unique name.::
 
   class AClass {
     var array: [Int]
   }
 
-  func copy(a : AClass, b : AClass) {
+  func copy(_ a : AClass, b : AClass) {
     for i in min(a.size, b.size) {
        a.array.append(b.array[i])
     }
@@ -452,7 +452,7 @@ Further we would like to reason that:::
 
   a.array.append
 
-cannot change the uniqueness state of the instance of array 'a.array' accross
+cannot change the uniqueness state of the instance of array 'a.array' across
 iterations. We can conclude so because ``appendAssumingUnique``'s side-effects
 guarantee that no destructor can run - it's only side-effect is that ``tmp``
 is captured and initializes storage in the array - these are the only
@@ -473,7 +473,7 @@ and further releases an element of type T - these are the only side-effects
 according to ``@set_subobject``::
 
  @set_subobject
- func setElement(e: T, index: Int) {
+ func setElement(_ e: T, index: Int) {
    storage->setElement(e, index)
  }
 
@@ -482,7 +482,7 @@ destructor can have arbitrary side-effects. Therefore, it is not valid to hoist
 the makeUnique in the code without proving that 'T's destructor cannot change
 the uniqueness state. This is trivial for trivial types but requires a more
 sophisticated analysis for class types (and in general cannot be disproved). In
-following example we can only hoist makeUnique if we can prove that  elt's, and
+following example we can only hoist makeUnique if we can prove that elt's, and
 elt2's destructor can't change the uniqueness state of the arrays.::
 
  for i in 0 ..< min(a.size, b.size) {
@@ -512,7 +512,7 @@ Furthermore, methods marked with ``@get_subobject`` will allow us to remove
 redundant calls to read-only like methods on COW type instances assuming we can
 prove that the instance is not changed in between them.::
 
-  func f(a: [Int]) {
+  func f(_ a: [Int]) {
    @get_subobject
    count(a)
    @get_subobject
@@ -535,7 +535,7 @@ User-Specified Effects, Syntax and Defaults
 Mostly TBD.
 
 The optimizer can only take advantage of user-specified effects before
-they have been inlined. Consequently, the optimizer initialy preserves
+they have been inlined. Consequently, the optimizer initially preserves
 calls to annotated @effects() functions. After optimizing for effects
 these functions can be inlined, dropping the effects information.
 
@@ -559,10 +559,10 @@ generic arguments::
 
   struct MyContainer<T> {
     var t: T
-    func setElt(elt: T) { t = elt }
+    func setElt(_ elt: T) { t = elt }
   }
 
-With no knowledge of T.deinit() we must assume worst case. SIL effects
+With no knowledge of T.deinit() we must assume the worst case. SIL effects
 analysis following specialization can easily handle such a trivial
 example. But there are two situations to be concerned about:
 
@@ -617,7 +617,7 @@ optimizing the surrounding code.
 For example::
 
   func bar<T>(t: T) {...}
-   
+
   func foo<T>(t: T, N: Int) {
     for _ in 1...N {
       bar(t)
@@ -644,12 +644,12 @@ defined types composed from Arrays, Sets, and Strings.
 Conceptually, a pure value does not share state with another
 value. Any trivial struct is automatically pure. Other structs can be
 declared pure by the author. It then becomes the author's
-resonsibility to guarantee value semantics. For instance, any stored
+responsibility to guarantee value semantics. For instance, any stored
 reference into the heap must either be to immutable data or protected
 by CoW.
 
 Since a pure value type can in practice share implementation state, we
-need an enforcable definition of such types. More formally:
+need an enforceable definition of such types. More formally:
 
 - Copying or destroying a pure value cannot affect other program
   state.
@@ -700,7 +700,7 @@ the need of sophisticated alias or escape analysis.
 
 Consider this example.::
 
-    func add(arr: Array<Int>, i: Int) -> Int {
+    func add(_ arr: Array<Int>, i: Int) -> Int {
       let e1 = arr[i]
       unknownFunction()
       let e2 = arr[i]
@@ -708,7 +708,7 @@ Consider this example.::
 
 This code is generated to something like::
 
-    func add(arr: Array<Int>, i: Int) -> Int {
+    func add(_ arr: Array<Int>, i: Int) -> Int {
       let e1 = getElement(i, arr)
       unknownFunction()
       let e2 = getElement(i, arr)
@@ -738,7 +738,7 @@ effects. This is the crux of the difficulty in defining the CoW
 effects. Consequently, communicating purity to the compiler will
 require some function annotations and/or type constraints.
 
-A CoW type consits of a top-level value type, most likely a struct, and a
+A CoW type consists of a top-level value type, most likely a struct, and a
 referenced storage, which may be shared between multiple instances of the CoW
 type.
 
@@ -757,7 +757,7 @@ struct but only the referenced storage.
 
 Let's assume we have a setElement function in Array.::
 
-    mutating func setElement(i: Int, e: Element) {
+    mutating func setElement(_ i: Int, e: Element) {
       storage[i] = e
     }
 
@@ -768,7 +768,8 @@ after the mutating function. This lets the second ``getElement`` function get
 another array parameter which prevents CSE of the two ``getElement`` calls.
 Shown in this swift-SIL pseudo code::
 
-    func add(var arr: Array<Int>, i: Int) -> Int {
+    func add(arr: Array<Int>, i: Int) -> Int {
+      var arr = arr
       let e1 = getElement(i, arr)
       store arr to stack_array
       setElement(i, 0, &stack_array)
@@ -782,7 +783,8 @@ which directly access the storage, are not inlined during high-level SIL.
 Optimizations like code motion could move a store to the storage over a
 ``readnone getElement``.::
 
-    func add(var arr: Array<Int>, i: Int) -> Int {
+    func add(arr: Array<Int>, i: Int) -> Int {
+      var arr = arr
       let e1 = getElement(i, arr)
       store arr to stack_array
       stack_array.storage[i] = 0          // (1)
@@ -795,7 +797,7 @@ Store (1) and load (2) do not alias and (3) is defined as ``readnone``. So (1)
 could be moved over (3).
 
 Currently inlining is prevented in high-level SIL for all functions which
-have an semantics or effect attribute. Therefore we could say that the
+have a semantics or effect attribute. Therefore we could say that the
 implementor of a pure value type has to define effects on all member functions
 which eventually can access or modify the storage.
 
@@ -842,7 +844,7 @@ Inferring Function Purity
 
 The optimizer can infer function purity by knowing that (1) the
 function does not access unspecified state, (2) all arguments are pure
-values, and (3) no calls are made into nonpure code.
+values, and (3) no calls are made into non-pure code.
 
 (1) The effects system described above already tells the optimizer via
     analysis or annotation that the function does not access
@@ -853,7 +855,7 @@ values, and (3) no calls are made into nonpure code.
     type definition, or it may rely on a type constraint.
 
 (3) Naturally, any calls within the function body must be transitively
-    pure. There is no need to check a calls to the storage
+    pure. There is no need to check calls to the storage
     deinitializer, which should already be guaranteed pure by virtue
     of (2).
 
@@ -919,5 +921,5 @@ Generally, a default-safe policy provides a much better user model
 from some effects. For example, we could decide that functions cannot
 affect unspecified state by default. If the user accesses globals,
 they then need to annotate their function. However, default safety
-dictates that any neccessary annotations should be introduced before
+dictates that any necessary annotations should be introduced before
 declaring API stability.

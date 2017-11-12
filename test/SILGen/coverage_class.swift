@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_class %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_class %s | %FileCheck %s
 
 class C {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.foo
@@ -26,5 +26,5 @@ enum E {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.E.foo
   func foo() {}
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.E.init
-  init() { self = Y }
+  init() { self = .Y }
 }

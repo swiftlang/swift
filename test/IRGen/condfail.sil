@@ -1,15 +1,69 @@
-// RUN: %target-swift-frontend -primary-file %s -g -emit-ir  | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-NOOPT-%target-os
 
 import Builtin
 import Swift
 
 // Make sure we emit two traps.
 
-// CHECK-LABEL: define {{.*}} @test_cond_fail({{.*}}) {{.*}} {
-// CHECK:  call void @llvm.trap()
-// CHECK:  call void @llvm.trap()
-// CHECK: }
+// CHECK-LABEL:       test_cond_fail:
 
+// CHECK-x86_64:      .cfi_startproc
+// CHECK-i386:        .cfi_startproc
+// CHECK-arm64:       .cfi_startproc
+// CHECK-armv7:       Lfunc_begin
+// CHECK-armv7s:      Lfunc_begin
+// CHECK-powerpc64:   .cfi_startproc
+// CHECK-powerpc64le: .cfi_startproc
+// CHECK-s390x:       .cfi_startproc
+// CHECK-OPT-macosx:  ## InlineAsm Start
+// CHECK-OPT-macosx:  ## InlineAsm End
+// CHECK-OPT-linux:   ##APP
+// CHECK-OPT-linux:   ##NO_APP
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm Start
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm End
+// CHECK-NOOPT-linux-NOT:  ##APP
+// CHECK-NOOPT-linux-NOT:  ##NO_APP
+// CHECK-x86_64:      ud2
+// CHECK-i386:        ud2
+// CHECK-arm64:       brk
+// CHECK-armv7:       trap
+// CHECK-armv7s:      trap
+// CHECK-powerpc64:   trap
+// CHECK-powerpc64le: trap
+// CHECK-s390x:       j       .Ltmp{{[0-9]+}}+2
+// CHECK-NOT-x86_64:      .cfi_endproc
+// CHECK-NOT-i386:        .cfi_endproc
+// CHECK-NOT-arm64:       .cfi_endproc
+// CHECK-NOT-armv7:       Lfunc_end
+// CHECK-NOT-armv7s:      Lfunc_end
+// CHECK-NOT-powerpc64:   .cfi_endproc
+// CHECK-NOT-powerpc64le: .cfi_endproc
+// CHECK-NOT-s390x:       .cfi_endproc
+// CHECK-OPT-macosx:  ## InlineAsm Start
+// CHECK-OPT-macosx:  ## InlineAsm End
+// CHECK-OPT-linux:   ##APP
+// CHECK-OPT-linux:   ##NO_APP
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm Start
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm End
+// CHECK-NOOPT-linux-NOT:  ##APP
+// CHECK-NOOPT-linux-NOT:  ##NO_APP
+// CHECK-x86_64:      ud2
+// CHECK-i386:        ud2
+// CHECK-arm64:       brk
+// CHECK-armv7:       trap
+// CHECK-armv7s:      trap
+// CHECK-powerpc64:   trap
+// CHECK-powerpc64le: trap
+// CHECK-s390x:       j       .Ltmp{{[0-9]+}}+2
+// CHECK-x86_64:      .cfi_endproc
+// CHECK-i386:        .cfi_endproc
+// CHECK-arm64:       .cfi_endproc
+// CHECK-armv7:       Lfunc_end
+// CHECK-armv7s:      Lfunc_end
+// CHECK-powerpc64:   .cfi_endproc
+// CHECK-powerpc64le: .cfi_endproc
+// CHECK-s390x:       .cfi_endproc
 sil hidden @test_cond_fail : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %2 = integer_literal $Builtin.Int32, 1
@@ -20,8 +74,9 @@ bb0(%0 : $Int32):
   %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %7 : $Builtin.Int1
   %8 = builtin "sadd_with_overflow_Int32"(%6 : $Builtin.Int32, %2 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
-  %9 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1
-  cond_fail %9 : $Builtin.Int1
-  %10 = struct $Int32 (%6 : $Builtin.Int32)
-  return %10 : $Int32
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0
+  %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %10 : $Builtin.Int1
+  %11 = struct $Int32 (%9 : $Builtin.Int32)
+  return %11 : $Int32
 }

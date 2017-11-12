@@ -70,7 +70,7 @@ example, the following is a valid initializer::
       completeInit()
     }
 
-    func completeInit() { /* ... */ }    
+    func completeInit() { /* ... */ }
   }
 
 After all stored properties have been initialized, one is free to use
@@ -96,7 +96,7 @@ in that order. For example, consider a subclass ``B`` of ``A``::
       completeInitForB()            // perform other tasks
     }
 
-    func completeInitForB() { /* ... */ }    
+    func completeInitForB() { /* ... */ }
   }
 
 Consider the following construction of an object of type ``B``::
@@ -109,7 +109,7 @@ Consider the following construction of an object of type ``B``::
   initialize stored properties *before* chaining to the superclass
   initializer. This is part of Swift's memory safety guarantee, and
   is discussed further in the section on `Three-Phase
-  Initialization`_. 
+  Initialization`_.
 
 Initialization proceeds in several steps:
 
@@ -164,7 +164,7 @@ to construct objects, using the same syntax. For example, the ``A``
 initializer above can be used to build a new ``A`` object without any
 arguments::
 
-  var a2 = A() // uses convenience initializer  
+  var a2 = A() // uses convenience initializer
 
 Initializer Inheritance
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,14 +189,14 @@ Initialization proceeds as follows:
    ``B``'s designated initializer.
 4. ``B``'s designated initializer initializes the stored property
    ``d`` to ``17.0``.
-5. ``B``'s designated initializer chains to ``A``'s designated 
+5. ``B``'s designated initializer chains to ``A``'s designated
    initializer.
 6. ``A``'s designated initializer initialize's the stored properties
    ``i`` and ``s``'.
 7. ``A``'s designated initializer calls ``completeInit()``, then
    returns.
 8. ``B``'s designated initializer calls ``completeInitForB()``, then
-   returns. 
+   returns.
 9. ``A``'s convenience initializer returns.
 
 Convenience initializers are only inherited under certain
@@ -276,7 +276,7 @@ When a particular class does not specify any designated initializers,
 the implementation will synthesize initializers for the class when all
 of the class's stored properties have initial values in the class. The
 form of the synthesized initializers depends on the superclass (if
-present). 
+present).
 
 When a superclass is present, the compiler synthesizes a new
 designated initializer in the subclass for each designated initializer
@@ -345,7 +345,7 @@ performed at runtime, with the actual subclass being determined via
 some external file that describes the user interface. The actual
 instantiation of the object would use a type value::
 
-  func createView(viewClass: View.Type, frame: Rect) -> View {
+  func createView(_ viewClass: View.Type, frame: Rect) -> View {
     return viewClass(frame: frame) // error: 'init frame:' is not 'required'
   }
 
@@ -356,12 +356,12 @@ the subclass might have taken over its own initialization (as with
 particular initializer, use the ``required`` attribute as follows::
 
   class View {
-    @required init frame(Rect) { 
-      /* initialize view */ 
+    @required init frame(Rect) {
+      /* initialize view */
     }
   }
 
-  func createView(viewClass: View.Type, frame: Rect) -> View {
+  func createView(_ viewClass: View.Type, frame: Rect) -> View {
     return viewClass(frame: frame) // okay
   }
 
@@ -413,7 +413,7 @@ declaring conformance to the protocol will also have the initializer,
 so they too will conform to the protocol. This allows one to construct
 objects given type values of protocol type::
 
-  func createAnyDefInit(typeVal: DefaultInitializable.Type) -> DefaultInitializable {
+  func createAnyDefInit(_ typeVal: DefaultInitializable.Type) -> DefaultInitializable {
     return typeVal()
   }
 
@@ -444,7 +444,7 @@ itself during initialization, one can write a de-initializer using
 The statements within a de-initializer (here, the call to ``close``)
 execute first, then the superclass's de-initializer is
 called. Finally, stored properties are released and the object is
-deallocated. 
+deallocated.
 
 Methods Returning ``Self``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -456,7 +456,7 @@ return an object with the same dynamic type as ``self``. One of the
 primary uses of the ``Self`` return type is for factory methods::
 
   extension View {
-    class func createView(frame: Rect) -> Self {
+    class func createView(_ frame: Rect) -> Self {
       return self(frame: frame)
     }
   }
@@ -482,12 +482,12 @@ allow chaining of method calls by returning ``Self`` from each method,
 as in the builder pattern::
 
   class DialogBuilder {
-    func setTitle(title: String) -> Self {
+    func setTitle(_ title: String) -> Self {
       // set the title
       return self;
     }
 
-    func setBounds(frame: Rect) -> Self {
+    func setBounds(_ frame: Rect) -> Self {
       // set the bounds
       return self;
     }
@@ -560,7 +560,7 @@ call to the superclass initializer::
   resilient to ``nil`` objects, this default behavior eliminates (or
   hides) many such initialization bugs. In Swift, however, the
   zero-initialized state is less likely to be valid, and the memory
-  safety goals are stronger, so zero-initialization does not suffice. 
+  safety goals are stronger, so zero-initialization does not suffice.
 
 When initializing a ``B`` object, the ``NSLog`` statement will print::
 
@@ -576,10 +576,10 @@ of the current class (not its superclasses!). Additionally, this
 initialization directly writes to the storage of the stored
 properties, and does not call any setter or ``willSet``/``didSet``
 method. In this phase, it is not possible to read any of the stored
-properties. 
+properties.
 
 2. Call to superclass initializer, if any. As with the first step,
-``self`` cannot be accessed at all. 
+``self`` cannot be accessed at all.
 
 3. Perform any additional initialization tasks, which may call methods
 on ``self``, access properties, and so on.

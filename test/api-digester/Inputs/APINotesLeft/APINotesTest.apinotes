@@ -1,0 +1,7 @@
+Name: APINotesTest
+Globals:
+  - Name: ANTGlobalValue
+    SwiftName: OldType.oldMember
+Protocols:
+  - Name: TypeWithMethod
+    SwiftName: SwiftTypeWithMethodLeft

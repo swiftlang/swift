@@ -1,11 +1,11 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 // CHECK-NOT: @_TWvi{{.*}}
-// CHECK: _TWvdvC12rdar153043293Bar3fooGVS_3FooSi_
+// CHECK: _T012rdar153043293BarC3fooAA3FooVySiGvpWvd
 // CHECK-NOT: @_TWvi{{.*}}
 
 import Foundation

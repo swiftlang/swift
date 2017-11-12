@@ -1,0 +1,287 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
+
+// UNSUPPORTED: resilient_stdlib
+
+// REQUIRES: CPU=x86_64
+
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+import c_layout
+import Builtin
+import Swift
+
+struct BigTempStruct<T> {
+  var i0 : Int32
+  var i1 : Int32
+  var i2 : Int32
+  var i3 : Int32
+  var i4 : Int32
+  var i5 : Int32
+  var i6 : Int32
+  var i7 : Int32
+  var i8 : Int32
+}
+
+public struct BigStruct {
+  var i0 : Int32 = 0
+  var i1 : Int32 = 1
+  var i2 : Int32 = 2
+  var i3 : Int32 = 3
+  var i4 : Int32 = 4
+  var i5 : Int32 = 5
+  var i6 : Int32 = 6
+  var i7 : Int32 = 7
+  var i8 : Int32 = 8
+}
+
+public struct BigBigStruct {
+  var s : BigStruct
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
+// CHECK:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
+sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
+entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
+  %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
+  return %r : $BitfieldOne
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testTupleExtract
+// CHECK:         call void {{%.*}}(%TSC11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSC11BitfieldOneV* byval align 8 {{%.*}})
+sil @testTupleExtract : $@convention(thin) (@owned (BitfieldOne, @convention(block) (BitfieldOne) -> BitfieldOne), BitfieldOne) -> BitfieldOne  {
+entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x : $BitfieldOne):
+  %a = tuple_extract %b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), 1
+  %r = apply %a(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
+  return %r : $BitfieldOne
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret, %swift.bridge*, %swift.type* %Element) #0 {
+// CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases13BigTempStructV
+// CHECK: call swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret [[ALLOC]], %swift.bridge* %1, %swift.type* %Element)
+// CHECK: ret void
+sil @testBigTempStruct : $@convention(method) <Element> (@guaranteed _ArrayBuffer<Element>) -> @owned BigTempStruct<Element> {
+bb0(%0 : $_ArrayBuffer<Element>):
+  // function_ref specialized _ArrayBuffer.subscript.getter
+  %4 = function_ref @testBigTempStruct : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
+  %9 = apply %4<Element>(%0) : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
+  return %9 : $BigTempStruct<Element>
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testTryApply(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i8*, %swift.refcounted*, %swift.refcounted* swiftself, %swift.error** swifterror) #0 {
+// CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]]
+// CHECK: ret void
+sil @testTryApply : $@convention(thin)(() -> (@owned BigStruct, @error Error)) -> (@owned BigStruct, @error Error) {
+bb0(%0 : $() -> (@owned BigStruct, @error Error)):
+  try_apply %0() : $() -> (@owned BigStruct, @error Error), normal bb1, error bb2
+
+bb1(%ret : $BigStruct):
+  %s = struct $BigBigStruct (%ret : $BigStruct)
+  return %ret : $BigStruct
+  
+bb2(%err : $Error):
+  throw %err : $Error
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @testThinFuncPointer(%swift.type* %"BigTempStruct<Element>", %T22big_types_corner_cases13BigTempStructV* noalias nocapture swiftself dereferenceable({{.*}}) #0 {
+// CHECK-NEXT: entry
+// CHECK-NEXT: ret i8* bitcast (i8* (%swift.type*, %T22big_types_corner_cases13BigTempStructV*)* @testThinFuncPointer to i8*)
+sil @testThinFuncPointer : $@convention(method) <Element> (@guaranteed BigTempStruct<Element>) -> @owned Builtin.RawPointer {
+bb0(%0 : $BigTempStruct<Element>):
+  // function_ref specialized BigTempStruct.subscript.getter
+  %fref = function_ref @testThinFuncPointer : $@convention(method) <τ_0_0> (@guaranteed BigTempStruct<τ_0_0>) -> @owned Builtin.RawPointer
+  %ret = thin_function_to_pointer %fref : $@convention(method) <τ_0_0> (@guaranteed BigTempStruct<τ_0_0>) -> @owned Builtin.RawPointer to $Builtin.RawPointer
+  return %ret : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testFuncWithModBlockStorageApply({ %objc_block, %swift.function }* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) #0 {
+// CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %1
+// CHECK: ret void
+sil @testFuncWithModBlockStorageApply : $@convention(thin) (@inout_aliasable @block_storage @callee_owned (@owned BigStruct) -> (), BigStruct) -> () {
+// %0                                             // user: %5
+// %1                                             // users: %12, %13, %7
+// %2                                             // user: %20
+// %3                                             // user: %20
+// %4                                             // user: %20
+bb0(%0 : $*@block_storage @callee_owned (@owned BigStruct) -> (), %1 : $BigStruct):
+  %proji = project_block_storage %0 : $*@block_storage @callee_owned (@owned BigStruct) -> () // user: %6
+  %ldi = load %proji : $*@callee_owned (@owned BigStruct) -> () // users: %11, %17, %20
+  %appi = apply %ldi(%1) : $@callee_owned (@owned BigStruct) -> ()
+  %ret = tuple ()                                  // user: %22
+  return %ret : $()                                // id: %22
+}
+
+
+sil public_external @c_return_func : $@convention(thin) () -> () -> @owned BigStruct
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @part_apply_caller() #0 {
+// CHECK: [[CALLEXT:%.*]] = call swiftcc { i8*, %swift.refcounted* } @c_return_func()
+// CHECK: [[VALEXT:%.*]] = extractvalue { i8*, %swift.refcounted* } [[CALLEXT]], 1
+// CHECK: store %swift.refcounted* [[VALEXT]], %swift.refcounted**
+// CHECK: [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%T22big_types_corner_cases9BigStructV*, i64, %swift.refcounted*)* @_T017part_apply_calleeTA to i8*), %swift.refcounted* undef }, %swift.refcounted*
+// CHECK: ret { i8*, %swift.refcounted* } [[RET]]
+
+// CHECK-LABEL: define internal swiftcc void @_T017part_apply_calleeTA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i64, %swift.refcounted* swiftself) #0 {
+// CHECK: bitcast %swift.refcounted* %2 to <{ %swift.refcounted, %swift.function }>*
+// CHECK: ret void
+
+sil @part_apply_caller : $@convention(thin) () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct {
+bb0:
+  %ref_c = function_ref @c_return_func :$@convention(thin) () -> () -> @owned BigStruct
+  %apply_c = apply %ref_c() : $@convention(thin) () -> () -> @owned BigStruct
+  %ref_part_apply = function_ref @part_apply_callee : $@convention(thin) (@owned Builtin.Int64, () -> @owned BigStruct) -> @owned BigStruct
+  %ret = partial_apply %ref_part_apply(%apply_c) : $@convention(thin) (@owned Builtin.Int64, () -> @owned BigStruct) -> @owned BigStruct
+  return %ret : $@callee_owned (@owned Builtin.Int64) -> @owned BigStruct
+}
+
+sil private @part_apply_callee : $@convention(thin) (@owned Builtin.Int64, () -> @owned BigStruct) -> @owned BigStruct {
+bb0(%0 : $Builtin.Int64, %1 : $() -> @owned BigStruct):
+  return undef : $BigStruct
+}
+
+// CHECK-LABEL: define swiftcc void @poninter_to_mod_ret(i8*, %swift.refcounted*) #0 {
+// CHECK: [[BITCAST:%.*]] = bitcast i8* %0 to { i8*, %swift.refcounted* } (%swift.refcounted*)*
+// CHECK: [[CALL:%.*]] = call swiftcc { i8*, %swift.refcounted* } [[BITCAST]](%swift.refcounted* swiftself %1)
+// CHECK: extractvalue { i8*, %swift.refcounted* } [[CALL]], 0
+// CHECK: extractvalue { i8*, %swift.refcounted* } [[CALL]], 1
+// CHECK: ret void
+sil @poninter_to_mod_ret : $@convention(thin) (@owned @callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct) -> () {
+bb0(%funcpointer : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct):
+  %papply = apply %funcpointer() : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define swiftcc { i64, i64 } @ret_pointer_to_mod() #0 {
+// CHECK-NEXT: entry
+// CHECK-NEXT: ret { i64, i64 } zeroinitializer
+sil @ret_pointer_to_mod : $@convention(thin) () -> @owned Optional<@callee_owned () -> @owned Optional<BigStruct>> {
+bb0:
+  %0 = enum $Optional<@callee_owned () -> @owned Optional<BigStruct>>, #Optional.none!enumelt // user: %1
+  return %0 : $Optional<@callee_owned () -> @owned Optional<BigStruct>> // id: %1
+}
+
+//////////////////////
+// Autoclosure Test //
+//////////////////////
+
+class SuperBase {
+}
+
+class SuperSub : SuperBase {
+}
+
+sil @boom : $@convention(thin) (@guaranteed SuperBase) -> BigStruct
+
+sil [transparent] @autoclosure_rhs : $@convention(thin) (@owned SuperSub) -> (BigStruct, @error Error) {
+bb0(%0 : $SuperSub):
+  strong_retain %0 : $SuperSub
+  %5 = upcast %0 : $SuperSub to $SuperBase
+  %6 = function_ref @boom : $@convention(thin) (@guaranteed SuperBase) -> BigStruct
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed SuperBase) -> BigStruct
+  strong_release %5 : $SuperBase
+  strong_release %0 : $SuperSub
+  return %7 : $BigStruct
+}
+
+sil @get_optional_none : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+sil @short_circuit_operation : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+sil @autoclosure_partialapply : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @closure(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*) #0 {
+// CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
+// CHECK-64: call swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
+// CHECK: ret void
+sil @closure : $@convention(thin) (@owned SuperSub) -> BigStruct {
+bb0(%0 : $SuperSub):
+  %2 = function_ref @short_circuit_operation : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
+  %3 = alloc_stack $BigStruct
+  %4 = function_ref @get_optional_none : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+  %5 = alloc_stack $Optional<BigStruct>
+  %6 = metatype $@thin Optional<BigStruct>.Type
+  %7 = apply %4<BigStruct>(%5, %6) : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+  %8 = load %5 : $*Optional<BigStruct>
+  %9 = alloc_stack $Optional<BigStruct>
+  store %8 to %9 : $*Optional<BigStruct>
+
+  %11 = function_ref @autoclosure_rhs : $@convention(thin) (@owned SuperSub) -> (BigStruct, @error Error)
+  strong_retain %0 : $SuperSub
+  %13 = partial_apply %11(%0) : $@convention(thin) (@owned SuperSub) -> (BigStruct, @error Error)
+
+  %14 = function_ref @autoclosure_partialapply : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
+  %15 = partial_apply %14(%13) : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
+  try_apply %2<BigStruct>(%3, %9, %15) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal bb1, error bb2
+
+bb1(%17 : $()):
+  dealloc_stack %9 : $*Optional<BigStruct>
+  dealloc_stack %5 : $*Optional<BigStruct>
+  %20 = load %3 : $*BigStruct
+  dealloc_stack %3 : $*BigStruct
+  strong_release %0 : $SuperSub
+  return %20 : $BigStruct
+
+bb2(%24 : $Error):
+  unreachable
+}
+
+sil @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @closureToConvert() #0 {
+// CHECK: entry:
+// CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
+// CHECK:   call swiftcc void @returnBigStruct(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]])
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @closureToConvert : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @returnBigStruct : $@convention(thin) () -> @owned BigStruct
+  %apply = apply %f() : $@convention(thin) () -> @owned BigStruct
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testConvertFunc() #0 {
+// CHECK: entry:
+// CHECK:   call swiftcc void bitcast (void ()* @closureToConvert to void (%swift.refcounted*)*)(%swift.refcounted* swiftself null)
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @testConvertFunc : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @closureToConvert : $@convention(thin) () -> ()
+  %cf = convert_function %f : $@convention(thin) () -> () to $@noescape @convention(thin) () -> ()
+  %thick = thin_to_thick_function %cf : $@noescape @convention(thin) () -> () to $@noescape @callee_owned () -> ()
+  %apply = apply %thick() : $@noescape @callee_owned () -> ()
+  %99 = tuple ()
+  return %99 : $()
+}
+
+sil @convertToThickHelper : $@convention(thin) (@owned BigStruct) -> ()
+
+// CHECK-LABAL: define {{.*}} swiftcc void @convertToThick(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}})) #0 {
+// CHECK: entry:
+// CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV, align 4
+// CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64
+// CHECK:   call swiftcc void bitcast (void (%T22big_types_corner_cases9BigStructV*)* @convertToThickHelper to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*)(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) [[ALLOC]], %swift.refcounted* swiftself null)
+// CHECK:   ret void
+// CHECK-LABEL: }
+sil @convertToThick : $@convention(thin) (@in BigStruct) -> () {
+bb0(%0 : $*BigStruct):
+  %3 = function_ref @convertToThickHelper : $@convention(thin) (@owned BigStruct) -> ()
+  %4 = convert_function %3 : $@convention(thin) (@owned BigStruct) -> () to $@convention(thin) @noescape (@owned BigStruct) -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) @noescape (@owned BigStruct) -> () to $@noescape @callee_owned (@owned BigStruct) -> ()
+  %8 = load %0 : $*BigStruct
+  %10 = apply %5(%8) : $@noescape @callee_owned (@owned BigStruct) -> ()
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil_vtable SuperBase {
+}
+
+sil_vtable SuperSub {
+}
+

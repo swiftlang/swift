@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -6,6 +6,7 @@
 
 // rdar://20990451 is tracking the fix for compiling this test optimized.
 // XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_size
 // XFAIL: swift_test_mode_optimize_unchecked
 
 import Foundation
@@ -14,7 +15,7 @@ protocol Fooable {
   func foo()
 }
 
-func fooify<T>(x: T) {
+func fooify<T>(_ x: T) {
   if let foo = x as? Fooable {
     foo.foo()
   } else {

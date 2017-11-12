@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-run-simple-swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
 
 // Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
@@ -29,7 +29,7 @@ extension Int: Fooable {
   func foo() { print("Int") }
 }
 
-func fooify<T>(x: T) {
+func fooify<T>(_ x: T) {
   if let foo = x as? Fooable {
     foo.foo()
   } else {
@@ -96,14 +96,14 @@ let foo: Fooable = 2
 if let bar = foo as? Barrable {
   bar.bar() // CHECK-NEXT: Int.bar
 } else {
-  print("not barrable")
+  print("not barrable 1")
 }
 
 let foo2: Fooable = S()
 if let bar2 = foo2 as? Barrable {
   bar2.bar()
 } else {
-  print("not barrable") // CHECK-NEXT: not barrable
+  print("not barrable 2") // CHECK-NEXT: not barrable
 }
 
 protocol Runcible: class {
@@ -116,13 +116,13 @@ extension C: Runcible {
 
 let c1: AnyObject = C()
 let c2: Any = C()
-if let fruncible = c1 as? protocol<Fooable, Runcible> {
+if let fruncible = c1 as? Fooable & Runcible {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {
   print("not fooable and runcible")
 }
-if let fruncible = c2 as? protocol<Fooable, Runcible> {
+if let fruncible = c2 as? Fooable & Runcible {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {

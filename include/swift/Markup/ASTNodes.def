@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -61,6 +61,9 @@ MARKUP_AST_NODE(PrivateExtension, MarkupASTNode)
   MARKUP_AST_NODE(ExperimentField, PrivateExtension)
   MARKUP_AST_NODE(ImportantField, PrivateExtension)
   MARKUP_AST_NODE(InvariantField, PrivateExtension)
+  MARKUP_AST_NODE(LocalizationKeyField, PrivateExtension)
+  MARKUP_AST_NODE(MutatingvariantField, PrivateExtension)
+  MARKUP_AST_NODE(NonmutatingvariantField, PrivateExtension)
   MARKUP_AST_NODE(NoteField, PrivateExtension)
   MARKUP_AST_NODE(PostconditionField, PrivateExtension)
   MARKUP_AST_NODE(PreconditionField, PrivateExtension)
@@ -70,6 +73,7 @@ MARKUP_AST_NODE(PrivateExtension, MarkupASTNode)
   MARKUP_AST_NODE(RequiresField, PrivateExtension)
   MARKUP_AST_NODE(SeeField, PrivateExtension)
   MARKUP_AST_NODE(SinceField, PrivateExtension)
+  MARKUP_AST_NODE(TagField, PrivateExtension)
   MARKUP_AST_NODE(TODOField, PrivateExtension)
   MARKUP_AST_NODE(ThrowsField, PrivateExtension)
   MARKUP_AST_NODE(VersionField, PrivateExtension)

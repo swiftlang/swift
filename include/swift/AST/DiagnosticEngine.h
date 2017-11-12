@@ -1,12 +1,12 @@
-//===- DiagnosticEngine.h - Diagnostic Display Engine -----------*- C++ -*-===//
+//===--- DiagnosticEngine.h - Diagnostic Display Engine ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,23 +18,16 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Identifier.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/Basic/DiagnosticConsumer.h"
-#include "swift/Basic/SourceLoc.h"
-#include "clang/Basic/VersionTuple.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/StringRef.h"
-#include <string>
-#include <utility>
+#include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/DiagnosticConsumer.h"
 
 namespace swift {
   class Decl;
   class DiagnosticEngine;
   class SourceManager;
+  class ValueDecl;
   
   enum class PatternKind : uint8_t;
   enum class StaticSpellingKind : uint8_t;
@@ -79,6 +72,7 @@ namespace swift {
     Unsigned,
     Identifier,
     ObjCSelector,
+    ValueDecl,
     Type,
     TypeRepr,
     PatternKind,
@@ -86,6 +80,7 @@ namespace swift {
     DescriptiveDeclKind,
     DeclAttribute,
     VersionTuple,
+    LayoutConstraint,
   };
 
   namespace diag {
@@ -104,6 +99,7 @@ namespace swift {
       StringRef StringVal;
       DeclName IdentifierVal;
       ObjCSelector ObjCSelectorVal;
+      ValueDecl *TheValueDecl;
       Type TypeVal;
       TypeRepr *TyR;
       PatternKind PatternKindVal;
@@ -111,6 +107,7 @@ namespace swift {
       DescriptiveDeclKind DescriptiveDeclKindVal;
       const DeclAttribute *DeclAttributeVal;
       clang::VersionTuple VersionVal;
+      LayoutConstraint LayoutConstraintVal;
     };
     
   public:
@@ -126,16 +123,22 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
     }
 
-    DiagnosticArgument(DeclName I)
-      : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
-    }
-    
+    DiagnosticArgument(DeclName D)
+        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+
+    DiagnosticArgument(DeclBaseName D)
+        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+
     DiagnosticArgument(Identifier I)
       : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }
 
     DiagnosticArgument(ObjCSelector S)
       : Kind(DiagnosticArgumentKind::ObjCSelector), ObjCSelectorVal(S) {
+    }
+
+    DiagnosticArgument(ValueDecl *VD)
+      : Kind(DiagnosticArgumentKind::ValueDecl), TheValueDecl(VD) {
     }
 
     DiagnosticArgument(Type T)
@@ -175,6 +178,9 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::VersionTuple),
         VersionVal(version) { }
 
+    DiagnosticArgument(LayoutConstraint L)
+      : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
+    }
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -211,6 +217,11 @@ namespace swift {
       return ObjCSelectorVal;
     }
 
+    ValueDecl *getAsValueDecl() const {
+      assert(Kind == DiagnosticArgumentKind::ValueDecl);
+      return TheValueDecl;
+    }
+
     Type getAsType() const {
       assert(Kind == DiagnosticArgumentKind::Type);
       return TypeVal;
@@ -245,6 +256,28 @@ namespace swift {
       assert(Kind == DiagnosticArgumentKind::VersionTuple);
       return VersionVal;
     }
+
+    LayoutConstraint getAsLayoutConstraint() const {
+      assert(Kind == DiagnosticArgumentKind::LayoutConstraint);
+      return LayoutConstraintVal;
+    }
+  };
+  
+  struct DiagnosticFormatOptions {
+    const std::string OpeningQuotationMark;
+    const std::string ClosingQuotationMark;
+    const std::string AKAFormatString;
+
+    DiagnosticFormatOptions(std::string OpeningQuotationMark,
+                            std::string ClosingQuotationMark,
+                            std::string AKAFormatString)
+        : OpeningQuotationMark(OpeningQuotationMark),
+          ClosingQuotationMark(ClosingQuotationMark),
+          AKAFormatString(AKAFormatString) {}
+
+    DiagnosticFormatOptions()
+        : OpeningQuotationMark("'"), ClosingQuotationMark("'"),
+          AKAFormatString("'%1$s' (aka '%2$s')") {}
   };
   
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
@@ -387,6 +420,92 @@ namespace swift {
     InFlightDiagnostic &fixItRemoveChars(SourceLoc Start, SourceLoc End) {
       return fixItReplaceChars(Start, End, {});
     }
+
+    /// \brief Add two replacement fix-it exchanging source ranges to the
+    /// currently-active diagnostic.
+    InFlightDiagnostic &fixItExchange(SourceRange R1, SourceRange R2);
+  };
+
+  /// \brief Class to track, map, and remap diagnostic severity and fatality
+  ///
+  class DiagnosticState {
+  public:
+    /// \brief Describes the current behavior to take with a diagnostic
+    enum class Behavior : uint8_t {
+      Unspecified,
+      Ignore,
+      Note,
+      Remark,
+      Warning,
+      Error,
+      Fatal,
+    };
+
+  private:
+    /// \brief Whether we should continue to emit diagnostics, even after a
+    /// fatal error
+    bool showDiagnosticsAfterFatalError = false;
+
+    /// \brief Don't emit any warnings
+    bool suppressWarnings = false;
+
+    /// \brief Emit all warnings as errors
+    bool warningsAsErrors = false;
+
+    /// \brief Whether a fatal error has occurred
+    bool fatalErrorOccurred = false;
+
+    /// \brief Whether any error diagnostics have been emitted.
+    bool anyErrorOccurred = false;
+
+    /// \brief Track the previous emitted Behavior, useful for notes
+    Behavior previousBehavior = Behavior::Unspecified;
+
+    /// \brief Track settable, per-diagnostic state that we store
+    std::vector<Behavior> perDiagnosticBehavior;
+
+  public:
+    DiagnosticState();
+
+    /// \brief Figure out the Behavior for the given diagnostic, taking current
+    /// state such as fatality into account.
+    Behavior determineBehavior(DiagID id);
+
+    bool hadAnyError() const { return anyErrorOccurred; }
+    bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
+
+    void setShowDiagnosticsAfterFatalError(bool val = true) {
+      showDiagnosticsAfterFatalError = val;
+    }
+    bool getShowDiagnosticsAfterFatalError() {
+      return showDiagnosticsAfterFatalError;
+    }
+
+    /// \brief Whether to skip emitting warnings
+    void setSuppressWarnings(bool val) { suppressWarnings = val; }
+    bool getSuppressWarnings() const { return suppressWarnings; }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
+    bool getWarningsAsErrors() const { return warningsAsErrors; }
+
+    void resetHadAnyError() {
+      anyErrorOccurred = false;
+      fatalErrorOccurred = false;
+    }
+
+    /// Set per-diagnostic behavior
+    void setDiagnosticBehavior(DiagID id, Behavior behavior) {
+      perDiagnosticBehavior[(unsigned)id] = behavior;
+    }
+
+  private:
+    // Make the state movable only
+    DiagnosticState(const DiagnosticState &) = delete;
+    const DiagnosticState &operator=(const DiagnosticState &) = delete;
+
+    DiagnosticState(DiagnosticState &&) = default;
+    DiagnosticState &operator=(DiagnosticState &&) = default;
   };
     
   /// \brief Class responsible for formatting diagnostics and presenting them
@@ -400,19 +519,8 @@ namespace swift {
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;
 
-    /// HadAnyError - True if any error diagnostics have been emitted.
-    bool HadAnyError;
-
-    enum class FatalErrorState {
-      None,
-      JustEmitted,
-      Fatal
-    };
-
-    /// Sticky flag set to \c true when a fatal error is emitted.
-    FatalErrorState FatalState = FatalErrorState::None;
-
-    bool ShowDiagnosticsAfterFatalError = false;
+    /// \brief Tracks diagnostic behaviors and state
+    DiagnosticState state;
 
     /// \brief The currently active diagnostic, if there is one.
     Optional<Diagnostic> ActiveDiagnostic;
@@ -434,25 +542,41 @@ namespace swift {
     
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-      : SourceMgr(SourceMgr), HadAnyError(false), ActiveDiagnostic() {
+      : SourceMgr(SourceMgr), ActiveDiagnostic() {
     }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
-    bool hadAnyError() const {
-      return HadAnyError;
-    }
+    bool hadAnyError() const { return state.hadAnyError(); }
 
     bool hasFatalErrorOccurred() const {
-      return FatalState != FatalErrorState::None;
+      return state.hasFatalErrorOccurred();
     }
 
-    void setShowDiagnosticsAfterFatalError(bool Val = true) {
-      ShowDiagnosticsAfterFatalError = Val;
+    void setShowDiagnosticsAfterFatalError(bool val = true) {
+      state.setShowDiagnosticsAfterFatalError(val);
+    }
+    bool getShowDiagnosticsAfterFatalError() {
+      return state.getShowDiagnosticsAfterFatalError();
+    }
+
+    /// \brief Whether to skip emitting warnings
+    void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
+    bool getSuppressWarnings() const {
+      return state.getSuppressWarnings();
+    }
+
+    /// \brief Whether to treat warnings as errors
+    void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
+    bool getWarningsAsErrors() const {
+      return state.getWarningsAsErrors();
+    }
+
+    void ignoreDiagnostic(DiagID id) {
+      state.setDiagnosticBehavior(id, DiagnosticState::Behavior::Ignore);
     }
 
     void resetHadAnyError() {
-      HadAnyError = false;
-      FatalState = FatalErrorState::None;
+      state.resetHadAnyError();
     }
 
     /// \brief Add an additional DiagnosticConsumer to receive diagnostics.
@@ -489,6 +613,24 @@ namespace swift {
       return InFlightDiagnostic(*this);
     }
 
+    /// \brief Emit a diagnostic using a preformatted array of diagnostic
+    /// arguments.
+    ///
+    /// \param Loc The declaration name location to which the
+    /// diagnostic refers in the source code.
+    ///
+    /// \param ID The diagnostic ID.
+    ///
+    /// \param Args The preformatted set of diagnostic arguments. The caller
+    /// must ensure that the diagnostic arguments have the appropriate type.
+    ///
+    /// \returns An in-flight diagnostic, to which additional information can
+    /// be attached.
+    InFlightDiagnostic diagnose(DeclNameLoc Loc, DiagID ID, 
+                                ArrayRef<DiagnosticArgument> Args) {
+      return diagnose(Loc.getBaseNameLoc(), ID, Args);
+    }
+
     /// \brief Emit an already-constructed diagnostic at the given location.
     ///
     /// \param Loc The location to which the diagnostic refers in the source
@@ -521,6 +663,25 @@ namespace swift {
       assert(!ActiveDiagnostic && "Already have an active diagnostic");
       ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
       ActiveDiagnostic->setLoc(Loc);
+      return InFlightDiagnostic(*this);
+    }
+
+    /// \brief Emit a diagnostic with the given set of diagnostic arguments.
+    ///
+    /// \param Loc The declaration name location to which the
+    /// diagnostic refers in the source code.
+    ///
+    /// \param ID The diagnostic to be emitted.
+    ///
+    /// \param Args The diagnostic arguments, which will be converted to
+    /// the types expected by the diagnostic \p ID.
+    template<typename ...ArgTypes>
+    InFlightDiagnostic 
+    diagnose(DeclNameLoc Loc, Diag<ArgTypes...> ID,
+             typename detail::PassArgument<ArgTypes>::type... Args) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
+      ActiveDiagnostic->setLoc(Loc.getBaseNameLoc());
       return InFlightDiagnostic(*this);
     }
 
@@ -582,10 +743,18 @@ namespace swift {
 
     /// \returns true if diagnostic is marked with PointsToFirstBadToken
     /// option.
-    bool isDiagnosticPointsToFirstBadToken(DiagID ID) const;
+    bool isDiagnosticPointsToFirstBadToken(DiagID id) const;
 
-    /// \returns true if diagnostic is marked as fatal.
-    bool isDiagnosticFatal(DiagID ID) const;
+    /// \returns true if any diagnostic consumer gave an error while invoking
+    //// \c finishProcessing.
+    bool finishProcessing();
+    
+    /// \brief Format the given diagnostic text and place the result in the given
+    /// buffer.
+    static void formatDiagnosticText(
+        llvm::raw_ostream &Out, StringRef InText,
+        ArrayRef<DiagnosticArgument> FormatArgs,
+        DiagnosticFormatOptions FormatOpts = DiagnosticFormatOptions());
 
   private:
     /// \brief Flush the active diagnostic.

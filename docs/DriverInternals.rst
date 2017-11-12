@@ -24,10 +24,10 @@ Driver Stages
 The compiler driver for Swift roughly follows the same design as Clang's
 compiler driver:
 
-1. Parse: Command-line arguments are parsed into ``Arg``\ s. A ToolChain is 
+1. Parse: Command-line arguments are parsed into ``Arg``\ s. A ToolChain is
    selected based on the current platform.
-2. Pipeline: Based on the arguments and inputs, a tree of ``Action``\ s is 
-   generated. These are the high-level processing steps that need to occur, 
+2. Pipeline: Based on the arguments and inputs, a tree of ``Action``\ s is
+   generated. These are the high-level processing steps that need to occur,
    such as "compile this file" or "link the output of all compilation actions".
 3. Bind: The ToolChain converts the ``Action``\ s into a set of ``Job``\ s.
    These are individual commands that need to be run, such as
@@ -108,13 +108,13 @@ be run, the Compilation keeps track of a DependencyGraph. (If file A depends on
 file B and file B has changed, file A needs to be recompiled.) When a Job
 completes successfully, the Compilation will both re-attempt to schedule Jobs
 that were directly blocked on it, and check to see if any other Jobs now need
-to run based on the DependencyGraph. See the section on :doc:`Dependency
-Analysis` for more information.
+to run based on the DependencyGraph. See the section on :doc:`DependencyAnalysis`
+for more information.
 
 The Compilation's TaskQueue controls the low-level aspects of managing
 subprocesses. Multiple Jobs may execute simultaneously, but communication with
 the parent process (the driver) is handled on a single thread. The level of
-parellelism may be controlled by a compiler flag.
+parallelism may be controlled by a compiler flag.
 
 If a Job does not finish successfully, the Compilation needs to record which
 jobs have failed, so that they get rebuilt next time the user tries to build

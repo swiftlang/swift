@@ -1,11 +1,37 @@
-add_subdirectory(driver)
-add_subdirectory(sil-opt)
-add_subdirectory(swift-ide-test)
-add_subdirectory(swift-demangle)
-add_subdirectory(lldb-moduleimport-test)
-add_subdirectory(sil-extract)
-add_subdirectory(swift-llvm-opt)
+add_swift_tool_subdirectory(driver)
+add_swift_tool_subdirectory(sil-opt)
+add_swift_tool_subdirectory(swift-ide-test)
+add_swift_tool_subdirectory(swift-remoteast-test)
+add_swift_tool_subdirectory(swift-demangle)
+add_swift_tool_subdirectory(lldb-moduleimport-test)
+add_swift_tool_subdirectory(sil-func-extractor)
+add_swift_tool_subdirectory(sil-llvm-gen)
+add_swift_tool_subdirectory(sil-nm)
+add_swift_tool_subdirectory(sil-passpipeline-dumper)
+add_swift_tool_subdirectory(swift-llvm-opt)
+add_swift_tool_subdirectory(swift-api-digester)
+add_swift_tool_subdirectory(swift-syntax-test)
+add_swift_tool_subdirectory(swift-refactor)
 
 if(SWIFT_BUILD_SOURCEKIT)
-  add_subdirectory(SourceKit)
+  add_swift_tool_subdirectory(SourceKit)
+endif()
+
+
+if(SWIFT_HOST_VARIANT STREQUAL "macosx")
+  # Only build Darwin-specific tools when deploying to OS X.
+  add_swift_tool_subdirectory(swift-stdlib-tool)
+
+  # SwiftSyntax depends on both the standard library (because it's a
+  # Swift module), and the SDK overlays (because it depends on Foundation).
+  # Ensure we only build SwiftSyntax when we're building both.
+  if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
+    add_subdirectory(SwiftSyntax)
+  endif()
+endif()
+
+
+is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
+if(SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
+  add_swift_tool_subdirectory(swift-reflection-dump)
 endif()

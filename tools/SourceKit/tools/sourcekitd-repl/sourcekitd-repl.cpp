@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -114,7 +114,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
   (void)res;
   out.set_size(utf8_begin - out.begin());
 }
-}
+} // end anonymous namespace
 
 /// An arbitrary, otherwise-unused char value that editline interprets as
 /// entering/leaving "literal mode", meaning it passes prompt characters through
@@ -560,7 +560,7 @@ private:
   }
 
 };
-}
+} // end anonymous namespace
 
 static bool handleRequest(StringRef Req, std::string &Error);
 
@@ -652,7 +652,7 @@ static bool handleRequest(StringRef ReqStr, std::string &ErrorMessage) {
 
 
 int main(int argc, const char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal();
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
 

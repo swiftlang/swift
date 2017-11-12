@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,20 +15,33 @@
 
 using namespace SourceKit;
 
+NotificationCenter::NotificationCenter(bool dispatchToMain)
+  : DispatchToMain(dispatchToMain) {
+}
+NotificationCenter::~NotificationCenter() {}
+
 void NotificationCenter::addDocumentUpdateNotificationReceiver(
     DocumentUpdateNotificationReceiver Receiver) {
 
-  WorkQueue::dispatchOnMain([this, Receiver]{
-    DocUpdReceivers.push_back(Receiver);
-  });
+  llvm::sys::ScopedLock L(Mtx);
+  DocUpdReceivers.push_back(Receiver);
 }
 
 void NotificationCenter::postDocumentUpdateNotification(
     StringRef DocumentName) const {
-  
-  std::string DocName = DocumentName;
-  WorkQueue::dispatchOnMain([this, DocName]{
-    for (auto &Fn : DocUpdReceivers)
-      Fn(DocName);
-  });
+
+  std::vector<DocumentUpdateNotificationReceiver> recvs;
+  {
+    llvm::sys::ScopedLock L(Mtx);
+    recvs = DocUpdReceivers;
+  }  
+  std::string docName = DocumentName;
+  auto sendNote = [recvs, docName]{
+    for (auto &Fn : recvs)
+      Fn(docName);
+  };
+  if (DispatchToMain)
+    WorkQueue::dispatchOnMain(sendNote);
+  else
+    sendNote();
 }

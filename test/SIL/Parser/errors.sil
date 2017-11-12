@@ -8,9 +8,9 @@ import Swift
 sil @block_errors : $() -> () {
 bb0:
   %0 = tuple ()
-  %1 = return %0 : $()
+  return %0 : $()
 bb0:                      // expected-error {{redefinition of basic block 'bb0'}}
-  %3 = return %0 : $()
+  return %0 : $()
 }
 
 sil @local_value_errors : $() -> () {
@@ -27,7 +27,7 @@ bb0:
   %0 = function_ref @global_value_errors : $ () -> ((), ()) // expected-error {{defined with mismatching type}}
   %1 = function_ref @not_defined : $ () -> () // expected-error {{use of undefined value 'not_defined'}}
   %2 = tuple ()
-  %3 = return %2 : $()
+  return %2 : $()
 }
 
 sil @global_value_errors : $() -> () {  // expected-error {{redefinition of value 'global_value_errors'}}

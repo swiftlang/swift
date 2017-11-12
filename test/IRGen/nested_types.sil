@@ -1,0 +1,27 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Note: This test is trivial now that structs inside classes don't require dynamic
+// metadata instantiation.
+
+class Outer {
+  struct Inner {
+  }
+}
+
+sil_vtable Outer {}
+
+sil @test0 : $@convention(thin) (@thick Outer.Inner.Type) -> (@thick Outer.Type) {
+bb0(%0 : $@thick Outer.Inner.Type):
+  %1 = metatype $@thick Outer.Type
+  return %1 : $@thick Outer.Type
+}
+// CHECK-LABEL: define{{ | protected }}swiftcc %swift.type* @test0(%swift.type*)
+// CHECK:      [[T0:%.*]] = call %swift.type* @_T012nested_types5OuterCMa()
+// CHECK-NEXT: ret %swift.type* [[T0]]
+
+// CHECK-LABEL: define hidden %swift.type* @_T012nested_types5OuterC5InnerVMa()
+// CHECK:      ret %swift.type* bitcast {{.*}} @_T012nested_types5OuterC5InnerVMf

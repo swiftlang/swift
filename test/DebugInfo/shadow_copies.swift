@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - | %FileCheck %s
 
 class ClassA
 {
@@ -16,11 +16,11 @@ class ClassB : ClassA
 {
     override init (_ input : Int64)
     {
-    // CHECK: @_TFC{{.*}}6ClassBcfVs5Int64S0_
-    // CHECK:  alloca {{.*}}ClassB*
+    // CHECK: @_T0{{.*}}6ClassBCACs5Int64Vcfc
+    // CHECK:  alloca {{.*}}ClassBC*
     // CHECK:  alloca i64
     // CHECK-NOT: alloca
-    // CHECK: ret {{.*}}ClassB
+    // CHECK: ret {{.*}}ClassBC
         super.init (input)
     }
 }

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,6 +18,10 @@ namespace swift {
   static const char SERIALIZED_MODULE_EXTENSION[] = "swiftmodule";
   /// The extension for serialized documentation comments.
   static const char SERIALIZED_MODULE_DOC_EXTENSION[] = "swiftdoc";
+  /// The extension for PCH files.
+  static const char PCH_EXTENSION[] = "pch";
+  /// The extension for replacement map files.
+  static const char REMAP_EXTENSION[] = "remap";
   /// The extension for SIL files.
   static const char SIL_EXTENSION[] = "sil";
   /// The extension for SIB files.
@@ -27,6 +31,8 @@ namespace swift {
   static const char LLVM_IR_EXTENSION[] = "ll";
   /// The name of the standard library, which is a reserved module name.
   static const char STDLIB_NAME[] = "Swift";
+  /// The name of the Onone support library, which is a reserved module name.
+  static const char SWIFT_ONONE_SUPPORT[] = "SwiftOnoneSupport";
   /// The name of the SwiftShims module, which contains private stdlib decls.
   static const char SWIFT_SHIMS_NAME[] = "SwiftShims";
   /// The prefix of module names used by LLDB to capture Swift expressions
@@ -38,4 +44,4 @@ namespace swift {
   static const char MANGLING_MODULE_C[] = "__C";
 } // end namespace swift
 
-#endif
+#endif // SWIFT_STRINGS_H

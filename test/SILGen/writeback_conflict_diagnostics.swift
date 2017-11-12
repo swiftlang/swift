@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend %s -o /dev/null -emit-silgen -verify
-
+// RUN: %target-swift-frontend -enable-sil-ownership %s -o /dev/null -emit-silgen -verify
+// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -emit-silgen -verify
 
 struct MutatorStruct {
-  mutating func f(inout x : MutatorStruct) {}
+  mutating func f(_ x : inout MutatorStruct) {}
 }
 
 var global_property : MutatorStruct { get {} set {} }
@@ -67,7 +67,7 @@ func testComputedStructWithProperty() {
 
 var global_array : [[Int]]
 
-func testMultiArray(i : Int, j : Int, array : [[Int]]) {
+func testMultiArray(_ i : Int, j : Int, array : [[Int]]) {
   var array = array
   swap(&array[i][j],
        &array[i][i])
@@ -77,7 +77,7 @@ func testMultiArray(i : Int, j : Int, array : [[Int]]) {
        &global_array[0][i])
   
   // TODO: This is obviously the same writeback problem, but isn't detectable
-  // with the current level of sophisitication in SILGen.
+  // with the current level of sophistication in SILGen.
   swap(&array[1+0][j], &array[1+0][i])
 
   swap(&global_array[0][j], &array[j][i])  // ok
@@ -94,7 +94,7 @@ struct ArrayWithoutAddressors<T> {
 var global_array_without_addressors: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
 
 func testMultiArrayWithoutAddressors(
-  i: Int, j: Int, array: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
+  _ i: Int, j: Int, array: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
 ) {
   var array = array
   swap(&array[i][j],  // expected-note  {{concurrent writeback occurred here}}
@@ -105,7 +105,7 @@ func testMultiArrayWithoutAddressors(
        &global_array_without_addressors[0][i])   // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
 
   // TODO: This is obviously the same writeback problem, but isn't detectable
-  // with the current level of sophisitication in SILGen.
+  // with the current level of sophistication in SILGen.
   swap(&array[1+0][j], &array[1+0][i])
 
   swap(&global_array_without_addressors[0][j], &array[j][i])  // ok

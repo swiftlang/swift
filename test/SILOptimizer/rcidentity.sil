@@ -1,0 +1,173 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -rc-id-dumper %s -o /dev/null | %FileCheck %s
+
+import Builtin
+
+///////////////////////
+// NonTest Utilities //
+///////////////////////
+
+typealias AnyObject = Builtin.AnyObject
+
+protocol FakeAnyObject : class {}
+
+class C : FakeAnyObject {
+  init()
+}
+
+class D : C {
+  override init()
+}
+
+class E {
+  init()
+}
+
+sil @foo : $@convention(thin) (Builtin.Word) -> ()
+
+struct S1 {
+  var f1 : Builtin.Word
+  var f2 : Builtin.NativeObject
+  var f3 : Builtin.NativeObject
+}
+
+struct S2 {
+  var f1 : Builtin.Word
+  var f2 : S1
+  var f3 : Builtin.Word
+}
+
+struct S3 {
+  var f1 : Builtin.Word
+  var f2 : Builtin.Word
+  var f3 : Builtin.NativeObject
+}
+
+struct S4 {
+  var f1 : S3
+  var f2 : Builtin.Word
+  var f5 : Builtin.Word
+}
+
+enum E1 {
+  case Case1
+  case Case2(S1)
+  case Case3(Builtin.Word)
+}
+
+///////////
+// Tests //
+///////////
+
+// Make sure that we see all the way through the chain of casts that %9 has an RCIdentity of %0 and that %12 is really the partial apply.
+// CHECK-LABEL: @test_rcid_preserving_casts@
+// CHECK: RESULT #9: 9 = 0
+// CHECK: RESULT #12: 12 = 11
+sil @test_rcid_preserving_casts : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = unconditional_checked_cast %0 : $Builtin.NativeObject to $D
+  %2 = upcast %1 : $D to $C
+  %3 = unchecked_ref_cast %2 : $C to $E
+  %4 = integer_literal $Builtin.Word, 0
+  %5 = ref_to_bridge_object %3 : $E, %4 : $Builtin.Word
+  %6 = bridge_object_to_ref %5 : $Builtin.BridgeObject to $C
+  %7 = init_existential_ref %6 : $C : $C, $FakeAnyObject
+  %8 = open_existential_ref %7 : $FakeAnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233") FakeAnyObject
+  %9 = unchecked_ref_cast %8 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233") FakeAnyObject to $Builtin.NativeObject
+  %10 = function_ref @foo : $@convention(thin) (Builtin.Word) -> ()
+  %11 = partial_apply %10(%4) : $@convention(thin) (Builtin.Word) -> ()
+  %12 = convert_function %11 : $@callee_owned @convention(thick) () -> () to $@callee_owned @convention(thick) () -> ()
+  return undef : $()
+}
+
+// Make sure that we look through structs with only one reference counted fields
+// and that we do not look through structs without that property.
+//
+// CHECK-LABEL: @test_single_refcount_field_structs@
+// CHECK: RESULT #2: 2 = 0
+// CHECK: RESULT #3: 3 = 0
+// CHECK: RESULT #4: 4 = 4
+// CHECK: RESULT #5: 5 = 4
+sil @test_single_refcount_field_structs : $@convention(thin) (Builtin.NativeObject, Builtin.Word) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Word):
+  %2 = struct $S3(%1 : $Builtin.Word, %1 : $Builtin.Word, %0 : $Builtin.NativeObject)
+  %3 = struct $S4(%2 : $S3, %1 : $Builtin.Word, %1 : $Builtin.Word)
+
+  %4 = struct $S1(%1 : $Builtin.Word, %0 : $Builtin.NativeObject, %0 : $Builtin.NativeObject)
+  %5 = struct $S2(%1 : $Builtin.Word, %4 : $S1, %1 : $Builtin.Word)
+  return undef : $()
+}
+
+// CHECK-LABEL: @test_single_refcount_field_tuples@
+// CHECK: RESULT #2: 2 = 0
+// CHECK: RESULT #3: 3 = 0
+// CHECK: RESULT #4: 4 = 4
+// CHECK: RESULT #5: 5 = 4
+sil @test_single_refcount_field_tuples : $@convention(thin) (Builtin.NativeObject, Builtin.Word) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Word):
+  %2 = tuple(%1 : $Builtin.Word, %1 : $Builtin.Word, %0 : $Builtin.NativeObject)
+  %3 = tuple(%2 : $(Builtin.Word, Builtin.Word, Builtin.NativeObject), %1 : $Builtin.Word, %1 : $Builtin.Word)
+  %4 = tuple(%1 : $Builtin.Word, %0 : $Builtin.NativeObject, %0 : $Builtin.NativeObject)
+  %5 = tuple(%1 : $Builtin.Word, %4 : $(Builtin.Word, Builtin.NativeObject, Builtin.NativeObject), %1 : $Builtin.Word)
+  return undef : $()
+}
+
+// All of the SSA values in the given function besides %6 can be resolved to
+// (%0, %1). Because %6 has multiple SSA values and there is nothing tricky we
+// can do here, just bail.
+//
+// CHECK-LABEL: @test_single_pred_rc_id@
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 1
+// CHECK: RESULT #2: 2 = 0
+// CHECK: RESULT #3: 3 = 1
+// CHECK: RESULT #4: 4 = 1
+// CHECK: RESULT #5: 5 = 0
+// CHECK: RESULT #6: 6 = 6
+sil @test_single_pred_rc_id : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
+
+bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+  cond_br undef, bb2(%3 : $Builtin.NativeObject), bb3(%2 : $Builtin.NativeObject)
+
+bb2(%4 : $Builtin.NativeObject):
+  br bb4(%4 : $Builtin.NativeObject)
+
+bb3(%5 : $Builtin.NativeObject):
+  br bb4(%5 : $Builtin.NativeObject)
+
+bb4(%6 : $Builtin.NativeObject):
+  cond_br undef, bb4(%6 : $Builtin.NativeObject), bb5
+
+bb5:
+  return undef : $()
+}
+
+// All of the SSA values in the given function can be resolved to %0.
+//
+// CHECK-LABEL: @test_multiple_pred_same_rcid@
+// CHECK: RESULT #0: 0 = 0
+// CHECK: RESULT #1: 1 = 0
+// CHECK: RESULT #2: 2 = 0
+// CHECK: RESULT #3: 3 = 0
+// CHECK: RESULT #4: 4 = 0
+// CHECK: RESULT #5: 5 = 0
+sil @test_multiple_pred_same_rcid : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject, %0 : $Builtin.NativeObject)
+
+bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject):
+  cond_br undef, bb2(%3 : $Builtin.NativeObject), bb3(%2 : $Builtin.NativeObject)
+
+bb2(%4 : $Builtin.NativeObject):
+  br bb4(%4 : $Builtin.NativeObject)
+
+bb3(%5 : $Builtin.NativeObject):
+  br bb4(%5 : $Builtin.NativeObject)
+
+bb4(%6 : $Builtin.NativeObject):
+  br bb5
+
+bb5:
+  return undef : $()
+}

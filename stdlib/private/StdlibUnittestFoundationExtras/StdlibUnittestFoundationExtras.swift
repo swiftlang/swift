@@ -2,59 +2,64 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 import ObjectiveC
 import Foundation
+import StdlibUnittest
 
-internal var _temporaryNSLocaleCurrentLocale: NSLocale? = nil
+internal var _temporaryLocaleCurrentLocale: NSLocale?
 
 extension NSLocale {
   @objc
   public class func _swiftUnittest_currentLocale() -> NSLocale {
-    return _temporaryNSLocaleCurrentLocale!
+    return _temporaryLocaleCurrentLocale!
   }
 }
 
-public func withOverriddenNSLocaleCurrentLocale<Result>(
-  temporaryLocale: NSLocale,
-  @noescape _ body: () -> Result
+public func withOverriddenLocaleCurrentLocale<Result>(
+  _ temporaryLocale: NSLocale,
+  _ body: () -> Result
 ) -> Result {
-  let oldMethod = class_getClassMethod(
-    NSLocale.self, Selector("currentLocale"))
-  precondition(oldMethod != nil, "could not find +[NSLocale currentLocale]")
+  guard let oldMethod = class_getClassMethod(
+    NSLocale.self, #selector(getter: NSLocale.current)) as Optional
+  else {
+    _preconditionFailure("Could not find +[Locale currentLocale]")
+  }
 
-  let newMethod = class_getClassMethod(
-    NSLocale.self, Selector("_swiftUnittest_currentLocale"))
-  precondition(newMethod != nil, "could not find +[NSLocale _swiftUnittest_currentLocale]")
+  guard let newMethod = class_getClassMethod(
+    NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale)) as Optional
+  else {
+    _preconditionFailure("Could not find +[Locale _swiftUnittest_currentLocale]")
+  }
 
-  precondition(_temporaryNSLocaleCurrentLocale == nil,
-    "nested calls to withOverriddenNSLocaleCurrentLocale are not supported")
+  precondition(_temporaryLocaleCurrentLocale == nil,
+    "Nested calls to withOverriddenLocaleCurrentLocale are not supported")
 
-  _temporaryNSLocaleCurrentLocale = temporaryLocale
+  _temporaryLocaleCurrentLocale = temporaryLocale
   method_exchangeImplementations(oldMethod, newMethod)
   let result = body()
   method_exchangeImplementations(newMethod, oldMethod)
-  _temporaryNSLocaleCurrentLocale = nil
+  _temporaryLocaleCurrentLocale = nil
 
   return result
 }
 
-public func withOverriddenNSLocaleCurrentLocale<Result>(
-  temporaryLocaleIdentifier: String,
-  @noescape _ body: () -> Result
+public func withOverriddenLocaleCurrentLocale<Result>(
+  _ temporaryLocaleIdentifier: String,
+  _ body: () -> Result
 ) -> Result {
   precondition(
-    NSLocale.availableLocaleIdentifiers().contains(temporaryLocaleIdentifier),
-    "requested locale \(temporaryLocaleIdentifier) is not available")
+    NSLocale.availableLocaleIdentifiers.contains(temporaryLocaleIdentifier),
+    "Requested locale \(temporaryLocaleIdentifier) is not available")
 
-  return withOverriddenNSLocaleCurrentLocale(
+  return withOverriddenLocaleCurrentLocale(
     NSLocale(localeIdentifier: temporaryLocaleIdentifier), body)
 }
 
@@ -65,12 +70,73 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
 /// return-autoreleased optimization.)
 @inline(never)
 public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
-  @noescape body: () -> Void
+  invoking body: () -> Void
 ) {
 #if arch(i386) && (os(iOS) || os(watchOS))
-  autoreleasepool(body)
+  autoreleasepool(invoking: body)
 #else
   body()
 #endif
+}
+
+@_versioned
+@_silgen_name("NSArray_getObjects")
+func NSArray_getObjects(
+  nsArray: AnyObject,
+  objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
+  rangeLocation: Int,
+  rangeLength: Int)
+
+extension NSArray {
+  @nonobjc // FIXME: there should be no need in this attribute.
+  public func available_getObjects(
+    _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?, range: NSRange
+  ) {
+    return NSArray_getObjects(
+      nsArray: self,
+      objects: objects,
+      rangeLocation: range.location,
+      rangeLength: range.length)
+  }
+}
+
+@_silgen_name("NSDictionary_getObjects")
+func NSDictionary_getObjects(
+  nsDictionary: NSDictionary,
+  objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
+  andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
+)
+
+extension NSDictionary {
+  @nonobjc // FIXME: there should be no need in this attribute.
+  public func available_getObjects(
+    _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
+    andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
+  ) {
+    return NSDictionary_getObjects(
+      nsDictionary: self,
+      objects: objects,
+      andKeys: keys)
+  }
+}
+
+public func expectBridgeToNSValue<T>(_ value: T,
+                                     nsValueInitializer: ((T) -> NSValue)? = nil,
+                                     nsValueGetter: ((NSValue) -> T)? = nil,
+                                     equal: (T, T) -> Bool) {
+  let object = value as AnyObject
+  let nsValue = object as! NSValue
+  if let nsValueInitializer = nsValueInitializer {
+    expectEqual(nsValueInitializer(value), nsValue)
+  }
+  if let nsValueGetter = nsValueGetter {
+    expectTrue(equal(value, nsValueGetter(nsValue)))
+  }
+  if let nsValueInitializer = nsValueInitializer,
+     let nsValueGetter = nsValueGetter {
+    expectTrue(equal(value, nsValueGetter(nsValueInitializer(value))))
+  }
+  expectTrue(equal(value, object as! T))
+
 }
 

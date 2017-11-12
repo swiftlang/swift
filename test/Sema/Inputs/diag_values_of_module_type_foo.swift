@@ -1,5 +1,5 @@
-public class SomeClass {
-  public class NestedClass { public init() {} }
+open class SomeClass {
+  open class NestedClass { public init() {} }
 
   public static func staticFunc1() -> Int {}
   public static var staticVar1: Int
@@ -13,7 +13,7 @@ public enum SomeEnum {
   case Foo
 }
 public protocol SomeProtocol {
-  typealias Foo
+  associatedtype Foo
 }
 public protocol SomeExistential {
 }

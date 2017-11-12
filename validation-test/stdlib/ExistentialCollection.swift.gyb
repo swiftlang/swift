@@ -1,0 +1,475 @@
+//===--- ExistentialCollection.swift.gyb ----------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+%{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal
+)
+
+}%
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+// Check that the generic parameter is called 'Element'.
+protocol TestProtocol1 {}
+
+extension AnyIterator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnySequence where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnyCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnyBidirectionalCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnyRandomAccessCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+func storesSameUnderlyingCollection<
+  L: _AnyCollectionProtocol, R: _AnyCollectionProtocol
+>(_ lhs: L, _ rhs: R) -> Bool {
+  return lhs._boxID == rhs._boxID
+}
+
+var tests = TestSuite("ExistentialCollection")
+
+tests.test("AnyIterator") {
+  func digits() -> AnyIterator<OpaqueValue<Int>> {
+    let integers: CountableRange = 0..<5
+    let lazyStrings = integers.lazy.map { OpaqueValue($0) }
+
+    // This is a really complicated type of no interest to our
+    // clients.
+    let iterator: LazyMapIterator<
+        IndexingIterator<CountableRange<Int>>, OpaqueValue<Int>
+      > = lazyStrings.makeIterator()
+    return AnyIterator(iterator)
+  }
+  expectEqual([0, 1, 2, 3, 4], Array(digits()).map { $0.value })
+
+  var x = 7
+  let iterator = AnyIterator<Int> {
+    if x >= 15 { return nil }
+    x += 1
+    return x-1
+  }
+  expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(iterator))
+}
+
+tests.test("AnySequence.init(Sequence)") {
+  do {
+    let base = MinimalSequence<OpaqueValue<Int>>(elements: [])
+    var s = AnySequence(base)
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
+  }
+  do {
+    let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
+    let data = intData.map(OpaqueValue.init)
+    let base = MinimalSequence(elements: data)
+    var s = AnySequence(base)
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence(data, s, resiliencyChecks: .none) { $0.value == $1.value }
+  }
+}
+
+tests.test("AnySequence.init(() -> Generator)") {
+  do {
+    var s = AnySequence {
+      return MinimalIterator<OpaqueValue<Int>>([])
+    }
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
+  }
+  do {
+    let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
+    let data = intData.map(OpaqueValue.init)
+    var s = AnySequence {
+      return MinimalIterator(data)
+    }
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence(data, s, resiliencyChecks: .none) { $0.value == $1.value }
+  }
+}
+
+% for Traversal in ['Sequence'] + TRAVERSALS:
+%   if Traversal == 'Sequence':
+%     TestedType = 'AnySequence'
+%     LoggingWrapper = 'LoggingSequence'
+%     MinimalBase = 'MinimalSequence'
+%   else:
+%     TestedType = 'Any' + collectionForTraversal(Traversal)
+%     LoggingWrapper = 'Logging' + collectionForTraversal(Traversal)
+%     MinimalBase = 'Minimal' + collectionForTraversal(Traversal)
+%   end
+
+tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
+  typealias Base = ${LoggingWrapper}<${MinimalBase}<OpaqueValue<Int>>>
+  typealias Log = SequenceLog
+  let base = Base(wrapping:
+    ${MinimalBase}(elements: (0..<10).map(OpaqueValue.init)))
+  var s = ${TestedType}(base)
+  expectType(${TestedType}<OpaqueValue<Int>>.self, &s)
+
+  Log.makeIterator.expectIncrement(Base.self) {
+    _ = s.makeIterator()
+  }
+
+  Log.underestimatedCount.expectIncrement(Base.self) {
+    _ = s.underestimatedCount
+  }
+
+  Log.map.expectIncrement(Base.self) {
+    _ = s.map { $0 }
+  }
+
+  Log.filter.expectIncrement(Base.self) {
+    _ = s.filter { (_) in true }
+  }
+
+  Log.forEach.expectIncrement(Base.self) {
+    _ = s.forEach { (_) in }
+  }
+
+  Log.dropFirst.expectIncrement(Base.self) {
+    _ = s.dropFirst(0)
+  }
+
+  Log.dropLast.expectIncrement(Base.self) {
+    _ = s.dropLast(0)
+  }
+
+  Log.dropWhile.expectIncrement(Base.self) {
+    _ = s.drop { (_) in true }
+  }
+
+  Log.prefixWhile.expectIncrement(Base.self) {
+    _ = s.prefix { (_) in true }
+  }
+
+  Log.prefixMaxLength.expectIncrement(Base.self) {
+    _ = s.prefix(0)
+  }
+
+  Log.suffixMaxLength.expectIncrement(Base.self) {
+    _ = s.suffix(0)
+  }
+
+  Log.split.expectIncrement(Base.self) {
+    _ = s.split { (_) in true }
+  }
+
+  Log._customContainsEquatableElement.expectIncrement(Base.self) {
+    _ = s._customContainsEquatableElement(OpaqueValue(42))
+  }
+
+  Log._preprocessingPass.expectIncrement(Base.self) {
+    _ = s._preprocessingPass {}
+  }
+
+  Log._copyToContiguousArray.expectIncrement(Base.self) {
+    _ = s._copyToContiguousArray()
+  }
+
+  do {
+    var result = Array(repeating: OpaqueValue(0), count: 10)
+    Log._copyContents.expectIncrement(Base.self) {
+      result.withUnsafeMutableBufferPointer {
+        _ = s._copyContents(initializing: $0)
+      }
+    }
+  }
+}
+
+%   if Traversal != 'Sequence':
+tests.test("${TestedType}: dispatch to wrapped, CollectionLog") {
+  typealias Base = ${LoggingWrapper}<${MinimalBase}<OpaqueValue<Int>>>
+  typealias Log = CollectionLog
+  let base = Base(wrapping:
+    ${MinimalBase}(elements: (0..<10).map(OpaqueValue.init)))
+  var c = ${TestedType}(base)
+  expectType(${TestedType}<OpaqueValue<Int>>.self, &c)
+
+  do {
+    var i = c.startIndex
+    // `startIndex` is cached in the type erased wrapper, so first mutation
+    // makes a unique copy.
+    Log.successor.expectIncrement(Base.self) {
+      Log.formSuccessor.expectUnchanged(Base.self) {
+        c.formIndex(after: &i)
+      }
+    }
+    Log.successor.expectUnchanged(Base.self) {
+      Log.formSuccessor.expectIncrement(Base.self) {
+        c.formIndex(after: &i)
+      }
+    }
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  do {
+    typealias Log = BidirectionalCollectionLog
+    var i = c.endIndex
+    // `startIndex` is cached in the type erased wrapper, so first mutation
+    // makes a unique copy.
+    Log.predecessor.expectIncrement(Base.self) {
+      Log.formPredecessor.expectUnchanged(Base.self) {
+        c.formIndex(before: &i)
+      }
+    }
+    Log.predecessor.expectUnchanged(Base.self) {
+      Log.formPredecessor.expectIncrement(Base.self) {
+        c.formIndex(before: &i)
+      }
+    }
+  }
+%   end
+
+  do {
+    var startIndex = c.startIndex
+    var badBounds = c.index(c.startIndex, offsetBy: 3)..<c.endIndex
+
+    Log.subscriptIndex.expectIncrement(Base.self) {
+      Log.subscriptRange.expectUnchanged(Base.self) {
+        _ = c[startIndex]
+      }
+    }
+
+    Log.subscriptIndex.expectUnchanged(Base.self) {
+      Log.subscriptRange.expectIncrement(Base.self) {
+        _ = c[startIndex..<startIndex]
+      }
+    }
+
+    Log._failEarlyRangeCheckIndex.expectUnchanged(Base.self) {
+      Log._failEarlyRangeCheckRange.expectUnchanged(Base.self) {
+        // Early range checks are not forwarded for performance reasons.
+        _ = c._failEarlyRangeCheck(startIndex, bounds: badBounds)
+        _ = c._failEarlyRangeCheck(startIndex..<startIndex, bounds: badBounds)
+      }
+    }
+  }
+
+  do {
+    var i = c.startIndex
+    Log.successor.expectIncrement(Base.self) {
+      Log.formSuccessor.expectUnchanged(Base.self) {
+        i = c.index(after: i)
+      }
+    }
+
+    Log.successor.expectUnchanged(Base.self) {
+      Log.formSuccessor.expectIncrement(Base.self) {
+        c.formIndex(after: &i)
+      }
+    }
+
+    var x = i
+    Log.successor.expectIncrement(Base.self) {
+      Log.formSuccessor.expectUnchanged(Base.self) {
+        i = c.index(after: i)
+      }
+    }
+    _blackHole(x)
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  do {
+    typealias Log = BidirectionalCollectionLog
+    var i = c.endIndex
+
+    Log.predecessor.expectIncrement(Base.self) {
+      Log.formPredecessor.expectUnchanged(Base.self) {
+        i = c.index(before: i)
+      }
+    }
+
+    Log.predecessor.expectUnchanged(Base.self) {
+      Log.formPredecessor.expectIncrement(Base.self) {
+        c.formIndex(before: &i)
+      }
+    }
+
+    var x = i
+    Log.predecessor.expectIncrement(Base.self) {
+      Log.formPredecessor.expectUnchanged(Base.self) {
+        i = c.index(before: i)
+      }
+    }
+    _blackHole(x)
+  }
+%   end
+
+  Log.first.expectIncrement(Base.self) {
+    Log.startIndex.expectUnchanged(Base.self) {
+      Log.makeIterator.expectUnchanged(Base.self) {
+        _ = c.first
+      }
+    }
+  }
+
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  BidirectionalCollectionLog.last.expectIncrement(Base.self) {
+    Log.endIndex.expectUnchanged(Base.self) {
+      _ = c.last
+    }
+  }
+%   end
+
+}
+%   end
+% end
+
+tests.test("ForwardCollection") {
+  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
+  let fc0 = AnyCollection(a0)
+  let a1 = ContiguousArray(fc0)
+  expectEqual(a0, a1)
+  for e in a0 {
+    let i = fc0.index(of: e)
+    expectNotNil(i)
+    expectEqual(e, fc0[i!])
+  }
+  for i in fc0.indices {
+    expectNotEqual(fc0.endIndex, i)
+    expectEqual(1, fc0.indices.filter { $0 == i }.count)
+  }
+}
+
+tests.test("BidirectionalCollection") {
+  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
+  let fc0 = AnyCollection(a0.lazy.reversed())
+
+  let bc0_ = AnyBidirectionalCollection(fc0)  // upgrade!
+  expectNotNil(bc0_)
+  let bc0 = bc0_!
+  expectTrue(storesSameUnderlyingCollection(fc0, bc0))
+
+  let fc1 = AnyCollection(a0.lazy.reversed()) // new collection
+  expectFalse(storesSameUnderlyingCollection(fc1, fc0))
+
+  let fc2 = AnyCollection(bc0)                // downgrade
+  expectTrue(storesSameUnderlyingCollection(fc2, bc0))
+
+  let a1 = ContiguousArray(bc0.lazy.reversed())
+  expectEqual(a0, a1)
+  for e in a0 {
+    let i = bc0.index(of: e)
+    expectNotNil(i)
+    expectEqual(e, bc0[i!])
+  }
+  for i in bc0.indices {
+    expectNotEqual(bc0.endIndex, i)
+    expectEqual(1, bc0.indices.filter { $0 == i }.count)
+  }
+
+  // Can't upgrade a non-random-access collection to random access
+  let s0 = "Hello, Woyld".characters
+  let bc1 = AnyBidirectionalCollection(s0)
+  let fc3 = AnyCollection(bc1)
+  expectTrue(storesSameUnderlyingCollection(fc3, bc1))
+  expectNil(AnyRandomAccessCollection(bc1))
+  expectNil(AnyRandomAccessCollection(fc3))
+}
+
+tests.test("RandomAccessCollection") {
+  let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
+  let fc0 = AnyCollection(a0.lazy.reversed())
+  let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
+  expectNotNil(rc0_)
+  let rc0 = rc0_!
+  expectTrue(storesSameUnderlyingCollection(rc0, fc0))
+
+  let bc1 = AnyBidirectionalCollection(rc0)         // downgrade
+  expectTrue(storesSameUnderlyingCollection(bc1, rc0))
+
+  let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
+  expectTrue(storesSameUnderlyingCollection(fc1, rc0))
+
+  let a1 = ContiguousArray(rc0.lazy.reversed())
+  expectEqual(a0, a1)
+  for e in a0 {
+    let i = rc0.index(of: e)
+    expectNotNil(i)
+    expectEqual(e, rc0[i!])
+  }
+  for i in rc0.indices {
+    expectNotEqual(rc0.endIndex, i)
+    expectEqual(1, rc0.indices.filter { $0 == i }.count)
+  }
+}
+
+% for Traversal in TRAVERSALS:
+%   AnyCollection = 'Any' + collectionForTraversal(Traversal)
+%   Base = 'Minimal' + collectionForTraversal(Traversal)
+
+do {
+  var AnyCollectionTests = TestSuite("${AnyCollection}")
+
+  func makeCollection(elements: [OpaqueValue<Int>])
+    -> ${AnyCollection}<OpaqueValue<Int>> {
+    let base = ${Base}(elements: elements)
+    return ${AnyCollection}(base)
+  }
+
+  func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
+    -> ${AnyCollection}<MinimalEquatableValue> {
+    let base = ${Base}(elements: elements)
+    return ${AnyCollection}(base)
+  }
+
+  func makeCollectionOfComparable(elements: [MinimalComparableValue])
+    -> ${AnyCollection}<MinimalComparableValue> {
+    let base = ${Base}(elements: elements)
+    return ${AnyCollection}(base)
+  }
+
+
+  AnyCollectionTests.add${collectionForTraversal(Traversal)}Tests(
+    "tests.",
+    makeCollection: makeCollection,
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: makeCollectionOfEquatable,
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    resiliencyChecks: CollectionMisuseResiliencyChecks.all,
+    collectionIsBidirectional: ${'false' if Traversal == 'Forward' else 'true'}
+  )
+}
+
+% end
+
+runAllTests()

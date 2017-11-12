@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -50,38 +50,87 @@ protected:
   constexpr static const char * const SWIFT_EXECUTABLE_NAME = "swift";
 
   /// Packs together the supplementary information about the job being created.
-  struct JobContext {
+  class JobContext {
+  private:
+    Compilation &C;
+
+  public:
     ArrayRef<const Job *> Inputs;
-    const CommandOutput &Output;
     ArrayRef<const Action *> InputActions;
-    const llvm::opt::ArgList &Args;
+    const CommandOutput &Output;
     const OutputInfo &OI;
+
+    /// The arguments to the driver. Can also be used to create new strings with
+    /// the same lifetime.
+    ///
+    /// This just caches C.getArgs().
+    const llvm::opt::ArgList &Args;
+
+  public:
+    JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
+               ArrayRef<const Action *> InputActions,
+               const CommandOutput &Output, const OutputInfo &OI);
+
+    /// Forwards to Compilation::getInputFiles.
+    ArrayRef<InputPair> getTopLevelInputFiles() const;
+
+    /// Forwards to Compilation::getAllSourcesPath.
+    const char *getAllSourcesPath() const;
+
+    /// Creates a new temporary file for use by a job.
+    ///
+    /// The returned string already has its lifetime extended to match other
+    /// arguments.
+    const char *getTemporaryFilePath(const llvm::Twine &name,
+                                     StringRef suffix = "") const;
   };
 
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  /// Packs together information chosen by toolchains to create jobs.
+  struct InvocationInfo {
+    const char *ExecutableName;
+    llvm::opt::ArgStringList Arguments;
+    std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
+    FilelistInfo FilelistInfo;
+
+    InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
+                   decltype(ExtraEnvironment) extraEnv = {})
+      : ExecutableName(name), Arguments(std::move(args)),
+        ExtraEnvironment(std::move(extraEnv)) {}
+  };
+
+  virtual InvocationInfo
   constructInvocation(const CompileJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
+  constructInvocation(const InterpretJobAction &job,
+                      const JobContext &context) const;
+  virtual InvocationInfo
   constructInvocation(const BackendJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const MergeModuleJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const ModuleWrapJobAction &job,
                       const JobContext &context) const;
 
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const REPLJobAction &job,
                       const JobContext &context) const;
 
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const GenerateDSYMJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
+  constructInvocation(const VerifyDebugInfoJobAction &job,
+                      const JobContext &context) const;
+  virtual InvocationInfo
+  constructInvocation(const GeneratePCHJobAction &job,
+                      const JobContext &context) const;
+  virtual InvocationInfo
   constructInvocation(const AutolinkExtractJobAction &job,
                       const JobContext &context) const;
-  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  virtual InvocationInfo
   constructInvocation(const LinkJobAction &job,
                       const JobContext &context) const;
 
@@ -111,14 +160,24 @@ public:
   /// This method dispatches to the various \c constructInvocation methods,
   /// which may be overridden by platform-specific subclasses.
   std::unique_ptr<Job> constructJob(const JobAction &JA,
+                                    Compilation &C,
                                     SmallVectorImpl<const Job *> &&inputs,
+                                    ArrayRef<const Action *> inputActions,
                                     std::unique_ptr<CommandOutput> output,
-                                    const ActionList &inputActions,
-                                    const llvm::opt::ArgList &args,
                                     const OutputInfo &OI) const;
 
-  /// Return the default langauge type to use for the given extension.
+  /// Return the default language type to use for the given extension.
+  /// If the extension is empty or is otherwise not recognized, return
+  /// the invalid type \c TY_INVALID.
   virtual types::ID lookupTypeForExtension(StringRef Ext) const;
+
+  /// Check whether a clang library with a given name exists.
+  ///
+  /// \param args Invocation arguments.
+  /// \param sanitizer Sanitizer name.
+  virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
+                                         StringRef sanitizer) const;
+
 };
 } // end namespace driver
 } // end namespace swift

@@ -1,0 +1,97 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+// This test requires that the standard library calls ICU
+// directly.  It is not specific to Linux, it is just that on
+// Apple platforms we are using the NSString bridge right now.
+
+// REQUIRES: OS=linux-gnu
+
+import StdlibUnittest
+import StdlibUnicodeUnittest
+
+func assertASCIIRepresentationIfPossible(_ s: String) {
+  for us in s.unicodeScalars {
+    if !us.isASCII {
+      return
+    }
+  }
+  precondition(s._core.isASCII)
+}
+
+func forceUTF16Representation(_ s: String) -> String {
+  var s = s
+  s += "\u{fffd}"
+  s.removeSubrange(s.index(before: s.endIndex)..<s.endIndex)
+  precondition(!s._core.isASCII)
+  return s
+}
+
+func calculateSortOrder(_ tests: inout [StringComparisonTest]) {
+  tests.sort {
+    collationElements(
+      $0.collationElements,
+      areLessThan: $1.collationElements
+    )
+  }
+
+  tests[0].order = 0
+  for i in tests.indices.dropFirst() {
+    if collationElements(
+      tests[i - 1].collationElements,
+      areLessThan: tests[i].collationElements
+    ) {
+      tests[i].order = tests[i - 1].order! + 1
+    } else {
+      tests[i].order = tests[i - 1].order!
+    }
+  }
+}
+
+func checkStringHashableComparable(
+  _ tests: [StringComparisonTest],
+  stackTrace: SourceLocStack = SourceLocStack(),
+  file: String = #file, line: UInt = #line
+) {
+  var tests = tests
+  calculateSortOrder(&tests)
+
+  func comparisonOracle(_ i: Int, _ j: Int) -> ExpectedComparisonResult {
+    return tests[i].order! <=> tests[j].order!
+  }
+
+  checkHashable(
+    tests.map { $0.string },
+    equalityOracle: { comparisonOracle($0, $1).isEQ() },
+    stackTrace: stackTrace.pushIf(true, file: file, line: line))
+
+  checkComparable(
+    tests.map { $0.string },
+    oracle: comparisonOracle,
+    stackTrace: stackTrace.pushIf(true, file: file, line: line))
+}
+
+var StringTests = TestSuite("StringTests")
+
+StringTests.test("StringComparisonTest.allTests: tests are in ASCII representation")
+  .forEach(in: StringComparisonTest.allTests) {
+  test in
+  assertASCIIRepresentationIfPossible(test.string)
+}
+
+StringTests.test("Comparable") {
+  let allTestsInUTF16Representation = StringComparisonTest.allTests.map {
+    test -> StringComparisonTest in
+    return StringComparisonTest(
+      forceUTF16Representation(test.string),
+      test.collationElements,
+      sourceLocation: SourceLoc(
+        test.loc.file,
+        test.loc.line,
+        comment: (test.loc.comment ?? "") + "\nin Unicode representation"))
+  }
+  checkStringHashableComparable(StringComparisonTest.allTests + allTestsInUTF16Representation)
+}
+
+runAllTests()
+

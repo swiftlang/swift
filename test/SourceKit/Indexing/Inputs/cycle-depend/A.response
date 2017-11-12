@@ -25,6 +25,21 @@
               key.filepath: Swift.swiftmodule,
               key.hash: <hash>,
               key.is_system: 1
+            },
+            {
+              key.kind: source.lang.swift.import.module.swift,
+              key.name: "SwiftOnoneSupport",
+              key.filepath: SwiftOnoneSupport.swiftmodule,
+              key.hash: <hash>,
+              key.dependencies: [
+                {
+                  key.kind: source.lang.swift.import.module.swift,
+                  key.name: "Swift",
+                  key.filepath: Swift.swiftmodule,
+                  key.hash: <hash>,
+                  key.is_system: 1
+                }
+              ]
             }
           ]
         },
@@ -34,6 +49,12 @@
           key.filepath: Swift.swiftmodule,
           key.hash: <hash>,
           key.is_system: 1
+        },
+        {
+          key.kind: source.lang.swift.import.module.swift,
+          key.name: "SwiftOnoneSupport",
+          key.filepath: SwiftOnoneSupport.swiftmodule,
+          key.hash: <hash>
         }
       ]
     },
@@ -43,18 +64,40 @@
       key.filepath: Swift.swiftmodule,
       key.hash: <hash>,
       key.is_system: 1
+    },
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "SwiftOnoneSupport",
+      key.filepath: SwiftOnoneSupport.swiftmodule,
+      key.hash: <hash>
     }
   ],
   key.entities: [
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "A",
-      key.usr: "s:C1A1A",
+      key.usr: "s:1AAAC",
       key.entities: [
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "x",
-          key.usr: "s:vC1A1A1xC1B1B"
+          key.usr: "s:1AAAC1x1BADCvp",
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:1AAAC1x1BADCvg",
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:1AAAC1x1BADCvs",
+              key.is_dynamic: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:1AAACABycfc"
         }
       ]
     }

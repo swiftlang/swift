@@ -1,8 +1,8 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var b = true, i = 17
 
-var d : Dictionary = [0 : "Zero", 1 : "One", 2 : "Two" ]
+var d : Dictionary = [0 : "Zero", 1 : "One", 2 : "Two"]
 
 func testGlobals() {
   b = false

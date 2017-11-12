@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 
@@ -8,7 +8,7 @@ struct S {}
 protocol NonClassProto {}
 protocol ClassConstrainedProto : class {}
 
-func takesAnyObject(x: AnyObject) {}
+func takesAnyObject(_ x: AnyObject) {}
 
 func concreteTypes() {
   takesAnyObject(C.self) 
@@ -19,7 +19,7 @@ func concreteTypes() {
 
 func existentialMetatypes(nonClass: NonClassProto.Type,
                           classConstrained: ClassConstrainedProto.Type,
-                          compo: protocol<NonClassProto, ClassConstrainedProto>.Type) {
+                          compo: (NonClassProto & ClassConstrainedProto).Type) {
   takesAnyObject(nonClass) // expected-error{{argument type 'NonClassProto.Type' does not conform to expected type 'AnyObject'}}
   takesAnyObject(classConstrained)
   takesAnyObject(compo)

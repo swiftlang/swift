@@ -1,13 +1,15 @@
 // All of this is required in order to produce materializeForSet
 // declarations for A's properties.
-public protocol NilLiteralConvertible {
+precedencegroup AssignmentPrecedence { assignment: true }
+
+public protocol ExpressibleByNilLiteral {
   init(nilLiteral: ())
 }
-public enum Optional<T>: NilLiteralConvertible {
-  case Some(T)
-  case None
+public enum Optional<T> : ExpressibleByNilLiteral {
+  case none
+  case some(T)
 
-  public init(nilLiteral: ()) { self = .None }
+  public init(nilLiteral: ()) { self = .none }
 }
 
 public struct Y {}

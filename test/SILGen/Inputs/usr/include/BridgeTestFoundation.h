@@ -5,24 +5,24 @@
 
 @interface NSString : NSObject<NSCopying>
 
-- (__null_unspecified NSString*)uppercaseString;
-- (id) copyWithZone: (void*)zone;
+- (null_unspecified NSString*)uppercaseString;
+- (id) copyWithZone: (nullable void*)zone;
 
 @end
 
-@interface NSArray : NSObject
+@interface NSArray<ObjectType> : NSObject
 
-- (instancetype)initWithObjects:(const id *)objects count:(int)count;
-- (instancetype)initWithArray:(NSArray*)array;
+- (instancetype)initWithObjects:(const ObjectType *)objects count:(int)count;
+- (instancetype)initWithArray:(NSArray<ObjectType>*)array;
 
-- (id)objectAtIndexedSubscript:(NSInteger)i;
+- (nonnull ObjectType)objectAtIndexedSubscript:(NSInteger)i;
 
 @end
 
-@interface NSDictionary : NSObject
+@interface NSDictionary<KeyType, ValueType> : NSObject
 @end
 
-@interface NSSet : NSObject
+@interface NSSet<ObjectType> : NSObject
 @end
 
 @interface NSNumber : NSObject
@@ -30,8 +30,8 @@
 
 @interface Foo : NSObject
 
-- (__null_unspecified NSString*) foo;
-- (void) setFoo: (__null_unspecified NSString*)s;
+- (_Null_unspecified NSString*) foo;
+- (void)setFoo:(_Null_unspecified NSString *)s;
 
 - (BOOL) zim;
 - (void) setZim: (BOOL)b;
@@ -53,14 +53,14 @@
 
 @interface NSDraggingItem
 
-@property(copy, nullable) NSArray *__nonnull (^imageComponentsProvider)(void);
+@property(copy, nullable) NSArray *_Nonnull (^imageComponentsProvider)(void);
 
 @end
 
-__null_unspecified NSString *bar(void);
-void setBar(__null_unspecified NSString *s);
+_Null_unspecified NSString *bar(void);
+void setBar(_Null_unspecified NSString *s);
 
-__null_unspecified NSString *NSStringFromString(__null_unspecified NSString *s);
+_Null_unspecified NSString *NSStringFromString(_Null_unspecified NSString *s);
 NSString *NSStringFromClass(Class c);
 
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
@@ -87,5 +87,9 @@ void noescapeNonnullBlock(__attribute__((noescape)) void (^_Nonnull block)(void)
 void escapeNonnullBlock(void (^_Nonnull block)(void));
 
 void noescapeBlockAlias(__attribute__((noescape)) dispatch_block_t block);
-void noescapeNonnullBlockAlias(__attribute__((noescape)) _Nonnull dispatch_block_t  block);
-void escapeBlockAlias(dispatch_block_t  block);
+void noescapeNonnullBlockAlias(__attribute__((noescape)) _Nonnull dispatch_block_t block);
+void escapeBlockAlias(dispatch_block_t block);
+
+@interface ObjectWithSplitProperty : NSObject
+@property (nonatomic, setter=private_setFlagForSomething:) BOOL flagForSomething;
+@end

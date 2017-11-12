@@ -1,0 +1,245 @@
+#!/usr/bin/env python
+# utils/coverage/coverage-generate-data - Generate, parse test run profdata
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+import argparse
+import logging
+import multiprocessing
+import os
+import pipes
+import subprocess
+import sys
+import timeit
+from multiprocessing import Pool
+
+NUM_CORES = multiprocessing.cpu_count()
+
+logging_format = '%(asctime)s %(levelname)s %(message)s'
+logging.basicConfig(level=logging.DEBUG,
+                    format=logging_format,
+                    filename='/tmp/%s.log' % os.path.basename(__file__),
+                    filemode='w')
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+formatter = logging.Formatter(logging_format)
+console.setFormatter(formatter)
+logging.getLogger().addHandler(console)
+
+global_build_subdir = ''
+
+
+def quote_shell_cmd(cmd):
+    """Return `cmd` as a properly quoted shell string"""
+    return ' '.join([pipes.quote(a) for a in cmd])
+
+
+def call(cmd, verbose=True, show_cmd=True):
+    """Call `cmd` and optionally log debug info"""
+    formatted_cmd = quote_shell_cmd(cmd) if isinstance(cmd, list) else cmd
+    if show_cmd:
+        logging.info('$ ' + formatted_cmd)
+    start_time = timeit.default_timer()
+    process = subprocess.Popen(
+        cmd,
+        shell=(not isinstance(cmd, list)),
+        bufsize=1,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT
+    )
+    for line in iter(process.stdout.readline, b''):
+        if verbose:
+            logging.info('STDOUT: ' + line.rstrip())
+    end_time = timeit.default_timer()
+    logging.debug('END $ ' + formatted_cmd)
+    logging.debug('Return code: %s', process.returncode)
+    logging.debug('Elapsed time: %s', end_time - start_time)
+    return process.returncode
+
+
+def check_output(cmd, verbose=True, show_cmd=True):
+    """Return output of calling `cmd` and optionally log debug info"""
+    output = []
+    formatted_cmd = quote_shell_cmd(cmd) if isinstance(cmd, list) else cmd
+    if show_cmd:
+        logging.info('$ ' + formatted_cmd)
+    start_time = timeit.default_timer()
+    process = subprocess.Popen(
+        cmd,
+        shell=(not isinstance(cmd, list)),
+        bufsize=1,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT
+    )
+    for line in iter(process.stdout.readline, b''):
+        if verbose:
+            logging.info('STDOUT: ' + line.rstrip())
+        output.append(line)
+    end_time = timeit.default_timer()
+    logging.debug('Return code: %s', process.returncode)
+    logging.debug('Elapsed time: %s', end_time - start_time)
+    return (process.returncode, ''.join(output))
+
+
+def xcrun_find(cmd):
+    """Return path of `cmd` using xcrun -f"""
+    return check_output(['xcrun', '-f', cmd])[1].strip()
+
+
+llvm_cov = xcrun_find('llvm-cov')
+llvm_profdata = xcrun_find('llvm-profdata')
+
+
+def dump_coverage_data(merged_file):
+    """Dump coverage data of file at path `merged_file` using llvm-cov"""
+    try:
+        swift = os.path.join(global_build_subdir,
+                             'swift-macosx-x86_64/bin/swift')
+        coverage_log = os.path.join(os.path.dirname(merged_file),
+                                    'coverage.log')
+        testname = os.path.basename(os.path.dirname(merged_file))
+        logging.info('Searching for covered files: %s', testname)
+        (returncode, output) = check_output(
+            [llvm_cov, 'report', '-instr-profile=%s' % merged_file, swift],
+            verbose=False,
+            show_cmd=False
+        )
+        output = [line.split()[0]
+                  for line in output.split()
+                  if '0.00' not in line and '/swift' in line]
+        with open(coverage_log, 'w') as f:
+            logging.info('Dumping coverage data: %s', testname)
+            (returncode2, dumped) = check_output(
+                quote_shell_cmd(
+                    [llvm_cov, 'show', '-line-coverage-gt=0',
+                     '-instr-profile=%s' % merged_file, swift] +
+                    output
+                ),
+                verbose=False,
+                show_cmd=False
+            )
+            f.write(dumped)
+    except Exception as e:
+        logging.debug(str(e))
+
+
+def find_folders(root_path, suffix):
+    """Return a list of folder paths ending in `suffix` rooted at
+    `root_path`"""
+    found_folders = []
+    for root, folders, files in os.walk(root_path):
+        for folder in folders:
+            if folder.endswith(suffix):
+                folderpath = os.path.join(root, folder)
+                logging.debug('Found %s', folderpath)
+                found_folders.append(folderpath)
+    logging.info('Found %s "%s" folders', len(found_folders), suffix)
+    return found_folders
+
+
+def find_files(root_path, suffix):
+    """Return a list of file paths ending in `suffix` rooted at
+    `root_path`"""
+    found_files = []
+    for root, folders, files in os.walk(root_path):
+        for f in files:
+            if f.endswith(suffix):
+                fpath = os.path.join(root, f)
+                logging.debug('Found %s', fpath)
+                found_files.append(fpath)
+    logging.info('Found %s "%s" files', len(found_files), suffix)
+    return found_files
+
+
+def merge_profdir(profdir_path):
+    """Merge swift-*.profraw files contained in `profdir_path` into
+    merged.profraw"""
+    logging.info('Merging %s', profdir_path)
+    if not os.path.exists(os.path.join(profdir_path, 'merged.profraw')):
+        call('set -x; '
+             'cd %s; '
+             '%s merge -output merged.profraw swift-*.profraw && '
+             'rm swift-*.profraw' % (profdir_path, llvm_profdata))
+
+
+def demangle_coverage_data(coverage_log_path):
+    """Demangle coverage dump at `coverage_log_path` using c++filt"""
+    logging.info('Demangling %s', coverage_log_path)
+    cppfilt = '/usr/bin/c++filt'
+    demangled_log_path = coverage_log_path + '.demangled'
+    returncode = 1
+    with open(coverage_log_path) as cf, open(demangled_log_path, 'w') as df:
+        process = subprocess.Popen(
+            [cppfilt, '-n'],
+            stdin=subprocess.PIPE,
+            stdout=df,
+            stderr=subprocess.PIPE
+        )
+        for line in cf:
+            process.stdin.write(line)
+        process.stdin.close()
+        returncode = process.wait()
+    return returncode
+
+
+def main():
+    global global_build_subdir
+
+    parser = argparse.ArgumentParser(
+        description='Generate, parse test run profdata')
+    parser.add_argument('swift_dir', metavar='swift-dir')
+    parser.add_argument('--log',
+                        help='the level of information to log (default: info)',
+                        metavar='LEVEL',
+                        default='info',
+                        choices=['info', 'debug', 'warning', 'error',
+                                 'critical'])
+    args = parser.parse_args()
+
+    console.setLevel(level=args.log.upper())
+    logging.debug(args)
+
+    swift_dir = os.path.realpath(os.path.abspath(args.swift_dir))
+    build_dir = os.path.realpath(os.path.join(os.path.dirname(swift_dir),
+                                              'build'))
+    build_subdir = os.path.join(build_dir, 'buildbot_incremental_coverage')
+
+    global_build_subdir = build_subdir
+
+    build_script_cmd = [
+        os.path.join(swift_dir, 'utils/build-script'),
+        '--preset=buildbot_incremental,tools=RDA,stdlib=RDA,coverage',
+    ]
+
+    call(build_script_cmd)
+
+    assert global_build_subdir
+
+    pool = Pool(NUM_CORES)
+
+    logging.info('Starting merge on %s', build_dir)
+    folders = find_folders(build_dir, '.profdir')
+    pool.map_async(merge_profdir, folders).get(999999)
+
+    logging.info('Starting coverage data dump...')
+    merged_profraw_files = find_files(build_dir, 'merged.profraw')
+    pool.map_async(dump_coverage_data, merged_profraw_files).get(999999)
+
+    logging.info('Starting coverage data dump demangling...')
+    coverage_log_files = find_files(build_dir, 'coverage.log')
+    pool.map_async(demangle_coverage_data, coverage_log_files).get(999999)
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except Exception as e:
+        logging.debug(str(e))
+        sys.exit(1)

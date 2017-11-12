@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,14 +19,17 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Version.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Mutex.h"
 
 #include <memory>
 
 namespace llvm {
+  class GlobalVariable;
   class MemoryBuffer;
   class Module;
   class TargetOptions;
@@ -34,7 +37,7 @@ namespace llvm {
 }
 
 namespace swift {
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ASTContext;
   class CodeCompletionCallbacksFactory;
   class Decl;
@@ -43,6 +46,7 @@ namespace swift {
   class DiagnosticConsumer;
   class DiagnosticEngine;
   class FileUnit;
+  class GenericEnvironment;
   class GenericParamList;
   class IRGenOptions;
   class LangOptions;
@@ -58,13 +62,14 @@ namespace swift {
   class Token;
   class TopLevelContext;
   struct TypeLoc;
-  
-  /// SILParserState - This is a context object used to optionally maintain SIL
-  /// parsing context for the parser.
+  class UnifiedStatsReporter;
+
+  /// Used to optionally maintain SIL parsing context for the parser.
+  ///
+  /// When not parsing SIL, this has no overhead.
   class SILParserState {
   public:
-    SILModule *M;
-    SILParserTUState *S;
+    std::unique_ptr<SILParserTUState> Impl;
 
     explicit SILParserState(SILModule *M);
     ~SILParserState();
@@ -77,7 +82,7 @@ namespace swift {
   /// compilation.
   bool shouldVerify(const Decl *D, const ASTContext &Context);
 
-  /// \brief Check that the source file is well formed, aborting and spewing
+  /// \brief Check that the source file is well-formed, aborting and spewing
   /// errors if not.
   ///
   /// "Well-formed" here means following the invariants of the AST, not that the
@@ -123,7 +128,8 @@ namespace swift {
                               const SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
                               bool KeepComments = true,
-                              bool TokenizeInterpolatedString = true);
+                              bool TokenizeInterpolatedString = true,
+                              ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.
@@ -139,6 +145,11 @@ namespace swift {
   /// instrumentation that has a high runtime performance impact.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
   
+  /// Once parsing and name-binding are complete this optionally walks the ASTs
+  /// to add calls to externally provided functions that simulate
+  /// "program counter"-like debugging events.
+  void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
+  
   /// Flags used to control type checking.
   enum class TypeCheckingFlags : unsigned {
     /// Whether to delay checking that benefits from having the entire
@@ -151,17 +162,31 @@ namespace swift {
 
     /// Indicates that the type checker is checking code that will be
     /// immediately executed.
-    ForImmediateMode = 1 << 2
+    ForImmediateMode = 1 << 2,
+
+    /// If set, dumps wall time taken to type check each expression to
+    /// llvm::errs().
+    DebugTimeExpressions = 1 << 3,
   };
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
-  ///                  source file.
+  /// source file.
+  ///
+  /// \param WarnLongFunctionBodies If non-zero, warn when a function body takes
+  /// longer than this many milliseconds to type-check
   void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            OptionSet<TypeCheckingFlags> Options,
-                           unsigned StartElem = 0);
+                           unsigned StartElem = 0,
+                           unsigned WarnLongFunctionBodies = 0,
+                           unsigned WarnLongExpressionTypeChecking = 0,
+                           unsigned ExpressionTimeoutThreshold = 0);
+
+  /// Once type checking is complete, this walks protocol requirements
+  /// to resolve default witnesses.
+  void finishTypeCheckingFile(SourceFile &SF);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
@@ -182,41 +207,44 @@ namespace swift {
   ///
   /// \returns false on success, true on error.
   bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                              bool isSILType, DeclContext *DC,
+                              DeclContext *DC,
+                              bool ProduceDiagnostics = true);
+
+  /// \brief Recursively validate the specified type.
+  ///
+  /// This is used when dealing with partial source files (e.g. SIL parsing,
+  /// code completion).
+  ///
+  /// \returns false on success, true on error.
+  bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
+                              bool isSILMode,
+                              bool isSILType,
+                              GenericEnvironment *GenericEnv,
+                              DeclContext *DC,
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  /// We pass in a vector of nested GenericParamLists and a vector of
-  /// ArchetypeBuilders with the innermost GenericParamList in the beginning
-  /// of the vector.
-  bool handleSILGenericParams(ASTContext &Ctx,
-                              SmallVectorImpl<GenericParamList *> &gps,
-                              DeclContext *DC,
-                              SmallVectorImpl<ArchetypeBuilder *> &builders);
+  GenericEnvironment *handleSILGenericParams(ASTContext &Ctx,
+                                             GenericParamList *genericParams,
+                                             DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///
   /// The module must contain source files.
   ///
-  /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as fragile. This is used for compiling the stdlib.
   /// if \p wholeModuleCompilation is true, the optimizer assumes that the SIL
   /// of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performSILGeneration(ModuleDecl *M, SILOptions &options,
-                       bool makeModuleFragile = false,
                        bool wholeModuleCompilation = false);
 
   /// Turn a source file into SIL IR.
   ///
   /// If \p StartElem is provided, the module is assumed to be only part of the
   /// SourceFile, and any optimizations should take that into account.
-  /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as fragile. This is used for compiling the stdlib.
   std::unique_ptr<SILModule>
   performSILGeneration(FileUnit &SF, SILOptions &options,
-                       Optional<unsigned> StartElem = None,
-                       bool makeModuleFragile = false);
+                       Optional<unsigned> StartElem = None);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -230,34 +258,61 @@ namespace swift {
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
-  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                    ModuleDecl *M,
-                                                    SILModule *SILMod,
-                                                    StringRef ModuleName,
-                                                llvm::LLVMContext &LLVMContext);
+  /// If you set an outModuleHash, then you need to call performLLVM.
+  std::unique_ptr<llvm::Module>
+  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
+                      std::unique_ptr<SILModule> SILMod,
+                      StringRef ModuleName, llvm::LLVMContext &LLVMContext,
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
-  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
-                                                    SourceFile &SF,
-                                                    SILModule *SILMod,
-                                                    StringRef ModuleName,
-                                                 llvm::LLVMContext &LLVMContext,
-                                                    unsigned StartElem = 0);
+  /// If you set an outModuleHash, then you need to call performLLVM.
+  std::unique_ptr<llvm::Module>
+  performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+                      std::unique_ptr<SILModule> SILMod,
+                      StringRef ModuleName, llvm::LLVMContext &LLVMContext,
+                      unsigned StartElem = 0,
+                      llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be
-  /// printed. Only optimized.
+  /// printed, only to be optimized.
   void performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine);
 
-  /// Wrap a serialized module inside a swift ast section in an object file.
+  /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                    StringRef OutputPath);
 
   /// Turn the given LLVM module into native code and return true on error.
   bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
-                   llvm::Module *Module);
+                   llvm::Module *Module,
+                   UnifiedStatsReporter *Stats=nullptr);
+
+  /// Run the LLVM passes. In multi-threaded compilation this will be done for
+  /// multiple LLVM modules in parallel.
+  /// \param Diags may be null if LLVM code gen diagnostics are not required.
+  /// \param DiagMutex may also be null if a mutex around \p Diags is not
+  ///                  required.
+  /// \param HashGlobal used with incremental LLVMCodeGen to know if a module
+  ///                   was already compiled, may be null if not desired.
+  /// \param Module LLVM module to code gen, required.
+  /// \param TargetMachine target of code gen, required.
+  /// \param effectiveLanguageVersion version of the language, effectively.
+  /// \param OutputFilename Filename for output.
+  bool performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
+                   llvm::sys::Mutex *DiagMutex,
+                   llvm::GlobalVariable *HashGlobal,
+                   llvm::Module *Module,
+                   llvm::TargetMachine *TargetMachine,
+                   const version::Version &effectiveLanguageVersion,
+                   StringRef OutputFilename,
+                   UnifiedStatsReporter *Stats=nullptr);
+
+  /// Creates a TargetMachine from the IRGen opts and AST Context.
+  std::unique_ptr<llvm::TargetMachine>
+  createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
 
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
@@ -279,7 +334,6 @@ namespace swift {
     struct Implementation;
     Implementation &Impl;
   };
-
 } // end namespace swift
 
-#endif
+#endif // SWIFT_SUBSYSTEMS_H

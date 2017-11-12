@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,29 +17,41 @@
 
 import SwiftShims
 
+@_fixed_layout
+@_versioned
 internal struct _ArrayBody {
-  var _storage: _SwiftArrayBodyStorage
-  
-  init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
+  @_versioned
+  internal var _storage: _SwiftArrayBodyStorage
+
+  @_inlineable
+  @_versioned
+  internal init(
+    count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false
+  ) {
     _sanityCheck(count >= 0)
     _sanityCheck(capacity >= 0)
     
     _storage = _SwiftArrayBodyStorage(
       count: count,
       _capacityAndFlags:
-        (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0))
+        (UInt(truncatingIfNeeded: capacity) &<< 1) |
+        (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 
-  /// In principle CountAndCapacity shouldn't need to be default
+  /// In principle ArrayBody shouldn't need to be default
   /// constructed, but since we want to claim all the allocated
   /// capacity after a new buffer is allocated, it's typical to want
   /// to update it immediately after construction.
-  init() {
+  @_inlineable
+  @_versioned
+  internal init() {
     _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
   }
   
   /// The number of elements stored in this Array.
-  var count: Int {
+  @_inlineable
+  @_versioned
+  internal var count: Int {
     get {
       return _assumeNonNegative(_storage.count)
     }
@@ -50,8 +62,10 @@ internal struct _ArrayBody {
 
   /// The number of elements that can be stored in this Array without
   /// reallocation.
-  var capacity: Int {
-    return Int(_capacityAndFlags >> 1)
+  @_inlineable
+  @_versioned
+  internal var capacity: Int {
+    return Int(_capacityAndFlags &>> 1)
   }
 
   /// Is the Element type bitwise-compatible with some Objective-C
@@ -60,7 +74,9 @@ internal struct _ArrayBody {
   /// optimizer before 1.0 ships, so we store it in a bit here to
   /// avoid the cost of calls into the runtime that compute the
   /// answer.
-  var elementTypeIsBridgedVerbatim: Bool {
+  @_inlineable
+  @_versioned
+  internal var elementTypeIsBridgedVerbatim: Bool {
     get {
       return (_capacityAndFlags & 0x1) != 0
     }
@@ -72,7 +88,9 @@ internal struct _ArrayBody {
 
   /// Storage optimization: compresses capacity and
   /// elementTypeIsBridgedVerbatim together.
-  var _capacityAndFlags: UInt {
+  @_inlineable
+  @_versioned
+  internal var _capacityAndFlags: UInt {
     get {
       return _storage._capacityAndFlags
     }
@@ -81,4 +99,3 @@ internal struct _ArrayBody {
     }
   }
 }
-

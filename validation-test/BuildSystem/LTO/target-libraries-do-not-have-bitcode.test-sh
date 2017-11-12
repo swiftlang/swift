@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+
+# This test makes sure that if lto is enabled and bitcode is not that no runtime
+# libraries contain bitcode. We do not support this now.
+#
+# *NOTE* This will not trigger for embedded bitcode sections since to file these
+# are still mach-o files and come up as such.
+
+# REQUIRES: lto
+# REQUIRES: OS=macosx
+# RUN: %s %swift_obj_root %t
+
+set -u
+set -e
+set -o pipefail
+
+function check_thin_archive_for_bitcode() {
+    set -u
+    set -e
+
+    pushd . 1>/dev/null
+
+    local BASE_TEMPDIR=$1
+    local ARCHIVE=$2
+
+    local LIB_NAME
+    LIB_NAME=$(basename ${ARCHIVE})
+    local LIB_ARCH
+    LIB_ARCH=$(basename $(dirname ${ARCHIVE}))
+    local LIB_PLATFORM
+    LIB_PLATFORM=$(basename $(dirname $(dirname ${ARCHIVE})))
+
+    LIB_TEMP_DIR="${BASE_TEMPDIR}/${LIB_PLATFORM}-${LIB_ARCH}-${LIB_NAME}"
+    mkdir -p "${LIB_TEMP_DIR}"
+    cd "${LIB_TEMP_DIR}"
+    ar -x ${ARCHIVE}
+    if find ./ -iname '*.o' -exec file {} \; | grep -q -e bitcode -e bit-code; then
+        echo "Found bitcode file in thin archive: ${ARCHIVE}"
+        exit 1
+    else
+        echo "No bitcode in thin archive: ${ARCHIVE}"
+    fi
+    popd 1>/dev/null
+    set +e
+    set +u
+}
+export -f check_thin_archive_for_bitcode
+
+function check_thick_archive_for_bitcode() {
+    set -u
+    set -e
+
+    pushd . 1>/dev/null
+
+    local BASE_TEMPDIR=$1
+    local ARCHIVE=$2
+
+    local LIB_NAME
+    LIB_NAME=$(basename ${ARCHIVE})
+    local LIB_PLATFORM
+    LIB_PLATFORM=$(basename $(dirname ${ARCHIVE}))
+
+    LIB_TEMP_DIR="${BASE_TEMPDIR}/${LIB_PLATFORM}-thick-${LIB_NAME}"
+    LIB_ARCHIVE_DIR="${LIB_TEMP_DIR}/archive"
+    LIB_OBJECT_DIR="${LIB_TEMP_DIR}/object"
+
+    mkdir -p "${LIB_TEMP_DIR}"
+    mkdir -p "${LIB_ARCHIVE_DIR}"
+    mkdir -p "${LIB_OBJECT_DIR}"
+
+    ARCHS=( $(lipo -info ${ARCHIVE} | cut -f 3 -d ":" ) )
+    cd ${LIB_OBJECT_DIR}
+    for arch in "${ARCHS[@]}"; do
+        pushd . 1>/dev/null
+        local THIN_ARCHIVE="${LIB_NAME}.${arch}"
+        lipo -thin "${arch}" -output "${LIB_ARCHIVE_DIR}/${THIN_ARCHIVE}" "${ARCHIVE}"
+        mkdir ${arch}
+        cd ${arch}
+        ar -x "${LIB_ARCHIVE_DIR}/${THIN_ARCHIVE}"
+
+        if find ./ -iname '*.o' -exec file {} \; | grep -q -e bitcode -e bit-code; then
+            echo "Found bitcode file in thin archive: ${THIN_ARCHIVE}. Taken from thick archive: ${ARCHIVE}"
+            exit 1
+        else
+            echo "No bitcode in thin archive: ${THIN_ARCHIVE}. Taken from thick archive: ${ARCHIVE}"
+        fi
+
+        popd 1>/dev/null
+    done
+    popd 1>/dev/null
+
+    set +e
+    set +u
+}
+export -f check_thick_archive_for_bitcode
+
+# Make sure we have an absolute path to the OBJROOT. It makes code below
+# simpler.
+OBJROOT=$(cd ${1} && pwd)
+TEMPDIR=${2}
+
+rm -rf $TEMPDIR
+mkdir -p $TEMPDIR
+
+# *NOTE* We do not find directly in ./lib/swift_static since we want to not fail
+# in the case where we are not building a static standard library and thus
+# ./lib/swift_static is not created.
+THIN_ARCHIVES=( \
+    $(find ${OBJROOT}/lib/swift -iname '*.a' -exec lipo -info {} \; | grep "Non-fat file" | cut -f 3 -d " ") \
+    $(find ${OBJROOT}/lib -iname '*.a' -path "*swift_static*" -exec lipo -info {} \; | grep "Non-fat file" | cut -f 3 -d " ") \
+)
+if [[ ${#THIN_ARCHIVES[@]} -gt 0 ]]; then
+    echo "${THIN_ARCHIVES[@]}" | xargs -n 1 -P 8 bash -c "check_thin_archive_for_bitcode \"${TEMPDIR}\" \${1}" --
+fi
+
+# *NOTE* We do not find directly in ./lib/swift_static since we want to not fail
+# in the case where we are not building a static standard library and thus
+# ./lib/swift_static is not created.
+THICK_ARCHIVES=( \
+   $(find ${OBJROOT}/lib/swift -iname '*.a' -exec lipo -info {} \; | grep "Architectures in the fat file" | cut -f 6 -d " ") \
+   $(find ${OBJROOT}/lib -iname '*.a' -path "*swift_static*" -exec lipo -info {} \; | grep "Architectures in the fat file" | cut -f 6 -d " ") \
+)
+if [[ ${#THICK_ARCHIVES[@]} -gt 0 ]]; then
+    echo "${THICK_ARCHIVES[@]}" | xargs -n 1 -P 8 bash -c "check_thick_archive_for_bitcode \"${TEMPDIR}\" \${1}" --
+fi
+
+set +o pipefail
+set +e
+set +u

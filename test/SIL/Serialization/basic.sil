@@ -1,0 +1,58 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow | %FileCheck %s
+
+import Builtin
+
+// CHECK-LABEL: sil [serialized] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
+sil [serialized] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [serialized] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
+sil [serialized] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  end_lifetime %0 : $Builtin.NativeObject
+  return undef : $()
+}
+
+class TestArrayStorage {
+  @sil_stored var count: Int32
+  init()
+}
+
+struct TestArray2 {
+  var storage : TestArrayStorage
+  var someValue : Int32
+  var storage2 : TestArrayStorage
+}
+
+struct Int32 {
+  var x: Builtin.Int32
+}
+
+sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
+bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
+  (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
+  (%4, %5, %6) = destructure_struct %1 : $TestArray2
+  %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
+  return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+struct EmptyStruct {}
+
+sil @test_empty_destructure : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $EmptyStruct()
+  () = destructure_struct %0 : $EmptyStruct
+  %1 = tuple()
+  () = destructure_tuple %1 : $()
+  return %1 : $()
+}

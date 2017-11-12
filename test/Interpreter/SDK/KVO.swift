@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -31,14 +31,14 @@ class Observer : NSObject {
     model.number = 42
   }
 
-  override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+  override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
     if context != &kvoContext {
       // FIXME: we shouldn't need to unwrap these here, but it doesn't work on
       // older SDKs where these are non-optional types.
-      return super.observeValueForKeyPath(keyPath!, ofObject: object!, change: change!, context: context)
+      return super.observeValue(forKeyPath: keyPath!, of: object!, change: change!, context: context)
     }
 
-    print(object!.valueForKeyPath(keyPath!))
+    print((object! as AnyObject).value(forKeyPath: keyPath!))
   }
 }
 

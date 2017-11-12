@@ -1,0 +1,138 @@
+%{
+  # -*- mode: Swift -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition it applies to the resulting .swift file only
+}%
+//// Automatically Generated From SyntaxNodes.swift.gyb.
+//// Do Not Edit Directly!
+//===------------ SyntaxNodes.swift - Syntax Node definitions -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+"""
+Each Syntax node is a subclass of a more generic node. For example,
+StructDeclSyntax is a subclass of DeclSyntax and can be used in contexts
+where DeclSyntax is expected.
+
+Each node will have:
+- An accessor for each child that will lazily instantiate it.
+- A `withX(_ x: XSyntax)` method for each child that will return a new Syntax
+  node with the existing X child replaced with the passed-in version. This is a
+  way to incrementally transform nodes in the tree.
+- An `addX(_ x: XSyntax)` method for children that are collections. This will
+  append the provided node to the collection and return a new node with that
+  collection replaced.
+- (in DEBUG mode) a `validate()` method that's called in the initializer. This
+  only validates that all the children are the right kind/token, and does not
+  raise an error if, say, a non-optional child is missing.
+"""
+}%
+
+% for node in SYNTAX_NODES:
+%   base_type = node.base_type
+%   if node.collection_element:
+public typealias ${node.name} = SyntaxCollection<${node.collection_element_type}>
+%   else:
+public class ${node.name}: ${base_type} {
+%     if node.children:
+  enum Cursor: Int {
+%     for child in node.children:
+    case ${child.swift_name}
+%     end
+  }
+%     end
+
+%     if node.requires_validation():
+#if DEBUG
+  override func validate() {
+      if isMissing { return }
+    precondition(raw.layout.count == ${len(node.children)})
+%       for child in node.children:
+%         child_var = '_' + child.swift_name
+    let ${child_var} = raw[Cursor.${child.swift_syntax_kind}]
+%         if child.token_choices:
+%           choices = ["." + choice.swift_kind() for choice in child.token_choices]
+%           choice_array = "[%s]" % ', '.join(choices)
+    guard let ${child_var}TokenKind = ${child_var}.tokenKind else {
+      fatalError("expected token child, got \(${child_var}.kind)")
+    }
+    precondition(${choice_array}.contains(${child_var}TokenKind),
+      "expected one of ${choice_array} for '${child.swift_name}' " + 
+      "in node of kind ${node.swift_syntax_kind}")
+%         elif child.text_choices:
+%           choices = ", ".join("\"%s\"" % choice
+%                               for choice in child.text_choices)
+    guard let ${child_var}TokenKind = ${child_var}.tokenKind else {
+      fatalError("expected token child, got \(${child_var}.kind)")
+    }
+    precondition([${choices}].contains(${child_var}TokenKind.text),
+                 "expected one of '[${', '.join(child.text_choices)}]', got " +
+                 "'\(${child_var}TokenKind.text)'")
+%         else:
+    precondition(${child_var}.kind == .${child.swift_syntax_kind},
+                 "expected child of kind .${child.swift_syntax_kind}, " +
+                 "got \(${child_var}.kind)")
+%         end
+%       end
+  }
+#endif
+%     end
+%     for child in node.children:
+
+%       if child.is_optional:
+  public var ${child.swift_name}: ${child.type_name}? {
+    guard raw[Cursor.${child.swift_name}].isPresent else { return nil }
+    return ${child.type_name}(root: _root,
+      data: data.cachedChild(at: Cursor.${child.swift_name}))
+  }
+%       else:
+  public var ${(child.swift_name)}: ${child.type_name} {
+    return ${child.type_name}(root: _root,
+      data: data.cachedChild(at: Cursor.${child.swift_name}))
+  }
+%       end
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child_node.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+
+  public func add${child_elt}(_ elt: ${child_elt_type}) -> ${node.name} {
+    let childRaw = raw[Cursor.${child.swift_name}].appending(elt.raw)
+    let (root, newData) = data.replacingChild(childRaw,
+                                              at: Cursor.${child.swift_name})
+    return ${node.name}(root: root, data: newData)
+  }
+%       end
+
+  public func with${child.name}(
+    _ new${child.type_name}: ${child.type_name}?) -> ${node.name} {
+    let raw = new${child.type_name}?.raw ?? ${make_missing_swift_child(child)}
+    let (root, newData) = data.replacingChild(raw,
+                                              at: Cursor.${child.swift_name})
+    return ${node.name}(root: root, data: newData)
+  }
+%     end
+}
+%   end
+% end
+
+/// MARK: Convenience methods
+
+extension StructDeclSyntax {
+  func withIdentifier(_ name: String) -> StructDeclSyntax {
+    let newToken = SyntaxFactory.makeIdentifier(name,
+      leadingTrivia: identifier.leadingTrivia,
+      trailingTrivia: identifier.trailingTrivia)
+    return withIdentifier(newToken)
+  }
+}

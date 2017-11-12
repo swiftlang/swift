@@ -1,0 +1,204 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-sil %s | %FileCheck %s
+
+// Check that the optimizer can detect when an enum (e.g. Optional) is being deconstructed
+// and then recreated in the same form. It should replace it with the original value in
+// such cases.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public enum E {
+  case C1(Int32)
+  case C2(Int32)
+  case C3(Int32)
+}
+
+
+// CHECK-LABEL: sil @_TF10fold_enums18recreate_optional1FGSqVs5Int32_GSqS0__
+// CHECK: bb0(%0 : $Optional<Int32>)
+// CHECK-NOT: bb1
+// CHECK: return %0 : $Optional<Int32>
+sil @_TF10fold_enums18recreate_optional1FGSqVs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
+bb0(%0 : $Optional<Int32>):
+  debug_value %0 : $Optional<Int32>, let, name "x" // id: %1
+  switch_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: bb1, default bb2 // id: %2
+
+bb1(%3 : $Int32):                                 // Preds: bb0
+  debug_value %3 : $Int32, let, name "y" // id: %4
+  %5 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32 // user: %6
+  br bb3(%5 : $Optional<Int32>)                   // id: %6
+
+bb2:                                              // Preds: bb0
+  br bb3(%0 : $Optional<Int32>)                   // id: %7
+
+bb3(%8 : $Optional<Int32>):                       // Preds: bb1 bb2
+  return %8 : $Optional<Int32>                    // id: %9
+}
+
+// CHECK-LABEL: sil @dont_fold_wrong_arg
+// CHECK: bb0(%0 : $Optional<Int32>, %1 : $Int32):
+// CHECK: switch_enum
+// CHECK: {{^bb1.*:}}
+// CHECK: enum {{.*}} %1
+// CHECK: {{^bb2:}}
+// CHECK: {{^bb3.*:}}
+// CHECK: return
+sil @dont_fold_wrong_arg : $@convention(thin) (Optional<Int32>, Int32) -> Optional<Int32> {
+bb0(%0 : $Optional<Int32>, %1 : $Int32):
+  debug_value %0 : $Optional<Int32>
+  switch_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: bb1, default bb2
+
+bb1(%3 : $Int32):
+  debug_value %3 : $Int32
+
+  // The operand is not %3 (= the argument of this block).
+  %5 = enum $Optional<Int32>, #Optional.some!enumelt.1, %1 : $Int32
+  br bb3(%5 : $Optional<Int32>)
+
+bb2:
+  br bb3(%0 : $Optional<Int32>)
+
+bb3(%8 : $Optional<Int32>):
+  return %8 : $Optional<Int32>
+}
+
+// CHECK-LABEL: sil @_TF10fold_enums18recreate_optional2FGSqVs5Int32_GSqS0__
+// CHECK: bb0(%0 : $Optional<Int32>)
+// CHECK-NOT: bb1
+// CHECK: return %0 : $Optional<Int32>
+sil @_TF10fold_enums18recreate_optional2FGSqVs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
+bb0(%0 : $Optional<Int32>):
+  debug_value %0 : $Optional<Int32>, let, name "x" // id: %1
+  switch_enum %0 : $Optional<Int32>, case #Optional.some!enumelt.1: bb1, default bb2 // id: %2
+
+bb1(%3 : $Int32):                                 // Preds: bb0
+  debug_value %3 : $Int32, let, name "y" // id: %4
+  %5 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32 // user: %6
+  br bb3(%5 : $Optional<Int32>)                   // id: %6
+
+bb2:                                              // Preds: bb0
+  %7 = alloc_stack $Optional<Int32>               // users: %8, %10, %11
+  inject_enum_addr %7 : $*Optional<Int32>, #Optional.none!enumelt // id: %8
+  %9 = tuple ()
+  %10 = load %7 : $*Optional<Int32>             // user: %12
+  dealloc_stack %7 : $*Optional<Int32> // id: %11
+  br bb3(%10 : $Optional<Int32>)                  // id: %12
+
+bb3(%13 : $Optional<Int32>):                      // Preds: bb1 bb2
+  return %13 : $Optional<Int32>                   // id: %14
+}
+
+
+// CHECK-LABEL: sil @_TF10fold_enums13recreate_enumFOS_1ES0_
+// CHECK: bb0(%0 : $E)
+// CHECK-NOT: bb1
+// CHECK: return %0 : $E
+sil @_TF10fold_enums13recreate_enumFOS_1ES0_ : $@convention(thin) (E) -> E {
+bb0(%0 : $E):
+  debug_value %0 : $E, let, name "e" // id: %1
+  switch_enum %0 : $E, case #E.C1!enumelt.1: bb1, case #E.C2!enumelt.1: bb2, case #E.C3!enumelt.1: bb3 // id: %2
+
+bb1(%3 : $Int32):                                 // Preds: bb0
+  debug_value %3 : $Int32, let, name "x" // id: %4
+  %5 = enum $E, #E.C1!enumelt.1, %3 : $Int32      // user: %6
+  br bb4(%5 : $E)                                 // id: %6
+
+bb2(%7 : $Int32):                                 // Preds: bb0
+  debug_value %7 : $Int32, let, name "x" // id: %8
+  %9 = enum $E, #E.C2!enumelt.1, %7 : $Int32      // user: %10
+  br bb4(%9 : $E)                                 // id: %10
+
+bb3(%11 : $Int32):                                // Preds: bb0
+  debug_value %11 : $Int32, let, name "x" // id: %12
+  %13 = enum $E, #E.C3!enumelt.1, %11 : $Int32    // user: %14
+  br bb4(%13 : $E)                                // id: %14
+
+bb4(%15 : $E):                                    // Preds: bb1 bb2 bb3
+  return %15 : $E                                 // id: %16
+}
+
+// CHECK-LABEL: sil @_TF10fold_enums26create_different_enum_caseFOS_1ES0_
+// CHECK: bb0(%0 : $E)
+// CHECK: switch_enum %0 : $E
+// CHECK: bb1
+// CHECK: bb2
+// CHECK: bb3
+// CHECK: return
+sil @_TF10fold_enums26create_different_enum_caseFOS_1ES0_ : $@convention(thin) (E) -> E {
+bb0(%0 : $E):
+  debug_value %0 : $E, let, name "e" // id: %1
+  switch_enum %0 : $E, case #E.C1!enumelt.1: bb1, case #E.C2!enumelt.1: bb2, case #E.C3!enumelt.1: bb3 // id: %2
+
+bb1(%3 : $Int32):                                 // Preds: bb0
+  debug_value %3 : $Int32, let, name "x" // id: %4
+  %5 = enum $E, #E.C2!enumelt.1, %3 : $Int32      // user: %6
+  br bb4(%5 : $E)                                 // id: %6
+
+bb2(%7 : $Int32):                                 // Preds: bb0
+  debug_value %7 : $Int32, let, name "x" // id: %8
+  %9 = enum $E, #E.C3!enumelt.1, %7 : $Int32      // user: %10
+  br bb4(%9 : $E)                                 // id: %10
+
+bb3(%11 : $Int32):                                // Preds: bb0
+  debug_value %11 : $Int32, let, name "x" // id: %12
+  %13 = enum $E, #E.C1!enumelt.1, %11 : $Int32    // user: %14
+  br bb4(%13 : $E)                                // id: %14
+
+bb4(%15 : $E):                                    // Preds: bb1 bb2 bb3
+  return %15 : $E                                 // id: %16
+}
+
+public enum F {
+  case F1(Int32, Int32)
+  case F2(Int32, String)
+  case F3(Float, Float, Float)
+}
+
+// CHECK-LABEL: sil @_TF10fold_enums13recreate_enumFOS_1FS0_
+// CHECK: bb0(%0 : $F)
+// CHECK-NOT: bb1
+// CHECK: return %0 : $F
+sil @_TF10fold_enums13recreate_enumFOS_1FS0_ : $@convention(thin) (@owned F) -> @owned F {
+bb0(%0 : $F):
+  debug_value %0 : $F, let, name "e" // id: %1
+  retain_value %0 : $F                            // id: %2
+  switch_enum %0 : $F, case #F.F1!enumelt.1: bb1, case #F.F2!enumelt.1: bb2, case #F.F3!enumelt.1: bb3 // id: %3
+
+bb1(%4 : $(Int32, Int32)):                        // Preds: bb0
+  %5 = tuple_extract %4 : $(Int32, Int32), 0      // users: %7, %9
+  %6 = tuple_extract %4 : $(Int32, Int32), 1      // users: %8, %9
+  debug_value %5 : $Int32, let, name "x" // id: %7
+  debug_value %6 : $Int32, let, name "y" // id: %8
+  %9 = tuple (%5 : $Int32, %6 : $Int32)           // user: %10
+  %10 = enum $F, #F.F1!enumelt.1, %9 : $(Int32, Int32) // user: %11
+  br bb4(%10 : $F)                                // id: %11
+
+bb2(%12 : $(Int32, String)):                      // Preds: bb0
+  %13 = tuple_extract %12 : $(Int32, String), 0   // users: %15, %18
+  %14 = tuple_extract %12 : $(Int32, String), 1   // users: %16, %17, %18, %20
+  debug_value %13 : $Int32, let, name "x" // id: %15
+  debug_value %14 : $String, let, name "y" // id: %16
+  retain_value %14 : $String                      // id: %17
+  %18 = tuple (%13 : $Int32, %14 : $String)       // user: %19
+  %19 = enum $F, #F.F2!enumelt.1, %18 : $(Int32, String) // user: %21
+  release_value %14 : $String                     // id: %20
+  br bb4(%19 : $F)                                // id: %21
+
+bb3(%22 : $(Float, Float, Float)):                // Preds: bb0
+  %23 = tuple_extract %22 : $(Float, Float, Float), 0 // users: %26, %29
+  %24 = tuple_extract %22 : $(Float, Float, Float), 1 // users: %27, %29
+  %25 = tuple_extract %22 : $(Float, Float, Float), 2 // users: %28, %29
+  debug_value %23 : $Float, let, name "x" // id: %26
+  debug_value %24 : $Float, let, name "y" // id: %27
+  debug_value %25 : $Float, let, name "z" // id: %28
+  %29 = tuple (%23 : $Float, %24 : $Float, %25 : $Float) // user: %30
+  %30 = enum $F, #F.F3!enumelt.1, %29 : $(Float, Float, Float) // user: %31
+  br bb4(%30 : $F)                                // id: %31
+
+bb4(%32 : $F):                                    // Preds: bb1 bb2 bb3
+  release_value %0 : $F                           // id: %33
+  return %32 : $F                                 // id: %34
+}

@@ -1,33 +1,23 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-extension NSDecimal {
-  init?(_ string: String) {
-    self.init()
-    let scanner = NSScanner(string: string)
-    if !scanner.scanDecimal(&self) {
-      return nil
-    }
-  }
-}
-
-enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertible {
-  case Some(NSDecimal)
-  case Error(NSCalculationError)
+enum NSDecimalResult: ExpressibleByStringLiteral, Equatable, CustomStringConvertible {
+  case Some(Decimal)
+  case Error(Decimal.CalculationError)
   
   init() {
-    self = .Some(NSDecimal())
+    self = .Some(Decimal())
   }
   
   init(stringLiteral: String) {
-    if let value = NSDecimal(stringLiteral) {
+    if let value = Decimal(string: stringLiteral) {
       self = .Some(value)
     } else {
-      self = .Error(.LossOfPrecision)
+      self = .Error(.lossOfPrecision)
     }
   }
 
@@ -40,22 +30,20 @@ enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertib
 
   var description: String {
     switch self {
-    case .Some(let decimal):
-      var decimal = decimal
+    case .Some(var decimal):
       return NSDecimalString(&decimal, nil)
     case .Error:
       return "NaN"
     }
   }
 
-  func pow10(power: Int) -> NSDecimalResult {
+  func pow10(_ power: Int) -> NSDecimalResult {
     switch self {
-    case .Some(let decimal):
-      var decimal = decimal
-      var result = NSDecimal()
+    case .Some(var decimal):
+      var result = Decimal()
       let error = NSDecimalMultiplyByPowerOf10(&result, &decimal, Int16(power),
-                                               .RoundPlain)
-      if error != .NoError {
+                                               .plain)
+      if error != .noError {
         return .Error(error)
       } else {
         return .Some(result)
@@ -69,9 +57,8 @@ enum NSDecimalResult: StringLiteralConvertible, Equatable, CustomStringConvertib
 
 func ==(x: NSDecimalResult, y: NSDecimalResult) -> Bool {
   switch (x, y) {
-  case (.Some(let x1), .Some(let x2)):
-    var (x1, x2) = (x1, x2)
-    return NSDecimalCompare(&x1, &x2) == .OrderedSame
+  case var (.Some(x1), .Some(x2)):
+    return NSDecimalCompare(&x1, &x2) == .orderedSame
   default:
     return false
   }
@@ -79,11 +66,10 @@ func ==(x: NSDecimalResult, y: NSDecimalResult) -> Bool {
 
 func +(x: NSDecimalResult, y: NSDecimalResult) -> NSDecimalResult {
   switch (x, y) {
-  case (.Some(let x1), .Some(let y1)):
-    var (x1, y1) = (x1, y1)
-    var result = NSDecimal()
-    let error = NSDecimalAdd(&result, &x1, &y1, .RoundPlain)
-    if error != .NoError {
+  case var (.Some(x1), .Some(y1)):
+    var result = Decimal()
+    let error = NSDecimalAdd(&result, &x1, &y1, .plain)
+    if error != .noError {
       return .Error(error)
     } else {
       return .Some(result)
@@ -121,3 +107,20 @@ print(two + "not a number" == two) // CHECK: false
 let one: NSDecimalResult = "1"
 print(one.pow10(2)) // CHECK: 100
 print(one.pow10(-2)) // CHECK: 0.01
+
+var twenty = Decimal(20)
+var ten = Decimal(10)
+twenty *= ten
+print(twenty) // CHECK: 200
+
+twenty = Decimal(20)
+ten = Decimal(10)
+twenty /= ten
+print(twenty) // CHECK: 2
+
+twenty = NSDecimalNumber(mantissa: 2, exponent: 1, isNegative: false) as Decimal
+print(twenty.significand) // CHECK: 2
+print(twenty.exponent) // CHECK: 1
+print(twenty.ulp) // CHECK: 10
+
+print(Decimal(sign: .plus, exponent: -2, significand: 100)) // CHECK: 1

@@ -1,12 +1,12 @@
-//===--- BlotSetVector.h --------------------------------------------------===//
+//===--- BlotSetVector.h ----------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -70,7 +70,7 @@ public:
 
   using const_reverse_iterator = typename VectorT::const_reverse_iterator;
   const_reverse_iterator rbegin() const { return Vector.rbegin(); }
-  const_reverse_iterator rend() const { return Vector.rbegin(); }
+  const_reverse_iterator rend() const { return Vector.rend(); }
   llvm::iterator_range<const_reverse_iterator> getReverseRange() const {
     return {rbegin(), rend()};
   }
@@ -99,7 +99,7 @@ public:
   /// V1.
   void replace(const ValueT &V1, const ValueT &V2) {
     auto Iter1 = Map.find(V1);
-    assert(Iter1 != Map.end() && "Can not replace value that is not in set");
+    assert(Iter1 != Map.end() && "Cannot replace value that is not in set");
     unsigned V1Index = Iter1->second;
     Map.erase(V1);
 
@@ -145,4 +145,4 @@ public:
 
 } // end swift namespace
 
-#endif
+#endif // SWIFT_BASIC_BLOTSETVECTOR_H

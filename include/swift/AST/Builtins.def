@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -40,7 +40,7 @@ BUILTIN_CAST_OPERATION(BitCast , "bitcast",  "n")
 
 #undef BUILTIN_CAST_OPERATION
 
-/// Cast-or-bitcast operations have type T1 -> T2. 
+/// Cast-or-bitcast operations have type T1 -> T2.
 /// T1 and T2 may be the same size, unlike the corresponding true casts.
 #ifndef BUILTIN_CAST_OR_BITCAST_OPERATION
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
@@ -73,10 +73,11 @@ BUILTIN_BINARY_OPERATION(FSub,    "fsub",     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION(UDiv,    "udiv",     "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION(ExactUDiv, "udiv_exact", "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION(URem,    "urem",     "n", Integer)
+BUILTIN_BINARY_OPERATION(FRem,    "frem",     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION(Xor,     "xor",      "n", IntegerOrVector)
 #undef BUILTIN_BINARY_OPERATION
 
-/// These builtins are analogous the similarly named llvm intrinsics. The 
+/// These builtins are analogous the similarly named llvm intrinsics. The
 /// difference between the two is that these are not expected to overflow,
 /// so we should produce a compile time error if we can statically prove
 /// that they do.
@@ -150,7 +151,7 @@ BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
 
 // BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
 // These have various types.
-// Since these operations will be lowered to SIL Instructions, we do not 
+// Since these operations will be lowered to SIL Instructions, we do not
 // assign any attributes on them.
 #ifndef BUILTIN_SIL_OPERATION
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload) BUILTIN(Id, Name, "")
@@ -176,6 +177,16 @@ BUILTIN_SIL_OPERATION(Unpin, "unpin", Special)
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
 
+/// LoadRaw has type (Builtin.RawPointer) -> T
+/// This is a load of T from raw memory.
+/// Its address does not adhere to strict aliasing.
+BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
+
+/// LoadInvariant has type (Builtin.RawPointer) -> T
+/// This is a load of T from raw memory.
+/// The load is marked as invariant.
+BUILTIN_SIL_OPERATION(LoadInvariant, "loadInvariant", Special)
+
 /// Take has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Take, "take", Special)
 
@@ -188,44 +199,15 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
-/// MarkDependence has type (T, U) -> T
-BUILTIN_SIL_OPERATION(MarkDependence, "markDependence", Special)
-
-/// allocValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
-///                           -> Builtin.RawPointer
-BUILTIN_SIL_OPERATION(AllocValueBuffer, "allocValueBuffer", Special)
-
-/// projectValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
-///                             -> Builtin.RawPointer
-BUILTIN_SIL_OPERATION(ProjectValueBuffer, "projectValueBuffer", Special)
-
-/// deallocValueBuffer : <T> (inout Builtin.UnsafeValueBuffer, T.Type)
-///                           -> ()
-BUILTIN_SIL_OPERATION(DeallocValueBuffer, "deallocValueBuffer", Special)
-
-/// MakeMaterializeForSetCallback has type
-///   ((Builtin.RawPointer,
-///     inout Builtin.UnsafeValueBuffer,
-///     inout T,
-///     T.Type) -> ())
-///     -> Builtin.RawPointer
-///
-/// The first argument is the address returned from materializeForSet.
-/// The second argument is the same Builtin.UnsafeValueBuffer
-/// that was passed to materializeForSet.
-/// The third argument is self.
-/// The last argument is the metatype for self.
-BUILTIN_SIL_OPERATION(MakeMaterializeForSetCallback,
-                      "makeMaterializeForSetCallback", Special)
-
-/// CastToUnknownObject has type (T) -> Builtin.UnknownObject.
-BUILTIN_SIL_OPERATION(CastToUnknownObject, "castToUnknownObject", Special)
-
-/// CastFromUnknownObject has type (Builtin.UnknownObject) -> T.
-BUILTIN_SIL_OPERATION(CastFromUnknownObject, "castFromUnknownObject", Special)
-
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin asserts if the underlying type /could/ be objc.
 BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
+
+/// UnsafeCastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin does not check if the underlying type /could/ be objc.
+BUILTIN_SIL_OPERATION(UnsafeCastToNativeObject, "unsafeCastToNativeObject", Special)
 
 /// CastFromNativeObject has type (Builtin.NativeObject) -> T
 BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)
@@ -276,8 +258,22 @@ BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 /// valid within the scope of the statement for logical lvalues.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
-/// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
+/// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+///
+/// Adds index bytes to a base pointer.
+BUILTIN_SIL_OPERATION(GepRaw, "gepRaw", Integer)
+
+/// Gep (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.RawPointer
+///
+/// Like the GepRaw-builtin, but multiplies the index by stride-of type 'T'.
 BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
+
+/// getTailAddr(Builtin.RawPointer,
+///             Builtin.Word, T.Type, E.Type) -> Builtin.RawPointer
+///
+/// Like the Gep-builtin, but rounds up the resulting address to a tail-
+/// allocated element type 'E'.
+BUILTIN_SIL_OPERATION(GetTailAddr, "getTailAddr", Integer)
 
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.
@@ -291,7 +287,7 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 ///
 /// This builtin takes an inout object reference and returns a boolean. Passing
 /// the reference inout forces the optimizer to preserve a retain distinct from
-/// what’s required to maintain lifetime for any of the reference's source-level
+/// what's required to maintain lifetime for any of the reference's source-level
 /// copies, because the called function is allowed to replace the reference,
 /// thereby releasing the referent.
 ///
@@ -304,7 +300,7 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 ///
 /// - Objective-C object types require an additional check that the
 ///   dynamic object type uses native swift reference counting:
-///   (Builtin.UnknownObject, unknown class reference, class existential)
+///   (AnyObject, unknown class reference, class existential)
 ///
 /// - Bridged object types allow the dynamic object type check to be
 ///   passed based on their pointer encoding:
@@ -329,11 +325,25 @@ BUILTIN_SIL_OPERATION(IsUniqueOrPinned, "isUniqueOrPinned", Special)
 ///
 /// These variants of isUnique implicitly cast to a non-null NativeObject before
 /// checking uniqueness. This allows an object reference statically typed as
-/// BridgeObject or UnknownObject to be treated as a native object by the
-/// runtime.
+/// BridgeObject to be treated as a native object by the runtime.
 BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
 BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
                       Special)
+
+/// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
+BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
+
+/// allocWithTailElems_<n>(C.Type,
+///                    Builtin.Word, E1.Type, ... , Builtin.Word, En.Type) -> C\
+///
+/// The integer suffix <n> specifies the number of tail-allocated arrays.
+/// Each tail-allocated array adds a counter and an element meta-type parameter.
+BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
+
+/// projectTailElems : <C,E> (C) -> Builtin.RawPointer
+///
+/// Projects the first tail-allocated element of type E from a class C.
+BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
 #undef BUILTIN_SIL_OPERATION
 
@@ -344,14 +354,19 @@ BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
   BUILTIN(Id, Name, Attrs)
 #endif
 
-/// willThrow: ErrorType -> ()
+/// willThrow: Error -> ()
 BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
 
-/// unexpectedError: ErrorType -> ()
+/// unexpectedError: Error -> ()
 BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
 
-/// errorInMain: ErrorType -> ()
+/// errorInMain: Error -> ()
 BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
+
+/// IsOptionalType : T.Type -> Bool
+/// This builtin takes a metatype and returns true if the metatype's
+/// nominal type is Optional.
+BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 
 #undef BUILTIN_RUNTIME_CALL
 
@@ -361,7 +376,7 @@ BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 #define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) \
           BUILTIN(Id, Name, Attrs)
 #endif
-                       
+
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
 
@@ -371,13 +386,11 @@ BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 /// IsPOD has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
 
+/// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
+BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
+
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
-
-/// Strideof has type T.Type -> Int.
-/// Note that this version will never return 0.  It instead always returns
-/// at least 1
-BUILTIN_MISC_OPERATION(StrideofNonZero, "strideof_nonzero", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
@@ -387,6 +400,9 @@ BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
+
+/// onFastPath has type () -> ().
+BUILTIN_MISC_OPERATION(OnFastPath, "onFastPath", "n", None)
 
 /// CmpXChg has type (Builtin.RawPointer, T, T) -> (T, Bool).
 BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", "", Special)
@@ -415,10 +431,10 @@ BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
 
 /// Special truncation builtins that check for sign and overflow errors. These
-/// take an integer as an input and return a tuple of the truncated result and 
+/// take an integer as an input and return a tuple of the truncated result and
 /// an error bit. The name of each builtin is extended with the "from"
 /// (sign-agnostic) builtin integer type and the "to" integer type.
-/// We require the source type size to be larger than the destination type size 
+/// We require the source type size to be larger than the destination type size
 /// (number of bits).
 BUILTIN_MISC_OPERATION(UToSCheckedTrunc, "u_to_s_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(SToSCheckedTrunc, "s_to_s_checked_trunc", "n", Special)
@@ -426,11 +442,11 @@ BUILTIN_MISC_OPERATION(SToUCheckedTrunc, "s_to_u_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
 /// Checked conversions for signed <-> unsigned integers of the same size.
-/// Returns a tuple containing the conversion result as well as 
+/// Returns a tuple containing the conversion result as well as
 /// the sign error / overflow bit.
-BUILTIN_MISC_OPERATION(SUCheckedConversion, 
+BUILTIN_MISC_OPERATION(SUCheckedConversion,
                        "s_to_u_checked_conversion", "n", Special)
-BUILTIN_MISC_OPERATION(USCheckedConversion, 
+BUILTIN_MISC_OPERATION(USCheckedConversion,
                        "u_to_s_checked_conversion", "n", Special)
 
 /// IntToFPWithOverflow has type (Integer) -> Float
@@ -443,23 +459,66 @@ BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
+/// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
+BUILTIN_MISC_OPERATION(OnceWithContext, "onceWithContext", "", Special)
 
-/// unreachable has type @noreturn () -> ()
+/// unreachable has type () -> Never
 BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)
 
-/// conditionallyUnreachable has type @noreturn () -> ()
+/// conditionallyUnreachable has type () -> Never
 BUILTIN_MISC_OPERATION(CondUnreachable, "conditionallyUnreachable", "", Special)
 
 /// DestroyArray has type (T.Type, Builtin.RawPointer, Builtin.Word) -> ()
 BUILTIN_MISC_OPERATION(DestroyArray, "destroyArray", "", Special)
 
-/// CopyArray, TakeArrayFrontToBack, and TakeArrayBackToFront all have type
+/// CopyArray, TakeArrayNoAlias, TakeArrayFrontToBack, and TakeArrayBackToFront
+/// AssignCopyArrayNoAlias, AssignCopyArrayFrontToBack,
+/// AssignCopyArrayBackToFront, AssignTakeArray all have type
 /// (T.Type, Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> ()
 BUILTIN_MISC_OPERATION(CopyArray, "copyArray", "", Special)
+BUILTIN_MISC_OPERATION(TakeArrayNoAlias, "takeArrayNoAlias", "", Special)
 BUILTIN_MISC_OPERATION(TakeArrayFrontToBack, "takeArrayFrontToBack", "", Special)
 BUILTIN_MISC_OPERATION(TakeArrayBackToFront, "takeArrayBackToFront", "", Special)
+BUILTIN_MISC_OPERATION(AssignCopyArrayNoAlias, "assignCopyArrayNoAlias", "", Special)
+BUILTIN_MISC_OPERATION(AssignCopyArrayFrontToBack, "assignCopyArrayFrontToBack", "", Special)
+BUILTIN_MISC_OPERATION(AssignCopyArrayBackToFront, "assignCopyArrayBackToFront", "", Special)
+BUILTIN_MISC_OPERATION(AssignTakeArray, "assignTakeArray", "", Special)
+
+// unsafeGuaranteed has type <T: AnyObject> T -> (T, Builtin.Int8)
+BUILTIN_MISC_OPERATION(UnsafeGuaranteed, "unsafeGuaranteed", "", Special)
+
+// unsafeGuaranteedEnd has type (Builtin.Int8) -> ()
+BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
+
+// getObjCTypeEncoding has type <T> T.Type -> RawPointer
+BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
+
+// Swift3ImplicitObjCEntrypoint has type () -> ()
+BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
+
+/// Builtins for instrumentation added by sanitizers during SILGen.
+#ifndef BUILTIN_SANITIZER_OPERATION
+#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
+#endif
+
+/// Builtin representing a call to Thread Sanitizer instrumentation.
+/// TSanInoutAccess has type (T) -> ()
+BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
+
+#undef BUILTIN_SANITIZER_OPERATION
+
+/// Builtins for compile-time type-checking operations used for unit testing.
+#ifndef BUILTIN_TYPE_CHECKER_OPERATION
+#define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name) BUILTIN(Id, #Name, "n")
+#endif
+
+BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
+BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
+BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
+
+#undef BUILTIN_TYPE_CHECKER_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
 #ifndef BUILTIN_TYPE_TRAIT_OPERATION

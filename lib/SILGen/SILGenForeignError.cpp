@@ -1,12 +1,12 @@
-//===--- SILGenError.cpp - Error-handling code emission -------------------===//
+//===--- SILGenForeignError.cpp - Error-handling code emission ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,101 +28,99 @@ namespace {
   /// An abstract interface for producing bridged errors.
   struct BridgedErrorSource {
     virtual ~BridgedErrorSource() = default;
-    virtual SILValue emitBridged(SILGenFunction &gen, SILLocation loc,
-                                 CanType bridgedErrorType) const = 0;
-    virtual void emitRelease(SILGenFunction &gen, SILLocation loc) const = 0;
+    virtual SILValue emitBridged(SILGenFunction &SGF, SILLocation loc,
+                                 CanType bridgedError) const = 0;
+    virtual void emitRelease(SILGenFunction &SGF, SILLocation loc) const = 0;
   };
-}
+} // end anonymous namespace
 
 /// Emit a store of a native error to the foreign-error slot.
-static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
+static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
                                         SILLocation loc,
                                         SILValue foreignErrorSlot,
                                         const BridgedErrorSource &errorSrc) {
-  ASTContext &ctx = gen.getASTContext();
+  ASTContext &ctx = SGF.getASTContext();
 
-  // The foreign error slot has type SomePointer<SomeErrorType?>,
+  // The foreign error slot has type SomePointer<SomeError?>,
   // or possibly an optional thereof.
 
   // If the pointer itself is optional, we need to branch based on
   // whether it's really there.
-  // FIXME: this code is written expecting pointer types to actually
-  // be optional, as opposed to simply having a null inhabitant.
-  OptionalTypeKind errorPtrOptKind;
   if (SILType errorPtrObjectTy =
-        foreignErrorSlot.getType()
-                        .getAnyOptionalObjectType(gen.SGM.M, errorPtrOptKind)) {
-    SILBasicBlock *contBB = gen.createBasicBlock();
-    SILBasicBlock *noSlotBB = gen.createBasicBlock();
-    SILBasicBlock *hasSlotBB = gen.createBasicBlock();
-    gen.B.createSwitchEnum(loc, foreignErrorSlot, nullptr,
-                 { { ctx.getOptionalSomeDecl(errorPtrOptKind), hasSlotBB },
-                   { ctx.getOptionalNoneDecl(errorPtrOptKind),  noSlotBB } });
+        foreignErrorSlot->getType().getAnyOptionalObjectType()) {
+    SILBasicBlock *contBB = SGF.createBasicBlock();
+    SILBasicBlock *noSlotBB = SGF.createBasicBlock();
+    SILBasicBlock *hasSlotBB = SGF.createBasicBlock();
+    SGF.B.createSwitchEnum(loc, foreignErrorSlot, nullptr,
+                 { { ctx.getOptionalSomeDecl(), hasSlotBB },
+                   { ctx.getOptionalNoneDecl(), noSlotBB } });
 
     // If we have the slot, emit a store to it.
-    gen.B.emitBlock(hasSlotBB);
-    SILValue slot = hasSlotBB->createBBArg(errorPtrObjectTy);
-    emitStoreToForeignErrorSlot(gen, loc, slot, errorSrc);
-    gen.B.createBranch(loc, contBB);
+    SGF.B.emitBlock(hasSlotBB);
+    SILValue slot = hasSlotBB->createPHIArgument(errorPtrObjectTy,
+                                                 ValueOwnershipKind::Owned);
+    emitStoreToForeignErrorSlot(SGF, loc, slot, errorSrc);
+    SGF.B.createBranch(loc, contBB);
 
     // Otherwise, just release the error.
-    gen.B.emitBlock(noSlotBB);
-    errorSrc.emitRelease(gen, loc);
-    gen.B.createBranch(loc, contBB);
+    SGF.B.emitBlock(noSlotBB);
+    errorSrc.emitRelease(SGF, loc);
+    SGF.B.createBranch(loc, contBB);
 
     // Continue.
-    gen.B.emitBlock(contBB);
+    SGF.B.emitBlock(contBB);
     return;
   }
 
-  // Okay, break down the components of SomePointer<SomeErrorType?>.
+  // Okay, break down the components of SomePointer<SomeError?>.
   // TODO: this should really be an unlowered AST type?
   CanType bridgedErrorPtrType =
-    foreignErrorSlot.getType().getSwiftRValueType();
+    foreignErrorSlot->getType().getSwiftRValueType();
 
   PointerTypeKind ptrKind;
-  CanType bridgedErrorType =
+  CanType bridgedErrorProto =
     CanType(bridgedErrorPtrType->getAnyPointerElementType(ptrKind));
 
-  FullExpr scope(gen.Cleanups, CleanupLocation::get(loc));
-  WritebackScope writebacks(gen);
+  FullExpr scope(SGF.Cleanups, CleanupLocation::get(loc));
+  FormalEvaluationScope writebacks(SGF);
 
   // Convert the error to a bridged form.
-  SILValue bridgedError = errorSrc.emitBridged(gen, loc, bridgedErrorType);
+  SILValue bridgedError = errorSrc.emitBridged(SGF, loc, bridgedErrorProto);
 
-  // Store to the "memory" property.
+  // Store to the "pointee" property.
   // If we can't find it, diagnose and then just don't store anything.
-  VarDecl *memoryProperty = ctx.getPointerMemoryPropertyDecl(ptrKind);
-  if (!memoryProperty) {
-    gen.SGM.diagnose(loc, diag::could_not_find_pointer_memory_property,
+  VarDecl *pointeeProperty = ctx.getPointerPointeePropertyDecl(ptrKind);
+  if (!pointeeProperty) {
+    SGF.SGM.diagnose(loc, diag::could_not_find_pointer_pointee_property,
                      bridgedErrorPtrType);
     return;
   }
 
   // Otherwise, do a normal assignment.
   LValue lvalue =
-    gen.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
-                           bridgedErrorPtrType, memoryProperty,
+    SGF.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
+                           bridgedErrorPtrType, pointeeProperty,
+                           LValueOptions(),
                            AccessKind::Write,
                            AccessSemantics::Ordinary);
-  RValue rvalue(gen, loc, bridgedErrorType,
-                gen.emitManagedRValueWithCleanup(bridgedError));
-  gen.emitAssignToLValue(loc, std::move(rvalue), std::move(lvalue));
+  RValue rvalue(SGF, loc, bridgedErrorProto,
+                SGF.emitManagedRValueWithCleanup(bridgedError));
+  SGF.emitAssignToLValue(loc, std::move(rvalue), std::move(lvalue));
 }
 
 /// Emit a value of a certain integer-like type.
-static SILValue emitIntValue(SILGenFunction &gen, SILLocation loc,
+static SILValue emitIntValue(SILGenFunction &SGF, SILLocation loc,
                              SILType type, unsigned value) {
   if (auto structDecl = type.getStructOrBoundGenericStruct()) {
     auto properties = structDecl->getStoredProperties();
     assert(std::next(properties.begin()) == properties.end());
-    SILType fieldType = type.getFieldType(*properties.begin(), gen.SGM.M);
-    SILValue fieldValue = emitIntValue(gen, loc, fieldType, value);
-    return gen.B.createStruct(loc, type, fieldValue);
+    SILType fieldType = type.getFieldType(*properties.begin(), SGF.SGM.M);
+    SILValue fieldValue = emitIntValue(SGF, loc, fieldType, value);
+    return SGF.B.createStruct(loc, type, fieldValue);
   }
 
   assert(type.is<BuiltinIntegerType>());
-  return gen.B.createIntegerLiteral(loc, type, value);
+  return SGF.B.createIntegerLiteral(loc, type, value);
 }
 
 namespace {
@@ -132,49 +130,36 @@ namespace {
   public:
     EpilogErrorSource(SILValue nativeError) : NativeError(nativeError) {}
 
-    SILValue emitBridged(SILGenFunction &gen, SILLocation loc,
-                         CanType bridgedErrorType) const override {
-      bool errorShouldBeOptional = false;
-      CanType bridgedErrorObjectType = bridgedErrorType;
-      OptionalTypeKind optErrorKind;
-      if (auto objectType =
-            bridgedErrorType.getAnyOptionalObjectType(optErrorKind)) {
-        bridgedErrorObjectType = objectType;
-        errorShouldBeOptional = true;
-      }
+    SILValue emitBridged(SILGenFunction &SGF, SILLocation loc,
+                         CanType bridgedErrorProto) const override {
+      auto nativeErrorType = NativeError->getType().getSwiftRValueType();
+      assert(nativeErrorType == SGF.SGM.getASTContext().getExceptionType());
 
-      SILValue bridgedError = gen.emitNativeToBridgedError(loc,
-                                gen.emitManagedRValueWithCleanup(NativeError),
-                                bridgedErrorObjectType).forward(gen);
-
-      // Inject into an optional if necessary.
-      if (errorShouldBeOptional) {
-        bridgedError =
-          gen.B.createOptionalSome(loc, bridgedError, optErrorKind,
-                                   gen.getLoweredType(bridgedErrorType));
-      }
-
+      SILValue bridgedError = SGF.emitNativeToBridgedError(loc,
+                                SGF.emitManagedRValueWithCleanup(NativeError),
+                                nativeErrorType,
+                                bridgedErrorProto).forward(SGF);
       return bridgedError;
     }
 
-    void emitRelease(SILGenFunction &gen, SILLocation loc) const override {
-      gen.B.emitReleaseValueOperation(loc, NativeError);
+    void emitRelease(SILGenFunction &SGF, SILLocation loc) const override {
+      SGF.B.emitDestroyValueOperation(loc, NativeError);
     }
   };
 
   /// An error source that produces nil errors.
   class NilErrorSource : public BridgedErrorSource {
   public:
-    SILValue emitBridged(SILGenFunction &gen, SILLocation loc,
-                         CanType bridgedErrorType) const override {
-      SILType optTy = gen.getLoweredType(bridgedErrorType);
-      return gen.B.createOptionalNone(loc, optTy);
+    SILValue emitBridged(SILGenFunction &SGF, SILLocation loc,
+                         CanType bridgedError) const override {
+      SILType optTy = SGF.getLoweredType(bridgedError);
+      return SGF.B.createOptionalNone(loc, optTy);
     }
 
-    void emitRelease(SILGenFunction &gen, SILLocation loc) const override {
+    void emitRelease(SILGenFunction &SGF, SILLocation loc) const override {
     }
   };
-}
+} // end anonymous namespace
 
 /// Given that we are throwing a native error, turn it into a bridged
 /// error, dispose of it in the correct way, and create the appropriate
@@ -212,9 +197,8 @@ emitBridgeErrorForForeignError(SILLocation loc,
 SILValue SILGenFunction::
 emitBridgeReturnValueForForeignError(SILLocation loc,
                                      SILValue result,
-                                     SILFunctionTypeRepresentation repr,
-                                     AbstractionPattern origNativeType,
-                                     CanType substNativeType,
+                                     CanType formalNativeType,
+                                     CanType formalBridgedType,
                                      SILType bridgedType,
                                      SILValue foreignErrorSlot,
                                const ForeignErrorConvention &foreignError) {
@@ -237,17 +221,13 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 
   // If an error is signalled by a nil result, inject a non-nil result.
   case ForeignErrorConvention::NilResult: {
-    OptionalTypeKind optKind;
-    auto bridgedObjectType =
-      bridgedType.getSwiftRValueType().getAnyOptionalObjectType(optKind);
     ManagedValue bridgedResult =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedObjectType);
+                               formalNativeType, formalBridgedType,
+                               bridgedType.getAnyOptionalObjectType());
 
     auto someResult =
-      B.createOptionalSome(loc, bridgedResult.forward(*this), optKind,
-                           bridgedType);
+      B.createOptionalSome(loc, bridgedResult.forward(*this), bridgedType);
     return someResult;
   }
 
@@ -260,8 +240,8 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
     // The actual result value just needs to be bridged normally.
     ManagedValue bridgedValue =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               repr, origNativeType, substNativeType,
-                               bridgedType.getSwiftRValueType());
+                               formalNativeType, formalBridgedType,
+                               bridgedType);
     return bridgedValue.forward(*this);
   }
   }
@@ -272,18 +252,29 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 /// which loads from the error slot and jumps to the error slot.
 void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
                                            SILBasicBlock *errorBB,
-                                           ManagedValue errorSlot) {
-  SavedInsertionPoint savedIP(*this, errorBB, FunctionSection::Postmatter);
+                                           Optional<ManagedValue> errorSlot) {
+  SILGenSavedInsertionPoint savedIP(*this, errorBB,
+                                    FunctionSection::Postmatter);
 
   // Load the error (taking responsibility for it).  In theory, this
   // is happening within conditional code, so we need to be only
   // conditionally claiming the value.  In practice, claiming it
   // unconditionally is fine because we want to assume it's nil in the
   // other path.
-  SILValue errorV = B.createLoad(loc, errorSlot.forward(*this));
+  SILValue errorV;
+  if (errorSlot.hasValue()) {
+    errorV = B.emitLoadValueOperation(loc, errorSlot.getValue().forward(*this),
+                                      LoadOwnershipQualifier::Take);
+  } else {
+    // If we are not provided with an errorSlot value, then we are passed the
+    // unwrapped optional error as the argument of the errorBB. This value is
+    // passed at +1 meaning that we still need to create a cleanup for errorV.
+    errorV = errorBB->getArgument(0);
+  }
+
   ManagedValue error = emitManagedRValueWithCleanup(errorV);
 
-  // Turn the error into an ErrorType value.
+  // Turn the error into an Error value.
   error = emitBridgedToNativeError(loc, error);
 
   // Propagate.
@@ -293,16 +284,18 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
 
 /// Unwrap a value of a wrapped integer type to get at the juicy
 /// Builtin.IntegerN value within.
-static SILValue emitUnwrapIntegerResult(SILGenFunction &gen,
+static SILValue emitUnwrapIntegerResult(SILGenFunction &SGF,
                                         SILLocation loc,
                                         SILValue value) {
-  while (!value.getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value.getType().getStructOrBoundGenericStruct();
+  // This is a loop because we want to handle types that wrap integer types,
+  // like ObjCBool (which may be Bool or Int8).
+  while (!value->getType().is<BuiltinIntegerType>()) {
+    auto structDecl = value->getType().getStructOrBoundGenericStruct();
     assert(structDecl && "value for error result wasn't of struct type!");
     assert(std::next(structDecl->getStoredProperties().begin())
              == structDecl->getStoredProperties().end());
     auto property = *structDecl->getStoredProperties().begin();
-    value = gen.B.createStructExtract(loc, value, property);
+    value = SGF.B.createStructExtract(loc, value, property);
   }
 
   return value;
@@ -310,118 +303,124 @@ static SILValue emitUnwrapIntegerResult(SILGenFunction &gen,
 
 /// Perform a foreign error check by testing whether the call result is zero.
 /// The call result is otherwise ignored.
-static ManagedValue
-emitResultIsZeroErrorCheck(SILGenFunction &gen, SILLocation loc,
+static void
+emitResultIsZeroErrorCheck(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue result, ManagedValue errorSlot,
-                           bool suppressErrorCheck, bool resultIsIgnored,
-                           bool zeroIsError) {
+                           bool suppressErrorCheck, bool zeroIsError) {
   // Just ignore the call result if we're suppressing the error check.
   if (suppressErrorCheck) {
-    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+    return;
   }
 
   SILValue resultValue =
-    emitUnwrapIntegerResult(gen, loc, result.getUnmanagedValue());
-  SILValue zero =
-    gen.B.createIntegerLiteral(loc, resultValue.getType(), 0);
+    emitUnwrapIntegerResult(SGF, loc, result.getUnmanagedValue());
+  CanType resultType = resultValue->getType().getSwiftRValueType();
 
-  ASTContext &ctx = gen.getASTContext();
-  SILValue resultIsError =
-    gen.B.createBuiltinBinaryFunction(loc,
-                                      zeroIsError ? "cmp_eq" : "cmp_ne",
-                                      resultValue.getType(),
-                                      SILType::getBuiltinIntegerType(1, ctx),
-                                      {resultValue, zero});
+  if (!resultType->isBuiltinIntegerType(1)) {
+    SILValue zero =
+      SGF.B.createIntegerLiteral(loc, resultValue->getType(), 0);
 
-  SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
-  SILBasicBlock *contBB = gen.createBasicBlock();
-  gen.B.createCondBranch(loc, resultIsError, errorBB, contBB);
+    ASTContext &ctx = SGF.getASTContext();
+    resultValue =
+      SGF.B.createBuiltinBinaryFunction(loc,
+                                        "cmp_ne",
+                                        resultValue->getType(),
+                                        SILType::getBuiltinIntegerType(1, ctx),
+                                        {resultValue, zero});
+  }
 
-  gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
+  SILBasicBlock *errorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+  SILBasicBlock *contBB = SGF.createBasicBlock();
 
-  gen.B.emitBlock(contBB);
+  if (zeroIsError)
+    SGF.B.createCondBranch(loc, resultValue, contBB, errorBB);
+  else
+    SGF.B.createCondBranch(loc, resultValue, errorBB, contBB);
 
-  if (resultIsIgnored) return ManagedValue::forInContext();
-  return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+  SGF.emitForeignErrorBlock(loc, errorBB, errorSlot);
+
+  SGF.B.emitBlock(contBB);
 }
 
 /// Perform a foreign error check by testing whether the call result is nil.
 static ManagedValue
-emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
+emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
                           ManagedValue origResult, ManagedValue errorSlot,
                           bool suppressErrorCheck) {
   // Take local ownership of the optional result value.
-  SILValue optionalResult = origResult.forward(gen);
+  SILValue optionalResult = origResult.forward(SGF);
 
-  OptionalTypeKind optKind;
   SILType resultObjectType =
-    optionalResult.getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
+    optionalResult->getType().getAnyOptionalObjectType();
 
-  ASTContext &ctx = gen.getASTContext();
+  ASTContext &ctx = SGF.getASTContext();
 
   // If we're suppressing the check, just do an unchecked take.
   if (suppressErrorCheck) {
     SILValue objectResult =
-      gen.B.createUncheckedEnumData(loc, optionalResult,
-                                    ctx.getOptionalSomeDecl(optKind));
-    return gen.emitManagedRValueWithCleanup(objectResult);
+      SGF.B.createUncheckedEnumData(loc, optionalResult,
+                                    ctx.getOptionalSomeDecl());
+    return SGF.emitManagedRValueWithCleanup(objectResult);
   }
 
   // Switch on the optional result.
-  SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
-  SILBasicBlock *contBB = gen.createBasicBlock();
-  gen.B.createSwitchEnum(loc, optionalResult, /*default*/ nullptr,
-                         { { ctx.getOptionalSomeDecl(optKind), contBB },
-                           { ctx.getOptionalNoneDecl(optKind), errorBB } });
+  SILBasicBlock *errorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+  SILBasicBlock *contBB = SGF.createBasicBlock();
+  SGF.B.createSwitchEnum(loc, optionalResult, /*default*/ nullptr,
+                         { { ctx.getOptionalSomeDecl(), contBB },
+                           { ctx.getOptionalNoneDecl(), errorBB } });
 
   // Emit the error block.
-  gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
+  SGF.emitForeignErrorBlock(loc, errorBB, errorSlot);
 
   // In the continuation block, take ownership of the now non-optional
   // result value.
-  gen.B.emitBlock(contBB);
-  SILValue objectResult = contBB->createBBArg(resultObjectType);
-  return gen.emitManagedRValueWithCleanup(objectResult);
+  SGF.B.emitBlock(contBB);
+  SILValue objectResult =
+      contBB->createPHIArgument(resultObjectType, ValueOwnershipKind::Owned);
+  return SGF.emitManagedRValueWithCleanup(objectResult);
 }
 
 /// Perform a foreign error check by testing whether the error was nil.
-static ManagedValue
-emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
-                            ManagedValue origResult, ManagedValue errorSlot,
-                            bool suppressErrorCheck) {
+static void
+emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
+                            ManagedValue errorSlot, bool suppressErrorCheck) {
   // If we're suppressing the check, just don't check.
-  if (suppressErrorCheck) return origResult;
+  if (suppressErrorCheck) return;
 
-  SILValue optionalError = gen.B.createLoad(loc, errorSlot.getValue());
+  SILValue optionalError = SGF.B.emitLoadValueOperation(
+      loc, errorSlot.forward(SGF), LoadOwnershipQualifier::Take);
 
-  OptionalTypeKind optKind;
-  optionalError.getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
-
-  ASTContext &ctx = gen.getASTContext();
+  ASTContext &ctx = SGF.getASTContext();
 
   // Switch on the optional error.
-  SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
-  SILBasicBlock *contBB = gen.createBasicBlock();
-  gen.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
-                         { { ctx.getOptionalSomeDecl(optKind), errorBB },
-                           { ctx.getOptionalNoneDecl(optKind), contBB } });
+  SILBasicBlock *errorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+  errorBB->createPHIArgument(optionalError->getType().unwrapAnyOptionalType(),
+                             ValueOwnershipKind::Owned);
+  SILBasicBlock *contBB = SGF.createBasicBlock();
+  SGF.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
+                         { { ctx.getOptionalSomeDecl(), errorBB },
+                           { ctx.getOptionalNoneDecl(), contBB } });
 
-  // Emit the error block.  Just be lazy and reload the error there.
-  gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
+  // Emit the error block. Pass in none for the errorSlot since we have passed
+  // in the errorSlot as our BB argument so we can pass ownership correctly. In
+  // emitForeignErrorBlock, we will create the appropriate cleanup for the
+  // argument.
+  SGF.emitForeignErrorBlock(loc, errorBB, None);
 
   // Return the result.
-  gen.B.emitBlock(contBB);
-  return origResult;
+  SGF.B.emitBlock(contBB);
+  return;
 }
 
 /// Emit a check for whether a non-native function call produced an
 /// error.
 ///
-/// \return The true result of the function, in the normal code path;
-///   the entire error path will have been processed separately.
-ManagedValue
+/// \c results should be left with only values that match the formal
+/// direct results of the function.
+void
 SILGenFunction::emitForeignErrorCheck(SILLocation loc,
-                                      ManagedValue result,
+                                      SmallVectorImpl<ManagedValue> &results,
                                       ManagedValue errorSlot,
                                       bool suppressErrorCheck,
                                 const ForeignErrorConvention &foreignError) {
@@ -430,28 +429,32 @@ SILGenFunction::emitForeignErrorCheck(SILLocation loc,
 
   switch (foreignError.getKind()) {
   case ForeignErrorConvention::ZeroPreservedResult:
-    emitResultIsZeroErrorCheck(*this, loc, result, errorSlot,
+    assert(results.size() == 1);
+    emitResultIsZeroErrorCheck(*this, loc, results[0], errorSlot,
                                suppressErrorCheck,
-                               /*ignored*/ true,
                                /*zeroIsError*/ true);
-    assert(!result.hasCleanup());
-    return result;
+    return;
   case ForeignErrorConvention::ZeroResult:
-    return emitResultIsZeroErrorCheck(*this, loc, result, errorSlot,
-                                      suppressErrorCheck,
-                                      /*ignored*/ false,
-                                      /*zeroIsError*/ true);
+    assert(results.size() == 1);
+    emitResultIsZeroErrorCheck(*this, loc, results.pop_back_val(),
+                               errorSlot, suppressErrorCheck,
+                               /*zeroIsError*/ true);
+    return;
   case ForeignErrorConvention::NonZeroResult:
-    return emitResultIsZeroErrorCheck(*this, loc, result, errorSlot,
-                                      suppressErrorCheck,
-                                      /*ignored*/ false,
-                                      /*zeroIsError*/ false);
+    assert(results.size() == 1);
+    emitResultIsZeroErrorCheck(*this, loc, results.pop_back_val(),
+                               errorSlot, suppressErrorCheck,
+                               /*zeroIsError*/ false);
+    return;
   case ForeignErrorConvention::NilResult:
-    return emitResultIsNilErrorCheck(*this, loc, result, errorSlot,
-                                     suppressErrorCheck);
+    assert(results.size() == 1);
+    results[0] = emitResultIsNilErrorCheck(*this, loc, results[0], errorSlot,
+                                           suppressErrorCheck);
+    return;
   case ForeignErrorConvention::NonNilError:
-    return emitErrorIsNonNilErrorCheck(*this, loc, result, errorSlot,
-                                       suppressErrorCheck);
+    // Leave the direct results alone.
+    emitErrorIsNonNilErrorCheck(*this, loc, errorSlot, suppressErrorCheck);
+    return;
   }
   llvm_unreachable("bad foreign error convention kind");
 }

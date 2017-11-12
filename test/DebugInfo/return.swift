@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -g -emit-ir -o - | %FileCheck %s
 
 class X {
   init (i : Int64) { x = i }
@@ -7,22 +7,24 @@ class X {
 
 // CHECK: define {{.*}}ifelseexpr
 public func ifelseexpr() -> Int64 {
-  var x = X(i:0); 
-  // CHECK: [[META:%.*]] = call %swift.type* @_TMaC6return1X()
-  // CHECK: [[X:%.*]] = call %C6return1X* @_TFC6return1XCfT1iVs5Int64_S0_(
-  // CHECK-SAME:                                  i64 0, %swift.type* [[META]])
-  // CHECK:  @swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
+  var x = X(i:0)
+  // CHECK: [[ALLOCA:%.*]] = alloca %T6return1XC*
+  // CHECK: [[META:%.*]] = call %swift.type* @_T06return1XCMa()
+  // CHECK: [[X:%.*]] = call {{.*}}%T6return1XC* @_T06return1XCACs5Int64V1i_tcfC(
+  // CHECK-SAME:                                  i64 0, %swift.type* swiftself [[META]])
+  // CHECK:  store %T6return1XC* [[X]], %T6return1XC** [[ALLOCA]]
+  // CHECK:  @swift_rt_swift_release to void (%T6return1XC*)*)(%T6return1XC* [[X]])
   if true {
-    x.x++; 
+    x.x += 1
   } else {
-    x.x--;
+    x.x -= 1
   }
-  // CHECK:  @swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
-  // CHECK:  @swift_release to void (%C6return1X*)*)(%C6return1X* [[X]])
+  // CHECK:  [[X:%.*]] = load %T6return1XC*, %T6return1XC** [[ALLOCA]]
+  // CHECK:  @swift_rt_swift_release to void (%T6return1XC*)*)(%T6return1XC* [[X]])
   // CHECK-SAME:                    , !dbg ![[RELEASE:.*]]
 
   // The ret instruction should be in the same scope as the return expression.
   // CHECK:  ret{{.*}}, !dbg ![[RELEASE]]
-  return x.x; // CHECK: ![[RELEASE]] = !DILocation(line: [[@LINE]], column: 3
+  return x.x // CHECK: ![[RELEASE]] = !DILocation(line: [[@LINE]], column: 3
 }
 

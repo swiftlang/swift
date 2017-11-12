@@ -1,7 +1,6 @@
 // Please keep this file in alphabetical order!
 
-// RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -10,14 +9,15 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -parse-as-library %t/protocols.swiftmodule -parse -emit-objc-header-path %t/protocols.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/protocols.h
-// RUN: FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -parse-as-library %t/protocols.swiftmodule -typecheck -emit-objc-header-path %t/protocols.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck %s < %t/protocols.h
+// RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
 // RUN: %check-in-clang %t/protocols.h
 
 // REQUIRES: objc_interop
 
 import Foundation
+import objc_generics
 
 // CHECK-LABEL: @protocol A{{$}}
 // CHECK-NEXT: @end
@@ -28,12 +28,12 @@ import Foundation
 @objc protocol B : A {}
 
 // CHECK: @protocol CustomName2;
-// CHECK-LABEL: SWIFT_PROTOCOL_NAMED("CustomNameType")
+// CHECK-LABEL: SWIFT_PROTOCOL_NAMED("CustomName")
 // CHECK-NEXT: @protocol CustomName{{$}}
-// CHECK-NEXT: - (void)forwardCustomName:(id <CustomName2> __nonnull)_;
+// CHECK-NEXT: - (void)forwardCustomName:(id <CustomName2> _Nonnull)_;
 // CHECK-NEXT: @end
 @objc(CustomName)
-protocol CustomNameType {
+protocol CustomName {
   func forwardCustomName(_: CustomNameType2)
 }
 
@@ -45,50 +45,55 @@ protocol CustomNameType2 {}
 
 // CHECK-LABEL: @protocol Initializers{{$}}
 // CHECK-NEXT: - (nonnull instancetype)init;
-// CHECK-NEXT: - (nonnull instancetype)initWithObject:(id __nonnull)any;
+// CHECK-NEXT: - (nonnull instancetype)initWithObject:(id _Nonnull)any;
 // CHECK-NEXT: @end
 @objc protocol Initializers {
   init()
   init(object any: AnyObject)
 }
 
-// CHECK-LABEL: @protocol Methods{{$}}
-// CHECK-NEXT: - (void)test;
-// CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void)testRawAnyTypes:(id __nonnull)any other:(Class __nonnull)other;
-// CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A> __nonnull)a aAgain:(id <A> __nonnull)a2 b:(id <B> __nonnull)b bAgain:(id <B> __nonnull)b2 both:(id <B> __nonnull)both;
-// CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A> __nonnull)a aAgain:(Class <A> __nonnull)a2 b:(Class <B> __nonnull)b bAgain:(Class <B> __nonnull)b2 both:(Class <B> __nonnull)both;
-// CHECK-NEXT: - (void)testComposition:(id <A, ZZZ> __nonnull)x meta:(Class <A, ZZZ> __nonnull)xClass;
-// CHECK-NEXT: - (void)testOptional:(id <A> __nullable)opt meta:(Class <A> __nullable)m;
-// CHECK-NEXT: @end
-@objc protocol Methods {
-  func test()
-  static func test2()
-
-  func testRawAnyTypes(any: AnyObject, other: AnyObject.Type)
-
-  func testSingleProtocolTypes(a : A, aAgain a2: protocol<A>, b: B, bAgain b2: protocol<B>, both: protocol<A, B>)
-  func testSingleProtocolClassTypes(a : A.Type, aAgain a2: protocol<A>.Type, b: B.Type, bAgain b2: protocol<B>.Type, both: protocol<A, B>.Type)
-  func testComposition(x: protocol<A, ZZZ>, meta xClass: protocol<A, ZZZ>.Type)
-
-  func testOptional(opt: A?, meta m: A.Type?)
-}
-
-// CHECK-LABEL: @interface MyObject : NSObject <NSCoding>
-// CHECK-NEXT: init
+// CHECK-LABEL: @interface MyObject : NSObject <NSCoding, Fungible>
+// CHECK-NEXT: initWithCoder
+// CHECK-NEXT: init SWIFT_UNAVAILABLE
+// CHECK-NEXT: new SWIFT_UNAVAILABLE
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @protocol NSCoding
-class MyObject : NSObject, NSCoding {
+class MyObject : NSObject, NSCoding, Fungible {
   required init(coder aCoder: NSCoder) {
     super.init()
   }
 }
 
+// CHECK-LABEL: @protocol Methods{{$}}
+// CHECK-NEXT: - (void)test;
+// CHECK-NEXT: + (void)test2;
+// CHECK-NEXT: - (void)testRawAnyTypes:(id _Nonnull)any other:(Class _Nonnull)other;
+// CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A> _Nonnull)a aAgain:(id <A> _Nonnull)a2 b:(id <B> _Nonnull)b bAgain:(id <B> _Nonnull)b2 both:(id <B> _Nonnull)both;
+// CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A> _Nonnull)a aAgain:(Class <A> _Nonnull)a2 b:(Class <B> _Nonnull)b bAgain:(Class <B> _Nonnull)b2 both:(Class <B> _Nonnull)both;
+// CHECK-NEXT: - (void)testComposition:(id <A, ZZZ> _Nonnull)x meta:(Class <A, ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testSubclassComposition:(MyObject <ZZZ> * _Nonnull)x meta:(SWIFT_METATYPE(MyObject) <ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testGenericSubclassComposition:(FungibleContainer<MyObject *> <ZZZ> * _Nonnull)x meta:(SWIFT_METATYPE(FungibleContainer) <ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testOptional:(id <A> _Nullable)opt meta:(Class <A> _Nullable)m;
+// CHECK-NEXT: @end
+@objc protocol Methods {
+  func test()
+  static func test2()
+
+  func testRawAnyTypes(_ any: AnyObject, other: AnyObject.Type)
+
+  func testSingleProtocolTypes(_ a : A, aAgain a2: A, b: B, bAgain b2: B, both: A & B)
+  func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: A.Type, b: B.Type, bAgain b2: B.Type, both: (A & B).Type)
+  func testComposition(_ x: A & ZZZ, meta xClass: (A & ZZZ).Type)
+  func testSubclassComposition(_ x: MyObject & ZZZ, meta xClass: (MyObject & ZZZ).Type)
+  func testGenericSubclassComposition(_ x: FungibleContainer<MyObject> & ZZZ, meta xClass: (FungibleContainer<MyObject> & ZZZ).Type)
+
+  func testOptional(_ opt: A?, meta m: A.Type?)
+}
+
 // NEGATIVE-NOT: NotObjC
 protocol NotObjC : class {}
 
-
-// CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(protocols)){{$}}
+// NEGATIVE-NOT: @interface NSString (SWIFT_EXTENSION(protocols)){{$}}
 extension NSString : NotObjC {}
 
 // CHECK-LABEL: @protocol ZZZ{{$}}
@@ -110,12 +115,12 @@ extension NSString : A, ZZZ {}
   func a()
   func b()
 
-  optional func c()
-  optional func d()
+  @objc optional func c()
+  @objc optional func d()
 
   func e()
 
-  optional func f()
+  @objc optional func f()
 }
 
 // NEGATIVE-NOT: @protocol PrivateProto
@@ -133,15 +138,34 @@ extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @protocol Properties
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
-// CHECK-NEXT: @property (nonatomic, strong) id <Properties> __nullable b;
+// CHECK-NEXT: @property (nonatomic, strong) id <Properties> _Nullable b;
 // CHECK-NEXT: @optional
-// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull c;
+// CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * _Nonnull c;
 // CHECK-NEXT: @end
 @objc protocol Properties {
   var a: Int { get }
   var b: Properties? { get set }
-  optional var c: String { get }
+  @objc optional var c: String { get }
 }
+
+
+// Forward declaration of class referenced from subclass existential.
+
+// CHECK-LABEL: @class ReferencesSomeClass2;
+
+// CHECK-LABEL: @protocol ReferencesSomeClass1
+// CHECK-NEXT: - (void)referencesWithSomeClassAndZZZ:(ReferencesSomeClass2 <ZZZ> * _Nonnull)someClassAndZZZ;
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: @interface ReferencesSomeClass2
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+
+@objc protocol ReferencesSomeClass1 {
+  @objc func references(someClassAndZZZ: ReferencesSomeClass2 & ZZZ)
+}
+
+@objc class ReferencesSomeClass2 {}
 
 
 // CHECK-LABEL: @protocol ReversedOrder2{{$}}
@@ -155,8 +179,7 @@ extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @interface RootClass1{{$}}
 // CHECK: @interface RootClass2 <A>{{$}}
-// FIXME: Would prefer not to print A below.
-// CHECK: @interface RootClass3 <B, A>{{$}}
+// CHECK: @interface RootClass3 <B>{{$}}
 @objc class RootClass1 : NotObjC {}
 @objc class RootClass2 : A, NotObjC {}
 @objc class RootClass3 : NotObjC, B {}

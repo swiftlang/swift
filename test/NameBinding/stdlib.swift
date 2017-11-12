@@ -1,4 +1,9 @@
-// RUN: %target-parse-verify-swift -parse-stdlib -module-name Swift
+// RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift
+
+enum Optional<T> {
+  case none
+  case some(T)
+}
 
 // <rdar://problem/15593704>
 struct X {
@@ -8,12 +13,12 @@ struct X {
 
 typealias MaxBuiltinFloatType = Builtin.FPIEEE64
 
-protocol _BuiltinFloatLiteralConvertible {
+protocol _ExpressibleByBuiltinFloatLiteral {
   static func _convertFromBuiltinFloatLiteral(
                 value: MaxBuiltinFloatType) -> Self
 }
 
-protocol FloatLiteralConvertible {
-  typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
+protocol ExpressibleByFloatLiteral {
+  associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
   static func convertFromFloatLiteral(value: FloatLiteralType) -> Self
 }

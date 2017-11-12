@@ -1,0 +1,971 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+/////////////////////
+// Inlining Tests //
+/////////////////////
+
+// *NOTE* These tests currently validate whether or not we
+// visit nodes in the correct order since we do not explore inlined
+// code for more apply inst to inline. After that point, we will
+// probably need to do one of the following:
+//
+// 1. Introduce a flag to turn off the exploration behavior.
+// 2. Introduce some sort of debug output that displays the callgraph
+//    traversal order.
+
+// Node -> Node
+
+sil @test1_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test1
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64)
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK: [[MUL_TUPLE_RESULT:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]]
+// CHECK: [[MUL_RESULT:%[0-9]+]] = tuple_extract [[MUL_TUPLE_RESULT]]
+// CHECK: return [[MUL_RESULT]]
+sil @test1 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test1_multiply_leaf : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  return %2 : $Builtin.Int64
+}
+
+//      Node
+//     /    \
+//    v      v
+//  Node -> Node
+
+// CHECK-LABEL: sil @test2_add_leaf
+
+sil @test2_add_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test2_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test2_add_then_multiply : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test2_add_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test2_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test2 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]]
+// CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]] : $(Builtin.Int64, Builtin.Int1), 0
+// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[UADD_RESULT]] : {{.*}}, [[UADD_RESULT]]
+// CHECK: [[UADD_RESULT2:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE2]]
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT2]] : {{.*}}, [[UADD_RESULT2]]
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
+// CHECK: return [[UMUL_RESULT]] : $Builtin.Int64
+sil @test2 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test2_add_leaf: $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %3 = function_ref @test2_add_then_multiply : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %4 = apply %3 (%2) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  return %4 : $Builtin.Int64
+}
+
+//      Node
+//     /    \
+//    v      v
+//  Node    Node
+//    \      /
+//     v    v
+//      Node
+
+// CHECK-LABEL: sil @test3_add_leaf
+
+sil @test3_add_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test3_sub_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test3_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test3_add_then_multiply : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test3_add_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test3_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+sil @test3_sub_then_multiply : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test3_sub_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test3_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test3 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[LITERAL1:%[0-9]+]] = integer_literal {{.*}}, 1
+// CHECK: [[USUB_RESULT_TUPLE:%[0-9]+]] = builtin "usub_with_overflow_Int64"([[INPUT]] : {{.*}}, [[LITERAL1]] : {{.*}}
+// CHECK: [[USUB_RESULT:%[0-9]+]] = tuple_extract [[USUB_RESULT_TUPLE]]
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[USUB_RESULT]] : {{.*}}, [[USUB_RESULT]]
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[UMUL_RESULT]] : {{.*}}, [[UMUL_RESULT]]
+// CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]]
+// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT]] : {{.*}}, [[UADD_RESULT]]
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE2]]
+// CHECK: return [[UMUL_RESULT]]
+sil @test3 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test3_sub_then_multiply : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %3 = function_ref @test3_add_then_multiply : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %4 = apply %3 (%2) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  return %4 : $Builtin.Int64
+}
+
+//      Node
+//     /    \
+//    v      v
+//  Node -> Node
+//    \      /
+//     v    v
+//       Node
+
+// CHECK-LABEL: sil @test4_add_leaf
+
+sil @test4_add_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "uadd_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test4_sub_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "usub_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test4_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}
+
+sil @test4_add_then_multiply : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test4_add_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test4_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+sil @test4_add_then_multiply_then_multiply : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test4_add_then_multiply : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %3 = function_ref @test4_multiply_leaf : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %4 = apply %3(%2) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @test4 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[UADD_RESULT_TUPLE:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[INPUT]] : {{.*}}, [[INPUT]]
+// CHECK: [[UADD_RESULT:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE]]
+// CHECK: [[UMUL_RESULT_TUPLE:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT]] : {{.*}}, [[UADD_RESULT]]
+// CHECK: [[UMUL_RESULT:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE]]
+
+// CHECK: [[UADD_RESULT_TUPLE2:%[0-9]+]] = builtin "uadd_with_overflow_Int64"([[UMUL_RESULT]] : {{.*}}, [[UMUL_RESULT]]
+// CHECK: [[UADD_RESULT2:%[0-9]+]] = tuple_extract [[UADD_RESULT_TUPLE2]]
+// CHECK: [[UMUL_RESULT_TUPLE2:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UADD_RESULT2]] : {{.*}}, [[UADD_RESULT2]]
+// CHECK: [[UMUL_RESULT2:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE2]]
+
+// CHECK: [[UMUL_RESULT_TUPLE3:%[0-9]+]] = builtin "umul_with_overflow_Int64"([[UMUL_RESULT2]] : {{.*}}, [[UMUL_RESULT2]]
+// CHECK: [[UMUL_RESULT3:%[0-9]+]] = tuple_extract [[UMUL_RESULT_TUPLE3]]
+// CHECK: return [[UMUL_RESULT3]] : $Builtin.Int64
+sil @test4 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test4_add_then_multiply : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %2 = apply %1 (%0) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %3 = function_ref @test4_add_then_multiply_then_multiply : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  %4 = apply %3 (%2) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64)
+  return %4 : $Builtin.Int64
+}
+
+// Circular Inline.
+
+// CHECK-LABEL: sil @test5
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.Int64):
+// CHECK: [[FUN:%[0-9]+]] = function_ref @test5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+// CHECK: [[FUN_RESULT:%[0-9]+]] = apply [[FUN]]([[INPUT]]) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+// CHECK: return [[FUN_RESULT]] : $Builtin.Int64
+sil @test5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @test5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  return %2 : $Builtin.Int64
+}
+
+//////////////////////
+// Apply Type Tests //
+//////////////////////
+
+// CHECK-LABEL: sil @generic_function
+sil @generic_function : $@convention(thin) <T> (@in T, @in T) -> Builtin.Int8 {
+bb0(%0 : $*T, %1 : $*T):
+  %2 = integer_literal $Builtin.Int8, 2
+  return %2 : $Builtin.Int8
+}
+
+// IGNORE-THIS-CHECK-LABEL: sil @ignore_applies_with_substitutions
+
+// We can't deserialize apply_inst with subst lists. When radar://14443304
+// is fixed then we should uncomment this test.
+
+// sil @ignore_applies_with_substitutions : $@convention(thin) (Builtin.Int64) -> Builtin.Int8 {
+// bb0(%0 : $Builtin.Int64):
+//   %1 = function_ref @generic_function : $@convention(thin) <T> (@in T, @in T) -> Builtin.Int8
+//   %2 = apply %1<T = Builtin.Int64>(%0, %0) : $@convention(thin) <T> (@in T, @in T) -> Builtin.Int8
+//   return %2 : $Builtin.Int8
+// }
+
+// CHECK-LABEL: sil @trivial_fun
+
+sil @trivial_fun : $@convention(thin) () -> (Builtin.Int64) {
+  %0 = integer_literal $Builtin.Int64, 32
+  return %0 : $Builtin.Int64
+}
+
+protocol P {}
+extension Int64: P {}
+
+// We can inline function_refs with witness_method calling convention.
+sil @trivial_witness_method : $@convention(witness_method: P) (@inout Int64) -> Int64 {
+bb0(%0 : $*Int64):
+  %1 = load %0 : $*Int64
+  return %1 : $Int64
+}
+
+// CHECK-LABEL: sil @trivial_witness_method_caller : $@convention(thin) () -> ()
+// CHECK-NOT: apply .*@convention(witness_method
+// CHECK: return
+sil @trivial_witness_method_caller : $@convention(thin) () -> () {
+  %0 = alloc_box ${ var Int64 }, var, name "x"
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %2 = function_ref @_T0s5Int64VABBi2048_22_builtinIntegerLiteral_tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64 // user: %5
+  %3 = metatype $@thin Int64.Type
+  %4 = integer_literal $Builtin.Int2048, 0
+  %5 = apply %2(%4, %3) : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
+  store %5 to %1 : $*Int64
+  %6 = function_ref @trivial_witness_method : $@convention(witness_method: P) (@inout Int64) -> Int64
+  %7 = apply %6 (%1) : $@convention(witness_method: P) (@inout Int64) -> Int64
+  %8 = tuple()
+  return %8 : $()
+}
+
+// Int64.init(_builtinIntegerLiteral:)
+sil [transparent] [serialized] @_T0s5Int64VABBi2048_22_builtinIntegerLiteral_tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
+
+
+// We can inline function_refs with c calling convention.
+sil @trivial_c : $@convention(c) (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load %0 : $*Builtin.Int64
+  return %1 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @trivial_c_caller : $@convention(thin) () -> ()
+// CHECK-NOT: apply
+// CHECK: return
+sil @trivial_c_caller : $@convention(thin) () -> () {
+  %0 = alloc_stack $Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 0
+  store %1 to %0 : $*Builtin.Int64
+  %2 = function_ref @trivial_c : $@convention(c) (@inout Builtin.Int64) -> Builtin.Int64
+  apply %2 (%0) : $@convention(c) (@inout Builtin.Int64) -> Builtin.Int64
+  dealloc_stack %0 : $*Builtin.Int64
+  %3 = tuple()
+  return %3 : $()
+}
+
+// We can inline function_refs with objc_method calling convention.
+//
+// ObjC calls are unable to be devirtualized since at runtime the call
+// could change. But there is no reason in principal why we could not
+// (if there existed something like sealed classes in objc perhaps?),
+// inline a function_ref to such a call.
+sil @trivial_objc : $@convention(objc_method) (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load %0 : $*Builtin.Int64
+  return %1 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @trivial_objc_caller : $@convention(thin) () -> ()
+// CHECK-NOT: apply
+// CHECK: return
+sil @trivial_objc_caller : $@convention(thin) () -> () {
+  %0 = alloc_stack $Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 0
+  store %1 to %0 : $*Builtin.Int64
+  %2 = function_ref @trivial_objc : $@convention(objc_method) (@inout Builtin.Int64) -> Builtin.Int64
+  apply %2 (%0) : $@convention(objc_method) (@inout Builtin.Int64) -> Builtin.Int64
+  dealloc_stack %0 : $*Builtin.Int64
+  %3 = tuple()
+  return %3 : $()
+}
+
+//////////
+// Misc //
+//////////
+
+// Make sure SILCloner does not get into an infinite loop here.
+sil @_TFsoi1xFT3lhsVs5UWord3rhsS__S_ : $@convention(thin) (UInt32, UInt32) -> UInt32 {
+bb0(%0 : $UInt32, %1 : $UInt32):
+  %3 = struct_extract %0 : $UInt32, #UInt32._value   // user: %5
+  %4 = struct_extract %1 : $UInt32, #UInt32._value   // user: %5
+  %5 = builtin "xor_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int32 // user: %6
+  %6 = struct $UInt32 (%5 : $Builtin.Int32)         // user: %7
+  return %6 : $UInt32                               // id: %7
+}
+
+sil @_TFsop1tFT1aVs5UWord_S_ : $@convention(thin) (UInt32) -> UInt32 {
+bb0(%0 : $UInt32):
+  // function_ref Swift.^ [infix] (lhs : Swift.UInt32, rhs : Swift.UInt32) -> Swift.UInt32
+  %1 = function_ref @_TFsoi1xFT3lhsVs5UWord3rhsS__S_ : $@convention(thin) (UInt32, UInt32) -> UInt32 // user: %6
+  // function_ref Swift.~ [prefix] (a : Swift.UInt32) -> Swift.UInt32
+  %2 = function_ref @_TFsop1tFT1aVs5UWord_S_ : $@convention(thin) (UInt32) -> UInt32 // user: %5
+  %3 = integer_literal $Builtin.Int32, 0            // user: %4
+  %4 = struct $UInt32 (%3 : $Builtin.Int32)         // user: %5
+  %5 = apply %2(%4) : $@convention(thin) (UInt32) -> UInt32     // user: %6
+  %6 = apply %1(%0, %5) : $@convention(thin) (UInt32, UInt32) -> UInt32 // user: %7
+  return %6 : $UInt32                               // id: %7
+}
+
+// Transparent function may inline private functions.
+//
+sil private @private_ret_undef : $@convention(thin) () -> () {
+entry:
+  return undef : $()
+}
+
+sil @uses_private : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @private_ret_undef : $@convention(thin) () -> ()
+  %z = apply %f() : $@convention(thin) () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil [transparent] @transparent_uses_uses_private : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref @uses_private
+// CHECK: return
+sil [transparent] @transparent_uses_uses_private : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @uses_private : $@convention(thin) () -> ()
+  %z = apply %f() : $@convention(thin) () -> ()
+  return %z : $()
+}
+
+// Test fragile-resilient inlining rules:
+// Everything is allowed except inlining of a resilient function into a fragile function.
+
+sil @resilient_function : $@convention(thin) () -> () {
+entry:
+  return undef : $()
+}
+
+sil [serialized] @fragile_function : $@convention(thin) () -> () {
+entry:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [serialized] @fragile_calls_resilient : $@convention(thin) () -> () {
+// CHECK: function_ref @resilient_function
+// CHECK: return
+sil [serialized] @fragile_calls_resilient : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @resilient_function : $@convention(thin) () -> ()
+  %z = apply %f() : $@convention(thin) () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil [serialized] @fragile_calls_fragile : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref @resilient_function
+// CHECK: return
+sil [serialized] @fragile_calls_fragile : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @fragile_function : $@convention(thin) () -> ()
+  %z = apply %f() : $@convention(thin) () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @resilient_calls_fragile : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref @resilient_function
+// CHECK: return
+sil @resilient_calls_fragile : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @fragile_function : $@convention(thin) () -> ()
+  %z = apply %f() : $@convention(thin) () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @resilient_calls_resilient : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref @resilient_function
+// CHECK: return
+sil @resilient_calls_resilient : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @resilient_function : $@convention(thin) () -> ()
+  %z = apply %f() : $@convention(thin) () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @calls_self
+// CHECK-NEXT: bb0:
+// CHECK: function_ref @calls_self
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+sil @calls_self : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @calls_self : $@convention(thin) () -> ()
+  %z = apply %f() : $@convention(thin) () -> ()
+  return %z : $()
+}
+
+// Visibility Tests
+// These tests stem from a time where visibility had an influence
+// on the inlining. This is no longer the case so we just check
+// if everything can be inlined, regardless of visibility.
+
+sil_global private @private_global : $Builtin.Word
+sil private @private_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_private_global : $@convention(thin) () -> () {
+  %0 = global_addr @private_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_private_function : $@convention(thin) () -> () {
+  %0 = function_ref @private_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil_global shared @shared_global : $Builtin.Word
+sil shared @shared_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_shared_global : $@convention(thin) () -> () {
+  %0 = global_addr @shared_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_shared_function : $@convention(thin) () -> () {
+  %0 = function_ref @shared_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil_global hidden @hidden_global : $Builtin.Word
+sil hidden @hidden_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_hidden_global : $@convention(thin) () -> () {
+  %0 = global_addr @hidden_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_hidden_function : $@convention(thin) () -> () {
+  %0 = function_ref @hidden_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil_global @public_global : $Builtin.Word
+sil @public_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 4
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil @references_public_global : $@convention(thin) () -> () {
+  %0 = global_addr @public_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_public_function : $@convention(thin) () -> () {
+  %0 = function_ref @public_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil private @private_function_test : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref
+// CHECK: return
+sil private @private_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil shared @shared_function_test : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref
+// CHECK: return
+sil shared @shared_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil hidden @hidden_function_test : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref
+// CHECK: return
+sil hidden @hidden_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil @public_function_test : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref
+// CHECK: return
+sil @public_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil hidden_external @hidden_external_function_test : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref
+// CHECK: return
+sil hidden_external @hidden_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil public_external @public_external_function_test : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref
+// CHECK: return
+sil public_external @public_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @caller_of_noinline
+sil @caller_of_noinline : $@convention(thin) () -> () {
+bb0:
+  // CHECK: function_ref @noinline_callee
+  // CHECK: apply
+  %0 = function_ref @noinline_callee : $@convention(thin) () -> Int
+  %1 = apply %0() : $@convention(thin) () -> Int
+  %2 = tuple ()
+  return %2 : $()
+}
+// CHECK-LABEL: [noinline] @noinline_callee
+sil [noinline] @noinline_callee : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %1 = metatype $@thin Int.Type
+  %2 = integer_literal $Builtin.Int2048, 0
+  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  return %3 : $Int
+}
+sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+
+sil @unknown_function : $@convention(thin) () -> ()
+
+sil @coldcall : $@convention(thin) () -> () {
+bb0:
+  // make it a non-trivial function
+  %f = function_ref @unknown_function : $@convention(thin) () -> ()
+  %a1 = apply %f() : $@convention(thin) () -> ()
+  %a2 = apply %f() : $@convention(thin) () -> ()
+  %a3 = apply %f() : $@convention(thin) () -> ()
+  %a4 = apply %f() : $@convention(thin) () -> ()
+  %a5 = apply %f() : $@convention(thin) () -> ()
+  %a6 = apply %f() : $@convention(thin) () -> ()
+  %a7 = apply %f() : $@convention(thin) () -> ()
+  %a8 = apply %f() : $@convention(thin) () -> ()
+  %a9 = apply %f() : $@convention(thin) () -> ()
+  %a10 = apply %f() : $@convention(thin) () -> ()
+  %a11 = apply %f() : $@convention(thin) () -> ()
+  %a12 = apply %f() : $@convention(thin) () -> ()
+  %a13 = apply %f() : $@convention(thin) () -> ()
+  %a14 = apply %f() : $@convention(thin) () -> ()
+  %a15 = apply %f() : $@convention(thin) () -> ()
+  %a16 = apply %f() : $@convention(thin) () -> ()
+  %a17 = apply %f() : $@convention(thin) () -> ()
+  %a18 = apply %f() : $@convention(thin) () -> ()
+  %a19 = apply %f() : $@convention(thin) () -> ()
+  %a20 = apply %f() : $@convention(thin) () -> ()
+  %a21 = apply %f() : $@convention(thin) () -> ()
+  %a22 = apply %f() : $@convention(thin) () -> ()
+  %0 = tuple ()                                   // user: %1
+  return %0 : $()                                 // id: %1
+}
+
+// Generic call to "branchHint" for use in specialized @slowPath
+sil public_external [transparent] [_semantics "branchhint"] @_TFs11_branchHintUs7Boolean__FTQ_Sb_Sb : $@convention(thin)(Bool, Bool) -> Bool {
+bb0(%0 : $Bool, %1 : $Bool):
+  return %0 : $Bool
+}
+
+// Specialized call to "slowPath" for use in @coldcall_caller
+sil shared [noinline] [transparent] [_semantics "slowpath"] @_TTSgSbSbs7Boolean___TFs9_slowPathUs7Boolean__FQ_Sb : $@convention(thin) (Bool) -> Bool {
+bb0(%0 : $Bool):
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+  %5 = function_ref @_TFs11_branchHintUs7Boolean__FTQ_Sb_Sb : $@convention(thin) (Bool, Bool) -> Bool
+  %6 = apply %5(%0, %4) : $@convention(thin) (Bool, Bool) -> Bool
+  return %6 : $Bool
+}
+
+// CHECK-LABEL:  @coldcall_caller
+// CHECK: slowPath
+// CHECK-LABEL: bb1:
+// CHECK: function_ref @coldcall
+// CHECK: apply
+// CHECK-LABEL: bb2:
+sil @coldcall_caller : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Bool                          // users: %7, %9, %11
+  %2 = integer_literal $Builtin.Int32, 0          // user: %5
+  %4 = struct_extract %0 : $Int32, #Int32._value   // user: %5
+  %5 = builtin "cmp_eq_Word"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1 // user: %6
+  %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
+  store %6 to %1 : $*Bool                       // id: %7
+  %8 = function_ref @_TTSgSbSbs7Boolean___TFs9_slowPathUs7Boolean__FQ_Sb : $@convention(thin) (Bool) -> Bool // user: %9
+  %9 = apply %8(%6) : $@convention(thin) (Bool) -> Bool // user: %10
+  %10 = struct_extract %9 : $Bool, #Bool._value    // user: %12
+  dealloc_stack %1 : $*Bool      // id: %11
+  cond_br %10, bb1, bb2                           // id: %12
+
+bb1:                                              // Preds: bb0
+  %13 = function_ref @coldcall : $@convention(thin) () -> () // user: %14
+  %14 = apply %13() : $@convention(thin) () -> ()
+  br bb2                                          // id: %15
+
+bb2:                                              // Preds: bb0 bb1
+  %16 = tuple ()                                  // user: %17
+  return %16 : $()                                // id: %17
+}
+
+sil @slowHelper : $@convention(thin) () -> () {
+bb0:
+  // make it a non-trivial function
+  %f = function_ref @unknown_function : $@convention(thin) () -> ()
+  %a1 = apply %f() : $@convention(thin) () -> ()
+  %a2 = apply %f() : $@convention(thin) () -> ()
+  %a3 = apply %f() : $@convention(thin) () -> ()
+  %a4 = apply %f() : $@convention(thin) () -> ()
+  %a5 = apply %f() : $@convention(thin) () -> ()
+  %a6 = apply %f() : $@convention(thin) () -> ()
+  %a7 = apply %f() : $@convention(thin) () -> ()
+  %a8 = apply %f() : $@convention(thin) () -> ()
+  %a9 = apply %f() : $@convention(thin) () -> ()
+  %a10 = apply %f() : $@convention(thin) () -> ()
+  %a11 = apply %f() : $@convention(thin) () -> ()
+  %a12 = apply %f() : $@convention(thin) () -> ()
+  %a13 = apply %f() : $@convention(thin) () -> ()
+  %a14 = apply %f() : $@convention(thin) () -> ()
+  %a15 = apply %f() : $@convention(thin) () -> ()
+  %a16 = apply %f() : $@convention(thin) () -> ()
+  %a17 = apply %f() : $@convention(thin) () -> ()
+  %a18 = apply %f() : $@convention(thin) () -> ()
+  %a19 = apply %f() : $@convention(thin) () -> ()
+  %a20 = apply %f() : $@convention(thin) () -> ()
+  %a21 = apply %f() : $@convention(thin) () -> ()
+  %a22 = apply %f() : $@convention(thin) () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [transparent] [_semantics "fastpath"] @fastPathHelper : $@convention(thin) (Bool) -> Bool
+
+// fastpath.closedTest0 () -> ()
+// From <rdar://problem/17611447> _fastPath kills optimizer
+// First test that the inliner is not inlining the slow call.
+// Then test that same calls is not inlined when transparent.
+// CHECK-LABEL:  @testNoInlineSlow
+// CHECK-LABEL: bb0:
+// CHECK: function_ref @fastPathHelper
+// CHECK-LABEL: bb1:
+// CHECK: function_ref @slowHelper
+// CHECK-LABEL: bb2:
+sil @testNoInlineSlow : $@convention(thin) () -> () {
+bb0:
+  %f1 = function_ref @fastPathHelper : $@convention(thin) (Bool) -> Bool
+  %v9 = alloc_stack $Bool
+  %v12 = integer_literal $Builtin.Int1, 0
+  %v16 = struct $Bool (%v12 : $Builtin.Int1)
+  store %v16 to %v9 : $*Bool                      // id: %17
+  %v18 = apply %f1(%v16) : $@convention(thin) (Bool) -> Bool
+  %v19 = struct_extract %v18 : $Bool, #Bool._value
+  dealloc_stack %v9 : $*Bool      // id: %20
+  cond_br %v19, bb2, bb1                           // id: %21
+
+bb1:
+  %f2 = function_ref @slowHelper : $@convention(thin) () -> ()
+  %r2 = apply %f2() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  %t3 = tuple ()
+  return %t3 : $()
+}
+
+// CHECK-LABEL:  @testInlineSlowTransparent
+// CHECK-LABEL: bb0:
+// CHECK: function_ref @fastPathHelper
+// CHECK-LABEL: bb1:
+// CHECK: function_ref @slowHelper
+// CHECK-LABEL: bb2:
+sil @testInlineSlowTransparent : $@convention(thin) () -> () {
+bb0:
+  %f1 = function_ref @fastPathHelper : $@convention(thin) (Bool) -> Bool
+  %v9 = alloc_stack $Bool
+  %v12 = integer_literal $Builtin.Int1, 0
+  %v16 = struct $Bool (%v12 : $Builtin.Int1)
+  store %v16 to %v9 : $*Bool                      // id: %17
+  %v18 = apply %f1(%v16) : $@convention(thin) (Bool) -> Bool
+  %v19 = struct_extract %v18 : $Bool, #Bool._value
+  dealloc_stack %v9 : $*Bool      // id: %20
+  cond_br %v19, bb2, bb1                           // id: %21
+
+bb1:
+  %f2 = function_ref @slowHelper : $@convention(thin) () -> ()
+  %r2 = apply %f2() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  %t3 = tuple ()
+  return %t3 : $()
+}
+
+// Attempt to ensure that calling the devirtualizer on a try_apply
+// from the performance inliner doesn't result in an assert/crash.
+
+class C {
+  @inline(never) func callThrowing<T>(other: T, closure: () throws -> T) -> T
+}
+
+// CHECK-LABEL: sil [noinline] @callThrowing
+sil [noinline] @callThrowing : $@convention(method) <T> (@in T, @owned @callee_owned () -> (@out T, @error Error), @guaranteed C) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $@callee_owned () -> (@out T, @error Error), %3 : $C):
+  strong_retain %2 : $@callee_owned () -> (@out T, @error Error)
+  try_apply %2(%0) : $@callee_owned () -> (@out T, @error Error), normal bb1, error bb4
+
+bb1(%6 : $()):
+  br bb2
+
+bb2:
+  strong_release %2 : $@callee_owned () -> (@out T, @error Error)
+  destroy_addr %1 : $*T
+  %10 = tuple ()
+  return %10 : $()
+
+bb3:
+  copy_addr %1 to [initialization] %0 : $*T
+  strong_release %15 : $Error
+  br bb2
+
+bb4(%15 : $Error):
+  br bb3
+}
+
+
+// CHECK-LABEL: sil @callNonThrowing
+sil @callNonThrowing : $@convention(thin) (@owned C) -> Int32 {
+bb0(%0 : $C):
+  %1 = integer_literal $Builtin.Int32, 1
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = alloc_stack $Int32
+  store %2 to %3 : $*Int32
+  %5 = function_ref @theClosure : $@convention(thin) () -> (Int32, @error Error)
+  %6 = thin_to_thick_function %5 : $@convention(thin) () -> (Int32, @error Error) to $@callee_owned () -> (Int32, @error Error)
+  %7 = function_ref @reabstractionThunk : $@convention(thin) (@owned @callee_owned () -> (Int32, @error Error)) -> (@out Int32, @error Error)
+  %8 = partial_apply %7(%6) : $@convention(thin) (@owned @callee_owned () -> (Int32, @error Error)) -> (@out Int32, @error Error)
+  %9 = alloc_stack $Int32
+  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
+  %11 = apply %10<Int32>(%9, %3, %8, %0) : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
+  %12 = load %9 : $*Int32
+  dealloc_stack %9 : $*Int32
+  dealloc_stack %3 : $*Int32
+  strong_release %0 : $C
+// CHECK: return
+  return %12 : $Int32
+}
+
+
+// CHECK-LABEL: sil @theClosure
+sil @theClosure : $@convention(thin) () -> (Int32, @error Error) {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+// CHECK-LABEL: sil [transparent] [reabstraction_thunk] @reabstractionThunk
+sil [transparent] [reabstraction_thunk] @reabstractionThunk : $@convention(thin) (@owned @callee_owned () -> (Int32, @error Error)) -> (@out Int32, @error Error) {
+bb0(%0 : $*Int32, %1 : $@callee_owned () -> (Int32, @error Error)):
+  try_apply %1() : $@callee_owned () -> (Int32, @error Error), normal bb1, error bb2
+
+bb1(%3 : $Int32):
+  store %3 to %0 : $*Int32
+  %5 = tuple ()
+  return %5 : $()
+
+bb2(%7 : $Error):
+  %8 = builtin "willThrow"(%7 : $Error) : $()
+  throw %7 : $Error
+}
+
+sil_vtable C {
+  #C.callThrowing!1: callThrowing
+}

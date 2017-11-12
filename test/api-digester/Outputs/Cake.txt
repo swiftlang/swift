@@ -1,0 +1,21 @@
+
+/* Removed Decls */
+Constructor Somestruct2.init(_:) has been removed
+Func C4.foo() has been removed
+
+/* Moved Decls */
+
+/* Renamed Decls */
+Struct Somestruct2 has been renamed to Struct NSSomestruct2
+Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
+
+/* Type Changes */
+Constructor S1.init(_:) has parameter 0 type change from Int to Double
+Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
+
+/* Decl Attribute changes */
+Var C1.CIIns1 changes from weak to strong
+Var C1.CIIns2 changes from strong to weak
+Func C1.foo1() is now not static
+Func S1.foo3() is now static
+Func S1.foo1() is now mutating

@@ -1,12 +1,12 @@
-//===- AssertImplements.h - Assert that a class overrides a function ------===//
+//===--- AssertImplements.h - Assert that a class overrides a function ----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_ASSERT_IMPLEMENTS_H
-#define SWIFT_BASIC_ASSERT_IMPLEMENTS_H
+#ifndef SWIFT_BASIC_ASSERTIMPLEMENTS_H
+#define SWIFT_BASIC_ASSERTIMPLEMENTS_H
 
 #include <type_traits>
 
@@ -58,6 +58,7 @@ namespace swift {
                                           &BaseClass::MemberName,               \
                                           &DerivedClass::MemberName>::value,    \
                 "" #DerivedClass " does not properly override " #MemberName)
-}
 
-#endif
+} // end namespace swift
+
+#endif // SWIFT_BASIC_ASSERTIMPLEMENTS_H

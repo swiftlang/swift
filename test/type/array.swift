@@ -1,22 +1,22 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Array types.
 class Base1 {
-  func f0(x: [Int]) { }
-  func f0a(x: [Int]?) { }
-  func f1(x: [[Int]]) { }
-  func f1a(x: [[Int]]?) { }
-  func f2(x: [[Int] -> [Int]]) { }
-  func f2a(x: [[Int]? -> [Int]?]?) { }
+  func f0(_ x: [Int]) { }
+  func f0a(_ x: [Int]?) { }
+  func f1(_ x: [[Int]]) { }
+  func f1a(_ x: [[Int]]?) { }
+  func f2(_ x: [([Int]) -> [Int]]) { }
+  func f2a(_ x: [([Int]?) -> [Int]?]?) { }
 }
 
 class Derived1 : Base1 {
-  override func f0(x: Array<Int>) { }
-  override func f0a(x: Optional<Array<Int>>) { }
-  override func f1(x: Array<Array<Int>>) { }
-  override func f1a(x: Optional<Array<Array<Int>>>) { }
-  override func f2(x: Array<Array<Int> -> Array<Int>>) { }
-  override func f2a(x: Optional<Array<Optional<Array<Int>> -> Optional<Array<Int>>>>) { }
+  override func f0(_ x: Array<Int>) { }
+  override func f0a(_ x: Optional<Array<Int>>) { }
+  override func f1(_ x: Array<Array<Int>>) { }
+  override func f1a(_ x: Optional<Array<Array<Int>>>) { }
+  override func f2(_ x: Array<(Array<Int>) -> Array<Int>>) { }
+  override func f2a(_ x: Optional<Array<(Optional<Array<Int>>) -> Optional<Array<Int>>>>) { }
 }
 
 
@@ -28,8 +28,8 @@ func testGenericSpec() {
 }
 
 // Array types for construction.
-func constructArray(n: Int) {
-  var ones = [Int](count: n, repeatedValue: 1)
+func constructArray(_ n: Int) {
+  var ones = [Int](repeating: 1, count: n)
   ones[5] = 0
 
   var matrix = [[Float]]()
@@ -41,6 +41,76 @@ func constructArray(n: Int) {
 // Fix-Its from the old syntax to the new.
 
 typealias FixIt0 = Int[] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
-typealias FixIt1 = Int[][] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{25-26=}}
-// expected-error@-1{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
+
+// Make sure preCheckExpression() properly folds member types.
+
+class Outer {
+  class Middle {
+    class Inner {}
+    class GenericInner<V> {}
+
+    typealias Alias = Inner
+  }
+
+  class GenericMiddle<U> {
+    class Inner {}
+  }
+
+  typealias Alias = Middle
+}
+
+class GenericOuter<T> {
+  class Middle {
+    class Inner {}
+  }
+}
+
+func takesMiddle(_: [Outer.Middle]) {}
+
+takesMiddle([Outer.Middle]())
+
+func takesInner(_: [Outer.Middle.Inner]) {}
+
+takesInner([Outer.Middle.Inner]())
+takesInner([Outer.Alias.Inner]())
+takesInner([Outer.Middle.Alias]())
+takesInner([Outer.Alias.Alias]())
+
+takesInner([array.Outer.Middle.Inner]())
+takesInner([array.Outer.Alias.Inner]())
+takesInner([array.Outer.Middle.Alias]())
+takesInner([array.Outer.Alias.Alias]())
+
+func takesMiddle(_: [GenericOuter<Int>.Middle]) {}
+
+takesMiddle([GenericOuter<Int>.Middle]())
+
+func takesInner(_: [GenericOuter<Int>.Middle.Inner]) {}
+
+takesInner([GenericOuter<Int>.Middle.Inner]())
+takesInner([array.GenericOuter<Int>.Middle.Inner]())
+
+func takesMiddle(_: [Outer.GenericMiddle<Int>]) {}
+
+takesMiddle([Outer.GenericMiddle<Int>]())
+
+func takesInner(_: [Outer.GenericMiddle<Int>.Inner]) {}
+
+takesInner([Outer.GenericMiddle<Int>.Inner]())
+takesInner([array.Outer.GenericMiddle<Int>.Inner]())
+
+func takesInner(_: [Outer.Middle.GenericInner<Int>]) {}
+
+takesInner([Outer.Middle.GenericInner<Int>]())
+takesInner([array.Outer.Middle.GenericInner<Int>]())
+
+protocol HasAssocType {
+  associatedtype A
+}
+
+func takesAssocType<T : HasAssocType>(_: T, _: [T.A], _: [T.A?]) {}
+
+func passAssocType<T : HasAssocType>(_ t: T) {
+  takesAssocType(t, [T.A](), [T.A?]())
+}
 

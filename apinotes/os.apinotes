@@ -1,0 +1,42 @@
+Name: os
+Typedefs:
+- Name: os_log_type_t
+  SwiftName: OSLogType
+- Name: os_trace_payload_t
+  Availability: nonswift
+- Name: os_log_t
+  Availability: nonswift
+Classes:
+- Name: OS_os_log
+  SwiftName: OSLog
+Enumerators:
+- Name: OS_LOG_TYPE_DEFAULT
+  SwiftPrivate: true
+- Name: OS_LOG_TYPE_INFO
+  SwiftPrivate: true
+- Name: OS_LOG_TYPE_DEBUG
+  SwiftPrivate: true
+- Name: OS_LOG_TYPE_ERROR
+  SwiftPrivate: true
+- Name: OS_LOG_TYPE_FAULT
+  SwiftPrivate: true
+Functions:
+- Name: _os_log_impl
+  Availability: nonswift
+  AvailabilityMsg: 'Use os_log'
+- Name: _os_log_sensitive_deprecated
+  Availability: nonswift
+- Name: _os_trace_with_buffer
+  Availability: nonswift
+- Name: os_log_is_enabled
+  Availability: nonswift
+- Name: os_log_type_enabled
+  SwiftName: 'OSLog.isEnabled(self:type:)'
+- Name: _os_log_create
+  Availability: nonswift
+- Name: os_log_create
+  SwiftName: 'OSLog.init(__subsystem:category:)'
+  SwiftPrivate: true
+  NullabilityOfRet: N
+- Name: os_log_is_debug_enabled
+  Availability: nonswift

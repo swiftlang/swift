@@ -1,11 +1,12 @@
+// REQUIRES: objc_interop
 // RUN: %complete-test -hide-low-priority=1 -tok=TOP_LEVEL_0 %s -- -I %S/Inputs > %t.on
 // RUN: %complete-test -hide-low-priority=0 -tok=TOP_LEVEL_0 %s -- -I %S/Inputs > %t.off
 
-// RUN: FileCheck %s -check-prefix=HIDE < %t.on
-// RUN: FileCheck %s -check-prefix=NOHIDE < %t.off
+// RUN: %FileCheck %s -check-prefix=HIDE < %t.on
+// RUN: %FileCheck %s -check-prefix=NOHIDE < %t.off
 
-// RUN: %complete-test -hide-by-name=1 -hide-low-priority=1 -tok=TOP_LEVEL_TYPE_0 %s -- -I %S/Inputs | FileCheck %s -check-prefix=TYPES-HIDENAME
-// RUN: %complete-test -hide-by-name=0 -hide-low-priority=1 -tok=TOP_LEVEL_TYPE_0 %s -- -I %S/Inputs | FileCheck %s -check-prefix=TYPES-NOHIDENAME
+// RUN: %complete-test -hide-by-name=1 -hide-low-priority=1 -tok=TOP_LEVEL_TYPE_0 %s -- -I %S/Inputs | %FileCheck %s -check-prefix=TYPES-HIDENAME
+// RUN: %complete-test -hide-by-name=0 -hide-low-priority=1 -tok=TOP_LEVEL_TYPE_0 %s -- -I %S/Inputs | %FileCheck %s -check-prefix=TYPES-NOHIDENAME
 import PopularAPI
 
 let x = 1
@@ -26,9 +27,9 @@ func test(y: Int) {
 // NOHIDE: y
 // NOHIDE: z
 // NOHIDE: x
+// NOHIDE: import
 // NOHIDE: ModuleColor
 // NOHIDE: Int
-// NOHIDE: import
 
 func testType() {
   let x: #^TOP_LEVEL_TYPE_0^#

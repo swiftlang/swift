@@ -1,0 +1,207 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -split-critical-edges | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage raw
+
+enum OnePayload {
+  case x(Builtin.Int64)
+  case y
+}
+
+// CHECK-LABEL: sil @check_switch_enum
+// CHECK: bb0(
+// CHECK:  cond_br %1, bb1, bb2
+// CHECK: bb1:
+// CHECK:   integer_literal $Builtin.Int64, 1
+// CHECK:   br bb4(
+// CHECK: bb2:
+// CHECK:   switch_enum {{.*}} : $OnePayload, case #OnePayload.x!enumelt.1: bb3, case #OnePayload.y!enumelt: bb5
+// CHECK: bb3([[PAYLOAD:%.]] : $Builtin.Int64):
+// CHECK:   br bb4([[PAYLOAD]] : $Builtin.Int64)
+// CHECK: bb4([[VAL:%.*]] : $Builtin.Int64):
+// CHECK:   struct $Int64 ([[VAL]] : $Builtin.Int64)
+// CHECK:   br bb6
+// CHECK: bb5:
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK:   return
+
+sil @check_switch_enum : $(OnePayload, Builtin.Int1) -> () {
+entry(%0 : $OnePayload, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = integer_literal $Builtin.Int64, 1
+  br x_dest(%2 : $Builtin.Int64)
+
+bb2:
+  switch_enum %0 : $OnePayload, case #OnePayload.x!enumelt.1: x_dest, case #OnePayload.y!enumelt: y_dest
+
+x_dest(%4: $Builtin.Int64):
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  br end
+
+y_dest:
+  br end
+
+end:
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: sil @check_switch_value
+// CHECK: bb0
+// CHECK:   cond_br %1, bb1, bb2
+// CHECK: bb1:
+// CHECK:   integer_literal $Builtin.Int64, 1
+// CHECK:   br bb4
+// CHECK: bb2:
+// CHECK:   [[VAL:%[0-9]+]] = integer_literal $Builtin.Int32, 1
+// CHECK:   switch_value %0 : $Builtin.Int32, case [[VAL]]: bb3, default bb5
+// CHECK: bb3:
+// CHECK:   br bb4
+// CHECK: bb4:
+// CHECK:   br bb6
+// CHECK: bb5:
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK:   return
+
+sil @check_switch_value : $(Builtin.Int32, Builtin.Int1) -> () {
+entry(%0 : $Builtin.Int32, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = integer_literal $Builtin.Int64, 1
+  br x_dest
+bb2:
+  %3 = integer_literal $Builtin.Int32, 1
+  switch_value %0 : $Builtin.Int32, case %3: x_dest, default y_dest
+
+x_dest:
+  br end
+
+y_dest:
+  br end
+
+end:
+  %v = tuple ()
+  return %v : $()
+}
+
+class X {
+  @objc func f() { }
+  @objc class func g() { }
+  @objc var value : Int { get }
+  @objc subscript (i : Int) -> Int { get }
+}
+
+// CHECK: sil @dynamic_lookup_br : $@convention(thin) (AnyObject, Builtin.Int1) -> () {
+// CHECK: bb0(
+// CHECK:   cond_br %1, bb1, bb4
+// CHECK: bb1:
+// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb3, bb2
+// CHECK: bb2:
+// CHECK:   br bb8
+// CHECK: bb3({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
+// CHECK:   br bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
+// CHECK: bb4:
+// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb6, bb5
+// CHECK: bb5:
+// CHECK:   br bb8
+// CHECK: bb6({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+// CHECK:   br bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
+// CHECK: bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+// CHECK:   br bb9
+// CHECK: bb8:
+// CHECK:   br bb9
+// CHECK: bb9:
+// CHECK:   return
+
+sil @dynamic_lookup_br : $@convention(thin) (AnyObject, Builtin.Int1) -> () {
+bb0(%0 : $AnyObject, %10: $Builtin.Int1):
+  cond_br %10, lookup1, lookup2
+
+lookup1:
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+  store %0 to %1a : $*AnyObject
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
+  %4 = load %1a : $*AnyObject
+  strong_retain %4 : $AnyObject
+  %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
+  %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
+  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
+
+lookup2:
+  %21 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %21a = project_box %21 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+  store %0 to %21a : $*AnyObject
+  %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
+  %24 = load %21a : $*AnyObject
+  strong_retain %24 : $AnyObject
+  %26 = open_existential_ref %24 : $AnyObject to $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject
+  %27 = unchecked_ref_cast %26 : $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
+  dynamic_method_br %27 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
+
+bb1(%8 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %43 = tuple ()
+  return %43 : $()
+}
+
+class Node {
+}
+
+class ParentNode : Node {
+}
+
+// CHECK-LABEL: sil @test_checked_cast_br
+// CHECK: bb0(
+// CHECK:   cond_br %1, bb1, bb4
+// CHECK: bb1:
+// CHECK:   checked_cast_br [exact] {{.*}} : $Node to $ParentNode, bb3, bb2
+// CHECK: bb2:
+// CHECK:   br bb8
+// CHECK: bb3({{.*}} : $ParentNode):
+// CHECK:   br bb7({{.*}} : $ParentNode)
+// CHECK: bb4:
+// CHECK:   checked_cast_br [exact] {{.*}} : $Node to $ParentNode, bb6, bb5
+// CHECK: bb5:
+// CHECK:   br bb8
+// CHECK: bb6({{.*}} : $ParentNode):
+// CHECK:   br bb7({{.*}} : $ParentNode)
+// CHECK: bb7({{.*}} : $ParentNode):
+// CHECK:   br bb9
+// CHECK: bb8:
+// CHECK:   br bb9
+// CHECK: bb9:
+// CHECK:   return
+
+sil @test_checked_cast_br : $@convention(method) (@owned Node, Builtin.Int1) -> () {
+bb0(%0 : $Node, %2 : $Builtin.Int1):
+  cond_br %2, ccb1, ccb2
+
+ccb1:
+  checked_cast_br [exact] %0 : $Node to $ParentNode, bb2, bb3
+
+ccb2:
+  checked_cast_br [exact] %0 : $Node to $ParentNode, bb2, bb3
+
+bb2(%5 : $ParentNode):
+  br bb1
+
+bb3:
+  br bb1
+
+bb1:
+  %1 = tuple ()
+  return %1 : $()
+}

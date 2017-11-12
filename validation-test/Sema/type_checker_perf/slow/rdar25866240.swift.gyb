@@ -1,0 +1,11 @@
+// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+func f() {
+% for i in range(N):
+  let collection${i} = [String]()
+% end
+
+  _ = ${' + '.join("collection%s" % i for i in range(N))}
+}

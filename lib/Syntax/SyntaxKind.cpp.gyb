@@ -1,0 +1,86 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxKind.cpp.gyb.
+//// Do Not Edit Directly!
+//===-------------- SyntaxKind.cpp - Syntax Kind definitions --------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Syntax/SyntaxKind.h"
+
+namespace swift {
+namespace syntax {
+
+void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
+  switch (kind) {
+  case SyntaxKind::Token:
+    os << "Token";
+    break;
+  case SyntaxKind::Unknown:
+    os << "Unknown";
+    break;
+% for node in SYNTAX_NODES:
+  case SyntaxKind::${node.syntax_kind}:
+    os << "${node.syntax_kind}";
+    break;
+% end
+  }
+}
+
+bool isCollectionKind(SyntaxKind Kind) {
+  switch(Kind) {
+%   for node in SYNTAX_NODES:
+%     if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}:
+%     end
+%   end
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool isDeclKind(SyntaxKind Kind) {
+  return Kind >= SyntaxKind::First_Decl && Kind <= SyntaxKind::Last_Decl;
+}
+
+bool isTypeKind(SyntaxKind Kind) {
+  return Kind >= SyntaxKind::First_Type && Kind <= SyntaxKind::Last_Type;
+}
+
+bool isStmtKind(SyntaxKind Kind) {
+  return Kind >= SyntaxKind::First_Stmt && Kind <= SyntaxKind::Last_Stmt;
+}
+
+bool isExprKind(SyntaxKind Kind) {
+  return Kind >= SyntaxKind::First_Expr && Kind <= SyntaxKind::Last_Expr;
+}
+
+bool isPatternKind(SyntaxKind Kind) {
+  return Kind >= SyntaxKind::First_Pattern &&
+         Kind <= SyntaxKind::Last_Pattern;
+}
+
+bool isTokenKind(SyntaxKind Kind) {
+  return Kind == SyntaxKind::Token;
+}
+
+bool isUnknownKind(SyntaxKind Kind) {
+  return Kind == SyntaxKind::Unknown ||
+         Kind == SyntaxKind::UnknownDecl ||
+         Kind == SyntaxKind::UnknownExpr ||
+         Kind == SyntaxKind::UnknownStmt;
+}
+} // end namespace syntax
+} // end namespace swift

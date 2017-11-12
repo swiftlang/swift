@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -85,7 +85,8 @@ public:
                     unsigned Offset,
                     unsigned Length,
                     bool IsSystem,
-                    sourcekitd_variant_dictionary_applier_t applier) {
+                    llvm::function_ref<bool(sourcekitd_uid_t,
+                                            sourcekitd_variant_t)> applier) {
 
 #define APPLY(K, Ty, Field)                              \
   do {                                                   \
@@ -136,7 +137,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 namespace sourcekitd {
 
@@ -161,9 +162,11 @@ struct CompactVariantFuncs<TokenAnnotationsArray> {
 
     return Fn(key, Kind, Offset, Length, IsSystem);
   }
-
-  static bool dictionary_apply(sourcekitd_variant_t dict,
-                              sourcekitd_variant_dictionary_applier_t applier) {
+  
+  static bool
+  dictionary_apply(sourcekitd_variant_t dict,
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
     void *Buf = (void*)dict.data[1];
     size_t Index = dict.data[2];
 
@@ -218,7 +221,7 @@ VariantFunctions CompactVariantFuncs<TokenAnnotationsArray>::Funcs = {
   nullptr/*Annot_uid_get_value*/
 };
 
-}
+} // namespace sourcekitd
 
 VariantFunctions *
 sourcekitd::getVariantFunctionsForTokenAnnotationsArray() {

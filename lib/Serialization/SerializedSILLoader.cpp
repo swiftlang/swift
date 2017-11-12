@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -57,17 +57,28 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   return retVal;
 }
 
-SILFunction *SerializedSILLoader::lookupSILFunction(SILDeclRef Decl) {
-  llvm::SmallString<32> Name;
-  Decl.mangle(Name);
+SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
+                                                    bool declarationOnly,
+                                                    Optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Name)) {
+    if (auto Func = Des->lookupSILFunction(Name, declarationOnly)) {
       DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
             << Des->getModuleIdentifier().str() << "\n");
-      if (!Func->empty())
+      if (Linkage) {
+        // This is not the linkage we are looking for.
+        if (Func->getLinkage() != *Linkage) {
+          DEBUG(llvm::dbgs()
+                << "Wrong linkage for Function: " << Func->getName() << " : "
+                << (int)Func->getLinkage() << "\n");
+          Des->invalidateFunction(Func);
+          Func->getModule().eraseFunction(Func);
+          continue;
+        }
+      }
+      if (!Func->empty() || declarationOnly)
         return Func;
       retVal = Func;
     }
@@ -75,21 +86,18 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILDeclRef Decl) {
   return retVal;
 }
 
-SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name) {
+bool SerializedSILLoader::hasSILFunction(StringRef Name,
+                                         Optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Name)) {
-      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
-      if (!Func->empty())
-        return Func;
-      retVal = Func;
-    }
+    if (Des->hasSILFunction(Name, Linkage))
+      return true;
   }
   return retVal;
 }
+
 
 SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
   for (auto &Des : LoadedSILSections) {
@@ -106,9 +114,24 @@ SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
   return nullptr;
 }
 
+SILDefaultWitnessTable *SerializedSILLoader::
+lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto wT = Des->lookupDefaultWitnessTable(WT))
+      return wT;
+  return nullptr;
+}
+
 void SerializedSILLoader::invalidateCaches() {
   for (auto &Des : LoadedSILSections)
     Des->invalidateFunctionCache();
+}
+
+bool SerializedSILLoader::invalidateFunction(SILFunction *F) {
+  for (auto &Des : LoadedSILSections)
+    if (Des->invalidateFunction(F))
+      return true;
+  return false;
 }
 
 void SerializedSILLoader::getAll() {
@@ -143,6 +166,12 @@ void SerializedSILLoader::getAllVTables() {
 void SerializedSILLoader::getAllWitnessTables() {
   for (auto &Des : LoadedSILSections)
     Des->getAllWitnessTables();
+}
+
+/// Deserialize all DefaultWitnessTables in all SILModules.
+void SerializedSILLoader::getAllDefaultWitnessTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDefaultWitnessTables();
 }
 
 // Anchor the SerializedSILLoader v-table.

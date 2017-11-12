@@ -5,24 +5,21 @@
 import SwiftPrivate
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 var HashingTestSuite = TestSuite("Hashing")
 
-func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Double) {
+func avalancheTest(
+  _ bits: Int,
+  _ hashUnderTest: @escaping (UInt64) -> UInt64,
+  _ pValue: Double
+) {
   let testsInBatch = 100000
   let testData = randArray64(testsInBatch)
   let testDataHashed = Array(testData.lazy.map { hashUnderTest($0) })
 
   for inputBit in 0..<bits {
     // Using an array here makes the test too slow.
-    var bitFlips = UnsafeMutablePointer<Int>.alloc(bits)
+    var bitFlips = UnsafeMutablePointer<Int>.allocate(capacity: bits)
     for i in 0..<bits {
       bitFlips[i] = 0
     }
@@ -34,7 +31,7 @@ func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Dou
       var delta = outputA ^ outputB
       for outputBit in 0..<bits {
         if delta & 1 == 1 {
-          ++bitFlips[outputBit]
+          bitFlips[outputBit] += 1
         }
         delta = delta >> 1
       }
@@ -44,7 +41,7 @@ func avalancheTest(bits: Int, _ hashUnderTest: (UInt64) -> UInt64, _ pValue: Dou
         chiSquaredUniform2(testsInBatch, bitFlips[outputBit], pValue),
         "inputBit: \(inputBit), outputBit: \(outputBit)")
     }
-    bitFlips.dealloc(bits)
+    bitFlips.deallocate(capacity: bits)
   }
 }
 

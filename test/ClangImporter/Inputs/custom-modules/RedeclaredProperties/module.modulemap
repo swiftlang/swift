@@ -1,0 +1,22 @@
+module RedeclaredPropertiesTextual {
+  textual header "RPFirst.h"
+  textual header "RPSecond.h"
+}
+
+module RedeclaredProperties {
+  header "RedeclaredProperties.h"
+}
+
+module RedeclaredPropertiesSub {
+  header "RedeclaredPropertiesSub.h"
+  explicit module Private {
+    header "RedeclaredPropertiesSubPrivate.h"
+  }
+}
+
+module RedeclaredPropertiesSplit {
+  header "RedeclaredPropertiesSplit.h"
+}
+module RedeclaredPropertiesSplit2 {
+  header "RedeclaredPropertiesSplit2.h"
+}

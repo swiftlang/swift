@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 protocol RollCallable {
@@ -23,11 +23,11 @@ struct Crow : RollCallable, Snarker {
   func snark() -> String { return "That's one O!" }
 }
 
-func printRollCall(x: RollCallable) {
+func printRollCall(_ x: RollCallable) {
   print(x.rollCall())
 }
 
-func printRollCallWithSnark(x: protocol<RollCallable, Snarker>) {
+func printRollCallWithSnark(_ x: RollCallable & Snarker) {
   printRollCall(x)
   print("(\(x.snark()))")
 }

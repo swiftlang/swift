@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 func fib() {
@@ -19,18 +19,18 @@ fib()
 
 // From: <rdar://problem/17796401>
 // FIXME: <rdar://problem/21993692> type checker too slow
-let two_oneA = [1, 2, 3, 4].lazy.reverse()
+let two_oneA = [1, 2, 3, 4].lazy.reversed()
 let two_one = Array(two_oneA.filter { $0 % 2 == 0 }.map { $0 / 2 })
 print(two_one)
 // CHECK: [2, 1]
 
 // rdar://problem/18208283
-func flatten<Element, Sequence: SequenceType, InnerSequence: SequenceType
-       where Sequence.Generator.Element == InnerSequence, InnerSequence.Generator.Element == Element> (outerSequence: Sequence) -> [Element] {
+func flatten<Element, Seq: Sequence, InnerSequence: Sequence
+       where Seq.Iterator.Element == InnerSequence, InnerSequence.Iterator.Element == Element> (_ outerSequence: Seq) -> [Element] {
   var result = [Element]()
 
   for innerSequence in outerSequence {
-    result.appendContentsOf(innerSequence)
+    result.append(contentsOf: innerSequence)
   }
 
   return result
@@ -41,5 +41,5 @@ let flat = flatten([[1,2,3], [4,5,6]])
 print(flat)
 
 // rdar://problem/19416848
-func observe<T:SequenceType, V where V == T.Generator.Element>(g:T) { }
+func observe<T:Sequence, V where V == T.Iterator.Element>(_ g:T) { }
 observe(["a":1])

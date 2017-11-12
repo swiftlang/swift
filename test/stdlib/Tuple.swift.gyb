@@ -1,0 +1,159 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+
+var TupleTestSuite = TestSuite("Tuple")
+
+// Test tuple comparison operators
+// all the tuple types use the same basic implementation for the operators
+// so testing any arity tests the logic for them all.
+// Include at least one invocation for all arities as a sanity check.
+
+% maxArity = 6 # the highest arity the operators are defined for
+
+func testEquality<A : Equatable, B : Equatable, C : Equatable>(
+  _ lhs: (A, B, C), equal: Bool, to rhs: (A, B, C),
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  _ message: @autoclosure () -> String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),
+  file: String = #file, line: UInt = #line
+) {
+  let trace = stackTrace.pushIf(showFrame, file: file, line: line)
+  expectEqual(equal, lhs == rhs, stackTrace: trace)
+  expectEqual(equal, rhs == lhs, stackTrace: trace)
+  expectEqual(!equal, lhs != rhs, stackTrace: trace)
+  expectEqual(!equal, rhs != lhs, stackTrace: trace)
+}
+
+TupleTestSuite.test("Tuple/equality") {
+  testEquality((1,2,3), equal: true, to: (1,2,3))
+  testEquality((1,2,3), equal: false, to: (1,2,4))
+  testEquality((1,2,3), equal: false, to: (1,3,3))
+  testEquality((1,2,3), equal: false, to: (2,2,3))
+  testEquality((1,"2",3), equal: true, to: (1,"2",3))
+  testEquality((1,"2",3), equal: false, to: (1,"3",3))
+  testEquality(("one", 2.2, 3..<5), equal: true, to: ("one", 2.2, 3..<5))
+
+  testEquality((1.0, 2.0, 3.0), equal: false, to: (1.0, 2.0, .nan))
+  testEquality((1.0, 2.0, 3.0), equal: false, to: (1.0, .nan, 3.0))
+  testEquality((1.0, 2.0, 3.0), equal: false, to: (.nan, 2.0, 3.0))
+  testEquality((1.0, 2.0, 3.0), equal: false, to: (.nan, .nan, .nan))
+  testEquality((1.0, 2.0, Float.nan), equal: false, to: (1.0, 2.0, 3.0))
+  testEquality((1.0, 2.0, Float.nan), equal: false, to: (1.0, 2.0, Float.nan))
+  testEquality((Float.nan, Float.nan, Float.nan), equal: false, to: (.nan, .nan, .nan))
+  testEquality((Float.nan, Float.nan, Float.nan), equal: false, to: (1.0, 2.0, 3.0))
+
+  expectTrue((1,2) == (1,2))
+  expectTrue((1,2) != (1,3))
+  expectTrue((1,2,3,4) == (1,2,3,4))
+  expectTrue((1,2,3,4) != (1,2,3,3))
+  expectTrue((1,2,3,4,5) == (1,2,3,4,5))
+  expectTrue((1,2,3,4,5) != (1,2,3,4,4))
+  expectTrue((1,2,3,4,5,6) == (1,2,3,4,5,6))
+  expectTrue((1,2,3,4,5,6) != (1,2,3,4,5,5))
+}
+
+TupleTestSuite.test("Tuple/equality/sanity-check") {
+  // sanity check all arities
+
+  expectTrue(() == ())
+  expectFalse(() != ())
+  expectFalse(() < ())
+  expectTrue(() <= ())
+  expectFalse(() > ())
+  expectTrue(() >= ())
+
+% for arity in range(2, maxArity + 1):
+%   a = str(tuple(range(1, arity + 1)))
+%   b = "({}, 0)".format(", ".join([str(i) for i in range(1, arity)]))
+%   c = "(0, {})".format(", ".join([str(i) for i in range(2, arity + 1)]))
+  expectTrue(${a} == ${a})
+  expectTrue(${a} != ${b})
+  expectTrue(${b} != ${a})
+  expectTrue(${a} != ${c})
+  expectTrue(${c} != ${a})
+% end
+}
+
+enum Ordering : Equatable {
+  case LessThan
+  case EqualTo
+  case GreaterThan
+  case UnorderedWith // Comparable defines strict total order, but Float disobeys that with NaN
+
+  var isLT: Bool {
+    return self == .LessThan
+  }
+  var isEQ: Bool {
+    return self == .EqualTo
+  }
+  var isGT: Bool {
+    return self == .GreaterThan
+  }
+}
+
+func testOrdering<A : Comparable, B : Comparable, C : Comparable>(
+  _ lhs: (A, B, C), _ ordering: Ordering, _ rhs: (A, B, C),
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  _ message: @autoclosure () -> String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),
+  file: String = #file, line: UInt = #line
+) {
+  let trace = stackTrace.pushIf(showFrame, file: file, line: line)
+  expectEqual(ordering.isLT, lhs < rhs, stackTrace: trace)
+  expectEqual(ordering.isLT, rhs > lhs, stackTrace: trace)
+  expectEqual(ordering.isLT || ordering.isEQ, lhs <= rhs, stackTrace: trace)
+  expectEqual(ordering.isLT || ordering.isEQ, rhs >= lhs, stackTrace: trace)
+  expectEqual(ordering.isGT, lhs > rhs, stackTrace: trace)
+  expectEqual(ordering.isGT, rhs < lhs, stackTrace: trace)
+  expectEqual(ordering.isGT || ordering.isEQ, lhs >= rhs, stackTrace: trace)
+  expectEqual(ordering.isGT || ordering.isEQ, rhs <= lhs, stackTrace: trace)
+}
+
+TupleTestSuite.test("Tuple/comparison") {
+  testOrdering((1,2,3), .EqualTo, (1,2,3))
+  testOrdering((1,2,3), .LessThan, (1,2,4))
+  testOrdering((1,2,3), .GreaterThan, (1,2,2))
+  testOrdering((1,3,2), .GreaterThan, (1,2,3))
+  testOrdering((0,2,3), .LessThan, (1,2,3))
+  testOrdering((3,2,1), .GreaterThan, (1,2,3))
+
+  testOrdering(("one", 2, 3.3), .EqualTo, ("one", 2, 3.3))
+  testOrdering(("one", 2, 3.3), .LessThan, ("one", 2, 3.4))
+  testOrdering(("on", 2, 3.3), .LessThan, ("one", 1, 3.2))
+
+  testOrdering((1, 2, Float.nan), .UnorderedWith, (1, 2, .nan))
+  testOrdering((1, Float.nan, 3), .UnorderedWith, (1, 2, 3))
+  testOrdering((Double.nan, 2, 3), .UnorderedWith, (.nan, 2, 3))
+  testOrdering((Float.nan, Float.nan, Float.nan), .UnorderedWith, (1, 2, 3))
+  testOrdering((1, 2, 3.0), .UnorderedWith, (1, 2, .nan))
+  testOrdering((1, 2, 3.0), .LessThan, (1, 3, .nan))
+  testOrdering((1, 2, 3.0), .GreaterThan, (1, 1, .nan))
+  testOrdering((1, 2.0, 3), .LessThan, (2, .nan, 3))
+  testOrdering((1, 2.0, 3), .GreaterThan, (0, .nan, 3))
+  testOrdering((1, 2, Float.nan), .LessThan, (1, 3, 3.0))
+  testOrdering((1, Float.nan, 3), .GreaterThan, (0, 2.0, 3))
+  testOrdering(("one", "two", 3.0), .GreaterThan, ("a", "b", .nan))
+  testOrdering(("one", "two", .nan), .GreaterThan, ("a", "b", 3.0))
+  testOrdering((1.0, "two", "three"), .UnorderedWith, (.nan, "two", "four"))
+  testOrdering((.nan, "two", "three"), .UnorderedWith, (1.0, "two", "four"))
+}
+
+TupleTestSuite.test("Tuple/comparison/sanity-check") {
+  // sanity check all arities
+% for arity in range(2, maxArity + 1):
+%   a = str(tuple(range(1, arity + 1)))
+%   b = "({}, 0)".format(", ".join([str(i) for i in range(1, arity)]))
+%   c = "(0, {})".format(", ".join([str(i) for i in range(2, arity + 1)]))
+  expectTrue(${b} < ${a})
+  expectTrue(${b} <= ${a})
+  expectTrue(${a} > ${c})
+  expectTrue(${a} >= ${c})
+% end
+}
+
+runAllTests()

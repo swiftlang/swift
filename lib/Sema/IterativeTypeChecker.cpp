@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -53,6 +53,8 @@ bool IterativeTypeChecker::isSatisfied(TypeCheckRequest request) {
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
   }
+
+  llvm_unreachable("Unhandled TypeCheckRequestKind in switch.");
 }
 
 bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
@@ -62,7 +64,9 @@ bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
     return breakCycleFor##Request(request.get##PayloadName##Payload());
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
-  }  
+  }
+
+  llvm_unreachable("Unhandled TypeCheckRequestKind in switch.");
 }
 
 void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
@@ -84,7 +88,7 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
 
   // Add this request to the stack of active requests.
   ActiveRequests.push_back(request);
-  defer([&] { ActiveRequests.pop_back(); });
+  SWIFT_DEFER { ActiveRequests.pop_back(); };
 
   while (true) {
     // Process this requirement, enumerating dependencies if anything else needs
@@ -112,32 +116,45 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
   }
 }
 
-//----------------------------------------------------------------------------//
+static bool isSelfRedefinedTypeAliasDecl(const TypeCheckRequest &Request) {
+  if (Request.getKind() == TypeCheckRequest::Kind::ResolveTypeDecl) {
+    if (auto TAD = dyn_cast<TypeAliasDecl>(Request.getAnchor())) {
+      SourceRange SR = TAD->getUnderlyingTypeLoc().getSourceRange();
+      SourceManager &SM = TAD->getASTContext().SourceMgr;
+      CharSourceRange CR = CharSourceRange(SM, SR.Start,
+                                           Lexer::getLocForEndOfToken(SM,
+                                                                      SR.End));
+      return CR.str() == TAD->getNameStr();
+    }
+  }
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 void IterativeTypeChecker::diagnoseCircularReference(
        ArrayRef<TypeCheckRequest> requests) {
   bool isFirst = true;
   for (const auto &request : requests) {
-    diagnose(request.getLoc(),
-             isFirst ? diag::circular_reference
-                     : diag::circular_reference_through);
+    if (isSelfRedefinedTypeAliasDecl(request)) {
+      diagnose(request.getLoc(), diag::redundant_type_alias_define).
+        fixItRemove(request.getAnchor()->getSourceRange());
+    } else {
+      diagnose(request.getLoc(),
+               isFirst ? diag::circular_reference :
+                         diag::circular_reference_through);
+    }
 
     isFirst = false;
   }
 
   // Now try to break the cycle.
-#ifndef NDEBUG
   bool brokeCycle = false;
-#endif
   for (const auto &request : reverse(requests)) {
-    if (breakCycle(request)) {
-#ifndef NDEBUG
-      brokeCycle = true;
-#endif
-      break;
-    }
+    brokeCycle |= breakCycle(request);
   }
 
   assert(brokeCycle && "Will the cycle be unbroken?");
+  (void) brokeCycle;
 }

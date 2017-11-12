@@ -1,12 +1,12 @@
-//===-- lldb-moduleimport-test.cpp - LLDB moduleimport tester -------------===//
+//===--- lldb-moduleimport-test.cpp - LLDB moduleimport tester ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -48,6 +48,8 @@ static void printValidationInfo(llvm::StringRef data) {
   if (info.status != swift::serialization::Status::Valid)
     return;
 
+  if (!info.shortVersion.empty())
+    llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
   llvm::outs() << "- Target: " << info.targetTriple << "\n";
   if (!extendedInfo.getSDKPath().empty())
     llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
@@ -114,7 +116,11 @@ int main(int argc, char **argv) {
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setImportSearchPaths(ImportPaths);
-  Invocation.setFrameworkSearchPaths(FrameworkPaths);
+  std::vector<swift::SearchPathOptions::FrameworkSearchPath> FramePaths;
+  for (const auto &path : FrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setFrameworkSearchPaths(FramePaths);
 
   if (CI.setup(Invocation))
     return 1;
@@ -138,7 +144,7 @@ int main(int argc, char **argv) {
         llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
         if (nlist.n_type == N_AST) {
           auto Path = MachO->getSymbolName(RawSym);
-          if (Path.getError()) {
+          if (!Path) {
             llvm::outs() << "Cannot get symbol name\n;";
             exit(1);
           }

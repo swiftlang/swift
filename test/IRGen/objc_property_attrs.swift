@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -61,5 +61,5 @@ class Foo: NSManagedObject {
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22<_TtP19objc_property_attrs1P_>\22,N,&,Vp\00"
   var p: P?
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22<_TtP19objc_property_attrs1P_><_TtP19objc_property_attrs1Q_>\22,N,&,Vpq\00"
-  var pq: protocol<P, Q>?
+  var pq: (P & Q)?
 }

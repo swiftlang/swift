@@ -1,6 +1,14 @@
 include(CheckSymbolExists)
 
-set(SOURCEKIT_VERSION_STRING "${SWIFT_COMPILER_VERSION}")
+# Append our own modules to the module path.
+list(APPEND CMAKE_MODULE_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+if (DARWIN_TOOLCHAIN_VERSION)
+  set(SOURCEKIT_VERSION_STRING "${DARWIN_TOOLCHAIN_VERSION}")
+else()
+  set(SOURCEKIT_VERSION_STRING "${SWIFT_COMPILER_VERSION}")
+endif()
 
 set(SOURCEKIT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SOURCEKIT_BINARY_DIR ${SWIFT_BINARY_DIR})
@@ -16,391 +24,20 @@ configure_file(
 set(SOURCEKIT_DEPLOYMENT_OS "${SWIFT_HOST_VARIANT}")
 set(SOURCEKIT_DEPLOYMENT_TARGET "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
 
-function(add_sourcekit_symbol_exports target_name export_file)
-  # Makefile.rules contains special cases for different platforms.
-  # We restrict ourselves to Darwin for the time being.
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    add_custom_command(OUTPUT symbol.exports
-      COMMAND sed -e "s/^/_/" < ${export_file} > symbol.exports
-      DEPENDS ${export_file}
-      VERBATIM
-      COMMENT "Creating export file for ${target_name}")
-    add_custom_target(${target_name}_exports DEPENDS symbol.exports)
-    set_property(DIRECTORY APPEND
-      PROPERTY ADDITIONAL_MAKE_CLEAN_FILES symbol.exports)
+swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
 
-    get_property(srcs TARGET ${target_name} PROPERTY SOURCES)
-    foreach(src ${srcs})
-      get_filename_component(extension ${src} EXT)
-      if(extension STREQUAL ".cpp")
-        set(first_source_file ${src})
-        break()
-      endif()
-    endforeach()
-  
-    # Force re-linking when the exports file changes. Actually, it
-    # forces recompilation of the source file. The LINK_DEPENDS target
-    # property only works for makefile-based generators.
-    set_property(SOURCE ${first_source_file} APPEND PROPERTY
-      OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/symbol.exports)
-  
-    set_property(TARGET ${target_name} APPEND_STRING PROPERTY
-                 LINK_FLAGS " -Wl,-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/symbol.exports")
-    add_dependencies(${target_name} ${target_name}_exports)
-  endif()
-endfunction()
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
+  set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
+  set(CMAKE_OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "")
+endif()
 
-# Add a new SourceKit library.
-#
-# Usage:
-#   add_sourcekit_library(name       # Name of the library
-#     [DEPENDS dep1 ...]             # Libraries this library depends on
-#     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
-#     [INSTALL_IN_COMPONENT comp]    # The Swift installation component that this library belongs to.
-#     [SHARED]
-#     source1 [source2 source3 ...]) # Sources to add into this library
-macro(add_sourcekit_library name)
-  cmake_parse_arguments(SOURCEKITLIB
-      "SHARED"
-      "INSTALL_IN_COMPONENT"
-      "DEPENDS;COMPONENT_DEPENDS"
-      ${ARGN})
-  set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
-
-  llvm_process_sources(srcs ${srcs})
-  if(MSVC_IDE OR XCODE)
-    # Add public headers
-    file(RELATIVE_PATH lib_path
-      ${SOURCEKIT_SOURCE_DIR}/lib/
-      ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-    if(NOT lib_path MATCHES "^[.][.]")
-      file( GLOB_RECURSE headers
-        ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.h
-        ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.def
-      )
-      set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
-
-      file( GLOB_RECURSE tds
-        ${SOURCEKIT_SOURCE_DIR}/include/SourceKit/${lib_path}/*.td
-      )
-      source_group("TableGen descriptions" FILES ${tds})
-      set_source_files_properties(${tds}} PROPERTIES HEADER_FILE_ONLY ON)
-
-      set(srcs ${srcs} ${headers} ${tds})
-    endif()
-  endif()
-  if (MODULE)
-    set(libkind MODULE)
-  elseif(SOURCEKITLIB_SHARED)
-    set(libkind SHARED)
-  else()
-    set(libkind)
-  endif()
-  add_library( ${name} ${libkind} ${srcs} )
-  llvm_update_compile_flags(${name})
-
-  set_output_directory(${name}
-      BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
-      LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
-
-  if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
-  endif( LLVM_COMMON_DEPENDS )
-
-  set(prefixed_link_libraries)
-  foreach(dep ${SOURCEKITLIB_DEPENDS})
-    if("${dep}" MATCHES "^clang")
-      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-    endif()
-    if("${dep}" STREQUAL "cmark")
-      set(dep "${CMARK_LIBRARY_DIR}/lib${dep}.a")
-    endif()
-    list(APPEND prefixed_link_libraries "${dep}")
-  endforeach()
-  set(SOURCEKITLIB_DEPENDS "${prefixed_link_libraries}")
-
-  if("${libkind}" STREQUAL "SHARED")
-    target_link_libraries("${name}" PRIVATE ${SOURCEKITLIB_DEPENDS})
-  else()
-    target_link_libraries("${name}" INTERFACE ${SOURCEKITLIB_DEPENDS})
-  endif()
-
-  swift_common_llvm_config( ${name} ${SOURCEKITLIB_COMPONENT_DEPENDS} )
-
-  if(SOURCEKITLIB_SHARED AND EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
-  endif()
-
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    if(SOURCEKITLIB_SHARED)
-      set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-      set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath")
-    endif()
-  endif()
-
-  if("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
-    if(SOURCEKITLIB_SHARED)
-      set(SOURCEKITLIB_INSTALL_IN_COMPONENT tools)
-    else()
-      set(SOURCEKITLIB_INSTALL_IN_COMPONENT dev)
-    endif()
-  endif()
-  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
-      TARGETS ${name}
-      LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-      ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-      RUNTIME DESTINATION "bin")
-  set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
-endmacro()
-
-# Add a new SourceKit executable.
-#
-# Usage:
-#   add_sourcekit_executable(name     # Name of the executable
-#     [DEPENDS dep1 ...]              # Libraries this executable depends on
-#     [COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable 
-#                                     # depends on
-#     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
-#                                     # the ALL_BUILD target
-#     source1 [source2 source3 ...])  # Sources to add into this executable
-macro(add_sourcekit_executable name)
-  cmake_parse_arguments(SOURCEKITEXE
-    "EXCLUDE_FROM_ALL"
-    ""
-    "DEPENDS;COMPONENT_DEPENDS"
-    ${ARGN})
-
-  if (${SOURCEKITEXE_EXCLUDE_FROM_ALL})
-    add_executable(${name} EXCLUDE_FROM_ALL ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
-  else()
-    add_executable(${name} ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
-  endif()
-  llvm_update_compile_flags(${name})
-  set_output_directory(${name}
-      BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
-      LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
-
-  # Add appropriate dependencies
-  if(LLVM_COMMON_DEPENDS)
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
-  endif()
-
-  target_link_libraries(${name} ${SOURCEKITEXE_DEPENDS})
-  swift_common_llvm_config(${name} ${SOURCEKITEXE_COMPONENT_DEPENDS})
-  target_link_libraries(${name} ${LLVM_COMMON_LIBS})
-
-  set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
-  if (NOT SWIFT_ASAN_BUILD)
-    if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-      set_target_properties(${name}
-        PROPERTIES
-        LINK_FLAGS "-Wl,-exported_symbol,_main")
-    endif()
-  endif()
-endmacro()
-
-# Add a new SourceKit framework.
-#
-# Usage:
-#   add_sourcekit_framework(name     # Name of the framework
-#     [DEPENDS dep1 ...]             # Libraries this framework depends on
-#     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this framework depends on
-#     [MODULEMAP modulemap]          # Module map file for this framework
-#     [INSTALL_IN_COMPONENT comp]    # The Swift installation component that this framework belongs to.
-#     source1 [source2 source3 ...]) # Sources to add into this framework
-macro(add_sourcekit_framework name)
-  cmake_parse_arguments(SOURCEKITFW
-    "" "MODULEMAP;INSTALL_IN_COMPONENT" "DEPENDS;COMPONENT_DEPENDS" ${ARGN})
-  set(srcs ${SOURCEKITFW_UNPARSED_ARGUMENTS})
-
-  set(lib_dir ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
-  set(framework_location "${lib_dir}/${name}.framework")
-
-  if (NOT SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-    set(FLAT_FRAMEWORK_NAME "${name}")
-    set(FLAT_FRAMEWORK_IDENTIFIER "com.apple.${name}")
-    set(FLAT_FRAMEWORK_SHORT_VERSION_STRING "1.0")
-    set(FLAT_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
-    set(FLAT_FRAMEWORK_DEPLOYMENT_TARGET "${SOURCEKIT_DEPLOYMENT_TARGET}")
-    configure_file(
-      "${SOURCEKIT_SOURCE_DIR}/cmake/FlatFrameworkInfo.plist.in"
-      "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist")
-    add_custom_command(OUTPUT "${framework_location}/Info.plist"
-      DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist"
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist" "${framework_location}/Info.plist")
-    list(APPEND srcs "${framework_location}/Info.plist")
-  endif()
-
-  llvm_process_sources(srcs ${srcs})
-  add_library( ${name} SHARED ${srcs} )
-  llvm_update_compile_flags(${name})
-
-  set(headers)
-  foreach(src ${srcs})
-    get_filename_component(extension ${src} EXT)
-    if(extension STREQUAL ".h")
-      list(APPEND headers ${src})
-    endif()
-  endforeach()
-
-  if(MSVC_IDE OR XCODE)
-    set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
-  endif(MSVC_IDE OR XCODE)
-
-  if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
-  endif( LLVM_COMMON_DEPENDS )
-
-  target_link_libraries( ${name} PRIVATE ${SOURCEKITFW_DEPENDS} )
-  swift_common_llvm_config( ${name} ${SOURCEKITFW_COMPONENT_DEPENDS} )
-
-  if (EXPORTED_SYMBOL_FILE)
-    add_sourcekit_symbol_exports( ${name} ${EXPORTED_SYMBOL_FILE} ) 
-  endif()
-
-  if(SOURCEKITFW_MODULEMAP)
-    set(modulemap "${CMAKE_CURRENT_SOURCE_DIR}/${SOURCEKITFW_MODULEMAP}")
-    if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-      set(modules_dir "${framework_location}/Versions/A/Modules")
-      add_custom_command(TARGET ${name} PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy "${modulemap}" "${modules_dir}/module.modulemap"
-        COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/Modules" "${framework_location}/Modules")
-    else()
-      set(modules_dir "${framework_location}/Modules")
-      add_custom_command(TARGET ${name} PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy "${modulemap}" "${modules_dir}/module.modulemap")
-    endif()
-  endif()
-
-
-  if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
-        TARGETS ${name}
-        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        RUNTIME DESTINATION bin)
-    set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
-    set_output_directory(${name}
-        BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
-        LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
-    set_target_properties(${name} PROPERTIES FRAMEWORK TRUE)
-    set_target_properties(${name} PROPERTIES PUBLIC_HEADER "${headers}")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_INFO_PLIST "${SOURCEKIT_SOURCE_DIR}/cmake/MacOSXFrameworkInfo.plist.in")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_IDENTIFIER "com.apple.${name}")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
-    set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath")
-  else()
-    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
-        DIRECTORY ${framework_location}
-        DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        USE_SOURCE_PERMISSIONS)
-    set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
-    set_output_directory(${name}
-        BINARY_DIR ${framework_location}
-        LIBRARY_DIR ${framework_location})
-    set_target_properties(${name} PROPERTIES PREFIX "")
-    set_target_properties(${name} PROPERTIES SUFFIX "")
-    set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath/${name}.framework")
-
-    foreach(hdr ${headers})
-      get_filename_component(hdrname ${hdr} NAME)
-      add_custom_command(TARGET ${name} PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy "${hdr}" "${framework_location}/Headers/${hdrname}")
-    endforeach()
-  endif()
-endmacro(add_sourcekit_framework)
-
-# Add a new SourceKit XPC service to a framework.
-#
-# Usage:
-#   add_sourcekit_xpc_service(name    # Name of the XPC service
-#     [DEPENDS dep1 ...]              # Libraries this service depends on
-#     [COMPONENT_DEPENDS comp1 ...]   # LLVM components this service depends on
-#     source1 [source2 source3 ...])  # Sources to add into this service
-macro(add_sourcekit_xpc_service name framework_target)
-  cmake_parse_arguments(SOURCEKITXPC "" "" "DEPENDS;COMPONENT_DEPENDS" ${ARGN})
-  set(srcs ${SOURCEKITXPC_UNPARSED_ARGUMENTS})
-
-  set(lib_dir ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
-  set(framework_location "${lib_dir}/${framework_target}.framework")
-  if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-    set(xpc_bundle_dir "${framework_location}/Versions/A/XPCServices/${name}.xpc")
-    set(xpc_contents_dir "${xpc_bundle_dir}/Contents")
-    set(xpc_bin_dir "${xpc_contents_dir}/MacOS")
-  else()
-    set(xpc_bundle_dir "${framework_location}/XPCServices/${name}.xpc")
-    set(xpc_contents_dir "${xpc_bundle_dir}")
-    set(xpc_bin_dir "${xpc_contents_dir}")
-  endif()
-
-  set(XPCSERVICE_NAME ${name})  
-  set(XPCSERVICE_IDENTIFIER "com.apple.${name}")  
-  set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
-  set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
-  configure_file(
-    "${SOURCEKIT_SOURCE_DIR}/cmake/XPCServiceInfo.plist.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist")
-  add_custom_command(OUTPUT "${xpc_contents_dir}/Info.plist"
-    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist" "${xpc_contents_dir}/Info.plist")
-  list(APPEND srcs "${xpc_contents_dir}/Info.plist")
-
-  add_llvm_executable( ${name} ${srcs} )
-  set_target_properties(${name} PROPERTIES FOLDER "XPC Services")
-  set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${xpc_bin_dir}")
-
-  set_output_directory(${name}
-    BINARY_DIR "${xpc_bin_dir}"
-    LIBRARY_DIR "${xpc_bin_dir}")
-
-  # Add appropriate dependencies
-  if( LLVM_COMMON_DEPENDS )
-    add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
-  endif( LLVM_COMMON_DEPENDS )
-
-  target_link_libraries( ${name} ${SOURCEKITXPC_DEPENDS} )
-  swift_common_llvm_config( ${name} ${SOURCEKITXPC_COMPONENT_DEPENDS} )
-  target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
-  
-  add_dependencies( ${framework_target} ${name} )
-
-  if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-    add_custom_command(TARGET ${name} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/XPCServices" XPCServices
-      WORKING_DIRECTORY ${framework_location})
-  endif()
-
-  # ASan does not play well with exported_symbol option. This should be fixed soon.
-  if(NOT SWIFT_ASAN_BUILD)
-    if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-      set_target_properties(${name}
-        PROPERTIES
-        LINK_FLAGS "-Wl,-exported_symbol,_main")
-    endif()
-  endif()
-endmacro()
+# Now include AddSwiftSourceKit
+include(AddSwiftSourceKit)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  # Choose an SDK if none was set.
-  set(MODULES_SDK "" CACHE PATH
-      "Path to the modules-enabled SDK to use")
-  if (NOT MODULES_SDK)
-    execute_process(COMMAND xcrun --sdk macosx --show-sdk-path
-      OUTPUT_VARIABLE MODULES_SDK
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif()
-  if(NOT EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
-    message(FATAL_ERROR "A modules-enabled SDK is required for SourceKit on OS X.")
-  endif()
-
   # Choose a deployment target if none was set.
-  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING 
+  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING
       "Deployment target for SourceKit.")
   if (NOT SOURCEKIT_DEPLOYMENT_TARGET)
     execute_process(COMMAND sw_vers -productVersion
@@ -408,10 +45,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
     string(REGEX MATCH "[0-9]+\\.[0-9]+" SOURCEKIT_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
   endif()
-
-  # Choose a deployment OS if none was set.
-  set(SOURCEKIT_DEPLOYMENT_OS "macosx" CACHE STRING
-      "Deployment OS for SourceKit [macosx, iphoneos, iphonesimulator].")
 
   # Sadly there are two OS naming conventions.
   # xcrun SDK name:   macosx iphoneos iphonesimulator (+ "internal" or version)
@@ -433,14 +66,10 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     message(FATAL_ERROR "Can't understand SOURCEKIT_DEPLOYMENT_OS '${SOURCEKIT_DEPLOYMENT_OS}';")
   endif()
 
-  # Determine deployment flags for the C/C++ compiler and linker.
-  set(SOURCEKIT_GLOBAL_DEPLOYMENT_TARGET_FLAGS
-    "-m${version_min_os}-version-min=${SOURCEKIT_DEPLOYMENT_TARGET}")
-
   # Add deployment target to C/C++ compiler and linker flags.
   # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
   if (XCODE)
-    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx") 
+    if (${SOURCEKIT_DEPLOYMENT_OS} MATCHES "^macosx")
       set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
     else()
       set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
@@ -457,6 +86,71 @@ include_directories(BEFORE
   ${SOURCEKIT_BINARY_DIR}/include
   ${SOURCEKIT_SOURCE_DIR}/include
 )
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  if(SWIFT_BUILD_SOURCEKIT)
+    include(ExternalProject)
+    ExternalProject_Add(libdispatch
+                        SOURCE_DIR
+                          "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}"
+                        BINARY_DIR
+                          "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}"
+                        CMAKE_ARGS
+                          -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
+                          -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
+                          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+                          -DCMAKE_SWIFT_COMPILER=$<TARGET_FILE:swift>c
+                          -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+                          -DENABLE_SWIFT=YES
+                        BUILD_BYPRODUCTS
+                          ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
+                          ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}
+                        STEP_TARGETS
+                          configure
+                        BUILD_ALWAYS
+                          1)
+
+    # CMake does not like the addition of INTERFACE_INCLUDE_DIRECTORIES without
+    # the directory existing.  Just create the location which will be populated
+    # during the installation.
+    ExternalProject_Get_Property(libdispatch install_dir)
+    file(MAKE_DIRECTORY ${install_dir}/include)
+
+    # TODO(compnerd) this should be taken care of by the
+    # INTERFACE_INCLUDE_DIRECTORIES below
+    include_directories(AFTER
+                          ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime
+                          ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+    add_dependencies(libdispatch
+                       swift
+                       copy_shim_headers
+                       swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
+                       swiftSwiftOnoneSupport-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
+                       swiftCore-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
+                       swiftSwiftOnoneSupport-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+  endif()
+
+  ExternalProject_Get_Property(libdispatch install_dir)
+  add_library(dispatch SHARED IMPORTED)
+  set_target_properties(dispatch
+                        PROPERTIES
+                          IMPORTED_LOCATION
+                            ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
+                          INTERFACE_INCLUDE_DIRECTORIES
+                            ${install_dir}/include
+                          IMPORTED_LINK_INTERFACE_LIBRARIES
+                            swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+
+  add_library(BlocksRuntime STATIC IMPORTED)
+  set_target_properties(BlocksRuntime
+                        PROPERTIES
+                          IMPORTED_LOCATION
+                            ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}
+                          INTERFACE_INCLUDE_DIRECTORIES
+                            ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime)
+
+  set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
+endif()
 
 add_subdirectory(lib)
 add_subdirectory(tools)

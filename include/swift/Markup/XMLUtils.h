@@ -1,22 +1,22 @@
-//===--- XMLUtils.h - Various XML utility routines ------------------------===//
+//===--- XMLUtils.h - Various XML utility routines --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_MARKUP_XML_UTILS_H
-#define LLVM_MARKUP_XML_UTILS_H
+#ifndef SWIFT_MARKUP_XML_UTILS_H
+#define SWIFT_MARKUP_XML_UTILS_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace llvm {
+namespace swift {
 namespace markup {
 
 // FIXME: copied from Clang's
@@ -71,7 +71,7 @@ static inline void appendWithCDATAEscaping(raw_ostream &OS, StringRef S) {
 }
 
 } // namespace markup
-} // namespace llvm
+} // namespace swift
 
-#endif // LLVM_MARKUP_XML_UTILS_H
+#endif // SWIFT_MARKUP_XML_UTILS_H
 

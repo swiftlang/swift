@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,84 +19,49 @@
 
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 
 namespace llvm {
   class raw_ostream;
 }
 
 namespace swift {
-  class ArchetypeType;
-  class ProtocolConformance;
-  
-/// DenseMap type used internally by Substitution::subst to track conformances
-/// applied to archetypes.
-using ArchetypeConformanceMap
-  = llvm::DenseMap<ArchetypeType*, ArrayRef<ProtocolConformance*>>;
-  
+  class GenericEnvironment;
+  class SubstitutionMap;
+
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
-  ArchetypeType * Archetype = nullptr;
   Type Replacement;
-  ArrayRef<ProtocolConformance *> Conformance;
+  ArrayRef<ProtocolConformanceRef> Conformance;
 
 public:
-  /// FIXME: An archetype that looks like the archetype or dependent generic
-  /// parameter type that should be substituted by this substitution, but
-  /// which is not guaranteed to map to any particular context. All that is
-  /// guaranteed:
-  ///
-  /// - Archetype will conform to the same protocols as the substituted
-  ///   type.
-  /// - Archetype will appear at the same point in the generic parameter
-  ///   hierarchy as the substituted type; that is, if the substituted type
-  ///   is a generic parameter, it will be a primary archetype, or if the
-  ///   substituted type is a dependent member type, it will be a nested
-  ///   archetype with the same name path--if T0.Foo.Bar is being substituted,
-  ///   this will be some archetype X.Foo.Bar.
-  /// - If the substituted type represents a Self or associated type of a
-  ///   protocol requirement, this Archetype will be that archetype from the
-  ///   protocol context.
-  ///
-  /// You really shouldn't use the value of this field for anything new.
-  ArchetypeType *getArchetype() const { return Archetype; }
-  
   /// The replacement type.
   Type getReplacement() const { return Replacement; }
   
   /// The protocol conformances for the replacement. These appear in the same
   /// order as Archetype->getConformsTo() for the substituted archetype.
-  const ArrayRef<ProtocolConformance *> getConformances() const {
+  const ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformance;
   }
   
   Substitution() {}
   
-  Substitution(ArchetypeType *Archetype,
-               Type Replacement,
-               ArrayRef<ProtocolConformance*> Conformance);
+  Substitution(Type Replacement, ArrayRef<ProtocolConformanceRef> Conformance);
+
+  /// Checks whether the current substitution is canonical.
+  bool isCanonical() const;
+
+  /// Get the canonicalized substitution. If wasCanonical is not nullptr,
+  /// store there whether the current substitution was canonical already.
+  Substitution getCanonicalSubstitution(bool *wasCanonical = nullptr) const;
 
   bool operator!=(const Substitution &other) const { return !(*this == other); }
   bool operator==(const Substitution &other) const;
   void print(llvm::raw_ostream &os,
              const PrintOptions &PO = PrintOptions()) const;
   void dump() const;
-  
-  /// Substitute the replacement and conformance types with the given
-  /// substitution vector.
-  Substitution subst(ModuleDecl *module,
-                     GenericParamList *context,
-                     ArrayRef<Substitution> subs) const;
-  
-private:
-  friend class ProtocolConformance;
-  
-  Substitution subst(ModuleDecl *module,
-                     ArrayRef<Substitution> subs,
-                     TypeSubstitutionMap &subMap,
-                     ArchetypeConformanceMap &conformanceMap) const;
+  void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
 };
-
-void dump(const ArrayRef<Substitution> &subs);
 
 } // end namespace swift
 

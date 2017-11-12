@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-deadfuncelim %s | %FileCheck %s
+
+// Check that we don't crash on this.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+private class Base {
+	init()
+}
+
+private class Derived : Base {
+}
+
+sil private @BaseInit : $@convention(method) (@owned Base) -> @owned Base {
+bb0(%4 : $Base):
+  return %4 : $Base
+}
+
+sil private @DerivedInit : $@convention(method) (@owned Derived) -> @owned Derived {
+bb0(%4 : $Derived):
+  return %4 : $Derived
+}
+
+sil @testit : $@convention(method) (@owned Derived) -> @owned Derived {
+bb0(%1 : $Derived):
+  %157 = class_method %1 : $Derived, #Derived.init!initializer.1 : (Derived.Type) -> () -> Derived, $@convention(method) (@owned Derived) -> @owned Derived
+  return %1 : $Derived
+}
+
+sil_vtable Base {
+  #Base.init!initializer.1: BaseInit
+}
+
+sil_vtable Derived {
+  #Base.init!initializer.1: DerivedInit
+}
+
+
+// CHECK-LABEL: sil_vtable Base
+// CHECK-: BaseInit
+
+// CHECK-LABEL: sil_vtable Derived
+// CHECK: DerivedInit

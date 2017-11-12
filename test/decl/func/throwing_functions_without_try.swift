@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-throw-without-try
+// RUN: %target-typecheck-verify-swift -enable-throw-without-try
 
 // Test the -enable-throw-without-try option. Throwing function calls should
 // not require annotation with 'try'.
@@ -17,13 +17,16 @@ var global2: Int = foo() // no error
 var global3: Int = try foo() // no error
 
 // That includes autoclosures.
-func doLazy(@autoclosure fn: () throws -> Int) {}
+func doLazy(_ fn: @autoclosure () throws -> Int) {}
 doLazy(foo())
 
 // It doesn't include explicit closures.
 var closure: () -> () = {
-  var x = foo() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  _ = foo() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
   doLazy(foo()) // expected-error {{call can throw but is not marked with 'try'}}
+  // expected-note@-1 {{did you mean to use 'try'?}} {{10-10=try }}
+  // expected-note@-2 {{did you mean to handle error as optional value?}} {{10-10=try? }}
+  // expected-note@-3 {{did you mean to disable error propagation?}} {{10-10=try! }}
 }
 
 // Or any other sort of structure.
@@ -35,6 +38,9 @@ struct A {
 func baz() throws -> Int {
   var x: Int = 0
   x = foo() // expected-error{{call can throw but is not marked with 'try'}}
+  // expected-note@-1 {{did you mean to use 'try'?}} {{7-7=try }}
+  // expected-note@-2 {{did you mean to handle error as optional value?}} {{7-7=try? }}
+  // expected-note@-3 {{did you mean to disable error propagation?}} {{7-7=try! }}
   x = try foo() // no error
   return x
 }

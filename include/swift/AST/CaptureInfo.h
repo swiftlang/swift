@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,12 +14,18 @@
 #define SWIFT_AST_CAPTURE_INFO_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include <vector>
 
+namespace swift {
+class CapturedValue;
+}
+
 namespace llvm {
 class raw_ostream;
+template <> struct DenseMapInfo<swift::CapturedValue>;
 }
 
 namespace swift {
@@ -30,7 +36,12 @@ class FuncDecl;
 /// that indicate how it is captured.
 class CapturedValue {
   llvm::PointerIntPair<ValueDecl*, 2, unsigned> Value;
+
+  explicit CapturedValue(llvm::PointerIntPair<ValueDecl*, 2, unsigned> V) : Value(V) {}
+
 public:
+  friend struct llvm::DenseMapInfo<CapturedValue>;
+
   enum {
     /// IsDirect is set when a VarDecl with storage *and* accessors is captured
     /// by its storage address.  This happens in the accessors for the VarDecl.
@@ -44,10 +55,20 @@ public:
 
   CapturedValue(ValueDecl *D, unsigned Flags) : Value(D, Flags) {}
 
+  static CapturedValue getDynamicSelfMetadata() {
+    return CapturedValue(nullptr, 0);
+  }
+
   bool isDirect() const { return Value.getInt() & IsDirect; }
   bool isNoEscape() const { return Value.getInt() & IsNoEscape; }
 
-  ValueDecl *getDecl() const { return Value.getPointer(); }
+  bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
+
+  ValueDecl *getDecl() const {
+    assert(Value.getPointer() && "dynamic Self metadata capture does not "
+           "have a value");
+    return Value.getPointer();
+  }
 
   unsigned getFlags() const { return Value.getInt(); }
 
@@ -64,21 +85,57 @@ public:
   }
 };
 
+} // end swift namespace
 
+namespace llvm {
+
+template <> struct DenseMapInfo<swift::CapturedValue> {
+  using CapturedValue = swift::CapturedValue;
+
+  using PtrIntPairDenseMapInfo =
+      DenseMapInfo<llvm::PointerIntPair<swift::ValueDecl *, 2, unsigned>>;
+
+  static inline swift::CapturedValue getEmptyKey() {
+    return CapturedValue{PtrIntPairDenseMapInfo::getEmptyKey()};
+  }
+
+  static inline CapturedValue getTombstoneKey() {
+    return CapturedValue{PtrIntPairDenseMapInfo::getTombstoneKey()};
+  }
+
+  static unsigned getHashValue(const CapturedValue &Val) {
+    return PtrIntPairDenseMapInfo::getHashValue(Val.Value);
+  }
+
+  static bool isEqual(const CapturedValue &LHS, const CapturedValue &RHS) {
+    return PtrIntPairDenseMapInfo::isEqual(LHS.Value, RHS.Value);
+  }
+};
+
+} // end llvm namespace
+
+namespace swift {
+
+class DynamicSelfType;
 
 /// \brief Stores information about captured variables.
 class CaptureInfo {
   const CapturedValue *Captures;
+  DynamicSelfType *DynamicSelf;
   unsigned Count = 0;
   bool GenericParamCaptures : 1;
   bool Computed : 1;
 
 public:
   CaptureInfo()
-    : Captures(nullptr), Count(0), GenericParamCaptures(0), Computed(0) { }
+    : Captures(nullptr), DynamicSelf(nullptr), Count(0),
+      GenericParamCaptures(0), Computed(0) { }
 
   bool hasBeenComputed() { return Computed; }
-  bool empty() { return Count == 0; }
+
+  bool isTrivial() {
+    return Count == 0 && !GenericParamCaptures && !DynamicSelf;
+  }
 
   ArrayRef<CapturedValue> getCaptures() const {
     return llvm::makeArrayRef(Captures, Count);
@@ -99,12 +156,26 @@ public:
   bool hasLocalCaptures() const;
 
   /// \returns true if the function captures any generic type parameters.
-  bool hasGenericParamCaptures() {
+  bool hasGenericParamCaptures() const {
     return GenericParamCaptures;
   }
 
   void setGenericParamCaptures(bool genericParamCaptures) {
     GenericParamCaptures = genericParamCaptures;
+  }
+
+  /// \returns true if the function captures the dynamic Self type.
+  bool hasDynamicSelfCapture() const {
+    return DynamicSelf != nullptr;
+  }
+
+  /// \returns the captured dynamic Self type, if any.
+  DynamicSelfType *getDynamicSelfType() const {
+    return DynamicSelf;
+  }
+
+  void setDynamicSelfType(DynamicSelfType *dynamicSelf) {
+    DynamicSelf = dynamicSelf;
   }
 
   void dump() const;

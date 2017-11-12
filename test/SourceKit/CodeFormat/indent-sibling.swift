@@ -1,39 +1,39 @@
 class Foo {
   func foo(Value1 : Int,
     Value2 : Int) {
-	}
+  }
 func bar(value1 : Int,
 value2 : Int,
-	      value3 : Int) {
-	}
-		func foo1(Value1 : Int,
-		Value2 : Int) {}
-		func foo3() {
-			foo(1,
-	2)
-		foo(2,
+        value3 : Int) {
+  }
+    func foo1(Value1 : Int,
+    Value2 : Int) {}
+    func foo3() {
+      foo(1,
+  2)
+    foo(2,
 3)
-		    foo(3,
+        foo(3,
 4)
-		}
-		func intGen() -> Int { return 0 }
-		func foo4() {
-			var a = [1,
-			2,
-						3,
-	1 + 2,
-					intGen()]
-		}
-		func foo5() {
-			var a = [1 : 1,
-						2 : 2,
-					3 + 2 : 3,
-				intGen() : intGen()]
+    }
+    func intGen() -> Int { return 0 }
+    func foo4() {
+      var a = [1,
+      2,
+            3,
+  1 + 2,
+          intGen()]
+    }
+    func foo5() {
+      var a = [1 : 1,
+            2 : 2,
+          3 + 2 : 3,
+        intGen() : intGen()]
         var b = (2,
                    3,
                      4,
                        5)
-		}
+    }
     func foo6<T1: Testable,
      T2: Testable,
            T3: Testable,
@@ -99,7 +99,7 @@ class Foo2 {
 // RUN: %sourcekitd-test -req=format -line=65 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=67 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=69 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 //                        "  func foo(Value1 : Int,"
 // CHECK: key.sourcetext: "           Value2 : Int) {"
@@ -110,38 +110,38 @@ class Foo2 {
 //                        "value2 : Int,"
 // CHECK: key.sourcetext: "value3 : Int) {"
 
-//                        "		func foo1(Value1 : Int,"
-// CHECK: key.sourcetext: "		          Value2 : Int) {}"
+//                        "    func foo1(Value1 : Int,"
+// CHECK: key.sourcetext: "              Value2 : Int) {}"
 
-//                        "			foo(1,"
-// CHECK: key.sourcetext: "			    2)"
+//                        "      foo(1,"
+// CHECK: key.sourcetext: "          2)"
 
-//                        "		foo(2,"
-// CHECK: key.sourcetext: "		    3)"
+//                        "    foo(2,"
+// CHECK: key.sourcetext: "        3)"
 
-//                        "		    foo(3,"
-// CHECK: key.sourcetext: "		        4)"
+//                        "        foo(3,"
+// CHECK: key.sourcetext: "            4)"
 
-//                        "			var a = [1,"
-// CHECK: key.sourcetext: "			         2,"
+//                        "      var a = [1,"
+// CHECK: key.sourcetext: "               2,"
 
-//                        "			2,"
-// CHECK: key.sourcetext: "			3,"
+//                        "      2,"
+// CHECK: key.sourcetext: "      3,"
 
-//                        "						3,"
-// CHECK: key.sourcetext: "						1 + 2,"
+//                        "            3,"
+// CHECK: key.sourcetext: "            1 + 2,"
 
-//                        "	1 + 2,"
-// CHECK: key.sourcetext: "	intGen()]"
+//                        "  1 + 2,"
+// CHECK: key.sourcetext: "  intGen()]"
 
-//                        "			var a = [1 : 1,"
-// CHECK: key.sourcetext: "			         2 : 2,"
+//                        "      var a = [1 : 1,"
+// CHECK: key.sourcetext: "               2 : 2,"
 
-//                        "						2 : 2,"
-// CHECK: key.sourcetext: "						3 + 2 : 3,"
+//                        "            2 : 2,"
+// CHECK: key.sourcetext: "            3 + 2 : 3,"
 
-//                        "					3 + 2 : 3,"
-// CHECK: key.sourcetext: "					intGen() : intGen()]"
+//                        "          3 + 2 : 3,"
+// CHECK: key.sourcetext: "          intGen() : intGen()]"
 
 //                        "        var b = (2,"
 // CHECK: key.sourcetext: "                 3,"
@@ -153,13 +153,13 @@ class Foo2 {
 // CHECK: key.sourcetext: "                     5)"
 
 //                        "    func foo6<T1: Testable,"
-// CHECK: key.sourcetext: "              T2: Testable,"
+// CHECK: key.sourcetext: "        T2: Testable,"
 
 //                        "     T2: Testable,"
-// CHECK: key.sourcetext: "     T3: Testable,"
+// CHECK: key.sourcetext: "        T3: Testable,"
 
 //                        "           T3: Testable,"
-// CHECK: key.sourcetext: "           T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}"
+// CHECK: key.sourcetext: "        T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}"
 
 //                        "    func foo7(i1: Int, i2: Int,"
 // CHECK: key.sourcetext: "              i3: Int, i4: Int,"

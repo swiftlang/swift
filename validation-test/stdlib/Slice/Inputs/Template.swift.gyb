@@ -1,0 +1,176 @@
+%{
+# This is a template of validation-test/stdlib/Slice/*.swift
+#
+# cd validation-test/stdlib/Slice
+# ../../../utils/gyb --line-directive="" Inputs/Template.swift.gyb | ../../../utils/split_file.py
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName
+)
+
+import itertools
+
+class TestParameters(object):
+  name = ''
+  prefix = []
+  suffix = []
+  base = ''
+  base_slice = ''
+  traversal = ''
+  mutable = False
+  range_replaceable = False
+  base_kind = ''
+
+def all_tests():
+  for traversal, base_kind, mutable, range_replaceable in itertools.product(
+      TRAVERSALS,
+      ['Defaulted', 'Minimal'],
+      [False, True],
+      [False, True]):
+    test = TestParameters()
+    test.traversal = traversal
+    test.base_kind = base_kind
+    test.mutable = mutable
+    test.range_replaceable = range_replaceable
+    test.base_slice = sliceTypeName(
+      traversal=traversal,
+      mutable=mutable,
+      rangeReplaceable=range_replaceable)
+    test.base = base_kind + test.base_slice.replace('Slice', 'Collection')
+    for name, prefix, suffix in [
+      ('FullWidth', '[]', '[]'),
+      ('WithPrefix', '[-9999, -9998, -9997]', '[]'),
+      ('WithSuffix', '[]', '[ -9999, -9998, -9997]'),
+      ('WithPrefixAndSuffix', '[-9999, -9998, -9997, -9996, -9995]',
+       '[-9994, -9993, -9992]')
+    ]:
+      test.name = test.base_slice + '_Of_' + test.base + '_' + name + '.swift'
+      test.prefix = prefix
+      test.suffix
+      yield test
+
+def test_methods(test):
+  traversal = test.traversal
+  mutable = test.mutable
+  range_replaceable = test.range_replaceable
+  name = collectionForTraversal(traversal)
+  result = []
+  if range_replaceable:
+    result.append('RangeReplaceable' + name.replace('Collection', 'Slice'))
+
+  if mutable:
+    result.append('Mutable' + name)
+
+  if not range_replaceable and not mutable:
+    result.append(name)
+
+  return result
+
+}%
+
+% for test in all_tests():
+// BEGIN ${test.name}
+// -*- swift -*-
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Slice/Inputs/Template.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+// RUN: %target-run-simple-swift
+// REQUIRES: executable_test
+
+// FIXME: the test is too slow when the standard library is not optimized.
+// REQUIRES: optimized_stdlib
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+var SliceTests = TestSuite("Collection")
+
+let prefix: [Int] = ${test.prefix}
+let suffix: [Int] = ${test.suffix}
+
+func makeCollection(elements: [OpaqueValue<Int>])
+  -> ${test.base_slice}<${test.base}<OpaqueValue<Int>>> {
+  var baseElements = prefix.map(OpaqueValue.init)
+  baseElements.append(contentsOf: elements)
+  baseElements.append(contentsOf: suffix.map(OpaqueValue.init))
+  let base = ${test.base}(elements: baseElements)
+  let startIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
+  return ${test.base_slice}(
+    base: base,
+    bounds: startIndex..<endIndex)
+}
+
+func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
+  -> ${test.base_slice}<${test.base}<MinimalEquatableValue>> {
+  var baseElements = prefix.map(MinimalEquatableValue.init)
+  baseElements.append(contentsOf: elements)
+  baseElements.append(contentsOf: suffix.map(MinimalEquatableValue.init))
+  let base = ${test.base}(elements: baseElements)
+  let startIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
+  return ${test.base_slice}(
+    base: base,
+    bounds: startIndex..<endIndex)
+}
+
+func makeCollectionOfComparable(elements: [MinimalComparableValue])
+  -> ${test.base_slice}<${test.base}<MinimalComparableValue>> {
+  var baseElements = prefix.map(MinimalComparableValue.init)
+  baseElements.append(contentsOf: elements)
+  baseElements.append(contentsOf: suffix.map(MinimalComparableValue.init))
+  let base = ${test.base}(elements: baseElements)
+  let startIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count))
+  let endIndex = base.index(
+    base.startIndex,
+    offsetBy: numericCast(prefix.count + elements.count))
+  return ${test.base_slice}(
+    base: base,
+    bounds: startIndex..<endIndex)
+}
+
+var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
+resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .trap
+resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior = .trap
+
+% for method in test_methods(test):
+SliceTests.add${method}Tests(
+  "${test.name}.",
+  makeCollection: makeCollection,
+  wrapValue: identity,
+  extractValue: identity,
+  makeCollectionOfEquatable: makeCollectionOfEquatable,
+  wrapValueIntoEquatable: identityEq,
+  extractValueFromEquatable: identityEq,
+%   if 'Mutable' in method:
+  makeCollectionOfComparable: makeCollectionOfComparable,
+  wrapValueIntoComparable: identityComp,
+  extractValueFromComparable: identityComp,
+%   end
+  resiliencyChecks: resiliencyChecks,
+  outOfBoundsIndexOffset: 6
+%   if 'Mutable' in method:
+  , withUnsafeMutableBufferPointerIsSupported: false,
+  isFixedLengthCollection: true
+%   end
+)
+% end
+
+runAllTests()
+% end

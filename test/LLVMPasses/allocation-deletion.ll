@@ -1,4 +1,4 @@
-; RUN: %swift-llvm-opt -swift-llvm-arc-optimize %s | FileCheck %s
+; RUN: %swift-llvm-opt -swift-llvm-arc-optimize %s | %FileCheck %s
 
 target datalayout = "e-p:64:64:64-S128-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f16:16:16-f32:32:32-f64:64:64-f128:128:128-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64"
 target triple = "x86_64-apple-macosx10.9"
@@ -81,4 +81,19 @@ entry:
 ; CHECK-NEXT: ret void
 
 
+; external_dtor_alloc_eliminate -  Make sure we can not eliminate the allocation
+; because we know nothing about the type of the allocation.
+@external_dtor_metadata = external global %swift.heapmetadata, align 8
+define void @external_dtor_alloc_eliminate() nounwind {
+entry:
+  %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* nonnull @external_dtor_metadata, i64 24, i64 8) nounwind
+  tail call void @swift_release(%swift.refcounted* %0) nounwind
+  ret void
+}
+
+; CHECK: @external_dtor_alloc_eliminate
+; CHECK-NEXT: entry:
+; CHECK-NEXT: swift_allocObject
+; CHECK-NEXT: swift_release
+; CHECK-NEXT: ret void
 

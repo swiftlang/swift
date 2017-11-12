@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 protocol Protocol : class {
@@ -21,7 +21,7 @@ class SwiftClass : SwiftClassBase {
   }
 }
 
-func printState(x : SwiftClassBase?) {
+func printState(_ x : SwiftClassBase?) {
   print((x != nil) ? "is present" : "is nil")
 }
 
@@ -81,7 +81,7 @@ testWeakInLet()
 
 
   
-func printState(x : Protocol?) {
+func printState(_ x : Protocol?) {
   print((x != nil) ? "is present" : "is nil")
 }
 
@@ -107,7 +107,7 @@ testProtocol()
 protocol P : class { }
 
 func test_rdar15293354() {
-  weak var x : P? = .None
+  weak var x : P? = .none
   if x != nil {
     _ = x!
   }

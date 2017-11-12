@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library 
+// RUN: %target-typecheck-verify-swift -parse-as-library 
 
 struct S {
   init() {
@@ -53,3 +53,14 @@ class B {
   }
 }
 
+// SR-2484: Bad diagnostic for incorrectly calling private init
+class SR_2484 {
+  private init() {} // expected-note {{'init' declared here}}
+  private init(a: Int) {} // expected-note {{'init' declared here}}
+}
+
+class Impl_2484 : SR_2484 {
+  init() {
+    super.init() // expected-error {{'init' is inaccessible due to 'private' protection level}}
+  }
+}

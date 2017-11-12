@@ -1,0 +1,18 @@
+[
+  {
+    key.kind: source.codecompletion.identifier,
+    key.hide: 1,
+    key.names: [
+      "hideThis1()",
+      "hideThis2(_:namedParam2:)",
+      "hideThis3(namedParam1:_:)",
+    ]
+  },
+  {
+    key.kind: source.codecompletion.identifier,
+    key.hide: 1,
+    key.names: [
+      "hideThis4(namedParam1:namedParam2:)",
+    ]
+  }
+]

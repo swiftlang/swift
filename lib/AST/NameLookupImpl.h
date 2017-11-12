@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ParameterList.h"
 
 namespace swift {
 namespace namelookup {
@@ -22,13 +23,13 @@ namespace namelookup {
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 void
-lookupVisibleDeclsInModule(Module *M, Module::AccessPathTy accessPath,
+lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
                            LazyResolver *typeResolver,
                            const DeclContext *moduleScopeContext,
-                           ArrayRef<Module::ImportedModule> extraImports = {});
+                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
 
 /// Searches through statements and patterns for local variable declarations.
 class FindLocalVal : public StmtVisitor<FindLocalVal> {
@@ -59,12 +60,6 @@ public:
       return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
     case PatternKind::Named:
       return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
-
-    case PatternKind::NominalType: {
-      for (auto &elt : cast<NominalTypePattern>(Pat)->getElements())
-        checkPattern(elt.getSubPattern(), Reason);
-      return;
-    }
     case PatternKind::EnumElement: {
       auto *OP = cast<EnumElementPattern>(Pat);
       if (OP->hasSubPattern())
@@ -89,19 +84,24 @@ public:
       return;
     }
   }
+  
+  void checkParameterList(const ParameterList *params) {
+    for (auto param : *params) {
+      checkValueDecl(param, DeclVisibilityKind::FunctionParameter);
+    }
+  }
 
-  void checkGenericParams(GenericParamList *Params,
-                          DeclVisibilityKind Reason) {
+  void checkGenericParams(GenericParamList *Params) {
     if (!Params)
       return;
 
     for (auto P : *Params)
-      checkValueDecl(P, Reason);
+      checkValueDecl(P, DeclVisibilityKind::GenericParameter);
   }
 
   void checkSourceFile(const SourceFile &SF) {
     for (Decl *D : SF.Decls)
-      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
         visitBraceStmt(TLCD->getBody(), /*isTopLevel=*/true);
   }
 
@@ -121,10 +121,16 @@ private:
   }
 
   void checkStmtCondition(const StmtCondition &Cond) {
-    for (auto entry : Cond)
-      if (auto *P = entry.getPatternOrNull())
-        if (!isReferencePointInRange(entry.getSourceRange()))
+    SourceLoc start = SourceLoc();
+    for (auto entry : Cond) {
+      if (start.isInvalid())
+        start = entry.getStartLoc();
+      if (auto *P = entry.getPatternOrNull()) {
+        SourceRange previousConditionsToHere = SourceRange(start, entry.getEndLoc());
+        if (!isReferencePointInRange(previousConditionsToHere))
           checkPattern(P, DeclVisibilityKind::LocalVariable);
+      }
+    }
   }
 
   void visitIfStmt(IfStmt *S) {
@@ -151,10 +157,6 @@ private:
     visit(S->getBody());
   }
 
-  void visitIfConfigStmt(IfConfigStmt * S) {
-    // Active members are attached to the enclosing declaration, so there's no
-    // need to walk anything within.
-  }
   void visitWhileStmt(WhileStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
@@ -169,20 +171,12 @@ private:
     visit(S->getBody());
   }
 
-  void visitForStmt(ForStmt *S) {
-    if (!isReferencePointInRange(S->getSourceRange()))
-      return;
-    visit(S->getBody());
-    for (Decl *D : S->getInitializerVarDecls()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
-    }
-  }
   void visitForEachStmt(ForEachStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
     visit(S->getBody());
-    checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
+    if (!isReferencePointInRange(S->getSequence()->getSourceRange()))
+      checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
   }
 
   void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false) {
@@ -195,12 +189,12 @@ private:
     }
 
     for (auto elem : S->getElements()) {
-      if (Stmt *S = elem.dyn_cast<Stmt*>())
+      if (auto *S = elem.dyn_cast<Stmt*>())
         visit(S);
     }
     for (auto elem : S->getElements()) {
-      if (Decl *D = elem.dyn_cast<Decl*>()) {
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+      if (auto *D = elem.dyn_cast<Decl*>()) {
+        if (auto *VD = dyn_cast<ValueDecl>(D))
           checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
       }
     }
@@ -217,12 +211,23 @@ private:
   void visitCaseStmt(CaseStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
-    for (const auto &CLI : S->getCaseLabelItems()) {
-      auto *P = CLI.getPattern();
-      if (!isReferencePointInRange(P->getSourceRange()))
-        checkPattern(P, DeclVisibilityKind::LocalVariable);
+    // Pattern names aren't visible in the patterns themselves,
+    // just in the body or in where guards.
+    auto body = S->getBody();
+    bool inPatterns = isReferencePointInRange(S->getLabelItemsRange());
+    auto items = S->getCaseLabelItems();
+    if (inPatterns) {
+      for (const auto &CLI : items) {
+        auto guard = CLI.getGuardExpr();
+        if (guard && isReferencePointInRange(guard->getSourceRange())) {
+          inPatterns = false;
+          break;
+        }
+      }
     }
-    visit(S->getBody());
+    if (!inPatterns && items.size() > 0)
+      checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+    visit(body);
   }
 
   void visitDoCatchStmt(DoCatchStmt *S) {

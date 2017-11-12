@@ -1,0 +1,115 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -licm | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @read_from_param : $@convention(thin) (@inout Int64, Int64) -> Int64 {
+bb0(%0 : $*Int64, %1 : $Int64):
+  debug_value %1 : $Int64
+  %3 = struct_element_addr %0 : $*Int64, #Int64._value
+  %4 = load %3 : $*Builtin.Int64
+  return %1 : $Int64
+}
+
+//CHECK-LABEL: sil @licm_readonly_apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: bb1:
+//CHECK-NOT: {{ apply}}
+//CHECK: return
+sil @licm_readonly_apply : $@convention(thin) (Int64, @inout Int64) -> () {
+bb0(%0 : $Int64, %1 : $*Int64):
+  %2 = alloc_stack $Int64
+  store %0 to %2 : $*Int64
+  %9 = function_ref @read_from_param : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %10 = integer_literal $Builtin.Int64, 3
+  %11 = struct $Int64 (%10 : $Builtin.Int64)
+  %12 = struct_element_addr %1 : $*Int64, #Int64._value
+  %13 = integer_literal $Builtin.Int1, -1
+  br bb1
+
+bb1:
+  %21 = apply %9(%2, %11) : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %22 = load %12 : $*Builtin.Int64
+  %23 = struct_extract %21 : $Int64, #Int64._value
+  %24 = builtin "sadd_with_overflow_Int64"(%22 : $Builtin.Int64, %23 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %25 = tuple_extract %24 : $(Builtin.Int64, Builtin.Int1), 0
+  %28 = struct $Int64 (%25 : $Builtin.Int64)
+
+  // This store does _not_ alias with the read in @read_from_param
+  store %28 to %1 : $*Int64
+  cond_br undef, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  dealloc_stack %2 : $*Int64
+  return %15 : $()
+}
+
+//CHECK-LABEL: sil @dont_licm_readonly_apply
+//CHECK: bb1:
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: return
+sil @dont_licm_readonly_apply : $@convention(thin) (Int64, @inout Int64) -> () {
+bb0(%0 : $Int64, %1 : $*Int64):
+  %2 = alloc_stack $Int64
+  store %0 to %2 : $*Int64
+  %9 = function_ref @read_from_param : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %10 = integer_literal $Builtin.Int64, 3
+  %11 = struct $Int64 (%10 : $Builtin.Int64)
+  %12 = struct_element_addr %1 : $*Int64, #Int64._value
+  %13 = integer_literal $Builtin.Int1, -1
+  br bb1
+
+bb1:
+  %21 = apply %9(%2, %11) : $@convention(thin) (@inout Int64, Int64) -> Int64
+  %22 = load %12 : $*Builtin.Int64
+  %23 = struct_extract %21 : $Int64, #Int64._value
+  %24 = builtin "sadd_with_overflow_Int64"(%22 : $Builtin.Int64, %23 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %25 = tuple_extract %24 : $(Builtin.Int64, Builtin.Int1), 0
+  %28 = struct $Int64 (%25 : $Builtin.Int64)
+
+  // This store does alias with the read in @read_from_param
+  store %28 to %2 : $*Int64
+  cond_br undef, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  dealloc_stack %2 : $*Int64
+  return %15 : $()
+}
+
+class X {
+}
+
+sil_global @_static_object : $X
+
+sil @retain_only : $@convention(thin) () -> @owned X {
+bb0:
+  %1 = global_addr @_static_object : $*X
+  %2 = address_to_pointer %1 : $*X to $Builtin.RawPointer
+  %3 = raw_pointer_to_ref %2 : $Builtin.RawPointer to $X
+  strong_retain %3 : $X
+  return %3 : $X
+}
+
+//CHECK-LABEL: sil @dont_licm_retainonly_apply
+//CHECK: bb1:
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: return
+sil @dont_licm_retainonly_apply : $@convention(thin) (Int64, @inout Int64) -> () {
+bb0(%0 : $Int64, %1 : $*Int64):
+  %9 = function_ref @retain_only : $@convention(thin) () -> @owned X
+  br bb1
+
+bb1:
+  %21 = apply %9() : $@convention(thin) () -> @owned X
+  strong_release %21 : $X
+  cond_br undef, bb1, bb2
+
+bb2:
+  %15 = tuple ()
+  return %15 : $()
+}
+

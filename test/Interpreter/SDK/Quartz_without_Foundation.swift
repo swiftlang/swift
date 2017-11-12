@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
@@ -7,4 +7,4 @@ import QuartzCore
 
 var v = CIVector(x:7);
 // CHECK: x = 7
-print("x = \(v.X)")
+print("x = \(v.x)")

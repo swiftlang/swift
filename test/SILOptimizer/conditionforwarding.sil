@@ -1,0 +1,346 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-print-debuginfo -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage canonical
+
+enum E { case A, B }
+
+enum E3 { case A, B, C }
+
+class C {
+  @sil_stored var x : Builtin.Int64
+  init()
+}
+
+sil @callee : $@convention(thin) () -> ()
+sil @use_enum : $@convention(thin) (E) -> ()
+sil @use_int : $@convention(thin) (Builtin.Int64) -> ()
+
+// CHECK-LABEL: sil @simple_forwarding
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: br bb3
+// CHECK: bb1:
+// CHECK:   br bb4,
+// CHECK: bb2:
+// CHECK:   br bb5,
+// CHECK: bb3:
+// CHECK:   apply
+// CHECK:   cond_br %0, bb1, bb2
+// CHECK: bb4:
+// CHECK:   br bb6
+// CHECK: bb5:
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK:   return
+sil @simple_forwarding : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %1 = enum $E, #E.A!enumelt
+  br bb3(%1 : $E)
+
+bb2:
+  %2 = enum $E, #E.B!enumelt
+  br bb3(%2 : $E)
+
+bb3(%14 : $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @closed_range_iterator_example
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: br bb3
+// CHECK: bb1:
+// CHECK:   [[PL:%[0-9]+]] = struct $Int64
+// CHECK:   br bb4([[PL]] : $Int64)
+// CHECK: bb2:
+// CHECK:   [[O:%[0-9]+]] = enum $Optional<Int64>
+// CHECK:   br bb5([[O]] : $Optional<Int64>)
+// CHECK: bb3:
+// CHECK:   apply
+// CHECK:   cond_br %0, bb1, bb2
+// CHECK: bb4({{%[0-9]+}} : $Int64):
+// CHECK:   br bb6
+// CHECK: bb5([[O2:%[0-9]+]] : $Optional<Int64>):
+// CHECK:   br bb6([[O2]] : $Optional<Int64>)
+// CHECK: bb6
+// CHECK:   return
+sil @closed_range_iterator_example : $@convention(thin) (Builtin.Int1, Builtin.Int64) -> Optional<Int64> {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = integer_literal $Builtin.Int1, -1
+  %5 = builtin "sadd_with_overflow_Int64"(%1 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %7 : $Builtin.Int1
+  %9 = struct $Int64 (%6 : $Builtin.Int64)
+  %10 = enum $Optional<Int64>, #Optional.some!enumelt.1, %9 : $Int64
+  br bb3(%10 : $Optional<Int64>)
+
+bb2:
+  %12 = enum $Optional<Int64>, #Optional.none!enumelt
+  br bb3(%12 : $Optional<Int64>)
+
+
+bb3(%14 : $Optional<Int64>):
+  debug_value %14 : $Optional<Int64>
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $Optional<Int64>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb5
+
+
+bb4(%18 : $Int64):
+  %19 = enum $Optional<Int64>, #Optional.some!enumelt.1, %18 : $Int64
+  br bb6(%19 : $Optional<Int64>)
+
+bb5:
+  br bb6(%14 : $Optional<Int64>)
+
+
+bb6(%22 : $Optional<Int64>):
+  return %22 : $Optional<Int64>
+}
+
+// CHECK-LABEL: sil @simple_switch_enum_forwarding
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: br bb3
+// CHECK: bb1:
+// CHECK:   br bb4,
+// CHECK: bb2:
+// CHECK:   br bb5,
+// CHECK: bb3:
+// CHECK:   apply
+// CHECK:   switch_enum %0 : $E3, case #E3.A!enumelt: bb1, default bb2
+// CHECK: bb4:
+// CHECK:   br bb6
+// CHECK: bb5:
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK:   return
+sil @simple_switch_enum_forwarding : $@convention(thin) (E3) -> () {
+bb0(%0 : $E3):
+  switch_enum %0 : $E3, case #E3.A!enumelt: bb1, default bb2
+
+bb1:
+  %1 = enum $E, #E.A!enumelt
+  br bb3(%1 : $E)
+
+bb2:
+  %2 = enum $E, #E.B!enumelt
+  br bb3(%2 : $E)
+
+bb3(%14 : $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @no_forwarding_side_effect_inst
+// CHECK: bb0({{.*}}):
+// CHECK:   cond_br %0
+// CHECK: bb3({{.*}}):
+// CHECK:   switch_enum
+// CHECK: bb6
+// CHECK:   return
+sil @no_forwarding_side_effect_inst : $@convention(thin) (Builtin.Int1, C) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $C):
+  %e = ref_element_addr %1 : $C, #C.x
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = enum $E, #E.A!enumelt
+  br bb3(%2 : $E)
+
+bb2:
+  %3 = enum $E, #E.B!enumelt
+  %4 = load %e : $*Builtin.Int64
+  br bb3(%3 : $E)
+
+bb3(%14 : $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @no_forwarding_second_enum_use
+// CHECK: bb0({{.*}}):
+// CHECK:   cond_br %0
+// CHECK: bb3({{.*}}):
+// CHECK:   switch_enum
+// CHECK: bb6
+// CHECK:   return
+sil @no_forwarding_second_enum_use : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %1 = enum $E, #E.A!enumelt
+  br bb3(%1 : $E)
+
+bb2:
+  %2 = enum $E, #E.B!enumelt
+  br bb3(%2 : $E)
+
+bb3(%14 : $E):
+  %15 = function_ref @use_enum : $@convention(thin) (E) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (E) -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @no_forwarding_bad_control_flow
+// CHECK: bb0({{.*}}):
+// CHECK:   cond_br %0
+// CHECK: bb3({{.*}}):
+// CHECK:   switch_enum
+// CHECK: bb6
+// CHECK:   return
+sil @no_forwarding_bad_control_flow : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %1 = enum $E, #E.A!enumelt
+  br bb3(%1 : $E)
+
+bb2:
+  %2 = enum $E, #E.B!enumelt
+  br bb3(%2 : $E)
+
+bb3(%14 : $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  br bb6
+
+bb5:
+  cond_br undef, bb1, bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @no_forwarding_multiple_block_args
+// CHECK: bb0({{.*}}):
+// CHECK:   cond_br %0
+// CHECK: bb3({{.*}}):
+// CHECK:   switch_enum
+// CHECK: bb6
+// CHECK:   return
+sil @no_forwarding_multiple_block_args : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %i1 = integer_literal $Builtin.Int64, 1
+  %1 = enum $E, #E.A!enumelt
+  br bb3(%1 : $E, %i1 : $Builtin.Int64)
+
+bb2:
+  %i2 = integer_literal $Builtin.Int64, 2
+  %2 = enum $E, #E.B!enumelt
+  br bb3(%2 : $E, %i2 : $Builtin.Int64)
+
+bb3(%14 : $E, %i3 : $Builtin.Int64):
+  %15 = function_ref @use_int : $@convention(thin) (Builtin.Int64) -> ()
+  %16 = apply %15(%i3) : $@convention(thin) (Builtin.Int64) -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @no_forwarding_additional_successor
+// CHECK: bb0({{.*}}):
+// CHECK:   switch_enum %0
+// CHECK: bb3({{.*}}):
+// CHECK:   switch_enum
+// CHECK: bb6
+// CHECK:   return
+sil @no_forwarding_additional_successor : $@convention(thin) (E3) -> () {
+bb0(%0 : $E3):
+  switch_enum %0 : $E3, case #E3.A!enumelt: bb1, case #E3.B!enumelt: bb2, case #E3.C!enumelt: bb6
+
+bb1:
+  %1 = enum $E, #E.A!enumelt
+  br bb3(%1 : $E)
+
+bb2:
+  %2 = enum $E, #E.B!enumelt
+  br bb3(%2 : $E)
+
+bb3(%14 : $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4:
+  br bb7
+
+bb5:
+  br bb7
+
+bb6:
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}

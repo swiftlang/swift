@@ -1,0 +1,35 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name copydestroy_value
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name copydestroy_value
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name copydestroy_value | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+
+// CHECK-LABEL: sil [serialized] @test_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[T0:%[0-9]+]] : $@sil_unowned Builtin.NativeObject):
+// CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_unowned_value [[T0]] : $@sil_unowned Builtin.NativeObject
+// CHECK-NEXT: destroy_value [[T0]] : $@sil_unowned Builtin.NativeObject
+// CHECK-NEXT: return [[COPY_RESULT]] : $Builtin.NativeObject
+sil [serialized] @test_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $@sil_unowned Builtin.NativeObject):
+  %1 = copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
+  destroy_value %0 : $@sil_unowned Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [serialized] @test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG1:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK: [[COPY_VALUE_RESULT:%[0-9]+]] = copy_value [[ARG1]] : $Builtin.NativeObject
+// CHECK: destroy_value [[ARG1]]
+// CHECK: return [[COPY_VALUE_RESULT]]
+sil [serialized] @test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}

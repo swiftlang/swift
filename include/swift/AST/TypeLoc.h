@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,12 +19,12 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 
 class ASTContext;
+class TypeRepr;
 
 /// TypeLoc - Provides source location information for a parsed type.
 /// A TypeLoc is stored in AST nodes which use an explicitly written type.
@@ -54,11 +54,8 @@ public:
 
   /// Get the representative location of this type, for diagnostic
   /// purposes.
-  SourceLoc getLoc() const {
-    if (TyR) return TyR->getLoc();
-    return SourceLoc();
-  }
-
+  /// This location is not necessarily the start location of the type repr.
+  SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
   bool hasLocation() const { return TyR != nullptr; }
@@ -72,15 +69,7 @@ public:
     TAndValidBit.setPointerAndInt(Ty, validated);
   }
 
-  TypeLoc clone(ASTContext &ctx) const {
-    if (TyR) {
-      TypeLoc result(TyR->clone(ctx));
-      result.TAndValidBit = this->TAndValidBit;
-      return result;
-    }
-
-    return *this;
-  }
+  TypeLoc clone(ASTContext &ctx) const;
 };
 
 } // end namespace llvm

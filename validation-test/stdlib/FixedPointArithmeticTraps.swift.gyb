@@ -1,34 +1,26 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/FixedPointArithmeticTraps.swift
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Release -O
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/FixedPointArithmeticTraps.swift
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Debug -Onone
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Release -O
 //
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Release
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Debug
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test
 
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-#if _runtime(_ObjC)
-import ObjectiveC
-#endif
 
 // Note: in this file, we need to go through opaque functions to load
-// constants.  This is to to check runtime behaviour and ensure the constant is
+// constants.  This is to check runtime behavior and ensure the constant is
 // not folded.
 
 func expectOverflow<T>(
-  res: (T, overflow: Bool),
+  _ res: (partialValue: T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UInt = __LINE__
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line
 ) {
   expectTrue(
     res.overflow, "expected overflow",
@@ -36,12 +28,12 @@ func expectOverflow<T>(
 }
 
 func expectNoOverflow<T>(
-  res: (T, overflow: Bool),
+  _ res: (partialValue: T, overflow: Bool),
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: ()->String = "",
+  _ message: @autoclosure () -> String = "",
     showFrame: Bool = true,
-    stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UInt = __LINE__
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line
 ) {
   expectFalse(
     res.overflow, "expected no overflow",
@@ -50,7 +42,7 @@ func expectNoOverflow<T>(
 
 %{
 
-from SwiftIntTypes import *
+from SwiftIntTypes import all_integer_types
 
 # Test cases are written in a way that they don't depend on the word size.
 word_bits = 4
@@ -68,45 +60,45 @@ var FixedPointArithmeticTraps = TestSuite("FixedPointArithmeticTraps")
 
 FixedPointArithmeticTraps.test("PreDecrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.min)
-  ++x
+  x += 1
 
   x = get${IntTy}(${IntTy}.min)
   expectCrashLater()
-  // --IntTy.min
-  --x
+  // IntTy.min -= 1
+  x -= 1
   _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PreIncrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.max)
-  --x
+  x -= 1
 
   x = get${IntTy}(${IntTy}.max)
   expectCrashLater()
-  // ++IntTy.max
-  ++x
+  // IntTy.max += 1
+  x += 1
   _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PostDecrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.min)
-  x++
+  x += 1
 
   x = get${IntTy}(${IntTy}.min)
   expectCrashLater()
-  // IntTy.min--
-  x--
+  // IntTy.min -= 1
+  x -= 1
   _blackHole(x)
 }
 
 FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
   var x = get${IntTy}(${IntTy}.max)
-  x--
+  x -= 1
 
   x = get${IntTy}(${IntTy}.max)
   expectCrashLater()
-  // IntTy.max++
-  x++
+  // IntTy.max += 1
+  x += 1
   _blackHole(x)
 }
 
@@ -117,14 +109,14 @@ FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
 FixedPointArithmeticTraps.test("Addition/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
-  expectNoOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectNoOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   a = a + get${IntTy}(${IntTy}.max / 3)
 
-  expectNoOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectNoOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   a = a + get${IntTy}(${IntTy}.max / 3)
 
   // Overflow in addition.
-  expectOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   expectCrashLater()
   a = a + get${IntTy}(${IntTy}.max / 3)
   _blackHole(a)
@@ -137,11 +129,11 @@ FixedPointArithmeticTraps.test("Addition/${IntTy}") {
 FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
   var a = get${IntTy}(${IntTy}.min + get${IntTy}(${IntTy}.max / 3))
 
-  expectNoOverflow(${IntTy}.subtractWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectNoOverflow(a.subtractingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   a = a - get${IntTy}(${IntTy}.max / 3)
 
   // Overflow in subtraction.
-  expectOverflow(${IntTy}.subtractWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectOverflow(a.subtractingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   expectCrashLater()
   a = a - get${IntTy}(${IntTy}.max / 3)
   _blackHole(a)
@@ -151,14 +143,14 @@ FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
 // Test multiplication for ${IntTy}
 //
 
-FixedPointArithmeticTraps.test("Multplication/${IntTy}") {
+FixedPointArithmeticTraps.test("Multiplication/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
-  expectNoOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
+  expectNoOverflow(a.multipliedReportingOverflow(by: get${IntTy}(2)))
   a = a * get${IntTy}(2)
 
   // Overflow in multiplication.
-  expectOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
+  expectOverflow(a.multipliedReportingOverflow(by: get${IntTy}(2)))
   expectCrashLater()
   a = a * get${IntTy}(2)
   _blackHole(a)
@@ -172,11 +164,11 @@ FixedPointArithmeticTraps.test("Division/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   // x / 3
-  expectNoOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
   a = a / get${IntTy}(3)
 
   // x / 0
-  expectOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(0)))
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(0)))
   expectCrashLater()
   a = a / get${IntTy}(0)
 }
@@ -186,11 +178,11 @@ FixedPointArithmeticTraps.test("Division/${IntTy}") {
 FixedPointArithmeticTraps.test("Division/${IntTy}.min-over-minus-one") {
   var a = get${IntTy}(${IntTy}.min)
 
-  expectNoOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
   a = a / get${IntTy}(3)
 
   a = get${IntTy}(${IntTy}.min)
-  expectOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(-1)))
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(-1)))
   expectCrashLater()
   a = a / get${IntTy}(-1)
   // IntTy.min / -1
@@ -207,11 +199,11 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   // x % 3
-  expectNoOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(3)))
   a = a % get${IntTy}(3)
 
   // x % 0
-  expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(0)))
+  expectOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(0)))
   expectCrashLater()
   a = a % get${IntTy}(0)
   _blackHole(a)
@@ -223,79 +215,14 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
   var a = get${IntTy}(${IntTy}.min)
 
   // Int.min % 3
-  expectNoOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(3)))
   a = a % get${IntTy}(3)
 
   // Int.min % -1
   a = get${IntTy}(${IntTy}.min)
-  expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(-1)))
+  expectOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(-1)))
   expectCrashLater()
   a = a % get${IntTy}(-1)
-  _blackHole(a)
-}
-
-%   end
-
-%   for (description, operation) in [("RightShift", ">>"), ("LeftShift", "<<")]:
-
-//
-// Test ${description} for ${IntTy}
-//
-
-%     if self_ty.is_signed:
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/Negative") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(1))
-
-  let shiftAmount: ${IntTy} = -1
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
-  _blackHole(a)
-}
-
-%     end
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSize") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(0))
-  a = get${IntTy}(a ${operation} get${IntTy}(1))
-
-  let shiftAmount = ${IntTy}(sizeof(${IntTy}.self) * 8)
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
-  _blackHole(a)
-}
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSizePlusOne") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(0))
-
-  let shiftAmount = ${IntTy}(sizeof(${IntTy}.self) * 8 + 1)
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
-  _blackHole(a)
-}
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(0))
-
-  let shiftAmount: ${IntTy} = ${IntTy}.max
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
   _blackHole(a)
 }
 
@@ -305,70 +232,6 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
 // <rdar://problem/17548877> gyb miscompiles a certain for loop
 
 % end
-
-// FIXME: these tests should be more thorough, and test all combinations of
-// types and error conditions.
-var FixedPointTruncationTraps = TestSuite("FixedPointTruncationTraps")
-
-FixedPointTruncationTraps.test("SignedToSignedTruncation/dest=sign-overflow") {
-  // Test that we check if we overflow on the sign bit.
-  var x = getInt16(128)
-  expectCrashLater()
-  var result = Int8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=-1") {
-  var x = getInt32(-1)
-  expectCrashLater()
-  var result = UInt8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("SignedToUnignedSameSize/src=min") {
-  var x = getInt8(-128)
-  expectCrashLater()
-  var result = UInt16(x)
-  _blackHole(result)
-}
-
-
-FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=max") {
-  var x = getInt32(0xFFFFFFF)
-  expectCrashLater()
-  var result = UInt16(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("UnsignedToSignedTruncation/dest=sign-overflow") {
-  // Test that we check if we overflow on the sign bit.
-  var x = getUInt16(128)
-  expectCrashLater()
-  var result = Int8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("UnsignedToUnsignedTruncation/src=max") {
-  var x = getUInt32(0xFFFFFFFF)
-  expectCrashLater()
-  var result = UInt16(x)
-  _blackHole(result)
-}
-
-// Same size conversions.
-FixedPointTruncationTraps.test("SignedToUnsignedSameSize") {
-  var x = getInt8(-2)
-  expectCrashLater()
-  var result = UInt8(x)
-  _blackHole(result)
-}
-
-FixedPointTruncationTraps.test("UnsignedToSignedSameSize") {
-  var x = getUInt8(128)
-  expectCrashLater()
-  var result = Int8(x)
-  _blackHole(result)
-}
 
 runAllTests()
 

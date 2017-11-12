@@ -34,10 +34,10 @@ struct Invariant {
 func note() {}
 
 /// - postcondition: x is unchanged
-func postcondition(inout x: Int) {}
+func postcondition(_ x: inout Int) {}
 
 /// - precondition: `x < 100`
-func precondition(x: Int) {
+func precondition(_ x: Int) {
   assert(x < 100)
 }
 

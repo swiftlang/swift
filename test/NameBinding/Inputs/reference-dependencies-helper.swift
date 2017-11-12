@@ -22,17 +22,33 @@ struct OtherFileSecretTypeWrapper {
   }
 }
 
-struct OtherFileIntArray : SequenceType {
+struct OtherFileIntArray : Sequence {
   var array: [Int] = []
-  func generate() -> Array<Int>.Generator { return array.generate() }
+  func makeIterator() -> Array<Int>.Iterator { return array.makeIterator() }
 }
 func getOtherFileIntArray() -> OtherFileIntArray { return OtherFileIntArray() }
 
 typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 
 prefix operator *** {}
+prefix operator ~~~~~ {}
 
-typealias OtherFileAliasForFloatLiteralConvertible = FloatLiteralConvertible
+prefix operator ****
+infix operator *****
+infix operator ******
+protocol Starry {
+  static prefix func ****(arg: Self)
+  static func *****(lhs: Self, rhs: Int)
+  static func ******(lhs: Int, rhs: Self)
+}
+// Deliberately does not conform to Starry.
+struct Flyswatter {
+  static prefix func ****(arg: Flyswatter) {}
+  static func *****(lhs: Flyswatter, rhs: Int) {}
+  static func ******(lhs: Int, rhs: Flyswatter) {}
+}
+
+typealias ExpressibleByOtherFileAliasForFloatLiteral = ExpressibleByFloatLiteral
 
 enum OtherFileEnum {
   case Value
@@ -130,3 +146,12 @@ protocol PrivateProto3 {}
 struct OtherFileElementType {}
 
 struct OtherFileTypeToBeExtended {}
+
+struct TypeReferencedOnlyBySubscript {}
+struct TypeReferencedOnlyByPrivateSubscript {}
+
+protocol ProtoReferencedOnlyInGeneric {}
+protocol ProtoReferencedOnlyInPrivateGeneric {}
+
+struct TypeReferencedOnlyByPrivateVar {}
+struct TypeReferencedOnlyByPrivateClassVar {}

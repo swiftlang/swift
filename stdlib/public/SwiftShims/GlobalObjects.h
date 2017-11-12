@@ -1,12 +1,12 @@
-//===--- GlobalObjects.h - Statically-initialized objects -----------------===//
+//===--- GlobalObjects.h - Statically-initialized objects -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,6 +20,7 @@
 
 #include "SwiftStdint.h"
 #include "HeapObject.h"
+#include "Visibility.h"
 
 #ifdef __cplusplus
 namespace swift { extern "C" {
@@ -35,11 +36,67 @@ struct _SwiftEmptyArrayStorage {
   struct _SwiftArrayBodyStorage body;
 };
 
-extern struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
+SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
-extern __swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;
+struct _SwiftUnsafeBitMap {
+  __swift_uintptr_t *values;
+  __swift_intptr_t bitCount;
+};
+
+struct _SwiftDictionaryBodyStorage {
+  __swift_intptr_t capacity;
+  __swift_intptr_t count;
+  struct _SwiftUnsafeBitMap initializedEntries;
+  void *keys;
+  void *values;
+};
+
+struct _SwiftSetBodyStorage {
+  __swift_intptr_t capacity;
+  __swift_intptr_t count;
+  struct _SwiftUnsafeBitMap initializedEntries;
+  void *keys;
+};
+
+struct _SwiftEmptyDictionaryStorage {
+  struct HeapObject header;
+  struct _SwiftDictionaryBodyStorage body;
+  __swift_uintptr_t entries;
+};
+
+struct _SwiftEmptySetStorage {
+  struct HeapObject header;
+  struct _SwiftSetBodyStorage body;
+  __swift_uintptr_t entries;
+};
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptySetStorage _swiftEmptySetStorage;
+
+struct _SwiftHashingSecretKey {
+  __swift_uint64_t key0;
+  __swift_uint64_t key1;
+};
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftHashingSecretKey _swift_stdlib_Hashing_secretKey;
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;
 
 #ifdef __cplusplus
+
+static_assert(std::is_pod<_SwiftEmptyArrayStorage>::value,
+              "empty array type should be POD");
+static_assert(std::is_pod<_SwiftEmptyDictionaryStorage>::value,
+              "empty dictionary type should be POD");
+static_assert(std::is_pod<_SwiftEmptySetStorage>::value,
+              "empty set type should be POD");
+
 }} // extern "C", namespace swift
 #endif
 

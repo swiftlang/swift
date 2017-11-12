@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 class C {
   let n : Int64
@@ -10,8 +10,12 @@ class C {
 extension C {
   class func Factory() -> Self {
     // Currently we emit the static type C for r.
-    // CHECK: !DILocalVariable(name: "r", {{.*}}line: [[@LINE+2]], type: ![[SELFTY:[0-9]+]])
-    // CHECK: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtDC11DynamicSelf1C", {{.*}}, baseType: !"_TtC11DynamicSelf1C")
+    // CHECK: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "_T011DynamicSelf1CCD"
+    // CHECK: !DILocalVariable(name: "r",
+    // CHECK-SAME:             line: [[@LINE+4]], type: ![[SELFTY:[0-9]+]])
+    // CHECK: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef,
+    // CHECK-SAME:                         name: "_T011DynamicSelf1CCXDD",
+    // CHECK-SAME:                         baseType: ![[BASE]])
     let r = self.init(number: 0)
     return r
   }

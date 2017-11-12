@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct Test0 {}
 
@@ -17,4 +17,4 @@ Test1b.foo()
 var test1 = Test1a.self
 test1 = Test1b.self
 var x = Test1b()
-test1 = x.dynamicType
+test1 = type(of: x)

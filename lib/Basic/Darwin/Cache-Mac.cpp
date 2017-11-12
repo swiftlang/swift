@@ -1,18 +1,18 @@
-//===--- Cache.h - Caching mechanism implementation -----------------------===//
+//===--- Cache-Mac.cpp - Caching mechanism implementation -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 //  This file implements the caching mechanism using darwin's libcache.
 //
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Cache.h"
 #include "llvm/ADT/SmallString.h"
@@ -29,11 +29,11 @@ CacheImpl::ImplTy CacheImpl::create(StringRef Name, const CallBacks &CBs) {
     CBs.keyIsEqualCB,
     nullptr,
     CBs.keyDestroyCB,
-    CBs.valueDestroyCB,
+    CBs.valueReleaseCB,
     nullptr,
     nullptr,
     CBs.UserData,
-    nullptr
+    CBs.valueRetainCB,
   };
 
   cache_t *cache_out = nullptr;

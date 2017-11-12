@@ -1,8 +1,7 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
-// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %s
-// RUN: llvm-bcanalyzer %t/global_init.swiftmodule | FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -enable-sil-verify-all %t/global_init.swiftmodule | FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %s
+// RUN: llvm-bcanalyzer %t/global_init.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %target-sil-opt -enable-sil-verify-all -disable-sil-linking %t/global_init.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 
@@ -13,15 +12,19 @@
 // The only way to inspect the serialized module is sil-opt. The swift
 // driver will only output the SIL that it deserializes.
 
+@_versioned
 let MyConst = 42
+@_versioned
 var MyVar = 3
 
 // CHECK: let MyConst: Int
 // CHECK: var MyVar: Int
 
-// CHECK-DAG: sil hidden [fragile] [global_init] @_TF11global_initau7MyConstSi : $@convention(thin) () -> Builtin.RawPointer
-// CHECK-DAG: sil hidden [fragile] [global_init] @_TF11global_initau5MyVarSi : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-DAG: sil [global_init] @_T011global_init7MyConstSivau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-DAG: sil [global_init] @_T011global_init5MyVarSivau : $@convention(thin) () -> Builtin.RawPointer
 
+@_inlineable
+@_versioned
 func getGlobals() -> Int {
   return MyVar + MyConst
 }

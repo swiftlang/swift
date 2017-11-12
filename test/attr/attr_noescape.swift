@@ -1,33 +1,40 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
-@noescape var fn : () -> Int = { 4 }  // expected-error {{@noescape may only be used on 'parameter' declarations}} {{1-11=}}
+@noescape var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
 
-func doesEscape(fn : () -> Int) {}
+func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
+ // expected-warning@-1{{@noescape is the default and is deprecated}} {{29-39=}}
 
-func takesGenericClosure<T>(a : Int, @noescape _ fn : () -> T) {}
+func doesEscape(_ fn : @escaping () -> Int) {}
+
+func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {} // expected-warning{{@noescape is the default and is deprecated}} {{47-57=}}
 
 
-func takesNoEscapeClosure(@noescape fn : () -> Int) {
+func takesNoEscapeClosure(_ fn : () -> Int) {
+  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-2{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-3{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-4{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
-  fn()  // ok
+  _ = fn()  // ok
 
-  var x = fn  // expected-error {{@noescape parameter 'fn' may only be called}}
+  var x = fn  // expected-error {{non-escaping parameter 'fn' may only be called}}
 
   // This is ok, because the closure itself is noescape.
   takesNoEscapeClosure { fn() }
 
   // This is not ok, because it escapes the 'fn' closure.
-  doesEscape { fn() }   // expected-error {{closure use of @noescape parameter 'fn' may allow it to escape}}
+  doesEscape { fn() }   // expected-error {{closure use of non-escaping parameter 'fn' may allow it to escape}}
 
   // This is not ok, because it escapes the 'fn' closure.
   func nested_function() {
-    fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
+    _ = fn()   // expected-error {{declaration closing over non-escaping parameter 'fn' may allow it to escape}}
   }
 
   takesNoEscapeClosure(fn)  // ok
 
-  doesEscape(fn)                   // expected-error {{invalid conversion from non-escaping function of type '@noescape () -> Int' to potentially escaping function type '() -> Int'}}
+  doesEscape(fn)                   // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 }
@@ -44,6 +51,7 @@ class SomeClass {
     takesNoEscapeClosure { x }
   }
 
+  @discardableResult
   func foo() -> Int {
     foo()
 
@@ -105,6 +113,7 @@ class SomeClass {
     }
 
     struct Outer {
+      @discardableResult
       func bar() -> Int {
         bar()
 
@@ -126,6 +135,7 @@ class SomeClass {
 
     func structOuter() {
       struct Inner {
+        @discardableResult
         func bar() -> Int {
           bar() // no-warning
 
@@ -152,59 +162,59 @@ class SomeClass {
 
 
 // Implicit conversions (in this case to @convention(block)) are ok.
-@_silgen_name("whatever")
-func takeNoEscapeAsObjCBlock(@noescape _: @convention(block) () -> Void)
-func takeNoEscapeTest2(@noescape fn : () -> ()) {
+@_silgen_name("whatever") 
+func takeNoEscapeAsObjCBlock(_: @noescape @convention(block) () -> Void)  // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
+func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-warning{{@noescape is the default and is deprecated}} {{31-41=}}
   takeNoEscapeAsObjCBlock(fn)
 }
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(@autoclosure a : () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
-  doesEscape { a() }  // expected-error {{closure use of @noescape parameter 'a' may allow it to escape}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping}}
+  doesEscape { a() }  // expected-error {{closure use of non-escaping parameter 'a' may allow it to escape}}
 }
 
 
 // <rdar://problem/19470858> QoI: @autoclosure implies @noescape, so you shouldn't be allowed to specify both
-func redundant(@noescape  // expected-error {{@noescape is implied by @autoclosure and should not be redundantly specified}} {{16-25=}}
-               @autoclosure fn : () -> Int) {
+func redundant(_ fn : @noescape  // expected-error @+1 {{@noescape is implied by @autoclosure and should not be redundantly specified}}
+               @autoclosure () -> Int) {
+ // expected-warning@-2{{@noescape is the default and is deprecated}} {{23-33=}}
 }
 
 
 protocol P1 {
-  typealias Element
+  associatedtype Element
 }
 protocol P2 : P1 {
-  typealias Element
+  associatedtype Element
 }
 
-func overloadedEach<O: P1, T>(source: O, _ transform: O.Element -> (), _: T) {}
+func overloadedEach<O: P1, T>(_ source: O, _ transform: @escaping (O.Element) -> (), _: T) {}
 
-func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> (), _: T) {}
+func overloadedEach<P: P2, T>(_ source: P, _ transform: @escaping (P.Element) -> (), _: T) {}
 
 struct S : P2 {
   typealias Element = Int
-  func each(@noescape transform: Int -> ()) {
-    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape Int -> (), Int)'}}
+  func each(_ transform: @noescape (Int) -> ()) { // expected-warning{{@noescape is the default and is deprecated}} {{26-36=}}
+    overloadedEach(self,  // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, (Int) -> (), Int)'}}
                    transform, 1)
-    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, O.Element -> (), T), (P, P.Element -> (), T)}}
+    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, @escaping (O.Element) -> (), T), (P, @escaping (P.Element) -> (), T)}}
   }
 }
 
 
 
 // rdar://19763676 - False positive in @noescape analysis triggered by parameter label
-func r19763676Callee(@noescape f: (param: Int) -> Int) {}
+func r19763676Callee(_ f: @noescape (_ param: Int) -> Int) {} // expected-warning{{@noescape is the default and is deprecated}} {{27-37=}}
 
-func r19763676Caller(@noescape g: (Int) -> Int) {
+func r19763676Caller(_ g: @noescape (Int) -> Int) { // expected-warning{{@noescape is the default and is deprecated}} {{27-37=}}
   r19763676Callee({ _ in g(1) })
 }
 
 
 // <rdar://problem/19763732> False positive in @noescape analysis triggered by default arguments
-func calleeWithDefaultParameters(@noescape f: () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
-
-func callerOfDefaultParams(@noescape g: () -> ()) {
+func calleeWithDefaultParameters(_ f: @noescape () -> (), x : Int = 1) {} // expected-warning{{@noescape is the default and is deprecated}} {{39-49=}}
+func callerOfDefaultParams(_ g: @noescape () -> ()) { // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
   calleeWithDefaultParameters(g)
 }
 
@@ -223,10 +233,111 @@ class NoEscapeImmediatelyApplied {
 
 
 // Reduced example from XCTest overlay, involves a TupleShuffleExpr
-public func XCTAssertTrue(@autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertTrue(_ expression: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #file, line: UInt = #line) -> Void {
 }
-public func XCTAssert( @autoclosure expression: () -> BooleanType, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__)  -> Void {
+public func XCTAssert(_ expression: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
   XCTAssertTrue(expression, message, file: file, line: line);
 }
 
+
+
+/// SR-770 - Currying and `noescape`/`rethrows` don't work together anymore
+func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-warning{{@noescape is the default and is deprecated}} {{41-50=}}
+  return { f in
+    x.flatMap(f)
+  }
+}
+
+func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-warning{{@noescape is the default and is deprecated}} {{42-51=}}
+  return { (f : @noescape (A) -> [B]) in // expected-warning{{@noescape is the default and is deprecated}} {{17-27=}}
+    x.flatMap(f)
+  }
+}
+
+func bad(_ a : @escaping (Int)-> Int) -> Int { return 42 }
+func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // expected-warning{{@noescape is the default and is deprecated}} {{43-52=}}
+  return { f in // expected-note{{parameter 'f' is implicitly non-escaping}}
+    bad(f)  // expected-error {{passing non-escaping parameter 'f' to function expecting an @escaping closure}}
+  }
+}
+
+
+// SR-824 - @noescape for Type Aliased Closures
+//
+
+// Old syntax -- @noescape is the default, and is redundant
+typealias CompletionHandlerNE = @noescape (_ success: Bool) -> () // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
+
+// Explicit @escaping is not allowed here
+typealias CompletionHandlerE = @escaping (_ success: Bool) -> () // expected-error{{@escaping attribute may only be used in function parameter position}} {{32-42=}}
+
+// No @escaping -- it's implicit from context
+typealias CompletionHandler = (_ success: Bool) -> ()
+
+var escape : CompletionHandlerNE
+var escapeOther : CompletionHandler
+func doThing1(_ completion: (_ success: Bool) -> ()) {
+  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+}
+func doThing2(_ completion: CompletionHandlerNE) {
+  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+}
+func doThing3(_ completion: CompletionHandler) {
+  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+}
+func doThing4(_ completion: @escaping CompletionHandler) {
+  escapeOther = completion
+}
+
+// <rdar://problem/19997680> @noescape doesn't work on parameters of function type
+func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U) -> U { 
+  // expected-warning@-1{{@noescape is the default and is deprecated}} {{23-33=}}
+  // expected-warning@-2{{@noescape is the default and is deprecated}} {{46-56=}}
+  // expected-warning@-3{{@noescape is the default and is deprecated}} {{57-66=}}
+  return g(f)
+  // expected-warning@-1{{passing a non-escaping function parameter 'f' to a call to a non-escaping function parameter}}
+}
+
+// <rdar://problem/19997577> @noescape cannot be applied to locals, leading to duplication of code
+enum r19997577Type {
+  case Unit
+  case Function(() -> r19997577Type, () -> r19997577Type)
+  case Sum(() -> r19997577Type, () -> r19997577Type)
+
+  func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result { // expected-warning{{@noescape is the default and is deprecated}} {{53-63=}}
+    let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) } // expected-warning{{@noescape is the default and is deprecated}} {{17-27=}}
+    switch self {
+    case .Unit:
+      return combine(initial, self)
+    case let .Function(t1, t2):
+      return binary(t1(), t2())
+    case let .Sum(t1, t2):
+      return binary(t1(), t2())
+    }
+  }
+}
+
+// type attribute and decl attribute
+func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
+func noescapeT(f: @noescape () -> Bool) {} // expected-warning{{@noescape is the default and is deprecated}} {{19-29=}}
+func noescapeG<T>(@noescape f: () -> T) {} // expected-error{{attribute can only be applied to types, not declarations}}
+
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
+func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
+func autoclosureG<T>(@autoclosure f: () -> T) {} // expected-error{{attribute can only be applied to types, not declarations}}
+
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
+ // expected-warning@-1{{@noescape is the default and is deprecated}} {{39-49=}}
+
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
+ // expected-warning@-1{{@noescape is the default and is deprecated}} {{45-55=}}
 

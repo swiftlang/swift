@@ -1,0 +1,563 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -closure-specialize %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil shared [noinline] @_T07specgen12take_closureyySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> () {
+// CHECK: bb0(%0 : $Int)
+// CHECK: function_ref @_T07specgen6callerySiFySi_SitcfU_
+// CHECK: partial_apply
+
+// CHECK-LABEL: sil shared [noinline] @_T07specgen12take_closureyySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> () {
+// CHECK-NEXT: bb0:
+// CHECK: [[FUN:%.*]] = function_ref @_T07specgen6calleeySi_SitF : $@convention(thin) (Int, Int) -> ()
+// CHECK: thin_to_thick_function [[FUN]] : $@convention(thin) (Int, Int) -> () to $@callee_owned (Int, Int) -> ()
+
+// CHECK-LABEL: sil [noinline] @_T07specgen12take_closureyySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () {
+sil [noinline] @_T07specgen12take_closureyySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () {
+bb0(%0 : $@callee_owned (Int, Int) -> ()):
+  %1 = alloc_stack $Int
+  %2 = load %1 : $*Int
+  %3 = apply %0(%2, %2) : $@callee_owned (Int, Int) -> ()
+  dealloc_stack %1 : $*Int
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil shared [noinline] @_T07specgen13take_closure2yySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> () {
+// CHECK: bb0(%0 : $Int)
+// CHECK: [[FUN:%.*]] = function_ref @_T07specgen6callerySiFySi_SitcfU_
+// CHECK: partial_apply [[FUN]](
+
+// CHECK-LABEL: sil shared [noinline] @_T07specgen13take_closure2yySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> () {
+// CHECK-NEXT: bb0:
+// CHECK: [[FUN:%.*]] = function_ref @_T07specgen6calleeySi_SitF : $@convention(thin) (Int, Int) -> ()
+// CHECK: thin_to_thick_function [[FUN]] : $@convention(thin) (Int, Int) -> () to $@callee_owned (Int, Int) -> ()
+
+// CHECK-LABEL: sil [noinline] @_T07specgen13take_closure2yySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () {
+sil [noinline] @_T07specgen13take_closure2yySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () {
+bb0(%0 : $@callee_owned (Int, Int) -> ()):
+  %1 = alloc_stack $Int
+  %2 = load %1 : $*Int
+  %3 = apply %0(%2, %2) : $@callee_owned (Int, Int) -> ()
+  dealloc_stack %1 : $*Int
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [noinline] @_T07specgen6calleeySi_S2itF : $@convention(thin) (Int, Int, Int) -> () {
+// specgen.callee (Swift.Int, Swift.Int, Swift.Int) -> ()
+sil [noinline] @_T07specgen6calleeySi_S2itF : $@convention(thin) (Int, Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int):
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+// CHECK-LABEL: sil @_T07specgen6callerySiF : $@convention(thin) (Int) -> () {
+// CHECK: [[ID1:%[0-9]+]] = function_ref @_T07specgen13take_closure2yySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_T07specgen12take_closureyySi_SitcF023_T07specgen6callerySiFyE8_SitcfU_SiTf1c_n : $@convention(thin) (Int) -> ()
+// CHECK: apply [[ID2]](%0) : $@convention(thin) (Int) -> ()
+// CHECK: apply [[ID1]](%0) : $@convention(thin) (Int) -> ()
+sil @_T07specgen6callerySiF : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
+  %2 = function_ref @_T07specgen12take_closureyySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () // user: %5
+  // function_ref specgen.(caller (Swift.Int) -> ()).(closure #1)
+  %3 = function_ref @_T07specgen6callerySiFySi_SitcfU_ : $@convention(thin) (Int, Int, Int) -> () // user: %4
+  %4 = partial_apply %3(%0) : $@convention(thin) (Int, Int, Int) -> () // user: %5
+  strong_retain %4 : $@callee_owned (Int, Int) -> ()
+  %5 = apply %2(%4) : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %6 = function_ref @_T07specgen13take_closure2yySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () // user: %5
+  strong_retain %4 : $@callee_owned (Int, Int) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> ()
+  strong_release %4 : $@callee_owned (Int, Int) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil shared @_T07specgen6callerySiFySi_SitcfU_ : $@convention(thin) (Int, Int, Int) -> () {
+sil shared @_T07specgen6callerySiFySi_SitcfU_ : $@convention(thin) (Int, Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int):
+  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>, var, name "p"                   // users: %6, %10, %14
+  %5a = project_box %5 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  store %0 to %5a : $*Int                        // id: %6
+  %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>, var, name "q"                   // users: %8, %11, %13
+  %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  store %1 to %7a : $*Int                        // id: %8
+  // function_ref specgen.callee (Swift.Int, Swift.Int, Swift.Int) -> ()
+  %9 = function_ref @_T07specgen6calleeySi_S2itF : $@convention(thin) (Int, Int, Int) -> () // user: %12
+  %10 = load %5a : $*Int                         // user: %12
+  %11 = load %7a : $*Int                         // user: %12
+  %12 = apply %9(%10, %11, %2) : $@convention(thin) (Int, Int, Int) -> ()
+  strong_release %7 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_release %5 : $<τ_0_0> { var τ_0_0 } <Int>
+  %15 = tuple ()                                  // user: %16
+  return %15 : $()                                // id: %16
+}
+
+//////////////////////////////////
+// Thin To Thick Function Tests //
+//////////////////////////////////
+
+// CHECK-LABEL: sil [noinline] @_T07specgen6calleeySi_SitF : $@convention(thin) (Int, Int) -> () {
+// specgen.callee (Swift.Int, Swift.Int) -> ()
+sil [noinline] @_T07specgen6calleeySi_SitF : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+// CHECK-LABEL: sil @_T07specgen11tttficallerySiF : $@convention(thin) (Int) -> () {
+// CHECK: [[ID1:%[0-9]+]] = function_ref @_T07specgen13take_closure2yySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> ()
+// CHECK: [[ID2:%[0-9]+]] = function_ref @_T07specgen12take_closureyySi_SitcF26_T07specgen6calleeySi_SitFTf1c_n : $@convention(thin) () -> ()
+// CHECK: apply [[ID2]]() : $@convention(thin) () -> ()
+// CHECK: apply [[ID1]]() : $@convention(thin) () -> ()
+sil @_T07specgen11tttficallerySiF : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  // function_ref specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
+  %2 = function_ref @_T07specgen12take_closureyySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> () // user: %5
+  // function_ref specgen.(caller (Swift.Int) -> ()).(closure #1)
+  %3 = function_ref @_T07specgen6calleeySi_SitF : $@convention(thin) (Int, Int) -> () // user: %4
+  %4 = thin_to_thick_function %3 : $@convention(thin) (Int, Int) -> () to $@callee_owned (Int, Int) -> () // user: %5
+  %5 = apply %2(%4) : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %6 = function_ref @_T07specgen13take_closure2yySi_SitcF : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@owned @callee_owned (Int, Int) -> ()) -> ()
+  %9999 = tuple ()                                   // user: %7
+  return %9999 : $()                                 // id: %7
+}
+
+// We don't handle closures that close over address types (*NOTE* this includes
+// address and non-address only types) taken as @in or @in_guaranteed.
+
+// This is a temporary limitation.
+// CHECK-LABEL: sil @address_closure : $@convention(thin) (@in Int) -> () {
+sil @address_closure : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %6 = tuple()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
+sil @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  %1 = apply %0() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @address_caller : $@convention(thin) (@in Int) -> () {
+// CHECK-NOT: _TTSf1cl15address_closureSi__address_closure_user
+sil @address_caller : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = function_ref @address_closure : $@convention(thin) (@in Int) -> ()
+  %2 = partial_apply %1(%0) : $@convention(thin) (@in Int) -> ()
+  %3 = function_ref @address_closure_user : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+class A {}
+
+sil hidden [noinline] @closure : $@convention(thin) (@owned A, @owned A) -> () {
+bb0(%0 : $A, %1 : $A):
+  strong_release %1 : $A
+  strong_release %0 : $A
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil shared {{.*}} @_T011use_closure{{.*}}Tf{{.*}} : $@convention(thin) (@owned A) -> () {
+sil hidden [noinline] @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> () {
+bb0(%0 : $@callee_owned (@owned A) -> ()):
+  %1 = alloc_ref $A
+  %2 = apply %0(%1) : $@callee_owned (@owned A) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil shared {{.*}} @_T017use_closure_throw{{.*}}Tf{{.*}} : $@convention(thin) (@owned A) -> @error Error {
+sil hidden [noinline] @use_closure_throw : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> @error Error {
+bb0(%0 : $@callee_owned (@owned A) -> ()):
+  %1 = alloc_ref $A
+  %2 = apply %0(%1) : $@callee_owned (@owned A) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil {{.*}} @different_execution_counts
+// CHECK: bb0([[ARG:%.*]] : $A
+// CHECK:   strong_retain [[ARG]]
+// CHECK-NOT: partial_apply
+// CHECK:  [[SPECIALIZED_CLOSURE_USER:%.*]] = function_ref @_T011use_closure{{.*}}Tf
+// CHECK:   retain_value [[ARG]]
+// CHECK-NOT: partial_apply
+// CHECK:   integer_literal $Builtin.Int64, 0
+// CHECK: br bb2
+
+// CHECK: bb1:
+// CHECK:  strong_release [[ARG]]
+// CHECK:  release_value [[ARG]]
+// CHECK:  return
+
+// CHECK: bb2({{.*}}):
+// Match the partial_apply consume of arg.
+// CHECK: retain_value [[ARG]]
+// CHECK: apply [[SPECIALIZED_CLOSURE_USER]]([[ARG]])
+// CHECK: cond_br {{.*}}, bb1, bb3
+
+sil hidden [noinline] @different_execution_counts : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  strong_retain %0 : $A
+  %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned A, @owned A) -> ()
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = integer_literal $Builtin.Int64, 5
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = function_ref @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  br bb2(%4 : $Builtin.Int64)
+
+bb1:
+  strong_release %3 : $@callee_owned (@owned A) -> ()
+  %11 = tuple ()
+  return %11 : $()
+
+bb2(%13 : $Builtin.Int64):
+  %14 = builtin "sadd_with_overflow_Int64"(%13 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0
+  strong_retain %3 : $@callee_owned (@owned A) -> ()
+  %17 = apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  %18 = builtin "cmp_eq_Int64"(%15 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %18, bb1, bb3
+
+bb3:
+  br bb2(%15 : $Builtin.Int64)
+}
+
+// CHECK-LABEL: sil @insert_release_in_liferange_exit_block
+// CHECK: bb0(%0 : $A):
+// CHECK:   retain_value %0
+// CHECK: bb1:
+// CHECK-NEXT: release_value %0
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK:   retain_value %0
+// CHECK:   apply %{{[0-9]+}}(%0)
+// CHECK:   release_value %0
+// CHECK: bb3:
+// CHECK-NOT: %0
+// CHECK:   return
+sil @insert_release_in_liferange_exit_block : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  strong_retain %0 : $A
+  %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned A, @owned A) -> ()
+  %8 = function_ref @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  %5 = partial_apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  strong_retain %3 : $@callee_owned (@owned A) -> ()
+  %17 = apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  br bb3
+
+bb3:
+  strong_release %5 : $@callee_owned () -> ()
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @insert_release_at_critical_edge
+// CHECK: bb0(%0 : $A):
+// CHECK:   retain_value %0
+// CHECK: bb1:
+// CHECK-NEXT: release_value %0
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK:   retain_value %0
+// CHECK:   apply %{{[0-9]+}}(%0)
+// CHECK:   release_value %0
+// CHECK: bb3:
+// CHECK-NOT: %0
+// CHECK:   return
+sil @insert_release_at_critical_edge : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  strong_retain %0 : $A
+  %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned A, @owned A) -> ()
+  %8 = function_ref @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  %5 = partial_apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %3 : $@callee_owned (@owned A) -> ()
+  %17 = apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  br bb2
+
+bb2:
+  strong_release %5 : $@callee_owned () -> ()
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @insert_release_at_critical_loop_exit_edge
+// CHECK: bb0(%0 : $A):
+// CHECK:   retain_value %0
+// CHECK: bb1:
+// CHECK-NEXT:   br bb2
+// CHECK: bb2:
+// CHECK:   retain_value %0
+// CHECK:   apply %{{[0-9]+}}(%0)
+// CHECK-NOT:   %0
+// CHECK: bb3:
+// CHECK-NEXT: release_value %0
+// CHECK-NEXT: br bb5
+// CHECK: bb4:
+// CHECK-NEXT: release_value %0
+// CHECK-NEXT: br bb5
+// CHECK: bb5:
+// CHECK-NOT: %0
+// CHECK:   return
+sil @insert_release_at_critical_loop_exit_edge : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  strong_retain %0 : $A
+  %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned A, @owned A) -> ()
+  %8 = function_ref @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  %5 = partial_apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  cond_br undef, bb3, bb1
+
+bb1:
+  br bb2
+
+bb2:
+  strong_retain %3 : $@callee_owned (@owned A) -> ()
+  %17 = apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  cond_br undef, bb2, bb4
+
+bb3:
+  br bb4
+
+bb4:
+  strong_release %5 : $@callee_owned () -> ()
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @insert_release_in_loop_exit_block
+// CHECK: bb0(%0 : $A):
+// CHECK:   retain_value %0
+// CHECK: bb1:
+// CHECK-NEXT:   br bb2
+// CHECK: bb2:
+// CHECK:   retain_value %0
+// CHECK:   apply %{{[0-9]+}}(%0)
+// CHECK-NOT:   %0
+// CHECK: bb3:
+// CHECK-NEXT: release_value %0
+// CHECK-NOT: %0
+// CHECK:   return
+sil @insert_release_in_loop_exit_block : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  strong_retain %0 : $A
+  %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned A, @owned A) -> ()
+  %8 = function_ref @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  %5 = partial_apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  cond_br undef, bb3, bb1
+
+bb1:
+  br bb2
+
+bb2:
+  strong_retain %3 : $@callee_owned (@owned A) -> ()
+  %17 = apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  cond_br undef, bb2, bb3
+
+bb3:
+  strong_release %5 : $@callee_owned () -> ()
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @insert_release_after_try_apply
+// CHECK: bb0(%0 : $A):
+// CHECK:   retain_value %0
+// CHECK: bb1:
+// CHECK:   retain_value %0
+// CHECK-NEXT:   try_apply
+// CHECK: bb2(%{{[0-9]+}} : $()):
+// CHECK-NEXT:   strong_release %0
+// CHECK-NEXT:   release_value %0
+// CHECK-NEXT:   br bb4
+// CHECK: bb3(%{{[0-9]+}} : $Error):
+// CHECK-NEXT:   strong_release %0
+// CHECK-NEXT:   release_value %0
+// CHECK-NEXT:   br bb4
+// CHECK: bb4:
+// CHECK-NOT: %0
+// CHECK:   return
+sil @insert_release_after_try_apply : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned A, @owned A) -> ()
+  %8 = function_ref @use_closure_throw : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> @error Error
+  br bb1
+
+bb1:
+  strong_retain %3 : $@callee_owned (@owned A) -> ()
+  try_apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> @error Error, normal bb2, error bb3
+
+bb2(%n : $()):
+  br bb4
+
+bb3(%e : $Error):
+  br bb4
+
+bb4:
+  %11 = tuple ()
+  return %11 : $()
+}
+
+
+// Ensure that we can specialize and properly mangle functions that take closures with <τ_0_0> { var τ_0_0 } <arguments>.
+
+// CHECK-LABEL: sil shared [noinline] @_T04main5innerys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n : $@convention(thin) (@inout Builtin.Int32, @owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
+// CHECK: bb0
+// CHECK: [[FN:%.*]] = function_ref @closure_with_box_argument
+// CHECK: [[PARTIAL:%.*]] = partial_apply [[FN]](%1)
+// CHECK: [[ARG:%.*]] = load %0
+// CHECK: apply [[PARTIAL]]([[ARG]])
+
+// CHECK-LABEL: {{.*}} @_T04main5innerys5Int32Vz_yADctF
+sil hidden [noinline] @_T04main5innerys5Int32Vz_yADctF : $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> () {
+bb0(%0 : $*Builtin.Int32, %1 : $@callee_owned (Builtin.Int32) -> ()):
+  strong_retain %1 : $@callee_owned (Builtin.Int32) -> ()
+  %5 = load %0 : $*Builtin.Int32
+  %6 = apply %1(%5) : $@callee_owned (Builtin.Int32) -> ()
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @pass_a_closure
+sil @pass_a_closure: $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, var, name "i"
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %1 = integer_literal $Builtin.Int32, 0
+  store %1 to %0a : $*Builtin.Int32
+  %4 = function_ref @closure_with_box_argument : $@convention(thin) (Builtin.Int32, @owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
+  strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %6 = partial_apply %4(%0) : $@convention(thin) (Builtin.Int32, @owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
+  %7 = alloc_stack $Builtin.Int32
+  %9 = integer_literal $Builtin.Int32, 1
+  store %9 to %7 : $*Builtin.Int32
+  %12 = function_ref @_T04main5innerys5Int32Vz_yADctF: $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> ()
+  strong_retain %6 : $@callee_owned (Builtin.Int32) -> ()
+  %14 = apply %12(%7, %6) : $@convention(thin) (@inout Builtin.Int32, @owned @callee_owned (Builtin.Int32) -> ()) -> ()
+  strong_release %6 : $@callee_owned (Builtin.Int32) -> ()
+  %16 = tuple ()
+  dealloc_stack %7 : $*Builtin.Int32
+  %18 = load %0a : $*Builtin.Int32
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  return %18 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil shared @closure_with_box_argument
+sil shared @closure_with_box_argument : $@convention(thin) (Builtin.Int32, @owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+  %3 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  store %0 to %3 : $*Builtin.Int32
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// The specialized function should always be a thin function, regardless of the
+// representation of the original function.
+
+public protocol P {
+  static func foo(cl: () -> Int) -> Int
+}
+
+public struct S : P {
+  public static func foo(cl: () -> Int) -> Int
+  init()
+}
+
+// CHECK-LABEL: sil shared @_T04test1SVAA1PA2aDP3fooS2iycFZTW8closure2SiTf1cn_n : $@convention(thin) (@thick S.Type, Int) -> Int
+sil @_T04test1SVAA1PA2aDP3fooS2iycFZTW : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int {
+bb0(%0 : $@callee_owned () -> Int, %1 : $@thick S.Type):
+  %3 = apply %0() : $@callee_owned () -> Int
+  return %3 : $Int
+}
+
+sil shared @closure2 : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  return %0 : $Int
+}
+
+sil @call_witness_method : $@convention(thin) (Int, S) -> Int {
+bb0(%0 : $Int, %1 : $S):
+  %3 = function_ref @closure2 : $@convention(thin) (Int) -> Int
+  %4 = partial_apply %3(%0) : $@convention(thin) (Int) -> Int
+  %5 = metatype $@thick S.Type
+  %6 = function_ref @_T04test1SVAA1PA2aDP3fooS2iycFZTW : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
+  %7 = apply %6(%4, %5) : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
+  return %7 : $Int
+}
+
+sil_witness_table S: P module test {
+  method #P.foo!1: @_T04test1SVAA1PA2aDP3fooS2iycFZTW
+}
+
+// Test partial_apply -> convert_function -> convert_function -> try_apply.
+sil @testClosureConvertHelper : $(Int) -> ()
+
+// specialized testClosureConvertThunk
+// CHECK-LABEL: sil shared @_T023testClosureConvertThunk0abC6HelperSiTf1nc_n : $@convention(thin) (Int) -> (@out (), @error Error) {
+// CHECK: bb0(%0 : $*(), %1 : $Int):
+// CHECK:   [[F:%.*]] = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [[F]](%1) : $@convention(thin) (Int) -> ()
+// CHECK:   [[CVT1:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+// CHECK:   [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
+// CHECK:   try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
+// CHECK-LABEL: } // end sil function '_T023testClosureConvertThunk0abC6HelperSiTf1nc_n'
+sil @testClosureConvertThunk : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error) {
+bb0(%0 : $*(), %1 : $@noescape @callee_owned () -> @error Error):
+  try_apply %1() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
+
+bb1(%7 : $()):
+  %8 = tuple ()
+  return %8 : $()
+
+bb2(%10 : $Error):
+  throw %10 : $Error
+}
+
+// Test closure specialization when the closure type is converted before application.
+sil @testClosureConvert : $(Int) -> () {
+bb0(%0 : $Int):
+  %48 = alloc_stack $()
+  %49 = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
+  %50 = partial_apply %49(%0) : $@convention(thin) (Int) -> ()
+  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  %52 = convert_function %51 : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
+  %53 = function_ref @testClosureConvertThunk : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error)
+  try_apply %53(%48, %52) : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error), normal bb7, error bb11
+
+bb7(%callret : $()):
+  br bb99
+
+bb11(%128 : $Error):
+  br bb99
+
+bb99:
+  dealloc_stack %48 : $*()
+  %empty = tuple ()
+  return %empty : $()
+}

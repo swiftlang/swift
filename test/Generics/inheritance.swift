@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class A {
   func foo() { }
@@ -10,9 +10,9 @@ class B : A {
 
 class Other { }
 
-func acceptA(a: A) { }
+func acceptA(_ a: A) { }
 
-func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
+func f0<T : A>(_ obji: T, _ ai: A, _ bi: B) {
   var obj = obji, a = ai, b = bi
   // Method access
   obj.foo()
@@ -25,8 +25,8 @@ func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
   a = obj
 
   // Invalid assignments
-  obj = a // expected-error{{'A' is not convertible to 'T'}}
-  obj = b // expected-error{{'B' is not convertible to 'T'}}
+  obj = a // expected-error{{cannot assign value of type 'A' to type 'T'}}
+  obj = b // expected-error{{cannot assign value of type 'B' to type 'T'}}
 
   // Downcast that is actually a coercion
   a = (obj as? A)! // expected-warning{{conditional cast from 'T' to 'A' always succeeds}}
@@ -36,15 +36,11 @@ func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
   b = obj as! B
 }
 
-func call_f0(a: A, b: B, other: Other) {
+func call_f0(_ a: A, b: B, other: Other) {
   f0(a, a, b)
   f0(b, a, b)
   f0(other, a, b) // expected-error{{cannot convert value of type 'Other' to expected argument type 'A'}}
 }
-
-// Declaration errors
-func f1<T : A where T : Other>(_: T) { } // expected-error{{generic parameter 'T' cannot be a subclass of both 'A' and 'Other'}}
-func f2<T : A where T : B>(_: T) { }
 
 class X<T> {
   func f() -> T {}
@@ -60,21 +56,27 @@ func testGenericInherit() {
 
 
 struct SS<T> : T { } // expected-error{{inheritance from non-protocol type 'T'}}
-enum SE<T> : T { case X } // expected-error{{raw type 'T' is not convertible from any literal}}
-// expected-error@-1{{type 'SE<T>' does not conform to protocol 'RawRepresentable'}}
+enum SE<T> : T { case X } // expected-error{{raw type 'T' is not expressible by any literal}} // expected-error {{SE<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable conformance cannot be synthesized because raw type 'T' is not Equatable}}
 
 // Also need Equatable for init?(RawValue)
-enum SE2<T : IntegerLiteralConvertible> 
-  : T // expected-error{{RawRepresentable 'init' cannot be synthesized because raw type 'T' is not Equatable}}
+enum SE2<T : ExpressibleByIntegerLiteral>
+  : T // expected-error {{'SE2<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable conformance cannot be synthesized because raw type 'T' is not Equatable}}
 { case X }
 
-// ... but not if init?(RawValue) is directly implemented some other way.
-enum SE3<T : IntegerLiteralConvertible> : T { 
+// ... but not if init?(RawValue) and `rawValue` are directly implemented some other way.
+protocol InstanceGettable {
+  static var someInstance : Self { get }
+}
+enum SE3<T : ExpressibleByIntegerLiteral> : T where T: InstanceGettable {
   case X 
 
   init?(rawValue: T) {
     self = SE3.X
   }
+
+  var rawValue : T {
+    return T.someInstance
+  }
 }
 
-enum SE4<T : protocol<IntegerLiteralConvertible,Equatable> > : T { case X }
+enum SE4<T : ExpressibleByIntegerLiteral & Equatable> : T { case X }

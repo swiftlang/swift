@@ -1,14 +1,14 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Dictionary types.
 class Base {
-  func f0(d: [String: Int]) { }
-  func f1(d: [String: [Int: Int]]) { }
+  func f0(_ d: [String: Int]) { }
+  func f1(_ d: [String: [Int: Int]]) { }
 }
 
 class Derived : Base {
-  override func f0(d: Dictionary<String, Int>) { }
-  override func f1(d: Dictionary<String, Dictionary<Int, Int>>) { }
+  override func f0(_ d: Dictionary<String, Int>) { }
+  override func f1(_ d: Dictionary<String, Dictionary<Int, Int>>) { }
 }
 
 // Dictionary types in generic specializations.
@@ -19,7 +19,7 @@ func testGenericSpec() {
 }
 
 // Dictionary types for construction.
-func constructDictionary(n: Int) {
+func constructDictionary(_ n: Int) {
   var dict = [Int : String](minimumCapacity: n)
   dict[5] = "hello"
 }
@@ -32,4 +32,14 @@ var y2: [String : ] // expected-error{{expected dictionary value type}}
 
 struct NotHashable { }
 
-var nh1 : [NotHashable : Int ] // expected-error{{'NotHashable' does not conform to protocol 'Hashable'}}
+var nh1 : [NotHashable : Int] // expected-error{{'NotHashable' does not conform to protocol 'Hashable'}}
+
+struct Y<T> : Hashable {
+  var hashValue: Int { return 0 }
+
+  static func ==(this: Y<T>, other: Y<T>) -> Bool { return true }
+}
+
+let _ = [Y<Int>: Int]()
+let _ = [Y<Int> : Int]()
+let _ = [Y<Int> :Int]()

@@ -1,0 +1,156 @@
+// RUN: %empty-directory(%t)
+//
+// RUN: %gyb %s -o %t/AnyHashableCasts.swift
+// RUN: %target-build-swift -g -module-name a %t/AnyHashableCasts.swift -o %t.out
+// RUN: %target-run %t.out
+// RUN: %target-build-swift -g -O -module-name a %t/AnyHashableCasts.swift -o %t.out.optimized
+// RUN: %target-run %t.out.optimized
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
+var AnyHashableCasts = TestSuite("AnyHashableCasts")
+
+protocol Implemented {}
+protocol Unimplemented {}
+extension Int : Implemented {}
+
+struct HashableStruct : Hashable {
+  var value : Int
+  static func ==(lhs: HashableStruct, rhs: HashableStruct) -> Bool {
+    return lhs.value == rhs.value
+  }
+  var hashValue : Int { return value }
+}
+
+class HashableClass : Hashable {
+  var value : Int
+  init(value v: Int) { self.value = v }
+  static func ==(lhs: HashableClass, rhs: HashableClass) -> Bool {
+    return lhs.value == rhs.value
+  }
+  var hashValue : Int { return value }
+}
+
+enum HashableEnum : Hashable {
+  case value(Int)
+  static func ==(lhs: HashableEnum, rhs: HashableEnum) -> Bool {
+    switch (lhs, rhs) {
+    case (.value(let l), .value(let r)): return l == r
+    }
+  }
+  var hashValue : Int {
+    switch self {
+    case .value(let v): return v
+    }
+  }
+}
+
+func opaqueCast<T, U>(_ lhs: T, _ rhs: U.Type) -> U? {
+  return lhs as? U
+}
+
+func matches<T: Equatable>(_ lhs: T, _ rhs: T) -> Bool {
+  return lhs == rhs
+}
+
+func matches<T: Equatable, U>(_ lhs: U, _ rhs: T) -> Bool {
+  if let x = lhs as? T {
+    return x == rhs
+  } else {
+    return false
+  }
+}
+
+%{
+testCases = [
+  ("5", "AnyHashable", "Int", "5"),
+  ("5", "AnyHashable", "Any", "5"),
+  ("5", "AnyHashable", "Implemented", "5"),
+  ("5", "AnyHashable", "Unimplemented", False),
+  ("5", "Int", "AnyHashable", "5"),
+  ("5", "Any", "AnyHashable", "5"),
+  ("AnyHashable(5)", "Any", "Int", "5"),
+  ("HashableStruct(value: 5)", "HashableStruct", "AnyHashable",
+   "AnyHashable(HashableStruct(value: 5))"),
+  ("HashableClass(value: 5)", "HashableClass", "AnyHashable",
+   "AnyHashable(HashableClass(value: 5))"),
+  ("HashableEnum.value(5)", "HashableEnum", "AnyHashable",
+   "AnyHashable(HashableEnum.value(5))"),
+]
+}%
+
+% for valueExpr, coercedType, castType, expected in testCases:
+AnyHashableCasts.test("${valueExpr} as ${coercedType} as? ${castType}") {
+  do {
+    let x = ${valueExpr}
+    let y : ${coercedType} = x
+    if let z = y as? ${castType} {
+%if expected:
+      expectTrue(matches(z, ${expected}))
+%else:
+      expectUnreachable()
+%end
+    } else {
+%if expected:
+      expectUnreachable()
+%end
+    }
+
+    if let z = opaqueCast(y, (${castType}).self) {
+%if expected:
+      expectTrue(matches(z, ${expected}))
+%else:
+      expectUnreachable()
+%end
+    } else {
+%if expected:
+      expectUnreachable()
+%end
+    }
+  }
+}
+% end
+
+#if _runtime(_ObjC)
+// A wrapper type around a String that bridges to NSString.
+struct StringWrapper1 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: String
+}
+
+// A wrapper type around a String that bridges to NSString.
+struct StringWrapper2 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: String
+}
+
+AnyHashableCasts.test("Wrappers around bridged types") {
+  let wrapper1Hello: AnyHashable = StringWrapper1(rawValue: "hello")
+  let stringHello: AnyHashable = "hello" as String
+  let nsStringHello: AnyHashable = "hello" as NSString
+
+  // Casting from Swift wrapper maintains type identity
+  expectNotNil(wrapper1Hello as? StringWrapper1)
+  expectNil(wrapper1Hello as? StringWrapper2)
+  expectNil(wrapper1Hello as? String)
+  expectNotNil(wrapper1Hello as? NSString)
+
+  // Casting from String maintains type identity
+  expectNil(stringHello as? StringWrapper1)
+  expectNil(stringHello as? StringWrapper2)
+  expectNotNil(stringHello as? String)
+  expectNotNil(stringHello as? NSString)
+
+  // Casting form NSString works with anything.
+  expectNotNil(nsStringHello as? StringWrapper1)
+  expectNotNil(nsStringHello as? StringWrapper2)
+  expectNotNil(nsStringHello as? String)
+  expectNotNil(nsStringHello as? NSString)
+}
+
+#endif
+
+runAllTests()

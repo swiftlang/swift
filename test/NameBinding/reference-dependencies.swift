@@ -1,8 +1,12 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
-// RUN: FileCheck %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %FileCheck %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+
+// Check that the output is deterministic.
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: diff %t.swiftdeps %t-2.swiftdeps
 
 // CHECK-LABEL: {{^provides-top-level:$}}
 // CHECK-NEXT: "IntWrapper"
@@ -13,39 +17,50 @@
 // CHECK-NEXT: "Subclass"
 // CHECK-NEXT: "MyArray"
 // CHECK-NEXT: "someGlobal"
-// CHECK-NEXT: "ExtraFloatLiteralConvertible"
+// CHECK-NEXT: "ExpressibleByExtraFloatLiteral"
 // CHECK-NEXT: "~~~"
-// CHECK-NEXT: "ThreeTildeType"
+// CHECK-NEXT: "ThreeTilde"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "overloadedOnProto"
+// CHECK-NEXT: "~~~~"
+// CHECK-NEXT: "FourTilde"
+// CHECK-NEXT: "FourTildeImpl"
+// CHECK-NEXT: "FiveTildeImpl"
 // CHECK-NEXT: "topLevelComputedProperty"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
+// CHECK-NEXT: "testOperators"
 // CHECK-NEXT: "TopLevelForMemberLookup"
 // CHECK-NEXT: "lookUpMembers"
 // CHECK-NEXT: "publicUseOfMember"
 // CHECK-NEXT: "Outer"
 // CHECK: "eof"
+// CHECK-NEXT: "~~~"
+// CHECK-NEXT: "~~~~"
+// CHECK-NEXT: "~~~~"
+// CHECK-NEXT: "~~~~~"
 
 // CHECK-LABEL: {{^provides-nominal:$}}
-// CHECK-NEXT: "V4main10IntWrapper"
-// CHECK-NEXT: "VV4main10IntWrapper16InnerForNoReason"
-// CHECK-NEXT: "C4main8Subclass"
-// CHECK-NEXT: "VE4mainSb11InnerToBool"
-// CHECK: "V4main9Sentinel1"
-// CHECK-NEXT: "V4main9Sentinel2"
+// CHECK-NEXT: "4main10IntWrapperV"
+// CHECK-NEXT: "4main10IntWrapperV16InnerForNoReasonV"
+// CHECK-NEXT: "4main8SubclassC"
+// CHECK-NEXT: "Sb4mainE11InnerToBoolV"
+// CHECK: "4main9Sentinel1V"
+// CHECK-NEXT: "4main9Sentinel2V"
 
 // CHECK-LABEL: {{^provides-member:$}}
-// CHECK-NEXT: - ["V4main10IntWrapper", ""]
-// CHECK-NEXT: - ["VV4main10IntWrapper16InnerForNoReason", ""]
-// CHECK-NEXT: - ["C4main8Subclass", ""]
-// CHECK-NEXT: - ["Ps23ArrayLiteralConvertible", ""]
+// CHECK-NEXT: - ["4main10IntWrapperV", ""]
+// CHECK-NEXT: - ["4main10IntWrapperV16InnerForNoReasonV", ""]
+// CHECK-NEXT: - ["4main8SubclassC", ""]
+// CHECK-NEXT: - ["s25ExpressibleByArrayLiteralP", ""]
 // CHECK-NEXT: - ["Sb", ""]
-// CHECK-NEXT: - ["VE4mainSb11InnerToBool", ""]
-// CHECK: - ["V4main9Sentinel1", ""]
-// CHECK-NEXT: - ["V4main9Sentinel2", ""]
-// CHECK: - ["Ps23ArrayLiteralConvertible", "useless"]
-// CHECK-NEXT: - ["Ps23ArrayLiteralConvertible", "useless2"]
+// CHECK-NEXT: - ["Sb4mainE11InnerToBoolV", ""]
+// CHECK: - ["4main9Sentinel1V", ""]
+// CHECK-NEXT: - ["4main9Sentinel2V", ""]
+// CHECK: - ["s25ExpressibleByArrayLiteralP", "useless"]
+// CHECK-NEXT: - ["s25ExpressibleByArrayLiteralP", "useless2"]
 // CHECK-NEXT: - ["Sb", "InnerToBool"]
+// CHECK-NEXT: - ["{{.*[0-9]}}FourTildeImplV", "~~~~"]
+// CHECK-NEXT: - ["{{.*[0-9]}}FiveTildeImplV", "~~~~~"]
 
 // CHECK-LABEL: {{^depends-top-level:$}}
 
@@ -55,6 +70,13 @@ struct IntWrapper: Comparable {
   var value: Int
 
   struct InnerForNoReason {}
+
+  // CHECK-DAG: - "TypeReferencedOnlyBySubscript"
+  subscript(_: TypeReferencedOnlyBySubscript) -> Void { return () }
+
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateSubscript"
+  // FIXME: This should be marked "!private".
+  private subscript(_: TypeReferencedOnlyByPrivateSubscript) -> Void { return () }
 }
 
 // CHECK-DAG: "IntWrapper"
@@ -75,7 +97,7 @@ func <(lhs: IntWrapper, rhs: IntWrapper) -> Bool {
 prefix func ***(lhs: IntWrapper) {}
 
 // This is provided as an operator but not implemented here.
-prefix operator ^^^ {}
+prefix operator ^^^
 
 // CHECK-DAG: "ClassFromOtherFile"
 class Subclass : ClassFromOtherFile {}
@@ -83,14 +105,14 @@ class Subclass : ClassFromOtherFile {}
 // CHECK-DAG: "Array"
 typealias MyArray = Array<Bool>
 
-// CHECK-DAG: "ArrayLiteralConvertible"
-extension ArrayLiteralConvertible {
-  final func useless() {}
+// CHECK-DAG: "ExpressibleByArrayLiteral"
+extension ExpressibleByArrayLiteral {
+  func useless() {}
 }
 
 // CHECK-DAG: OtherFileElementType
-extension ArrayLiteralConvertible where Element == OtherFileElementType {
-  final func useless2() {}
+extension ExpressibleByArrayLiteral where ArrayLiteralElement == OtherFileElementType {
+  func useless2() {}
 }
 
 // CHECK-DAG: "IntegerLiteralType"
@@ -100,27 +122,44 @@ extension Bool {
   struct InnerToBool {}
 }
 
-// CHECK-DAG: - "OtherFileAliasForFloatLiteralConvertible"
-protocol ExtraFloatLiteralConvertible
-    : OtherFileAliasForFloatLiteralConvertible {
+// CHECK-DAG: - "ExpressibleByOtherFileAliasForFloatLiteral"
+protocol ExpressibleByExtraFloatLiteral
+    : ExpressibleByOtherFileAliasForFloatLiteral {
 }
-// CHECK-DAG: !private "UnicodeScalarLiteralConvertible"
-private protocol ExtraCharLiteralConvertible : UnicodeScalarLiteralConvertible {
-}
-
-prefix operator ~~~ {}
-protocol ThreeTildeType {
-  prefix func ~~~(lhs: Self)
+// CHECK-DAG: !private "ExpressibleByUnicodeScalarLiteral"
+private protocol ExpressibleByExtraCharLiteral : ExpressibleByUnicodeScalarLiteral {
 }
 
-private struct ThreeTildeTypeImpl : ThreeTildeType {
+prefix operator ~~~
+protocol ThreeTilde {
+  prefix static func ~~~(lhs: Self)
+}
+
+private struct ThreeTildeTypeImpl : ThreeTilde {
 }
 
 func overloadedOnProto<T>(_: T) {}
-func overloadedOnProto<T: ThreeTildeType>(_: T) {}
+func overloadedOnProto<T: ThreeTilde>(_: T) {}
 
-// CHECK-DAG: !private "~~~"
+// CHECK-DAG: - "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
+
+// CHECK-DAG: - "~~~~"
+prefix operator ~~~~
+protocol FourTilde {
+  prefix static func ~~~~(arg: Self)
+}
+struct FourTildeImpl : FourTilde {}
+extension FourTildeImpl {
+  prefix static func ~~~~(arg: FourTildeImpl) {}
+}
+
+// CHECK-DAG: - "~~~~~"
+// ~~~~~ is declared in the other file.
+struct FiveTildeImpl {}
+extension FiveTildeImpl {
+  prefix static func ~~~~~(arg: FiveTildeImpl) {}
+}
 
 var topLevelComputedProperty: Bool {
   return true
@@ -132,7 +171,7 @@ func lookUpManyTopLevelNames() {
 
   // CHECK-DAG: !private "UInt"
   // CHECK-DAG: !private "+"
-  let _: UInt = [1, 2].reduce(0, combine: +)
+  let _: UInt = [1, 2].reduce(0, +)
   
   // CHECK-DAG: !private "-"
   let _: UInt = 3 - 2 - 1
@@ -146,7 +185,7 @@ func lookUpManyTopLevelNames() {
   // "CInt" is not used as a top-level name here.
   // CHECK-DAG: !private "StringLiteralType"
   // NEGATIVE-NOT: "CInt"
-  let CInt = "abc"
+  _ = "abc"
 
   // NEGATIVE-NOT: - "max"
   print(Int.max)
@@ -176,6 +215,8 @@ func lookUpManyTopLevelNames() {
   switch getOtherFileEnum() {
   case .Value:
     break
+  default:
+    break
   }
 
   _ = .Value as OtherFileEnumWrapper.Enum
@@ -192,18 +233,35 @@ func lookUpManyTopLevelNames() {
   switch value {
   case is OtherFileEnumWrapper.Enum:
     break
+  default:
+    break
   }
 
   // CHECK-DAG: !private "~="
   switch 42 {
   case 50:
     break
+  default:
+    break
   }
   
-  for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
+  for _: OtherFileEnumWrapper.Enum in EmptyIterator<X>() {}
   
   // CHECK-DAG: !private "otherFileGetNonImpl"
   overloadedOnProto(otherFileGetNonImpl())
+}
+
+func testOperators<T: Starry>(generic: T, specific: Flyswatter) {
+  // CHECK-DAG: !private "****"
+  // CHECK-DAG: !private "*****"
+  // CHECK-DAG: !private "******"
+  ****generic
+  generic*****0
+  0******generic
+
+  ****specific
+  specific*****0
+  0******specific
 }
 
 struct TopLevelForMemberLookup {
@@ -216,7 +274,7 @@ func lookUpMembers() {
   TopLevelForMemberLookup.m1()
   TopLevelForMemberLookup.m3()
 }
-public let publicUseOfMember = TopLevelForMemberLookup.m2()
+public let publicUseOfMember: () = TopLevelForMemberLookup.m2()
 
 struct Outer {
   struct Inner {
@@ -243,11 +301,11 @@ struct Use4 : TopLevelProto1 {
 }
 
 // CHECK-DAG: - "*"
-print(42 * 30)
+_ = 42 * 30
 
 // FIXME: Incorrectly marked non-private dependencies
 // CHECK-DAG: - "topLevel6"
-print(topLevel6())
+_ = topLevel6()
 // CHECK-DAG: - "topLevel7"
 private var use7 = topLevel7()
 // CHECK-DAG: - "topLevel8"
@@ -257,7 +315,7 @@ var use9 = { () -> Int in return topLevel9() }
 
 
 // CHECK-DAG: - "TopLevelTy1"
-func useTy1(x: TopLevelTy1) {}
+func useTy1(_ x: TopLevelTy1) {}
 // CHECK-DAG: - "TopLevelTy2"
 func useTy2() -> TopLevelTy2 {}
 // CHECK-DAG: - "TopLevelTy3"
@@ -282,7 +340,7 @@ struct StructForDeclaringProperties {
 }
 
 // CHECK-DAG: !private "privateTopLevel1"
-func private1(a: Int = privateTopLevel1()) {}
+func private1(_ a: Int = privateTopLevel1()) {}
 // CHECK-DAG: !private "privateTopLevel2"
 // CHECK-DAG: !private "PrivateProto1"
 private struct Private2 : PrivateProto1 {
@@ -290,7 +348,7 @@ private struct Private2 : PrivateProto1 {
 }
 // CHECK-DAG: !private "privateTopLevel3"
 func outerPrivate3() {
-  let private3 = { privateTopLevel3() }
+  let _ = { privateTopLevel3() }
 }
 
 // CHECK-DAG: !private "PrivateTopLevelTy1"
@@ -300,17 +358,19 @@ private extension Use4 {
 // CHECK-DAG: !private "PrivateTopLevelTy2"
 // CHECK-DAG: "PrivateProto2"
 extension Private2 : PrivateProto2 {
-  var privateTy2: PrivateTopLevelTy2? { return nil }
+  // FIXME: This test is supposed to check that we get this behavior /without/
+  // marking the property private, just from the base type.
+  private var privateTy2: PrivateTopLevelTy2? { return nil }
 }
 // CHECK-DAG: !private "PrivateTopLevelTy3"
 func outerPrivateTy3() {
-  func inner(a: PrivateTopLevelTy3?) {}
+  func inner(_ a: PrivateTopLevelTy3?) {}
   inner(nil)
 }
 // CHECK-DAG: !private "PrivateTopLevelStruct3"
 private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
 // CHECK-DAG: !private "PrivateTopLevelStruct4"
-private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
+private func privateTy5(_ x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
   return x
 }
 
@@ -318,6 +378,20 @@ private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelS
 private struct PrivateTy6 {}
 // CHECK-DAG: !private "PrivateProto3"
 extension PrivateTy6 : PrivateProto3 {}
+
+// CHECK-DAG: - "ProtoReferencedOnlyInGeneric"
+func genericTest<T: ProtoReferencedOnlyInGeneric>(_: T) {}
+// CHECK-DAG: !private "ProtoReferencedOnlyInPrivateGeneric"
+private func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
+
+struct PrivateStoredProperty {
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateVar"
+  private var value: TypeReferencedOnlyByPrivateVar
+}
+class PrivateStoredPropertyRef {
+  // CHECK-DAG: - "TypeReferencedOnlyByPrivateClassVar"
+  private var value: TypeReferencedOnlyByPrivateClassVar?
+}
 
 struct Sentinel1 {}
 
@@ -333,103 +407,84 @@ struct Sentinel2 {}
 
 
 // CHECK-LABEL: {{^depends-member:$}}
-// CHECK-DAG: - ["V4main10IntWrapper", "Int"]
-// CHECK-DAG: - ["V4main10IntWrapper", "deinit"]
-// CHECK-DAG: - ["Ps10Comparable", ""]
-// CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
-// CHECK-DAG: - !private ["Si", "Distance"]
-// CHECK-DAG: - !private ["Si", "IntegerLiteralType"]
-// CHECK-DAG: - !private ["Si", "Stride"]
-// CHECK-DAG: - !private ["Si", "deinit"]
+// CHECK-DAG: - ["4main10IntWrapperV", "Int"]
+// CHECK-DAG: - ["4main10IntWrapperV", "deinit"]
+// CHECK-DAG: - ["s10ComparableP", ""]
+// CHECK-DAG: - ["4main18ClassFromOtherFileC", ""]
 // CHECK-DAG: - !private ["Si", "max"]
-// CHECK-DAG: - ["Ps23FloatLiteralConvertible", ""]
-// CHECK-DAG: - !private ["Ps31UnicodeScalarLiteralConvertible", ""]
-// CHECK-DAG: - !private ["Ps10Strideable", "Stride"]
-// CHECK-DAG: - !private ["Sa", "Element"]
+// CHECK-DAG: - ["s25ExpressibleByFloatLiteralP", ""]
+// CHECK-DAG: - !private ["s33ExpressibleByUnicodeScalarLiteralP", ""]
+// CHECK-DAG: - !private ["s10StrideableP", "Stride"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
 // CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
 // CHECK-DAG: - ["Sb", "InnerToBool"]
-// CHECK-DAG: - !private ["Vs10Dictionary", "Key"]
-// CHECK-DAG: - !private ["Vs10Dictionary", "Value"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Generator"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
-// CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
-// CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]
-// CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "sharedConstant"]
-// CHECK-DAG: - !private ["VV4main26OtherFileSecretTypeWrapper10SecretType", "constant"]
-// CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
-// CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
-// CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "Element"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "init"]
-// CHECK-DAG: - !private ["Vs17IndexingGenerator", "Element"]
-// CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
-// CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
+// CHECK-DAG: - !private ["4main17OtherFileIntArrayV", "deinit"]
+// CHECK-DAG: - !private ["4main18OtherFileOuterTypeV", "InnerType"]
+// CHECK-DAG: - !private ["4main18OtherFileOuterTypeV05InnerE0V", "init"]
+// CHECK-DAG: - !private ["4main18OtherFileOuterTypeV05InnerE0V", "sharedConstant"]
+// CHECK-DAG: - !private ["4main26OtherFileSecretTypeWrapperV0dE0V", "constant"]
+// CHECK-DAG: - !private ["4main25OtherFileProtoImplementorV", "deinit"]
+// CHECK-DAG: - !private ["4main26OtherFileProtoImplementor2V", "deinit"]
+// CHECK-DAG: - !private ["s13EmptyIteratorV", "init"]
+// CHECK-DAG: - ["4main13OtherFileEnumO", "Value"]
+// CHECK-DAG: - !private ["4main20OtherFileEnumWrapperV", "Enum"]
 
-// CHECK-DAG: - ["V4main14TopLevelStruct", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct2", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct3", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct4", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct5", "ValueType"]
-// CHECK-DAG: - !private ["V4main21PrivateTopLevelStruct", "ValueType"]
-// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct2", "ValueType"]
-// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct3", "ValueType"]
-// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct4", "ValueType"]
+// CHECK-DAG: - ["4main14TopLevelStructV", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct2V", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct3V", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct4V", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct5V", "ValueType"]
+// CHECK-DAG: - !private ["4main21PrivateTopLevelStructV", "ValueType"]
+// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct2V", "ValueType"]
+// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct3V", "ValueType"]
+// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct4V", "ValueType"]
 
-// CHECK-DAG: - ["P4main14TopLevelProto1", ""]
-// CHECK-DAG: - ["P4main14TopLevelProto2", ""]
-// CHECK-DAG: - !private ["P4main13PrivateProto1", ""]
-// CHECK-DAG: - !private ["P4main13PrivateProto2", ""]
-// CHECK-DAG: - !private ["P4main13PrivateProto3", ""]
+// CHECK-DAG: - ["4main14TopLevelProto1P", ""]
+// CHECK-DAG: - ["4main14TopLevelProto2P", ""]
+// CHECK-DAG: - !private ["4main13PrivateProto1P", ""]
+// CHECK-DAG: - !private ["4main13PrivateProto2P", ""]
+// CHECK-DAG: - !private ["4main13PrivateProto3P", ""]
 
 // CHECK-LABEL: {{^depends-nominal:$}}
-// CHECK-DAG: - "V4main10IntWrapper"
-// CHECK-DAG: - "Ps10Comparable"
-// CHECK-DAG: - "C4main18ClassFromOtherFile"
-// CHECK-DAG: !private "Si"
-// CHECK-DAG: - "Ps23FloatLiteralConvertible"
-// CHECK-DAG: !private "Ps31UnicodeScalarLiteralConvertible"
-// CHECK-DAG: !private "Ps10Strideable"
-// CHECK-DAG: !private "Sa"
-// CHECK-DAG: - "Sb"
-// CHECK-DAG: !private "Vs10Dictionary"
-// CHECK-DAG: !private "V4main17OtherFileIntArray"
-// CHECK-DAG: !private "V4main18OtherFileOuterType"
-// CHECK-DAG: !private "VV4main18OtherFileOuterType9InnerType"
-// CHECK-DAG: !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
-// CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
-// CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
-// CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
-// CHECK-DAG: !private "Vs14EmptyGenerator"
-// CHECK-DAG: !private "Vs17IndexingGenerator"
-// CHECK-DAG: - "O4main13OtherFileEnum"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-// CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
-
-// CHECK-DAG: - "V4main23TopLevelForMemberLookup"
-
-// CHECK-DAG: - "V4main14TopLevelStruct"
-// CHECK-DAG: - "V4main15TopLevelStruct2"
-// CHECK-DAG: - "V4main15TopLevelStruct3"
-// CHECK-DAG: - "V4main15TopLevelStruct4"
-// CHECK-DAG: - "V4main15TopLevelStruct5"
-// CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct3"
-// CHECK-DAG: !private "V4main22PrivateTopLevelStruct4"
-
-// CHECK-DAG: - "P4main14TopLevelProto1"
-// CHECK-DAG: - "P4main14TopLevelProto2"
-// CHECK-DAG: !private "P4main13PrivateProto1"
-// CHECK-DAG: !private "P4main13PrivateProto2"
-// CHECK-DAG: !private "P4main13PrivateProto3"
+// We're checking order here to make sure the names are sorted.
+// CHECK: - !private "Sa"
+// CHECK: - "Sb"
+// CHECK: - "4main18ClassFromOtherFileC"
+// CHECK: - "s10ComparableP"
+// CHECK: - !private "s13EmptyIteratorV"
+// CHECK: - "s25ExpressibleByFloatLiteralP"
+// CHECK: - !private "s33ExpressibleByUnicodeScalarLiteralP"
+// CHECK: - !private "4main18OtherFileOuterTypeV05InnerE0V"
+// CHECK: - !private "Si"
+// CHECK: - "4main10IntWrapperV"
+// CHECK: - "4main13OtherFileEnumO"
+// CHECK: - !private "4main20OtherFileEnumWrapperV"
+// CHECK: - !private "4main17OtherFileIntArrayV"
+// CHECK: - !private "4main18OtherFileOuterTypeV"
+// CHECK: - !private "4main25OtherFileProtoImplementorV"
+// CHECK: - !private "4main26OtherFileProtoImplementor2V"
+// CHECK: - !private "4main13PrivateProto1P"
+// CHECK: - !private "4main13PrivateProto2P"
+// CHECK: - !private "4main13PrivateProto3P"
+// CHECK: - !private "4main21PrivateTopLevelStructV"
+// CHECK: - !private "4main22PrivateTopLevelStruct2V"
+// CHECK: - !private "4main22PrivateTopLevelStruct3V"
+// CHECK: - !private "4main22PrivateTopLevelStruct4V"
+// CHECK: - !private "4main26OtherFileSecretTypeWrapperV0dE0V"
+// CHECK: - !private "s10StrideableP"
+// CHECK: - "4main23TopLevelForMemberLookupV"
+// CHECK: - "4main14TopLevelProto1P"
+// CHECK: - "4main14TopLevelProto2P"
+// CHECK: - "4main14TopLevelStructV"
+// CHECK: - "4main15TopLevelStruct2V"
+// CHECK: - "4main15TopLevelStruct3V"
+// CHECK: - "4main15TopLevelStruct4V"
+// CHECK: - "4main15TopLevelStruct5V"
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
-// NEGATIVE-NOT: "SS"
 // These are used by the other file in this module, but not by this one.
-// NEGATIVE-NOT: "FloatLiteralConvertible"
+// NEGATIVE-NOT: "ExpressibleByFloatLiteral"
 // NEGATIVE-NOT: "Int16"
 // NEGATIVE-NOT: "OtherFileProto"
 // NEGATIVE-NOT: "OtherFileProtoImplementor"
@@ -438,6 +493,6 @@ struct Sentinel2 {}
 
 // OtherFileSecretTypeWrapper is never used directly in this file.
 // NEGATIVE-NOT: "OtherFileSecretTypeWrapper"
-// NEGATIVE-NOT: "V4main26OtherFileSecretTypeWrapper"
+// NEGATIVE-NOT: "4main26OtherFileSecretTypeWrapperV"
 
 let eof: () = ()

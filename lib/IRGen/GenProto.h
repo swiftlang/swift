@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,35 +17,61 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
+#include "swift/SIL/SILFunction.h"
+
+#include "Fulfillment.h"
+#include "GenericRequirement.h"
+
 namespace llvm {
   class Type;
 }
 
 namespace swift {
+  class AssociatedConformance;
+  class AssociatedType;
   class CanType;
   class FuncDecl;
-  class ProtocolConformance;
+  class ProtocolConformanceRef;
   struct SILDeclRef;
   class SILType;
   class SILFunction;
 
 namespace irgen {
-  class AbstractCallee;
   class Address;
   class Explosion;
-  class CallEmission;
+  class FunctionPointer;
   class IRGenFunction;
   class IRGenModule;
+  class MetadataPath;
   class ProtocolInfo;
   class TypeInfo;
+
+  /// Set an LLVM value name for the given type metadata.
+  void setTypeMetadataName(IRGenModule &IGM, llvm::Value *value, CanType type);
+
+  /// Set an LLVM value name for the given protocol witness table.
+  void setProtocolWitnessTableName(IRGenModule &IGM, llvm::Value *value,
+                                   CanType type, ProtocolDecl *protocol);
   
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
-  void emitWitnessMethodValue(IRGenFunction &IGF,
-                              CanType baseTy,
-                              SILDeclRef member,
-                              ProtocolConformance *conformance,
-                              Explosion &out);
+  FunctionPointer emitWitnessMethodValue(IRGenFunction &IGF,
+                                         CanType baseTy,
+                                         llvm::Value **baseMetadataCache,
+                                         SILDeclRef member,
+                                         ProtocolConformanceRef conformance,
+                                         CanSILFunctionType fnType);
+
+  /// Given a type T and an associated type X of some protocol P to
+  /// which T conforms, return the type metadata for T.X.
+  ///
+  /// \param parentMetadata - the type metadata for T
+  /// \param wtable - the witness table witnessing the conformance of T to P
+  /// \param associatedType - the declaration of X; a member of P
+  llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
+                                             llvm::Value *parentMetadata,
+                                             llvm::Value *wtable,
+                                             AssociatedType associatedType);
 
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
@@ -57,7 +83,7 @@ namespace irgen {
   /// witness method.
   inline unsigned getTrailingWitnessSignatureLength(IRGenModule &IGM,
                                                     CanSILFunctionType type) {
-    return 1;
+    return 2;
   }
 
   /// Add the trailing arguments necessary for calling a witness method.
@@ -67,6 +93,7 @@ namespace irgen {
 
   struct WitnessMetadata {
     llvm::Value *SelfMetadata = nullptr;
+    llvm::Value *SelfWitnessTable = nullptr;
   };
 
   /// Collect any required metadata for a witness method from the end
@@ -88,52 +115,35 @@ namespace irgen {
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
   
-  /// Perform the metadata bindings necessary to emit a generic value witness.
-  void emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
-                                                       NominalTypeDecl *ntd,
-                                                       llvm::Value *selfMeta);
-
-  /// Add the trailing arguments necessary for calling a witness method.
-  void emitTrailingWitnessArguments(IRGenFunction &IGF,
-                                    WitnessMetadata &witnessMetadata,
-                                    Explosion &args);
-
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 CanSILFunctionType origType,
-                                CanSILFunctionType substType,
-                                ArrayRef<Substitution> subs,
+                                const SubstitutionMap &subs,
                                 WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 
-  /// True if a type has a generic-parameter-dependent value witness table.
-  /// Currently, this is true if the size and/or alignment of the type is
-  /// dependent on its generic parameters.
-  bool hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty);
-  
-  /// Emit a value-witness table for the given type, which is assumed
-  /// to be non-dependent.
-  llvm::Constant *emitValueWitnessTable(IRGenModule &IGM, CanType type);
-
-  /// Emit the elements of a dependent value witness table template into a
-  /// vector.
-  void emitDependentValueWitnessTablePattern(IRGenModule &IGM,
-                                    CanType abstractType,
-                                    SmallVectorImpl<llvm::Constant*> &fields);
+  /// Bind the polymorphic parameter inside of a partial apply forwarding thunk.
+  void bindPolymorphicParameter(IRGenFunction &IGF,
+                                CanSILFunctionType &OrigFnType,
+                                CanSILFunctionType &SubstFnType,
+                                Explosion &nativeParam, unsigned paramIndex);
 
   /// Emit references to the witness tables for the substituted type
   /// in the given substitution.
   void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
+                            llvm::Value **metadataCache,
                             SmallVectorImpl<llvm::Value *> &out);
 
   /// Emit a witness table reference.
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
                                    CanType srcType,
-                                   const TypeInfo &srcTI,
-                                   ProtocolDecl *proto,
-                                   const ProtocolInfo &protoI,
-                                   ProtocolConformance *conformance);
+                                   llvm::Value **srcMetadataCache,
+                                   ProtocolConformanceRef conformance);
+
+  llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
+                                   CanType srcType,
+                                   ProtocolConformanceRef conformance);
 
   /// An entry in a list of known protocols.
   class ProtocolEntry {
@@ -155,18 +165,66 @@ namespace irgen {
                                           ProtocolDecl *target,
                                     const GetWitnessTableFn &getWitnessTable);
 
-  /// Allocate space for a value in a value buffer.
-  Address emitAllocateBuffer(IRGenFunction &IGF, SILType valueType,
-                             Address buffer);
+  class MetadataSource {
+  public:
+    enum class Kind {
+      /// Metadata is derived from a source class pointer.
+      ClassPointer,
 
-  /// Project to the address of a value in a value buffer.
-  Address emitProjectBuffer(IRGenFunction &IGF, SILType valueType,
-                            Address buffer);
+      /// Metadata is derived from a type metadata pointer.
+      Metadata,
 
-  /// Deallocate space for a value in a value buffer.
-  void emitDeallocateBuffer(IRGenFunction &IGF, SILType valueType,
-                            Address buffer);
-  
+      /// Metadata is derived from the origin type parameter.
+      GenericLValueMetadata,
+
+      /// Metadata is obtained directly from the from a Self metadata
+      /// parameter passed via the WitnessMethod convention.
+      SelfMetadata,
+
+      /// Metadata is derived from the Self witness table parameter
+      /// passed via the WitnessMethod convention.
+      SelfWitnessTable,
+    };
+
+    static bool requiresSourceIndex(Kind kind) {
+      return (kind == Kind::ClassPointer ||
+              kind == Kind::Metadata ||
+              kind == Kind::GenericLValueMetadata);
+    }
+
+    enum : unsigned { InvalidSourceIndex = ~0U };
+
+  private:
+    /// The kind of source this is.
+    Kind TheKind;
+
+    /// The parameter index, for ClassPointer and Metadata sources.
+    unsigned Index;
+
+  public:
+    CanType Type;
+
+    MetadataSource(Kind kind, unsigned index, CanType type)
+      : TheKind(kind), Index(index), Type(type) {
+      assert(index != InvalidSourceIndex || !requiresSourceIndex(kind));
+    }
+
+    Kind getKind() const { return TheKind; }
+    unsigned getParamIndex() const {
+      assert(requiresSourceIndex(getKind()));
+      return Index;
+    }
+  };
+
+  using GenericParamFulfillmentCallback =
+    llvm::function_ref<void(CanType genericParamType,
+                            const MetadataSource &source,
+                            const MetadataPath &path)>;
+
+  void enumerateGenericParamFulfillments(IRGenModule &IGM,
+    CanSILFunctionType fnType,
+    GenericParamFulfillmentCallback callback);
+
 } // end namespace irgen
 } // end namespace swift
 

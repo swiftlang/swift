@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -98,7 +98,9 @@ public:
   };
 
   bool InPoundLineEnvironment = false;
-
+  // FIXME: When condition evaluation moves to a later phase, remove this bit
+  // and adjust the client call 'performParseOnly'.
+  bool PerformConditionEvaluation = true;
 private:
   ScopeInfo ScopeInfo;
   typedef llvm::DenseMap<AbstractFunctionDecl *,

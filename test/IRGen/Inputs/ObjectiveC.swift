@@ -34,20 +34,20 @@ public struct ObjCBool : CustomStringConvertible {
 }
 
 public struct Selector {
-  private var ptr : COpaquePointer
+  private var ptr : OpaquePointer
 }
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-public func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+public func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
-public func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+public func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return x.boolValue
 }
 
 extension NSObject : Hashable {
-  public var hashValue: Int { return 0 }
+  open var hashValue: Int { return 0 }
 }
 public func ==(x: NSObject, y: NSObject) -> Bool { return x === y }
 

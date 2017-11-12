@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp -R %S/Inputs/FakeUnavailableObjCFramework.framework %t
 // RUN: %target-clang -dynamiclib %S/Inputs/FakeUnavailableObjCFramework.m -fmodules -F %t -framework Foundation -o %t/FakeUnavailableObjCFramework.framework/FakeUnavailableObjCFramework
 
@@ -8,17 +8,18 @@
 // These tests emulate deploying back to an older OS where newer APIs are not
 // available by linking to an Objective-C framework where APIs have been
 // annotated to only be available in the far future (version 1066.0 of all
-// platforms) and then moving the famework aside so that it can't be found
+// platforms) and then moving the framework aside so that it can't be found
 // at run time.
 // RUN: mv %t/FakeUnavailableObjCFramework.framework %t/FakeUnavailableObjCFramework-MovedAside.framework
 
-// RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework | FileCheck %s
-// RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework.opt | FileCheck %s
+// RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework | %FileCheck %s
+// RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework.opt | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
 import StdlibUnittest
+
 
 import FakeUnavailableObjCFramework
 import Foundation
@@ -114,7 +115,7 @@ func useUnavailableObjCClass() {
     o.someMethod()
   }
 
-  for var i = 0; i < getInt(5); ++i {
+  for i in 0 ..< getInt(5) {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let o: UnavailableObjCClass = printClassMetadataViaGeneric()
       _blackHole(o)
@@ -124,19 +125,24 @@ func useUnavailableObjCClass() {
   class SomeClass { }
   let someObject: AnyObject = _opaqueIdentity(SomeClass() as AnyObject)
 
-  for var i = 0; i < getInt(5); ++i {
+  for i in 0 ..< getInt(5) {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let isUnavailable = someObject is UnavailableObjCClass
       _blackHole(isUnavailable)
     }
   }
 
-  for var i = 0; i < getInt(5); ++i {
+  for i in 0 ..< getInt(5) {
     if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
       let asUnavailable = someObject as? UnavailableObjCClass
       _blackHole(asUnavailable)
     }
   }
+}
+
+@available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *)
+func wrapUnavailableFunction() {
+  someFunction()
 }
 
 useUnavailableObjCClass()

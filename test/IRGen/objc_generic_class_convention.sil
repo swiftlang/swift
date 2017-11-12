@@ -1,0 +1,26 @@
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import Foundation
+import objc_generics
+
+// If we define a method on an ObjC generic class in Swift, we don't have
+// access to Self's type parameters, and shouldn't try to emit type parameters
+// for them either, since they wouldn't be available through the polymorphic
+// convention for class methods.
+
+// CHECK-LABEL: define swiftcc void @method(i64, %TSo12GenericClassC* swiftself)
+sil @method : $@convention(method) @pseudogeneric <T: AnyObject> (Int64, @guaranteed GenericClass<T>) -> () {
+entry(%0 : $Int64, %1 : $GenericClass<T>):
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @objcMethod(i8*, i8*, i64)
+sil @objcMethod : $@convention(objc_method) @pseudogeneric <T: AnyObject> (Int64, @guaranteed GenericClass<T>) -> () {
+entry(%0 : $Int64, %1 : $GenericClass<T>):
+  return undef : $()
+}

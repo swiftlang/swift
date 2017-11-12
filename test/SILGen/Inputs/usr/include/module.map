@@ -1,33 +1,33 @@
-module ansible { 
-  header "Ansible.h" 
+module ansible {
+  header "Ansible.h"
   export *
 }
-module gizmo { 
-  header "Gizmo.h" 
+module gizmo {
+  header "Gizmo.h"
   export *
 }
-module ObjectiveC { 
-  header "ObjectiveC.h" 
+module ObjectiveC {
+  header "ObjectiveC.h"
   export *
 }
-module Foundation { 
-  header "BridgeTestFoundation.h" 
+module Foundation {
+  header "BridgeTestFoundation.h"
   export *
 }
-module CoreCooling { 
-  header "CoreCooling.h" 
+module CoreCooling {
+  header "CoreCooling.h"
   export *
 }
 module UIKit {
-  header "UIKit.h" 
+  header "UIKit.h"
   export *
 }
 module AppKit {
-  header "AppKit.h" 
+  header "AppKit.h"
   export *
 }
 module Dispatch {
-  header "dispatch.h" 
+  header "dispatch.h"
   export *
 }
 
@@ -35,3 +35,12 @@ module objc_extensions_helper {
   header "objc_extensions_helper.h"
 }
 
+module Newtype {
+  header "newtype.h"
+  export *
+}
+
+module NonNilTest {
+  header "NonNilTest.h"
+  export *
+}

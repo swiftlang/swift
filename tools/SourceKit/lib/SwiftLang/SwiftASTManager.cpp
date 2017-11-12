@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,9 +25,9 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 // This is included only for createLazyResolver(). Move to different header ?
-#include "swift/Sema/CodeCompletionTypeChecking.h"
+#include "swift/Sema/IDETypeChecking.h"
 
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/FileSystem.h"
@@ -46,24 +46,27 @@ public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, StringRef Text,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
     // FIXME: Print location info if available.
     switch (Kind) {
       case DiagnosticKind::Error: OS << "error: "; break;
       case DiagnosticKind::Warning: OS << "warning: "; break;
       case DiagnosticKind::Note: OS << "note: "; break;
+      case DiagnosticKind::Remark: OS << "remark: "; break;
     }
-    OS << Text;
+    DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
   }
 };
-} // anonymous namespace.
+} // end anonymous namespace
 
 void SwiftASTConsumer::failed(StringRef Error) { }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftInvocation
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -80,7 +83,7 @@ struct InvocationOptions {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
-    assert(this->Invok.getFrontendOptions().PrimaryInput.hasValue());
+    assert(this->Invok.getFrontendOptions().Inputs.hasPrimaryInput());
   }
 
   void applyTo(CompilerInvocation &CompInvok) const;
@@ -101,7 +104,7 @@ struct ASTKey {
   llvm::FoldingSetNodeID FSID;
 };
 
-} // anonymous namespace.
+} // end anonymous namespace
 
 struct SwiftInvocation::Implementation {
   InvocationOptions Opts;
@@ -149,20 +152,22 @@ void InvocationOptions::profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddString(PrimaryFile);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // SwiftASTManager
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 namespace SourceKit {
   struct ASTUnit::Implementation {
     const uint64_t Generation;
+    SwiftStatistics &Stats;
     SmallVector<ImmutableTextSnapshotRef, 4> Snapshots;
     EditorDiagConsumer CollectDiagConsumer;
     CompilerInstance CompInst;
     OwnedResolver TypeResolver{ nullptr, nullptr };
     WorkQueue Queue{ WorkQueue::Dequeuing::Serial, "sourcekit.swift.ConsumeAST" };
 
-    Implementation(uint64_t Generation) : Generation(Generation) {}
+    Implementation(uint64_t Generation, SwiftStatistics &Statistics)
+        : Generation(Generation), Stats(Statistics) {}
 
     void consumeAsync(SwiftASTConsumerRef ASTConsumer, ASTUnitRef ASTRef);
   };
@@ -183,10 +188,14 @@ namespace SourceKit {
     });
   }
 
-  ASTUnit::ASTUnit(uint64_t Generation) : Impl(*new Implementation(Generation)) {
+  ASTUnit::ASTUnit(uint64_t Generation, SwiftStatistics &Stats)
+      : Impl(*new Implementation(Generation, Stats)) {
+    auto numASTs = ++Stats.numASTsInMem;
+    Stats.maxASTsInMem.updateMax(numASTs);
   }
 
   ASTUnit::~ASTUnit() {
+    --Impl.Stats.numASTsInMem;
     delete &Impl;
   }
 
@@ -209,7 +218,11 @@ namespace SourceKit {
   EditorDiagConsumer &ASTUnit::getEditorDiagConsumer() const {
     return Impl.CollectDiagConsumer;
   }
-}
+
+  void ASTUnit::performAsync(std::function<void()> Fn) {
+    Impl.Queue.dispatch(std::move(Fn));
+  }
+} // namespace SourceKit
 
 namespace {
 
@@ -274,7 +287,7 @@ private:
 
 typedef IntrusiveRefCntPtr<ASTProducer> ASTProducerRef;
 
-} // anonymous namespace.
+} // end anonymous namespace
 
 namespace swift {
 namespace sys {
@@ -297,14 +310,16 @@ struct CacheKeyHashInfo<ASTKey> {
 };
 
 } // namespace sys
-} // namespace swift.
+} // namespace swift
 
 struct SwiftASTManager::Implementation {
   explicit Implementation(SwiftLangSupport &LangSupport)
-    : EditorDocs(LangSupport.getEditorDocuments()),
-      RuntimeResourcePath(LangSupport.getRuntimeResourcePath()) { }
+      : EditorDocs(LangSupport.getEditorDocuments()),
+        Stats(LangSupport.getStatistics()),
+        RuntimeResourcePath(LangSupport.getRuntimeResourcePath()) {}
 
   SwiftEditorDocumentFileMap &EditorDocs;
+  SwiftStatistics &Stats;
   std::string RuntimeResourcePath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
@@ -339,11 +354,11 @@ static void setModuleName(CompilerInvocation &Invocation) {
 
   StringRef Filename = Invocation.getOutputFilename();
   if (Filename.empty()) {
-    if (Invocation.getInputFilenames().empty()) {
+    if (!Invocation.getFrontendOptions().Inputs.hasInputFilenames()) {
       Invocation.setModuleName("__main__");
       return;
     }
-    Filename = Invocation.getInputFilenames()[0];
+    Filename = Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
   }
   Filename = llvm::sys::path::filename(Filename);
   StringRef ModuleName = llvm::sys::path::stem(Filename);
@@ -362,7 +377,14 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
       continue;
     if (Arg == "-c")
       continue;
+    if (Arg == "-v")
+      continue;
     if (Arg == "-Xfrontend")
+      continue;
+    if (Arg == "-embed-bitcode")
+      continue;
+    if (Arg == "-enable-bridging-pch" ||
+        Arg == "-disable-bridging-pch")
       continue;
     NewArgs.push_back(CArg);
   }
@@ -388,9 +410,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // clang's FileManager ?
   std::string PrimaryFile =
     SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
-  for (auto &InputFile : Invocation.getFrontendOptions().InputFilenames) {
-    InputFile = SwiftLangSupport::resolvePathSymlinks(InputFile);
-  }
+  Invocation.getFrontendOptions().Inputs.transformInputFilenames(
+      [](std::string s) -> std::string {
+        return SwiftLangSupport::resolvePathSymlinks(s);
+      });
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
@@ -398,6 +421,8 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   setModuleName(Invocation);
   Invocation.setSerializedDiagnosticsPath(StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
+  Invocation.getLangOptions().DiagnosticsEditorMode = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   auto &FrontendOpts = Invocation.getFrontendOptions();
   if (FrontendOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
@@ -407,10 +432,16 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     FrontendOpts.PlaygroundTransform = false;
   }
 
+  // Disable the index-store functionality for the sourcekitd requests.
+  FrontendOpts.IndexStorePath.clear();
+  ImporterOpts.IndexStorePath.clear();
+
   if (!PrimaryFile.empty()) {
     Optional<unsigned> PrimaryIndex;
-    for (auto i : indices(Invocation.getFrontendOptions().InputFilenames)) {
-      auto &CurFile = Invocation.getFrontendOptions().InputFilenames[i];
+    for (auto i :
+         indices(Invocation.getFrontendOptions().Inputs.getInputFilenames())) {
+      auto &CurFile =
+          Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
       if (PrimaryFile == CurFile) {
         PrimaryIndex = i;
         break;
@@ -423,7 +454,8 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
       Error = OS.str();
       return true;
     }
-    Invocation.getFrontendOptions().PrimaryInput = SelectedInput(*PrimaryIndex);
+    Invocation.getFrontendOptions().Inputs.setPrimaryInput(
+        SelectedInput(*PrimaryIndex));
   }
 
   return Err;
@@ -471,6 +503,7 @@ void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
 
   if (ASTUnitRef Unit = Producer->getExistingAST()) {
     if (ASTConsumer->canUseASTWithSnapshots(Unit->getSnapshots())) {
+      ++Impl.Stats.numASTsUsedWithSnaphots;
       Unit->Impl.consumeAsync(std::move(ASTConsumer), Unit);
       return;
     }
@@ -537,7 +570,7 @@ BufferStamp SwiftASTManager::Implementation::getBufferStamp(StringRef FilePath){
                   << " (" << Ret.message() << ')');
     return -1;
   }
-  return Status.getLastModificationTime().toEpochTime();
+  return Status.getLastModificationTime().time_since_epoch().count();
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
@@ -599,6 +632,8 @@ ASTUnitRef ASTProducer::getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
       ASTProducerRef ThisProducer = this;
       MgrImpl.ASTCache.set(InvokRef->Impl.Key, ThisProducer);
     }
+  } else {
+    ++MgrImpl.Stats.numASTCacheHits;
   }
 
   return AST;
@@ -636,8 +671,10 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
 
   // Check if the inputs changed.
   SmallVector<BufferStamp, 8> InputStamps;
-  InputStamps.reserve(Invok.Opts.Invok.getInputFilenames().size());
-  for (auto &File : Invok.Opts.Invok.getInputFilenames()) {
+  InputStamps.reserve(
+      Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
+  for (auto &File :
+       Invok.Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -649,7 +686,8 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
     if (!FoundSnapshot)
       InputStamps.push_back(MgrImpl.getBufferStamp(File));
   }
-  assert(InputStamps.size() == Invok.Opts.Invok.getInputFilenames().size());
+  assert(InputStamps.size() ==
+         Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
   if (Stamps != InputStamps)
     return true;
 
@@ -661,22 +699,22 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   return false;
 }
 
-static void collectModuleDependencies(Module *TopMod,
-    llvm::SmallPtrSetImpl<Module *> &Visited,
+static void collectModuleDependencies(ModuleDecl *TopMod,
+    llvm::SmallPtrSetImpl<ModuleDecl *> &Visited,
     SmallVectorImpl<std::string> &Filenames) {
 
   if (!TopMod)
     return;
 
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
-  SmallVector<Module::ImportedModule, 8> Imports;
-  TopMod->getImportedModules(Imports, Module::ImportFilter::All);
+  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  TopMod->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
 
   for (auto Import : Imports) {
-    Module *Mod = Import.second;
+    ModuleDecl *Mod = Import.second;
     if (Mod->isSystemModule())
       continue;
-    // FIXME: Setup dependecies on the included headers.
+    // FIXME: Setup dependencies on the included headers.
     if (ClangModuleLoader &&
         Mod == ClangModuleLoader->getImportedHeaderModule())
       continue;
@@ -715,13 +753,16 @@ static std::atomic<uint64_t> ASTUnitGeneration{ 0 };
 ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
                                       ArrayRef<ImmutableTextSnapshotRef> Snapshots,
                                       std::string &Error) {
+  ++MgrImpl.Stats.numASTBuilds;
+
   Stamps.clear();
   DependencyStamps.clear();
 
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
 
   SmallVector<FileContent, 8> Contents;
-  for (auto &File : Opts.Invok.getInputFilenames()) {
+  for (auto &File :
+       Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -741,7 +782,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     }
     Contents.push_back(std::move(Content));
   }
-  assert(Contents.size() == Opts.Invok.getInputFilenames().size());
+  assert(Contents.size() ==
+         Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
 
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
@@ -753,7 +795,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     TraceInfo.Args.Args = Opts.Args;
   }
 
-  ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration);
+  ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
   for (auto &Content : Contents) {
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
@@ -772,7 +814,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
   CompilerInvocation Invocation;
   Opts.applyTo(Invocation);
-
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   for (auto &Content : Contents)
     Invocation.addInputBuffer(Content.Buffer.get());
 
@@ -793,7 +835,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   Consumer.setInputBufferIDs(ASTRef->getCompilerInstance().getInputBufferIDs());
   CompIns.performSema();
 
-  llvm::SmallPtrSet<Module *, 16> Visited;
+  llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
   SmallVector<std::string, 8> Filenames;
   collectModuleDependencies(CompIns.getMainModule(), Visited, Filenames);
   // FIXME: There exists a small window where the module file may have been
@@ -818,12 +860,12 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     // but still allow SILGen'ing the first function ?
     // Or try to keep track of SIL diagnostics emitted previously ?
 
-    // FIXME: We should run SIL diagnostis asynchronously after typechecking
+    // FIXME: We should run SIL diagnostics asynchronously after typechecking
     // so that they don't delay reporting of typechecking diagnostics and they
     // don't block any other AST processing for the same SwiftInvocation.
 
     if (auto SF = CompIns.getPrimarySourceFile()) {
-      SILOptions SILOpts;
+      SILOptions SILOpts = Invocation.getSILOptions();
       std::unique_ptr<SILModule> SILMod = performSILGeneration(*SF, SILOpts);
       runSILDiagnosticPasses(*SILMod);
     }

@@ -6,11 +6,11 @@
 
 import Accelerate
 
-extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable {
+extension vU1024: ExpressibleByIntegerLiteral, CustomStringConvertible, Equatable {
   public init(integerLiteral: Int) {
     var integerLiteral = integerLiteral
     self.init()
-    memcpy(&self, &integerLiteral, sizeof(Int.self))
+    memcpy(&self, &integerLiteral, MemoryLayout<Int>.size)
   }
 
   init(_ int: Int) {
@@ -26,9 +26,9 @@ extension vU1024: IntegerLiteralConvertible, CustomStringConvertible, Equatable 
     var digit: vU1024 = 0
     repeat {
       (intermediate, digit) = quorem(intermediate, 10)
-      digits.append(Character(UnicodeScalar(Int(digit) + 48)))
+      digits.append(Character(UnicodeScalar(Int(digit) + 48)!))
     } while intermediate != 0
-    return String(digits.reverse())
+    return String(digits.reversed())
   }
 }
 
@@ -37,7 +37,7 @@ extension Int {
     var u1024 = u1024
     // NB: Doesn't overflow check
     self.init()
-    memcpy(&self, &u1024, sizeof(Int.self))
+    memcpy(&self, &u1024, MemoryLayout<Int>.size)
   }
 }
 
@@ -49,7 +49,7 @@ func *(x: vU1024, y: vU1024) -> vU1024 {
   return result
 }
 
-func quorem(x: vU1024, _ y: vU1024) -> (vU1024, vU1024) {
+func quorem(_ x: vU1024, _ y: vU1024) -> (vU1024, vU1024) {
   var x = x
   var y = y
   var quo = vU1024()
@@ -61,10 +61,10 @@ func quorem(x: vU1024, _ y: vU1024) -> (vU1024, vU1024) {
 public func ==(x: vU1024, y: vU1024) -> Bool {
   var x = x
   var y = y
-  return memcmp(&x, &y, sizeof(vU1024.self)) == 0
+  return memcmp(&x, &y, MemoryLayout<vU1024>.size) == 0
 }
 
-func factorial(x: Int) -> vU1024 {
+func factorial(_ x: Int) -> vU1024 {
   var result: vU1024 = 1
 
   for i in 1...x {

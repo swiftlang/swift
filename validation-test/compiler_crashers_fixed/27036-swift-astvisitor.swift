@@ -1,9 +1,11 @@
-// RUN: not %target-swift-frontend %s -parse
+// This source file is part of the Swift.org open source project
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// Distributed under the terms of the MIT license
-// Test case submitted to project by https://github.com/practicalswift (practicalswift)
-// Test case found by fuzzing
-
+// RUN: not %target-swift-frontend %s -typecheck
 var f:a
 {{
 for b in c<T where T.B =nil
@@ -19,7 +21,7 @@ typealias e = 0
 if true{
 {
 var:(<T>(e = c<T: B<T.b{
-typealias e:CollectionType where T.e = c<T where H.h =nil
+typealias e:Collection where T.e = c<T where H.h =nil
 struct Q<func u( )
 class B<T where T where H.e = 0
 struct S< {
@@ -31,7 +33,7 @@ let:d
 let a {struct Q<T.e = ")
 typealias e : d = [Void>
 }}
-let:CollectionType where H:e:d:a{
+let:Collection where H:e:d:a{
 func a=b() {
 struct c
 class p {

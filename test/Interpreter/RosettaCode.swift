@@ -1,14 +1,14 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // From http://rosettacode.org/wiki/Factorial
-func factorial(x: Int) -> Int {
+func factorial(_ x: Int) -> Int {
   if (x == 0) { return 1 }
   return x * factorial(x-1)
 }
 
 // From http://rosettacode.org/wiki/Towers_of_Hanoi
-func TowersOfHanoi(ndisks: Int, from: Int, to: Int, via: Int) -> Void {
+func TowersOfHanoi(_ ndisks: Int, from: Int, to: Int, via: Int) -> Void {
   if (ndisks == 1) {
     print("Move disk from pole \(from) to pole \(to)\n", terminator: "")
   }

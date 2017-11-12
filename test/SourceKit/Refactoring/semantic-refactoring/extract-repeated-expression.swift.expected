@@ -1,0 +1,10 @@
+source.edit.kind.active:
+  3:3-3:3 "let new_name = 1
+"
+  <note>source.refactoring.range.kind.basename 1:5-1:13 "new_name"</note>
+source.edit.kind.active:
+  3:11-3:12 "new_name"
+  <note>source.refactoring.range.kind.basename 1:1-1:9 "new_name"</note>
+source.edit.kind.active:
+  4:10-4:11 "new_name"
+  <note>source.refactoring.range.kind.basename 1:1-1:9 "new_name"</note>

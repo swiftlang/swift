@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -24,14 +24,16 @@ namespace swift {
 
 /// An adapter for iterating over a range of values as a range of
 /// values of a different type.
-template <class Orig, class Projected, Projected (&Project)(const Orig &)>
+template <class Orig, class Projected, Projected (&Project)(const Orig &),
+          bool AllowOrigAccess = false>
 class ArrayRefView {
   llvm::ArrayRef<Orig> Array;
 public:
+  ArrayRefView() {}
   ArrayRefView(llvm::ArrayRef<Orig> array) : Array(array) {}
 
   class iterator {
-    friend class ArrayRefView<Orig,Projected,Project>;
+    friend class ArrayRefView<Orig,Projected,Project,AllowOrigAccess>;
     const Orig *Ptr;
     iterator(const Orig *ptr) : Ptr(ptr) {}
   public:
@@ -44,8 +46,8 @@ public:
     Projected operator*() const { return Project(*Ptr); }
     iterator &operator++() { Ptr++; return *this; }
     iterator operator++(int) { return iterator(Ptr++); }
-    bool operator==(iterator rhs) { return Ptr == rhs.Ptr; }
-    bool operator!=(iterator rhs) { return Ptr != rhs.Ptr; }
+    bool operator==(iterator rhs) const { return Ptr == rhs.Ptr; }
+    bool operator!=(iterator rhs) const { return Ptr != rhs.Ptr; }
 
     iterator &operator+=(difference_type i) {
       Ptr += i;
@@ -92,14 +94,61 @@ public:
   Projected front() const { return Project(Array.front()); }
   Projected back() const { return Project(Array.back()); }
 
+  ArrayRefView drop_back(unsigned count = 1) const {
+    return ArrayRefView(Array.drop_back(count));
+  }
+
   ArrayRefView slice(unsigned start) const {
     return ArrayRefView(Array.slice(start));
   }
   ArrayRefView slice(unsigned start, unsigned length) const {
     return ArrayRefView(Array.slice(start, length));
   }
+
+  /// Peek through to the underlying array.  This operation is not
+  /// supported by default; it must be enabled at specialization time.
+  llvm::ArrayRef<Orig> getOriginalArray() const {
+    static_assert(AllowOrigAccess,
+                  "original array access not enabled for this view");
+    return Array;
+  }
+
+  friend bool operator==(ArrayRefView lhs, ArrayRefView rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+    for (auto i : indices(lhs))
+      if (lhs[i] != rhs[i])
+        return false;
+    return true;
+  }
+  friend bool operator==(llvm::ArrayRef<Projected> lhs, ArrayRefView rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+    for (auto i : indices(lhs))
+      if (lhs[i] != rhs[i])
+        return false;
+    return true;
+  }
+  friend bool operator==(ArrayRefView lhs, llvm::ArrayRef<Projected> rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+    for (auto i : indices(lhs))
+      if (lhs[i] != rhs[i])
+        return false;
+    return true;
+  }
+
+  friend bool operator!=(ArrayRefView lhs, ArrayRefView rhs) {
+    return !(lhs == rhs);
+  }
+  friend bool operator!=(llvm::ArrayRef<Projected> lhs, ArrayRefView rhs) {
+    return !(lhs == rhs);
+  }
+  friend bool operator!=(ArrayRefView lhs, llvm::ArrayRef<Projected> rhs) {
+    return !(lhs == rhs);
+  }
 };
 
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_ARRAYREFVIEW_H

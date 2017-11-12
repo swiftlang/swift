@@ -1,0 +1,797 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+// FIXME: The optimized-build behavior of UnsafeBufferPointer bounds/overflow
+// checking cannot be tested. The standard library always compiles with debug
+// checking enabled, so the behavior of the optimized test depends on whether
+// the inlining heuristics decide to inline these methods. To fix this, we need
+// a way to force @_inlineable UnsafeBufferPointer methods to be emitted inside
+// the client code, and thereby subject the stdlib implementation to the test
+// case's compile options.
+//
+// REQUIRES: swift_test_mode_optimize_none
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+// Tests
+
+func allocateForRawBuffer(count: Int) -> UnsafeMutableRawPointer {
+  return UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: 1)
+}
+func allocateForBuffer<T>(count: Int) -> UnsafeMutablePointer<T> {
+  return UnsafeMutablePointer<T>.allocate(capacity: count)
+}
+func deallocateForRawBuffer(
+  _ memory: UnsafeMutableRawPointer, count: Int
+) {
+  memory.deallocate(bytes: count, alignedTo: 1)
+}
+func deallocateForBuffer<T>(
+  _ memory: UnsafeMutablePointer<T>, count: Int
+) {
+  memory.deallocate(capacity: count)
+}
+
+// Initialize memory with arbitrary equatable, comparable values.
+func initUnsafeRawBufferPointer(_ b: UnsafeMutableRawBufferPointer) {
+  _ = b.initializeMemory(as: UInt8.self, from: UInt8(0)..<numericCast(b.count))
+}
+func initUnsafeBufferPointer(_ b: UnsafeMutableBufferPointer<Float>) {
+  _ = b.initialize(from: (0..<b.count).lazy.map {Float($0)})
+}
+
+// Test Suites
+
+var UnsafeBufferPointerTestSuite = TestSuite("UnsafeBufferPointer")
+var UnsafeMutableBufferPointerTestSuite = TestSuite("UnsafeMutableBufferPointer")
+var UnsafeRawBufferPointerTestSuite = TestSuite("UnsafeRawBufferPointer")
+var UnsafeMutableRawBufferPointerTestSuite = TestSuite("UnsafeMutableRawBufferPointer")
+
+% for (SelfName, IsMutable, IsRaw, SelfType, PointerType) in [
+%   ('UnsafeBufferPointer', False, False, 'UnsafeBufferPointer<Float>', 'UnsafePointer<Float>'),
+%   ('UnsafeMutableBufferPointer', True, False, 'UnsafeMutableBufferPointer<Float>', 'UnsafeMutablePointer<Float>'),
+%   ('UnsafeRawBufferPointer', False, True, 'UnsafeRawBufferPointer', 'UnsafeRawPointer'),
+%   ('UnsafeMutableRawBufferPointer', True, True, 'UnsafeMutableRawBufferPointer', 'UnsafeMutableRawPointer')
+% ]:
+%   Raw = 'Raw' if IsRaw else ''
+%   Element = 'UInt8' if IsRaw else 'Float'
+
+${SelfName}TestSuite.test("AssociatedTypes") {
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: ${SelfType}.self,
+%   if IsRaw:
+    iteratorType: ${SelfType}.Iterator.self,
+%   else:
+    iteratorType: UnsafeBufferPointerIterator<Float>.self,
+%   end
+    subSequenceType: ${'Mutable' if IsMutable else ''}RandomAccessSlice<${SelfType}>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+
+  expect${'Mutable' if IsMutable else ''}CollectionType(${SelfType}.self)
+}
+
+${SelfName}TestSuite.test("rebasing") {
+  let rawbuffer = UnsafeMutableRawBufferPointer.allocate(count: 4 * MemoryLayout<Int>.stride)
+  defer { rawbuffer.deallocate() }
+
+  rawbuffer.copyBytes(from: [0, 1, 2, 3])
+
+%   if IsRaw:
+  let buffer = rawbuffer
+%   else:
+  let intPtr = rawbuffer.baseAddress!.bindMemory(to: Int.self, capacity: 4)
+  let buffer = UnsafeMutableBufferPointer(start: intPtr, count: 4)
+%   end
+
+  for i in buffer.indices {
+    let slice = buffer[i..<buffer.endIndex]
+    let rebased = ${SelfName}(rebasing: slice)
+    expectEqual(rebased.startIndex, 0)
+    expectEqual(rebased.endIndex, rebased.count)
+    expectEqual(rebased.endIndex, buffer.endIndex - i)
+    expectEqual(rebased[0], slice[i])
+    if rebased.count > 1 {
+      expectEqual(rebased[1], slice[i + 1])
+
+      // Rebase again. Tests Mutable->Immutable initializer
+      // and an rvalue slice with literal indices.
+      let rebased2 = ${SelfName}(rebasing: rebased[1..<2])
+      expectEqual(rebased2.startIndex, 0)
+      expectEqual(rebased2.endIndex, 1)
+      expectEqual(rebased2[0], slice[i + 1])
+    }
+  }
+}
+
+// Allocate two buffers. Initialize one and copy it into the other. Pass those
+// to the specified generic collection test function `checkBuffers`.
+func checkWithExpectedBuffer(checkBuffers: (${SelfType}, ${SelfType}) -> Void) {
+  // A collection just big enough to be sliced up interestingly.
+  let elementCount = 4
+
+%   if IsRaw:
+  var memory: UnsafeMutableRawPointer
+  var memoryCopy: UnsafeMutableRawPointer
+%   else:
+  var memory: UnsafeMutablePointer<Float>
+  var memoryCopy: UnsafeMutablePointer<Float>
+%   end
+
+  memory = allocateFor${Raw}Buffer(count: elementCount)
+  defer { deallocateFor${Raw}Buffer(
+      memory, count: elementCount) }
+
+  memoryCopy = allocateFor${Raw}Buffer(count: elementCount)
+  defer { deallocateFor${Raw}Buffer(memoryCopy, count: elementCount) }
+
+  initUnsafe${Raw}BufferPointer(
+    UnsafeMutable${Raw}BufferPointer(start: memory, count: elementCount))
+
+  let buffer = ${SelfType}(start: memory, count: elementCount)
+
+  let expectedBuffer = UnsafeMutable${Raw}BufferPointer(start: memoryCopy,
+    count: elementCount)
+
+%   if IsRaw:
+    expectedBuffer.copyBytes(from: buffer)
+%   else:
+    _ = expectedBuffer.initialize(from: buffer)
+%   end
+
+  let expected = ${SelfType}(
+    start: expectedBuffer.baseAddress, count: expectedBuffer.count)
+
+  checkBuffers(expected, buffer)
+}
+
+${SelfName}TestSuite.test("RandomAccessCollection") {
+  checkWithExpectedBuffer { (expected: ${SelfType}, buffer: ${SelfType}) in
+    checkRandomAccessCollection(expected, buffer,
+      sameValue: { (a: ${Element}, b: ${Element}) in a == b })
+  }
+}
+
+${SelfName}TestSuite.test("nilBaseAddress") {
+  let emptyBuffer = ${SelfType}(start: nil, count: 0)
+  expectNil(emptyBuffer.baseAddress)
+  expectEqual(0, emptyBuffer.count)
+  expectTrue(emptyBuffer.startIndex == emptyBuffer.endIndex)
+
+  var iter = emptyBuffer.makeIterator()
+  expectNil(iter.next())
+
+  expectEqualSequence([], emptyBuffer)
+}
+
+${SelfName}TestSuite.test("nonNilButEmpty") {
+  let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
+  defer { emptyAllocated.deallocate(capacity: 0) }
+
+  let emptyBuffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: 0)
+  expectEqual(emptyAllocated, emptyBuffer.baseAddress)
+  expectEqual(0, emptyBuffer.count)
+  expectTrue(emptyBuffer.startIndex == emptyBuffer.endIndex)
+
+  var iter = emptyBuffer.makeIterator()
+  expectNil(iter.next())
+
+  expectEqualSequence([], emptyBuffer)
+}
+
+%   if IsRaw:
+${SelfName}TestSuite.test("nonNilNonEmpty") {
+  let count = 4
+  let allocated = UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: 1)
+  defer { allocated.deallocate(bytes: count, alignedTo: 1) }
+  let uint8Ptr = allocated.initializeMemory(as: UInt8.self, count: count, to: 1)
+  uint8Ptr[count - 1] = 2
+
+  let buffer = ${SelfType}(start: ${PointerType}(allocated), count: count - 1)
+  expectEqual(allocated, buffer.baseAddress)
+  expectEqual(count - 1, buffer.count)
+  expectEqual(count - 1, buffer.endIndex - buffer.startIndex)
+
+  uint8Ptr[1] = 0
+  expectEqual(1, buffer[0])
+  expectEqual(0, buffer[1])
+  expectEqual(1, buffer[2])
+
+  var iter = buffer.makeIterator()
+  expectEqual(1, iter.next())
+  expectEqual(0, iter.next())
+  expectEqual(1, iter.next())
+  expectNil(iter.next())
+
+  expectEqualSequence([1, 0, 1], buffer.map { Int($0) })
+
+  expectEqual(2, uint8Ptr[count-1])
+}
+%   else: # !IsRaw
+${SelfName}TestSuite.test("nonNilNonEmpty") {
+  let count = 4
+  let allocated = UnsafeMutablePointer<Float>.allocate(capacity: count)
+  defer { allocated.deallocate(capacity: count) }
+  allocated.initialize(to: 1.0, count: count)
+  allocated[count - 1] = 2.0
+
+  let buffer = ${SelfType}(start: ${PointerType}(allocated), count: count - 1)
+  expectEqual(allocated, buffer.baseAddress)
+  expectEqual(count - 1, buffer.count)
+  expectEqual(count - 1, buffer.endIndex - buffer.startIndex)
+
+  allocated[1] = 0.0
+  expectEqual(1.0, buffer[0])
+  expectEqual(0.0, buffer[1])
+  expectEqual(1.0, buffer[2])
+
+  var iter = buffer.makeIterator()
+  expectEqual(1.0, iter.next())
+  expectEqual(0.0, iter.next())
+  expectEqual(1.0, iter.next())
+  expectNil(iter.next())
+
+  expectEqualSequence([1.0, 0.0, 1.0], buffer)
+
+  expectEqual(2.0, allocated[count-1])
+}
+%   end # !IsRaw
+
+${SelfName}TestSuite.test("badCount")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  expectCrashLater()
+
+  let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
+  defer { emptyAllocated.deallocate(capacity: 0) }
+
+  let buffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: -1)
+  _ = buffer
+}
+
+${SelfName}TestSuite.test("badNilCount")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  expectCrashLater()
+
+  let buffer = ${SelfType}(start: nil, count: 1)
+  _ = buffer
+}
+% end # for SelfName, IsRaw, SelfType
+
+UnsafeMutableRawBufferPointerTestSuite.test("changeElementViaBuffer") {
+  let count = 4
+  let allocated = UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: 1)
+  defer { allocated.deallocate(bytes: count, alignedTo: 1) }
+  let uint8Ptr = allocated.initializeMemory(as: UInt8.self, count: count, to: 1)
+  uint8Ptr[count-1] = UInt8.max
+
+  var buffer = UnsafeMutableRawBufferPointer(start: allocated, count: count - 1)
+
+  buffer[1] = 0
+  expectEqual(1, buffer[0])
+  expectEqual(0, buffer[1])
+  expectEqual(1, buffer[2])
+
+  expectEqual(1, uint8Ptr[0])
+  expectEqual(0, uint8Ptr[1])
+  expectEqual(1, uint8Ptr[2])
+  expectEqual(UInt8.max, uint8Ptr[count-1])
+
+  buffer.sort()
+  expectEqual(0, buffer[0])
+  expectEqual(1, buffer[1])
+  expectEqual(1, buffer[2])
+
+  expectEqual(0, uint8Ptr[0])
+  expectEqual(1, uint8Ptr[1])
+  expectEqual(1, uint8Ptr[2])
+  expectEqual(UInt8.max, uint8Ptr[count-1])
+}
+
+UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
+  let count = 4
+  let allocated = UnsafeMutablePointer<Float>.allocate(capacity: count)
+  defer { allocated.deallocate(capacity: count) }
+  allocated.initialize(to: 1.0, count: count)
+  allocated[count-1] = -1.0
+
+  var buffer = UnsafeMutableBufferPointer(start: allocated, count: count - 1)
+
+  buffer[1] = 0.0
+  expectEqual(1.0, buffer[0])
+  expectEqual(0.0, buffer[1])
+  expectEqual(1.0, buffer[2])
+
+  expectEqual(1.0, allocated[0])
+  expectEqual(0.0, allocated[1])
+  expectEqual(1.0, allocated[2])
+  expectEqual(-1.0, allocated[count-1])
+
+  buffer.sort()
+  expectEqual(0.0, buffer[0])
+  expectEqual(1.0, buffer[1])
+  expectEqual(1.0, buffer[2])
+
+  expectEqual(0.0, allocated[0])
+  expectEqual(1.0, allocated[1])
+  expectEqual(1.0, allocated[2])
+  expectEqual(-1.0, allocated[count-1])
+}
+
+protocol SubscriptTest {
+  static var start: Int { get }
+  static var end: Int { get }
+  static var elementCount: Int { get }
+}
+
+// Initialize memory with opaque values, for use with subscript tests.
+extension SubscriptTest {
+  static var elementCount: Int { get { return end - start } }
+
+% for SelfType in ['UnsafeRawBufferPointer', 'UnsafeMutableRawBufferPointer']:
+  /// Create and populate an `${SelfType}` for use with unit tests.
+  /// PRECONDITION: `memory` must be allocated with space for
+  /// `SubscriptGetTest.elementCount` bytes.
+  static func create${SelfType}(from memory: UnsafeMutableRawPointer)
+    -> ${SelfType}
+  {
+    for i in Self.start..<Self.end {
+      memory.initializeMemory(as: UInt8.self, at: i, to: numericCast(i))
+    }
+    return ${SelfType}(start: memory, count: Self.elementCount)
+  }
+% end
+
+% for SelfType in ['UnsafeBufferPointer', 'UnsafeMutableBufferPointer']:
+  /// Create and populate an `${SelfType}` for use with unit tests.
+  /// PRECONDITION: `memory` must be allocated with space for
+  /// `SubscriptGetTest.elementCount` elements.
+  static func create${SelfType}(from memory: UnsafeMutablePointer<OpaqueValue<Int>>)
+    -> ${SelfType}<OpaqueValue<Int>>
+  {
+    for i in Self.start..<Self.end {
+      memory[i] = OpaqueValue(i)
+    }
+    return ${SelfType}(start: memory, count: Self.elementCount)
+  }
+% end
+}
+
+struct SubscriptGetTest : SubscriptTest {
+  // SubscriptGetTest operates on a `(end - start)` sized buffer containing
+  // monotonically increasing integers from `start` to `end - 1`.
+  static var start = 0
+  static var end = 20
+
+  let rangeSelection: RangeSelection
+  /// The values that should be expected by slicing the UBP, or `nil` if the
+  /// test is expected to crash.
+  let expectedValues: [Int]?
+  /// Same as `expectedValues`, but for closed ranges. `nil` if no difference,
+  /// and empty if the test is expected to crash.
+  let expectedClosedValues: [Int]?
+
+  let loc: SourceLoc
+
+  init(
+    rangeSelection: RangeSelection, expectedValues: [Int]? = nil,
+    expectedClosedValues: [Int]? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.rangeSelection = rangeSelection
+    self.expectedValues = expectedValues
+    self.expectedClosedValues = expectedClosedValues ?? expectedValues
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let subscriptGetTests : [SubscriptGetTest] = [
+  // Valid, empty.
+  SubscriptGetTest(rangeSelection: .emptyRange, expectedValues: []),
+
+  // Valid, edges.
+  SubscriptGetTest(rangeSelection: .leftEdge,
+    expectedValues: [],
+    expectedClosedValues: [0]),
+  SubscriptGetTest(rangeSelection: .rightEdge,
+    expectedValues: [],
+    expectedClosedValues: [19]),
+
+  // Valid, internal.
+  SubscriptGetTest(rangeSelection: .leftHalf,
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+  SubscriptGetTest(rangeSelection: .rightHalf,
+    expectedValues: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+  SubscriptGetTest(rangeSelection: .middle,
+    expectedValues: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
+  SubscriptGetTest(rangeSelection: .full,
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+  SubscriptGetTest(rangeSelection: .offsets(2, 4),
+    expectedValues: [2, 3],
+    expectedClosedValues: [2, 3, 4]),
+  SubscriptGetTest(rangeSelection: .offsets(16, 19),
+    expectedValues: [16, 17, 18],
+    expectedClosedValues: [16, 17, 18, 19]),
+
+  // Invalid, bottom out of bounds.
+  SubscriptGetTest(rangeSelection: .offsets(-1, -1)),
+  SubscriptGetTest(rangeSelection: .offsets(-1, 0)),
+  SubscriptGetTest(rangeSelection: .offsets(-100, 5)),
+
+  // Invalid, top out of bounds.
+  SubscriptGetTest(rangeSelection: .offsets(20, 20),
+    expectedValues: []), // Only crash on a closed range.
+  SubscriptGetTest(rangeSelection: .offsets(19, 20),
+    expectedValues: [19],
+    expectedClosedValues: []), // Only crash on a closed range
+  SubscriptGetTest(rangeSelection: .offsets(21, 21)),
+  SubscriptGetTest(rangeSelection: .offsets(5, 100)),
+
+  // Invalid, both out of bounds.
+  SubscriptGetTest(rangeSelection: .offsets(-1, 20)),
+  SubscriptGetTest(rangeSelection: .offsets(-100, 100)),
+]
+
+struct SubscriptSetTest : SubscriptTest {
+  // SubscriptSetTest operates on a `(end - start)` sized buffer containing
+  // monotonically increasing integers from `start` to `end - 1`.
+  static var start = 0
+  static var end = 10
+
+  let rangeSelection: RangeSelection
+
+  let replacementValues: [OpaqueValue<Int>]
+  let replacementClosedValues: [OpaqueValue<Int>]
+
+  /// The values that should be expected by slicing the UBP, or `nil` if the
+  /// test is expected to crash.
+  let expectedValues: [Int]?
+  /// Same as `expectedValues`, but for closed ranges. `nil` if no difference.
+  let expectedClosedValues: [Int]?
+
+  let loc: SourceLoc
+
+  init(
+    rangeSelection: RangeSelection,
+    replacementValues: [Int],
+    replacementClosedValues: [Int]? = nil,
+    expectedValues: [Int]? = nil,
+    expectedClosedValues: [Int]? = nil,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.rangeSelection = rangeSelection
+    self.expectedValues = expectedValues
+    self.expectedClosedValues = expectedClosedValues ?? expectedValues
+
+    self.replacementValues = replacementValues.map { OpaqueValue($0) }
+    if let replacements = replacementClosedValues {
+      self.replacementClosedValues = replacements.map { OpaqueValue($0) }
+    } else {
+      self.replacementClosedValues = self.replacementValues
+    }
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+
+  /// Create and populate an UnsafeMutableRawBufferPointer slice for use with
+  /// unit tests.
+  /// PRECONDITION: `memory` must be allocated with space for
+  /// `replacementValues.count` bytes.
+  func replacementValuesSlice(
+    from memory: UnsafeMutableRawPointer,
+    replacementValues: [OpaqueValue<Int>]
+  ) -> UnsafeMutableRawBufferPointer.SubSequence
+  {
+    for (i, value) in replacementValues.enumerated() {
+      memory.initializeMemory(
+        as: UInt8.self, at: i, to: numericCast(value.value))
+    }
+    let buffer = UnsafeMutableRawBufferPointer(
+      start: memory, count: replacementValues.count)
+    let fullRange = RangeSelection.full.range(in: buffer)
+    return buffer[fullRange]
+  }
+
+  /// Create and populate an UnsafeMutableBufferPointer slice for use with unit
+  /// tests.
+  /// PRECONDITION: `memory` must be allocated with space for
+  /// `replacementValues.count` elements.
+  func replacementValuesSlice(
+    from memory: UnsafeMutablePointer<OpaqueValue<Int>>,
+    replacementValues: [OpaqueValue<Int>]
+  ) -> MutableRandomAccessSlice<UnsafeMutableBufferPointer<OpaqueValue<Int>>>
+  {
+    for (i, value) in replacementValues.enumerated() {
+      memory[i] = value
+    }
+    let buffer = UnsafeMutableBufferPointer(
+      start: memory, count: replacementValues.count)
+    let fullRange = RangeSelection.full.range(in: buffer)
+    return buffer[fullRange]
+  }
+}
+
+let subscriptSetTests : [SubscriptSetTest] = [
+  // Valid, empty.
+  SubscriptSetTest(
+    rangeSelection: .emptyRange,
+    replacementValues: [],
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+
+  // Valid, edges.
+  SubscriptSetTest(
+    rangeSelection: .leftEdge,
+    replacementValues: [],
+    replacementClosedValues: [91],
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    expectedClosedValues: [91, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+  SubscriptSetTest(
+    rangeSelection: .rightEdge,
+    replacementValues: [],
+    replacementClosedValues: [91],
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    expectedClosedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 91]),
+
+  // Valid, internal.
+  SubscriptSetTest(
+    rangeSelection: .leftHalf,
+    replacementValues: [10, 11, 12, 13, 14],
+    expectedValues: [10, 11, 12, 13, 14, 5, 6, 7, 8, 9]),
+  SubscriptSetTest(
+    rangeSelection: .rightHalf,
+    replacementValues: [10, 11, 12, 13, 14],
+    expectedValues: [0, 1, 2, 3, 4, 10, 11, 12, 13, 14]),
+  SubscriptSetTest(
+    rangeSelection: .middle,
+    replacementValues: [10, 11, 12, 13, 14, 15],
+    expectedValues: [0, 1, 10, 11, 12, 13, 14, 15, 8, 9]),
+  SubscriptSetTest(
+    rangeSelection: .full,
+    replacementValues: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+    expectedValues: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+
+  // Invalid, range and replacement count mismatch.
+  SubscriptSetTest(
+    rangeSelection: .leftEdge,
+    replacementValues: [9, 9],
+    replacementClosedValues: [9, 9, 9]),
+  SubscriptSetTest(
+    rangeSelection: .offsets(1, 2),
+    replacementValues: [],
+    replacementClosedValues: [9]),
+  SubscriptSetTest(
+    rangeSelection: .offsets(1, 2),
+    replacementValues: [9, 9],
+    replacementClosedValues: [9, 9, 9]),
+  SubscriptSetTest(
+    rangeSelection: .offsets(2, 5),
+    replacementValues: [9, 9],
+    replacementClosedValues: [9, 9, 9]),
+  SubscriptSetTest(
+    rangeSelection: .offsets(2, 5),
+    replacementValues: [9, 9, 9, 9],
+    replacementClosedValues: [9, 9, 9, 9, 9]),
+
+  // Invalid, bottom out of bounds.
+  SubscriptSetTest(
+    rangeSelection: .offsets(-1, -1),
+    replacementValues: []),
+  SubscriptSetTest(
+    rangeSelection: .offsets(-1, 0),
+    replacementValues: [9]),
+  SubscriptSetTest(
+    rangeSelection: .offsets(-3, 5),
+    replacementValues: [9, 9, 9, 9, 9, 9, 9, 9]),
+
+  // Invalid, top out of bounds.
+  SubscriptSetTest(
+    rangeSelection: .offsets(10, 10),
+    replacementValues: [],
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    expectedClosedValues: []), // Only crash on a closed range.
+  SubscriptSetTest(
+    rangeSelection: .offsets(9, 10),
+    replacementValues: [91],
+    expectedValues: [0, 1, 2, 3, 4, 5, 6, 7, 8, 91],
+    expectedClosedValues: []), // Only crash on a closed range.
+  SubscriptSetTest(
+    rangeSelection: .offsets(11, 11),
+    replacementValues: []),
+  SubscriptSetTest(
+    rangeSelection: .offsets(8, 15),
+    replacementValues: [9, 9, 9, 9, 9, 9, 9]),
+
+  // Invalid, both out of bounds.
+  SubscriptSetTest(
+    rangeSelection: .offsets(-1, 10),
+    replacementValues: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9]),
+  SubscriptSetTest(
+    rangeSelection: .offsets(-2, 11),
+    replacementValues: [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9]),
+]
+
+% for (SelfName, IsRaw) in [
+%   ('UnsafeBufferPointer', False),
+%   ('UnsafeRawBufferPointer', True),
+%   ('UnsafeMutableBufferPointer', False),
+%   ('UnsafeMutableRawBufferPointer', True)
+% ]:
+
+%   Raw = 'Raw' if IsRaw else ''
+
+%   for RangeName in ['range', 'countableRange', 'closedRange', 'countableClosedRange']:
+${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGetTests) {
+  (test) in
+
+  let expectedValues: [Int]?
+%     if 'closed' in RangeName.lower():
+  if test.rangeSelection.isEmpty {
+    return
+  }
+  // Treat an empty set as nil for closed ranges.
+  if test.expectedClosedValues?.isEmpty ?? true {
+    expectedValues = nil
+  }
+  else {
+    expectedValues = test.expectedClosedValues
+  }
+%     else:
+  expectedValues = test.expectedValues
+%     end
+
+  let elementCount = SubscriptGetTest.elementCount
+
+%     if IsRaw:
+  var memory: UnsafeMutableRawPointer
+%     else:
+  var memory: UnsafeMutablePointer<OpaqueValue<Int>>
+%     end
+
+  memory = allocateFor${Raw}Buffer(count: elementCount)
+  defer { deallocateFor${Raw}Buffer(memory, count: elementCount) }
+
+  let buffer = SubscriptGetTest.create${SelfName}(from: memory)
+
+%     if IsRaw:
+  // A raw buffer pointer has debug bounds checks on indices, and
+  // (currently) invokes Collection._failEarlyRangeCheck in nondebug mode.
+  if expectedValues == nil { expectCrashLater() }
+%     end
+  let range = test.rangeSelection.${RangeName}(in: buffer)
+
+  if _isDebugAssertConfiguration() {
+    if expectedValues == nil { expectCrashLater() }
+  }
+  let slice = buffer[range]
+  // If expectedValues is nil, we should have crashed above. Allowing the
+  // following code to crash leads to false positives.
+  if let expectedValues = expectedValues {
+    expectEqual(
+      expectedValues,
+%     if IsRaw:
+      slice.map { Int($0) },
+% else:
+      slice.map { $0.value },
+%     end
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+  }
+}
+
+%   end # RangeName
+% end # SelfName, IsMutable, IsRaw, SelfType, PointerType
+
+% for (SelfName, IsRaw) in [
+%   ('UnsafeMutableBufferPointer', False),
+%   ('UnsafeMutableRawBufferPointer', True)
+% ]:
+%   Raw = 'Raw' if IsRaw else ''
+%   for RangeName in ['range', 'countableRange', 'closedRange', 'countableClosedRange']:
+
+UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${RangeName}/set")
+%     if not IsRaw:
+  // UnsafeRawBuffer (currently) invokes Collection._failEarlyRangeCheck
+  // in nondebug mode.
+  .skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+%     end
+.forEach(in: subscriptSetTests) { (test) in
+
+  let expectedValues: [Int]?
+  let replacementValues: [OpaqueValue<Int>]
+  let elementCount = SubscriptSetTest.elementCount
+
+%      if 'closed' in RangeName.lower():
+  if test.rangeSelection.isEmpty {
+    return
+  }
+  // Treat an empty set as nil for closed ranges.
+  if test.expectedClosedValues?.isEmpty ?? true {
+    expectedValues = nil
+  }
+  else {
+    expectedValues = test.expectedClosedValues
+  }
+  replacementValues = test.replacementClosedValues
+  let isOutOfBounds: () -> Bool = {
+    switch test.rangeSelection {
+    case let .offsets(lowerBound, upperBound):
+      return lowerBound < 0 || upperBound >= elementCount
+    default:
+      return false
+    }
+  }
+%      else: # !closed
+  expectedValues = test.expectedValues
+  replacementValues = test.replacementValues
+  let isOutOfBounds: () -> Bool = {
+    switch test.rangeSelection {
+    case let .offsets(lowerBound, upperBound):
+      return lowerBound < 0 || upperBound > elementCount
+    default:
+      return false
+    }
+  }
+%      end # !closed
+
+%     if IsRaw:
+  var memory: UnsafeMutableRawPointer
+  var sliceMemory: UnsafeMutableRawPointer
+%     else:
+  var memory: UnsafeMutablePointer<OpaqueValue<Int>>
+  var sliceMemory: UnsafeMutablePointer<OpaqueValue<Int>>
+%     end
+
+  memory = allocateFor${Raw}Buffer(count: elementCount)
+  defer { deallocateFor${Raw}Buffer(memory, count: elementCount) }
+
+  sliceMemory = allocateFor${Raw}Buffer(count: replacementValues.count)
+  defer { deallocateFor${Raw}Buffer(
+      sliceMemory, count: replacementValues.count) }
+
+  var buffer = SubscriptSetTest.create${SelfName}(from: memory)
+
+%     if IsRaw:
+  // A raw buffer pointer has debug bounds checks on indices, and
+  // (currently) invokes Collection._failEarlyRangeCheck in nondebug mode.
+  if _isDebugAssertConfiguration() || isOutOfBounds() {
+    if expectedValues == nil { expectCrashLater() }
+  }
+%     end
+  let range = test.rangeSelection.${RangeName}(in: buffer)
+
+  let replacementSlice = test.replacementValuesSlice(
+    from: sliceMemory,
+    replacementValues: replacementValues)
+
+  if _isDebugAssertConfiguration() {
+    if expectedValues == nil { expectCrashLater() }
+  }
+  buffer[range] = replacementSlice
+  // If expectedValues is nil, we should have crashed above. Allowing the
+  // following code to crash leads to false positives.
+  if let expectedValues = expectedValues {
+    expectEqual(
+      expectedValues,
+%     if IsRaw:
+      buffer.map { Int($0) },
+% else:
+      buffer.map { $0.value },
+%     end
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+  }
+}
+
+%   end # RangeName
+
+% end # SelfName
+
+runAllTests()

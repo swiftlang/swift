@@ -1,18 +1,18 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Deduction of generic arguments
 //===----------------------------------------------------------------------===//
 
-func identity<T>(value: T) -> T { return value }
+func identity<T>(_ value: T) -> T { return value }
 
-func identity2<T>(value: T) -> T { return value }
-func identity2<T>(value: T) -> Int { return 0 }
+func identity2<T>(_ value: T) -> T { return value }
+func identity2<T>(_ value: T) -> Int { return 0 }
 
 struct X { }
 struct Y { }
 
-func useIdentity(x: Int, y: Float, i32: Int32) {
+func useIdentity(_ x: Int, y: Float, i32: Int32) {
   var x2 = identity(x)
   var y2 = identity(y)
 
@@ -22,14 +22,14 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
 
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+  xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
   xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
 }
 
 // FIXME: Crummy diagnostic!
-func twoIdentical<T>(x: T, _ y: T) -> T {}
+func twoIdentical<T>(_ x: T, _ y: T) -> T {}
 
-func useTwoIdentical(xi: Int, yi: Float) {
+func useTwoIdentical(_ xi: Int, yi: Float) {
   var x = xi, y = yi
   x = twoIdentical(x, x)
   y = twoIdentical(y, y)
@@ -38,17 +38,17 @@ func useTwoIdentical(xi: Int, yi: Float) {
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
   
-  twoIdentical(x, y) // expected-error{{cannot invoke 'twoIdentical' with an argument list of type '(Int, Float)'}} expected-note{{expected an argument list of type '(T, T)'}}
+  twoIdentical(x, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
-func mySwap<T>(inout x: T,
-               inout _ y: T) {
+func mySwap<T>(_ x: inout T,
+               _ y: inout T) {
   let tmp = x
   x = y
   y = tmp
 }
 
-func useSwap(xi: Int, yi: Float) {
+func useSwap(_ xi: Int, yi: Float) {
   var x = xi, y = yi
   mySwap(&x, &x)
   mySwap(&y, &y)
@@ -56,33 +56,32 @@ func useSwap(xi: Int, yi: Float) {
   mySwap(x, x) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
     // expected-error @-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{13-13=&}}
   
-  mySwap(&x, &y) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'inout _'}}
+  mySwap(&x, &y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 }
 
-func useTuples(x: Int, y: Float, z: (Float, Int)) {
+func useTuples(_ x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type '(Int, Float)' to expected argument type '(_, _)'}}
+  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
 }
 
-func acceptFunction<T, U>(f: (T) -> U, _ t: T, _ u: U) {}
+func acceptFunction<T, U>(_ f: (T) -> U, _ t: T, _ u: U) {}
 
-func passFunction(f: (Int) -> Float, x: Int, y: Float) {
+func passFunction(_ f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{cannot convert value of type '(Int) -> Float' to expected argument type '(_) -> _'}}
+   acceptFunction(f, y, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
-func returnTuple<T, U>(_: T) -> (T, U) { }
+func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
 
-func testReturnTuple(x: Int, y: Float) {
-  returnTuple(x) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+func testReturnTuple(_ x: Int, y: Float) {
+  returnTuple(x) // expected-error{{generic parameter 'U' could not be inferred}}
   
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
@@ -92,16 +91,16 @@ func testReturnTuple(x: Int, y: Float) {
 }
 
 
-func confusingArgAndParam<T, U>(f: (T) -> U, _ g: (U) -> T) {
+func confusingArgAndParam<T, U>(_ f: (T) -> U, _ g: (U) -> T) {
   confusingArgAndParam(g, f)
   confusingArgAndParam(f, g)
 }
 
-func acceptUnaryFn<T, U>(f: (T) -> U) { }
-func acceptUnaryFnSame<T>(f: (T) -> T) { }
+func acceptUnaryFn<T, U>(_ f: (T) -> U) { }
+func acceptUnaryFnSame<T>(_ f: (T) -> T) { }
 
-func acceptUnaryFnRef<T, U>(inout f: (T) -> U) { }
-func acceptUnaryFnSameRef<T>(inout f: (T) -> T) { }
+func acceptUnaryFnRef<T, U>(_ f: inout (T) -> U) { }
+func acceptUnaryFnSameRef<T>(_ f: inout (T) -> T) { }
 
 func unaryFnIntInt(_: Int) -> Int {}
 
@@ -132,8 +131,8 @@ func passOverloadSet() {
   acceptUnaryFnRef(unaryFnIntIntVar) // expected-error{{passing value of type '(Int) -> Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
 }
 
-func acceptFnFloatFloat(f: (Float) -> Float) {}
-func acceptFnDoubleDouble(f: (Double) -> Double) {}
+func acceptFnFloatFloat(_ f: (Float) -> Float) {}
+func acceptFnDoubleDouble(_ f: (Double) -> Double) {}
 
 func passGeneric() {
   acceptFnFloatFloat(identity)
@@ -144,15 +143,15 @@ func passGeneric() {
 // Simple deduction for generic member functions
 //===----------------------------------------------------------------------===//
 struct SomeType {
-  func identity<T>(x: T) -> T { return x }
+  func identity<T>(_ x: T) -> T { return x }
 
-  func identity2<T>(x: T) -> T { return x } // expected-note 2{{found this candidate}}
-  func identity2<T>(x: T) -> Float { } // expected-note 2{{found this candidate}}
+  func identity2<T>(_ x: T) -> T { return x } // expected-note 2{{found this candidate}}
+  func identity2<T>(_ x: T) -> Float { } // expected-note 2{{found this candidate}}
 
   func returnAs<T>() -> T {}
 }
 
-func testMemberDeduction(sti: SomeType, ii: Int, fi: Float) {
+func testMemberDeduction(_ sti: SomeType, ii: Int, fi: Float) {
   var st = sti, i = ii, f = fi
   i = st.identity(i)
   f = st.identity(f)
@@ -177,7 +176,7 @@ struct StaticFuncsGeneric<U> {
 
 func chameleon<T>() -> T {}
 
-func testStatic(sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
+func testStatic(_ sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
   var x: Int16
   x = StaticFuncs.chameleon()
   x = sf.chameleon2()
@@ -192,40 +191,60 @@ func testStatic(sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
 // Deduction checking for constraints
 //===----------------------------------------------------------------------===//
 protocol IsBefore {
-  func isBefore(other: Self) -> Bool
+  func isBefore(_ other: Self) -> Bool
 }
 
-func min2<T : IsBefore>(x: T, _ y: T) -> T {
+func min2<T : IsBefore>(_ x: T, _ y: T) -> T {
   if y.isBefore(x) { return y }
   return x
 }
 
 extension Int : IsBefore {
-  func isBefore(other: Int) -> Bool { return self < other }
+  func isBefore(_ other: Int) -> Bool { return self < other }
 }
 
-func callMin(x: Int, y: Int, a: Float, b: Float) {
-  min2(x, y)
-  min2(a, b) // expected-error{{cannot invoke 'min2' with an argument list of type '(Float, Float)'}} expected-note {{expected an argument list of type '(T, T)'}}
+func callMin(_ x: Int, y: Int, a: Float, b: Float) {
+  _ = min2(x, y)
+  min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<
-  R : GeneratorType where R.Element : IsBefore
->(range : R) { }
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {}
 
-
-func callRangeOfIsBefore(ia: [Int], da: [Double]) {
-  rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type '(IndexingGenerator<[Double]>)'}} expected-note{{expected an argument list of type '(R)'}}
+func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
+  rangeOfIsBefore(ia.makeIterator())
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{type 'Double' does not conform to protocol 'IsBefore'}}
 }
+
+func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
+// expected-note@-1 {{candidate requires that the types 'Int' and 'Double' be equivalent (requirement specified as 'A.Element' == 'B.Element' [with A = IndexingIterator<[Int]>, B = IndexingIterator<[Double]>])}}
+func compareIterators() {
+  var a: [Int] = []
+  var b: [Double] = []
+  testEqualIterElementTypes(a.makeIterator(), b.makeIterator())
+  // expected-error@-1 {{cannot invoke 'testEqualIterElementTypes(_:_:)' with an argument list of type '(IndexingIterator<[Int]>, IndexingIterator<[Double]>)'}}
+}
+
+protocol P_GI {
+  associatedtype Y
+}
+
+class C_GI : P_GI {
+  typealias Y = Double
+}
+
+class GI_Diff {}
+func genericInheritsA<T>(_ x: T) where T : P_GI, T.Y : GI_Diff {}
+// expected-note@-1 {{candidate requires that 'GI_Diff' inherit from 'T.Y' (requirement specified as 'T.Y' : 'GI_Diff' [with T = C_GI])}}
+genericInheritsA(C_GI())
+// expected-error@-1 {{cannot invoke 'genericInheritsA(_:)' with an argument list of type '(C_GI)'}}
 
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
 protocol Addable {
-  func +(x: Self, y: Self) -> Self
+  static func +(x: Self, y: Self) -> Self
 }
-func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
+func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
   u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
   return x+y
@@ -236,14 +255,14 @@ func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
 //===----------------------------------------------------------------------===//
 struct MyVector<T> { func size() -> Int {} }
 
-func getVectorSize<T>(v: MyVector<T>) -> Int {
+func getVectorSize<T>(_ v: MyVector<T>) -> Int {
   return v.size()
 }
 
-func ovlVector<T>(v: MyVector<T>) -> X {}
-func ovlVector<T>(v: MyVector<MyVector<T>>) -> Y {}
+func ovlVector<T>(_ v: MyVector<T>) -> X {}
+func ovlVector<T>(_ v: MyVector<MyVector<T>>) -> Y {}
 
-func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
+func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   var i : Int
   i = getVectorSize(vi)
   i = getVectorSize(vf)
@@ -263,19 +282,19 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
 }
 
 // <rdar://problem/15104554>
-postfix operator <*> {}
+postfix operator <*>
 
 protocol MetaFunction {
-  typealias Result
-  postfix func <*> (_: Self) -> Result?
+  associatedtype Result
+  static postfix func <*> (_: Self) -> Result?
 }
 
 protocol Bool_ {}
 struct False : Bool_ {}
 struct True : Bool_ {}
 
-postfix func <*> <B:Bool_>(_: Test<B>) -> Int? { return .None }
-postfix func <*> (_: Test<True>) -> String? { return .None }
+postfix func <*> <B>(_: Test<B>) -> Int? { return .none }
+postfix func <*> (_: Test<True>) -> String? { return .none }
 
 class Test<C: Bool_> : MetaFunction {
   typealias Result = Int
@@ -288,3 +307,36 @@ var iy2 : Inty = "hello" // expected-error{{cannot convert value of type 'String
 class DeducePropertyParams {
   let badSet: Set = ["Hello"]
 }
+
+// SR-69
+struct A {}
+func foo() {
+    for i in min(1,2) { // expected-error{{type 'Int' does not conform to protocol 'Sequence'}}
+    }
+    let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+    let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}
+    let oi : Int? = 5
+    let l = min(3, oi) // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+}
+
+infix operator +&
+func +&<R, S>(lhs: inout R, rhs: S) where R : RangeReplaceableCollection, S : Sequence, R.Element == S.Element {}
+// expected-note@-1 {{candidate requires that the types 'String' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'R.Element' == 'S.Element' [with R = [String], S = String])}}
+
+func rdar33477726_1() {
+  var arr: [String] = []
+  arr +& "hello"
+  // expected-error@-1 {{binary operator '+&(_:_:)' cannot be applied to operands of type '[String]' and 'String'}}
+}
+
+func rdar33477726_2<R, S>(_: R, _: S) where R: Sequence, S == R.Element {}
+// expected-note@-1 {{candidate requires that the types 'Int' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'S' == 'R.Element' [with R = String, S = Int])}}
+rdar33477726_2("answer", 42)
+// expected-error@-1 {{cannot invoke 'rdar33477726_2(_:_:)' with an argument list of type '(String, Int)'}}
+
+prefix operator +-
+prefix func +-<T>(_: T) where T: Sequence, T.Element == Int {}
+// expected-note@-1 {{candidate requires that the types 'String.Element' (aka 'Character') and 'Int' be equivalent (requirement specified as 'T.Element' == 'Int' [with T = String])}}
+
++-"hello"
+// expected-error@-1 {{unary operator '+-(_:)' cannot be applied to an operand of type 'String'}}

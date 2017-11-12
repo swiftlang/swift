@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,12 +19,13 @@
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include <tuple>
 using namespace swift;
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Inheritance clause handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 static std::tuple<TypeResolutionOptions, DeclContext *,
                   MutableArrayRef<TypeLoc>>
 decomposeInheritedClauseDecl(
@@ -36,7 +37,9 @@ decomposeInheritedClauseDecl(
     inheritanceClause = typeDecl->getInherited();
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
-      options |= TR_GenericSignature | TR_InheritanceClause;
+      options |= (TR_GenericSignature |
+                  TR_InheritanceClause |
+                  TR_AllowUnavailableProtocol);
     } else {
       dc = typeDecl->getDeclContext();
 
@@ -62,7 +65,9 @@ decomposeInheritedClauseDecl(
     auto ext = decl.get<ExtensionDecl *>();
     inheritanceClause = ext->getInherited();
     dc = ext;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   }
 
   return std::make_tuple(options, dc, inheritanceClause);
@@ -96,17 +101,30 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
   // FIXME: Declaration validation is overkill. Sink it down into type
   // resolution when it is actually needed.
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-    TC.validateDecl(nominal);
+    TC.validateDeclForNameLookup(nominal);
   else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     TC.validateExtension(ext);
   }
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  PartialGenericTypeToArchetypeResolver resolver(TC);
-  if (TC.validateType(*inherited, dc, options, &resolver)) {
+  ProtocolRequirementTypeResolver protoResolver;
+  GenericTypeToArchetypeResolver archetypeResolver(dc);
+  GenericTypeResolver *resolver;
+  if (isa<ProtocolDecl>(dc)) {
+    resolver = &protoResolver;
+  } else {
+    resolver = &archetypeResolver;
+  }
+
+  if (TC.validateType(*inherited, dc, options, resolver,
+                      &unsatisfiedDependency)) {
     inherited->setInvalidType(getASTContext());
   }
+
+  auto type = inherited->getType();
+  if (!type.isNull() && !isa<ProtocolDecl>(dc))
+    inherited->setType(dc->mapTypeOutOfContext(type));
 }
 
 bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
@@ -116,9 +134,9 @@ bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Superclass handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isTypeCheckSuperclassSatisfied(ClassDecl *payload) {
   return payload->LazySemanticInfo.Superclass.getInt();
 }
@@ -153,6 +171,8 @@ void IterativeTypeChecker::processTypeCheckSuperclass(
   }
 
   // Set the superclass type.
+  if (classDecl->isInvalid())
+    superclassType = ErrorType::get(getASTContext());
   classDecl->setSuperclass(superclassType);
 }
 
@@ -162,9 +182,9 @@ bool IterativeTypeChecker::breakCycleForTypeCheckSuperclass(
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Raw type handling
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isTypeCheckRawTypeSatisfied(EnumDecl *payload) {
   return payload->LazySemanticInfo.RawType.getInt();
 }
@@ -205,11 +225,17 @@ bool IterativeTypeChecker::breakCycleForTypeCheckRawType(EnumDecl *enumDecl) {
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Inherited protocols
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isInheritedProtocolsSatisfied(ProtocolDecl *payload){
-  return payload->isInheritedProtocolsValid();
+  auto inheritedClause = payload->getInherited();
+  for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
+    TypeLoc &inherited = inheritedClause[i];
+    if (!inherited.getType()) return false;
+  }
+
+  return true;
 }
 
 void IterativeTypeChecker::processInheritedProtocols(
@@ -220,6 +246,7 @@ void IterativeTypeChecker::processInheritedProtocols(
   // FIXME: Technically, we only need very basic name binding.
   auto inheritedClause = protocol->getInherited();
   bool anyDependencies = false;
+  bool diagnosedCircularity = false;
   llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     TypeLoc &inherited = inheritedClause[i];
@@ -233,100 +260,104 @@ void IterativeTypeChecker::processInheritedProtocols(
 
     // Collect existential types.
     // FIXME: We'd prefer to keep what the user wrote here.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (inherited.getType()->isExistentialType(protocols)) {
-      allProtocols.insert(protocols.begin(), protocols.end());
-      continue;
+    if (inherited.getType()->isExistentialType()) {
+      auto layout = inherited.getType()->getExistentialLayout();
+      for (auto inheritedProtocolTy: layout.getProtocols()) {
+        auto *inheritedProtocol = inheritedProtocolTy->getDecl();
+
+        if (inheritedProtocol == protocol ||
+            inheritedProtocol->inheritsFrom(protocol)) {
+          if (!diagnosedCircularity) {
+            diagnose(protocol,
+                     diag::circular_protocol_def, protocol->getName().str())
+                    .fixItRemove(inherited.getSourceRange());
+            diagnosedCircularity = true;
+          }
+          continue;
+        }
+        allProtocols.insert(inheritedProtocol);
+      }
     }
   }
 
   // If we enumerated any dependencies, we can't complete this request.
   if (anyDependencies)
     return;
-
-  // FIXME: Hack to deal with recursion elsewhere.
-  if (protocol->isInheritedProtocolsValid())
-    return;
-
-  // Check for circular inheritance.
-  // FIXME: The diagnostics here should be improved... and this should probably
-  // be handled by the normal cycle detection.
-  bool diagnosedCircularity = false;
-  for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
-    if (allProtocols[i] == protocol ||
-        allProtocols[i]->inheritsFrom(protocol)) {
-      if (!diagnosedCircularity) {
-        diagnose(protocol,
-                 diag::circular_protocol_def, protocol->getName().str());
-        diagnosedCircularity = true;
-      }
-
-      allProtocols.remove(allProtocols[i]);
-      --n;
-      continue;
-    }
-
-    ++i;
-  }
-
-  protocol->setInheritedProtocols(getASTContext().AllocateCopy(allProtocols));
 }
 
 bool IterativeTypeChecker::breakCycleForInheritedProtocols(
        ProtocolDecl *protocol) {
   // FIXME: We'd like to drop just the problematic protocols, not
   // everything.
-  protocol->setInheritedProtocols({});
   return true;
 }
 
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 // Resolve a type declaration
-//----------------------------------------------------------------------------//
+//===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
-  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    // If the underlying type was validated, we're done.
-    return typeAliasDecl->getUnderlyingTypeLoc().wasValidated();
-  }
+  auto *dc = typeDecl->getDeclContext();
 
-  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(typeDecl)) {
-    // FIXME: Deal with these.
-    return typeParam->getArchetype();
-  }
-
-  // Module types are always fully resolved.
-  if (isa<ModuleDecl>(typeDecl))
+  if (typeDecl->hasInterfaceType())
     return true;
 
-  // Nominal types.
-  auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return !nominal->getDeclaredType().isNull();
+  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      return typeAliasDecl->hasInterfaceType();
+    }
+  }
+
+  // If this request can *never* be satisfied due to recursion,
+  // return success and fail elsewhere.
+  if (typeDecl->isBeingValidated())
+    return true;
+
+  while (dc) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isBeingValidated())
+        return true;
+      if (nominal->hasInterfaceType())
+        return false;
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      if (ext->isBeingValidated())
+        return true;
+      if (ext->hasValidationStarted())
+        return false;
+    } else {
+      break;
+    }
+    dc = dc->getParent();
+  }
+
+  // Ok, we can try calling validateDecl().
+  return false;
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(
        TypeDecl *typeDecl,
        UnsatisfiedDependency unsatisfiedDependency) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
-      // FIXME: This is silly.
-      if (!typeAliasDecl->hasType())
-        typeAliasDecl->computeType();
-      
-      TypeResolutionOptions options;
-      options |= TR_GlobalTypeAlias;
-      if (typeAliasDecl->getFormalAccess() == Accessibility::Private)
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
+      if (typeAliasDecl->getFormalAccess() <= AccessLevel::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
       // Note: recursion into old type checker is okay when passing in an
       // unsatisfied-dependency callback.
-      if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(),
-                          typeAliasDecl->getDeclContext(),
-                          options, nullptr, &unsatisfiedDependency)) {
+      GenericTypeToArchetypeResolver resolver(typeAliasDecl);
+      if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(), typeAliasDecl,
+                          options, &resolver, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
-      
+
+      if (typeAliasDecl->getUnderlyingTypeLoc().wasValidated()) {
+        typeAliasDecl->setUnderlyingType(
+            typeAliasDecl->getUnderlyingTypeLoc().getType());
+      }
+
       return;
     }
 
@@ -340,7 +371,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
 bool IterativeTypeChecker::breakCycleForResolveTypeDecl(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     typeAliasDecl->setInvalid();
-    typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+    typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
     typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
     return true;
   }

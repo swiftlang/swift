@@ -1,12 +1,12 @@
-//===--- EncodedSequence.h - A byte-encoded sequence -----------*- C++ -*-===//
+//===--- EncodedSequence.h - A byte-encoded sequence ------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,11 +21,13 @@
 #ifndef SWIFT_BASIC_ENCODEDSEQUENCE_H
 #define SWIFT_BASIC_ENCODEDSEQUENCE_H
 
-#include <climits>
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrefixMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/TrailingObjects.h"
+#include <climits>
 
 namespace swift {
 
@@ -66,7 +68,10 @@ private:
   }
 
   /// A structure representing out-of-line chunk storage.
-  struct OutOfLineStorage {
+  struct OutOfLineStorage final :
+      private llvm::TrailingObjects<OutOfLineStorage, Chunk> {
+    friend TrailingObjects;
+
     uint16_t Size;
     uint16_t Capacity;
 
@@ -74,13 +79,13 @@ private:
 
   public:
     OutOfLineStorage *clone(size_t newCapacity) const {
-      size_t newAllocSize =
-        sizeof(OutOfLineStorage) + newCapacity * sizeof(Chunk);
+      assert(newCapacity >= Size);
+      size_t newAllocSize = totalSizeToAlloc<Chunk>(newCapacity);
       auto newData =
         new (operator new(newAllocSize)) OutOfLineStorage(newCapacity);
       newData->setSize(Size);
-      memcpy(newData->chunkStorage().data(), chunks().data(),
-             Size * sizeof(Chunk));
+      std::uninitialized_copy(chunks().begin(), chunks().end(),
+                              newData->chunkStorage().begin());
       return newData;
     }
     static OutOfLineStorage *alloc(size_t newSizeInBytes) {
@@ -97,13 +102,13 @@ private:
     }
 
     MutableArrayRef<Chunk> chunkStorage() {
-      return MutableArrayRef<Chunk>(reinterpret_cast<Chunk*>(this+1), Capacity);
+      return {getTrailingObjects<Chunk>(), Capacity};
     }
     ArrayRef<Chunk> chunkStorage() const {
-      return ArrayRef<Chunk>(reinterpret_cast<const Chunk*>(this+1), Capacity);
+      return {getTrailingObjects<Chunk>(), Capacity};
     }
     ArrayRef<Chunk> chunks() const {
-      return ArrayRef<Chunk>(reinterpret_cast<const Chunk*>(this+1), Size);
+      return {getTrailingObjects<Chunk>(), Size};
     }
   };
   OutOfLineStorage *getOutOfLineStorage() {
@@ -333,11 +338,20 @@ public:
   /// see the documentation there for information about how to use this
   /// data structure.
   template <class ValueType> class Map {
+    // Hack: MSVC isn't able to resolve the InlineKeyCapacity part of the
+    // template of PrefixMap, so we have to split it up and pass it manually.
+#if SWIFT_COMPILER_IS_MSVC && _MSC_VER < 1910
+    static const size_t Size = (sizeof(void*) - 1) / sizeof(Chunk);
+    static const size_t ActualSize = max<size_t>(Size, 1);
+
+    using MapBase = PrefixMap<Chunk, ValueType, ActualSize>;
+#else
     using MapBase = PrefixMap<Chunk, ValueType>;
+#endif
     MapBase TheMap;
 
   public:
-    using SequenceIterator = EncodedSequence::iterator;
+    using SequenceIterator = typename EncodedSequence::iterator;
     using KeyType = typename MapBase::KeyType;
     using Handle = typename MapBase::Handle;
 
@@ -367,4 +381,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_ENCODEDSEQUENCE_H

@@ -2,65 +2,70 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// FIXME: Workaround for inability to create existentials of protocols
-// with associated types <rdar://problem/11689181>
 
 // This file contains "existentials" for the protocols defined in
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
 
-/// Unavailable; use `AnyGenerator<T>` instead.
-@available(*, unavailable, renamed="AnyGenerator")
-public struct GeneratorOf<T>  {}
-
-/// Unavailable; use `AnySequence<T>` instead.
-@available(*, unavailable, renamed="AnySequence")
-public struct SequenceOf<T> {}
-
+@_fixed_layout // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
 internal struct _CollectionOf<
-  IndexType_ : ForwardIndexType, T
-> : CollectionType {
-  init(startIndex: IndexType_, endIndex: IndexType_,
-      _ subscriptImpl: (IndexType_)->T) {
-    self.startIndex = startIndex
+  IndexType : Strideable, Element
+> : Collection {
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(
+    _startIndex: IndexType, endIndex: IndexType,
+    _ subscriptImpl: @escaping (IndexType) -> Element
+  ) {
+    self.startIndex = _startIndex
     self.endIndex = endIndex
-    _subscriptImpl = subscriptImpl
+    self._subscriptImpl = subscriptImpl
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  func generate() -> AnyGenerator<T> {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func makeIterator() -> AnyIterator<Element> {
     var index = startIndex
-    return AnyGenerator {
-      () -> T? in
+    return AnyIterator {
+      () -> Element? in
       if _fastPath(index != self.endIndex) {
-        ++index
+        self.formIndex(after: &index)
         return self._subscriptImpl(index)
       }
-      return .None
+      return nil
     }
   }
 
-  let startIndex: IndexType_
-  let endIndex: IndexType_
+  @_versioned // FIXME(sil-serialize-all)
+  internal let startIndex: IndexType
+  @_versioned // FIXME(sil-serialize-all)
+  internal let endIndex: IndexType
 
-  subscript(i: IndexType_) -> T {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func index(after i: IndexType) -> IndexType {
+    return i.advanced(by: 1)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(i: IndexType) -> Element {
     return _subscriptImpl(i)
   }
 
-  let _subscriptImpl: (IndexType_)->T
+  @_versioned // FIXME(sil-serialize-all)
+  internal let _subscriptImpl: (IndexType) -> Element
 }
-
-@available(*, unavailable, message="SinkOf has been removed. Use (T)->() closures directly instead.")
-public struct SinkOf<T> {}
 

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift foo | FileCheck %s
+// RUN: %target-run-simple-swift foo | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -18,20 +18,23 @@ class SuperString : NSString {
   required init?(coder aDecoder: NSCoder) {
     super.init(coder: aDecoder)
   }
+  required init(itemProviderData data: Data, typeIdentifier: String) throws {
+    fatalError("don't call this initializer")
+  }
 
   override var length: Int {
     return len
   }
 
-  override func characterAtIndex(n: Int) -> unichar {
+  override func character(at n: Int) -> unichar {
     return unichar(0x30 + n)
   }
 
-  override func substringWithRange(r: NSRange) -> String {
+  override func substring(with r: NSRange) -> String {
     if (r.location == 0) {
       return SuperString(r.length) as String
     }
-    return super.substringWithRange(r)
+    return super.substring(with: r)
   }
 }
 
@@ -40,9 +43,9 @@ print(SuperString(10))
 // CHECK: 0123456789
 print(NSString(string: SuperString(10) as String))
 // CHECK: 012
-print(SuperString(10).substringWithRange(NSRange(location: 0, length: 3)))
+print(SuperString(10).substring(with: NSRange(location: 0, length: 3)))
 // CHECK: 345
-print(SuperString(10).substringWithRange(NSRange(location: 3, length: 3)))
+print(SuperString(10).substring(with: NSRange(location: 3, length: 3)))
 
 class X {
   var label: String
@@ -106,7 +109,7 @@ testB()
 // Propagating nil init out of a superclass initialization.
 class MyNSData : NSData {
   init?(base64EncodedString str: String) {
-    super.init(base64EncodedString:str, 
+    super.init(base64Encoded:str, 
                options:[])
     print("MyNSData code should not be executed")
   }
@@ -127,7 +130,7 @@ if let myNSData = MyNSData(base64EncodedString:"\n\n\n") {
 // Propagating nil out of delegating initialization.
 extension NSData {
   convenience init?(myString str: String) {
-    self.init(base64EncodedString:str, 
+    self.init(base64Encoded:str, 
               options:[])
     print("NSData code should not be executed")
   }

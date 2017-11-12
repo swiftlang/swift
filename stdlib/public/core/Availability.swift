@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,12 +15,12 @@ import SwiftShims
 /// Returns 1 if the running OS version is greater than or equal to
 /// major.minor.patchVersion and 0 otherwise.
 ///
-/// This is a magic entrypoint known to the compiler. It is called in
+/// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
-@warn_unused_result
+@_inlineable // FIXME(sil-serialize-all)
 @_semantics("availability.osversion")
 public func _stdlib_isOSVersionAtLeast(
-  major: Builtin.Word,
+  _ major: Builtin.Word,
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {
@@ -37,85 +37,54 @@ public func _stdlib_isOSVersionAtLeast(
   return result._value
 #else
   // FIXME: As yet, there is no obvious versioning standard for platforms other
-  // than Darwin-based OS', so we just assume false for now. 
+  // than Darwin-based OSes, so we just assume false for now. 
   // rdar://problem/18881232
   return false._value
 #endif
 }
 
-extension _SwiftNSOperatingSystemVersion : Comparable { }
+extension _SwiftNSOperatingSystemVersion : Comparable {
 
-@warn_unused_result
-public func == (
-  left: _SwiftNSOperatingSystemVersion,
-  right: _SwiftNSOperatingSystemVersion
-) -> Bool {
-  return left.majorVersion == right.majorVersion &&
-         left.minorVersion == right.minorVersion &&
-         left.patchVersion == right.patchVersion
-}
-
-/// Lexicographic comparison of version components.
-@warn_unused_result
-public func < (
-  _lhs: _SwiftNSOperatingSystemVersion,
-  _rhs: _SwiftNSOperatingSystemVersion
-) -> Bool {
-  if _lhs.majorVersion > _rhs.majorVersion {
-    return false
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (
+    lhs: _SwiftNSOperatingSystemVersion,
+    rhs: _SwiftNSOperatingSystemVersion
+  ) -> Bool {
+    return lhs.majorVersion == rhs.majorVersion &&
+           lhs.minorVersion == rhs.minorVersion &&
+           lhs.patchVersion == rhs.patchVersion
   }
 
-  if _lhs.majorVersion < _rhs.majorVersion {
-    return true
+  /// Lexicographic comparison of version components.
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < (
+    lhs: _SwiftNSOperatingSystemVersion,
+    rhs: _SwiftNSOperatingSystemVersion
+  ) -> Bool {
+    guard lhs.majorVersion == rhs.majorVersion else {
+      return lhs.majorVersion < rhs.majorVersion
+    }
+
+    guard lhs.minorVersion == rhs.minorVersion else {
+      return lhs.minorVersion < rhs.minorVersion
+    }
+
+    return lhs.patchVersion < rhs.patchVersion
   }
 
-  if _lhs.minorVersion > _rhs.minorVersion {
-    return false
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func >= (
+    lhs: _SwiftNSOperatingSystemVersion,
+    rhs: _SwiftNSOperatingSystemVersion
+  ) -> Bool {
+    guard lhs.majorVersion == rhs.majorVersion else {
+      return lhs.majorVersion >= rhs.majorVersion
+    }
+
+    guard lhs.minorVersion == rhs.minorVersion else {
+      return lhs.minorVersion >= rhs.minorVersion
+    }
+
+    return lhs.patchVersion >= rhs.patchVersion
   }
-
-  if _lhs.minorVersion < _rhs.minorVersion {
-    return true
-  }
-
-  if _lhs.patchVersion > _rhs.patchVersion {
-    return false
-  }
-
-  if _lhs.patchVersion < _rhs.patchVersion {
-    return true
-  }
-
-  return false
-}
-
-@warn_unused_result
-public func >= (
-  _lhs: _SwiftNSOperatingSystemVersion,
-  _rhs: _SwiftNSOperatingSystemVersion
-) -> Bool {
-  if _lhs.majorVersion < _rhs.majorVersion {
-    return false
-  }
-
-  if _lhs.majorVersion > _rhs.majorVersion {
-    return true
-  }
-
-  if _lhs.minorVersion < _rhs.minorVersion {
-    return false
-  }
-
-  if _lhs.minorVersion > _rhs.minorVersion {
-    return true
-  }
-
-  if _lhs.patchVersion < _rhs.patchVersion {
-    return false
-  }
-
-  if _lhs.patchVersion > _rhs.patchVersion {
-    return true
-  }
-
-  return true
 }

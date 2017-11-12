@@ -1,12 +1,12 @@
-//===--- Context.h - ---------------------------------------------*- C++ -*-==//
+//===--- Context.h - --------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include <memory>
 #include <string>
 
@@ -32,7 +33,10 @@ class Context {
   std::unique_ptr<NotificationCenter> NotificationCtr;
 
 public:
-  explicit Context(StringRef RuntimeLibPath);
+  Context(StringRef RuntimeLibPath,
+          llvm::function_ref<
+              std::unique_ptr<LangSupport>(Context &)> LangSupportFactoryFn,
+          bool shouldDispatchNotificationsOnMain = true);
   ~Context();
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }

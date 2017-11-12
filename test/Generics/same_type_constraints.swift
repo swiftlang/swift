@@ -1,13 +1,13 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 protocol Fooable {
-  typealias Foo
+  associatedtype Foo
 
   var foo: Foo { get }
 }
 
 protocol Barrable {
-  typealias Bar: Fooable
+  associatedtype Bar: Fooable
   var bar: Bar { get }
 }
 
@@ -22,39 +22,39 @@ struct Z: Barrable {
 }
 
 protocol TestSameTypeRequirement {
-  func foo<F1: Fooable where F1.Foo == X>(f: F1)
+  func foo<F1: Fooable>(_ f: F1) where F1.Foo == X
 }
 struct SatisfySameTypeRequirement : TestSameTypeRequirement {
-  func foo<F2: Fooable where F2.Foo == X>(f: F2) {}
+  func foo<F2: Fooable>(_ f: F2) where F2.Foo == X {}
 }
 
 protocol TestSameTypeAssocTypeRequirement {
-  typealias Assoc
-  func foo<F1: Fooable where F1.Foo == Assoc>(f: F1)
+  associatedtype Assoc
+  func foo<F1: Fooable>(_ f: F1) where F1.Foo == Assoc
 }
 struct SatisfySameTypeAssocTypeRequirement : TestSameTypeAssocTypeRequirement {
   typealias Assoc = X
-  func foo<F2: Fooable where F2.Foo == X>(f: F2) {}
+  func foo<F2: Fooable>(_ f: F2) where F2.Foo == X {}
 }
 struct SatisfySameTypeAssocTypeRequirementDependent<T>
   : TestSameTypeAssocTypeRequirement
 {
   typealias Assoc = T
-  func foo<F3: Fooable where F3.Foo == T>(f: F3) {}
+  func foo<F3: Fooable>(_ f: F3) where F3.Foo == T {}
 }
 
 // Pulled in from old standard library to keep the following test
 // (LazySequenceOf) valid.
-public struct GeneratorOf<T> : GeneratorType, SequenceType {
+public struct GeneratorOf<T> : IteratorProtocol, Sequence {
 
   /// Construct an instance whose `next()` method calls `nextElement`.
-  public init(_ nextElement: ()->T?) {
+  public init(_ nextElement: @escaping () -> T?) {
     self._next = nextElement
   }
   
   /// Construct an instance whose `next()` method pulls its results
   /// from `base`.
-  public init<G: GeneratorType where G.Element == T>(_ base: G) {
+  public init<I : IteratorProtocol>(_ base: I) where I.Element == T {
     var base = base
     self._next = { base.next() }
   }
@@ -62,41 +62,41 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: `next()` has not been applied to a copy of `self`
+  /// Precondition: `next()` has not been applied to a copy of `self`
   /// since the copy was made, and no preceding call to `self.next()`
   /// has returned `nil`.
   public mutating func next() -> T? {
     return _next()
   }
 
-  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`\ s
+  /// `GeneratorOf<T>` is also a `Sequence`, so it `generate`\ s
   /// a copy of itself
-  public func generate() -> GeneratorOf {
+  public func makeIterator() -> GeneratorOf {
     return self
   }
-  let _next: ()->T?
+  let _next: () -> T?
 }
 
 // rdar://problem/19009056
-public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A> : SequenceType {
-  public func generate() -> GeneratorOf<A> { 
+public struct LazySequenceOf<S : Sequence, A> : Sequence where S.Iterator.Element == A {
+  public func makeIterator() -> GeneratorOf<A> { 
     return GeneratorOf<A>({ return nil })
   }
   public subscript(i : A) -> A { return i }
 }
 
-public func iterate<A>(f : A -> A)(x : A) -> LazySequenceOf<Iterate<A>, A>? { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
-  return nil
+public func iterate<A>(_ f : @escaping (A) -> A) -> (_ x : A) -> LazySequenceOf<Iterate<A>, A>? {
+  return { x in nil }
 }
 
-public final class Iterate<A> : SequenceType {
-  typealias GeneratorType = IterateGenerator<A>
-  public func generate() -> IterateGenerator<A> {
+public final class Iterate<A> : Sequence {
+  typealias IteratorProtocol = IterateGenerator<A>
+  public func makeIterator() -> IterateGenerator<A> {
     return IterateGenerator<A>()
   }
 }
 
-public final class IterateGenerator<A> : GeneratorType {
+public final class IterateGenerator<A> : IteratorProtocol {
   public func next() -> A? {
     return nil
   }
@@ -104,12 +104,12 @@ public final class IterateGenerator<A> : GeneratorType {
 
 // rdar://problem/18475138
 public protocol Observable : class {
-    typealias Output
-    func addObserver(obj : Output->Void)
+    associatedtype Output
+    func addObserver(_ obj : @escaping (Output) -> Void)
 }
 
 public protocol Bindable : class {
-    typealias Input
+    associatedtype Input
     func foo()
 }
 
@@ -118,13 +118,13 @@ class SideEffect<In> : Bindable {
   func foo() { }
 }
 
-struct Composed<Left: Bindable, Right: Observable where Left.Input == Right.Output> { }
+struct Composed<Left: Bindable, Right: Observable> where Left.Input == Right.Output {}
 
-infix operator <- { associativity right precedence 90 }
+infix operator <- : AssignmentPrecedence
 
 func <- <
-    Right : Observable
-    >(lhs:Right.Output -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
+    Right
+    >(lhs: @escaping (Right.Output) -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
 {
   return nil
 }
@@ -135,14 +135,15 @@ struct Pair<T, U> {
 }
 
 protocol Seq {
-  typealias Element
+  associatedtype Element
 
-  func zip<OtherSeq: Seq, ResultSeq: Seq where ResultSeq.Element == Pair<Element, OtherSeq.Element>.Type_> (otherSeq: OtherSeq) -> ResultSeq
+  func zip<OtherSeq: Seq, ResultSeq: Seq> (_ otherSeq: OtherSeq) -> ResultSeq
+    where ResultSeq.Element == Pair<Element, OtherSeq.Element>.Type_
 }
 
 // rdar://problem/18435371
 extension Dictionary {
-    func multiSubscript<S: SequenceType where S.Generator.Element == Key>(seq: S) -> [Value?] {
+    func multiSubscript<S : Sequence>(_ seq: S) -> [Value?] where S.Iterator.Element == Key {
         var result = [Value?]()
         for seqElt in seq {
             result.append(self[seqElt])
@@ -153,11 +154,11 @@ extension Dictionary {
 
 // rdar://problem/19245317
 protocol P {
-	typealias T: P // expected-error{{type may not reference itself as a requirement}}
+	associatedtype T: P
 }
 
 struct S<A: P> {
-	init<Q: P where Q.T == A>(_ q: Q) {}
+	init<Q: P>(_ q: Q) where Q.T == A {}
 }
 
 // rdar://problem/19371678
@@ -165,22 +166,22 @@ protocol Food { }
 class Grass : Food { }
 
 protocol Animal {
-    typealias EdibleFood:Food
-    func eat(f:EdibleFood)
+    associatedtype EdibleFood:Food
+    func eat(_ f:EdibleFood)
 }
 class Cow : Animal {
-    func eat(f: Grass) { }
+    func eat(_ f: Grass) { }
 }
 
 struct SpecificAnimal<F:Food> : Animal {
     typealias EdibleFood=F
-    let _eat:(f:F)->()
+    let _eat:(_ f:F) -> ()
 
-    init<A:Animal where A.EdibleFood == F>(_ selfie:A) {
+    init<A:Animal>(_ selfie:A) where A.EdibleFood == F {
         _eat = { selfie.eat($0) }
     }
-    func eat(f:F) {
-        _eat(f:f)
+    func eat(_ f:F) {
+        _eat(f)
     }
 }
 
@@ -190,7 +191,7 @@ struct Something<T> {
 }
 
 extension Something {
-    init<S: SequenceType where S.Generator.Element == T>(_ s: S) {
+    init<S : Sequence>(_ s: S) where S.Iterator.Element == T {
         for item in s {
             items.append(item)
         }
@@ -198,48 +199,45 @@ extension Something {
 }
 
 // rdar://problem/18120419
-func TTGenWrap<T, G: GeneratorType where G.Element == (T,T)>(gen: G)
+func TTGenWrap<T, I : IteratorProtocol>(_ iterator: I) where I.Element == (T,T)
 {
-  var gen = gen
-  _ = gen.next()
+  var iterator = iterator
+  _ = iterator.next()
 }
 
-func IntIntGenWrap<G: GeneratorType where G.Element == (Int,Int)>(gen: G)
+func IntIntGenWrap<I : IteratorProtocol>(_ iterator: I) where I.Element == (Int,Int)
 {
-  var gen = gen
-  _ = gen.next()
+  var iterator = iterator
+  _ = iterator.next()
 }
 
-func GGWrap<G1: GeneratorType, G2: GeneratorType where G1.Element == G2.Element>(g1: G1, _ g2: G2)
+func GGWrap<I1 : IteratorProtocol, I2 : IteratorProtocol>(_ i1: I1, _ i2: I2) where I1.Element == I2.Element
 {
-  var g1 = g1
-  var g2 = g2
-  _ = g1.next()
-  _ = g2.next()
+  var i1 = i1
+  var i2 = i2
+  _ = i1.next()
+  _ = i2.next()
 }
 
-func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
-  GGWrap(a.generate(), s.generate())
-  TTGenWrap(a.generate())
-  IntIntGenWrap(s.generate())
+func testSameTypeTuple(_ a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
+  GGWrap(a.makeIterator(), s.makeIterator())
+  TTGenWrap(a.makeIterator())
+  IntIntGenWrap(s.makeIterator())
 }
 
 // rdar://problem/20256475
-protocol FooType {
-  typealias Element
+protocol FooProtocol {
+  associatedtype Element
 
   func getElement() -> Element
 }
-protocol BarType {
-  typealias Foo : FooType
+protocol Bar {
+  associatedtype Foo : FooProtocol
 
   func getFoo() -> Foo
 
-  mutating func extend<
-    C : FooType
-    where
-    C.Element == Foo.Element
-  >(elements: C)
+  mutating func extend<C : FooProtocol>(_ elements: C)
+    where C.Element == Foo.Element
 }
 
 // rdar://problem/21620908
@@ -248,7 +246,7 @@ protocol P1 { }
 protocol P2Base { }
 
 protocol P2 : P2Base {
-  typealias Q : P1
+  associatedtype Q : P1
 
   func getQ() -> Q
 }
@@ -257,17 +255,17 @@ struct XP1<T : P2Base> : P1 {
   func wibble() { }
 }
 
-func sameTypeParameterizedConcrete<C : P2 where C.Q == XP1<C>>(c: C) {
+func sameTypeParameterizedConcrete<C : P2>(_ c: C) where C.Q == XP1<C> {
   c.getQ().wibble()
 }
 
 // rdar://problem/21621421
 protocol P3 {
-  typealias AssocP3 : P1
+  associatedtype AssocP3 : P1
 }
 
 protocol P4 {
-  typealias AssocP4 : P3
+  associatedtype AssocP4 : P3
 }
 
 struct X1 : P1 { }
@@ -276,13 +274,13 @@ struct X3 : P3 {
   typealias AssocP3 = X1
 }
 
-func foo<C : P4 where C.AssocP4 == X3>(c: C) { }
+func foo<C : P4>(_ c: C) where C.AssocP4 == X3 {}
 
 struct X4 : P4 {
   typealias AssocP4 = X3
 }
 
-func testFoo(x3: X4) {
+func testFoo(_ x3: X4) {
   foo(x3)
 }
 
@@ -292,24 +290,24 @@ struct X6<T> { }
 protocol P6 { }
 
 protocol P7 {
-  typealias AssocP7
+  associatedtype AssocP7
 }
 
 protocol P8 {
-  typealias AssocP8 : P7
-  typealias AssocOther
+  associatedtype AssocP8 : P7
+  associatedtype AssocOther
 }
 
-func testP8<C : P8 where C.AssocOther == X6<C.AssocP8.AssocP7>>(c: C) { }
+func testP8<C : P8>(_ c: C) where C.AssocOther == X6<C.AssocP8.AssocP7> {}
 
 // setGenericSignature() was getting called twice here
 struct Ghost<T> {}
 
 protocol Timewarp {
-  typealias Wormhole
+  associatedtype Wormhole
 }
 
-struct Teleporter<A, B where A : Timewarp, A.Wormhole == Ghost<B>> {}
+struct Teleporter<A, B> where A : Timewarp, A.Wormhole == Ghost<B> {}
 
 struct Beam {}
 
@@ -317,6 +315,59 @@ struct EventHorizon : Timewarp {
   typealias Wormhole = Ghost<Beam>
 }
 
-func activate<T>(t: T) {}
+func activate<T>(_ t: T) {}
 
 activate(Teleporter<EventHorizon, Beam>())
+
+// rdar://problem/29288428
+class C {}
+
+protocol P9 {
+  associatedtype A
+}
+
+struct X7<T: P9> where T.A : C { }
+
+extension X7 where T.A == Int { } // expected-error {{'T.A' requires that 'Int' inherit from 'C'}}
+struct X8<T: C> { }
+
+extension X8 where T == Int { } // expected-error {{'T' requires that 'Int' inherit from 'C'}}
+
+protocol P10 {
+	associatedtype A
+	associatedtype B
+	associatedtype C
+	associatedtype D
+	associatedtype E
+}
+
+protocol P11: P10 where A == B { }
+
+func intracomponent<T: P11>(_: T) // expected-note{{previous same-type constraint 'T.A' == 'T.B' implied here}}
+  where T.A == T.B { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
+
+func intercomponentSameComponents<T: P10>(_: T)
+  where T.A == T.B, // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
+        T.B == T.A { } // expected-note{{previous same-type constraint 'T.B' == 'T.A' written here}}
+
+func intercomponentMoreThanSpanningTree<T: P10>(_: T)
+  where T.A == T.B,
+        T.B == T.C,
+        T.D == T.E, // expected-note{{previous same-type constraint 'T.D' == 'T.E' written here}}
+        T.D == T.B,
+        T.E == T.B  // expected-warning{{redundant same-type constraint 'T.E' == 'T.B'}}
+        { }
+
+func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.A'}}
+
+struct X11<T: P10> where T.A == T.B { }
+
+func intracomponentInferred<T>(_: X11<T>)
+  where T.A == T.B { }
+
+// Suppress redundant same-type constraint warnings from result types.
+struct StructTakingP1<T: P1> { }
+
+func resultTypeSuppress<T: P1>() -> StructTakingP1<T> {
+  return StructTakingP1()
+}

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -54,6 +54,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
+    case CodeCompletionString::Chunk::ChunkKind::Equal:
     case CodeCompletionString::Chunk::ChunkKind::Whitespace:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
@@ -65,7 +66,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
-    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamEqual:
+    case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamColon:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
@@ -100,6 +101,7 @@ static void toDisplayString(CodeCompletionResult *Result,
       if (Result->getKind() == CodeCompletionResult::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
+        case CodeCompletionDeclKind::PrecedenceGroup:
         case CodeCompletionDeclKind::Class:
         case CodeCompletionDeclKind::Struct:
         case CodeCompletionDeclKind::Enum:
@@ -111,6 +113,7 @@ static void toDisplayString(CodeCompletionResult *Result,
 
         case CodeCompletionDeclKind::Protocol:
         case CodeCompletionDeclKind::TypeAlias:
+        case CodeCompletionDeclKind::AssociatedType:
         case CodeCompletionDeclKind::GenericTypeParam:
         case CodeCompletionDeclKind::Constructor:
         case CodeCompletionDeclKind::Destructor:
@@ -178,11 +181,11 @@ REPLCompletions::REPLCompletions()
   // Create a CodeCompletionConsumer.
   Consumer.reset(new REPLCodeCompletionConsumer(*this));
 
-  // Cerate a factory for code completion callbacks that will feed the
+  // Create a factory for code completion callbacks that will feed the
   // Consumer.
   CompletionCallbacksFactory.reset(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              *Consumer.get()));
+                                              *Consumer));
 }
 
 static void

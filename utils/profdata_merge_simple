@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -x
+set -e
+
+PROFRAW_DIR=$1
+OUTPUT_FILENAME=$2
+
+# Reads the paths to prof data files from INPUT_FILENAME and then merges them
+# into OUTPUT_FILENAME.
+TARGETS=($(find ${PROFRAW_DIR} -name '*.profraw'))
+
+if [[ ${#TARGETS[@]} -eq 0 ]]; then
+    echo "Error! No *.profraw targets to merge!"
+    exit 1
+fi
+
+FIRST_TARGET=${TARGETS[0]}
+xcrun -sdk macosx llvm-profdata merge -output-file=${OUTPUT_FILENAME} ${FIRST_TARGET}
+
+if [[ ${#TARGETS[@]} -eq 1 ]]; then
+    exit 0
+fi
+
+# Reduce over the rest of the targets
+for t in "${TARGETS[@]:1}"; do
+    xcrun -sdk macosx llvm-profdata merge -o=${OUTPUT_FILENAME}.tmp ${t} ${OUTPUT_FILENAME}
+    mv ${OUTPUT_FILENAME}.tmp ${OUTPUT_FILENAME}
+done
+
+set +e
+set +x

@@ -1,0 +1,893 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer -inline  | %FileCheck %s --check-prefix=CHECK-DEVIRT
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt  | %FileCheck %s --check-prefix=CHECK-SPECDEVIRT
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mandatory-inlining  | %FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class Base {
+  @inline(never) func foo() throws -> Int32?
+  @inline(never) func boo1() throws -> Base
+  @inline(never) func boo2() throws -> Base?
+   deinit
+  init()
+}
+
+public class Derived1 : Base {
+  @inline(never) override func foo() throws -> Int32?
+  @inline(never) override func boo1() throws -> Derived1
+  @inline(never) override func boo2() throws -> Derived1?
+   deinit
+  override init()
+}
+
+public class Derived2 : Base {
+  @inline(never) override func foo() throws -> Int32
+  @inline(never) override func boo1() throws -> Derived2
+  @inline(never) override func boo2() throws -> Derived2
+   deinit
+  override init()
+}
+
+public protocol P {
+  func foo() throws -> Int32
+}
+
+public class CP1 : P {
+  public func foo() throws -> Int32
+   deinit
+  init()
+}
+
+public class CP2 : CP1 {
+  override public func foo() throws -> Int32
+   deinit
+  override init()
+}
+
+@inline(never) public func testTryApplyDevirt1(b: Base) -> Int32?
+
+@inline(never) public func testTryApplyDevirt2(b: Base) -> Base?
+
+@inline(never) public func testTryApplyDevirt3(b: Base) -> Base?
+
+public func test1()
+
+public func test2()
+
+public func test3()
+
+public func test4() -> Int32
+
+public func test5() -> Int32
+
+public func test6() -> Int32?
+
+
+sil_global [serialized] @_TZvOs7Process5_argcVs5Int32 : $Int32
+
+
+sil_global private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+
+
+sil_global [serialized] @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
+  %2 = global_addr @_TZvOs7Process5_argcVs5Int32 : $*Int32
+  store %0 to %2 : $*Int32
+  %4 = global_addr @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $*Builtin.Word
+  %5 = address_to_pointer %4 : $*Builtin.Word to $Builtin.RawPointer
+
+  %6 = function_ref @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> ()
+  %7 = builtin "once"(%5 : $Builtin.RawPointer, %6 : $@convention(thin) () -> ()) : $()
+  %8 = global_addr @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $*UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+  store %1 to %8 : $*UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+  %10 = tuple ()
+  %11 = integer_literal $Builtin.Int32, 0
+  %12 = struct $Int32 (%11 : $Builtin.Int32)
+  return %12 : $Int32
+}
+
+
+sil [transparent] [serialized] @_TFs13_didEnterMainFTVs5Int324argvGVs20UnsafeMutablePointerGS0_Vs4Int8___T_ : $@convention(thin) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply4Base3foofS0_FzT_GSqVs5Int32_ : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error) {
+bb0(%0 : $Base):
+  debug_value %0 : $Base
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32
+  return %4 : $Optional<Int32>
+}
+
+
+sil [transparent] [serialized] @_TFVs5Int32CfMS_FT22_builtinIntegerLiteralBi2048__S_ : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error) {
+bb0(%0 : $Base):
+  debug_value %0 : $Base
+  strong_retain %0 : $Base
+  return %0 : $Base
+}
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply4Base4boo2fS0_FzT_GSqS0__ : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error) {
+bb0(%0 : $Base):
+  debug_value %0 : $Base
+  strong_retain %0 : $Base
+  %3 = enum $Optional<Base>, #Optional.some!enumelt.1, %0 : $Base
+  return %3 : $Optional<Base>
+}
+
+
+sil @_TFC16devirt_try_apply4BaseD : $@convention(method) (@owned Base) -> () {
+bb0(%0 : $Base):
+  debug_value %0 : $Base
+
+  %2 = function_ref @_TFC16devirt_try_apply4Based : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Base
+  dealloc_ref %4 : $Base
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+sil @_TFC16devirt_try_apply4Based : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject {
+bb0(%0 : $Base):
+  debug_value %0 : $Base
+  %2 = unchecked_ref_cast %0 : $Base to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+
+sil hidden @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base {
+bb0(%0 : $Base):
+  debug_value %0 : $Base
+  return %0 : $Base
+}
+
+
+sil hidden @_TFC16devirt_try_apply4BaseCfMS0_FT_S0_ : $@convention(thin) (@thick Base.Type) -> @owned Base {
+bb0(%0 : $@thick Base.Type):
+  %1 = alloc_ref $Base
+
+  %2 = function_ref @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base
+  %3 = apply %2(%1) : $@convention(method) (@owned Base) -> @owned Base
+  return %3 : $Base
+}
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply8Derived13foofS0_FzT_GSqVs5Int32_ : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error) {
+bb0(%0 : $Derived1):
+  debug_value %0 : $Derived1
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32
+  return %4 : $Optional<Int32>
+}
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply8Derived14boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived1) -> (@owned Derived1, @error Error) {
+bb0(%0 : $Derived1):
+  debug_value %0 : $Derived1
+  strong_retain %0 : $Derived1
+  return %0 : $Derived1
+}
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__ : $@convention(method) (@guaranteed Derived1) -> (@owned Optional<Derived1>, @error Error) {
+bb0(%0 : $Derived1):
+  debug_value %0 : $Derived1
+  strong_retain %0 : $Derived1
+  %3 = enum $Optional<Derived1>, #Optional.some!enumelt.1, %0 : $Derived1
+  return %3 : $Optional<Derived1>
+}
+
+
+sil @_TFC16devirt_try_apply8Derived1D : $@convention(method) (@owned Derived1) -> () {
+bb0(%0 : $Derived1):
+  debug_value %0 : $Derived1
+
+  %2 = function_ref @_TFC16devirt_try_apply8Derived1d : $@convention(method) (@guaranteed Derived1) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed Derived1) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Derived1
+  dealloc_ref %4 : $Derived1
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+sil @_TFC16devirt_try_apply8Derived1d : $@convention(method) (@guaranteed Derived1) -> @owned Builtin.NativeObject {
+bb0(%0 : $Derived1):
+  debug_value %0 : $Derived1
+  %2 = upcast %0 : $Derived1 to $Base
+
+  %3 = function_ref @_TFC16devirt_try_apply4Based : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+  return %4 : $Builtin.NativeObject
+}
+
+
+sil hidden @_TFC16devirt_try_apply8Derived1cfMS0_FT_S0_ : $@convention(method) (@owned Derived1) -> @owned Derived1 {
+bb0(%0 : $Derived1):
+  %1 = alloc_stack $Derived1
+  store %0 to %1 : $*Derived1
+  %3 = upcast %0 : $Derived1 to $Base
+
+  %4 = function_ref @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base
+  %7 = apply %4(%3) : $@convention(method) (@owned Base) -> @owned Base
+  %8 = unchecked_ref_cast %7 : $Base to $Derived1
+  store %8 to %1 : $*Derived1
+  dealloc_stack %1 : $*Derived1
+  return %8 : $Derived1
+}
+
+
+sil hidden @_TFC16devirt_try_apply8Derived1CfMS0_FT_S0_ : $@convention(thin) (@thick Derived1.Type) -> @owned Derived1 {
+bb0(%0 : $@thick Derived1.Type):
+  %1 = alloc_ref $Derived1
+
+  %2 = function_ref @_TFC16devirt_try_apply8Derived1cfMS0_FT_S0_ : $@convention(method) (@owned Derived1) -> @owned Derived1
+  %3 = apply %2(%1) : $@convention(method) (@owned Derived1) -> @owned Derived1
+  return %3 : $Derived1
+}
+
+
+sil private @_TTVFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Optional<Int32>, @error Error) {
+bb0(%0 : $Derived2):
+
+  %1 = function_ref @_TFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Int32, @error Error)
+  try_apply %1(%0) : $@convention(method) (@guaranteed Derived2) -> (Int32, @error Error), normal bb1, error bb2
+
+bb1(%3 : $Int32):
+  %4 = enum $Optional<Int32>, #Optional.some!enumelt.1, %3 : $Int32
+  return %4 : $Optional<Int32>
+
+bb2(%6 : $Error):
+  %7 = builtin "willThrow"(%6 : $Error) : $()
+  throw %6 : $Error
+}
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed Derived2) -> (Int32, @error Error) {
+bb0(%0 : $Derived2):
+  debug_value %0 : $Derived2
+  %2 = integer_literal $Builtin.Int32, 2
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply8Derived24boo1fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived2) -> (@owned Derived2, @error Error) {
+bb0(%0 : $Derived2):
+  debug_value %0 : $Derived2
+  strong_retain %0 : $Derived2
+  return %0 : $Derived2
+}
+
+
+sil hidden [noinline] @_TFC16devirt_try_apply8Derived24boo2fS0_FzT_S0_ : $@convention(method) (@guaranteed Derived2) -> (@owned Derived2, @error Error) {
+bb0(%0 : $Derived2):
+  debug_value %0 : $Derived2
+  strong_retain %0 : $Derived2
+  return %0 : $Derived2
+}
+
+
+sil @_TFC16devirt_try_apply8Derived2D : $@convention(method) (@owned Derived2) -> () {
+bb0(%0 : $Derived2):
+  debug_value %0 : $Derived2
+
+  %2 = function_ref @_TFC16devirt_try_apply8Derived2d : $@convention(method) (@guaranteed Derived2) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed Derived2) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Derived2
+  dealloc_ref %4 : $Derived2
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+sil @_TFC16devirt_try_apply8Derived2d : $@convention(method) (@guaranteed Derived2) -> @owned Builtin.NativeObject {
+bb0(%0 : $Derived2):
+  debug_value %0 : $Derived2
+  %2 = upcast %0 : $Derived2 to $Base
+
+  %3 = function_ref @_TFC16devirt_try_apply4Based : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+  return %4 : $Builtin.NativeObject
+}
+
+
+sil hidden @_TFC16devirt_try_apply8Derived2cfMS0_FT_S0_ : $@convention(method) (@owned Derived2) -> @owned Derived2 {
+bb0(%0 : $Derived2):
+  %1 = alloc_stack $Derived2
+  store %0 to %1 : $*Derived2
+  %3 = upcast %0 : $Derived2 to $Base
+
+  %4 = function_ref @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base
+  %7 = apply %4(%3) : $@convention(method) (@owned Base) -> @owned Base
+  %8 = unchecked_ref_cast %7 : $Base to $Derived2
+  store %8 to %1 : $*Derived2
+  dealloc_stack %1 : $*Derived2
+  return %8 : $Derived2
+}
+
+
+sil @_TFC16devirt_try_apply3CP13foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed CP1) -> (Int32, @error Error) {
+bb0(%0 : $CP1):
+  debug_value %0 : $CP1
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
+
+sil @_TFC16devirt_try_apply3CP1D : $@convention(method) (@owned CP1) -> () {
+bb0(%0 : $CP1):
+  debug_value %0 : $CP1
+
+  %2 = function_ref @_TFC16devirt_try_apply3CP1d : $@convention(method) (@guaranteed CP1) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed CP1) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $CP1
+  dealloc_ref %4 : $CP1
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+sil @_TFC16devirt_try_apply3CP1d : $@convention(method) (@guaranteed CP1) -> @owned Builtin.NativeObject {
+bb0(%0 : $CP1):
+  debug_value %0 : $CP1
+  %2 = unchecked_ref_cast %0 : $CP1 to $Builtin.NativeObject
+  return %2 : $Builtin.NativeObject
+}
+
+
+sil hidden @_TFC16devirt_try_apply3CP1cfMS0_FT_S0_ : $@convention(method) (@owned CP1) -> @owned CP1 {
+bb0(%0 : $CP1):
+  debug_value %0 : $CP1
+  return %0 : $CP1
+}
+
+
+sil hidden @_TFC16devirt_try_apply3CP1CfMS0_FT_S0_ : $@convention(thin) (@thick CP1.Type) -> @owned CP1 {
+bb0(%0 : $@thick CP1.Type):
+  %1 = alloc_ref $CP1
+
+  %2 = function_ref @_TFC16devirt_try_apply3CP1cfMS0_FT_S0_ : $@convention(method) (@owned CP1) -> @owned CP1
+  %3 = apply %2(%1) : $@convention(method) (@owned CP1) -> @owned CP1
+  return %3 : $CP1
+}
+
+
+sil [transparent] [thunk] @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_FzT_Vs5Int32 : $@convention(witness_method: P) (@in_guaranteed CP1) -> (Int32, @error Error) {
+bb0(%0 : $*CP1):
+  %1 = load %0 : $*CP1
+  strong_retain %1 : $CP1
+  %3 = class_method %1 : $CP1, #CP1.foo!1 : (CP1) -> () throws -> Int32, $@convention(method) (@guaranteed CP1) -> (Int32, @error Error)
+  try_apply %3(%1) : $@convention(method) (@guaranteed CP1) -> (Int32, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Int32):
+  strong_release %1 : $CP1
+  return %5 : $Int32
+
+bb2(%8 : $Error):
+  %9 = builtin "willThrow"(%8 : $Error) : $()
+  strong_release %1 : $CP1
+  throw %8 : $Error
+}
+
+
+sil @_TFC16devirt_try_apply3CP23foofS0_FzT_Vs5Int32 : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error) {
+bb0(%0 : $CP2):
+  debug_value %0 : $CP2
+  %2 = integer_literal $Builtin.Int32, 2
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  return %3 : $Int32
+}
+
+
+sil @_TFC16devirt_try_apply3CP2D : $@convention(method) (@owned CP2) -> () {
+bb0(%0 : $CP2):
+  debug_value %0 : $CP2
+
+  %2 = function_ref @_TFC16devirt_try_apply3CP2d : $@convention(method) (@guaranteed CP2) -> @owned Builtin.NativeObject
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed CP2) -> @owned Builtin.NativeObject
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $CP2
+  dealloc_ref %4 : $CP2
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+sil @_TFC16devirt_try_apply3CP2d : $@convention(method) (@guaranteed CP2) -> @owned Builtin.NativeObject {
+bb0(%0 : $CP2):
+  debug_value %0 : $CP2
+  %2 = upcast %0 : $CP2 to $CP1
+
+  %3 = function_ref @_TFC16devirt_try_apply3CP1d : $@convention(method) (@guaranteed CP1) -> @owned Builtin.NativeObject
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed CP1) -> @owned Builtin.NativeObject
+  return %4 : $Builtin.NativeObject
+}
+
+
+sil hidden @_TFC16devirt_try_apply3CP2cfMS0_FT_S0_ : $@convention(method) (@owned CP2) -> @owned CP2 {
+bb0(%0 : $CP2):
+  %1 = alloc_stack $CP2
+  store %0 to %1 : $*CP2
+  %3 = upcast %0 : $CP2 to $CP1
+
+  %4 = function_ref @_TFC16devirt_try_apply3CP1cfMS0_FT_S0_ : $@convention(method) (@owned CP1) -> @owned CP1
+  %7 = apply %4(%3) : $@convention(method) (@owned CP1) -> @owned CP1
+  %8 = unchecked_ref_cast %7 : $CP1 to $CP2
+  store %8 to %1 : $*CP2
+  dealloc_stack %1 : $*CP2
+  return %8 : $CP2
+}
+
+
+sil hidden @_TFC16devirt_try_apply3CP2CfMS0_FT_S0_ : $@convention(thin) (@thick CP2.Type) -> @owned CP2 {
+bb0(%0 : $@thick CP2.Type):
+  %1 = alloc_ref $CP2
+
+  %2 = function_ref @_TFC16devirt_try_apply3CP2cfMS0_FT_S0_ : $@convention(method) (@owned CP2) -> @owned CP2
+  %3 = apply %2(%1) : $@convention(method) (@owned CP2) -> @owned CP2
+  return %3 : $CP2
+}
+
+
+// Check that -specdevirt can devirtualize it
+// CHECK-SPECDEVIRT-LABEL: sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt1FCS_4BaseGSqVs5Int32_
+// CHECK-SPECDEVIRT: checked_cast_br [exact]
+// CHECK-SPECDEVIRT: }
+
+sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt1FCS_4BaseGSqVs5Int32_ : $@convention(thin) (@owned Base) -> Optional<Int32> {
+bb0(%0 : $Base):
+  %1 = alloc_stack $Optional<Int32>
+  debug_value %0 : $Base
+  %3 = alloc_stack $Optional<Int32>
+  inject_enum_addr %3 : $*Optional<Int32>, #Optional.none!enumelt
+  %5 = tuple ()
+  %6 = load %3 : $*Optional<Int32>
+  store %6 to %1 : $*Optional<Int32>
+  dealloc_stack %3 : $*Optional<Int32>
+  %9 = class_method %0 : $Base, #Base.foo!1 : (Base) -> () throws -> Int32?, $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error)
+  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error), normal bb1, error bb4
+
+bb1(%11 : $Optional<Int32>):
+  store %11 to %1 : $*Optional<Int32>
+  br bb2
+
+bb2:
+  %14 = load %1 : $*Optional<Int32>
+  strong_release %0 : $Base
+  dealloc_stack %1 : $*Optional<Int32>
+  return %14 : $Optional<Int32>
+
+bb3:
+  strong_release %20 : $Error
+  br bb2
+
+bb4(%20 : $Error):
+  br bb3
+}
+
+
+sil [transparent] [serialized] @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <T> (@thin Optional<T>.Type) -> @out Optional<T>
+
+
+// Check that -specdevirt can devirtualize it
+// CHECK-SPECDEVIRT-LABEL: sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt2FCS_4BaseGSqS0__
+// CHECK-SPECDEVIRT: checked_cast_br [exact]
+// CHECK-SPECDEVIRT: }
+
+sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt2FCS_4BaseGSqS0__ : $@convention(thin) (@owned Base) -> @owned Optional<Base> {
+bb0(%0 : $Base):
+  %1 = alloc_stack $Optional<Base>
+  debug_value %0 : $Base
+  %3 = alloc_stack $Optional<Base>
+  inject_enum_addr %3 : $*Optional<Base>, #Optional.none!enumelt
+  %5 = tuple ()
+  %6 = load %3 : $*Optional<Base>
+  store %6 to %1 : $*Optional<Base>
+  dealloc_stack %3 : $*Optional<Base>
+  %9 = class_method %0 : $Base, #Base.boo1!1 : (Base) -> () throws -> Base, $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error)
+  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error), normal bb1, error bb4
+
+bb1(%11 : $Base):
+  %12 = enum $Optional<Base>, #Optional.some!enumelt.1, %11 : $Base
+  store %12 to %1 : $*Optional<Base>
+  release_value %6 : $Optional<Base>
+  br bb2
+
+bb2:
+  %16 = load %1 : $*Optional<Base>
+  retain_value %16 : $Optional<Base>
+  destroy_addr %1 : $*Optional<Base>
+  strong_release %0 : $Base
+  dealloc_stack %1 : $*Optional<Base>
+  return %16 : $Optional<Base>
+
+bb3:
+  strong_release %24 : $Error
+  br bb2
+
+bb4(%24 : $Error):
+  br bb3
+}
+
+
+// Check that -specdevirt can devirtualize it
+// CHECK-SPECDEVIRT-LABEL: sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt3FCS_4BaseGSqS0__
+// CHECK-SPECDEVIRT: checked_cast_br [exact]
+// CHECK-SPECDEVIRT: }
+
+sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt3FCS_4BaseGSqS0__ : $@convention(thin) (@owned Base) -> @owned Optional<Base> {
+bb0(%0 : $Base):
+  %1 = alloc_stack $Optional<Base>
+  debug_value %0 : $Base
+  %3 = alloc_stack $Optional<Base>
+  inject_enum_addr %3 : $*Optional<Base>, #Optional.none!enumelt
+  %5 = tuple ()
+  %6 = load %3 : $*Optional<Base>
+  store %6 to %1 : $*Optional<Base>
+  dealloc_stack %3 : $*Optional<Base>
+  %9 = class_method %0 : $Base, #Base.boo2!1 : (Base) -> () throws -> Base?, $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error)
+  try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error), normal bb1, error bb4
+
+bb1(%11 : $Optional<Base>):
+  store %11 to %1 : $*Optional<Base>
+  release_value %6 : $Optional<Base>
+  br bb2
+
+bb2:
+  %15 = load %1 : $*Optional<Base>
+  retain_value %15 : $Optional<Base>
+  destroy_addr %1 : $*Optional<Base>
+  strong_release %0 : $Base
+  dealloc_stack %1 : $*Optional<Base>
+  return %15 : $Optional<Base>
+
+bb3:
+  strong_release %23 : $Error
+  br bb2
+
+bb4(%23 : $Error):
+  br bb3
+}
+
+
+sil @_TF16devirt_try_apply5test1FT_T_ : $@convention(thin) () -> () {
+bb0:
+
+  %0 = function_ref @_TF16devirt_try_apply19testTryApplyDevirt1FCS_4BaseGSqVs5Int32_ : $@convention(thin) (@owned Base) -> Optional<Int32>
+
+  %1 = function_ref @_TFC16devirt_try_apply4BaseCfMS0_FT_S0_ : $@convention(thin) (@thick Base.Type) -> @owned Base
+  %2 = metatype $@thick Base.Type
+  %3 = apply %1(%2) : $@convention(thin) (@thick Base.Type) -> @owned Base
+  %4 = apply %0(%3) : $@convention(thin) (@owned Base) -> Optional<Int32>
+  %5 = tuple ()
+  return %5 : $()
+}
+
+
+sil @_TF16devirt_try_apply5test2FT_T_ : $@convention(thin) () -> () {
+bb0:
+
+  %0 = function_ref @_TF16devirt_try_apply19testTryApplyDevirt2FCS_4BaseGSqS0__ : $@convention(thin) (@owned Base) -> @owned Optional<Base>
+
+  %1 = function_ref @_TFC16devirt_try_apply4BaseCfMS0_FT_S0_ : $@convention(thin) (@thick Base.Type) -> @owned Base
+  %2 = metatype $@thick Base.Type
+  %3 = apply %1(%2) : $@convention(thin) (@thick Base.Type) -> @owned Base
+  %4 = apply %0(%3) : $@convention(thin) (@owned Base) -> @owned Optional<Base>
+  release_value %4 : $Optional<Base>
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+sil @_TF16devirt_try_apply5test3FT_T_ : $@convention(thin) () -> () {
+bb0:
+
+  %0 = function_ref @_TF16devirt_try_apply19testTryApplyDevirt3FCS_4BaseGSqS0__ : $@convention(thin) (@owned Base) -> @owned Optional<Base>
+
+  %1 = function_ref @_TFC16devirt_try_apply4BaseCfMS0_FT_S0_ : $@convention(thin) (@thick Base.Type) -> @owned Base
+  %2 = metatype $@thick Base.Type
+  %3 = apply %1(%2) : $@convention(thin) (@thick Base.Type) -> @owned Base
+  %4 = apply %0(%3) : $@convention(thin) (@owned Base) -> @owned Optional<Base>
+  release_value %4 : $Optional<Base>
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
+// Check that -specdevirt can devirtualize it
+// CHECK-SPECDEVIRT-LABEL: sil @_TF16devirt_try_apply5test4FT_Vs5Int32
+// CHECK-SPECDEVIRT: checked_cast_br [exact]
+// CHECK-SPECDEVIRT: }
+
+// CHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test4FT_Vs5Int32
+// CHECK-DEVIRT-NOT: checked_cast_br [exact]
+// CHECK-DEVIRT-NOT: class_method
+// CHECK-DEVIRT: }
+
+sil @_TF16devirt_try_apply5test4FT_Vs5Int32 : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $Int32
+  %1 = function_ref @_TFC16devirt_try_apply3CP2CfMS0_FT_S0_ : $@convention(thin) (@thick CP2.Type) -> @owned CP2
+  %2 = metatype $@thick CP2.Type
+  %3 = apply %1(%2) : $@convention(thin) (@thick CP2.Type) -> @owned CP2
+  debug_value %3 : $CP2
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  store %6 to %0 : $*Int32
+  %8 = class_method %3 : $CP2, #CP2.foo!1 : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
+  try_apply %8(%3) : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error), normal bb1, error bb4
+
+bb1(%10 : $Int32):
+  store %10 to %0 : $*Int32
+  br bb2
+
+bb2:
+  %13 = load %0 : $*Int32
+  strong_release %3 : $CP2
+  dealloc_stack %0 : $*Int32
+  return %13 : $Int32
+
+bb3:
+  strong_release %19 : $Error
+  br bb2
+
+bb4(%19 : $Error):
+  br bb3
+}
+
+// DISABLE THIS TEST CASE FOR NOW. AS RLE GETS BETTER. WILL RE-ENABLE.
+//
+// DISABLECHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test5FT_Vs5Int32
+// DISABLECHECK-DEVIRT-NOT: = witness_method
+// DISABLECHECK-DEVIRT-NOT: = class_method
+// DISABLECHECK-DEVIRT: }
+sil @_TF16devirt_try_apply5test5FT_Vs5Int32 : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $Int32
+  %1 = alloc_stack $P
+  %2 = init_existential_addr %1 : $*P, $CP1
+
+  %3 = function_ref @_TFC16devirt_try_apply3CP1CfMS0_FT_S0_ : $@convention(thin) (@thick CP1.Type) -> @owned CP1
+  %4 = metatype $@thick CP1.Type
+  %5 = apply %3(%4) : $@convention(thin) (@thick CP1.Type) -> @owned CP1
+  store %5 to %2 : $*CP1
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = struct $Int32 (%7 : $Builtin.Int32)
+  store %8 to %0 : $*Int32
+  %10 = open_existential_addr immutable_access %1 : $*P to $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P
+  %11 = witness_method $@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P, #P.foo!1, %10 : $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error)
+  try_apply %11<@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error), normal bb1, error bb4
+
+bb1(%13 : $Int32):
+  store %13 to %0 : $*Int32
+  br bb2
+
+bb2:
+  %16 = load %0 : $*Int32
+  destroy_addr %1 : $*P
+  dealloc_stack %1 : $*P
+  dealloc_stack %0 : $*Int32
+  return %16 : $Int32
+
+bb3:
+  strong_release %23 : $Error
+  br bb2
+
+bb4(%23 : $Error):
+  br bb3
+}
+
+
+// Check that devirtualization happens even at -inline, without an explicit invocation of the -devirtualize.
+
+// CHECK-SPECDEVIRT-LABEL: sil @_TF16devirt_try_apply5test6FT_GSqVs5Int32_
+// CHECK-SPECDEVIRT: checked_cast_br [exact]
+// CHECK-SPECDEVIRT: }
+
+// CHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test6FT_GSqVs5Int32_
+// CHECK-DEVIRT-NOT: class_method
+// CHECK-DEVIRT: }
+
+sil @_TF16devirt_try_apply5test6FT_GSqVs5Int32_ : $@convention(thin) () -> Optional<Int32> {
+bb0:
+  %0 = alloc_stack $Optional<Int32>
+
+  %1 = function_ref @_TFC16devirt_try_apply8Derived1CfMS0_FT_S0_ : $@convention(thin) (@thick Derived1.Type) -> @owned Derived1
+  %2 = metatype $@thick Derived1.Type
+  %3 = apply %1(%2) : $@convention(thin) (@thick Derived1.Type) -> @owned Derived1
+  debug_value %3 : $Derived1
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %7 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
+  store %7 to %0 : $*Optional<Int32>
+  %9 = class_method %3 : $Derived1, #Derived1.foo!1 : (Derived1) -> () throws -> Int32?, $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error)
+  try_apply %9(%3) : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error), normal bb1, error bb4
+
+bb1(%11 : $Optional<Int32>):
+  store %11 to %0 : $*Optional<Int32>
+  br bb2
+
+bb2:
+  %14 = load %0 : $*Optional<Int32>
+  strong_release %3 : $Derived1
+  dealloc_stack %0 : $*Optional<Int32>
+  return %14 : $Optional<Int32>
+
+bb3:
+  strong_release %20 : $Error
+  br bb2
+
+bb4(%20 : $Error):
+  br bb3
+}
+
+// Check that -specdevirt can devirtualize it
+// CHECK-SPECDEVIRT-LABEL: sil @_TF16devirt_try_apply5test7FT_Vs5Int32
+// CHECK-SPECDEVIRT: checked_cast_br [exact]
+// CHECK-SPECDEVIRT: }
+
+// CHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test7FT_Vs5Int32
+// CHECK-DEVIRT-NOT: checked_cast_br [exact]
+// CHECK-DEVIRT-NOT: class_method
+// CHECK-DEVIRT: }
+
+// CHECK-MANDATORY-INLINING-LABEL: sil @_TF16devirt_try_apply5test7FT_Vs5Int32
+// CHECK-MANDATORY-INLINING-NOT: checked_cast_br [exact]
+// CHECK-MANDATORY-INLINING-NOT: class_method
+// CHECK-MANDATORY-INLINING: }
+
+sil @_TF16devirt_try_apply5test7FT_Vs5Int32 : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $Int32
+  %1 = alloc_ref $CP2
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  store %6 to %0 : $*Int32
+  %8 = class_method %1 : $CP2, #CP2.foo!1 : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
+  try_apply %8(%1) : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error), normal bb1, error bb4
+
+bb1(%10 : $Int32):
+  store %10 to %0 : $*Int32
+  br bb2
+
+bb2:
+  %13 = load %0 : $*Int32
+  strong_release %1 : $CP2
+  dealloc_stack %0 : $*Int32
+  return %13 : $Int32
+
+bb3:
+  strong_release %19 : $Error
+  br bb2
+
+bb4(%19 : $Error):
+  br bb3
+}
+
+
+sil private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> ()
+
+
+public class A {
+   deinit
+  init()
+}
+
+class D1 {
+  func f1() throws -> A?
+   deinit
+  init()
+}
+
+class D3 : D1 {
+  override func f1() throws -> A
+   deinit
+  override init()
+}
+
+// devirt_try_apply.D1.f1 () throws -> Swift.Optional<devirt_try_apply.A>
+sil @_TFC16devirt_try_apply2D12f1fzT_GSqCS_1A_ : $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error)
+
+// devirt_try_apply.D3.f1 () throws -> devirt_try_apply.A
+sil @_TFC16devirt_try_apply2D32f1fzT_CS_1A : $@convention(method) (@guaranteed D3) -> (@owned A, @error Error)
+
+sil @compute_something : $@convention(thin) () -> (@owned Optional<A>, @error Error)
+
+// CHECK-MANDATORY-INLINING-LABEL: sil @test_devirt_try_apply_at_Onone
+// CHECK-MANDATORY-INLINING: bb0:
+// CHECK-MANDATORY-INLINING-NOT: bb1:
+// CHECK-MANDATORY-INLINING: try_apply {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// Check that normal BB was reused and its argument was adjusted accordingly, i.e. its type is changed from Optional<A> to A
+// CHECK-MANDATORY-INLINING: [[NORMAL]]({{%[0-9]+}} : $A):
+// CHECK-MANDATORY-INLINING: strong_release
+// CHECK-MANDATORY-INLINING: return
+// Check that error BB was reused, because it only had a single predecessor and thus
+// no critical edge would be created by this reuse.
+// CHECK-MANDATORY-INLINING: [[ERROR]]({{%[0-9]+}} : $Error):
+// CHECK-MANDATORY-INLINING: strong_release
+// CHECK-MANDATORY-INLINING: throw
+// CHECK-MANDATORY-INLINING-NOT: bb3
+// CHECK-MANDATORY-INLINING: }
+sil @test_devirt_try_apply_at_Onone : $@convention(thin) () -> (@owned Optional<A>, @error Error) {
+bb0:
+  %2 = alloc_ref $D3
+  %3 = upcast %2 : $D3 to $D1
+  %4 = class_method %3 : $D1, #D1.f1!1 : (D1) -> () throws -> Optional<A>, $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error)
+  try_apply %4(%3) : $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error), normal bb1, error bb2
+
+bb1(%6 : $Optional<A>):
+  strong_release %2 : $D3
+  return %6 : $Optional<A>
+
+bb2(%10 : $Error):
+  strong_release %2 : $D3
+  throw %10 : $Error
+}
+
+
+sil_vtable A {
+}
+
+sil_vtable D1 {
+  #D1.f1!1: _TFC16devirt_try_apply2D12f1fzT_GSqCS_1A_// devirt_try_apply.D1.f1 () throws -> Swift.Optional<devirt_try_apply.A>
+}
+
+sil_vtable D3 {
+  #D1.f1!1: _TFC16devirt_try_apply2D32f1fzT_CS_1A// devirt_try_apply.D3.f1 () throws -> devirt_try_apply.A
+}
+
+
+sil_vtable Base {
+  #Base.foo!1: _TFC16devirt_try_apply4Base3foofS0_FzT_GSqVs5Int32_
+  #Base.boo1!1: _TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_
+  #Base.boo2!1: _TFC16devirt_try_apply4Base4boo2fS0_FzT_GSqS0__
+  #Base.deinit!deallocator: _TFC16devirt_try_apply4BaseD
+  #Base.init!initializer.1: _TFC16devirt_try_apply4BasecfMS0_FT_S0_
+}
+
+sil_vtable Derived1 {
+  #Base.foo!1: _TFC16devirt_try_apply8Derived13foofS0_FzT_GSqVs5Int32_
+  #Base.boo1!1: _TFC16devirt_try_apply8Derived14boo1fS0_FzT_S0_
+  #Base.boo2!1: _TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__
+  #Base.init!initializer.1: _TFC16devirt_try_apply8Derived1cfMS0_FT_S0_
+  #Derived1.deinit!deallocator: _TFC16devirt_try_apply8Derived1D
+}
+
+sil_vtable Derived2 {
+  #Base.foo!1: _TTVFC16devirt_try_apply8Derived23foofS0_FzT_Vs5Int32
+  #Base.boo1!1: _TFC16devirt_try_apply8Derived24boo1fS0_FzT_S0_
+  #Base.boo2!1: _TFC16devirt_try_apply8Derived24boo2fS0_FzT_S0_
+  #Base.init!initializer.1: _TFC16devirt_try_apply8Derived2cfMS0_FT_S0_
+  #Derived2.deinit!deallocator: _TFC16devirt_try_apply8Derived2D
+}
+
+sil_vtable CP1 {
+  #CP1.foo!1: _TFC16devirt_try_apply3CP13foofS0_FzT_Vs5Int32
+  #CP1.deinit!deallocator: _TFC16devirt_try_apply3CP1D
+  #CP1.init!initializer.1: _TFC16devirt_try_apply3CP1cfMS0_FT_S0_
+}
+
+sil_vtable CP2 {
+  #CP1.foo!1: _TFC16devirt_try_apply3CP23foofS0_FzT_Vs5Int32
+  #CP1.init!initializer.1: _TFC16devirt_try_apply3CP2cfMS0_FT_S0_
+  #CP2.deinit!deallocator: _TFC16devirt_try_apply3CP2D
+}
+
+sil_witness_table CP1: P module devirt_try_apply {
+  method #P.foo!1: @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_FzT_Vs5Int32
+}

@@ -1,0 +1,385 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: looprotate
+// CHECK: bb0(%0 : $Int32, %1 : $Bar):
+// CHECK:  class_method
+// CHECK:  cond_br {{.*}}, bb3({{.*}} : $Builtin.Int32), bb1
+
+// CHECK: bb1:
+// CHECK:  br bb2({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}: $Int32)
+
+// CHECK: bb2({{.*}}: $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32):
+// CHECK:   class_method
+// CHECK:   cond_br {{%.*}}, bb3({{.*}} : $Builtin.Int32), bb2({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32)
+
+// CHECK: bb3({{.*}} : $Builtin.Int32):
+// CHECK:   [[STRUCT:%.*]] = struct $Int32 ({{%.*}} : $Builtin.Int32)
+// CHECK:   return [[STRUCT]] : $Int32
+
+protocol P {
+  func boo() -> Int64
+}
+
+class Bar {
+  func boo() -> Int64
+  func foo()
+  @objc func foo_objc()
+}
+
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
+sil @_TFC4main3Bar3boofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> Int64
+sil @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@convention(objc_method) (Bar) -> ()
+
+sil_vtable Bar {
+  #Bar.boo!1: _TFC4main3Bar3boofS0_FT_T_
+  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+  #Bar.foo_objc!1: _TFC4main3Bar3foofS0_FT_T_
+}
+
+sil @looprotate : $@convention(thin) (Int32, @owned Bar) -> Int32 {
+bb0(%0 : $Int32, %25: $Bar):
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
+  %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $<τ_0_0> { var τ_0_0 } <Bool>, %30a : $*Bool)
+
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool):
+  %24 = class_method %26 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %27 = apply %24(%25) : $@convention(method) (@guaranteed Bar) -> ()
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb3, bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt.1
+  %17 = struct_extract %16 : $Int32, #Int32._value
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool)
+
+bb3:
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
+// This example illustrates the problem with using ValueUseIterators.
+// As part of updating SSA form we will introduce a phi node argument to the
+// branch to bb2. This means we change "cond_br %8, bb3(%4 : $Builtin.Int32),
+// bb2" invalidating any outstanding use iterator pointing to the use of "%4" in
+// said branch.
+
+// CHECK-LABEL: looprotate2
+// CHECK: return
+sil @looprotate2 : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
+
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32):
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb3(%4 : $Builtin.Int32), bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt.1
+  %17 = struct_extract %16 : $Int32, #Int32._value
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32)
+
+bb3 (%23 : $Builtin.Int32) :
+  %24 = struct $Int32 (%23 : $Builtin.Int32)
+  return %24 : $Int32
+}
+
+// The following function used to crash the compiler, because loop rotate
+// could not properly handle the reference from witness_method to the
+// archetype opened by open_existential_addr
+// CHECK-LABEL: sil @looprotate_with_opened_archetype
+// CHECK: return
+sil @looprotate_with_opened_archetype : $@convention(thin) (Int32, @in P) -> Int32 {
+bb0(%0 : $Int32, %25: $*P):
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
+  %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
+  %40 = open_existential_addr immutable_access %25 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $*P, %30 : $<τ_0_0> { var τ_0_0 } <Bool>, %30a : $*Bool)
+
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $*P, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool):
+  %111 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.boo!1, %40 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %122 = apply %111<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%40) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb3, bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt.1
+  %17 = struct_extract %16 : $Int32, #Int32._value
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $*P, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool)
+
+bb3:
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
+// Don't assert on this loop. bb2 is bb1 loop's new header after rotation but
+// also bb2 loop's header.
+
+// CHECK-LABEL: @testnested
+// CHECK: return
+sil @testnested : $@convention(thin) () -> () {
+bb0:
+  br bb1(undef : $Builtin.Int32, undef : $Builtin.Int32) // id: %0
+
+bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32):    // Preds: bb0 bb2
+  %3 = integer_literal $Builtin.Int1, 0           // user: %4
+  cond_br %3, bb2(%1 : $Builtin.Int32, %2 : $Builtin.Int32), bb10 // id: %4
+
+bb2(%5 : $Builtin.Int32, %6 : $Builtin.Int32):    // Preds: bb1 bb8
+  %7 = integer_literal $Builtin.Int1, -1          // user: %8
+  cond_br %7, bb3, bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32) // id: %8
+
+bb3:                                              // Preds: bb2
+  %9 = integer_literal $Builtin.Int32, 0          // user: %11
+  %10 = integer_literal $Builtin.Int32, 1         // users: %14, %23
+  br bb4(%9 : $Builtin.Int32)                     // id: %11
+
+bb4(%12 : $Builtin.Int32):                        // Preds: bb3 bb7
+  %14 = builtin "cmp_eq_Word"(%12 : $Builtin.Int32, %10 : $Builtin.Int32) : $Builtin.Int1 // user: %15
+  cond_br %14, bb5, bb9                           // id: %15
+
+bb5:                                              // Preds: bb4
+  %16 = enum $Optional<Int32>, #Optional.none!enumelt // user: %17
+  br bb6(%12 : $Builtin.Int32, %16 : $Optional<Int32>) // id: %17
+
+bb6(%18 : $Builtin.Int32, %19 : $Optional<Int32>):   // Preds: bb5 bb9
+  switch_enum %19 : $Optional<Int32>, case #Optional.some!enumelt.1: bb7, case #Optional.none!enumelt: bb8 // id: %20
+
+bb7:                                              // Preds: bb6
+  %21 = unchecked_enum_data %19 : $Optional<Int32>, #Optional.some!enumelt.1
+  br bb4(%18 : $Builtin.Int32)                     // id: %22
+
+bb8:                                              // Preds: bb6
+  br bb2(%18 : $Builtin.Int32, %10 : $Builtin.Int32) // id: %23
+
+bb9:                                              // Preds: bb4
+  %24 = struct $Int32 (%12 : $Builtin.Int32)      // user: %32
+  %25 = integer_literal $Builtin.Int32, 1         // user: %28
+  %27 = integer_literal $Builtin.Int1, -1         // user: %28
+  %28 = builtin "sadd_with_overflow_Word"(%12 : $Builtin.Int32, %25 : $Builtin.Int32, %27 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %29, %30
+  %29 = tuple_extract %28 : $(Builtin.Int32, Builtin.Int1), 0 // user: %33
+  %30 = tuple_extract %28 : $(Builtin.Int32, Builtin.Int1), 1 // user: %31
+  cond_fail %30 : $Builtin.Int1                   // id: %31
+  %32 = enum $Optional<Int32>, #Optional.some!enumelt.1, %24 : $Int32 // user: %33
+  br bb6(%29 : $Builtin.Int32, %32 : $Optional<Int32>) // id: %33
+
+bb10:                                             // Preds: bb1
+  %34 = tuple ()                                  // user: %35
+  return %34 : $()                                // id: %35
+}
+
+// CHECK-LABEL: dont_looprotate_objc
+// CHECK: bb0{{.*}}:
+// CHECK:  br bb1
+// CHECK: bb1{{.*}}:
+// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK: bb2:
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   return
+
+sil @dont_looprotate_objc : $@convention(thin) (Int32, @owned Bar) -> Int32 {
+bb0(%0 : $Int32, %25: $Bar):
+  %100 = alloc_ref $Bar
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar)
+
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar):
+  %101 = objc_method %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb3, bb2
+
+bb2:
+  %102 = apply %101(%100) : $@convention(objc_method) (Bar) -> ()
+  %10 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt.1
+  %17 = struct_extract %16 : $Int32, #Int32._value
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar)
+
+bb3:
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
+sil @readInt : $@convention(thin) (Int32) -> () {
+bb0(%a0 : $Int32):
+  %t1 = tuple ()
+  return %t1 : $()
+}
+
+// Test the SSA Updater utility: replaceBBArgWithCast().
+//
+// CHECK-LABEL: struct_arg
+// CHECK: bb0:
+// CHECK:  cond_br
+// CHECK: bb1:
+// CHECK:  br bb2
+// CHECK: bb2({{%.*}} : $Builtin.Int32, [[WORD:%.*]] : $Builtin.Int32
+// CHECK:  [[STRUCT:%[0-9]+]] = struct $Int32 ([[WORD]]
+// CHECK:  apply {{.*}}([[STRUCT]])
+// CHECK:  cond_br
+// CHECK: bb3({{.*}}):
+// CHECK:  return
+sil @struct_arg : $@convention(thin) () -> () {
+bb0:
+  %c0 = integer_literal $Builtin.Int32, 0
+  %c100 = integer_literal $Builtin.Int32, 100
+  br bb1(%c0 : $Builtin.Int32, %c0 : $Builtin.Int32)
+
+bb1(%a1 : $Builtin.Int32, %a0 : $Builtin.Int32):
+  %s0 = struct $Int32 (%a0 : $Builtin.Int32)
+  %z1 = builtin "cmp_eq_Word"(%a0 : $Builtin.Int32, %c100 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %z1, bb2, bb3
+
+bb3:
+  %c1 = integer_literal $Builtin.Int32, 1
+  %z2 = integer_literal $Builtin.Int1, 0
+  %d1 = builtin "sadd_with_overflow_Word"(%a0 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %t1 = tuple_extract %d1 : $(Builtin.Int32, Builtin.Int1), 0
+  %d2 = builtin "sadd_with_overflow_Word"(%a1 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %t2 = tuple_extract %d2 : $(Builtin.Int32, Builtin.Int1), 0
+  %f1 = function_ref @readInt : $@convention(thin) (Int32) -> ()
+  %l1 = apply %f1(%s0) : $@convention(thin) (Int32) -> ()
+  br bb1(%t2 : $Builtin.Int32, %t1 : $Builtin.Int32)
+
+bb2:
+  %14 = struct $Int32 (%a1 : $Builtin.Int32)
+  %t3 = tuple ()
+  return %t3 : $()
+
+}
+
+// Test LoopRotate insertBackedgeBlock.
+//
+// CHECK-LABEL: insert_backedge_block
+// PreLoop Check
+// CHECK: bb0(%
+// CHECK:   cond_br
+// Loop Header
+// CHECK: bb1:
+// CHECK-NEXT: br bb2
+// CHECK: bb2:
+// CHECK:   cond_br %{{.*}}, bb3, bb5
+// CHECK: bb3:
+// CHECK:   apply
+// CHECK:   br bb4(
+// CHECK: bb4(%[[ARG:[0-9]*]]
+// CHECK-NEXT: cond_br %{{.*}}, bb6, bb2
+// CHECK: bb5:
+// CHECK:   apply
+// CHECK:   br bb4(%
+// CHECK: bb6
+// CHECK:   return
+sil @insert_backedge_block : $@convention(thin) (@owned @callee_owned () -> Builtin.Int32) -> () {
+bb0(%0 : $@callee_owned () -> Builtin.Int32):
+  %r0 = apply %0() : $@callee_owned () -> Builtin.Int32
+  br bb1(%r0: $Builtin.Int32)
+
+bb1(%a1 : $Builtin.Int32):
+  %z1 = integer_literal $Builtin.Int1, 0
+  cond_br %z1, bb5, bb2
+
+bb2:
+  %z2 = integer_literal $Builtin.Int1, 0
+  cond_br %z2, bb3, bb4
+
+bb3:
+  %r1 = apply %0() : $@callee_owned () -> Builtin.Int32
+  br bb1(%r1: $Builtin.Int32)
+
+bb4:
+  %r2 = apply %0() : $@callee_owned () -> Builtin.Int32
+  br bb1(%r2: $Builtin.Int32)
+
+bb5:
+  %r3 = tuple ()
+  return %r3 : $()
+
+}
+
+// CHECK-LABEL: sil @dont_rotate_single_basic_block_loop
+// CHECK: bb0({{.*}}):
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   cond_br {{.*}}, bb1, bb2
+// CHECK: bb2:
+// CHECK:   return
+sil @dont_rotate_single_basic_block_loop : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  br bb1
+bb1:
+  cond_br %0, bb1, bb2
+bb2:
+ %1 = tuple ()
+ return %1 : $()
+}
+
+// CHECK-LABEL: sil @dont_rotate_single_basic_block_loop_split_backedge
+// CHECK: bb0({{.*}}):
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   cond_br {{.*}}, bb2, bb3
+// CHECK: bb2:
+// CHECK:   br bb1
+// CHECK: bb3:
+// CHECK:   return
+sil @dont_rotate_single_basic_block_loop_split_backedge : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  br bb1
+bb1:
+  cond_br %0, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+ %1 = tuple ()
+ return %1 : $()
+}

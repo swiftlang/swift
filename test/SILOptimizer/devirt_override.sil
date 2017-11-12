@@ -1,0 +1,135 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -devirtualizer | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Hash {
+  func update()
+  func hash()
+}
+
+class MD5 : Hash {
+  override init()
+  override func hash()
+}
+
+
+sil @_TFC4test3MD5cfMS0_FT_S0_ : $@convention(method) (@owned MD5) -> @owned MD5 {
+bb0(%0 : $MD5):
+  release_value %0 : $MD5
+  return %0 : $MD5
+}
+
+sil @_TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_ : $@convention(method) (@guaranteed MD5) -> ()
+sil @_TFC4test4Hash4hashfS0_FT3MsgVs5UInt8_T_ : $@convention(method) (@guaranteed Hash) -> ()
+sil @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_ : $@convention(method) (@guaranteed Hash) -> ()
+
+// CHECK-LABEL: @_TF4test8testHashFT_T_
+sil @_TF4test8testHashFT_T_ : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $MD5
+
+  %1 = function_ref @_TFC4test3MD5cfMS0_FT_S0_ : $@convention(method) (@owned MD5) -> @owned MD5
+  %2 = apply %1(%0) : $@convention(method) (@owned MD5) -> @owned MD5
+  strong_retain %2 : $MD5
+  %69 = upcast %2 : $MD5 to $Hash
+  strong_retain %69 : $Hash
+  // CHECK: function_ref @_TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_ : $@convention(method) (@guaranteed MD5) -> ()
+  // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed MD5) -> ()
+  %134 = class_method %69 : $Hash, #Hash.hash!1 : (Hash) -> () -> (), $@convention(method) (@guaranteed Hash) -> ()
+  %135 = apply %134(%69) : $@convention(method) (@guaranteed Hash) -> ()
+  strong_release %2 : $MD5
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: @test_unchecked_ref
+sil @test_unchecked_ref : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $MD5
+  %11 = upcast %0 : $MD5 to $Hash
+  %21 = unchecked_ref_cast %11 : $Hash to $MD5
+  %61 = upcast %21 : $MD5 to $Hash
+  // CHECK: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_ : $@convention(method) (@guaranteed Hash) -> ()
+  // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed Hash) -> ()
+  %62 = class_method %61 : $Hash, #Hash.update!1 : (Hash) -> () -> (), $@convention(method) (@guaranteed Hash) -> ()
+  %135 = apply %62(%61) : $@convention(method) (@guaranteed Hash) -> ()
+  %17 = tuple ()
+  // CHECK: return
+  return %17 : $()
+}
+
+sil_vtable Hash {
+  #Hash.update!1: _TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_
+  #Hash.hash!1: _TFC4test4Hash4hashfS0_FT3MsgVs5UInt8_T_
+}
+
+sil_vtable MD5 {
+  // vtable should be keyed with the least-derived method, otherwise
+  // devirtualizer will choose the wrong function ref.
+  #Hash.hash!1: _TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_
+  #MD5.init!initializer.1: _TFC4test3MD5cfMS0_FT_S0_
+  #Hash.update!1: _TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_
+}
+
+class C {
+  func doIt()
+}
+
+class D : C {
+  override func doIt()
+}
+
+class E : D {
+  override func doIt()
+}
+
+// CHECK-LABEL: sil @_TFC1b1C4doItfS0_FT_T_
+sil @_TFC1b1C4doItfS0_FT_T_ : $@convention(method) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @_TFC1b1D4doItfS0_FT_T_
+sil @_TFC1b1D4doItfS0_FT_T_ : $@convention(method) (@guaranteed D) -> () {
+bb0(%0 : $D):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK-LABEL: sil @_TFC1b1E4doItfS0_FT_T_
+sil @_TFC1b1E4doItfS0_FT_T_ : $@convention(method) (@guaranteed E) -> () {
+bb0(%0 : $E):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK-LABEL: sil @_TF1b3fooFT_T_
+sil @_TF1b3fooFT_T_ : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $E
+  %1 = upcast %0 : $E to $C
+  %2 = unconditional_checked_cast %1 : $C to $D
+  %3 = class_method %2 : $D, #D.doIt!1 : (D) -> () -> (), $@convention(method) (@guaranteed D) -> ()
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed D) -> ()
+  %5 = tuple ()
+// CHECK: return
+  return %5 : $()
+}
+
+sil_vtable C {
+  #C.doIt!1: _TFC1b1C4doItfS0_FT_T_
+}
+
+sil_vtable D {
+  #C.doIt!1: _TFC1b1D4doItfS0_FT_T_
+}
+
+sil_vtable E {
+  #C.doIt!1: _TFC1b1E4doItfS0_FT_T_
+}

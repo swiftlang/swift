@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct X { }
 struct Y { }
@@ -44,8 +44,17 @@ slice[7] = f // expected-error{{cannot assign value of type 'Y' to type 'X'}}
 
 slice[7] = _ // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 
-func value(x: Int) {}
-func value2(inout x: Int) {}
+func value(_ x: Int) {}
+func value2(_ x: inout Int) {}
 value2(&_) // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 value(_) // expected-error{{'_' can only appear in a pattern or on the left side of an assignment}}
 
+
+// <rdar://problem/23798944> = vs. == in Swift if string character count statement causes segmentation fault
+func f23798944() {
+  let s = ""
+  if s.characters.count = 0 { // expected-error {{cannot assign to property: 'count' is a get-only property}}
+  }
+}
+
+.sr_3506 = 0 // expected-error {{reference to member 'sr_3506' cannot be resolved without a contextual type}}

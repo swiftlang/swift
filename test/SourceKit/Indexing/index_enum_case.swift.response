@@ -1,0 +1,162 @@
+{
+  key.hash: <hash>,
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.hash: <hash>,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.name: "E",
+      key.usr: "s:15index_enum_case1EO",
+      key.line: 4,
+      key.column: 13,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.enumelement,
+          key.name: "one",
+          key.usr: "s:15index_enum_case1EO3oneA2CmF",
+          key.line: 6,
+          key.column: 10
+        },
+        {
+          key.kind: source.lang.swift.decl.enumelement,
+          key.name: "two",
+          key.usr: "s:15index_enum_case1EO3twoACSS1a_tcACmF",
+          key.line: 6,
+          key.column: 15,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "String",
+              key.usr: "s:SS",
+              key.line: 6,
+              key.column: 22
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.enumelement,
+          key.name: "three",
+          key.usr: "s:15index_enum_case1EO5threeA2CmF",
+          key.line: 6,
+          key.column: 31
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "text",
+          key.usr: "s:15index_enum_case1EO4textSSvp",
+          key.line: 8,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.name: "getter:text",
+              key.usr: "s:15index_enum_case1EO4textSSvg",
+              key.line: 8,
+              key.column: 22,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.ref.enumelement,
+                  key.name: "one",
+                  key.usr: "s:15index_enum_case1EO3oneA2CmF",
+                  key.line: 10,
+                  key.column: 15
+                },
+                {
+                  key.kind: source.lang.swift.ref.enumelement,
+                  key.name: "two",
+                  key.usr: "s:15index_enum_case1EO3twoACSS1a_tcACmF",
+                  key.line: 12,
+                  key.column: 15
+                },
+                {
+                  key.kind: source.lang.swift.ref.enumelement,
+                  key.name: "three",
+                  key.usr: "s:15index_enum_case1EO5threeA2CmF",
+                  key.line: 14,
+                  key.column: 15
+                }
+              ]
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "String",
+          key.usr: "s:SS",
+          key.line: 8,
+          key.column: 15
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.public
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.name: "e",
+      key.usr: "s:15index_enum_case1eAA1EOvp",
+      key.line: 21,
+      key.column: 5,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.usr: "s:15index_enum_case1eAA1EOvg",
+          key.line: 21,
+          key.column: 5
+        },
+        {
+          key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.usr: "s:15index_enum_case1eAA1EOvs",
+          key.line: 21,
+          key.column: 5
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.ref.enum,
+      key.name: "E",
+      key.usr: "s:15index_enum_case1EO",
+      key.line: 21,
+      key.column: 8
+    },
+    {
+      key.kind: source.lang.swift.ref.enumelement,
+      key.name: "two",
+      key.usr: "s:15index_enum_case1EO3twoACSS1a_tcACmF",
+      key.line: 21,
+      key.column: 13
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "brokenEnums()",
+      key.usr: "s:15index_enum_case11brokenEnumsyyF",
+      key.line: 23,
+      key.column: 6,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.enum,
+          key.name: "E",
+          key.usr: "s:15index_enum_case1EO",
+          key.line: 28,
+          key.column: 10
+        },
+        {
+          key.kind: source.lang.swift.ref.enumelement,
+          key.name: "one",
+          key.usr: "s:15index_enum_case1EO3oneA2CmF",
+          key.line: 28,
+          key.column: 12
+        }
+      ]
+    }
+  ]
+}

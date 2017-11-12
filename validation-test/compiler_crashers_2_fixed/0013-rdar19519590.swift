@@ -1,36 +1,38 @@
 // RUN: %target-swift-frontend %s -emit-ir
 
 protocol SourceTargetTransformable {
-    typealias Source
-    typealias Target
-    typealias Transformer = Source -> Target
+    associatedtype Source
+    associatedtype Target
+  
+    // FIXME: should really be a typealias once we support that
+    associatedtype Transformer = (Source) -> Target
 }
 
 
-struct PiecewiseTransformedGeneratorOf<
+struct PiecewiseTransformedIteratorOf<
                                         Source,
                                         Target,
-                                        SourceGenerator: GeneratorType,
-                                        TransformerGenerator: GeneratorType,
+                                        SourceIterator: IteratorProtocol,
+                                        TransformerIterator: IteratorProtocol,
                                         Transformable: SourceTargetTransformable
                                       where
                                         Transformable.Source == Source,
                                         Transformable.Target == Target,
-                                        SourceGenerator.Element == Source,
-                                        TransformerGenerator.Element == Transformable.Transformer
+                                        SourceIterator.Element == Source,
+                                        TransformerIterator.Element == Transformable.Transformer
                                       >
-       : GeneratorType {
+       : IteratorProtocol {
     typealias Element = Target
     
-    var sourceGenerator: SourceGenerator
-    var transformerGenerator: TransformerGenerator
+    var sourceIterator: SourceIterator
+    var transformerIterator: TransformerIterator
     
     mutating func next() -> Element? {
-        let source: Transformable.Source? = sourceGenerator.next()
+        let source: Transformable.Source? = sourceIterator.next()
         if let source: Transformable.Source = source {
-            let transformer: Transformable.Transformer? = transformerGenerator.next()
+            let transformer: Transformable.Transformer? = transformerIterator.next()
             if let transformer: Transformable.Transformer = transformer {
-                let tfunc: (Source -> Target)? = transformer as? (Source -> Target)
+                let tfunc: ((Source) -> Target)? = transformer as? ((Source) -> Target)
                 if let tfunc = tfunc {
                     return tfunc(source)
                 }
@@ -41,17 +43,17 @@ struct PiecewiseTransformedGeneratorOf<
 }
 
 struct PiecewiseTransformedSequenceOf<
-        SourceSequence: SequenceType,
-        TransformerSequence: SequenceType,
+        SourceSequence: Sequence,
+        TransformerSequence: Sequence,
         Transformable: SourceTargetTransformable
     where
-        SourceSequence.Generator.Element == Transformable.Source,
-        TransformerSequence.Generator.Element == Transformable.Transformer
-        >: SequenceType {
+        SourceSequence.Iterator.Element == Transformable.Source,
+        TransformerSequence.Iterator.Element == Transformable.Transformer
+        >: Sequence {
     
-    typealias Source = SourceSequence.Generator.Element
+    typealias Source = SourceSequence.Iterator.Element
     typealias Target = Transformable.Target
-    typealias Generator = PiecewiseTransformedGeneratorOf<Source, Target, SourceSequence.Generator, TransformerSequence.Generator, Transformable>
+    typealias Iterator = PiecewiseTransformedIteratorOf<Source, Target, SourceSequence.Iterator, TransformerSequence.Iterator, Transformable>
     
  
     let inputs: SourceSequence
@@ -62,7 +64,7 @@ struct PiecewiseTransformedSequenceOf<
         self.transformers = transformers
     }
     
-    func generate() -> Generator {
-        return PiecewiseTransformedGeneratorOf(sourceGenerator: inputs.generate(), transformerGenerator: transformers.generate())
+    func makeIterator() -> Iterator {
+        return PiecewiseTransformedIteratorOf(sourceIterator: inputs.makeIterator(), transformerIterator: transformers.makeIterator())
     }
 }

@@ -1,0 +1,3 @@
+module ObjCFail {
+  header "objcfail.h"
+}

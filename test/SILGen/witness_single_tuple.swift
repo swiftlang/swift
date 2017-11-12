@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol Runcible {
   func runce(x: Int)
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV20witness_single_tuple3FooS_8RuncibleS_FS1_5runce
+// CHECK-LABEL: sil private [transparent] [thunk] @_T020witness_single_tuple3FooVAA8RuncibleA2aDP5runce{{[_0-9a-zA-Z]*}}FTW
 struct Foo: Runcible {
   func runce(x: Int = 0) {}
 }

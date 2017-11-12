@@ -1,24 +1,27 @@
-prefix operator ~~~ {}
-postfix operator ^^ {}
+prefix operator ~~~
+postfix operator ^^
 
-infix operator *- {
-  associativity left
-  precedence 50
+infix operator *- : LowPrecedence
+precedencegroup LowPrecedence {
+  associativity: left
+  lowerThan: AssignmentPrecedence
+  higherThan: LollipopPrecedence 
 }
 
-infix operator -* {
-  associativity right
-  precedence 40
+infix operator -* : LollipopPrecedence
+precedencegroup LollipopPrecedence {
+  associativity: right
+  higherThan: DoubleLollipopPrecedence
 }
 
-infix operator *-* {
-  associativity none
-  precedence 10
-  assignment
+infix operator *-* : DoubleLollipopPrecedence
+precedencegroup DoubleLollipopPrecedence {
+  associativity: none
+  assignment: true
 }
 
 prefix public func ~~~(x: Bool) -> () {}
-postfix public func ^^(inout x: Bool) -> () { x = true }
+postfix public func ^^(x: inout Bool) -> () { x = true }
 public func *-*(x: Bool, y: Bool) -> () {}
-public func  *-(inout x: Bool, y: Bool) -> Bool { x = y; return x }
+public func  *-(x: inout Bool, y: Bool) -> Bool { x = y; return x }
 

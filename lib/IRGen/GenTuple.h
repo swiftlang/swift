@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,6 +26,7 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
+  class Size;
 
   /// Project the address of a tuple element.
   Address projectTupleElementAddress(IRGenFunction &IGF,
@@ -40,6 +41,21 @@ namespace irgen {
                                         unsigned fieldNo,
                                         Explosion &out);
 
+  /// Return the offset to the given tuple element, if it's fixed.
+  ///
+  /// This API is used by RemoteAST.
+  Optional<Size> getFixedTupleElementOffset(IRGenModule &IGM,
+                                            SILType tupleType,
+                                            unsigned fieldNo);
+
+  /// Returns the index of the element in the llvm struct type which represents
+  /// \p fieldNo in \p tupleType.
+  ///
+  /// Returns None if the tuple element is an empty type and therefore has no
+  /// corresponding element in the llvm type.
+  Optional<unsigned> getPhysicalTupleElementStructIndex(IRGenModule &IGM,
+                                                        SILType tupleType,
+                                                        unsigned fieldNo);
 } // end namespace irgen
 } // end namespace swift
 

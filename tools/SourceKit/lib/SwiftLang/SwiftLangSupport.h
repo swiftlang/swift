@@ -1,12 +1,12 @@
-//===--- SwiftLangSupport.h - ------------------------------------*- C++ -*-==//
+//===--- SwiftLangSupport.h - -----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -17,9 +17,13 @@
 #include "SwiftInterfaceGenContext.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/Concurrency.h"
+#include "SourceKit/Support/Statistic.h"
 #include "SourceKit/Support/ThreadSafeRefCntPtr.h"
 #include "SourceKit/Support/Tracing.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/IDE/Formatting.h"
+#include "swift/IDE/Refactoring.h"
+#include "swift/Index/IndexSymbol.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Mutex.h"
@@ -32,6 +36,7 @@ namespace swift {
   class CompilerInstance;
   class CompilerInvocation;
   class Decl;
+  class Type;
   class AbstractStorageDecl;
   class SourceFile;
   class ValueDecl;
@@ -40,11 +45,18 @@ namespace swift {
 namespace ide {
   class CodeCompletionCache;
   class OnDiskCodeCompletionCache;
+  class SourceEditConsumer;
   enum class CodeCompletionDeclKind;
   enum class SyntaxNodeKind : uint8_t;
   enum class SyntaxStructureKind : uint8_t;
   enum class SyntaxStructureElementKind : uint8_t;
+  enum class RangeKind : int8_t;
   class CodeCompletionConsumer;
+
+  enum class NameKind {
+    ObjC,
+    Swift,
+  };
 }
 }
 
@@ -53,21 +65,18 @@ namespace SourceKit {
   typedef RefPtr<ImmutableTextSnapshot> ImmutableTextSnapshotRef;
   class SwiftASTManager;
   class SwiftLangSupport;
+  class Context;
 
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
 
-
   struct Implementation;
   Implementation &Impl;
 
-  size_t getLineOffset(unsigned LineIndex);
-  size_t getTrimmedLineOffset(unsigned LineIndex);
-
 public:
-  struct CodeFormatOptions;
 
-  SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport);
+  SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport,
+       swift::ide::CodeFormatOptions Options = swift::ide::CodeFormatOptions());
   ~SwiftEditorDocument();
 
   ImmutableTextSnapshotRef initializeText(llvm::MemoryBuffer *Buf,
@@ -91,10 +100,7 @@ public:
   void formatText(unsigned Line, unsigned Length, EditorConsumer &Consumer);
   void expandPlaceholder(unsigned Offset, unsigned Length,
                          EditorConsumer &Consumer);
-  StringRef getTrimmedTextForLine(unsigned Line);
-  size_t getExpandedIndentForLine(unsigned LineIndex);
-
-  const CodeFormatOptions &getFormatOptions();
+  const swift::ide::CodeFormatOptions &getFormatOptions();
 
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
@@ -137,19 +143,30 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   CompletionSink sink;
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
+  bool completionHasExpectedTypes;
+  bool completionMayUseImplicitMemberExpr;
+  FilterRules filterRules;
   llvm::sys::Mutex mtx;
 
 public:
   SessionCache(CompletionSink &&sink,
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
-               std::vector<std::string> &&args, CompletionKind completionKind)
+               std::vector<std::string> &&args, CompletionKind completionKind,
+               bool hasExpectedTypes, bool mayUseImplicitMemberExpr,
+               FilterRules filterRules)
       : buffer(std::move(buffer)), args(std::move(args)), sink(std::move(sink)),
-        completionKind(completionKind) {}
+        completionKind(completionKind),
+        completionHasExpectedTypes(hasExpectedTypes),
+        completionMayUseImplicitMemberExpr(mayUseImplicitMemberExpr),
+        filterRules(std::move(filterRules)) {}
   void setSortedCompletions(std::vector<Completion *> &&completions);
   ArrayRef<Completion *> getSortedCompletions();
   llvm::MemoryBuffer *getBuffer();
   ArrayRef<std::string> getCompilerArgs();
+  const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
+  bool getCompletionHasExpectedTypes();
+  bool getCompletionMayUseImplicitMemberExpr();
 };
 typedef RefPtr<SessionCache> SessionCacheRef;
 
@@ -201,6 +218,45 @@ struct SwiftCustomCompletions
   std::vector<CustomCompletionInfo> customCompletions;
 };
 
+class RequestRefactoringEditConsumer: public swift::ide::SourceEditConsumer,
+                                      public swift::DiagnosticConsumer {
+  class Implementation;
+  Implementation &Impl;
+public:
+  RequestRefactoringEditConsumer(CategorizedEditsReceiver Receiver);
+  ~RequestRefactoringEditConsumer();
+  void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
+              ArrayRef<swift::ide::Replacement> Replacements) override;
+  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                        swift::DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                        const swift::DiagnosticInfo &Info) override;
+};
+
+class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
+                                   public swift::DiagnosticConsumer {
+  class Implementation;
+  Implementation &Impl;
+
+public:
+  RequestRenameRangeConsumer(CategorizedRenameRangesReceiver Receiver);
+  ~RequestRenameRangeConsumer();
+  void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
+              ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
+  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                        swift::DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                        const swift::DiagnosticInfo &Info) override;
+};
+
+struct SwiftStatistics {
+#define SWIFT_STATISTIC(VAR, UID, DESC)                                        \
+  Statistic VAR{UIdent{"source.statistic." #UID}, DESC};
+#include "SwiftStatistics.def"
+};
+
 class SwiftLangSupport : public LangSupport {
   SourceKit::Context &SKCtx;
   std::string RuntimeResourcePath;
@@ -211,6 +267,7 @@ class SwiftLangSupport : public LangSupport {
   ThreadSafeRefCntPtr<SwiftPopularAPI> PopularAPI;
   CodeCompletion::SessionCacheMap CCSessions;
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
+  SwiftStatistics Stats;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -228,9 +285,14 @@ public:
     return CCCache;
   }
 
+  SwiftStatistics &getStatistics() { return Stats; }
+
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
+  static SourceKit::UIdent getUIDForExtensionOfDecl(const swift::Decl *D);
   static SourceKit::UIdent getUIDForLocalVar(bool IsRef = false);
+  static SourceKit::UIdent getUIDForRefactoringKind(
+      swift::ide::RefactoringKind Kind);
   static SourceKit::UIdent getUIDForCodeCompletionDeclKind(
       swift::ide::CodeCompletionDeclKind Kind, bool IsRef = false);
   static SourceKit::UIdent getUIDForAccessor(const swift::ValueDecl *D,
@@ -244,17 +306,58 @@ public:
   static SourceKit::UIdent getUIDForSyntaxStructureElementKind(
       swift::ide::SyntaxStructureElementKind Kind);
 
+  static SourceKit::UIdent getUIDForSymbol(swift::index::SymbolInfo sym,
+                                           bool isRef);
+
+  static SourceKit::UIdent getUIDForRangeKind(swift::ide::RangeKind Kind);
+
+  static SourceKit::UIdent getUIDForRegionType(swift::ide::RegionType Type);
+
+  static SourceKit::UIdent getUIDForRefactoringRangeKind(swift::ide::RefactoringRangeKind Kind);
+
+  static Optional<UIdent> getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
+
+  static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
+
+  static SourceKit::UIdent getUIDForNameKind(swift::ide::NameKind Kind);
+
+  static swift::ide::NameKind getNameKindForUID(SourceKit::UIdent Id);
+
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
   /// Generate a USR for a Decl, including the prefix.
   /// \returns true if the results should be ignored, false otherwise.
   static bool printUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
+  /// Generate a USR for the Type of a given decl.
+  /// \returns true if the results should be ignored, false otherwise.
+  static bool printDeclTypeUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
+
+  /// Generate a USR for of a given type.
+  /// \returns true if the results should be ignored, false otherwise.
+  static bool printTypeUSR(swift::Type Ty, llvm::raw_ostream &OS);
+
   /// Generate a USR for an accessor, including the prefix.
   /// \returns true if the results should be ignored, false otherwise.
   static bool printAccessorUSR(const swift::AbstractStorageDecl *D,
                                swift::AccessorKind AccKind,
                                llvm::raw_ostream &OS);
+
+  /// Annotates a declaration with XML tags that describe the key substructure
+  /// of the declaration for CursorInfo/DocInfo.
+  ///
+  /// Prints declarations with decl- and type-specific tags derived from the
+  /// UIDs used for decl/refs.
+  ///
+  /// FIXME: This move to libIDE, but currently depends on the UIdentVisitor.
+  static void printFullyAnnotatedDeclaration(const swift::ValueDecl *VD,
+                                             swift::Type BaseTy,
+                                             llvm::raw_ostream &OS);
+
+  static void printFullyAnnotatedSynthesizedDeclaration(
+                                            const swift::ValueDecl *VD,
+                                            swift::NominalTypeDecl *Target,
+                                            llvm::raw_ostream &OS);
 
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
@@ -272,8 +375,8 @@ public:
                     ArrayRef<const char *> Args) override;
 
   void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
-                        unsigned offset,
-                        OptionsDictionary *options,
+                        unsigned offset, OptionsDictionary *options,
+                        ArrayRef<FilterRule> rawFilterRules,
                         GroupedCodeCompletionConsumer &consumer,
                         ArrayRef<const char *> args) override;
 
@@ -299,12 +402,22 @@ public:
   void editorOpenInterface(EditorConsumer &Consumer,
                            StringRef Name,
                            StringRef ModuleName,
-                           ArrayRef<const char *> Args) override;
+                           Optional<StringRef> Group,
+                           ArrayRef<const char *> Args,
+                           bool SynthesizedExtensions,
+                           Optional<StringRef> InterestedUSR) override;
+
+  void editorOpenTypeInterface(EditorConsumer &Consumer,
+                               ArrayRef<const char *> Args,
+                               StringRef TypeUSR) override;
 
   void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                  StringRef Name,
                                  StringRef HeaderName,
-                                 ArrayRef<const char *> Args) override;
+                                 ArrayRef<const char *> Args,
+                                 bool UsingSwiftArgs,
+                                 bool SynthesizedExtensions,
+                                 Optional<unsigned> swiftVersion) override;
 
   void editorOpenSwiftSourceInterface(StringRef Name,
                                       StringRef SourceName,
@@ -326,16 +439,54 @@ public:
   void editorExtractTextFromComment(StringRef Source,
                                     EditorConsumer &Consumer) override;
 
+  void editorConvertMarkupToXML(StringRef Source,
+                                EditorConsumer &Consumer) override;
+
   void editorExpandPlaceholder(StringRef Name, unsigned Offset, unsigned Length,
                                EditorConsumer &Consumer) override;
 
   void getCursorInfo(StringRef Filename, unsigned Offset,
+                     unsigned Length, bool Actionables,
+                     bool CancelOnSubsequentRequest,
                      ArrayRef<const char *> Args,
-                     std::function<void(const CursorInfo &)> Receiver) override;
+                 std::function<void(const CursorInfoData &)> Receiver) override;
+
+  void getNameInfo(StringRef Filename, unsigned Offset,
+                   NameTranslatingInfo &Input,
+                   ArrayRef<const char *> Args,
+                   std::function<void(const NameTranslatingInfo &)> Receiver) override;
+
+  void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
+                    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+                    std::function<void(const RangeInfo&)> Receiver) override;
+
+  void getCursorInfoFromUSR(
+      StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args,
+      std::function<void(const CursorInfoData &)> Receiver) override;
 
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
+                                    bool CancelOnSubsequentRequest,
                                     ArrayRef<const char *> Args,
               std::function<void(const RelatedIdentsInfo &)> Receiver) override;
+
+  void syntacticRename(llvm::MemoryBuffer *InputBuf,
+                       ArrayRef<RenameLocations> RenameLocations,
+                       ArrayRef<const char*> Args,
+                       CategorizedEditsReceiver Receiver) override;
+
+  void findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                        ArrayRef<RenameLocations> RenameLocations,
+                        ArrayRef<const char *> Args,
+                        CategorizedRenameRangesReceiver Receiver) override;
+
+  void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
+                             unsigned Length, ArrayRef<const char *> Args,
+                             CategorizedRenameRangesReceiver Receiver) override;
+
+  void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
+                           ArrayRef<const char*> Args,
+                           CategorizedEditsReceiver Receiver) override;
 
   void getDocInfo(llvm::MemoryBuffer *InputBuf,
                   StringRef ModuleName,
@@ -347,13 +498,24 @@ public:
 
   void findInterfaceDocument(StringRef ModuleName, ArrayRef<const char *> Args,
                std::function<void(const InterfaceDocInfo &)> Receiver) override;
+
+  void findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
+               std::function<void(ArrayRef<StringRef>, StringRef Error)> Receiver) override;
+
+  void getStatistics(StatisticsReceiver) override;
+
+private:
+  swift::SourceFile *getSyntacticSourceFile(llvm::MemoryBuffer *InputBuf,
+                                            ArrayRef<const char *> Args,
+                                            swift::CompilerInstance &ParseCI,
+                                            std::string &Error);
 };
 
 namespace trace {
   void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                      StringRef InputFile,
                      ArrayRef<const char *> Args);
-  
+
   void initTraceFiles(trace::SwiftInvocation &SwiftArgs,
                       swift::CompilerInstance &CI);
 }
@@ -369,6 +531,6 @@ public:
   ~CloseClangModuleFiles();
 };
 
-} // namespace SourceKit.
+} // namespace SourceKit
 
 #endif

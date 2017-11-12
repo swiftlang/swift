@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,8 +22,7 @@ namespace swift {
   struct SwiftAAResult : llvm::AAResultBase<SwiftAAResult> {
     friend llvm::AAResultBase<SwiftAAResult>;
 
-    explicit SwiftAAResult(const llvm::TargetLibraryInfo &TLI)
-        : AAResultBase(TLI) {}
+    explicit SwiftAAResult() : AAResultBase() {}
     SwiftAAResult(SwiftAAResult &&Arg)
         : AAResultBase(std::move(Arg)) {}
 
@@ -88,14 +87,13 @@ namespace swift {
     SwiftARCContract() : llvm::FunctionPass(ID) {}
   };
 
-  class SwiftStackPromotion : public llvm::FunctionPass {
+  class InlineTreePrinter : public llvm::ModulePass {
     virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
-    virtual bool runOnFunction(llvm::Function &F) override;
+    virtual bool runOnModule(llvm::Module &M) override;
   public:
     static char ID;
-    SwiftStackPromotion() : llvm::FunctionPass(ID) {}
+    InlineTreePrinter() : llvm::ModulePass(ID) {}
   };
-
 
 } // end namespace swift
 

@@ -2,23 +2,23 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
+#include "SourceKit/Support/Concurrency.h"
+#include "SourceKit/SwiftLang/Factory.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/TargetSelect.h"
 #include "gtest/gtest.h"
-
-// FIXME: Portability.
-#include <dispatch/dispatch.h>
 
 using namespace SourceKit;
 using namespace llvm;
@@ -52,12 +52,14 @@ class NullEditorConsumer : public EditorConsumer {
                                  unsigned NameLength,
                                  unsigned BodyOffset,
                                  unsigned BodyLength,
+                                 unsigned DocOffset,
+                                 unsigned DocLength,
                                  StringRef DisplayName,
                                  StringRef TypeName,
                                  StringRef RuntimeName,
                                  StringRef SelectorName,
                                  ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<UIdent> Attrs) override {
+                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
     return false;
   }
 
@@ -96,20 +98,18 @@ struct TestCursorInfo {
 };
 
 class CursorInfoTest : public ::testing::Test {
-  SourceKit::Context Ctx{ getRuntimeLibPath() };
+  SourceKit::Context Ctx{ getRuntimeLibPath(), SourceKit::createSwiftLangSupport };
   std::atomic<int> NumTasks;
-  dispatch_semaphore_t TaskSema = nullptr;
 
 public:
   LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
 
-  void SetUp() {
+  void SetUp() override {
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmPrinters();
+    llvm::InitializeAllAsmParsers();
     NumTasks = 0;
-    TaskSema = dispatch_semaphore_create(0);
-  }
-
-  void TearDown() {
-    dispatch_release(TaskSema);
   }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
@@ -133,47 +133,22 @@ public:
   TestCursorInfo getCursor(const char *DocName, unsigned Offset,
                            ArrayRef<const char *> CArgs) {
     auto Args = makeArgs(DocName, CArgs);
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    Semaphore sema(0);
 
     TestCursorInfo TestInfo;
-    getLang().getCursorInfo(DocName, Offset, Args,
-      [&](const CursorInfo &Info) {
+    getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
+      [&](const CursorInfoData &Info) {
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;
         TestInfo.Filename = Info.Filename;
         TestInfo.DeclarationLoc = Info.DeclarationLoc;
-        dispatch_semaphore_signal(sema);
+        sema.signal();
       });
 
-    dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60);
-    bool expired = dispatch_semaphore_wait(sema, when);
+    bool expired = sema.wait(60 * 1000);
     if (expired)
       llvm::report_fatal_error("check took too long");
-    dispatch_release(sema);
     return TestInfo;
-  }
-
-  void checkCursorAsync(const char *DocName, unsigned Offset,
-                        ArrayRef<const char *> CArgs,
-                        StringRef ExpectedName, StringRef ExpectedTypename) {
-    auto Args = makeArgs(DocName, CArgs);
-    ++NumTasks;
-    getLang().getCursorInfo(DocName, Offset, Args,
-      [this, ExpectedName, ExpectedTypename](const CursorInfo &Info) {
-        EXPECT_EQ(ExpectedName, Info.Name);
-        EXPECT_EQ(ExpectedTypename, Info.TypeName);
-
-        int Num = --NumTasks;
-        if (Num == 0)
-          dispatch_semaphore_signal(TaskSema);
-      });
-  }
-
-  void waitForChecks() {
-    dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60);
-    bool expired = dispatch_semaphore_wait(TaskSema, when);
-    if (expired)
-      llvm::report_fatal_error("checks took too long");
   }
 
   unsigned findOffset(StringRef Val, StringRef Text) {

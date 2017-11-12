@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -26,6 +26,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <vector>
 
 namespace swift {
 namespace json {
@@ -117,7 +119,7 @@ struct ScalarTraits {
 ///        return seq.size();
 ///      }
 ///      static MyType& element(Output &, std::vector<MyType> &seq, size_t index) {
-///        if ( index >= seq.size() )
+///        if (index >= seq.size())
 ///          seq.resize(index+1);
 ///        return seq[index];
 ///      }
@@ -284,7 +286,7 @@ struct missingTraits : public std::integral_constant<bool,
  && !has_ScalarBitSetTraits<T>::value
  && !has_ScalarTraits<T>::value
  && !has_ObjectTraits<T>::value
- && !has_ArrayTraits<T>::value>  {};
+ && !has_ArrayTraits<T>::value> {};
 
 template<typename T>
 struct validatedObjectTraits : public std::integral_constant<bool,
@@ -339,14 +341,14 @@ public:
 
   template <typename T>
   void enumCase(T &Val, const char* Str, const T ConstVal) {
-    if ( matchEnumScalar(Str, Val == ConstVal) ) {
+    if (matchEnumScalar(Str, Val == ConstVal)) {
       Val = ConstVal;
     }
   }
 
   template <typename T>
   void bitSetCase(T &Val, const char* Str, const T ConstVal) {
-    if ( bitSetMatch(Str, (Val & ConstVal) == ConstVal) ) {
+    if (bitSetMatch(Str, (Val & ConstVal) == ConstVal)) {
       Val = Val | ConstVal;
     }
   }
@@ -373,7 +375,7 @@ public:
   typename std::enable_if<has_ArrayTraits<T>::value,void>::type
   mapOptional(const char* Key, T& Val) {
     // omit key/value instead of outputting empty array
-    if ( this->canElideEmptyArray() && !(Val.begin() != Val.end()) )
+    if (this->canElideEmptyArray() && !(Val.begin() != Val.end()))
       return;
     this->processKey(Key, Val, false);
   }
@@ -398,7 +400,7 @@ private:
   template <typename T>
   void processKeyWithDefault(const char *Key, Optional<T> &Val,
                              const Optional<T> &DefaultValue, bool Required) {
-    assert(DefaultValue.hasValue() == false &&
+    assert(!DefaultValue.hasValue() &&
            "Optional<T> shouldn't have a value!");
     void *SaveInfo;
     bool UseDefault;
@@ -421,13 +423,12 @@ private:
     void *SaveInfo;
     bool UseDefault;
     const bool sameAsDefault = Val == DefaultValue;
-    if ( this->preflightKey(Key, Required, sameAsDefault, UseDefault,
-                            SaveInfo) ) {
+    if (this->preflightKey(Key, Required, sameAsDefault, UseDefault,
+                           SaveInfo)) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
-    }
-    else {
-      if ( UseDefault )
+    } else {
+      if (UseDefault)
         Val = DefaultValue;
     }
   }
@@ -436,7 +437,7 @@ private:
   void processKey(const char *Key, T &Val, bool Required) {
     void *SaveInfo;
     bool UseDefault;
-    if ( this->preflightKey(Key, Required, false, UseDefault, SaveInfo) ) {
+    if (this->preflightKey(Key, Required, false, UseDefault, SaveInfo)) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
     }
@@ -444,6 +445,16 @@ private:
 
 private:
   void indent();
+};
+
+template <typename T> struct ArrayTraits<std::vector<T>> {
+  static size_t size(Output &out, std::vector<T> &seq) { return seq.size(); }
+
+  static T &element(Output &out, std::vector<T> &seq, size_t index) {
+    if (index >= seq.size())
+      seq.resize(index + 1);
+    return seq[index];
+  }
 };
 
 template<>
@@ -481,6 +492,16 @@ struct ScalarTraits<uint32_t> {
   static void output(const uint32_t &, llvm::raw_ostream &);
   static bool mustQuote(StringRef) { return false; }
 };
+
+#if defined(_MSC_VER)
+// In MSVC, 'unsigned long' is 32bit size and different from uint32_t,
+// and it is used to define swift::sys::ProcessId.
+template<>
+struct ScalarTraits<unsigned long> {
+  static void output(const unsigned long &, llvm::raw_ostream &);
+  static bool mustQuote(StringRef) { return false; }
+};
+#endif
 
 template<>
 struct ScalarTraits<uint64_t> {
@@ -536,8 +557,8 @@ template<typename T>
 typename std::enable_if<has_ScalarBitSetTraits<T>::value,void>::type
 jsonize(Output &out, T &Val, bool) {
   bool DoClear;
-  if ( out.beginBitSetScalar(DoClear) ) {
-    if ( DoClear )
+  if (out.beginBitSetScalar(DoClear)) {
+    if (DoClear)
       Val = static_cast<T>(0);
     ScalarBitSetTraits<T>::bitset(out, Val);
     out.endBitSetScalar();
@@ -593,9 +614,9 @@ jsonize(Output &out, T &Seq, bool) {
   {
     out.beginArray();
     unsigned count = ArrayTraits<T>::size(out, Seq);
-    for(unsigned i=0; i < count; ++i) {
+    for (unsigned i=0; i < count; ++i) {
       void *SaveInfo;
-      if ( out.preflightElement(i, SaveInfo) ) {
+      if (out.preflightElement(i, SaveInfo)) {
         jsonize(out, ArrayTraits<T>::element(out, Seq, i), true);
         out.postflightElement(SaveInfo);
       }
@@ -614,7 +635,7 @@ operator<<(Output &yout, T &map) {
   return yout;
 }
 
-// Define non-member operator<< so that Output can stream out a array.
+// Define non-member operator<< so that Output can stream out an array.
 template <typename T>
 inline
 typename
@@ -627,4 +648,4 @@ operator<<(Output &yout, T &seq) {
 } // end namespace json
 } // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_JSONSERIALIZATION_H

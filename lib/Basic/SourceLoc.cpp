@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,7 +24,7 @@ void SourceManager::verifyAllBuffers() const {
   };
 
   // FIXME: This depends on the buffer IDs chosen by llvm::SourceMgr.
-  __attribute__((used)) static char arbitraryTotal = 0;
+  LLVM_ATTRIBUTE_USED static char arbitraryTotal = 0;
   for (unsigned i = 1, e = LLVMSourceMgr.getNumBuffers(); i <= e; ++i) {
     auto *buffer = LLVMSourceMgr.getMemoryBuffer(i);
     if (buffer->getBufferSize() == 0)
@@ -82,7 +82,7 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
 
   CharSourceRange range = CharSourceRange(*this, loc, end);
   VirtualFiles[end.Value.getPointer()] = { range, name, lineOffset };
-  CachedVFile = {};
+  CachedVFile = {nullptr, nullptr};
   return true;
 }
 
@@ -99,7 +99,7 @@ void SourceManager::closeVirtualFile(SourceLoc end) {
 #endif
     return;
   }
-  CachedVFile = {};
+  CachedVFile = {nullptr, nullptr};
 
   CharSourceRange oldRange = virtualFile->Range;
   virtualFile->Range = CharSourceRange(*this, virtualFile->Range.getStart(),
@@ -137,7 +137,7 @@ Optional<unsigned> SourceManager::getIDForBufferIdentifier(
   return It->second;
 }
 
-const char *SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
+StringRef SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
   auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
   assert(buffer && "invalid buffer ID");
   return buffer->getBufferIdentifier();
@@ -174,6 +174,10 @@ unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
   return End.Value.getPointer() - Start.Value.getPointer();
 }
 
+StringRef SourceManager::getEntireTextForBuffer(unsigned BufferID) const {
+  return LLVMSourceMgr.getMemoryBuffer(BufferID)->getBuffer();
+}
+
 StringRef SourceManager::extractText(CharSourceRange Range,
                                      Optional<unsigned> BufferID) const {
   assert(Range.isValid() && "range should be valid");
@@ -199,6 +203,13 @@ unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {
       return i;
   }
   llvm_unreachable("no buffer containing location found");
+}
+
+void SourceRange::widen(SourceRange Other) {
+  if (Other.Start.Value.getPointer() < Start.Value.getPointer())
+    Start = Other.Start;
+  if (Other.End.Value.getPointer() > End.Value.getPointer())
+    End = Other.End;
 }
 
 void SourceLoc::printLineAndColumn(raw_ostream &OS,

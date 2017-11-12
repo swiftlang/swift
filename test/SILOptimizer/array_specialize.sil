@@ -1,0 +1,178 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -array-specialize
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct MyArray<T> {
+  var buffer : ArrayIntBuffer
+}
+
+enum MyBool{
+  case True
+  case False
+}
+
+class MyClass {
+}
+
+/// We need to split the loop exit edge from bb1 to bb3 before updating ssa form
+/// after cloning.
+sil @clone_switch_enum_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*MyBool
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb3, case #MyBool.True!enumelt: bb2
+
+bb2:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb4
+
+bb3:
+ br bb4
+
+bb4:
+  return %4 : $MyBool
+}
+
+protocol AProtocol : class {
+}
+
+sil @cant_handle_open_existential_use_outside_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool, @owned AProtocol) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool, %10 : $AProtocol):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*MyBool
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %11 = open_existential_ref %10 : $AProtocol to $@opened("B538073C-2428-11E5-AC93-C82A1428F987") AProtocol
+  switch_enum %4 : $MyBool, case #MyBool.False!enumelt: bb3, case #MyBool.True!enumelt: bb2
+
+bb2:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb4
+
+bb3:
+ br bb4
+
+bb4:
+  release_value %11 : $@opened("B538073C-2428-11E5-AC93-C82A1428F987") AProtocol
+  return %4 : $MyBool
+}
+
+sil public_external [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool {
+bb0(%0: $MyArray<MyClass>):
+  unreachable
+}
+
+// Make sure we can handle try_apply when splitting edges. This test used to crash.
+
+sil @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
+
+sil @clone_try_apply_exit : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> (MyBool, @error Error) {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*MyBool
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %7 = function_ref @throwing_fun : $@convention(thin) () -> (MyBool, @error Error)
+  try_apply %7() : $@convention(thin) () -> (MyBool, @error Error), normal bb2, error bb5
+
+bb2(%8 : $MyBool):
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb4
+
+bb3:
+ br bb4
+
+bb4:
+  return %4 : $MyBool
+
+bb5(%9 : $Error):
+  throw %9 : $Error
+}
+
+sil @dominator_update_outside_non_exit_block : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*Builtin.Int1
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  cond_br %4, bb2, bb4
+
+bb2:
+ cond_br undef, bb3, bb5
+
+bb3:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb7
+
+bb4: // Exit block; b1 dom b4
+ cond_br undef, bb5, bb6
+
+bb5: // Exit Block; b1 dom b4
+ br bb6
+
+bb6: // Non-exit Dominated by bb1
+ br bb7
+
+bb7:
+  return %4 : $Builtin.Int1
+}
+
+sil @dominator_update_outside_non_exit_block_2 : $@convention(thin) (@inout MyArray<MyClass>, @inout Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*Builtin.Int1):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %4 = load %1 : $*Builtin.Int1
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  cond_br %4, bb2, bb4
+
+bb2:
+ cond_br undef, bb3, bb5
+
+bb3:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb1, bb7
+
+bb4: // Exit block; b1 dom b4
+ cond_br undef, bb5, bb6
+
+bb5: // Exit Block; b1 dom b4
+ br bb6
+
+bb6: // Non-exit Dominated by bb1
+ br bb8
+
+bb7: // Exit dominated by bb3
+ br bb8
+
+bb8: // Non-exit dominated by bb1
+  return %4 : $Builtin.Int1
+}

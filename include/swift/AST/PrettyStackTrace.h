@@ -1,16 +1,16 @@
-//===- PrettyStackTrace.h - Crash trace information -------------*- C++ -*-===//
+//===--- PrettyStackTrace.h - Crash trace information -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines RAII classes that give better dagnostic output
+// This file defines RAII classes that give better diagnostic output
 // about when, exactly, a crash is occurring.
 //
 //===----------------------------------------------------------------------===//
@@ -26,6 +26,7 @@ namespace swift {
   class ASTContext;
   class Decl;
   class Expr;
+  class GenericSignature;
   class Pattern;
   class Stmt;
   class TypeRepr;
@@ -127,6 +128,24 @@ public:
   PrettyStackTraceTypeRepr(ASTContext &C, const char *action, TypeRepr *type)
     : Context(C), TheType(type), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
+};
+
+class PrettyStackTraceGenericSignature : public llvm::PrettyStackTraceEntry {
+  const char *Action;
+  GenericSignature *GenericSig;
+  Optional<unsigned> Requirement;
+
+public:
+  PrettyStackTraceGenericSignature(const char *action,
+                                   GenericSignature *genericSig,
+                                   Optional<unsigned> requirement = None)
+    : Action(action), GenericSig(genericSig), Requirement(requirement) { }
+
+  void setRequirement(Optional<unsigned> requirement) {
+    Requirement = requirement;
+  }
+
+  void print(llvm::raw_ostream &out) const override;
 };
 
 } // end namespace swift

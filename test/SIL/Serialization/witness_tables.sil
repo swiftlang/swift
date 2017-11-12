@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -sil-serialize-all -module-name witness_tables -emit-module -o - %s | %target-sil-opt -module-name witness_tables | FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -module-name witness_tables -emit-module -o - %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name witness_tables | %FileCheck %s
 
 protocol AssocReqt {
   func requiredMethod()
@@ -8,14 +8,14 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod()
 }
 
-sil @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (ConformingAssoc) -> () {
+sil [serialized] @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (ConformingAssoc) -> () {
 bb0(%0 : $ConformingAssoc):
   debug_value %0 : $ConformingAssoc
   %2 = tuple ()
   return %2 : $()
 }
 
-sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method) (@inout ConformingAssoc) -> () {
+sil [serialized] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@inout ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
   %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (ConformingAssoc) -> ()
@@ -23,16 +23,16 @@ bb0(%0 : $*ConformingAssoc):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
-// CHECK: #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+// CHECK-LABEL: sil_witness_table [serialized] ConformingAssoc: AssocReqt module witness_tables {
+// CHECK: #AssocReqt.requiredMethod!1: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 // CHECK: }
-sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
+sil_witness_table [serialized] ConformingAssoc: AssocReqt module witness_tables {
   method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 }
 
 protocol AnyProtocol {
-  typealias AssocType
-  typealias AssocWithReqt : AssocReqt
+  associatedtype AssocType
+  associatedtype AssocWithReqt : AssocReqt
   func assocTypesMethod(x: AssocType, y: AssocWithReqt)
   static func staticMethod(x: Self)
 }
@@ -57,29 +57,21 @@ struct InheritedConformance2 : InheritedProtocol1 {
 }
 
 
-// CHECK-LABEL: sil_witness_table shared InheritedConformance: InheritedProtocol1 module
+// CHECK-LABEL: sil_witness_table shared [serialized] InheritedConformance: InheritedProtocol1 module
 // CHECK: base_protocol AnyProtocol: InheritedConformance: AnyProtocol module
 // CHECK: }
-sil_witness_table shared InheritedConformance: InheritedProtocol1 module witness_tables {
+sil_witness_table shared [serialized] InheritedConformance: InheritedProtocol1 module witness_tables {
   base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
 }
 
-// CHECK-LABEL: sil_witness_table shared InheritedConformance: AnyProtocol module
+// CHECK-LABEL: sil_witness_table shared [serialized] InheritedConformance: AnyProtocol module
 // CHECK: associated_type AssocType: SomeAssoc
 // CHECK: associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module
 // CHECK: }
-sil_witness_table shared InheritedConformance: AnyProtocol module witness_tables {
+sil_witness_table shared [serialized] InheritedConformance: AnyProtocol module witness_tables {
   associated_type AssocType: SomeAssoc
   associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }
-
-// CHECK-LABEL: sil_witness_table InheritedConformance2: InheritedProtocol1 module witness_tables
-// CHECK-NOT: }
-sil_witness_table InheritedConformance2: InheritedProtocol1 module witness_tables
-// CHECK-LABEL: sil_witness_table InheritedConformance2: AnyProtocol module witness_tables
-// CHECK-NOT: }
-sil_witness_table InheritedConformance2: AnyProtocol module witness_tables
-
 
 protocol Proto {
 	func abc()
@@ -89,10 +81,10 @@ class DeadMethodClass : Proto {
 	func abc()
 }
 
-// CHECK-LABEL: sil_witness_table DeadMethodClass: Proto module witness_tables
-// CHECK: method #Proto.abc!1: nil
+// CHECK-LABEL: sil_witness_table [serialized] DeadMethodClass: Proto module witness_tables
+// CHECK: method #Proto.abc!1: {{.*}} : nil
 // CHECK: }
-sil_witness_table DeadMethodClass: Proto module witness_tables {
+sil_witness_table [serialized] DeadMethodClass: Proto module witness_tables {
   method #Proto.abc!1: nil
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func capture_nested_class() {
   var a = 5 //expected-note{{'a' declared here}}

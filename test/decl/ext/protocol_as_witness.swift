@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // rdar://problem/21496715
 protocol P1 {
@@ -24,7 +24,7 @@ struct X2 : P2 {
 }
 
 extension P2 where Self : Comparable {
-  func f()  {}
+  func f() {}
 }
 
 // rdar://problem/19423637

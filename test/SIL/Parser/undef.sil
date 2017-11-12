@@ -1,0 +1,370 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+sil_stage raw
+
+import Builtin
+import Swift
+
+protocol P { }
+@objc protocol ObjcP { }
+protocol ClassP : class { }
+
+class C {
+  let x : () = ()
+  @objc func fn() { }
+}
+
+class D : C, P, ClassP { }
+
+struct S {
+  let x : ()
+}
+
+enum E {
+  case Case
+  case DataCase(())
+}
+
+sil @general_test : $() -> () {
+bb0:
+
+  // Allocation and Deallocation
+
+  // CHECK: alloc_ref_dynamic undef : $@thick C.Type, $C
+  alloc_ref_dynamic undef : $@thick C.Type, $C
+  // CHECK: alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
+  alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
+  // CHECK: dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
+  dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
+  // CHECK: dealloc_ref undef : $C
+  dealloc_ref undef : $C
+  // CHECK: dealloc_partial_ref undef : $D, undef : $@thick C.Type
+  dealloc_partial_ref undef : $D, undef : $@thick C.Type
+  // CHECK: dealloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
+  dealloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
+
+  // Debug information
+
+  // CHECK: debug_value undef : $()
+  debug_value undef : $()
+  // CHECK: debug_value_addr undef : $*()
+  debug_value_addr undef : $*()
+
+  // Accessing memory
+
+  // CHECK: load undef : $*()
+  load undef : $*()
+  // CHECK: store undef to undef : $*()
+  store undef to undef : $*()
+  // CHECK: assign undef to undef : $*()
+  assign undef to undef : $*()
+  // CHECK: mark_uninitialized [var] undef : $*()
+  mark_uninitialized [var] undef : $*()
+  // CHECK: mark_function_escape undef : $*()
+  mark_function_escape undef : $*()
+  // CHECK: copy_addr undef to [initialization] undef : $*()
+  copy_addr undef to [initialization] undef : $*()
+  // CHECK: destroy_addr undef : $*()
+  destroy_addr undef : $*()
+  // CHECK: index_addr undef : $*(), undef : $Builtin.Int64
+  index_addr undef : $*(), undef : $Builtin.Int64
+  // CHECK: index_raw_pointer undef : $Builtin.RawPointer, undef : $Builtin.Int64
+  index_raw_pointer undef : $Builtin.RawPointer, undef : $Builtin.Int64
+  // CHECK: bind_memory undef : $Builtin.RawPointer, undef : $Builtin.Word to $*S
+  bind_memory undef : $Builtin.RawPointer, undef : $Builtin.Word to $*S
+
+  // Reference Counting
+
+  // CHECK: strong_retain undef : $C
+  strong_retain undef : $C
+  // CHECK: strong_release undef : $C
+  strong_release undef : $C
+  // CHECK: strong_retain_unowned undef : $@sil_unowned C
+  strong_retain_unowned undef : $@sil_unowned C
+  // CHECK: unowned_retain undef : $@sil_unowned C
+  unowned_retain undef : $@sil_unowned C
+  // CHECK: unowned_release undef : $@sil_unowned C
+  unowned_release undef : $@sil_unowned C
+  // CHECK: load_weak undef : $*@sil_weak Optional<C>
+  load_weak undef : $*@sil_weak Optional<C>
+  // CHECK: store_weak undef to [initialization] undef : $*@sil_weak Optional<C>
+  store_weak undef to [initialization] undef : $*@sil_weak Optional<C>
+  // CHECK: fix_lifetime undef : $C
+  fix_lifetime undef : $C
+  // CHECK: mark_dependence undef : $C on undef : $C
+  mark_dependence undef : $C on undef : $C
+  // CHECK: is_unique undef : $C
+  is_unique undef : $C
+  // CHECK: is_unique_or_pinned undef : $C
+  is_unique_or_pinned undef : $C
+  // CHECK: copy_block undef : $@convention(block) () -> ()
+  copy_block undef : $@convention(block) () -> ()
+
+  // Dynamic dispatch
+
+  // CHECK: class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
+  objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
+
+  // Function Application
+
+  // CHECK: apply undef(undef) : $(()) -> ()
+  apply undef(undef) : $(()) -> ()
+  // CHECK: apply undef<()>(undef) : $<τ_0_0> (τ_0_0) -> ()
+  apply undef<()>(undef) : $<τ_0_0> (τ_0_0) -> ()
+  // CHECK: partial_apply undef(undef) : $((), ()) -> ()
+  partial_apply undef(undef) : $((), ()) -> ()
+  // CHECK: partial_apply undef<()>(undef) : $<τ_0_0> (τ_0_0, τ_0_0) -> ()
+  partial_apply undef<()>(undef) : $<T>(T, T) -> ()
+  // CHECK: builtin "sizeof"(undef : $@thick ().Type) : $Bool
+  builtin "sizeof"(undef : $@thick ().Type) : $Bool
+
+  // Metatypes
+
+  // CHECK: value_metatype $@thick C.Type, undef : $C
+  value_metatype $@thick C.Type, undef : $C
+  // CHECK: existential_metatype $@thick P.Type, undef : $P
+  existential_metatype $@thick P.Type, undef : $P
+
+  // Aggregate Types
+
+  // CHECK: retain_value undef : $()
+  retain_value undef : $()
+  // CHECK: release_value undef : $()
+  release_value undef : $()
+  // CHECK: autorelease_value undef : $C
+  autorelease_value undef : $C
+  // CHECK: tuple (undef : $(), undef : $())
+  %0 = tuple (undef : $(), undef : $())
+  // CHECK: tuple $(a: (), b: ()) (undef, undef)
+  tuple $(a: (), b: ()) (undef, undef)
+  // CHECK: tuple_extract undef : $((), ()), 0
+  tuple_extract undef : $((), ()), 0
+  // CHECK: tuple_element_addr undef : $*((), ()), 0
+  tuple_element_addr undef : $*((), ()), 0
+  // CHECK: struct $S (undef : $())
+  struct $S (undef : $())
+  // CHECK: struct_extract undef : $S, #S.x
+  struct_extract undef : $S, #S.x
+  // CHECK: struct_element_addr undef : $*S, #S.x
+  struct_element_addr undef : $*S, #S.x
+  // CHECK: ref_element_addr undef : $C, #C.x
+  ref_element_addr undef : $C, #C.x
+
+  // Enums
+
+  // CHECK: enum $E, #E.DataCase!enumelt.1, undef : $()
+  enum $E, #E.DataCase!enumelt.1, undef : $()
+  // CHECK: unchecked_enum_data undef : $E, #E.DataCase!enumelt
+  unchecked_enum_data undef : $E, #E.DataCase!enumelt
+  // CHECK: init_enum_data_addr undef : $*E, #E.DataCase!enumelt
+  init_enum_data_addr undef : $*E, #E.DataCase!enumelt
+  // CHECK: inject_enum_addr undef : $*E, #E.Case!enumelt
+  inject_enum_addr undef : $*E, #E.Case!enumelt
+  // CHECK: unchecked_take_enum_data_addr undef : $*E, #E.DataCase!enumelt
+  unchecked_take_enum_data_addr undef : $*E, #E.DataCase!enumelt
+  // CHECK: select_enum undef : $E, case #E.Case!enumelt: undef, default undef : $E
+  select_enum undef : $E, case #E.Case!enumelt: undef, default undef : $E
+  // CHECK: select_enum_addr undef : $*E, case #E.Case!enumelt: undef, default undef : $()
+  select_enum_addr undef : $*E, case #E.Case!enumelt: undef, default undef : $()
+
+  // Protocol and Protocol Composition Types
+
+  // CHECK: init_existential_addr undef : $*P, $D
+  init_existential_addr undef : $*P, $D
+  // CHECK: deinit_existential_addr undef : $*P
+  deinit_existential_addr undef : $*P
+  // CHECK: open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
+  open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
+  // CHECK: open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000") P
+  open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000") P
+  // CHECK: init_existential_ref undef : $D : $D, $ClassP
+  init_existential_ref undef : $D : $D, $ClassP
+  // CHECK: open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001") ClassP
+  open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001") ClassP
+  // CHECK: init_existential_metatype undef : $@thick D.Type, $@thick P.Type
+  init_existential_metatype undef : $@thick D.Type, $@thick P.Type
+  // CHECK: open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
+  open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
+  // CHECK: open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003") Error
+  open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003") Error
+  // CHECK: dealloc_existential_box undef : $Error, $()
+  dealloc_existential_box undef : $Error, $()
+
+  // Blocks
+
+  // CHECK: project_block_storage undef : $*@block_storage Builtin.RawPointer
+  project_block_storage undef : $*@block_storage Builtin.RawPointer
+  // CHECK: init_block_storage_header undef : $*@block_storage Int, invoke undef : $@convention(c) (@inout_aliasable @block_storage Int) -> (), type $@convention(block) () -> ()
+  init_block_storage_header undef : $*@block_storage Int, invoke undef : $@convention(c) (@inout_aliasable @block_storage Int) -> (), type $@convention(block) () -> ()
+
+  // Unchecked Conversions
+
+  // CHECK: upcast undef : $D to $C
+  upcast undef : $D to $C
+  // CHECK: address_to_pointer undef : $*() to $Builtin.RawPointer
+  address_to_pointer undef : $*() to $Builtin.RawPointer
+  // CHECK: pointer_to_address undef : $Builtin.RawPointer to $*()
+  pointer_to_address undef : $Builtin.RawPointer to $*()
+  // CHECK: pointer_to_address undef : $Builtin.RawPointer to [strict] $*()
+  pointer_to_address undef : $Builtin.RawPointer to [strict] $*()
+  // CHECK: unchecked_ref_cast undef : $C to $D
+  unchecked_ref_cast undef : $C to $D
+  // CHECK: unchecked_addr_cast undef : $*D to $*C
+  unchecked_addr_cast undef : $*D to $*C
+  // CHECK: unchecked_trivial_bit_cast undef : $Builtin.NativeObject to $Builtin.Word
+  unchecked_trivial_bit_cast undef : $Builtin.NativeObject to $Builtin.Word
+  // CHECK: unchecked_bitwise_cast undef : $Builtin.Int64 to $Builtin.Int1
+  unchecked_bitwise_cast undef : $Builtin.Int64 to $Builtin.Int1
+  // CHECK: ref_to_raw_pointer undef : $Builtin.NativeObject to $Builtin.RawPointer
+  ref_to_raw_pointer undef : $Builtin.NativeObject to $Builtin.RawPointer
+  // CHECK: ref_to_unowned undef : $C to $@sil_unowned C
+  ref_to_unowned undef : $C to $@sil_unowned C
+  // CHECK: unowned_to_ref undef : $@sil_unowned C to $C
+  unowned_to_ref undef : $@sil_unowned C to $C
+  // CHECK: unchecked_ref_cast_addr C in undef : $*C to D in undef : $*D
+  unchecked_ref_cast_addr C in undef : $*C to D in undef : $*D
+  // CHECK: ref_to_unmanaged undef : $C to $@sil_unmanaged C
+  ref_to_unmanaged undef : $C to $@sil_unmanaged C
+  // CHECK: unmanaged_to_ref undef : $@sil_unmanaged C to $C
+  unmanaged_to_ref undef : $@sil_unmanaged C to $C
+  // CHECK: convert_function undef : $(D) -> () to $(C) -> ()
+  convert_function undef : $(D) -> () to $(C) -> ()
+  // CHECK: thin_function_to_pointer undef : $@convention(thin) () -> () to $Builtin.RawPointer
+  thin_function_to_pointer undef : $@convention(thin) () -> () to $Builtin.RawPointer
+  // CHECK: pointer_to_thin_function undef : $Builtin.RawPointer to $@convention(thin) () -> ()
+  pointer_to_thin_function undef : $Builtin.RawPointer to $@convention(thin) () -> ()
+  // CHECK: ref_to_bridge_object undef : $C, undef : $Builtin.Word
+  ref_to_bridge_object undef : $C, undef : $Builtin.Word
+  // CHECK: bridge_object_to_ref undef : $Builtin.BridgeObject to $C
+  bridge_object_to_ref undef : $Builtin.BridgeObject to $C
+  // CHECK: bridge_object_to_word undef : $Builtin.BridgeObject to $Builtin.Word
+  bridge_object_to_word undef : $Builtin.BridgeObject to $Builtin.Word
+  // CHECK: thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
+  thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
+
+  // Checked Conversions
+
+  // CHECK: unconditional_checked_cast undef : $C to $C
+  unconditional_checked_cast undef : $C to $C
+  // CHECK: unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
+  unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
+
+  // Runtime Failures
+
+  // CHECK: cond_fail undef : $Builtin.Int1
+  cond_fail undef : $Builtin.Int1
+
+  return undef : $()
+}
+
+// Terminators
+
+sil @return_test : $() -> () {
+bb0:
+  // CHECK: return undef : $()
+  return undef : $()
+}
+
+sil @throw_test : $() -> @error () {
+bb0:
+  // CHECK: throw undef : $()
+  throw undef : $()
+}
+
+sil @br_test : $() -> () {
+bb0:
+  // CHECK: br bb1(undef : $())
+  br bb1(undef : $())
+bb1(%x : $()):
+  return undef : $()
+}
+
+sil @cond_br_test : $() -> () {
+bb0:
+  // CHECK: cond_br undef, bb1(undef : $()), bb2
+  cond_br undef, bb1(undef : $()), bb2
+bb1(%1 : $()):
+  br bb2
+bb2:
+  return undef : $()
+}
+
+sil @switch_value_test : $() -> () {
+bb0:
+  // CHECK: switch_value undef : $Builtin.Int1, case undef: bb1
+  switch_value undef : $Builtin.Int1, case undef: bb1
+bb1:
+  // CHECK: switch_value undef : $() -> (), case undef: bb2
+  switch_value undef : $() -> (), case undef: bb2
+bb2:
+  return undef : $()
+}
+
+sil @select_value_test : $() -> () {
+bb0:
+  // CHECK: select_value undef : $Builtin.Int1, case undef: undef, default undef : $Builtin.Int1
+  select_value undef : $Builtin.Int1, case undef: undef, default undef : $Builtin.Int1
+  return undef : $()
+}
+
+sil @switch_enum_test : $() -> () {
+bb0:
+  // CHECK: switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb1
+  switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb1
+bb1:
+  return undef : $()
+}
+
+sil @switch_enum_addr_test : $() -> () {
+bb0:
+  // CHECK: switch_enum_addr undef : $*E, case #E.Case!enumelt: bb1, default bb1
+  switch_enum_addr undef : $*E, case #E.Case!enumelt: bb1, default bb1
+bb1:
+  return undef : $()
+}
+
+sil @dynamic_method_br_test : $() -> () {
+bb0:
+  // CHECK: dynamic_method_br undef : $P, #C.fn!1.foreign, bb1, bb2
+  dynamic_method_br undef : $P, #C.fn!1.foreign, bb1, bb2
+bb1(%x : $@convention(objc_method) (P) -> ()):
+  br bb2
+bb2:
+  return undef: $()
+}
+
+sil @checked_cast_br_test : $() -> () {
+bb0:
+  // CHECK: checked_cast_br undef : $C to $C, bb1, bb2
+  checked_cast_br undef : $C to $C, bb1, bb2
+bb1(%x : $C):
+  br bb2
+bb2:
+  return undef : $()
+}
+
+sil @checked_cast_br_addr_test : $() -> () {
+bb0:
+  // CHECK: checked_cast_addr_br take_always C in undef : $*C to C in undef : $*C, bb1, bb2
+  checked_cast_addr_br take_always C in undef : $*C to C in undef : $*C, bb1, bb2
+bb1:
+  br bb2
+bb2:
+  return undef : $()
+}
+
+
+sil @try_apply_test : $() -> () {
+bb0:
+  // CHECK: try_apply undef(undef) : $@convention(thin) (()) -> @error Error, normal bb1, error bb2
+  try_apply undef(undef) : $@convention(thin) (()) -> @error Error, normal bb1, error bb2
+bb1(%1 : $()):
+  br bb3
+bb2(%2 : $Error):
+  br bb3
+bb3:
+  return undef : $()
+}

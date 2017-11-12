@@ -1,0 +1,109 @@
+
+//===--- Index.swift.gyb - tests for Index types and operations -----------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+
+var Index = TestSuite("Index")
+
+% from gyb_stdlib_support import collectionForTraversal
+
+% # RandomAccess does not add any new behaviors to Bidirectional
+% # so we are left with just 2 traversals for the following tests
+% for Traversal in ['Forward', 'Bidirectional']:
+%   TraversalCollection = collectionForTraversal(Traversal)
+
+Index.test("${TraversalCollection}/distance(to:)/dispatch") {
+  let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
+  _ = c.distance(from: 0, to: 10)
+  expectCustomizable(c, c.log.distance)
+}
+
+Index.test("${TraversalCollection}/index(_:offsetBy:)/dispatch") {
+  let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
+  _ = c.index(c.startIndex, offsetBy: 10)
+  expectCustomizable(c, c.log.advance)
+}
+
+Index.test("${TraversalCollection}/index(_:offsetBy:limitedBy:)/dispatch") {
+  let c = ${TraversalCollection}Log.dispatchTester(Array(0..<10))
+  _ = c.index(c.startIndex, offsetBy: 10, limitedBy: 5)
+  expectCustomizable(c, c.log.advanceLimit)
+}
+
+% end
+
+// Check that a random access collection doesn't call into O(n) predecessor
+// calls when it has a more efficient implementation.
+
+% for IsStrideable in [False, True]:
+%   Collection = 'DefaultedRandomAccessCollection'
+%   Collection += 'WithStrideableIndex' if IsStrideable else ''
+
+Index.test(
+  "${Collection}/index(_:offsetBy:)/"
+  + "avoidsSuccessorAndPredecessor/dispatch"
+) {
+  let max = 10
+  for test in indexOffsetByTests.filter(
+    { $0.limit == nil && $0.distance >= 0 && ($0.expectedOffset ?? max) < max }
+  ) {
+    let c = ${Collection}(Array(0..<max))
+
+    let i = c.nthIndex(test.startOffset)
+    let result  = c.index(i, offsetBy: test.distance)
+
+%   if IsStrideable:
+    expectTrue(i.timesAdvancedCalled.value <= 1)
+    if i.timesAdvancedCalled.value == 0 {
+      expectEqual(1, i.timesDistanceCalled.value)
+    }
+%   else:
+    expectEqual(0, c.timesSuccessorCalled.value)
+    expectEqual(0, c.timesPredecessorCalled.value)
+%   end
+  }
+}
+
+Index.test(
+  "${Collection}/index(_:offsetBy:limitedBy:)/"
+  + "avoidsSuccessorAndPredecessor/dispatch"
+) {
+  for test in indexOffsetByTests.filter(
+    {$0.limit != nil}
+  ) {
+    let c = ${Collection}(Array(0..<10))
+
+    let i = c.nthIndex(test.startOffset)
+    let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+    _ = c.index(i, offsetBy: test.distance, limitedBy: limit)
+
+%   if IsStrideable:
+    expectTrue(i.timesAdvancedCalled.value <= 1)
+    if i.timesAdvancedCalled.value == 0 {
+      expectEqual(1, i.timesDistanceCalled.value)
+    }
+%   else:
+    expectEqual(0, c.timesSuccessorCalled.value)
+    expectEqual(0, c.timesPredecessorCalled.value)
+%   end
+  }
+}
+
+% end
+
+runAllTests()

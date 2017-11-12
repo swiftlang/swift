@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -14,63 +14,81 @@
 //  a little bit with Cocoa.  Because we want to keep the core
 //  decoupled from the Foundation module, we can't use NSArray
 //  directly.  We _can_, however, use an @objc protocol with a
-//  compatible API.  That's _NSArrayCoreType.
+//  compatible API.  That's _NSArrayCore.
 //
 //===----------------------------------------------------------------------===//
 
 #if _runtime(_ObjC)
 import SwiftShims
 
-/// A wrapper around any `_NSArrayCoreType` that gives it
-/// `CollectionType` conformance.  Why not make
-/// `_NSArrayCoreType` conform directly?  It's a class, and I
+/// A wrapper around any `_NSArrayCore` that gives it
+/// `Collection` conformance.  Why not make
+/// `_NSArrayCore` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
-internal struct _CocoaArrayWrapper : CollectionType {
-  var startIndex: Int {
+@_versioned
+@_fixed_layout
+internal struct _CocoaArrayWrapper : RandomAccessCollection {
+  typealias Indices = CountableRange<Int>
+  @_inlineable
+  @_versioned
+  internal var startIndex: Int {
     return 0
   }
 
-  var endIndex: Int {
+  @_inlineable
+  @_versioned
+  internal var endIndex: Int {
     return buffer.count
   }
 
-  subscript(i: Int) -> AnyObject {
-    return buffer.objectAtIndex(i)
+  @_inlineable
+  @_versioned
+  internal subscript(i: Int) -> AnyObject {
+    return buffer.objectAt(i)
   }
 
-  /// Returns a pointer to the first element in the given subRange if
-  /// the subRange is stored contiguously. Otherwise, return nil.
+  /// Returns a pointer to the first element in the given non-empty `subRange`
+  /// if the subRange is stored contiguously. Otherwise, return `nil`.
+  ///
+  /// The "non-empty" condition saves a branch within this method that can
+  /// likely be better handled in a caller.
   ///
   /// - Note: This method should only be used as an optimization; it
-  ///   is sometimes conservative and may return nil even when
+  ///   is sometimes conservative and may return `nil` even when
   ///   contiguous storage exists, e.g., if array doesn't have a smart
-  /// implementation of countByEnumeratingWithState.
-  func contiguousStorage(
-    subRange: Range<Int>
-  ) -> UnsafeMutablePointer<AnyObject>
+  /// implementation of countByEnumerating.
+  @_inlineable
+  @_versioned
+  internal func contiguousStorage(
+    _ subRange: Range<Int>
+  ) -> UnsafeMutablePointer<AnyObject>?
   {
+    _sanityCheck(!subRange.isEmpty)
     var enumerationState = _makeSwiftNSFastEnumerationState()
 
     // This function currently returns nil unless the first
-    // subRange.endIndex items are stored contiguously.  This is an
+    // subRange.upperBound items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
-    let contiguousCount = withUnsafeMutablePointer(&enumerationState) {
-      self.buffer.countByEnumeratingWithState($0, objects: nil, count: 0)
+    let contiguousCount = withUnsafeMutablePointer(to: &enumerationState) {
+      self.buffer.countByEnumerating(with: $0, objects: nil, count: 0)
     }
     
-    return contiguousCount >= subRange.endIndex
-    ? unsafeBitCast(
-      enumerationState.itemsPtr, UnsafeMutablePointer<AnyObject>.self
-      ) + subRange.startIndex
-    : nil
+    return contiguousCount >= subRange.upperBound
+      ? UnsafeMutableRawPointer(enumerationState.itemsPtr!)
+          .assumingMemoryBound(to: AnyObject.self)
+        + subRange.lowerBound
+      : nil
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
   @_transparent
-  init(_ buffer: _NSArrayCoreType) {
+  internal init(_ buffer: _NSArrayCore) {
     self.buffer = buffer
   }
 
-  var buffer: _NSArrayCoreType
+  @_versioned
+  internal var buffer: _NSArrayCore
 }
 #endif

@@ -1,0 +1,271 @@
+//===--- LazyCollection.swift.gyb -----------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+
+/// A collection on which normally-eager operations such as `map` and
+/// `filter` are implemented lazily.
+///
+/// Please see `LazySequenceProtocol` for background; `LazyCollectionProtocol`
+/// is an analogous component, but for collections.
+///
+/// To add new lazy collection operations, extend this protocol with
+/// methods that return lazy wrappers that are themselves
+/// `LazyCollectionProtocol`s.
+public protocol LazyCollectionProtocol
+  : Collection, LazySequenceProtocol {
+  /// A `Collection` that can contain the same elements as this one,
+  /// possibly with a simpler type.
+  ///
+  /// - See also: `elements`
+  associatedtype Elements : Collection = Self
+}
+
+/// When there's no special associated `Elements` type, the `elements`
+/// property is provided.
+extension LazyCollectionProtocol where Elements == Self {
+  /// Identical to `self`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var elements: Self { return self }
+}
+
+% for Traversal in TRAVERSALS:
+%   TraversalCollection = collectionForTraversal(Traversal)
+%   Self = 'Lazy' + TraversalCollection
+%   Slice = TraversalCollection.replace('Collection', 'Slice')
+
+/// A collection containing the same elements as a `Base` collection,
+/// but on which some operations such as `map` and `filter` are
+/// implemented lazily.
+///
+/// - See also: `LazySequenceProtocol`, `LazyCollection`
+@_fixed_layout
+public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
+
+  /// The type of the underlying collection.
+  public typealias Elements = Base
+
+  /// The underlying collection.
+  @_inlineable
+  public var elements: Elements { return _base }
+
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
+  public typealias Index = Base.Index
+
+  /// Creates an instance with `base` as its underlying Collection
+  /// instance.
+  @_inlineable
+  @_versioned
+  internal init(_base: Base) {
+    self._base = _base
+  }
+
+  @_versioned
+  internal var _base: Base
+}
+
+/// Forward implementations to the base collection, to pick up any
+/// optimizations it might implement.
+extension ${Self} : Sequence {
+  
+  public typealias Iterator = Base.Iterator
+
+  /// Returns an iterator over the elements of this sequence.
+  ///
+  /// - Complexity: O(1).
+  @_inlineable
+  public func makeIterator() -> Iterator {
+    return _base.makeIterator()
+  }
+
+  /// Returns a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(*n*)
+  @_inlineable
+  public var underestimatedCount: Int { return _base.underestimatedCount }
+
+  @_inlineable
+  public func _copyToContiguousArray()
+     -> ContiguousArray<Base.Iterator.Element> {
+    return _base._copyToContiguousArray()
+  }
+
+  @_inlineable
+  public func _copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    return _base._copyContents(initializing: buf)
+  }
+
+  @_inlineable
+  public func _customContainsEquatableElement(
+    _ element: Base.Iterator.Element
+  ) -> Bool? {
+    return _base._customContainsEquatableElement(element)
+  }
+}
+
+extension ${Self} : ${TraversalCollection} {
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// In an empty collection, `startIndex == endIndex`.
+  @_inlineable
+  public var startIndex: Base.Index {
+    return _base.startIndex
+  }
+
+  /// The collection's "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
+  ///
+  /// `endIndex` is always reachable from `startIndex` by zero or more
+  /// applications of `index(after:)`.
+  @_inlineable
+  public var endIndex: Base.Index {
+    return _base.endIndex
+  }
+
+  @_inlineable
+  public var indices: Base.Indices {
+    return _base.indices
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @_inlineable
+  public func index(after i: Base.Index) -> Base.Index {
+    return _base.index(after: i)
+  }
+
+  /// Accesses the element at `position`.
+  ///
+  /// - Precondition: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
+  @_inlineable
+  public subscript(position: Base.Index) -> Base.Element {
+    return _base[position]
+  }
+
+  /// Returns a collection representing a contiguous sub-range of
+  /// `self`'s elements.
+  ///
+  /// - Complexity: O(1)
+  @_inlineable
+  public subscript(bounds: Range<Index>) -> ${Slice}<${Self}<Base>> {
+    return ${Slice}(base: self, bounds: bounds)
+  }
+
+  /// A Boolean value indicating whether the collection is empty.
+  @_inlineable
+  public var isEmpty: Bool {
+    return _base.isEmpty
+  }
+
+  /// Returns the number of elements.
+  ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
+  /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
+  ///   O(*n*) otherwise.
+  @_inlineable
+  public var count: Base.IndexDistance {
+    return _base.count
+  }
+
+  // The following requirement enables dispatching for index(of:) when
+  // the element type is Equatable.
+
+  /// Returns `Optional(Optional(index))` if an element was found;
+  /// `nil` otherwise.
+  ///
+  /// - Complexity: O(*n*)
+  @_inlineable
+  public func _customIndexOfEquatableElement(
+    _ element: Base.Iterator.Element
+  ) -> Index?? {
+    return _base._customIndexOfEquatableElement(element)
+  }
+
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  @_inlineable
+  public var first: Base.Element? {
+    return _base.first
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @_inlineable
+  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+    return _base.index(i, offsetBy: n)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @_inlineable
+  public func index(
+    _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return _base.index(i, offsetBy: n, limitedBy: limit)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  @_inlineable
+  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+    return _base.distance(from:start, to: end)
+  }
+
+%   if Traversal != 'Forward':
+
+  @_inlineable
+  public func index(before i: Base.Index) -> Base.Index {
+    return _base.index(before: i)
+  }
+
+  @_inlineable
+  public var last: Base.Element? {
+    return _base.last
+  }
+%   end
+}
+
+/// Augment `self` with lazy methods such as `map`, `filter`, etc.
+extension ${TraversalCollection} {
+  /// A view onto this collection that provides lazy implementations of
+  /// normally eager operations, such as `map` and `filter`.
+  ///
+  /// Use the `lazy` property when chaining operations to prevent
+  /// intermediate operations from allocating storage, or when you only
+  /// need a part of the final collection to avoid unnecessary computation.
+  @_inlineable
+  public var lazy: ${Self}<Self> {
+    return ${Self}(_base: self)
+  }
+}
+
+// Without this specific overload the non-re-wrapping extension on
+// LazyCollectionProtocol (below) is not selected for some reason.
+extension ${TraversalCollection} where Self : LazyCollectionProtocol {
+  /// Identical to `self`.
+  @_inlineable
+  public var lazy: Self { // Don't re-wrap already-lazy collections
+    return self
+  }
+}
+
+% end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
 
 // CHECK: final class Rect
 // CHECK: @sil_stored final var orgx: Double

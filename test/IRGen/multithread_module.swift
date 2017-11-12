@@ -1,12 +1,12 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
-// RUN: FileCheck --check-prefix=CHECK-MAINLL %s <%t/main.ll
-// RUN: FileCheck --check-prefix=CHECK-MODULELL %s <%t/mt_module.ll
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
+// RUN: %FileCheck --check-prefix=CHECK-MAINLL %s <%t/main.ll
+// RUN: %FileCheck --check-prefix=CHECK-MODULELL %s <%t/mt_module.ll
 
-// RUN: %target-swift-frontend -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test
 // RUN: %target-build-swift %t/main.o %t/mt_module.o -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 
@@ -19,12 +19,12 @@
 // CHECK: 42
 // CHECK: 237
 
-public func testit(x: Int) -> Int {
+public func testit(_ x: Int) -> Int {
 	return incrementit(x)
 }
 
 public class Base {
-	func memberfunc(x: Int) -> Int {
+	func memberfunc(_ x: Int) -> Int {
 		return x + 1
 	}
 }
@@ -32,25 +32,28 @@ public class Base {
 public var g2 = 123
 
 @inline(never)
-func callmember(b: Base) -> Int {
+func callmember(_ b: Base) -> Int {
 	return b.memberfunc(g2)
 }
 
 @inline(never)
-private func privateInc(x: Int) -> Int {
+private func privateInc(_ x: Int) -> Int {
 	return x + 3
 }
 
-func callPrivInc(x: Int) -> Int {
+func callPrivInc(_ x: Int) -> Int {
 	return privateInc(x)
 }
+
+// Check if we use the correct linkage for a transparent function
+public var transparentfuncptr = transparentfunc
 
 protocol MyProto {
 	func protofunc() -> Int
 }
 
 @inline(never)
-func callproto(p: MyProto) {
+func callproto(_ p: MyProto) {
 	print(p.protofunc())
 }
 

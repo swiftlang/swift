@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,7 +14,6 @@
 #include "swift/LLVMPasses/Passes.h"
 #include "ARCEntryPointBuilder.h"
 #include "LLVMARCOpts.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Verifier.h"
@@ -100,7 +99,14 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Create the retainN call right by the first retain.
       B.setInsertPoint(RetainList[0]);
       O = RetainList[0]->getArgOperand(0);
-      B.createRetainN(RC->getSwiftRCIdentityRoot(O), RetainList.size());
+      auto *RI = RetainList[0];
+      for (auto R : RetainList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
+      B.createRetainN(RC->getSwiftRCIdentityRoot(O), RetainList.size(), RI);
 
       // Replace all uses of the retain instructions with our new retainN and
       // then delete them.
@@ -119,7 +125,14 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = ReleaseList[ReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
-      B.createReleaseN(RC->getSwiftRCIdentityRoot(O), ReleaseList.size());
+      auto *RI = OldCI;
+      for (auto R : ReleaseList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
+      B.createReleaseN(RC->getSwiftRCIdentityRoot(O), ReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : ReleaseList) {
@@ -136,8 +149,15 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Create the retainN call right by the first retain.
       B.setInsertPoint(UnknownRetainList[0]);
       O = UnknownRetainList[0]->getArgOperand(0);
+      auto *RI = UnknownRetainList[0];
+      for (auto R : UnknownRetainList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       B.createUnknownRetainN(RC->getSwiftRCIdentityRoot(O),
-                             UnknownRetainList.size());
+                             UnknownRetainList.size(), RI);
 
       // Replace all uses of the retain instructions with our new retainN and
       // then delete them.
@@ -156,8 +176,15 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = UnknownReleaseList[UnknownReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
+      auto *RI = OldCI;
+      for (auto R : UnknownReleaseList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       B.createUnknownReleaseN(RC->getSwiftRCIdentityRoot(O),
-                              UnknownReleaseList.size());
+                              UnknownReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : UnknownReleaseList) {
@@ -175,9 +202,16 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = BridgeRetainList[0];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
+      auto *RI = OldCI;
+      for (auto R : BridgeRetainList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       // Bridge retain may modify the input reference before forwarding it.
       auto *I = B.createBridgeRetainN(RC->getSwiftRCIdentityRoot(O),
-                                      BridgeRetainList.size());
+                                      BridgeRetainList.size(), RI);
 
       // Remove all old retain instructions.
       for (auto *Inst : BridgeRetainList) {
@@ -196,8 +230,15 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       auto *OldCI = BridgeReleaseList[BridgeReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
+      auto *RI = OldCI;
+      for (auto R : BridgeReleaseList) {
+        if (B.isAtomic(R)) {
+          RI = R;
+          break;
+        }
+      }
       B.createBridgeReleaseN(RC->getSwiftRCIdentityRoot(O),
-                              BridgeReleaseList.size());
+                              BridgeReleaseList.size(), RI);
 
       // Remove all old release instructions.
       for (auto *Inst : BridgeReleaseList) {
@@ -231,9 +272,10 @@ bool SwiftARCContractImpl::run() {
       case RT_UnknownReleaseN:
       case RT_BridgeReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
-      // Delete all fix lifetime instructions. After llvm-ir they have no use
-      // and show up as calls in the final binary.
+      // Delete all fix lifetime and end borrow instructions. After llvm-ir they
+      // have no use and show up as calls in the final binary.
       case RT_FixLifetime:
+      case RT_EndBorrow:
         Inst.eraseFromParent();
         ++NumNoopDeleted;
         continue;

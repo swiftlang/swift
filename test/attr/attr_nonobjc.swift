@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 // REQUIRES: objc_interop
 
 import Foundation
@@ -8,17 +8,17 @@ import Foundation
     caloriesBurned = 5
   }
 
-  func defeatEnemy(b: Bool) -> Bool { // expected-note {{'defeatEnemy' previously declared here}}
+  func defeatEnemy(_ b: Bool) -> Bool { // expected-note {{'defeatEnemy' previously declared here}}
     return !b
   }
 
   // Make sure we can overload a method with @nonobjc methods
-  @nonobjc func defeatEnemy(i: Int) -> Bool {
+  @nonobjc func defeatEnemy(_ i: Int) -> Bool {
     return (i > 0)
   }
 
   // This is not allowed, though
-  func defeatEnemy(s: String) -> Bool { // expected-error {{method 'defeatEnemy' with Objective-C selector 'defeatEnemy:' conflicts with previous declaration with the same Objective-C selector}}
+  func defeatEnemy(_ s: String) -> Bool { // expected-error {{method 'defeatEnemy' with Objective-C selector 'defeatEnemy:' conflicts with previous declaration with the same Objective-C selector}}
     return s != ""
   }
 
@@ -30,7 +30,7 @@ import Foundation
 }
 
 class BlueLightSaber : LightSaber {
-  @nonobjc override func defeatEnemy(b: Bool) -> Bool { }
+  @nonobjc override func defeatEnemy(_ b: Bool) -> Bool { }
 }
 
 @objc class InchoateToad {
@@ -68,7 +68,7 @@ class ObjCAndNonObjCNotAllowed {
 }
 
 class DynamicAndNonObjCNotAllowed {
-  @nonobjc dynamic func redundantAttributes() { } // expected-error {{declaration is marked dynamic, and cannot be marked @nonobjc}}
+  @nonobjc dynamic func redundantAttributes() { } // expected-error {{a declaration cannot be both '@nonobjc' and 'dynamic'}}
 }
 
 class IBOutletAndNonObjCNotAllowed {
@@ -79,10 +79,10 @@ class NSManagedAndNonObjCNotAllowed {
   @nonobjc @NSManaged var rosie : NSObject // expected-error {{declaration is marked @NSManaged, and cannot be marked @nonobjc}}
 }
 
-@nonobjc func nonObjCTopLevelFuncNotAllowed() { } // expected-error {{only methods, initializers, properties and subscript declarations can be declared @nonobjc}} {{1-10=}}
+@nonobjc func nonObjCTopLevelFuncNotAllowed() { } // expected-error {{only class members and extensions of classes can be declared @nonobjc}} {{1-10=}}
 
 @objc class NonObjCPropertyObjCProtocolNotAllowed : ObjCProtocol { // expected-error {{does not conform to protocol}}
-  @nonobjc func protocolMethod() { } // expected-note {{candidate is not '@objc', but protocol requires it}} {{3-3=@objc }}
+  @nonobjc func protocolMethod() { } // expected-note {{candidate is explicitly '@nonobjc'}}
 
   func nonObjCProtocolMethodNotAllowed() { }
 
@@ -101,4 +101,13 @@ class NSManagedAndNonObjCNotAllowed {
       return Float(100)
     }
   }
+}
+
+struct SomeStruct { }
+@nonobjc extension SomeStruct { } // expected-error{{only extensions of classes can be declared @nonobjc}}
+
+protocol SR4226_Protocol : class {}
+
+extension SR4226_Protocol {
+  @nonobjc func function() {} // expected-error {{only class members and extensions of classes can be declared @nonobjc}}
 }

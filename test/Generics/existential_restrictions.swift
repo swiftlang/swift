@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P { }
 @objc protocol OP { }
@@ -8,15 +8,15 @@ protocol CP : class { }
   static func createNewOne() -> SP
 }
 
-func fP<T : P>(t: T) { }
-func fOP<T : OP>(t: T) { }
-func fOPE(t: OP) { }
-func fSP<T : SP>(t: T) { }
-func fAO<T : AnyObject>(t: T) { }
-func fAOE(t: AnyObject) { }
-func fT<T>(t: T) { }
+func fP<T : P>(_ t: T) { }
+func fOP<T : OP>(_ t: T) { }
+func fOPE(_ t: OP) { }
+func fSP<T : SP>(_ t: T) { }
+func fAO<T : AnyObject>(_ t: T) { }
+func fAOE(_ t: AnyObject) { }
+func fT<T>(_ t: T) { }
 
-func testPassExistential(p: P, op: OP, opp: protocol<OP, P>, cp: CP, sp: SP, any: Any, ao: AnyObject) {
+func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, ao: AnyObject) {
   fP(p) // expected-error{{cannot invoke 'fP' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAO(p) // expected-error{{cannot invoke 'fAO' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAOE(p) // expected-error{{argument type 'P' does not conform to expected type 'AnyObject'}}
@@ -31,9 +31,9 @@ func testPassExistential(p: P, op: OP, opp: protocol<OP, P>, cp: CP, sp: SP, any
   fAOE(cp)
   fT(cp)
 
-  fP(opp) // expected-error{{cannot invoke 'fP' with an argument list of type '(protocol<OP, P>)'}} // expected-note{{expected an argument list of type '(T)'}}
-  fOP(opp) // expected-error{{cannot invoke 'fOP' with an argument list of type '(protocol<OP, P>)'}} // expected-note{{expected an argument list of type '(T)'}}
-  fAO(opp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(protocol<OP, P>)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fP(opp) // expected-error{{cannot invoke 'fP' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fOP(opp) // expected-error{{cannot invoke 'fOP' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fAO(opp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAOE(opp)
   fT(opp)
 
@@ -55,15 +55,15 @@ class GCP<T : CP> {}
 class GSP<T : SP> {}
 class GAO<T : AnyObject> {}
 
-func blackHole(t: Any) {}
+func blackHole(_ t: Any) {}
 
 func testBindExistential() {
   blackHole(GP<P>()) // expected-error{{using 'P' as a concrete type conforming to protocol 'P' is not supported}}
   blackHole(GOP<OP>())
   blackHole(GCP<CP>()) // expected-error{{using 'CP' as a concrete type conforming to protocol 'CP' is not supported}}
-  blackHole(GAO<P>()) // expected-error{{type 'P' does not conform to protocol 'AnyObject'}}
+  blackHole(GAO<P>()) // expected-error{{'P' is not convertible to 'AnyObject'}}
   blackHole(GAO<OP>())
-  blackHole(GAO<CP>()) // expected-error{{using 'CP' as a concrete type conforming to protocol 'AnyObject' is not supported}}
+  blackHole(GAO<CP>()) // expected-error{{'CP' is not convertible to 'AnyObject'}}
   blackHole(GSP<SP>()) // expected-error{{'SP' cannot be used as a type conforming to protocol 'SP' because 'SP' has static requirements}}
   blackHole(GAO<AnyObject>())
 }
@@ -72,8 +72,8 @@ func testBindExistential() {
 protocol Mine {}
 class M1: Mine {}
 class M2: Mine {}
-extension CollectionType where Generator.Element : Mine {
-    final func takeAll() {}
+extension Collection where Iterator.Element : Mine {
+    func takeAll() {}
 }
 
 func foo() {

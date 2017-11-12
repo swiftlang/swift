@@ -20,7 +20,7 @@ might be expressed as::
       T value;
       Node *next;
     };
-  
+
     Node *first;
   };
 
@@ -35,7 +35,7 @@ such as a simple, linear search algorithm::
     for (typename List<T>::Node *result = list.first; result; result = result->next)
       if (result->value == value)
         return result;
-    
+
     return 0;
   }
 
@@ -51,7 +51,7 @@ The alternatives to generics tend to lead to poor solutions:
 
 * Object-oriented languages tend to use "top" types (id in Objective-C,
   java.lang.Object in pre-generics Java, etc.) for their containers and
-  algorithms, which gives up static type safety. Pre- generics Java forced the
+  algorithms, which gives up static type safety. Pre-generics Java forced the
   user to introduce run-time-checked type casts when interacting with containers
   (which is overly verbose), while Objective-C relies on id's unsound implicit
   conversion behavior to eliminate the need for casts.
@@ -89,7 +89,7 @@ Polymorphism
 ------------
 
 Polymorphism allows one to use different data types with a uniform
-interface. Overloading already allows a form of polymorphism ( ad hoc
+interface. Overloading already allows a form of polymorphism (ad hoc
 polymorphism) in Swift. For example, given::
 
   func +(x : Int, y : Int) -> Int { add... }
@@ -156,7 +156,7 @@ Multiple inheritance is permitted, allowing us to form a directed acyclic graph
 of protocols::
 
   protocol PersistentDocument : VersionedDocument, Serializable {
-    func saveToFile(filename : path)
+    func saveToFile(_ filename : path)
   }
 
 .. @example.prepend('struct path {} ; protocol Serializable {}')
@@ -173,7 +173,7 @@ operations. For example, let's try to write a Comparable protocol that could be
 used to search for a generic find() operation::
 
   protocol Comparable {
-    func isEqual(other : ???) -> bool
+    func isEqual(_ other : ???) -> Bool
   }
 
 Our options for filling in ??? are currently very poor. We could use the syntax
@@ -204,11 +204,11 @@ interface, e.g. (in Java)::
 
 .. @ignore()
 .. This test just doesn't compile at the moment, but that represents a
-   bug in swift
+   bug in Swift
 
 and then a class X that wants to be Comparable will inherit from
 Comparable<X>. This is ugly and has a number of pitfalls; see
-http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6479372 .
+http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6479372.
 
 Scala and Strongtalk have the notion of the 'Self' type, which effectively
 allows one to refer to the eventual type of 'self' (which we call
@@ -216,7 +216,7 @@ allows one to refer to the eventual type of 'self' (which we call
 Comparable protocol in a natural way::
 
   protocol Comparable {
-    func isEqual(other : Self) -> bool
+    func isEqual(_ other : Self) -> Bool
   }
 
 By expressing Comparable in this way, we know that if we have two objects of
@@ -242,8 +242,8 @@ us to cleanly describe a protocol for collections::
 
   protocol Collection {
     typealias Element
-    func forEach(callback : (value : Element) -> void)
-    func add(value : Element)
+    func forEach(_ callback : (value : Element) -> Void)
+    func add(_ value : Element)
   }
 
 It is important here that a generic function that refers to a given type T,
@@ -259,11 +259,11 @@ As previously noted, protocols can contain both function requirements (which are
 in effect requirements for instance methods) and associated type
 requirements. Protocols can also contain operators, properties, and subscript
 operators::
-  
+
   protocol RandomAccessContainer : Collection {
-    var length : Int
-    func ==(lhs : Self, rhs : Self)
-    subscript (i : Int) -> Element
+    var count: Int
+    func == (lhs: Self, rhs: Self)
+    subscript(i: Int) -> Element
   }
 
 Operator requirements can be satisfied by operator definitions, property
@@ -284,16 +284,16 @@ example, given::
   }
 
 One could write a Circle struct such as::
-  
+
   struct Circle {
     var center : Point
     var radius : Int
-    
+
     func draw() {
       // draw it
     }
   }
-  
+
 Circle provides a draw() method with the same input and result types as required
 by the Shape protocol. Therefore, Circle conforms to Shape.
 
@@ -304,7 +304,7 @@ also know how to "draw!"::
 
   struct Cowboy {
     var gun : SixShooter
-  
+
     func draw() {
       // draw!
     }
@@ -313,7 +313,7 @@ also know how to "draw!"::
 It is unlikely that Cowboy is meant to conform to Shape, but the method name and
 signatures match, so implicit conformance deduces that Cowboy conforms to
 Shape. Random collisions between types are fairly rare. However, when one is
-using protocol inheritance with fine- grained (semantic or mostly-semantic)
+using protocol inheritance with fine-grained (semantic or mostly-semantic)
 differences between protocols in the hierarchy, they become more common. See
 http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1798.html for examples
 of this problem as it surfaced with C++ concepts. It is not clear at this time
@@ -330,8 +330,8 @@ type::
 
   struct EmployeeList : Collection { // EmployeeList is a collection
     typealias Element = T
-    func forEach(callback : (value : Element) -> void) { /* Implement this */ }
-    func add(value : Element) { /* Implement this */ }
+    func forEach(_ callback : (value : Element) -> Void) { /* Implement this */ }
+    func add(_ value : Element) { /* Implement this */ }
   }
 
 This explicit protocol conformance declaration forces the compiler to check that
@@ -367,8 +367,8 @@ extensions, e.g.,::
 
   extension String : Collection {
     typealias Element = char
-    func forEach(callback : (value : Element) -> void) { /* use existing String routines to enumerate characters */ }
-    func add(value : Element) { self += value /* append character */ }
+    func forEach(_ callback : (value : Element) -> Void) { /* use existing String routines to enumerate characters */ }
+    func add(_ value : Element) { self += value /* append character */ }
   }
 
 Once an extension is defined, the extension now conforms to the Collection
@@ -382,7 +382,7 @@ meet if it wants to conform to the protocol. There is a natural tension here,
 then, between larger protocols that make it easier to write generic algorithms,
 and smaller protocols that make it easier to write conforming types. For
 example, should a Numeric protocol implement all operations, e.g.,::
-  
+
   protocol Numeric {
     func +(lhs : Self, rhs : Self) -> Self
     func -(lhs : Self, rhs : Self) -> Self
@@ -404,7 +404,7 @@ algorithms)? Both of the protocols express the same thing (semantically),
 because one can use the core operations (binary +, unary -) to implement the
 other algorithms. However, it's far easier to allow the protocol itself to
 provide default implementations::
-  
+
   protocol Numeric {
     func +(lhs : Self, rhs : Self) -> Self
     func -(lhs : Self, rhs : Self) -> Self { return lhs + -rhs }
@@ -452,7 +452,7 @@ to implement. We can now see how Self types interact with subtype
 polymorphism. For example, say we have two values of type Comparable, and we try
 to compare them::
 
-  var x : Comparable = ... 
+  var x : Comparable = ...
   var y : Comparable = ...
   if x.isEqual(y) { // well-typed?
   }
@@ -465,7 +465,7 @@ mode (aborting, throwing an exception, etc.) if the dynamic type check fails.
 
 To express types that meet the requirements of several protocols, one can just
 create a new protocol aggregating those protocols::
-  
+
   protocol SerializableDocument : Document, Serializable { }
   var doc : SerializableDocument
   print(doc.title()) // okay: title() is part of the Document protocol, so we can call it
@@ -473,20 +473,17 @@ create a new protocol aggregating those protocols::
 
 However, this only makes sense when the resulting protocol is a useful
 abstraction. A SerializableDocument may or may not be a useful abstraction. When
-it is not useful, one can instead use protocol<> types to compose different
-protocols, e.g.,::
+it is not useful, one can instead use '&' types to compose different protocols, e.g.,::
 
-  var doc : protocol<Document, Serializable>
+  var doc : Document & Serializable
 
 Here, doc has an existential type that is known to conform to both the Document
 and Serializable protocols. This gives rise to a natural "top" type, such that
 every type in the language is a subtype of "top". Java has java.lang.Object, C#
 has object, Objective-C has "id" (although "id" is weird, because it is also
 convertible to everything; it's best not to use it as a model). In Swift, the
-"top" type is simply an empty protocol composition::
+"top" type is simply an empty protocol composition: ``Any``::
 
-  typealias Any = protocol<>
-  
   var value : Any = 17 // an any can hold an integer
   value = "hello" // or a String
   value = (42, "hello", Red) // or anything else
@@ -511,13 +508,13 @@ polymorphism.
 
 Protocols provide a natural way to express the constraints of a generic function
 in Swift. For example, one could define a generic linked list as::
-  
+
   struct ListNode<T> {
     var Value : T
     enum NextNode { case Node : ListNode<T>, End }
     var Next : NextNode
   }
-  
+
   struct List<T > {
     var First : ListNode<T>::NextNode
   }
@@ -525,7 +522,7 @@ in Swift. For example, one could define a generic linked list as::
 This list works on any type T. One could then add a generic function that
 inserts at the beginning of the list::
 
-  func insertAtBeginning<T>(list : List<T>, value : T) {
+  func insertAtBeginning<T>(_ list : List<T>, value : T) {
     list.First = ListNode<T>(value, list.First)
   }
 
@@ -539,7 +536,7 @@ conform. Within the body of the generic type or function, any of the functions
 or types described by the constraints are available. For example, let's
 implement a find() operation on lists::
 
-  func find<T : Comparable>(list : List<T>, value : T) -> Int {
+  func find<T : Comparable>(_ list : List<T>, value : T) -> Int {
     var index = 0
     var current
     for (current = list.First; current is Node; current = current.Next) {
@@ -556,14 +553,14 @@ able to constrain associated types. To do so, we introduce the notion of a
 "where" clause, which follows the signature of the generic type or
 function. For example, let's generalize our find algorithm to work on any
 ordered collection::
-  
+
   protocol OrderedCollection : Collection {
     func size() -> Int
-    func getAt(index : Int) -> Element // Element is an associated type
+    func getAt(_ index : Int) -> Element // Element is an associated type
   }
-  
+
   func find<C : OrderedCollection where C.Element : Comparable>(
-         collection : C, value : C.Element) -> Int
+         _ collection : C, value : C.Element) -> Int
   {
     for index in 0...collection.size() {
       if (collection.getAt(index) == value) { // okay: we know that C.Element is Comparable
@@ -579,7 +576,7 @@ OrderedCollection>) are just sugar for a where clause.  For example, the
 above find() signature is equivalent to::
 
   func find<C where C : OrderedCollection, C.Element : Comparable>(
-         collection : C, value : C.Element)-> Int
+         _ collection : C, value : C.Element) -> Int
 
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since
 every type conforms to the Any protocol composition.
@@ -594,7 +591,7 @@ lets us describe an iteration of values of some given value type::
     func next() -> Element
   }
 
-Now, we want to express the notion of an enumerable collection, which provides a
+Now, we want to express the notion of an enumerable collection, which provides
 iteration, which we do by adding requirements into the protocol::
 
   protocol EnumerableCollection : Collection {
@@ -626,7 +623,7 @@ Comparable::
 Naturally, one any generic operation on a SortedDictionary<K,V> would also require
 that K be Comparable, e.g.,::
 
-  func forEachKey<Key : Comparable, Value>(c : SortedDictionary<Key, Value>,
+  func forEachKey<Key : Comparable, Value>(_ c : SortedDictionary<Key, Value>,
                                            f : (Key) -> Void) { /* ... */ }
 
 However, explicitly requiring that Key conform to Comparable is redundant: one
@@ -636,7 +633,7 @@ itself could not be formed. Constraint inference infers these additional
 constraints within a generic function from the parameter and return types of the
 function, simplifying the specification of forEachKey::
 
-  func forEachKey<Key, Value>(c : SortedDictionary<Key, Value>,
+  func forEachKey<Key, Value>(_ c : SortedDictionary<Key, Value>,
                               f : (Key) -> Void) { /* ... */ }
 
 Type Parameter Deduction
@@ -651,7 +648,7 @@ generic function::
 Since Swift already has top-down type inference (as well as the C++-like
 bottom-up inference), we can also deduce type arguments from the result type::
 
-  func cast<T, U>(value : T) -> U { ... }
+  func cast<T, U>(_ value : T) -> U { ... }
   var x : Any
   var y : Int = cast(x) // deduces T = Any, U = Int
 
@@ -679,8 +676,8 @@ language (generic functions can be "virtual").
 
 The translation model is fairly simple. Consider the generic find() we
 implemented for lists, above::
-  
-  func find<T : Comparable>(list : List<T>, value : T) -> Int {
+
+  func find<T : Comparable>(_ list : List<T>, value : T) -> Int {
     var index = 0
     var current = list.First
     while current is ListNode<T> { // now I'm just making stuff up
@@ -701,6 +698,8 @@ on Int), to an operation within a protocol (which requires indirection through
 the corresponding vtable), or to an operation on a generic type definition, all
 of which can be emitted as object code.
 
+.. _generics-specialization:
+
 Specialization
 --------------
 
@@ -713,6 +712,69 @@ the virtual dispatch, inline calls when appropriate, and eliminate the overhead
 of the generic system. Such optimizations can be performed based on heuristics,
 user direction, or profile-guided optimization.
 
+An internal @_specialize function attribute allows developers to force
+full specialization by listing concrete type names corresponding to the
+function's generic signature. A function's generic signature is a
+concatenation of its generic context and the function's own generic
+type parameters.::
+
+  struct S<T> {
+    var x: T
+    @_specialize(where T == Int, U == Float)
+    mutating func exchangeSecond<U>(_ u: U, _ t: T) -> (U, T) {
+      x = t
+      return (u, x)
+    }
+  }
+
+  // Substitutes: <T, U> with <Int, Float> producing:
+  // S<Int>::exchangeSecond<Float>(u: Float, t: Int) -> (Float, Int)
+
+@_specialize currently acts as a hint to the optimizer, which
+generates type checks and code to dispatch to the specialized routine
+without affecting the signature of the generic function. The
+intention is to support efforts at evaluating the performance of
+specialized code. The performance impact is not guaranteed and is
+likely to change with the optimizer. This attribute should only be
+used in conjunction with rigorous performance analysis. Eventually,
+a similar attribute could be defined in the language, allowing it to be
+exposed as part of a function's API. That would allow direct dispatch
+to specialized code without type checks, even across modules.
+
+The exact syntax of the @_specialize function attribute is defined as: ::
+
+  @_specialize(exported: true, kind: full, where K == Int, V == Int)
+  @_specialize(exported: false, kind: partial, where K: _Trivial64)
+  func dictFunction<K, V>(dict: Dictionary<K, V>) {
+  }
+    
+If 'exported' is set, the corresponding specialization would have a public
+visibility and can be used by clients. If 'exported' is omitted, it's value
+is assumed to be 'false'.
+
+If 'kind' is 'full' it means a full specialization and the compiler will
+produce an error if you forget to specify the type for some of the generic
+parameters in the 'where' clause. If 'kind' is 'partial' it means a partial
+specialization. If 'kind' is omitted, its value is assumed to be 'full.
+
+The requirements in the where clause may be same-type constaints like 'T == Int',
+but they may also specify so-called layout constraints like 'T: _Trivial'.
+
+The following layout constraints are currently supported:
+  * AnyObject - the actual parameter should be an instance of a class
+  * _NativeClass - the actual parameter should be an instance of a Swift native
+    class
+  * _RefCountedObject - the actual parameter should be a reference-counted object
+  * _NativeRefCountedObject - the actual parameter should be a Swift-native
+    reference-counted object
+  * _Trivial - the actual parameter should be of a trivial type, i.e. a type
+    without any reference counted properties.
+  * _Trivial(SizeInBits) - like _Trivial, but the size of the type should be
+    exactly 'SizeInBits' bits.
+  * _TrivialAtMost(SizeInBits) - like _Trivial, but the size of the type should
+    be at most 'SizeInBits' bits.
+  
+
 Existential Types and Generics
 ------------------------------
 
@@ -724,7 +786,7 @@ the actual representation is larger than 3 words). By itself, this value cannot
 be interpreted, because it's type is not known statically, and may change due to
 assignment. The vtable provides the means to manipulate the value, because it
 provides a mapping between the protocols to which the existential type conforms
-(which is known statically) to the functions that implementation that
+(which is known statically) to the functions that implements that
 functionality for the type of the value. The value, therefore, can only be
 safely manipulated through the functions in this vtable.
 
@@ -738,10 +800,10 @@ Overloading
 
 Generic functions can be overloaded based entirely on constraints. For example,
 consider a binary search algorithm::
-  
+
    func binarySearch<
       C : EnumerableCollection where C.Element : Comparable
-   >(collection : C, value : C.Element) 
+   >(_ collection : C, value : C.Element)
      -> C.EnumeratorType
    {
      // We can perform log(N) comparisons, but EnumerableCollection
@@ -750,17 +812,17 @@ consider a binary search algorithm::
 
    protocol RandomAccessEnumerator : Enumerator {
      // splits a range in half, returning both halves
-     func split() -> (Enumerator, Enumerator) 
+     func split() -> (Enumerator, Enumerator)
    }
 
    func binarySearch<
-      C : EnumerableCollection 
-       where C.Element : Comparable, 
+      C : EnumerableCollection
+       where C.Element : Comparable,
                  C.EnumeratorType: RandomAccessEnumerator
-   >(collection : C, value : C.Element) 
+   >(_ collection : C, value : C.Element)
      -> C.EnumeratorType
    {
-     // We can perform log(N) comparisons and log(N) range splits, 
+     // We can perform log(N) comparisons and log(N) range splits,
      // so this is logarithmic time
    }
 
@@ -777,8 +839,8 @@ minimal requirements::
   func doSomethingWithSearch<
     C : EnumerableCollection where C.Element : Ordered
   >(
-    collection : C, value : C.Element
-  ) -> C.EnumeratorType 
+    _ collection : C, value : C.Element
+  ) -> C.EnumeratorType
   {
     binarySearch(collection, value)
   }
@@ -814,7 +876,7 @@ because code like this::
 
 will essentially parse the type as::
 
-  identifier operator Int operator
+  identifier operator identifier operator
 
 and verify that the operators are '<' and '>', respectively. Cases
 involving <> are more interesting, because the type of::
@@ -827,15 +889,15 @@ is effectively parsed as::
 
 by splitting the '>>' operator token into two '>' operator tokens.
 
-However, this is manageable, and is already implemented for protocol composition
-(protocol<>). The larger problem occurs at expression context, where the parser
-cannot disambiguate the tokens::
+However, this is manageable, and is already implemented for the (now deprecated)
+protocol composition syntax (protocol<>). The larger problem occurs at expression
+context, where the parser cannot disambiguate the tokens::
 
   Matrix<Double>(10, 10)
 
 i.e.,::
 
-  identifier operator identifier operator unspaced_lparen integer- literal comma integer-literal rparen
+  identifier operator identifier operator unspaced_lparen integer-literal comma integer-literal rparen
 
 which can be interpreted as either::
 
@@ -848,7 +910,7 @@ which can be interpreted as either::
       (integer_literal 10)))
 
 or::
-  
+
   (constructor Matrix<Double>
     (tuple
       (integer_literal 10)

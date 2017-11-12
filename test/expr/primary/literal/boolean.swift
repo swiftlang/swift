@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func boolLiterals() {
   var b: Bool = false
@@ -11,7 +11,7 @@ func defaultBoolLiterals() {
   var _: Bool = b
 }
 
-struct CustomBool : BooleanLiteralConvertible {
+struct CustomBool : ExpressibleByBooleanLiteral {
   let value: Bool
 
   init(booleanLiteral value: Bool) {

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,14 +22,20 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
                                    CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
-  // If we have a non-null, non-void, non-address-only return type, receive the
-  // return value via a BB argument.
-  NeedsReturn = resultType && !resultType->isVoid();
-  if (NeedsReturn) {
-    auto &resultTI = getTypeLowering(resultType);
-    if (!resultTI.isAddressOnly())
-      new (F.getModule()) SILArgument(epilogBB, resultTI.getLoweredType());
+  // If we have any direct results, receive them via BB arguments.
+  // But callers can disable this by passing a null result type.
+  if (resultType) {
+    auto fnConv = F.getConventions();
+    // Set NeedsReturn for indirect or direct results. This ensures that SILGen
+    // emits unreachable if there is no source level return.
+    NeedsReturn = (fnConv.funcTy->getNumResults() != 0);
+    for (auto directResult : fnConv.getDirectSILResults()) {
+      SILType resultType =
+          F.mapTypeIntoContext(fnConv.getSILType(directResult));
+      epilogBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+    }
   }
+
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 
   if (isThrowing) {
@@ -40,8 +46,25 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  new (F.getModule()) SILArgument(rethrowBB, exnType);
+  rethrowBB->createPHIArgument(exnType, ValueOwnershipKind::Owned);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
+}
+
+/// Given a list of direct results, form the direct result value.
+///
+/// Note that this intentionally loses any tuple sub-structure of the
+/// formal result type.
+static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
+                                 ArrayRef<SILValue> directResults) {
+  if (directResults.size() == 1)
+    return directResults[0];
+
+  SmallVector<TupleTypeElt, 4> eltTypes;
+  for (auto elt : directResults)
+    eltTypes.push_back(elt->getType().getSwiftRValueType());
+  auto resultType = SILType::getPrimitiveObjectType(
+    CanType(TupleType::get(eltTypes, SGF.getASTContext())));
+  return SGF.B.createTuple(loc, resultType, directResults);
 }
 
 std::pair<Optional<SILValue>, SILLocation>
@@ -50,7 +73,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   SILBasicBlock *epilogBB = ReturnDest.getBlock();
   SILLocation ImplicitReturnFromTopLevel =
     ImplicitReturnLocation::getImplicitReturnLoc(TopLevel);
-  SILValue returnValue;
+  SmallVector<SILValue, 4> directResults;
   Optional<SILLocation> returnLoc = None;
 
   // If the current BB isn't terminated, and we require a return, then we
@@ -59,8 +82,6 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     B.createUnreachable(ImplicitReturnFromTopLevel);
 
   if (epilogBB->pred_empty()) {
-    bool hadArg = !epilogBB->bbarg_empty();
-
     // If the epilog was not branched to at all, kill the BB and
     // just emit the epilog into the current BB.
     while (!epilogBB->empty())
@@ -70,9 +91,8 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If the current bb is terminated then the epilog is just unreachable.
     if (!B.hasValidInsertionPoint())
       return { None, TopLevel };
+
     // We emit the epilog at the current insertion point.
-    assert(!hadArg && "NeedsReturn is false but epilog had argument?!");
-    (void)hadArg;
     returnLoc = ImplicitReturnFromTopLevel;
 
   } else if (std::next(epilogBB->pred_begin()) == epilogBB->pred_end()
@@ -80,22 +100,17 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If the epilog has a single predecessor and there's no current insertion
     // point to fall through from, then we can weld the epilog to that
     // predecessor BB.
-    bool needsArg = false;
-    if (!epilogBB->bbarg_empty()) {
-      assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
-      needsArg = true;
-    }
 
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
-    assert(predBranch->getArgs().size() == (needsArg ? 1 : 0) &&
+    assert(predBranch->getArgs().size() == epilogBB->args_size() &&
            "epilog predecessor arguments does not match block params");
 
-    if (needsArg) {
-      returnValue = predBranch->getArgs()[0];
-      // RAUW the old BB argument (if any) with the new value.
-      SILValue(*epilogBB->bbarg_begin(),0).replaceAllUsesWith(returnValue);
+    for (auto index : indices(predBranch->getArgs())) {
+      SILValue result = predBranch->getArgs()[index];
+      directResults.push_back(result);
+      epilogBB->getArgument(index)->replaceAllUsesWith(result);
     }
 
     // If we are optimizing, we should use the return location from the single,
@@ -119,15 +134,12 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     B.setInsertionPoint(pred);
   } else {
     // Move the epilog block to the end of the ordinary section.
-    auto endOfOrdinarySection =
-      (StartOfPostmatter ? SILFunction::iterator(StartOfPostmatter) : F.end());
+    auto endOfOrdinarySection = StartOfPostmatter;
     B.moveBlockTo(epilogBB, endOfOrdinarySection);
 
-    // Emit the epilog into the epilog bb. Its argument is the return value.
-    if (!epilogBB->bbarg_empty()) {
-      assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
-      returnValue = epilogBB->bbarg_begin()[0];
-    }
+    // Emit the epilog into the epilog bb. Its arguments are the
+    // direct results.
+    directResults.append(epilogBB->args_begin(), epilogBB->args_end());
 
     // If we are falling through from the current block, the return is implicit.
     B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
@@ -147,6 +159,16 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   //
   // Otherwise make the ret instruction part of the cleanups.
   if (!returnLoc) returnLoc = cleanupLoc;
+
+  // Build the return value.  We don't do this if there are no direct
+  // results; this can happen for void functions, but also happens when
+  // prepareEpilog was asked to not add result arguments to the epilog
+  // block.
+  SILValue returnValue;
+  if (!directResults.empty()) {
+    assert(directResults.size() == F.getConventions().getNumDirectSILResults());
+    returnValue = buildReturnValue(*this, TopLevel, directResults);
+  }
 
   return { returnValue, *returnLoc };
 }
@@ -202,7 +224,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   }
 
   SILLocation throwLoc = topLevel;
-  SILValue exn = rethrowBB->bbarg_begin()[0];
+  SILValue exn = rethrowBB->args_begin()[0];
   bool reposition = true;
 
   // If the rethrow destination has a single branch predecessor,

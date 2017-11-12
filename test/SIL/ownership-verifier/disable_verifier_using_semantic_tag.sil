@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt -enable-sil-ownership -sil-ownership-verifier-enable-testing -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+// This test makes sure that the ownership verifier can be disabled on specific
+// functions via the usage of the semantic attribute
+// "verify.ownership.sil.never".
+
+sil_stage canonical
+
+import Builtin
+
+sil [_semantics "verify.ownership.sil.never"] @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-NOT: Function: 'test1'
+// CHECK-LABEL: Function: 'test2'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb0
+// CHECK-NOT: Function: 'test1'
+sil @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

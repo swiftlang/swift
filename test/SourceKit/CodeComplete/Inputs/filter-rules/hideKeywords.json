@@ -1,0 +1,9 @@
+[
+  {
+    key.kind: source.codecompletion.keyword,
+    key.hide: 1,
+    key.uids: [
+      source.lang.swift.keyword.let
+    ]
+  }
+]

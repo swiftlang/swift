@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -43,6 +43,7 @@ namespace llvm {
   // Reference counting.
   template <typename T> class IntrusiveRefCntPtr;
   template <typename T> struct IntrusiveRefCntPtrInfo;
+  template <class Derived> class ThreadSafeRefCountedBase;
 
   class raw_ostream;
   // TODO: DenseMap, ...
@@ -69,7 +70,6 @@ namespace llvm {
 }
 
 namespace swift {
-  template <class Derived> class ThreadSafeRefCountedBase;
   class ThreadSafeRefCountedBaseVPTR;
 }
 
@@ -95,7 +95,7 @@ namespace SourceKit {
   // Reference counting.
   using llvm::IntrusiveRefCntPtr;
   using llvm::IntrusiveRefCntPtrInfo;
-  using swift::ThreadSafeRefCountedBase;
+  using llvm::ThreadSafeRefCountedBase;
   using swift::ThreadSafeRefCountedBaseVPTR;
   template <typename T> class ThreadSafeRefCntPtr;
 
@@ -104,6 +104,6 @@ namespace SourceKit {
   template <typename T>
   using RefPtr = IntrusiveRefCntPtr<T>;
   
-} // end namespace SourceKit.
+} // end namespace SourceKit
 
 #endif

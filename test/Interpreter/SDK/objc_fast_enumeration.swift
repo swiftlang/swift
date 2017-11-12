@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -15,8 +15,8 @@ var a_m: NSMutableArray = ["two", 12, [11,12,13]]
 // CHECK:   2,
 // CHECK:   3
 // CHECK: )
-for x: AnyObject in a {
-  print(x.description!)
+for x in a {
+  print(x)
 }
 
 // CHECK: two
@@ -26,8 +26,8 @@ for x: AnyObject in a {
 // CHECK:   12,
 // CHECK:   13
 // CHECK: )
-for x: AnyObject in a_m {
-  print(x.description!)
+for x in a_m {
+  print(x)
 }
 
 class Canary {
@@ -46,7 +46,7 @@ autoreleasepool {
   print("iterating array")
 
   // CHECK: 1
-  for x: AnyObject in b {
+  for x in b {
     (x as! Canary).chirp()
     break
   }
@@ -60,30 +60,30 @@ autoreleasepool {
 // CHECK: exited
 print("exited")
 
-var d : NSDictionary = [415 : "Giants", 510 : "A's"]
+var d : NSDictionary = [415 : "Giants" , 510 : "A's"]
 var d_m : NSMutableDictionary = [1415 : "Big Giants", 11510 : "B's"]
 
 // CHECK: 510 => A's
 for (key, value) in d {
-  print("\(key.description!) => \(value.description!)")
+  print("\(key) => \(value)")
 }
 
 // CHECK: 11510 => B's
 for (key, value) in d_m {
-  print("\(key.description!) => \(value.description!)")
+  print("\(key) => \(value)")
 }
 
 var s = NSSet(object: "the most forward-thinking test yet")
 var s_m = NSMutableSet(object: "the next most forward-thinking test yet")
 
 // CHECK: the most forward-thinking test yet
-for x: AnyObject in s {
-  print(x.description!)
+for x in s {
+  print(x)
 }
 
 // CHECK: the next most forward-thinking test yet
-for x: AnyObject in s_m {
-  print(x.description!)
+for x in s_m {
+  print(x)
 }
 
 // Enumeration over a _SwiftDeferredNSArray
@@ -91,7 +91,23 @@ for x: AnyObject in s_m {
 // CHECK: 2
 // CHECK: 1
 var a2 = [3, 2, 1]
-var nsa2 = (a2._buffer._asCocoaArray() as AnyObject) as! NSArray
-for x: AnyObject in nsa2 {
-  print(x.description!)
+var nsa2: NSArray = a2._bridgeToObjectiveC()
+for x in nsa2 {
+  print(x)
+}
+
+class X : CustomStringConvertible {
+  init(_ value: Int) { self.value = value }
+  var value: Int
+  var description: String { return "X(\(value))" }
+}
+
+// Enumeration over a _ContiguousArrayBuffer
+// CHECK: X(3)
+// CHECK: X(2)
+// CHECK: X(1)
+var a3 = [X(3), X(2), X(1)]
+var nsa3: NSArray = a3._bridgeToObjectiveC()
+for x in nsa3 {
+  print(x)
 }

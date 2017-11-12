@@ -1,12 +1,12 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s
+// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-stdlib %s
 
 protocol P {
-  typealias Assoc
+  associatedtype Assoc
 }
 
 protocol Q {
-  typealias Assoc1
-  typealias Assoc2
+  associatedtype Assoc1
+  associatedtype Assoc2
 }
 
 struct G<T> {}
@@ -15,7 +15,7 @@ class C {}
 func a<T>(x: T) {}
 func b<T: P>(x: G<T>, y: T.Assoc) {}
 func c<T where T: P>(x: T, y: T.Assoc) {}
-func d<T: P, U: protocol<P, Q>>(x: T, y: U) {}
+func d<T: P, U: P & Q>(x: T, y: U) {}
 func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
 // FIXME: Same-type constraints expose a typechecker bug.
 // <rdar://problem/15730168>
@@ -34,7 +34,7 @@ struct Foo<V> {
   func a<T>(x: T) {}
   func b<T: P>(x: G<T>, y: T.Assoc) {}
   func c<T where T: P>(x: T, y: T.Assoc) {}
-  func d<T: P, U: protocol<P, Q>>(x: T, y: U) {}
+  func d<T: P, U: P & Q>(x: T, y: U) {}
   func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
   func f<T: Q where T.Assoc1 == T.Assoc2>(x: T) {}
   func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
@@ -50,11 +50,11 @@ struct Foo<V> {
 // member of a dependent member that substitutes to a type parameter.
 // <rdar://problem/16257259>
 protocol Fooable {
-  typealias Foo
+  associatedtype Foo
 }
 
 protocol Barrable {
-  typealias Bar: Fooable
+  associatedtype Bar: Fooable
 
   func bar(_: Bar) -> Bar.Foo
 }
@@ -65,3 +65,19 @@ struct FooBar<T: Fooable>: Barrable {
   func bar(_ x: T) -> T.Foo { }
 }
 
+
+// Test that associated types can be constrained to concrete types
+
+func concreteJungle<T where T : Fooable, T.Foo == C>(_: T) -> T.Foo {
+  return C()
+}
+
+func concreteJungle<T where T : Fooable, T.Foo == C>(_: T, t: T.Foo) -> C {
+  let c: C = t
+  return c
+}
+
+func concreteJungle<T where T : Fooable, T.Foo == C>(_: T, f: @escaping (T.Foo) -> C) -> T.Foo {
+  let ff: (C) -> T.Foo = f
+  return ff(C())
+}

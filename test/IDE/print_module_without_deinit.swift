@@ -1,11 +1,10 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=SKIP1 %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=false -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=NOSKIP1 %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=INIT1 %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=INIT2 %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | FileCheck -check-prefix=ATTR1 %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | %FileCheck -check-prefix=SKIP1 %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=false -module-to-print=print_module_without_deinit -I %t -source-filename=%s | %FileCheck -check-prefix=NOSKIP1 %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | %FileCheck -check-prefix=INIT1 %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | %FileCheck -check-prefix=INIT2 %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -skip-deinit=true -module-to-print=print_module_without_deinit -I %t -source-filename=%s | %FileCheck -check-prefix=ATTR1 %s
 
 // SKIP1: class PropertyOwnership {
 // NOSKIP1: class PropertyOwnership {
@@ -38,8 +37,10 @@ public class ImplicitOptionalInitContainer {
 
 // ATTR1: class AttributeContainer1 {
 public class AttributeContainer1 {
-  // ATTR1: func m1(@autoclosure a: () -> Int)
-  public func m1(@autoclosure a : ()->Int) {}
-  // ATTR1: func m2(@noescape a: () -> Int)
-  public func m2(@noescape a : ()->Int) {}
+  // ATTR1: func m1(a: @autoclosure () -> Int)
+  public func m1(a : @autoclosure () -> Int) {}
+  // ATTR1: func m2(a: () -> Int)
+  public func m2(a : () -> Int) {} // TODO: drop @noescape
+  // ATTR1: func m3(a: @escaping () -> Int)
+  public func m3(a : @escaping () -> Int) {}
 }

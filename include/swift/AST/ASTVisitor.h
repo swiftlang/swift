@@ -1,12 +1,12 @@
-//===-- ASTVisitor.h - Decl, Expr and Stmt Visitor --------------*- C++ -*-===//
+//===--- ASTVisitor.h - Decl, Expr and Stmt Visitor -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -27,6 +27,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
+  class ParameterList;
   
 /// ASTVisitor - This is a simple visitor class for Swift expressions.
 template<typename ImplClass,
@@ -52,7 +53,7 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
-  
+
   ExprRetTy visit(Expr *E, Args... AA) {
     switch (E->getKind()) {
 
@@ -158,6 +159,12 @@ public:
              A, ::std::forward<Args>(AA)...);                       \
   }
 #include "swift/AST/Attr.def"
+  
+  bool visit(ParameterList *PL) {
+    return static_cast<ImplClass*>(this)->visitParameterList(PL);
+  }
+  
+  bool visitParameterList(ParameterList *PL) { return false; }
 };
   
   

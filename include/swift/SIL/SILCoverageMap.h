@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,9 +21,10 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILPrintContext.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
-#include "llvm/ProfileData/CoverageMapping.h"
+#include "llvm/ProfileData/Coverage/CoverageMapping.h"
 
 namespace llvm {
 namespace coverage {
@@ -60,34 +61,31 @@ private:
   // The mangled name of the function covered by this mapping.
   StringRef Name;
 
+  // Whether or not the covered function may have external linkage.
+  bool External;
+
   // The coverage hash of the function covered by this mapping.
   uint64_t Hash;
 
-  // The number of mapped regions.
-  unsigned NumMappedRegions;
-
-  // The number of counter expressions.
-  unsigned NumExpressions;
-
   // Tail-allocated region mappings.
-  MappedRegion *MappedRegions;
+  MutableArrayRef<MappedRegion> MappedRegions;
 
   // Tail-allocated expression list.
-  llvm::coverage::CounterExpression *Expressions;
+  MutableArrayRef<llvm::coverage::CounterExpression> Expressions;
 
   // Disallow copying into temporary objects.
   SILCoverageMap(const SILCoverageMap &other) = delete;
   SILCoverageMap &operator=(const SILCoverageMap &) = delete;
 
   /// Private constructor. Create these using SILCoverageMap::create.
-  SILCoverageMap(uint64_t Hash);
+  SILCoverageMap(uint64_t Hash, bool External);
 
 public:
   ~SILCoverageMap();
 
   static SILCoverageMap *
-  create(SILModule &M, StringRef Filename, StringRef Name, uint64_t Hash,
-         ArrayRef<MappedRegion> MappedRegions,
+  create(SILModule &M, StringRef Filename, StringRef Name, bool External,
+         uint64_t Hash, ArrayRef<MappedRegion> MappedRegions,
          ArrayRef<llvm::coverage::CounterExpression> Expressions);
 
   /// Return the name of the source file where this mapping is found.
@@ -96,24 +94,31 @@ public:
   /// Return the mangled name of the function this mapping covers.
   StringRef getName() const { return Name; }
 
+  /// Check whether the covered function may have external linkage.
+  bool isPossiblyUsedExternally() const { return External; }
+
   /// Return the coverage hash for function this mapping covers.
   uint64_t getHash() const { return Hash; }
 
   /// Return all of the mapped regions.
-  ArrayRef<MappedRegion> getMappedRegions() const {
-    return {MappedRegions, NumMappedRegions};
-  }
+  ArrayRef<MappedRegion> getMappedRegions() const { return MappedRegions; }
 
   /// Return all of the counter expressions.
   ArrayRef<llvm::coverage::CounterExpression> getExpressions() const {
-    return {Expressions, NumExpressions};
+    return Expressions;
   }
 
   void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;
 
   /// Print the coverage map.
-  void print(llvm::raw_ostream &OS, bool ShouldSort = false,
-             bool Verbose = false) const;
+  void print(llvm::raw_ostream &OS, bool Verbose = false,
+             bool ShouldSort = false) const {
+    SILPrintContext Ctx(OS, Verbose, ShouldSort);
+    print(Ctx);
+  }
+
+  void print(SILPrintContext &PrintCtx) const;
+
   void dump() const;
 };
 
@@ -130,18 +135,7 @@ struct ilist_traits<::swift::SILCoverageMap> :
 public ilist_default_traits<::swift::SILCoverageMap> {
   typedef ::swift::SILCoverageMap SILCoverageMap;
 
-private:
-  mutable ilist_half_node<SILCoverageMap> Sentinel;
-
 public:
-  SILCoverageMap *createSentinel() const {
-    return static_cast<SILCoverageMap*>(&Sentinel);
-  }
-  void destroySentinel(SILCoverageMap *) const {}
-
-  SILCoverageMap *provideInitialHead() const { return createSentinel(); }
-  SILCoverageMap *ensureHead(SILCoverageMap*) const { return createSentinel(); }
-  static void noteHead(SILCoverageMap*, SILCoverageMap*) {}
   static void deleteNode(SILCoverageMap *VT) { VT->~SILCoverageMap(); }
 
 private:

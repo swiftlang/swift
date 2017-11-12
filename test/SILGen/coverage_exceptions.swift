@@ -1,8 +1,19 @@
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_catch %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_catch %s | %FileCheck %s
 
-enum SomeErr : ErrorType {
+enum SomeErr : Error {
   case Err1
   case Err2
+}
+
+struct S {
+  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.S.init
+  init() {
+    do {
+      throw SomeErr.Err1
+    } catch {
+      // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 2
+    } // CHECK: [[@LINE]]:6 -> [[@LINE+1]]:4 : 1
+  }
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.bar
@@ -12,7 +23,7 @@ func bar() throws {
 } // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.baz
-func baz(fn: () throws -> ()) rethrows {
+func baz(_ fn: () throws -> ()) rethrows {
   do {
     try fn()
   } catch SomeErr.Err1 { // CHECK: [[@LINE]]:24 -> {{[0-9]+}}:4 : 2
@@ -48,17 +59,6 @@ func foo() -> Int32 {
   try! baz { () throws -> () in return }
 
   return x
-}
-
-struct S {
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.S.init
-  init() {
-    do {
-      throw SomeErr.Err1
-    } catch {
-      // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 2
-    } // CHECK: [[@LINE]]:6 -> [[@LINE+1]]:4 : 1
-  }
 }
 
 foo()

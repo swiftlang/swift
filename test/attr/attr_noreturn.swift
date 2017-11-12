@@ -1,136 +1,51 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
+
+@noreturn func noReturn1(_: Int) {}
+// expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{33-33= -> Never }}
+
+@noreturn func noReturn2(_: Int)
+{}
+// expected-error@-2 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{33-33= -> Never}}
 
 @noreturn
-func exit(_: Int) {}
+func noReturn3(_: Int)
+{}
+// expected-error@-3 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-10=}}{{23-23= -> Never}}
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-class InvalidOnClass {}
+@noreturn func noReturnInt1(_: Int) -> Int {}
+// expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{40-43=Never}}
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-struct InvalidOnStruct {}
+@noreturn func noReturnInt2(_: Int) -> Int
+{}
+// expected-error@-2 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{40-43=Never}}
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-enum InvalidOnEnum {}
+@noreturn func noReturnThrows1(_: Int) throws {}
+// expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{46-46= -> Never }}
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-protocol InvalidOnProtocol {}
+@noreturn func noReturnThrows2(_: Int) throws
+{}
+// expected-error@-2 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{46-46= -> Never}}
 
-struct InvalidOnExtension {}
+@noreturn func noReturnThrowsInt1(_: Int) throws -> Int {}
+// expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{53-56=Never}}
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}} {{1-11=}}
-extension InvalidOnExtension {}
+@noreturn func noReturnThrowsInt2(_: Int) throws -> Int
+{}
+// expected-error@-2 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{53-56=Never}}
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-var invalidOnVar = 0
+// Test that error recovery gives us the 'Never' return type
+let x: Never = noReturn1(0) // No error
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-let invalidOnLet = 0
+// @noreturn in function type declarations
+let valueNoReturn: @noreturn () -> ()
+// expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{20-30=}}{{36-38=Never}}
 
-class InvalidOnClassMembers {
-  @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{3-13=}}
-  init() {}
+let valueNoReturnInt: @noreturn () -> Int
+// expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{23-33=}}{{39-42=Never}}
 
-  @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{3-13=}}
-  deinit {}
+let valueNoReturnInt2: @noreturn
+() -> Int
+// expected-error@-2 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{24-1=}}{{7-10=Never}}
 
-  @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{3-13=}}
-  subscript(i: Int) -> Int {
-    get {
-      return 0
-    }
-  }
-}
-
-protocol TestProtocol {
-  // expected-note@+1 {{protocol requires function 'neverReturns()' with type '@noreturn () -> ()'}}
-  @noreturn func neverReturns()
-  func doesReturn()
-
-  // expected-note@+1 {{protocol requires function 'neverReturnsStatic()' with type '@noreturn () -> ()'}}
-  @noreturn static func neverReturnsStatic()
-  static func doesReturnStatic()
-}
-// expected-error@+1 {{type 'ConformsToProtocolA' does not conform to protocol 'TestProtocol'}}
-struct ConformsToProtocolA : TestProtocol {
-  // expected-note@+1 {{candidate is not @noreturn, but protocol requires it}}
-  func neverReturns() {}
-
-  // OK: a @noreturn function conforms to a non-@noreturn protocol requirement.
-  @noreturn func doesReturn() { exit(0) }
-
-  // expected-note@+1 {{candidate is not @noreturn, but protocol requires it}}
-  static func neverReturnsStatic() {}
-
-  // OK: a @noreturn function conforms to a non-@noreturn protocol requirement.
-  @noreturn static func doesReturnStatic() {}
-}
-
-class BaseClass {
-  @noreturn func neverReturns() { exit(0) } // expected-note 3{{overridden declaration is here}}
-  func doesReturn() {} // expected-note {{overridden declaration is here}}
-
-  @noreturn class func neverReturnsClass() { exit(0) } // expected-note 3{{overridden declaration is here}}
-  class func doesReturn() {} // expected-note {{overridden declaration is here}}
-}
-class DerivedClassA : BaseClass {
-  // expected-error@+2 {{overriding declaration requires an 'override' keyword}} {{3-3=override }}
-  // expected-error@+1 {{an override of a @noreturn method should also be @noreturn}}
-  func neverReturns() {}
-
-  // expected-error@+1 {{overriding declaration requires an 'override' keyword}} {{13-13=override }}
-  @noreturn func doesReturn() { exit(0) }
-
-  // expected-error@+2 {{overriding declaration requires an 'override' keyword}} {{3-3=override }}
-  // expected-error@+1 {{an override of a @noreturn method should also be @noreturn}}
-  class func neverReturnsClass() { exit(0) }
-
-  // expected-error@+1 {{overriding declaration requires an 'override' keyword}} {{13-13=override }}
-  @noreturn class func doesReturn() {}
-}
-class DerivedClassB : BaseClass {
-  // expected-error@+1 {{an override of a @noreturn method should also be @noreturn}}
-  override func neverReturns() {}
-
-  // OK: a @noreturn method overrides a non-@noreturn base method.
-  @noreturn override func doesReturn() { exit(0) }
-
-  // expected-error@+1 {{an override of a @noreturn method should also be @noreturn}}
-  override class func neverReturnsClass() { exit(0) }
-
-  // OK: a @noreturn method overrides a non-@noreturn base method.
-  @noreturn override class func doesReturn() {}
-}
-
-struct MethodWithNoreturn {
-  @noreturn
-  func neverReturns() { exit(0) }
-}
-
-func printInt(_: Int) {}
-var maybeReturns: (Int) -> () = exit // no-error
-var neverReturns1 = exit
-neverReturns1 = printInt // expected-error {{cannot assign value of type '(Int) -> ()' to type '@noreturn (Int) -> ()'}}
-
-var neverReturns2: MethodWithNoreturn -> @noreturn () -> () = MethodWithNoreturn.neverReturns
-
-exit(5) // no-error
-
-@noreturn
-func exit() -> () {}
-@noreturn
-func testFunctionOverload() -> () {
-  exit()
-}
-
-func testRvalue(lhs: (), rhs: @noreturn () -> ()) -> () {
-  return rhs()
-}
-
-var fnr: @noreturn (_: Int) -> () = exit
-// This might be a desirable syntax, but it does not get properly propagated to SIL, so reject it for now.
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
-var fpr: (_: Int) -> () = exit
-
-func testWitnessMethod<T: TestProtocol>(t: T) {
-  _ = T.neverReturnsStatic
-}
+let valueNoReturn2: @noreturn () -> () = {}
+// expected-error@-1 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{21-31=}}{{37-39=Never}}

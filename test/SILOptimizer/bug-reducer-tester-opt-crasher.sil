@@ -1,0 +1,44 @@
+// RUN: not --crash %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=opt-crasher -bug-reducer-tester-target-func='target_func'
+// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=opt-crasher -bug-reducer-tester-target-func='target_func_2' | %FileCheck %s
+// RUN: %target-sil-opt -bug-reducer-tester -bug-reducer-tester-failure-kind=opt-crasher %s | %FileCheck %s
+
+// Make sure that we do not crash on partial applies. This is important to
+// enable testing if a suffix needing a prefix case.
+// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=opt-crasher -bug-reducer-tester-target-func='partial_apply_callee'
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+// CHECK-LABEL: sil @target_func : $@convention(thin) () -> () {
+sil @target_func : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @func_2 : $@convention(thin) () -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @target_func : $@convention(thin) () -> ()
+// CHECK: apply [[FUNC]]()
+sil @func_2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @target_func : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @partial_apply_callee : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @partial_apply_caller : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @partial_apply_callee : $@convention(thin) () -> ()
+  %1 = partial_apply %0() : $@convention(thin) () -> ()
+  %2 = apply %1() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

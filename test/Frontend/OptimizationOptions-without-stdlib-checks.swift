@@ -1,13 +1,12 @@
-// RUN: %target-swift-frontend -module-name OptimizationOptions -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
-// RUN: %target-swift-frontend -module-name OptimizationOptions -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
-// RUN: %target-swift-frontend -module-name OptimizationOptions -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
-// RUN: %target-swift-frontend -module-name OptimizationOptions -Oplayground -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=PLAYGROUND
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Onone -emit-sil -primary-file %s -o - | %FileCheck %s --check-prefix=DEBUG
+// RUN: %target-swift-frontend -module-name OptimizationOptions -O -emit-sil -primary-file %s -o - | %FileCheck %s --check-prefix=RELEASE
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Ounchecked -emit-sil -primary-file %s -o - | %FileCheck %s --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Oplayground -emit-sil -primary-file %s -o - | %FileCheck %s --check-prefix=PLAYGROUND
 
 // REQUIRES: optimized_stdlib
-// REQUIRES: swift_stdlib_asserts
 // REQUIRES: swift_stdlib_no_asserts
 
-func test_assert() (x: Int, y: Int) -> Int {
+func test_assert(x: Int, y: Int) -> Int {
   assert(x >= y , "x smaller than y")
   return x + y
 }
@@ -20,96 +19,96 @@ func test_fatal(x: Int, y: Int) -> Int {
 }
 
 func test_precondition_check(x: Int, y: Int) -> Int {
-  _precondition(x > y, "test precondition check")
+  _precondition(x > y, "Test precondition check")
   return x + y
 }
 
 func test_partial_safety_check(x: Int, y: Int) -> Int {
-  _debugPrecondition(x > y, "test partial safety check")
+  _debugPrecondition(x > y, "Test partial safety check")
   return x + y
 }
 
 // In debug mode keep user asserts and runtime checks.
-// DEBUG-LABEL: _TF19OptimizationOptions11test_assertfT_FT1xSi1ySi_Si
+// DEBUG-LABEL: sil hidden @_T019OptimizationOptions11test_assertS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // DEBUG: "x smaller than y"
-// DEBUG: "assertion failed"
+// DEBUG: "Assertion failed"
 // DEBUG: cond_fail
+// DEBUG: return
 
 // In playground mode keep user asserts and runtime checks.
-// PLAYGROUND-LABEL: _TF19OptimizationOptions11test_assertfT_FT1xSi1ySi_Si
+// PLAYGROUND-LABEL: sil hidden @_T019OptimizationOptions11test_assertS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // PLAYGROUND: "x smaller than y"
-// PLAYGROUND: "assertion failed"
+// PLAYGROUND: "Assertion failed"
 // PLAYGROUND: cond_fail
 
 // In release mode remove user asserts and keep runtime checks.
-// RELEASE-LABEL: _TF19OptimizationOptions11test_assertfT_FT1xSi1ySi_Si
+// RELEASE-LABEL: sil hidden @_T019OptimizationOptions11test_assertS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // RELEASE-NOT: "x smaller than y"
-// RELEASE-NOT: "assertion failed"
+// RELEASE-NOT: "Assertion failed"
 // RELEASE: cond_fail
 
 // In fast mode remove user asserts and runtime checks.
-// FAST-LABEL: _TF19OptimizationOptions11test_assertfT_FT1xSi1ySi_Si
+// FAST-LABEL: sil hidden @_T019OptimizationOptions11test_assertS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // FAST-NOT: "x smaller than y"
-// FAST-NOT: "assertion failed"
+// FAST-NOT: "Assertion failed"
 // FAST-NOT: cond_fail
 
 
 // In debug mode keep verbose fatal errors.
-// DEBUG-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
+// DEBUG-LABEL: sil hidden @_T019OptimizationOptions10test_fatalS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // DEBUG-DAG: "Human nature ..."
-// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC:.*fatalErrorMessage.*]] : $@convention(thin)
+// DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
 // In playground mode keep verbose fatal errors.
-// PLAYGROUND-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
+// PLAYGROUND-LABEL: sil hidden @_T019OptimizationOptions10test_fatalS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // PLAYGROUND-DAG: "Human nature ..."
-// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC:.*fatalErrorMessage.*]] : $@convention(thin)
+// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 
 // In release mode keep succinct fatal errors (trap).
-// RELEASE-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
+// RELEASE-LABEL: sil hidden @_T019OptimizationOptions10test_fatalS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // RELEASE-NOT: "Human nature ..."
-// RELEASE-NOT: "fatal error"
-// RELEASE: bb2:
-// RELEASE: %[[ALWAYS:.+]] = integer_literal $Builtin.Int1, -1
-// RELEASE: cond_fail %[[ALWAYS]]
+// RELEASE-NOT: "Fatal error"
+// RELEASE: cond_fail
+// RELEASE: return
 
 // In fast mode remove fatal errors.
-// FAST-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
+// FAST-LABEL: sil hidden @_T019OptimizationOptions10test_fatalS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
 // FAST-NOT: "Human nature ..."
-// FAST-NOT: "fatal error"
+// FAST-NOT: "Fatal error"
 // FAST-NOT: int_trap
 
 // Precondition safety checks.
 
 // In debug mode keep verbose library precondition checks.
-// DEBUG-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
-// DEBUG-DAG: "fatal error"
-// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG-LABEL: sil hidden @_T019OptimizationOptions23test_precondition_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// DEBUG-DAG: "Fatal error"
+// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
+// DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 // DEBUG: return
 
 // In playground mode keep verbose library precondition checks.
-// PLAYGROUND-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
-// PLAYGROUND-DAG: "fatal error"
-// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND-LABEL: sil hidden @_T019OptimizationOptions23test_precondition_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// PLAYGROUND-DAG: "Fatal error"
+// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
+// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 // PLAYGROUND: return
 
 // In release mode keep succinct library precondition checks (trap).
-// RELEASE-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
-// RELEASE-NOT:  "fatal error"
+// RELEASE-LABEL: sil hidden @_T019OptimizationOptions23test_precondition_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// RELEASE-NOT:  "Fatal error"
 // RELEASE:  %[[V2:.+]] = builtin "xor_Int1"(%{{.+}}, %{{.+}})
 // RELEASE:  cond_fail %[[V2]]
 // RELEASE:  return
 
 // In unchecked mode remove library precondition checks.
-// UNCHECKED-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
-// UNCHECKED-NOT:  "fatal error"
+// UNCHECKED-LABEL: sil hidden @_T019OptimizationOptions23test_precondition_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// UNCHECKED-NOT:  "Fatal error"
 // UNCHECKED-NOT:  builtin "int_trap"
 // UNCHECKED-NOT:  unreachable
 // UNCHECKED:  return
@@ -117,29 +116,29 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 //  Partial safety checks.
 
 // In debug mode keep verbose partial safety checks.
-// DEBUG-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
-// DEBUG-DAG: "fatal error"
-// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG-LABEL: sil hidden @_T019OptimizationOptions25test_partial_safety_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// DEBUG-DAG: "Fatal error"
+// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
+// DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
 // In playground mode keep verbose partial safety checks.
-// PLAYGROUND-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
-// PLAYGROUND-DAG: "fatal error"
-// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND-LABEL: sil hidden @_T019OptimizationOptions25test_partial_safety_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// PLAYGROUND-DAG: "Fatal error"
+// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
+// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 
 // In release mode remove partial safety checks.
-// RELEASE-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
-// RELEASE-NOT:  "fatal error"
+// RELEASE-LABEL: sil hidden @_T019OptimizationOptions25test_partial_safety_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// RELEASE-NOT:  "Fatal error"
 // RELEASE-NOT:  builtin "int_trap"
 // RELEASE-NOT:  unreachable
 // RELEASE: return
 
 // In fast mode remove partial safety checks.
-// FAST-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
-// FAST-NOT:  "fatal error"
+// FAST-LABEL: sil hidden @_T019OptimizationOptions25test_partial_safety_checkS2i1x_Si1ytF : $@convention(thin) (Int, Int) -> Int {
+// FAST-NOT:  "Fatal error"
 // FAST-NOT:  builtin "int_trap"
 // FAST-NOT:  unreachable
 // FAST: return

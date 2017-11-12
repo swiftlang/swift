@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 class HeapBuf<Element> {}
@@ -9,7 +9,7 @@ struct XBuffer {
 
 class Q {}
 
-func hexAddr(x: AnyObject) -> Q {
+func hexAddr(_ x: AnyObject) -> Q {
  return Q()
 }
 

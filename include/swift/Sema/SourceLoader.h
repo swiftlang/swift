@@ -1,12 +1,12 @@
-//===--- SourceLoader.h - Import .swift files as modules --------*- c++ -*-===//
+//===--- SourceLoader.h - Import .swift files as modules --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,16 +25,21 @@ class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
   bool SkipBodies;
+  bool EnableResilience;
 
-  explicit SourceLoader(ASTContext &ctx, bool skipBodies, DependencyTracker *tracker)
-    : ModuleLoader(tracker), Ctx(ctx), SkipBodies(skipBodies) {}
+  explicit SourceLoader(ASTContext &ctx,
+                        bool skipBodies,
+                        bool enableResilience,
+                        DependencyTracker *tracker)
+    : ModuleLoader(tracker), Ctx(ctx),
+      SkipBodies(skipBodies), EnableResilience(enableResilience) {}
 
 public:
   static std::unique_ptr<SourceLoader>
-  create(ASTContext &ctx, bool skipBodies,
+  create(ASTContext &ctx, bool skipBodies, bool enableResilience,
          DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SourceLoader>{
-      new SourceLoader(ctx, skipBodies, tracker)
+      new SourceLoader(ctx, skipBodies, enableResilience, tracker)
     };
   }
 
@@ -42,6 +47,13 @@ public:
   SourceLoader(SourceLoader &&) = delete;
   SourceLoader &operator=(const SourceLoader &) = delete;
   SourceLoader &operator=(SourceLoader &&) = delete;
+
+  /// \brief Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
 
   /// \brief Import a module with the given module path.
   ///

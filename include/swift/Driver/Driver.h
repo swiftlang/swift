@@ -1,12 +1,12 @@
-//===-- Driver.h - Swift compiler driver -----------------------*- C++ -*--===//
+//===--- Driver.h - Swift compiler driver -----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,8 @@
 
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/DenseMap.h"
@@ -42,8 +44,10 @@ namespace opt {
 namespace swift {
   class DiagnosticEngine;
 namespace driver {
+  class Action;
   class Compilation;
   class Job;
+  class JobAction;
   class OutputFileMap;
   class ToolChain;
 
@@ -64,9 +68,6 @@ public:
 
     /// Compile and execute the inputs immediately
     Immediate,
-
-    /// Invoke swift-update with the compiler frontend options.
-    UpdateCode,
   };
 
   /// The mode in which the driver should invoke the frontend.
@@ -96,9 +97,6 @@ public:
   /// Whether the compiler picked the current module name, rather than the user.
   bool ModuleNameIsFallback = false;
 
-  // Whether the driver should generate compiler fixits as source edits.
-  bool ShouldGenerateFixitEdits = false;
-  
   /// The number of threads for multi-threaded compilation.
   unsigned numThreads = 0;
 
@@ -111,6 +109,8 @@ public:
   /// The path to the SDK against which to build.
   /// (If empty, this implies no SDK.)
   std::string SDKPath;
+
+  OptionSet<SanitizerKind> SelectedSanitizers;
 };
 
 class Driver {
@@ -121,6 +121,7 @@ public:
     Interactive,     // swift
     Batch,           // swiftc
     AutolinkExtract, // swift-autolink-extract
+    SwiftFormat      // swift-format
   };
 
   class InputInfoMap;
@@ -150,17 +151,7 @@ private:
   /// Indicates whether the driver should check that the input files exist.
   bool CheckInputFilesExist = true;
 
-  /// \brief Cache of all the ToolChains in use by the driver.
-  ///
-  /// This maps from the string representation of a triple to a ToolChain
-  /// created targeting that triple. The driver owns all the ToolChain objects
-  /// stored in it, and will clean them up when torn down.
-  mutable llvm::StringMap<ToolChain *> ToolChains;
-
 public:
-  typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
-  typedef SmallVector<InputPair, 16> InputList;
-
   Driver(StringRef DriverExecutable, StringRef Name,
          ArrayRef<const char *> Args, DiagnosticEngine &Diags);
   ~Driver();
@@ -205,7 +196,7 @@ public:
   /// \param[out] Inputs The list in which to store the resulting compilation
   /// inputs.
   void buildInputs(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
-                   InputList &Inputs) const;
+                   InputFileList &Inputs) const;
 
   /// Construct the OutputInfo for the driver from the given arguments.
   ///
@@ -216,24 +207,23 @@ public:
   /// information.
   void buildOutputInfo(const ToolChain &TC,
                        const llvm::opt::DerivedArgList &Args,
-                       const InputList &Inputs, OutputInfo &OI) const;
+                       const InputFileList &Inputs, OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,
   /// which are only done for a single architecture.
   ///
+  /// \param[out] TopLevelActions The main Actions to build Jobs for.
   /// \param TC the default host tool chain.
-  /// \param Args The input arguments.
-  /// \param Inputs The inputs for which Actions should be generated.
   /// \param OI The OutputInfo for which Actions should be generated.
   /// \param OFM The OutputFileMap for the compilation; used to find any
   /// cross-build information.
   /// \param OutOfDateMap If present, information used to decide which files
   /// need to be rebuilt.
-  /// \param[out] Actions The list in which to store the resulting Actions.
-  void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
-                    const InputList &Inputs, const OutputInfo &OI,
-                    const OutputFileMap *OFM, InputInfoMap *OutOfDateMap,
-                    ActionList &Actions) const;
+  /// \param C The Compilation to which Actions should be added.
+  void buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
+                    const ToolChain &TC, const OutputInfo &OI,
+                    const OutputFileMap *OFM, const InputInfoMap *OutOfDateMap,
+                    Compilation &C) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
   std::unique_ptr<OutputFileMap>
@@ -242,12 +232,15 @@ public:
   /// Add top-level Jobs to Compilation \p C for the given \p Actions and
   /// OutputInfo.
   ///
-  /// \param Actions The Actions for which Jobs should be generated.
-  /// \param OI The OutputInfo for which Jobs should be generated
-  /// \param OFM The OutputFileMap for which Jobs should be generated
-  /// \param[out] C The Compilation to which Jobs should be added
-  void buildJobs(const ActionList &Actions, const OutputInfo &OI,
-                 const OutputFileMap *OFM, Compilation &C) const;
+  /// \param TopLevelActions The main Actions to build Jobs for.
+  /// \param OI The OutputInfo for which Jobs should be generated.
+  /// \param OFM The OutputFileMap for which Jobs should be generated.
+  /// \param TC The ToolChain to build Jobs with.
+  /// \param C The Compilation containing the Actions for which Jobs should be
+  /// created.
+  void buildJobs(ArrayRef<const Action *> TopLevelActions, const OutputInfo &OI,
+                 const OutputFileMap *OFM, const ToolChain &TC,
+                 Compilation &C) const;
 
   /// A map for caching Jobs for a given Action/ToolChain pair
   using JobCacheMap =
@@ -257,7 +250,7 @@ public:
   /// input Jobs.
   ///
   /// \param C The Compilation which this Job will eventually be part of
-  /// \param A The Action for which a Job should be created
+  /// \param JA The Action for which a Job should be created
   /// \param OI The OutputInfo for which a Job should be created
   /// \param OFM The OutputFileMap for which a Job should be created
   /// \param TC The tool chain which should be used to create the Job
@@ -265,7 +258,7 @@ public:
   /// \param JobCache maps existing Action/ToolChain pairs to Jobs
   ///
   /// \returns a Job for the given Action/ToolChain pair
-  Job *buildJobsForAction(Compilation &C, const Action *A,
+  Job *buildJobsForAction(Compilation &C, const JobAction *JA,
                           const OutputInfo &OI, const OutputFileMap *OFM,
                           const ToolChain &TC, bool AtTopLevel,
                           JobCacheMap &JobCache) const;
@@ -276,8 +269,8 @@ public:
   /// \return Whether any compilation should be built for this invocation
   bool handleImmediateArgs(const llvm::opt::ArgList &Args, const ToolChain &TC);
 
-  /// Print the list of Actions.
-  void printActions(const ActionList &Actions) const;
+  /// Print the list of Actions in a Compilation.
+  void printActions(const Compilation &C) const;
 
   /// Print the list of Jobs in a Compilation.
   void printJobs(const Compilation &C) const;
@@ -291,8 +284,6 @@ public:
   void printHelp(bool ShowHidden) const;
 
 private:
-  const ToolChain *getToolChain(const llvm::opt::ArgList &Args) const;
-
   /// Parse the driver kind.
   ///
   /// \param Args The arguments passed to the driver (excluding the path to the

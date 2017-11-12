@@ -1,0 +1,160 @@
+// RUN: %target-sil-opt  -assume-parsing-unqualified-ownership-sil -guaranteed-arc-opts %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+sil @kraken : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil @retainvalue_test1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.NativeObject, [[ARG2:%.*]] : $Builtin.NativeObject):
+// CHECK-NOT: retain_value [[ARG1]]
+// CHECK: retain_value [[ARG2]]
+// CHECK-NOT: release_value [[ARG1]]
+sil @retainvalue_test1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  retain_value %0 : $Builtin.NativeObject
+  retain_value %1 : $Builtin.NativeObject
+  release_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @retainvalue_test2 : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32) -> () {
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @retainvalue_test2 : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.Int32):
+  retain_value %0 : $Builtin.NativeObject
+  %2 = integer_literal $Builtin.Int32, 0
+  store %2 to %1 : $*Builtin.Int32
+  release_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @retainvalue_test3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: retain_value
+// CHECK: release_value
+sil @retainvalue_test3 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  retain_value %0 : $Builtin.NativeObject
+  %1 = function_ref @kraken : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  release_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @retainvalue_test4 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: release_value
+sil @retainvalue_test4 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  release_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @strongretain_test1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.NativeObject, [[ARG2:%.*]] : $Builtin.NativeObject):
+// CHECK-NOT: strong_retain [[ARG1]]
+// CHECK: strong_retain [[ARG2]]
+// CHECK-NOT: strong_release [[ARG1]]
+sil @strongretain_test1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %1 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @strongretain_test2 : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @strongretain_test2 : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.Int32):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = integer_literal $Builtin.Int32, 0
+  store %2 to %1 : $*Builtin.Int32
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @strongretain_test3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK: strong_release
+sil @strongretain_test3 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @kraken : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @strongretain_test4 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: strong_release
+sil @strongretain_test4 : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @copyaddr_test1 : $@convention(thin) (@in Builtin.NativeObject) -> @out Builtin.NativeObject {
+// CHECK: bb0([[ARG1:%.*]] : $*Builtin.NativeObject, [[ARG2:%.*]] : $*Builtin.NativeObject):
+// CHECK: copy_addr [take] {{%.*}} to {{%.*}}
+// CHECK-NOT: destroy_addr [[ARG1]]
+sil @copyaddr_test1 : $@convention(thin) (@in Builtin.NativeObject) -> @out Builtin.NativeObject {
+bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  copy_addr %1 to %0 : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @copyaddr_test2 : $@convention(thin) (@in Builtin.NativeObject) -> @out Builtin.NativeObject {
+// CHECK: copy_addr
+// CHECK: destroy_addr
+sil @copyaddr_test2 : $@convention(thin) (@in Builtin.NativeObject) -> @out Builtin.NativeObject {
+bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  copy_addr %1 to %0 : $*Builtin.NativeObject
+  %2 = function_ref @kraken : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  destroy_addr %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @copyaddr_test3 : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: destroy_addr
+sil @copyaddr_test3 : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  destroy_addr %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+class C {
+  var val: Builtin.Int32
+  init(i: Builtin.Int32)
+  deinit
+}
+
+// CHECK-LABEL: sil @access_test : $@convention(thin) (@owned C, Builtin.Int32) -> ()
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @access_test : $@convention(thin) (@owned C, Builtin.Int32) -> () {
+bb0(%0 : $C, %1 : $Builtin.Int32):
+  strong_retain %0 : $C
+  %valadr = ref_element_addr %0 : $C, #C.val
+  %access = begin_access [modify] [dynamic] %valadr : $*Builtin.Int32
+  store %1 to %access : $*Builtin.Int32
+  end_access %access : $*Builtin.Int32
+  strong_release %0 : $C
+  %9999 = tuple()
+  return %9999 : $()
+}

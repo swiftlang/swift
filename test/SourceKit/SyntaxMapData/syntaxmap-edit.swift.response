@@ -41,15 +41,10 @@
   ]
 }
 {
-  key.offset: 81,
-  key.length: 15,
+  key.offset: 87,
+  key.length: 6,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
-    {
-      key.kind: source.lang.swift.syntaxtype.keyword,
-      key.offset: 81,
-      key.length: 5
-    },
     {
       key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 87,

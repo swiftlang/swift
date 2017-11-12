@@ -1,12 +1,12 @@
-//===- SerializedDiagnosticConsumer.h - Serialize Diagnostics --*- C++ -*--===//
+//===--- SerializedDiagnosticConsumer.h - Serialize Diagnostics -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,7 +21,7 @@
 #include <memory>
 
 namespace llvm {
-  class raw_ostream;
+  class StringRef;
 }
 
 namespace swift {
@@ -30,13 +30,12 @@ namespace swift {
 
   namespace serialized_diagnostics {
     /// \brief Create a DiagnosticConsumer that serializes diagnostics to a
-    ///        stream.
+    ///        file.
     ///
-    /// \param OS the stream to emit the diagnostics.  The consumer takes
-    ///        ownership of the stream.
+    /// \param serializedDiagnosticsPath the file path to write the diagnostics.
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
-    DiagnosticConsumer *createConsumer(std::unique_ptr<llvm::raw_ostream> OS);
+    DiagnosticConsumer *createConsumer(llvm::StringRef serializedDiagnosticsPath);
   }
 }
 

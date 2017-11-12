@@ -1,0 +1,28 @@
+//===--- SwiftStatistics.def - ----------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_STATISTIC
+#error "must define SWIFT_STATISTIC to use"
+#endif
+
+/// SWIFT_STATISTIC(VAR_NAME, UNIQUE_ID, DESCRIPTION)
+
+SWIFT_STATISTIC(numASTBuilds, num-ast-builds, "# of ASTs built or rebuilt")
+SWIFT_STATISTIC(numASTsInMem, num-asts-in-memory, "# of ASTs currently in memory")
+SWIFT_STATISTIC(maxASTsInMem, max-asts-in-memory, "maximum # of ASTs ever in memory at once")
+SWIFT_STATISTIC(numASTCacheHits, num-ast-cache-hits, "# of ASTs found in the cache without rebuilding")
+SWIFT_STATISTIC(numASTsUsedWithSnaphots, num-ast-snaphost-uses, "# of ASTs used with snaphots without rebuilding")
+
+SWIFT_STATISTIC(numOpenDocs, num-open-documents, "# of editor documents currently open")
+SWIFT_STATISTIC(maxOpenDocs, max-open-documents, "maximum # of editor documents ever open at once")
+
+#undef SWIFT_STATISTIC

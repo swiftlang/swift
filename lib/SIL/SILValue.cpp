@@ -2,21 +2,39 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILInstruction.h"
+#include "ValueOwnershipKindClassifier.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBuiltinVisitor.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILVisitor.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
+
+//===----------------------------------------------------------------------===//
+//                       Check SILNode Type Properties
+//===----------------------------------------------------------------------===//
+
+/// These are just for performance and verification. If one needs to make
+/// changes that cause the asserts the fire, please update them. The purpose is
+/// to prevent these predicates from changing values by mistake.
+
+// SILNode uses its padding bits to delegate space to its subclasses. That being
+// said, we do not want to by mistake increase the size as our usage of the
+// padding bits changes over time. So we assert that our value is still exactly
+// 8 bytes in size.
+static_assert((sizeof(SILNode) * 8) == SILNode::NumTotalSILNodeBits,
+              "Expected SILNode to be exactly 8 bytes in size");
 
 //===----------------------------------------------------------------------===//
 //                       Check SILValue Type Properties
@@ -34,220 +52,244 @@ static_assert(sizeof(SILValue) == sizeof(uintptr_t),
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
 
-void SILValue::replaceAllUsesWith(SILValue V) {
-  assert(*this != V && "Cannot RAUW a value with itself");
-  assert(getType() == V.getType() && "Invalid type");
-  while (!use_empty())
-    (**use_begin()).set(V);
-}
-
-static bool isRCIdentityPreservingCast(ValueKind Kind) {
-  switch (Kind) {
-  case ValueKind::UpcastInst:
-  case ValueKind::UncheckedRefCastInst:
-  case ValueKind::UncheckedRefCastAddrInst:
-  case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::RefToBridgeObjectInst:
-  case ValueKind::BridgeObjectToRefInst:
-    return true;
-  default:
-    return false;
+void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
+  assert(this != RHS && "Cannot RAUW a value with itself");
+  while (!use_empty()) {
+    Operand *Op = *use_begin();
+    Op->set(RHS);
   }
 }
 
-/// Return the underlying SILValue after stripping off identity SILArguments if
-/// we belong to a BB with one predecessor.
-static SILValue stripSinglePredecessorArgs(SILValue V) {
-  while (true) {
-    auto *A = dyn_cast<SILArgument>(V);
-    if (!A)
-      return V;
-
-    SILBasicBlock *BB = A->getParent();
-
-    // First try and grab the single predecessor of our parent BB. If we don't
-    // have one, bail.
-    SILBasicBlock *Pred = BB->getSinglePredecessor();
-    if (!Pred)
-      return V;
-
-    // Then grab the terminator of Pred...
-    TermInst *PredTI = Pred->getTerminator();
-
-    // And attempt to find our matching argument.
-    if (auto *BI = dyn_cast<BranchInst>(PredTI)) {
-      V = BI->getArg(A->getIndex());
-      continue;
-    }
-
-    if (auto *CBI = dyn_cast<CondBranchInst>(PredTI)) {
-      if (SILValue Arg = CBI->getArgForDestBB(BB, A)) {
-        V = Arg;
-        continue;
-      }
-    }
-
-    return V;
+void ValueBase::replaceAllUsesWithUndef() {
+  SILModule *Mod = getModule();
+  if (!Mod) {
+    llvm_unreachable("replaceAllUsesWithUndef can only be used on ValueBase "
+                     "that have access to the parent module.");
+  }
+  while (!use_empty()) {
+    Operand *Op = *use_begin();
+    Op->set(SILUndef::get(Op->get()->getType(), Mod));
   }
 }
 
-SILValue SILValue::stripCasts() {
-  SILValue V = *this;
-
-  while (true) {
-    V = stripSinglePredecessorArgs(V);
-
-    auto K = V->getKind();
-    if (isRCIdentityPreservingCast(K)
-        || K == ValueKind::UncheckedTrivialBitCastInst
-        || K == ValueKind::MarkDependenceInst) {
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    }
-
-    return V;
-  }
+SILInstruction *ValueBase::getDefiningInstruction() {
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
+    return inst;
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return result->getParent();
+  return nullptr;
 }
 
-SILValue SILValue::stripUpCasts() {
-  assert(getType().isClassOrClassMetatype() &&
-         "Expected class or class metatype!");
-
-  SILValue V = stripSinglePredecessorArgs(*this);
-
-  while (isa<UpcastInst>(V))
-    V = stripSinglePredecessorArgs(cast<UpcastInst>(V)->getOperand());
-
-  return V;
+Optional<ValueBase::DefiningInstructionResult>
+ValueBase::getDefiningInstructionResult() {
+  if (auto *inst = dyn_cast<SingleValueInstruction>(this))
+    return DefiningInstructionResult{inst, 0};
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(this))
+    return DefiningInstructionResult{result->getParent(), result->getIndex()};
+  return None;
 }
 
-SILValue SILValue::stripClassCasts() {
-  SILValue V = *this;
-  while (true) {
-    if (auto *UI = dyn_cast<UpcastInst>(V)) {
-      V = UI->getOperand();
-      continue;
-    }
-
-    if (auto *UCCI = dyn_cast<UnconditionalCheckedCastInst>(V)) {
-      V = UCCI->getOperand();
-      continue;
-    }
-
-    return V;
-  }
-}
-
-
-SILValue SILValue::stripAddressProjections() {
-  SILValue V = *this;
-
-  while (true) {
-    V = stripSinglePredecessorArgs(V);
-
-    switch (V->getKind()) {
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::RefElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    default:
-      return V;
-    }
-  }
-}
-
-SILValue SILValue::stripValueProjections() {
-  SILValue V = *this;
-
-  while (true) {
-    V = stripSinglePredecessorArgs(V);
-
-    switch (V->getKind()) {
-    case ValueKind::StructExtractInst:
-    case ValueKind::TupleExtractInst:
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
-      continue;
-    default:
-      return V;
-    }
-  }
-}
-
-SILValue SILValue::stripIndexingInsts() {
-  SILValue V = *this;
-  while (true) {
-    if (!isa<IndexingInst>(V.getDef()))
-      return V;
-    V = cast<IndexingInst>(V)->getBase();
-  }
-}
-
-SILValue SILValue::stripExpectIntrinsic() {
-  SILValue V = *this;
-  auto *BI = dyn_cast<BuiltinInst>(V);
-  if (!BI)
-    return V;
-  if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::expect)
-    return V;
-  return BI->getArguments()[0];
-}
-
-SILBasicBlock *ValueBase::getParentBB() {
-  if (auto Inst = dyn_cast<SILInstruction>(this))
+SILBasicBlock *SILNode::getParentBlock() const {
+  auto *CanonicalNode =
+      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
+  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
     return Inst->getParent();
-  if (auto Arg = dyn_cast<SILArgument>(this))
+  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
     return Arg->getParent();
   return nullptr;
 }
 
-void Operand::hoistAddressProjections(SILInstruction *InsertBefore,
-                                      DominanceInfo *DomTree) {
-  SILValue V = get();
-  SILInstruction *Prev = nullptr;
-  auto *InsertPt = InsertBefore;
-  while (true) {
-    SILValue Incoming = stripSinglePredecessorArgs(V);
+SILFunction *SILNode::getFunction() const {
+  auto *CanonicalNode =
+      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
+  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
+    return Inst->getFunction();
+  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
+    return Arg->getFunction();
+  return nullptr;
+}
 
-    // Forward the incoming arg from a single predeccessor.
-    if (V != Incoming) {
-      if (V == get()) {
-        // If we are the operand itself set the operand to the incoming
-        // arugment.
-        set(Incoming);
-        V = Incoming;
-      } else {
-        // Otherwise, set the previous projections operand to the incoming
-        // argument.
-        assert(Prev && "Must have seen a projection");
-        Prev->setOperand(0, Incoming);
-        V = Incoming;
-      }
-    }
+SILModule *SILNode::getModule() const {
+  auto *CanonicalNode =
+      const_cast<SILNode *>(this)->getRepresentativeSILNodeInObject();
+  if (auto *Inst = dyn_cast<SILInstruction>(CanonicalNode))
+    return &Inst->getModule();
+  if (auto *Arg = dyn_cast<SILArgument>(CanonicalNode))
+    return &Arg->getModule();
+  return nullptr;
+}
 
-    switch (V->getKind()) {
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::RefElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst: {
-      auto *Inst = cast<SILInstruction>(V);
-      // We are done once the current projection dominates the insert point.
-      if (DomTree->dominates(Inst->getParent(), InsertBefore->getParent()))
-        return;
+const SILNode *SILNode::getRepresentativeSILNodeSlowPath() const {
+  assert(getStorageLoc() != SILNodeStorageLocation::Instruction);
 
-      // Move the current projection and memorize it for the next iteration.
-      Prev = Inst;
-      Inst->moveBefore(InsertPt);
-      InsertPt = Inst;
-      V = Inst->getOperand(0);
-      continue;
-    }
-    default:
-      assert(DomTree->dominates(V->getParentBB(), InsertBefore->getParent()) &&
-             "The projected value must dominate the insertion point");
-      return;
-    }
+  if (isa<SingleValueInstruction>(this)) {
+    assert(hasMultipleSILNodeBases(getKind()));
+    return &static_cast<const SILInstruction &>(
+        static_cast<const SingleValueInstruction &>(
+            static_cast<const ValueBase &>(*this)));
+  }
+
+  if (auto *MVR = dyn_cast<MultipleValueInstructionResult>(this)) {
+    return MVR->getParent();
+  }
+
+  llvm_unreachable("Invalid value for slow path");
+}
+
+/// Get a location for this value.
+SILLocation SILValue::getLoc() const {
+  if (auto *instr = Value->getDefiningInstruction())
+    return instr->getLoc();
+
+  if (auto *arg = dyn_cast<SILArgument>(*this)) {
+    if (arg->getDecl())
+      return RegularLocation(const_cast<ValueDecl *>(arg->getDecl()));
+  }
+  // TODO: bbargs should probably use one of their operand locations.
+  return Value->getFunction()->getLocation();
+}
+
+
+//===----------------------------------------------------------------------===//
+//                             ValueOwnershipKind
+//===----------------------------------------------------------------------===//
+
+ValueOwnershipKind::ValueOwnershipKind(SILModule &M, SILType Type,
+                                       SILArgumentConvention Convention)
+    : Value() {
+  // Trivial types can be passed using a variety of conventions. They always
+  // have trivial ownership.
+  if (Type.isTrivial(M)) {
+    Value = ValueOwnershipKind::Trivial;
+    return;
+  }
+
+  switch (Convention) {
+  case SILArgumentConvention::Indirect_In:
+  case SILArgumentConvention::Indirect_In_Constant:
+    Value = SILModuleConventions(M).useLoweredAddresses()
+      ? ValueOwnershipKind::Trivial
+      : ValueOwnershipKind::Owned;
+    break;
+  case SILArgumentConvention::Indirect_In_Guaranteed:
+    Value = SILModuleConventions(M).useLoweredAddresses()
+      ? ValueOwnershipKind::Trivial
+      : ValueOwnershipKind::Guaranteed;
+    break;
+  case SILArgumentConvention::Indirect_Inout:
+  case SILArgumentConvention::Indirect_InoutAliasable:
+  case SILArgumentConvention::Indirect_Out:
+    Value = ValueOwnershipKind::Trivial;
+    return;
+  case SILArgumentConvention::Direct_Owned:
+    Value = ValueOwnershipKind::Owned;
+    return;
+  case SILArgumentConvention::Direct_Unowned:
+    Value = ValueOwnershipKind::Unowned;
+    return;
+  case SILArgumentConvention::Direct_Guaranteed:
+    Value = ValueOwnershipKind::Guaranteed;
+    return;
+  case SILArgumentConvention::Direct_Deallocating:
+    llvm_unreachable("Not handled");
   }
 }
 
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     ValueOwnershipKind Kind) {
+  switch (Kind) {
+  case ValueOwnershipKind::Trivial:
+    return os << "trivial";
+  case ValueOwnershipKind::Unowned:
+    return os << "unowned";
+  case ValueOwnershipKind::Owned:
+    return os << "owned";
+  case ValueOwnershipKind::Guaranteed:
+    return os << "guaranteed";
+  case ValueOwnershipKind::Any:
+    return os << "any";
+  }
+
+  llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
+}
+
+Optional<ValueOwnershipKind>
+ValueOwnershipKind::merge(ValueOwnershipKind RHS) const {
+  auto LHSVal = Value;
+  auto RHSVal = RHS.Value;
+
+  // Any merges with anything.
+  if (LHSVal == ValueOwnershipKind::Any) {
+    return ValueOwnershipKind(RHSVal);
+  }
+  // Any merges with anything.
+  if (RHSVal == ValueOwnershipKind::Any) {
+    return ValueOwnershipKind(LHSVal);
+  }
+
+  return (LHSVal == RHSVal) ? Optional<ValueOwnershipKind>(*this) : None;
+}
+
+ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
+  auto Result = llvm::StringSwitch<Optional<ValueOwnershipKind::innerty>>(S)
+                    .Case("trivial", ValueOwnershipKind::Trivial)
+                    .Case("unowned", ValueOwnershipKind::Unowned)
+                    .Case("owned", ValueOwnershipKind::Owned)
+                    .Case("guaranteed", ValueOwnershipKind::Guaranteed)
+                    .Case("any", ValueOwnershipKind::Any)
+                    .Default(None);
+  if (!Result.hasValue())
+    llvm_unreachable("Invalid string representation of ValueOwnershipKind");
+  Value = Result.getValue();
+}
+
+ValueOwnershipKind
+ValueOwnershipKind::getProjectedOwnershipKind(SILModule &M,
+                                              SILType Proj) const {
+  if (Proj.isTrivial(M))
+    return ValueOwnershipKind::Trivial;
+  return *this;
+}
+
+ValueOwnershipKind SILValue::getOwnershipKind() const {
+  // Once we have multiple return values, this must be changed.
+  sil::ValueOwnershipKindClassifier Classifier;
+  return Classifier.visit(const_cast<ValueBase *>(Value));
+}
+
+#if 0
+/// Map a SILValue mnemonic name to its ValueKind.
+ValueKind swift::getSILValueKind(StringRef Name) {
+#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior, ReleasingBehavior)       \
+  if (Name == #TextualName)                                                    \
+    return ValueKind::Id;
+
+#define VALUE(Id, Parent)                                                      \
+  if (Name == #Id)                                                             \
+    return ValueKind::Id;
+
+#include "swift/SIL/SILNodes.def"
+
+#ifdef NDEBUG
+  llvm::errs()
+    << "Unknown SILValue name\n";
+  abort();
+#endif
+  llvm_unreachable("Unknown SILValue name");
+}
+
+/// Map ValueKind to a corresponding mnemonic name.
+StringRef swift::getSILValueName(ValueKind Kind) {
+  switch (Kind) {
+#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior, ReleasingBehavior)       \
+  case ValueKind::Id:                                                          \
+    return #TextualName;
+
+#define VALUE(Id, Parent)                                                      \
+  case ValueKind::Id:                                                          \
+    return #Id;
+
+#include "swift/SIL/SILNodes.def"
+  }
+}
+#endif

@@ -1,0 +1,120 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer -dce | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Bar {
+  init()
+  func ping()
+}
+
+class Foo : Bar {
+  override init()
+  override func ping()
+}
+
+sil_global @x : $Bar
+
+// CHECK-LABEL: sil @function_with_cm_with_cast
+// CHECK: [[SELF:%.*]] = alloc_ref $Foo
+// CHECK-NOT: class_method
+// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Foo4pingfS0_FT_T_
+// CHECK: apply [[REF]]([[SELF]])
+// CHECK: return
+sil @function_with_cm_with_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @x : $*Bar                     // users: %7, %8
+  %1 = alloc_ref $Foo                             // users: %5, %3, %2
+  strong_retain %1 : $Foo                         // id: %2
+  %3 = upcast %1 : $Foo to $Bar                   // user: %4
+  %4 = unconditional_checked_cast %3 : $Bar to $Foo // user: %6
+  strong_release %1 : $Foo                        // id: %5
+  %6 = upcast %4 : $Foo to $Bar                   // user: %7
+  store %6 to %0 : $*Bar                          // id: %7
+  %8 = load %0 : $*Bar                            // users: %11, %10, %9
+  strong_retain %6 : $Bar                         // id: %9
+  %10 = class_method %6 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %11
+  %11 = apply %10(%8) : $@convention(method) (@guaranteed Bar) -> ()
+  %12 = tuple ()                                  // user: %13
+  return %12 : $()                                // id: %13
+}
+
+// CHECK-LABEL: sil @function_with_cm_with_dynamic_type_known_from_checked_cast_br
+// CHECK-NOT: class_method
+// CHECK: bb1([[SELF:%.*]] : $Bar):
+// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
+// CHECK: apply [[REF]]([[SELF]])
+// CHECK: return
+sil @function_with_cm_with_dynamic_type_known_from_checked_cast_br : $@convention(thin) (Bar) -> () {
+bb0(%0 : $Bar):
+  checked_cast_br [exact] %0 : $Bar to $Bar, bb1, bb5
+
+bb1(%1 : $Bar):
+  br bb2(%1 : $Bar)
+
+bb2(%2 : $Bar):
+  br bb3(%2 : $Bar)
+
+bb3(%3 : $Bar):
+  br bb4(%3 : $Bar)
+
+bb4(%4 : $Bar):
+  // Devirtualizer should be able to figure out that the exact dynamic type of %1 is Bar.
+  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed Bar) -> ()
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @function_with_cm_with_dynamic_type_known_from_incoming_bb_args
+// CHECK-NOT: class_method
+// CHECK: bb3([[SELF:%.*]] : $Bar):
+// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
+// CHECK: apply [[REF]]([[SELF]])
+// CHECK: return
+sil @function_with_cm_with_dynamic_type_known_from_incoming_bb_args : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %1 = alloc_ref $Bar
+  br bb3(%1 : $Bar)
+
+bb2:
+  %2 = alloc_ref $Bar
+  br bb3(%2 : $Bar)
+
+bb3(%4 : $Bar):
+  // Devirtualizer should be able to figure out that the exact dynamic type of %4 is Bar.
+  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed Bar) -> ()
+  br bb4
+
+bb4:
+  strong_release %4 : $Bar
+  %7 = tuple ()
+  return %7 : $()
+}
+
+
+sil @_TFC4main3Bar4pingfS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
+sil @_TFC4main3Foo4pingfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> ()
+
+sil_vtable Bar {
+  #Bar.ping!1: _TFC4main3Bar4pingfS0_FT_T_
+}
+
+sil_vtable Foo {
+  #Bar.ping!1: _TFC4main3Foo4pingfS0_FT_T_
+}
+
+
+

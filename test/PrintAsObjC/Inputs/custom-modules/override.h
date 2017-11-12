@@ -6,6 +6,7 @@
 - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
 
 @property(readonly,getter=getProp) NSUInteger prop;
+@property(readonly) NSInteger originalName __attribute__((swift_name("renamedProp")));
 
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 

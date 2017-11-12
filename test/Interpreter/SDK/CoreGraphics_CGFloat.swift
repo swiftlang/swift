@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-// XFAIL: interpret
+// REQUIRES: rdar30317033
 
 import CoreGraphics
 import Foundation
@@ -22,6 +22,7 @@ CGFloatTestSuite.test("init") {
   expectEqual(0.0, CGFloat())
   expectEqual(4.125, CGFloat(Float(4.125)))
   expectEqual(4.125, CGFloat(Double(4.125)))
+  expectEqual(4.125, CGFloat(CGFloat(Double(4.125))))
 
   expectEqual(42, CGFloat(Int(42)))
   expectEqual(42, CGFloat(Int8(42)))
@@ -54,37 +55,12 @@ CGFloatTestSuite.test("initOtherTypesFromCGFloat") {
 }
 
 CGFloatTestSuite.test("comparisons") {
-  let x = 3.14
-  let y = 3.14
-  let z = 2.71
+  let instances: [CGFloat] = [ 2.71, 3.14 ]
 
-  expectTrue(x == y)
-  expectFalse(x != y)
-  checkHashable(true, x, y)
+  checkHashable(instances, equalityOracle: { $0 == $1 })
 
-  expectFalse(x == z)
-  expectTrue(x != z)
-  checkHashable(false, x, z)
-
-  expectFalse(x < z)
-  expectFalse(x <= z)
-  expectTrue(x >= z)
-  expectTrue(x > z)
-  checkComparable(.GT, x, z)
-
-  expectTrue(z < x)
-  expectTrue(z <= x)
-  expectFalse(z >= x)
-  expectFalse(z > x)
-  checkComparable(.LT, z, x)
-
-  expectFalse(x < y)
-  expectTrue(x <= y)
-  expectTrue(x >= y)
-  expectFalse(x > y)
-  checkComparable(.EQ, x, y)
+  checkComparable(instances, oracle: { $0 <=> $1 })
 }
-
 
 CGFloatTestSuite.test("arithmetic") {
   let x: CGFloat = 0.25
@@ -98,22 +74,20 @@ CGFloatTestSuite.test("arithmetic") {
   expectEqual(1.0, x * y)
 
   expectEqual(0.0625, x / y)
-
-  expectEqual(0.25, x % z)
 }
 
 CGFloatTestSuite.test("striding") {
-  if true {
+  do {
     var result = [CGFloat]()
-    for f in (1.0 as CGFloat).stride(to: 2.0, by: 0.5) {
+    for f in stride(from: (1.0 as CGFloat), to: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5 ], result)
   }
 
-  if true {
+  do {
     var result = [CGFloat]()
-    for f in (1.0 as CGFloat).stride(through: 2.0, by: 0.5) {
+    for f in stride(from: (1.0 as CGFloat), through: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5, 2.0 ], result)
@@ -122,7 +96,7 @@ CGFloatTestSuite.test("striding") {
 
 CGFloatTestSuite.test("bridging") {
   // Bridging to NSNumber.
-  if true {
+  do {
     let flt: CGFloat = 4.125
 
     // CGFloat -> NSNumber conversion.
@@ -135,7 +109,7 @@ CGFloatTestSuite.test("bridging") {
   }
 
   // Array bridging.
-  if true {
+  do {
     let originalArray: [CGFloat] = [ 4.125, 10.625 ]
 
     // Array -> NSArray
@@ -150,13 +124,13 @@ CGFloatTestSuite.test("bridging") {
 }
 
 CGFloatTestSuite.test("varargs") {
-  let v: CVarArgType = CGFloat(0)
+  let v: CVarArg = CGFloat(0)
   expectEqual(
-    "0.023230", NSString(format: "%.6f", CGFloat(0.02323) as CVarArgType))
+    "0.023230", NSString(format: "%.6f", CGFloat(0.02323) as CVarArg))
   expectEqual(
-    "0.123450", NSString(format: "%.6f", CGFloat(0.12345) as CVarArgType))
+    "0.123450", NSString(format: "%.6f", CGFloat(0.12345) as CVarArg))
   expectEqual(
-    "1.234560", NSString(format: "%.6f", CGFloat(1.23456) as CVarArgType))
+    "1.234560", NSString(format: "%.6f", CGFloat(1.23456) as CVarArg))
 }
 
 runAllTests()

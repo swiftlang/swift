@@ -1,0 +1,4 @@
+# Dependencies before compilation:
+depends-nominal: [x, a]
+depends-member: [[x, x], !private [a, a]]
+provides-nominal: [b]

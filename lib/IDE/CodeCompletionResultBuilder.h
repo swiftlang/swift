@@ -1,12 +1,12 @@
-//===- CodeCompletionResultBuilder.h - Bulid completion results -----------===//
+//===--- CodeCompletionResultBuilder.h - Build completion results ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,9 +14,12 @@
 #define SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
 
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 
 namespace clang {
 class Module;
@@ -46,6 +49,8 @@ class CodeCompletionResultBuilder {
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   bool IsNotRecommended = false;
+  CodeCompletionResult::NotRecommendedReason NotRecReason =
+    CodeCompletionResult::NotRecommendedReason::NoReason;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -93,8 +98,9 @@ public:
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
-  void setNotRecommended(bool NotRecommended = true) {
-    IsNotRecommended = NotRecommended;
+  void setNotRecommended(CodeCompletionResult::NotRecommendedReason Reason) {
+    IsNotRecommended = true;
+    NotRecReason = Reason;
   }
 
   void
@@ -102,20 +108,30 @@ public:
     ExpectedTypeRelation = relation;
   }
 
-  void addAccessControlKeyword(Accessibility Access) {
+  void addAccessControlKeyword(AccessLevel Access) {
     switch (Access) {
-    case Accessibility::Private:
+    case AccessLevel::Private:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "private ");
       break;
-    case Accessibility::Internal:
+    case AccessLevel::FilePrivate:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "fileprivate ");
+      break;
+    case AccessLevel::Internal:
       // 'internal' is the default, don't add it.
       break;
-    case Accessibility::Public:
+    case AccessLevel::Public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "public ");
+      break;
+    case AccessLevel::Open:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "open ");
       break;
     }
   }
@@ -229,34 +245,48 @@ public:
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
+  void addEqual() {
+    addChunkWithTextNoCopy(CodeCompletionString::Chunk::ChunkKind::Equal, "=");
+  }
+
   void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
                                bool NeedSpecify) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
                      DeclAttrParamKeyword, Name);
     if (NeedSpecify)
       addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
-                       DeclAttrParamEqual, "=");
-    if(!Annotation.empty())
+                       DeclAttrParamColon, ": ");
+    if (!Annotation.empty())
       addTypeAnnotation(Annotation);
   }
 
   void addDeclAttrKeyword(StringRef Name, StringRef Annotation) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
                      DeclAttrKeyword, Name);
-    if(!Annotation.empty())
+    if (!Annotation.empty())
       addTypeAnnotation(Annotation);
   }
 
-  bool escapeKeyword(StringRef Word, llvm::SmallString<16> &EscapedKeyword) {
-#define KEYWORD(kw)                                                           \
-    if (Word.equals(#kw)) {                                                   \
-      EscapedKeyword.append("`");                                             \
-      EscapedKeyword.append(Word);                                            \
-      EscapedKeyword.append("`");                                             \
-      return true;                                                            \
+  StringRef escapeArgumentLabel(StringRef Word,
+                                bool escapeAllKeywords,
+                                llvm::SmallString<16> &EscapedKeyword) {
+    bool shouldEscape = false;
+    if (escapeAllKeywords) {
+#define KEYWORD(kw) .Case(#kw, true)
+      shouldEscape = llvm::StringSwitch<bool>(Word)
+#include "swift/Syntax/TokenKinds.def"
+        .Default(false);
+    } else {
+      shouldEscape = !canBeArgumentLabel(Word);
     }
-#include "swift/Parse/Tokens.def"
-    return false;
+
+    if (!shouldEscape)
+      return Word;
+
+    EscapedKeyword.append("`");
+    EscapedKeyword.append(Word);
+    EscapedKeyword.append("`");
+    return EscapedKeyword;
   }
 
   void addCallParameterColon() {
@@ -267,7 +297,7 @@ public:
   void addSimpleNamedParameter(StringRef name) {
     CurrentNestingLevel++;
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    // Use internal, since we don't want the name to be outisde the placeholder.
+    // Use internal, since we don't want the name to be outside the placeholder.
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
         name);
@@ -285,7 +315,7 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg) {
+                        bool IsVarArg, bool Outermost, bool IsInOut) {
     CurrentNestingLevel++;
 
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
@@ -293,7 +323,7 @@ public:
     if (!Name.empty()) {
       StringRef NameStr = Name.str();
 
-      // 'self' is a keyword, we can not allow to insert it into the source
+      // 'self' is a keyword, we cannot allow to insert it into the source
       // buffer.
       bool IsAnnotation = (NameStr == "self");
 
@@ -301,8 +331,9 @@ public:
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
           // if the name is not annotation, we need to escape keyword
-          !IsAnnotation && escapeKeyword(NameStr, EscapedKeyword) ?
-            EscapedKeyword.str() : NameStr);
+          IsAnnotation ? NameStr
+                       : escapeArgumentLabel(NameStr, !Outermost,
+                                             EscapedKeyword));
       if (IsAnnotation)
         getLastChunk().setIsAnnotation();
 
@@ -313,10 +344,10 @@ public:
     }
 
     // 'inout' arguments are printed specially.
-    if (auto *IOT = Ty->getAs<InOutType>()) {
+    if (IsInOut) {
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::Ampersand, "&");
-      Ty = IOT->getObjectType();
+      Ty = Ty->getInOutObjectType();
     }
 
     if (Name.empty() && !LocalName.empty()) {
@@ -324,8 +355,7 @@ public:
       // Use local (non-API) parameter name if we have nothing else.
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-          escapeKeyword(LocalName.str(), EscapedKeyword) ? EscapedKeyword.str()
-                                                         : LocalName.str());
+            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
@@ -364,8 +394,9 @@ public:
     CurrentNestingLevel--;
   }
 
-  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg) {
-    addCallParameter(Name, Identifier(), Ty, IsVarArg);
+  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg,
+                        bool Outermost, bool IsInOut) {
+    addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost, IsInOut);
   }
 
   void addGenericParameter(StringRef Name) {
@@ -396,9 +427,10 @@ public:
     getLastChunk().setIsAnnotation();
   }
 
-  void addBraceStmtWithCursor() {
-    addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor, " {}");
+  void addBraceStmtWithCursor(StringRef Description = "") {
+    addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor,
+        Description);
   }
 
   void addWhitespace(StringRef space) {

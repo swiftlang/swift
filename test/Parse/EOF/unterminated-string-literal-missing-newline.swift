@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift 
+// RUN: %target-typecheck-verify-swift 
 
 // Check that we correctly process an unterminated string literal right near EOF.
 

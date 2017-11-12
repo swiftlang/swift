@@ -1,6 +1,46 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 protocol AddrOnly {}
+
+func callMethodsOnD<U>(d: D, b: B, a: AddrOnly, u: U, i: Int) {
+  _ = d.iuo(x: b, y: b, z: b)
+  _ = d.f(x: b, y: b)
+  _ = d.f2(x: b, y: b)
+  _ = d.f3(x: b, y: b)
+  _ = d.f4(x: b, y: b)
+  _ = d.g(x: a, y: a)
+  _ = d.g2(x: a, y: a)
+  _ = d.g3(x: a, y: a)
+  _ = d.g4(x: a, y: a)
+  _ = d.h(x: u, y: u)
+  _ = d.h2(x: u, y: u)
+  _ = d.h3(x: u, y: u)
+  _ = d.h4(x: u, y: u)
+  _ = d.i(x: i, y: i)
+  _ = d.i2(x: i, y: i)
+  _ = d.i3(x: i, y: i)
+  _ = d.i4(x: i, y: i)
+}
+
+func callMethodsOnF<U>(d: F, b: B, a: AddrOnly, u: U, i: Int) {
+  _ = d.iuo(x: b, y: b, z: b)
+  _ = d.f(x: b, y: b)
+  _ = d.f2(x: b, y: b)
+  _ = d.f3(x: b, y: b)
+  _ = d.f4(x: b, y: b)
+  _ = d.g(x: a, y: a)
+  _ = d.g2(x: a, y: a)
+  _ = d.g3(x: a, y: a)
+  _ = d.g4(x: a, y: a)
+  _ = d.h(x: u, y: u)
+  _ = d.h2(x: u, y: u)
+  _ = d.h3(x: u, y: u)
+  _ = d.h4(x: u, y: u)
+  _ = d.i(x: i, y: i)
+  _ = d.i2(x: i, y: i)
+  _ = d.i3(x: i, y: i)
+  _ = d.i4(x: i, y: i)
+}
 
 @objc class B {
   // We only allow B! -> B overrides for @objc methods.
@@ -89,24 +129,34 @@ class F: D {
   override func i4(x: Int, y: Int) -> Int {}
 }
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuo
-// CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
-// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
-// CHECK:         apply [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%.*]]#1,
-// CHECK:         [[UNWRAP_Y:%.*]] = load [[UNWRAP_Y_ADDR]]
-// CHECK:         [[RES:%.*]] = apply {{%.*}}([[WRAP_X]], [[UNWRAP_Y]], %2, %3)
-// CHECK:         [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
-// CHECK:         return [[WRAP_RES]]
+// This test is incorrect in semantic SIL today. But it will be fixed in
+// forthcoming commits.
+//
+// CHECK-LABEL: sil private @_T013vtable_thunks1DC3iuo{{[_0-9a-zA-Z]*}}FTV
+// CHECK: bb0([[X:%.*]] : @owned $B, [[Y:%.*]] : @owned $Optional<B>, [[Z:%.*]] : @owned $B, [[W:%.*]] : @guaranteed $D):
+// CHECK:   [[WRAP_X:%.*]] = enum $Optional<B>, #Optional.some!enumelt.1, [[X]] : $B
+// CHECK:   switch_enum [[Y]] : $Optional<B>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D1g
+// CHECK: [[NONE_BB]]:
+// CHECK:   [[DIAGNOSE_UNREACHABLE_FUNC:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{.*}}
+// CHECK:   apply [[DIAGNOSE_UNREACHABLE_FUNC]]
+// CHECK:   unreachable
+
+// CHECK: [[SOME_BB]]([[UNWRAP_Y:%.*]] : @owned $B):
+// CHECK:   [[THUNK_FUNC:%.*]] = function_ref @_T013vtable_thunks1DC3iuo{{.*}}
+// CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[UNWRAP_Y]], [[Z]], [[W]])
+// CHECK:   [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
+// CHECK:   return [[WRAP_RES]]
+
+// CHECK-LABEL: sil private @_T013vtable_thunks1DC1g{{[_0-9a-zA-Z]*}}FTV
 // TODO: extra copies here
 // CHECK:         [[WRAPPED_X_ADDR:%.*]] = init_enum_data_addr [[WRAP_X_ADDR:%.*]] :
 // CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR]]
 // CHECK:         inject_enum_addr [[WRAP_X_ADDR]]
 // CHECK:         [[RES_ADDR:%.*]] = alloc_stack
-// CHECK:         apply {{%.*}}([[RES_ADDR]]#1, [[WRAP_X_ADDR]], %2, %3)
+// CHECK:         apply {{%.*}}([[RES_ADDR]], [[WRAP_X_ADDR]], %2, %3)
 // CHECK:         [[DEST_ADDR:%.*]] = init_enum_data_addr %0
-// CHECK:         copy_addr [take] [[RES_ADDR]]#1 to [initialization] [[DEST_ADDR]]
+// CHECK:         copy_addr [take] [[RES_ADDR]] to [initialization] [[DEST_ADDR]]
 // CHECK:         inject_enum_addr %0
 
 class ThrowVariance {
@@ -131,11 +181,11 @@ class Y: X<D> {
 // optional.
 
 class Foo {
-  func foo(x: Int -> Int) -> (Int -> Int)? {}
+  func foo(x: @escaping (Int) -> Int) -> ((Int) -> Int)? {}
 }
 
 class Bar: Foo {
-  override func foo(x: (Int -> Int)?) -> Int -> Int {}
+  override func foo(x: ((Int) -> Int)?) -> (Int) -> Int {}
 }
 
 // rdar://problem/21364764
@@ -151,7 +201,7 @@ class Aap {
 
   func flip() -> (() -> S?) {}
 
-  func map() -> S -> () -> Aap? {}
+  func map() -> (S) -> () -> Aap? {}
 }
 
 class Noot : Aap {
@@ -163,96 +213,94 @@ class Noot : Aap {
 
   override func flip() -> (() -> S) {}
 
-  override func map() -> S? -> () -> Noot {}
+  override func map() -> (S?) -> () -> Noot {}
 }
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
-// CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
-// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks3Bar3foo{{.*}}
+// CHECK-LABEL: sil private @_T013vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}FTV : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<@callee_owned (Int) -> Int>
+// CHECK:         [[IMPL:%.*]] = function_ref @_T013vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[IMPL]]
-// CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot4flip{{.*}}
-// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot4flip{{.*}}
+// CHECK-LABEL: sil private @_T013vtable_thunks4NootC4flip{{[_0-9a-zA-Z]*}}FTV
+// CHECK:         [[IMPL:%.*]] = function_ref @_T013vtable_thunks4NootC4flip{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
-// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo__dV13vtable_thunks1S_XFo__dGSqS0___
+// CHECK:         [[THUNK:%.*]] = function_ref @_T013vtable_thunks1SVIexd_ACSgIexd_TR
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dV13vtable_thunks1S_XFo__dGSqS0___
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVIexd_ACSgIexd_TR
 // CHECK:         [[INNER:%.*]] = apply %0()
-// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %1 : $S
+// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %1 : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot3map{{.*}}
-// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot3map{{.*}}
+// CHECK-LABEL: sil private @_T013vtable_thunks4NootC3map{{[_0-9a-zA-Z]*}}FTV
+// CHECK:         [[IMPL:%.*]] = function_ref @_T013vtable_thunks4NootC3map{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
-// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dGSqV13vtable_thunks1S__oXFo__oCS_4Noot__XFo_dS0__oXFo__oGSqCS_3Aap___
+// CHECK:         [[THUNK:%.*]] = function_ref @_T013vtable_thunks1SVSgAA4NootCIexo_Iexyo_AcA3AapCSgIexo_Iexyo_TR
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqV13vtable_thunks1S__oXFo__oCS_4Noot__XFo_dS0__oXFo__oGSqCS_3Aap___
-// CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %0
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIexo_Iexyo_AcA3AapCSgIexo_Iexyo_TR
+// CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
 // CHECK:         [[INNER:%.*]] = apply %1(%2)
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>
 // CHECK:         return [[OUTER]]
 // CHECK-LABEL: sil_vtable D {
-// CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f2!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f3!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f4!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g4!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h4!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.f!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f2!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f3!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.g!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.h!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.i!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable E {
-// CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f2!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f3!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f4!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.g4!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.h4!1: _TF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i2!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i3!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.i4!1: _TF{{[A-Z0-9a-z_]*}}1D
+// CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.f!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f2!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f3!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.g!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.h!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.i!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i4!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable F {
-// CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
-// CHECK:         #B.f!1: _TF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.f2!1: _TF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.f3!1: _TF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.f4!1: _TF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.g!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.g2!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.g3!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.g4!1: _TF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.h!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.h2!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.h3!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.h4!1: _TF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.i!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.i2!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.i3!1: _TTVF{{[A-Z0-9a-z_]*}}1F
-// CHECK:         #B.i4!1: _TF{{[A-Z0-9a-z_]*}}1F
+// CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.f!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f2!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f3!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.f4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.g!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.h!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+// CHECK:         #B.i!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: {{.*}} : hidden _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i4!1: {{.*}} : _T013vtable_thunks1F{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable NoThrowVariance {
-// CHECK:         #ThrowVariance.mightThrow!1: _TF
+// CHECK:         #ThrowVariance.mightThrow!1: {{.*}} : _T013vtable_thunks{{[A-Z0-9a-z_]*}}F
 

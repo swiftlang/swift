@@ -1,0 +1,7 @@
+framework module PrivatelyReadwrite {
+  umbrella header "PrivatelyReadwrite.h"
+  module * {
+    export *
+  }
+  exclude header "Private.h"
+}

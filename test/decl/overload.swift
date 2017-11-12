@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var var_redecl1: Int // expected-note {{previously declared here}}
 var_redecl1 = 0
@@ -115,35 +115,35 @@ let mixed_redecl13: Int = 0 // expected-note {{previously declared here}}
 var mixed_redecl13: Int // expected-error {{invalid redeclaration}}
 
 var mixed_redecl14 : Int
-func mixed_redecl14(i: Int) {} // okay
+func mixed_redecl14(_ i: Int) {} // okay
 
-func mixed_redecl15(i: Int) {}
+func mixed_redecl15(_ i: Int) {}
 var mixed_redecl15 : Int  // okay
 
 class OverloadStaticFromBase {
   class func create() {}
 }
 class OverloadStaticFromBase_Derived : OverloadStaticFromBase {
-  class func create(x: Int) {}
+  class func create(_ x: Int) {}
 }
 
 
 // Overloading of functions based on argument names only.
-func ovl_argname1(x x: Int, y: Int) { }
-func ovl_argname1(y y: Int, x: Int) { }
-func ovl_argname1(a a: Int, b: Int) { }
+func ovl_argname1(x: Int, y: Int) { }
+func ovl_argname1(y: Int, x: Int) { }
+func ovl_argname1(a: Int, b: Int) { }
 
 // Overloading with generics
 protocol P1 { }
 protocol P2 { }
-func ovl_generic1<T: protocol<P1, P2>>(t t: T) { } // expected-note{{previous}}
-func ovl_generic1<U: protocol<P1, P2>>(t t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
+func ovl_generic1<T: P1 & P2>(t: T) { } // expected-note{{previous}}
+func ovl_generic1<U: P1 & P2>(t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
 
 func ovl_generic2<T : P1>(_: T) {} // expected-note{{previously declared here}}
 func ovl_generic2<T : P1>(_: T) {} // expected-error{{invalid redeclaration of 'ovl_generic2'}}
 
-func ovl_generic3<T : P1>(x: T) {} // OK
-func ovl_generic3<T : P2>(x: T) {} // OK
+func ovl_generic3<T : P1>(_ x: T) {} // OK
+func ovl_generic3<T : P2>(_ x: T) {} // OK
 
 // Redeclarations within nominal types
 struct X { }
@@ -154,17 +154,17 @@ struct Z {
 }
 
 struct X1 {
-  func f(a a : Int) {}  // expected-note{{previously declared here}}
-  func f(a a : Int) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
+  func f(a : Int) {}  // expected-note{{previously declared here}}
+  func f(a : Int) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
 }
 struct X2 {
-  func f(a a : Int) {} // expected-note{{previously declared here}}
+  func f(a : Int) {} // expected-note{{previously declared here}}
   typealias IntAlias = Int
-  func f(a a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
+  func f(a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
 }
 struct X3 { 
-  func f(a a : Int) {} // expected-note{{previously declared here}}
-  func f(a a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
+  func f(a : Int) {} // expected-note{{previously declared here}}
+  func f(a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
   typealias IntAlias = Int
 }
 
@@ -201,9 +201,9 @@ class Initializers {
 
 // Default arguments
 // <rdar://problem/13338746>
-func sub(x x:Int64, y:Int64) -> Int64 { return x - y } // expected-note 2{{'sub(x:y:)' previously declared here}}
-func sub(x x:Int64, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
-func sub(x x:Int64 = 0, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
+func sub(x:Int64, y:Int64) -> Int64 { return x - y } // expected-note 2{{'sub(x:y:)' previously declared here}}
+func sub(x:Int64, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
+func sub(x:Int64 = 0, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
 
 // <rdar://problem/13783231>
 struct NoneType {
@@ -217,49 +217,52 @@ func != <T>(lhs : T, rhs : NoneType) -> Bool { // expected-error{{invalid redecl
   return true
 }
 
-// <rdar://problem/15082356>
-func &&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool { // expected-note{{previously declared}}
-  return lhs.boolValue && rhs().boolValue
-}
-
-func &&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
-  return lhs.boolValue || rhs().boolValue
-}
 
 // throws
-func throwsFunc(code code: Int) { } // expected-note{{previously declared}}
-@noreturn func throwsFunc(code code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
+func throwsFunc(code: Int) { } // expected-note{{previously declared}}
+func throwsFunc(code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
 
 // throws function parameter -- OK
-func throwsFuncParam(fn: () throws -> ()) { }
-func throwsFuncParam(fn: () -> ()) { }
+func throwsFuncParam(_ fn: () throws -> ()) { }
+func throwsFuncParam(_ fn: () -> ()) { }
 
-// @noreturn
-func noreturn(code code: Int) { } // expected-note{{previously declared}}
-@noreturn func noreturn(code code: Int) { } // expected-error{{invalid redeclaration of 'noreturn(code:)'}}
+// @escaping
+func escaping(x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+func escaping(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(x:)'}}
+func escaping(_ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+func escaping(_ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+func escaping(a: Int, _ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+func escaping(a: Int, _ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(a:_:)'}}
 
-// <rdar://problem/19816831>
-func noreturn_1(x x: @noreturn (Int) -> Int) { } // expected-note{{previously declared}}
-func noreturn_1(x x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noreturn_1(x:)'}}
+func escaping(_ a: (Int) -> Int, _ x: (Int) -> Int) { }
+  // expected-note@-1{{previously declared}}
+  // expected-note@-2{{previously declared}}
+  // expected-note@-3{{previously declared}}
+func escaping(_ a: (Int) -> Int, _ x: @escaping (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+func escaping(_ a: @escaping (Int) -> Int, _ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+func escaping(_ a: @escaping (Int) -> Int, _ x: @escaping (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
 
-// @noescape
-func noescape(@noescape x x: (Int) -> Int) { } // expected-note{{previously declared}}
-func noescape(x x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noescape(x:)'}}
+struct Escaping {
+  func escaping(_ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+  func escaping(_ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping'}}
+  func escaping(a: Int, _ x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+  func escaping(a: Int, _ x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(a:_:)'}}
+}
 
 // @autoclosure
-func autoclosure(f f: () -> Int) { }
-func autoclosure(@autoclosure f f: () -> Int) { }
+func autoclosure(f: () -> Int) { }
+func autoclosure(f: @autoclosure () -> Int) { }
 
 // inout
-func inout2(x x: Int) { }
-func inout2(inout x x: Int) { }
+func inout2(x: Int) { }
+func inout2(x: inout Int) { }
 
 // optionals
-func optional(x x: Int?) { } // expected-note{{previously declared}}
-func optional(x x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
+func optional(x: Int?) { } // expected-note{{previously declared}}
+func optional(x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
 
-func optional_2(x x: (Int?) -> Int) { } // expected-note{{previously declared}}
-func optional_2(x x: (Int!) -> Int) { } // expected-error{{invalid redeclaration of 'optional_2(x:)'}}
+func optional_2(x: (Int?) -> Int) { } // expected-note{{previously declared}}
+func optional_2(x: (Int!) -> Int) { } // expected-error{{invalid redeclaration of 'optional_2(x:)'}}
 
 func optional_3() -> Int? { } // expected-note{{previously declared}}
 func optional_3() -> Int! { } // expected-error{{invalid redeclaration of 'optional_3()'}}
@@ -269,14 +272,10 @@ protocol ProtocolWithMutating {
   mutating func test1() // expected-note {{previously declared}}
   func test1() // expected-error{{invalid redeclaration of 'test1()'}}
 
-  mutating func test2(a: Int?) // expected-note {{previously declared}}
-  func test2(a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
+  mutating func test2(_ a: Int?) // expected-note {{previously declared}}
+  func test2(_ a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
 
-  @noreturn
-  mutating func test3() // expected-note {{previously declared}}
-  func test3() // expected-error {{invalid redeclaration of 'test3()'}}
-
-  mutating static func classTest1() // expected-error {{static functions may not be declared mutating}} {{3-12=}} expected-note {{previously declared}}
+  mutating static func classTest1() // expected-error {{static functions must not be declared mutating}} {{3-12=}} expected-note {{previously declared}}
   static func classTest1() // expected-error{{invalid redeclaration of 'classTest1()'}}
 }
 
@@ -284,16 +283,31 @@ struct StructWithMutating {
   mutating func test1() { } // expected-note {{previously declared}}
   func test1() { } // expected-error{{invalid redeclaration of 'test1()'}}
 
-  mutating func test2(a: Int?) { } // expected-note {{previously declared}}
-  func test2(a: Int!) { } // expected-error{{invalid redeclaration of 'test2'}}
-
-  @noreturn
-  mutating func test3() { } // expected-note {{previously declared}}
-  func test3() { } // expected-error {{invalid redeclaration of 'test3()'}}
+  mutating func test2(_ a: Int?) { } // expected-note {{previously declared}}
+  func test2(_ a: Int!) { } // expected-error{{invalid redeclaration of 'test2'}}
 }
 
 enum EnumWithMutating {
   mutating func test1() { } // expected-note {{previously declared}}
   func test1() { } // expected-error{{invalid redeclaration of 'test1()'}}
 }
+
+// <rdar://problem/21783216> Ban members named Type and Protocol without backticks
+// https://twitter.com/jadengeller/status/619989059046240256
+protocol r21783216a {
+  // expected-error @+2 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
+  // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{18-22=`Type`}}
+  associatedtype Type
+  
+  // expected-error @+2 {{type member must not be named 'Protocol', since it would conflict with the 'foo.Protocol' expression}}
+  // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{18-26=`Protocol`}}
+  associatedtype Protocol
+}
+
+protocol r21783216b {
+  associatedtype `Type`  // ok
+  associatedtype `Protocol` // ok
+}
+
+
 

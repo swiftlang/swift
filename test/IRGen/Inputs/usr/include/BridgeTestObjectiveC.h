@@ -1,5 +1,11 @@
 @class NSString;
 
+typedef struct _NSZone NSZone;
+
+@protocol NSCopying
+- copyWithZone:(nullable NSZone*)z;
+@end
+
 @interface NSObject
 + (NSObject*) alloc;
 - (NSObject*) init;

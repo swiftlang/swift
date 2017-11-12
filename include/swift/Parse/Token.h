@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,39 +19,11 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Syntax/TokenKinds.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
-
-enum class tok {
-  unknown = 0,
-  eof,
-  code_complete,
-  identifier,
-  oper_binary_unspaced,   // "x+y"
-  oper_binary_spaced,     // "x + y"
-  oper_postfix,
-  oper_prefix,
-  dollarident,
-  integer_literal,
-  floating_literal,
-  string_literal,
-  sil_local_name,      // %42 in SIL mode.
-  pound_if,
-  pound_else,
-  pound_elseif,
-  pound_endif,
-  pound_line,
-  pound_available,
-  comment,
-  
-#define KEYWORD(X) kw_ ## X,
-#define PUNCTUATOR(X, Y) X,
-#include "swift/Parse/Tokens.def"
-  
-  NUM_TOKENS
-};
 
 /// Token - This structure provides full information about a lexed token.
 /// It is not intended to be space efficient, it is intended to return as much
@@ -74,6 +46,9 @@ class Token {
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
   
+  /// Modifiers for string literals
+  unsigned MultilineString : 1;
+
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
 
@@ -86,9 +61,17 @@ class Token {
 public:
   Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
             EscapedIdentifier(false) {}
-  
+
+  Token(tok Kind, StringRef Text, unsigned CommentLength)
+          : Kind(Kind), AtStartOfLine(false), CommentLength(CommentLength),
+            EscapedIdentifier(false), MultilineString(false),
+            Text(Text) {}
+
+  Token(tok Kind, StringRef Text): Token(Kind, Text, 0) {};
+
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
+  void clearCommentLength() { CommentLength = 0; }
   
   /// is/isNot - Predicates to check if this token is a specific kind, as in
   /// "if (Tok.is(tok::l_brace)) {...}".
@@ -172,7 +155,7 @@ public:
     case 'n':
       return Text == "nonmutating";
     case 'o':
-      return Text == "optional" || Text == "override";
+      return Text == "open" || Text == "override" || Text == "optional";
     case 'p':
       return Text == "prefix" || Text == "postfix";
     case 'r':
@@ -188,6 +171,29 @@ public:
 
   bool isContextualPunctuator(StringRef ContextPunc) const {
     return isAnyOperator() && Text == ContextPunc;
+  }
+
+  /// Determine whether the token can be an argument label.
+  ///
+  /// This covers all identifiers and keywords except those keywords
+  /// used
+  bool canBeArgumentLabel() const {
+    // Identifiers, escaped identifiers, and '_' can be argument labels.
+    if (is(tok::identifier) || isEscapedIdentifier() || is(tok::kw__)) {
+      // ... except for '__shared' and '__owned'.
+      if (getRawText().equals("__shared") ||
+          getRawText().equals("__owned"))
+        return false;
+
+      return true;
+    }
+
+    // 'let', 'var', and 'inout' cannot be argument labels.
+    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout))
+      return false;
+
+    // All other keywords can be argument labels.
+    return isKeyword();
   }
 
   /// True if the token is an identifier or '_'.
@@ -209,7 +215,27 @@ public:
   bool isKeyword() const {
     switch (Kind) {
 #define KEYWORD(X) case tok::kw_##X: return true;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
+    default: return false;
+    }
+  }
+
+  /// True if the token is any literal.
+  bool isLiteral() const {
+    switch(Kind) {
+    case tok::integer_literal:
+    case tok::floating_literal:
+    case tok::string_literal:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  bool isPunctuation() const {
+    switch (Kind) {
+#define PUNCTUATOR(Name, Str) case tok::Name: return true;
+#include "swift/Syntax/TokenKinds.def"
     default: return false;
     }
   }
@@ -245,6 +271,9 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
   }
 
+  StringRef getRawText() const {
+    return Text;
+  }
 
   StringRef getText() const {
     if (EscapedIdentifier) {
@@ -258,11 +287,17 @@ public:
   void setText(StringRef T) { Text = T; }
 
   /// \brief Set the token to the specified kind and source range.
-  void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0,
+                bool MultilineString = false) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
+    this->MultilineString = MultilineString;
+  }
+
+  bool IsMultilineString() const {
+    return MultilineString;
   }
 };
   
@@ -273,6 +308,6 @@ namespace llvm {
   template <typename T> struct isPodLike;
   template <>
   struct isPodLike<swift::Token> { static const bool value = true; };
-}  // end namespace llvm
+} // end namespace llvm
 
 #endif

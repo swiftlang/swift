@@ -1,0 +1,795 @@
+#!/usr/bin/env python
+#
+# -*- python -*-
+#
+# Runs a .gyb scale-testing file repeatedly through swiftc while varying a
+# scaling variable 'N', collects json stats from the compiler, transforms the
+# problem to log-space and runs a linear regression to estimate the exponent on
+# the stat's growth curve relative to N.
+#
+# The estimate will be more accurate as N increases, so if you get a
+# not-terribly-convincing estimate, try increasing --begin and --end to larger
+# values.
+#
+
+from __future__ import print_function
+
+import argparse
+import functools
+import json
+import math
+import os
+import os.path
+import random
+import shutil
+import subprocess
+import sys
+import tempfile
+from collections import namedtuple
+from operator import attrgetter
+import gyb
+from jobstats import load_stats_dir, merge_all_jobstats
+
+
+def find_which(p):
+    for d in os.environ["PATH"].split(os.pathsep):
+        full = os.path.join(d, p)
+        if os.path.isfile(full) and os.access(full, os.X_OK):
+            return full
+    return p
+
+
+# Evidently the debug-symbol reader in dtrace is sufficiently slow and/or buggy
+# that attempting to inject probes into a binary w/ debuginfo is asking for a
+# failed run (possibly racing with probe insertion, or probing the stabs
+# entries, see rdar://problem/7037927 or rdar://problem/11490861 respectively),
+# so we sniff the presence of debug symbols here.
+def has_debuginfo(swiftc):
+    swiftc = find_which(swiftc)
+    for line in subprocess.check_output(
+            ["dwarfdump", "--file-stats", swiftc]).splitlines():
+        if '%' not in line:
+            continue
+        fields = line.split()
+        if fields[8] != '0.00%' or fields[10] != '0.00%':
+            return True
+    return False
+
+
+def write_input_file(args, ast, d, n):
+    fname = "in%d.swift" % n
+    pathname = os.path.join(d, fname)
+    with open(pathname, 'w+') as f:
+        f.write(gyb.execute_template(ast, '', N=n))
+    return fname
+
+
+def ensure_tmpdir(d):
+    if d is not None and not os.path.exists(d):
+        os.makedirs(d, 0700)
+    return tempfile.mkdtemp(dir=d)
+
+
+# In newer compilers, we can use -stats-output-dir and get both more
+# counters, plus counters that are enabled in non-assert builds. Check
+# to see if we have support for that.
+def supports_stats_output_dir(args):
+    d = ensure_tmpdir(args.tmpdir)
+    sd = os.path.join(d, "stats-probe")
+
+    try:
+        os.makedirs(sd, 0700)
+        # Write a trivial test program and try running with
+        # -stats-output-dir
+        testpath = os.path.join(sd, "test.swift")
+        with open(testpath, 'w+') as f:
+            f.write("print(1)\n")
+        command = [args.swiftc_binary, '-frontend',
+                   '-typecheck',
+                   '-stats-output-dir', sd, testpath]
+        subprocess.check_call(command)
+        stats = load_stats_dir(sd)
+        return len(stats) != 0
+    except subprocess.CalledProcessError:
+        return False
+    finally:
+        shutil.rmtree(sd)
+
+
+def run_once_with_primary(args, ast, rng, primary_idx):
+    r = {}
+    try:
+        d = ensure_tmpdir(args.tmpdir)
+        inputs = [write_input_file(args, ast, d, i) for i in rng]
+        primary = inputs[primary_idx]
+        ofile = "out.o"
+
+        mode = "-c"
+        if args.typecheck:
+            mode = "-typecheck"
+
+        focus = ["-primary-file", primary]
+        if args.whole_module_optimization:
+            focus = ['-whole-module-optimization']
+
+        opts = []
+        if args.optimize:
+            opts = ['-O']
+        elif args.optimize_none:
+            opts = ['-Onone']
+        elif args.optimize_unchecked:
+            opts = ['-Ounchecked']
+
+        extra = args.Xfrontend[:]
+        if args.debuginfo:
+            extra.append('-g')
+
+        command = [args.swiftc_binary,
+                   "-frontend", mode,
+                   "-o", ofile] + opts + focus + extra + inputs
+
+        if args.trace:
+            print("running: " + " ".join(command))
+
+        if args.dtrace:
+            trace = "trace.txt"
+            script = ("pid$target:swiftc:*%s*:entry { @[probefunc] = count() }"
+                      % args.select)
+            try:
+                subprocess.check_call(
+                    ["sudo", "dtrace", "-q",
+                     "-o", trace,
+                     "-b", "256",
+                     "-n", script,
+                     "-c", " ".join(command)], cwd=d)
+            except subprocess.CalledProcessError as e:
+                if e.returncode != args.expected_exit_code:
+                    raise
+
+            r = {fields[0]: int(fields[1]) for fields in
+                 [line.split() for line in open(os.path.join(d, trace))]
+                 if len(fields) == 2}
+        else:
+            if args.debug:
+                command = ["lldb", "--"] + command
+            stats = "stats.json"
+            if args.llvm_stat_reporter:
+                argv = command + ["-Xllvm", "-stats",
+                                  "-Xllvm", "-stats-json",
+                                  "-Xllvm", "-info-output-file=" + stats]
+            else:
+                argv = command + ["-stats-output-dir", d]
+            try:
+                subprocess.check_call(argv, cwd=d)
+            except subprocess.CalledProcessError as e:
+                if e.returncode != args.expected_exit_code:
+                    raise
+
+            if args.llvm_stat_reporter:
+                with open(os.path.join(d, stats)) as f:
+                    r = json.load(f)
+            else:
+                r = merge_all_jobstats(load_stats_dir(d)).stats
+    finally:
+        shutil.rmtree(d)
+
+    return {k: v for (k, v) in r.items() if args.select in k}
+
+
+def run_once(args, ast, rng):
+    if args.sum_multi:
+        cumulative = {}
+        for i in range(len(rng)):
+            tmp = run_once_with_primary(args, ast, rng, i)
+            for (k, v) in tmp.items():
+                if k in cumulative:
+                    cumulative[k] += v
+                else:
+                    cumulative[k] = v
+        return cumulative
+    else:
+        return run_once_with_primary(args, ast, rng, -1)
+
+
+def run_many(args):
+
+    if args.dtrace and has_debuginfo(args.swiftc_binary):
+        print("")
+        print("**************************************************")
+        print("")
+        print("dtrace is unreliable on binaries w/ debug symbols")
+        print("please run 'strip -S %s'" % args.swiftc_binary)
+        print("or pass a different --swiftc-binary")
+        print("")
+        print("**************************************************")
+        print("")
+        exit(1)
+
+    if not args.llvm_stat_reporter:
+        if not supports_stats_output_dir(args):
+            print("**************************************************")
+            print("")
+            print("unable to use new-style -stats-output-dir reporting,")
+            print("falling back to old-style -Xllvm -stats-json reporting")
+            print("(run with --llvm-stat-reporter to silence this warning)")
+            print("")
+            print("**************************************************")
+            args.llvm_stat_reporter = True
+
+    ast = gyb.parse_template(args.file.name, args.file.read())
+    rng = range(args.begin, args.end, args.step)
+    if args.step > (args.end - args.begin):
+        print("Step value", args.step,
+              "is too large for the range", str((args.begin, args.end)) + ".",
+              "Have you forgotten to override it?")
+        exit(1)
+    if args.multi_file or args.sum_multi:
+        return (rng, [run_once(args, ast, range(i)) for i in rng])
+    else:
+        return (rng, [run_once(args, ast, [r]) for r in rng])
+
+
+somewhat_small = 1e-4
+
+
+def is_somewhat_small(x):
+    return abs(x) < somewhat_small
+
+
+def tup_add(t1, t2):
+    return tuple(a + b for (a, b) in zip(t1, t2))
+
+
+def tup_sub(t1, t2):
+    return tuple(a - b for (a, b) in zip(t1, t2))
+
+
+def tup_mul(s, t):
+    return tuple(s * v for v in t)
+
+
+def tup_distance(t1, t2):
+    return math.sqrt(sum((a - b) ** 2 for (a, b) in zip(t1, t2)))
+
+
+def centroid(tuples):
+    n = len(tuples)
+    if n == 0:
+        return 0.0
+    tupsz = len(tuples[0])
+    zero = (0,) * tupsz
+    s = functools.reduce(tup_add, tuples, zero)
+    return tup_mul(1.0 / float(n), s)
+
+
+def converged(ctr, simplex, epsilon):
+    return max(tup_distance(ctr, p.loc) for p in simplex) < epsilon
+
+
+def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
+    # By the book: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
+    ndim = len(params)
+    assert(ndim >= 2)
+
+    def named(tup):
+        return params.__new__(params.__class__, *tup)
+
+    def f(tup):
+        return objective(named(tup))
+
+    locs = [tuple(random.uniform(*b) for b in bounds)
+            for _ in range(ndim + 1)]
+    SimplexPoint = namedtuple("SimplexPoint", ["loc", "val"])
+    simplex = [SimplexPoint(loc=l, val=f(l)) for l in locs]
+
+    # Algorithm parameters
+    alpha = 1.0
+    gamma = 2.0
+    rho = 0.5
+    sigma = 0.5
+    max_iter = 1024
+
+    while True:
+
+        # 1. Order
+        simplex.sort(key=attrgetter('val'))
+
+        # 2. Centroid
+        x0 = centroid([s.loc for s in simplex[:-1]])
+
+        max_iter -= 1
+        if max_iter < 0 or converged(x0, simplex, epsilon):
+            return (named(simplex[0].loc), simplex[0].val)
+
+        # (convenient names for best-point and value)
+        xb = simplex[0].loc
+        vb = simplex[0].val
+
+        # (convenient names for worst-point and value)
+        xw = simplex[-1].loc
+        vw = simplex[-1].val
+
+        # 3. Reflection
+        xr = tup_add(x0, tup_mul(alpha, tup_sub(x0, xw)))
+        vr = f(xr)
+        if vb <= vr and vr < simplex[-2].val:
+            simplex[-1] = SimplexPoint(loc=xr, val=vr)
+            continue
+
+        # 4. Expansion
+        if vr < vb:
+            xe = tup_add(x0, tup_mul(gamma, tup_sub(xr, x0)))
+            ve = f(xe)
+            if ve < vr:
+                simplex[-1] = SimplexPoint(loc=xe, val=ve)
+            else:
+                simplex[-1] = SimplexPoint(loc=xr, val=vr)
+            continue
+
+        # 5. Contraction
+        assert(vr >= simplex[-2].val)
+        xc = tup_add(x0, tup_mul(rho, tup_sub(xw, x0)))
+        vc = f(xc)
+        if vc < vw:
+            simplex[-1] = SimplexPoint(loc=xc, val=vc)
+            continue
+
+        # 6. Shrink
+        simplex = (simplex[:1] +
+                   [SimplexPoint(loc=l, val=f(l))
+                    for l in [tup_add(xb, tup_mul(sigma, tup_sub(p.loc, xb)))
+                              for p in simplex[1:]]])
+
+
+# Nonlinear regression entrypoint
+#
+# Takes an objective function of type
+#
+#   objective: (params:namedtuple, x:float) -> y:float
+#
+# Along with a set of parameters, bounds on the parameters, and some xs and
+# ys that make up a dataset. Creates a local function (over _just_
+# parameters) that calculates the sum-of-squares-of-residuals between the
+# objective-at-those-params and the data. Then runs a simple
+# coordinate_descent nonlinear optimization on the parameter space until it
+# converges. Then calculates the r_squared (coefficient of determination
+# a.k.a. goodness-of-fit, a number betwee 0 and 1 with 1 meaning "fits
+# perfectly") and finally returns (fit_params, r_squared).
+def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
+
+    assert(len(ys) > 0)
+    mean_y = sum(ys) / len(ys)
+    ss_total = sum((y - mean_y) ** 2 for y in ys)
+    data = zip(xs, ys)
+
+    def inner(ps):
+        s = 0.0
+        for (x, y) in data:
+            s += (y - objective(ps, x)) ** 2
+        return s
+
+    retries = 100
+    for _ in range(retries):
+        (fit_params, ss_residuals) = Nelder_Mead_simplex(inner, params, bounds)
+        if is_somewhat_small(ss_total):
+            ss_total = somewhat_small
+        if is_somewhat_small(ss_residuals / ss_total):
+            r_squared = 1.0 - (ss_residuals / ss_total)
+            return (fit_params, r_squared)
+        else:
+            # Bad fit, restart
+            pass
+    raise ValueError("Nelder-Mead failed %d retries" % retries)
+
+
+# Fit a 2-parameter linear model f(x) = const + coeff * x to a set
+# of data (lists of xs and ys). Returns (coeff, const, fit).
+def fit_linear_model(xs, ys):
+    # By the book: https://en.wikipedia.org/wiki/Simple_linear_regression
+    n = float(len(xs))
+    assert n == len(ys)
+    if n == 0:
+        return 0, 0, 1.0
+
+    # Don't bother with anything fancy if function is constant.
+    if all(y == ys[0] for y in ys):
+        return (0.0, ys[0], 1.0)
+
+    sum_x = sum(xs)
+    sum_y = sum(ys)
+    sum_prod = sum(a * b for a, b in zip(xs, ys))
+    sum_x_sq = sum(a ** 2 for a in xs)
+    sum_y_sq = sum(b ** 2 for b in ys)
+    mean_x = sum_x / n
+    mean_y = sum_y / n
+    mean_prod = sum_prod / n
+    mean_x_sq = sum_x_sq / n
+    mean_y_sq = sum_y_sq / n
+    covar_xy = mean_prod - mean_x * mean_y
+    var_x = mean_x_sq - mean_x**2
+    var_y = mean_y_sq - mean_y**2
+    slope = covar_xy / var_x
+    inter = mean_y - slope * mean_x
+
+    # Compute the correlation coefficient aka r^2, to compare goodness-of-fit.
+    if is_somewhat_small(var_y):
+        # all of the outputs are the same, so this is a perfect fit
+        assert is_somewhat_small(covar_xy)
+        cor_coeff_sq = 1.0
+    elif is_somewhat_small(var_x):
+        # all of the inputs are the same, and the outputs are different, so
+        # this is a completely imperfect fit
+        assert is_somewhat_small(covar_xy)
+        cor_coeff_sq = 0.0
+    else:
+        cor_coeff_sq = covar_xy**2 / (var_x * var_y)
+
+    return slope, inter, cor_coeff_sq
+
+
+# Fit a 3-parameter polynomial model f(x) = const + coeff * x^exp to a set
+# of data (lists of xs and ys). Returns (exp, coeff, fit).
+def fit_polynomial_model(xs, ys):
+
+    PolynomialParams = namedtuple('PolynomialParams',
+                                  ['const', 'coeff', 'exp'])
+    params = PolynomialParams(const=0.0, coeff=1.0, exp=1.0)
+    mag = max(abs(y) for y in ys)
+    bounds = PolynomialParams(const=(0, mag),
+                              coeff=(0, mag),
+                              exp=(0.25, 8.0))
+
+    def objective(params, x):
+        return params.const + params.coeff * (x ** params.exp)
+
+    (p, f) = fit_function_to_data_by_least_squares(objective,
+                                                   params, bounds,
+                                                   xs, ys)
+    e = p.exp
+    if is_somewhat_small(p.coeff):
+        e = 0.0
+    return (e, p.coeff, f)
+
+
+# Fit a 3-parameter exponential model f(x) = const + coeff * base^x to
+# a set of data (lists of xs and ys). Returns (base, coeff, fit).
+def fit_exponential_model(xs, ys):
+    ExponentialParams = namedtuple('ExponentialParams',
+                                   ['base', 'coeff', 'const'])
+    params = ExponentialParams(base=1.0, const=1.0, coeff=1.0)
+    mag = max(abs(y) for y in ys)
+    bounds = ExponentialParams(base=(0.0, 10.0),
+                               coeff=(-mag, mag),
+                               const=(-mag, mag))
+
+    def objective(params, x):
+        return params.const + params.coeff * (params.base ** x)
+
+    (p, f) = fit_function_to_data_by_least_squares(objective,
+                                                   params, bounds,
+                                                   xs, ys)
+    b = p.base
+    if is_somewhat_small(p.coeff):
+        b = 0.0
+    return (b, p.coeff, f)
+
+
+def self_test():
+    import unittest
+
+    class Tests(unittest.TestCase):
+
+        def check_linearfit(self, xs, ys, lin, fit=1.0):
+            (m, _, f) = fit_linear_model(xs, ys)
+            print("linearfit(xs, ys, lin=%f, fit=%f) = (%f, %f)" %
+                  (lin, fit, m, f))
+            self.assertAlmostEqual(m, lin, places=1)
+            self.assertAlmostEqual(f, fit, places=1)
+            return f
+
+        def check_polyfit(self, xs, ys, exp, fit=1.0):
+            (e, _, f) = fit_polynomial_model(xs, ys)
+            print("polyfit(xs, ys, exp=%f, fit=%f) = (%f, %f)" %
+                  (exp, fit, e, f))
+            self.assertAlmostEqual(e, exp, places=1)
+            self.assertAlmostEqual(f, fit, places=1)
+            return f
+
+        def check_expfit(self, xs, ys, base, fit=1.0):
+            (b, _, f) = fit_exponential_model(xs, ys)
+            print("expfit(xs, ys, base=%f, fit=%f) = (%f, %f)" %
+                  (base, fit, b, f))
+            self.assertAlmostEqual(b, base, places=1)
+            self.assertAlmostEqual(f, fit, places=1)
+            return f
+
+        def test_tuples(self):
+            self.assertEqual(tup_distance((1, 0, 0), (0, 0, 0)), 1.0)
+            self.assertEqual(tup_distance((1, 0, 0), (1, 0, 0)), 0.0)
+            self.assertEqual(tup_distance((2, 0, 2, 0),
+                                          (0, 2, 0, 2)), 4.0)
+            self.assertEqual(tup_add((1, 0, 0), (1, 0, 0)), (2, 0, 0))
+            self.assertEqual(tup_add((1, 3, 1), (1, 2, 5)), (2, 5, 6))
+            self.assertEqual(centroid([(1, 0),
+                                       (0, 1)]), (0.5, 0.5))
+            self.assertEqual(centroid([(1, 0, 0, 0),
+                                       (0, 1, 0, 0),
+                                       (0, 0, 1, 0),
+                                       (0, 0, 0, 1)]),
+                             (0.25, 0.25, 0.25, 0.25))
+
+        def test_constant(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [5, 5, 5, 5, 5, 5], 0)
+
+        def test_linear1(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [1, 2, 3, 4, 5, 6], 1)
+
+        def test_linear2(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [100, 200, 300, 400, 500, 600], 1)
+
+        def test_linear3(self):
+            self.check_polyfit([5, 10, 15],
+                               [307, 632, 957], 1)
+
+        # "Basically linear", with a little nonlinearity in the first
+        # point. Polynomial-fit fails here because the simplex algorithm
+        # keeps trying to account for the first point by admitting a
+        # nonzero nonlinear term, thus bending the whole line instead of
+        # focusing on the linear and constant terms. So we run an
+        # independent fit on a "strictly linear" model too.
+        def test_eventually_linear(self):
+            self.check_linearfit([1, 2, 3, 4, 5, 6, 7, 8],
+                                 [15, 20, 30, 40, 50, 60, 70, 80],
+                                 9.6)
+
+        # Double check that linear-fit (which "always fits") isn't
+        # preferred over good nonlinear fits.
+        def test_linear_model_of_poly(self):
+            xs = [10, 20, 30, 40, 50, 60]
+            ys = [100, 400, 900, 1600, 2500, 3600]
+            lf = self.check_linearfit(xs, ys, 70)
+            pf = self.check_polyfit(xs, ys, 2)
+            self.assertGreater(pf, lf)
+
+        def test_linear_model_of_poly_2(self):
+            xs = [10, 20, 30, 40, 50, 60]
+            ys = [1000, 8000, 27000, 64000, 125000, 216000]
+            lf = self.check_linearfit(xs, ys, 4180, 0.87)
+            pf = self.check_polyfit(xs, ys, 3)
+            self.assertGreater(pf, lf)
+
+        def test_linear_model_of_poly_3(self):
+            xs = [1, 2, 3, 4, 5]
+            ys = [1.0, 2.3, 3.74, 5.28, 6.9]
+            lf = self.check_linearfit(xs, ys, 1.47)
+            pf = self.check_polyfit(xs, ys, 1.2)
+            self.assertGreater(pf, lf)
+
+        def test_linear_model_of_poly_offset(self):
+            xs = [10, 20, 30, 40, 50, 60]
+            ys = [1100, 1400, 1900, 2600, 3500, 4600]
+            lf = self.check_linearfit(xs, ys, 70)
+            pf = self.check_polyfit(xs, ys, 2)
+            self.assertGreater(pf, lf)
+
+        def test_linear_offset(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [1000 + i for i in range(1, 7)], 1)
+
+        def test_linear_offset_scaled(self):
+            self.check_polyfit([1, 2, 3, 4, 5, 6],
+                               [1000 + 2 * i for i in range(1, 7)], 1)
+
+        def test_quadratic2(self):
+            self.check_polyfit([10, 20, 30, 40, 50, 60],
+                               [100, 400, 900, 1600, 2500, 3600], 2)
+
+        def test_exp_model_of_quadratic(self):
+            with self.assertRaises(ValueError):
+                self.check_expfit([10, 20, 30, 40, 50, 60],
+                                  [100, 400, 900, 1600, 2500, 3600], 2)
+
+        def test_poly_model_of_exp(self):
+            with self.assertRaises(ValueError):
+                self.check_polyfit([10, 20, 30, 40, 50, 60],
+                                   [1002, 1004, 1008, 1016, 1032], 2)
+
+        def test_quadratic_offset(self):
+            self.check_polyfit([10, 20, 30, 40, 50, 60],
+                               [1100, 1400, 1900, 2600, 3500, 4600], 2)
+
+        def test_expt(self):
+            self.check_expfit([1, 2, 3, 4, 5],
+                              [2, 4, 8, 16, 32], 2)
+
+        def test_expt_offset(self):
+            self.check_expfit([1, 2, 3, 4, 5],
+                              [1002, 1004, 1008, 1016, 1032], 2)
+
+        def test_expt_scale_offset(self):
+            self.check_expfit([1, 2, 3, 4, 5],
+                              [2004, 2008, 2016, 2032, 2064], 2)
+
+    suite = unittest.TestLoader().loadTestsFromTestCase(Tests)
+    return unittest.TextTestRunner(verbosity=2).run(suite)
+
+
+def report(args, rng, runs):
+    bad = False
+    keys = set.intersection(*[set(j.keys()) for j in runs])
+    if len(keys) == 0:
+        print("No data found")
+        if len(args.select) != 0:
+            "(perhaps try a different --select?)"
+        return True
+    rows = []
+    for k in keys:
+        vals = [r[k] for r in runs]
+        bounded = [max(v, 1) for v in vals]
+        one_fit = False
+        perfect_fit = False
+        fit_r2_thresh = 0.99
+        lin_b, lin_a, lin_r2 = fit_linear_model(rng, bounded)
+        if lin_r2 > fit_r2_thresh:
+            one_fit = True
+        if lin_r2 == 1.0:
+            perfect_fit = True
+        p_b, p_a, p_r2 = (1.0, 1.0, 0.0)
+        e_b, e_a, e_r2 = (1.0, 1.0, 0.0)
+        try:
+            if not perfect_fit:
+                p_b, p_a, p_r2 = fit_polynomial_model(rng, bounded)
+                if p_r2 > fit_r2_thresh:
+                    one_fit = True
+                if p_r2 == 1.0:
+                    perfect_fit = True
+        except ValueError:
+            pass
+        try:
+            if not perfect_fit:
+                e_b, e_a, e_r2 = fit_exponential_model(rng, bounded)
+                if e_r2 > fit_r2_thresh:
+                    one_fit = True
+        except ValueError:
+            pass
+        if not one_fit:
+            print("failed to fit model to " + repr(vals))
+            return True
+        if lin_r2 >= e_r2 and lin_r2 >= p_r2:
+            # strict-linear is best
+            rows.append((False, 0.0 if lin_b == 0 else 1.0, k, vals))
+        elif p_r2 >= e_r2:
+            # polynomial is best
+            rows.append((False, p_b, k, vals))
+        else:
+            # exponential is best
+            rows.append((True, e_b, k, vals))
+    # Exponential fits always go after polynomial fits.
+    rows.sort()
+    for (is_exp, b, k, vals) in rows:
+        # same threshold for both the polynomial exponent or the exponential
+        # base.
+        if is_exp:
+            this_is_bad = b >= args.exponential_threshold
+            formatted = '%1.1f^n' % b
+        else:
+            this_is_bad = b >= args.polynomial_threshold
+            formatted = 'n^%1.1f' % b
+
+        if this_is_bad:
+            bad = True
+        if not args.quiet or this_is_bad:
+            print("O(%s) : %s" % (formatted, k))
+            if args.values:
+                print("                = ", vals)
+
+    if args.invert_result:
+        bad = not bad
+    return bad
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        'file', type=argparse.FileType(),
+        help='Path to GYB template file (defaults to stdin)', nargs='?',
+        default=sys.stdin)
+    parser.add_argument(
+        '--values', action='store_true',
+        default=False, help='print stat values')
+    parser.add_argument(
+        '--trace', action='store_true',
+        default=False, help='trace compiler invocations')
+    parser.add_argument(
+        '--quiet', action='store_true',
+        default=False, help='only print superlinear stats')
+    parser.add_argument(
+        '--polynomial-threshold', type=float,
+        default=1.2,
+        help='minimum exponent for polynomial fit to consider "bad scaling"')
+    parser.add_argument(
+        '--exponential-threshold', type=float,
+        default=1.2,
+        help='minimum base for exponential fit to consider "bad scaling"')
+    parser.add_argument(
+        '-typecheck', '--typecheck', action='store_true',
+        default=False, help='only run compiler with -typecheck')
+    parser.add_argument(
+        '-g', '--debuginfo', action='store_true',
+        default=False, help='run compiler with -g')
+    parser.add_argument(
+        '-wmo', '--whole-module-optimization', action='store_true',
+        default=False, help='run compiler with -whole-module-optimization')
+    parser.add_argument(
+        '--dtrace', action='store_true',
+        default=False, help='use dtrace to sample all functions')
+    parser.add_argument(
+        '-Xfrontend', action='append',
+        default=[], help='pass additional args to frontend jobs')
+    parser.add_argument(
+        '--begin', type=int,
+        default=10, help='first value for N')
+    parser.add_argument(
+        '--end', type=int,
+        default=100, help='last value for N')
+    parser.add_argument(
+        '--step', type=int,
+        default=10, help='step value for N')
+    parser.add_argument(
+        '--swiftc-binary',
+        default="swiftc", help='swift binary to execute')
+    parser.add_argument(
+        '--tmpdir', type=str,
+        default=None, help='directory to create tempfiles in')
+    parser.add_argument(
+        '--select',
+        default="", help='substring of counters/symbols to limit attention to')
+    parser.add_argument(
+        '--debug', action='store_true',
+        default=False, help='invoke lldb on each scale test')
+    parser.add_argument(
+        '--llvm-stat-reporter', action='store_true',
+        default=False, help='only collect stats via old-style LLVM reporter')
+    parser.add_argument(
+        '--self-test', action='store_true',
+        default=False, help='run arithmetic unit-tests of scale-test itself')
+    parser.add_argument(
+        '--expected-exit-code', type=int, default=0,
+        help='exit code expected from the compiler invocation')
+    parser.add_argument(
+        '--invert-result', action='store_true',
+        default=False, help='invert the result of the data fitting')
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '-O', '--optimize', action='store_true',
+        default=False, help='run compiler with -O')
+    group.add_argument(
+        '-Onone', '--optimize-none', action='store_true',
+        default=False, help='run compiler with -Onone')
+    group.add_argument(
+        '-Ounchecked', '--optimize-unchecked', action='store_true',
+        default=False, help='run compiler with -Ounchecked')
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        '--multi-file', action='store_true',
+        default=False, help='vary number of input files as well')
+    group.add_argument(
+        '--sum-multi', action='store_true',
+        default=False, help='simulate a multi-primary run and sum stats')
+
+    args = parser.parse_args(sys.argv[1:])
+    if args.self_test:
+        exit(self_test())
+    (rng, runs) = run_many(args)
+    if report(args, rng, runs):
+        exit(1)
+    exit(0)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,53 +1,88 @@
 This file is a list of the people responsible for ensuring that patches for a
-particular part of Swift are reviewed, either by themself or by someone else.
+particular part of Swift are reviewed, either by themselves or by someone else.
 They are also the gatekeepers for their part of Swift, with the final word on
 what goes in or not.
 
 The list is sorted by surname and formatted to allow easy grepping and
-beautification by scripts.  The fields are: name (N), email (E), web-address
-(W), PGP key ID and fingerprint (P), description (D), and snail-mail address
-(S).
+beautification by scripts.  The fields are: name (N), email (E),
+GitHub account (G), description (D).
 
-N: David Abrahams
-E: dabrahams@apple.com
+N: Ben Cohen
+E: ben_cohen@apple.com
+G: airspeedswift
 D: Swift standard library
 
-N: David Farler
-E: dfarler@apple.com
-D: Markup, Swift Linux port
+N: Brian Croom
+E: bcroom@apple.com
+G: briancroom
+D: XCTest overlay
+
+N: Erik Eckstein
+E: eeckstein@apple.com
+G: eeckstein
+D: SILOptimizer
+
+N: Xi Ge
+E: xi_ge@apple.com
+G: nkcsgexi
+D: Markup, Migrator, lib/Syntax
 
 N: Doug Gregor
 E: dgregor@apple.com
+G: DougGregor
 D: AST, Basic, Parse, Sema
 
 N: Joe Groff
 E: jgroff@apple.com
-D: SIL, SILGen
+G: jckarter
+D: SIL, SILGen, everything in Swift not covered by someone else
 
 N: Argyrios Kyrzidis
 E: kyrtzidis@apple.com
-D: IDE, SourceKit, swift-ide-test
+G: akyrtzi
+D: IDE, Index, SourceKit, swift-ide-test
 
-N: Chris Lattner
-E: clattner@apple.com
-D: Everything in Swift not covered by someone else
+N: Luke Larson
+E: llarson@apple.com
+G: lplarson
+D: Swift Benchmark Suite
 
 N: John McCall
 E: rjmccall@apple.com
+G: rjmccall
 D: Demangler, IRGen, Runtime
 
-N: Joe Pamer
-E: jpamer@apple.com
-D: Expression type checker (Sema/ConstraintSystem)
+N: Max Moiseev
+E: moiseev@apple.com
+G: moiseev
+D: Apple contact for non-corelibs overlays
+
+N: Tony Parker
+E: anthony.parker@apple.com
+G: parkera
+D: Foundation overlay
+
+N: Slava Pestov
+E: spestov@apple.com
+G: slavapestov
+D: Reflection, SwiftRemoteMirror
+
+N: Adrian Prantl
+E: aprantl@apple.com
+G: adrian-prantl
+D: Debug info
 
 N: Jordan Rose
 E: jordan_rose@apple.com
-D: ClangImporter, Serialization, (Objective-)C printer, Driver
+G: jrose-apple
+D: ClangImporter, Serialization, PrintAsObjC, Driver, Frontend
 
-N: Nadav Rotem
-E: nrotem@apple.com
-D: SILAnalysis, SILPasses
+N: Daniel Steffen
+E: dsteffen@apple.com
+G: das
+D: Dispatch overlay
 
 N: Anna Zaks
 E: ganna@apple.com
-D: SIL diagnostics passes
+G: AnnaZaks
+D: SIL diagnostics passes, sanitizers

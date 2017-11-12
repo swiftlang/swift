@@ -1,0 +1,58 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt -code-sinking  | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt -code-sinking  -wmo | %FileCheck --check-prefix=CHECK-WMO %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Make sure we convert a class_method into a diamond control flow
+// where one of the sides is a direct call to FOO::ping.
+class Foo {
+  func ping()
+}
+
+class Bar : Foo {
+}
+
+sil @_TFC8testcase3Foo4pingfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> () {
+bb0(%0 : $Foo):
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+sil @_TFC8testcase3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo {
+bb0(%0 : $Foo):
+  return %0 : $Foo                                // id: %1
+}
+
+
+//CHECK-LABEL: @_TF8testcase7my_mainFCS_3FooT_
+//CHECK: checked_cast_br [exact] %0 : $Foo to $Foo
+//CHECK: return
+//CHECK: checked_cast_br [exact] %0 : $Foo to $Bar
+//CHECK: class_method
+
+//CHECK-WMO-LABEL: @_TF8testcase7my_mainFCS_3FooT_
+//CHECK-WMO: checked_cast_br [exact] %0 : $Foo to $Foo
+//CHECK-WMO: return
+//CHECK-WMO: unchecked_ref_cast %0 : $Foo to $Bar
+//CHECK-WMO: class_method
+
+sil @_TF8testcase7my_mainFCS_3FooT_ : $@convention(thin) (@owned Foo) -> () {
+bb0(%0 : $Foo):
+  %1 = class_method %0 : $Foo, #Foo.ping!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Foo) -> ()
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+}
+
+sil_vtable Foo {
+  #Foo.ping!1: _TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
+  #Foo.init!initializer.1: _TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
+}
+
+sil_vtable Bar {
+  #Foo.ping!1: _TFC8testcase3Foo4pingfS0_FT_T_	// testcase.Foo.ping (testcase.Foo)() -> ()
+  #Foo.init!initializer.1: _TFC8testcase3FoocfMS0_FT_S0_	// testcase.Foo.init (testcase.Foo.Type)() -> testcase.Foo
+}

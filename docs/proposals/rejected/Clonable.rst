@@ -15,7 +15,7 @@
   language-level copying mechanism for classes.
 
 **Abstract:** to better support the creation of value types, we
-propose a “magic” ``Clonable`` protocol and an annotation for describing
+propose a "magic" ``Clonable`` protocol and an annotation for describing
 which instance variables should be cloned when a type is copied.  This
 proposal **augments revision 1** of the Clonable proposal with our
 rationale for dropping our support for ``val`` and ``ref``, a
@@ -34,12 +34,12 @@ one has to engage in some kind of wrapping and forwarding::
 
   struct MyClassVal {
     var [clone] value : MyClass
-    
+
     constructor(x : A, y : B) {
        value = new MyClass(x, y)
     }
 
-    func someFunction(z : C) -> D {
+    func someFunction(_ z : C) -> D {
       return value.someFunction(z)
     }
 
@@ -65,7 +65,7 @@ automatic, if we add that feature) forwarding.
 
 By dropping ``val`` we also lose some terseness aggregating ``class``
 contents into ``struct``\ s.  However, since ``ref`` is being dropped
-there's less call for a symmetric ``val``.  The extra “cruft” that
+there's less call for a symmetric ``val``.  The extra "cruft" that
 ``[clone]`` adds actually seems appropriate when viewed as a special
 bridge for ``class`` types, and less like a penalty against value
 types.
@@ -76,7 +76,7 @@ Generics
 There is actually a straightforward programming model for generics.
 If you want to design a generic component where a type parameter ``T``
 binds to both ``class``\ es and non-``class`` types, you can view
-``T`` as a value type where—as with C pointers—the value is the
+``T`` as a value type where--as with C pointers--the value is the
 reference rather than the object being referred to.
 
 Of course, if ``T`` is only supposed to bind to ``class``\ es, a
@@ -110,12 +110,12 @@ all ordinary instance variables, and a ``clone()`` of all instance
 variables marked ``[clone]``::
 
   class FooValue : Clonable  {}
-  
+
   class Bar {}
 
   class Foo : Clonable {
       var count : Int
-      var [clone] myValue : FooValue 
+      var [clone] myValue : FooValue
       var somethingIJustReferTo : Bar
   }
 
@@ -125,12 +125,12 @@ variables marked ``[clone]``::
       var somethingIJustReferTo : Bar
   }
 
-When a ``Baz`` is copied by any of the “big three” operations (variable
+When a ``Baz`` is copied by any of the "big three" operations (variable
 initialization, assignment, or function argument passing), even as
 part of a larger ``struct``, its ``[clone]`` member is ``clone()``\ d.
 Because ``Foo`` itself has a ``[clone]`` member, that is ``clone()``\ d
-also.  Therfore copying a ``Baz`` object ``clone()``\ s a ``Foo`` and
-``clone()``\ ing a ``Foo`` ``clone()``\ s a ``FooValue``.  
+also.  Therefore copying a ``Baz`` object ``clone()``\ s a ``Foo`` and
+``clone()``\ ing a ``Foo`` ``clone()``\ s a ``FooValue``.
 
 All ``struct``\ s are ``Clonable`` by default, with ``clone()`` delivering
 ordinary copy semantics.  Therefore, ::

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 struct S {
@@ -30,11 +30,11 @@ class D : C {
   }
 }
 
-func print(s: S) {
+func print(_ s: S) {
   print("S(a=\(s.a), b=\(s.b))")
 }
 
-func print(c: C) {
+func print(_ c: C) {
   print("C(a=\(c.a), b=\(c.b))")
 }
 

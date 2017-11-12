@@ -1,38 +1,39 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
 //
 // Note: this test checks both module import case and file import case.
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=MODULE_QUALIFIED_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_1 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_2 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_2 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_2 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_3 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_3 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_3 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_4 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=MODULE_QUALIFIED_4 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=MODULE_QUALIFIED_4 < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | FileCheck %s -check-prefix=ERROR_COMMON
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | %FileCheck %s -check-prefix=ERROR_COMMON
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=POSTFIX_OPERATOR_1 | FileCheck %s -check-prefix=POSTFIX_OPERATOR_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=POSTFIX_OPERATOR_1 > %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=POSTFIX_OPERATOR_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_POSTFIX_OPERATOR_1 < %t.compl.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
-// FIXME: FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
+// FIXME: %FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %S/Inputs -enable-source-import -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
-// FIXME: FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
+// FIXME: %FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -61,20 +62,18 @@ func testCompleteModuleQualified3() {
   foo_swift_module.BarGenericSwiftStruct1#^MODULE_QUALIFIED_3^#
 }
 // MODULE_QUALIFIED_3: Begin completions
-// MODULE_QUALIFIED_3-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#})[#BarGenericSwiftStruct1<T>#]
-// MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#self: BarGenericSwiftStruct1<T>#})[#() -> Void#]{{; name=.+$}}
-// FIXME: recovery is treating the reference to BarGenericSwiftStruct1<t_0_0> as Int.
-// MODULE_QUALIFIED_3: Decl[PostfixOperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
+// MODULE_QUALIFIED_3-NEXT: Decl[Constructor]/CurrNominal: ({#t: _#})[#BarGenericSwiftStruct1<_>#]; name=(t: _)
+// MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#self: BarGenericSwiftStruct1<_>#})[#() -> Void#]; name=bar1InstanceFunc(BarGenericSwiftStruct1<_>)
+// MODULE_QUALIFIED_3: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#Any.Type?#}[#Bool#];
 // MODULE_QUALIFIED_3: End completions
 
 func testCompleteModuleQualified4() {
   foo_swift_module.BarGenericSwiftStruct2#^MODULE_QUALIFIED_4^#
 }
 // MODULE_QUALIFIED_4: Begin completions
-// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#}, {#u: U#})[#BarGenericSwiftStruct2<T, U>#]
-// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<T, U>#})[#() -> Void#]
-// FIXME: recovery is treating the reference to BarGenericSwiftStruct1<t_0_0> as Int.
-// MODULE_QUALIFIED_4: Decl[PostfixOperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
+// MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal: ({#t: _#}, {#u: _#})[#BarGenericSwiftStruct2<_, _>#]; name=(t: _, u: _)
+// MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<_, _>#})[#() -> Void#]; name=bar2InstanceFunc(BarGenericSwiftStruct2<_, _>)
+// MODULE_QUALIFIED_4: Decl[InfixOperatorFunction]/OtherModule[Swift]: != {#Any.Type?#}[#Bool#];
 // MODULE_QUALIFIED_4-NEXT: End completions
 
 func testCompleteModuleQualified5() {
@@ -88,8 +87,8 @@ func testPostfixOperator1(x: Int) {
 // POSTFIX_OPERATOR_1: Begin completions
 // POSTFIX_OPERATOR_1-DAG: Decl[PostfixOperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
 // POSTFIX_OPERATOR_1-DAG: Decl[InfixOperatorFunction]/OtherModule[foo_swift_module]:  %%% {#Int#}[#Int#]
-// POSTFIX_OPERATOR_1-DAG-NOT: =->
 // POSTFIX_OPERATOR_1: End completions
+// NEGATIVE_POSTFIX_OPERATOR_1-NOT: =->
 
 #^TOP_LEVEL_1^#
 // TOP_LEVEL_1: Begin completions

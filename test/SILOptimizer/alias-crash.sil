@@ -1,0 +1,41 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+struct MyStruct {
+  var value: Builtin.FPIEEE64
+}
+
+enum MyEnum {
+  case some(MyStruct)
+  case none
+}
+
+// Check if alias analysis can handle unchecked_take_enum_data_addr correctly
+// and does not crash with a stack overflow.
+
+// CHECK-LABEL: sil @testit
+// CHECK: load
+// CHECK: load
+// CHECK: return
+sil @testit : $@convention(method) (MyEnum) -> Builtin.FPIEEE64 {
+bb0(%0 : $MyEnum):
+  %x1 = alloc_stack $MyEnum
+  store %0 to %x1 : $*MyEnum
+  %x7 = unchecked_take_enum_data_addr %x1 : $*MyEnum, #MyEnum.some!enumelt.1
+  %x8 = struct_element_addr %x7 : $*MyStruct, #MyStruct.value
+  %x11 = alloc_stack $MyEnum
+  store %0 to %x11 : $*MyEnum
+  %x19 = unchecked_take_enum_data_addr %x11 : $*MyEnum, #MyEnum.some!enumelt.1
+  %x20 = struct_element_addr %x19 : $*MyStruct, #MyStruct.value
+  %x24 = load %x20 : $*Builtin.FPIEEE64
+  %x27 = load %x8 : $*Builtin.FPIEEE64
+  %x28 = builtin "fsub_FPIEEE64"(%x27 : $Builtin.FPIEEE64, %x24 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
+  dealloc_stack %x11 : $*MyEnum
+  dealloc_stack %x1 : $*MyEnum
+  return %x28 : $Builtin.FPIEEE64
+}
+
+

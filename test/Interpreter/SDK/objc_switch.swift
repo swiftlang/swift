@@ -1,11 +1,11 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-func testAnyObjectIsa(obj: AnyObject) {
+func testAnyObjectIsa(_ obj: AnyObject) {
   print("(", terminator: "")
   if obj is String {
     print("String", terminator: "")
@@ -30,21 +30,21 @@ print("testing...")
 
 
 // CHECK-NEXT: (String)
-testAnyObjectIsa("hello")
+testAnyObjectIsa("hello" as NSString)
 
 // CHECK-NEXT: (Int)
-testAnyObjectIsa(5)
+testAnyObjectIsa(5 as NSNumber)
 
 // CHECK-NEXT: ([NSString])
-testAnyObjectIsa(["hello", "swift", "world"])
+testAnyObjectIsa(["hello", "swift", "world"] as NSArray)
 
 // CHECK-NEXT: ([Int])
-testAnyObjectIsa([1, 2, 3, 4, 5])
+testAnyObjectIsa([1, 2, 3, 4, 5] as NSArray)
 
 // CHECK-NEXT: (Dictionary<String, Int>)
-testAnyObjectIsa(["hello" : 1, "world" : 2])
+testAnyObjectIsa(["hello" : 1, "world" : 2] as NSDictionary)
 
-func testNSArrayIsa(nsArr: NSArray) {
+func testNSArrayIsa(_ nsArr: NSArray) {
   print("(", terminator: "")
   if nsArr is [String] {
     print("[String]", terminator: "")
@@ -64,7 +64,7 @@ testNSArrayIsa([1, 2, 3])
 // CHECK-NEXT: ()
 testNSArrayIsa([[1, 2], [3, 4], [5, 6]])
 
-func testArrayIsa(arr: Array<AnyObject>) {
+func testArrayIsa(_ arr: Array<Any>) {
   print("(", terminator: "")
   if arr is [NSString] {
     print("[NSString]", terminator: "")
@@ -84,7 +84,7 @@ testArrayIsa([1, 2, 3])
 // CHECK-NEXT: ()
 testArrayIsa([[1, 2], [3, 4], [5, 6]])
 
-func testArrayIsaBridged(arr: Array<AnyObject>) {
+func testArrayIsaBridged(_ arr: Array<Any>) {
   print("(", terminator: "")
   if arr is [String] {
     print("[String]", terminator: "")
@@ -104,7 +104,7 @@ testArrayIsaBridged([1, 2, 3])
 // CHECK-NEXT: ()
 testArrayIsaBridged([[1, 2], [3, 4], [5, 6]])
 
-func testNSMutableStringMatch(sa: NSMutableString) {
+func testNSMutableStringMatch(_ sa: NSMutableString) {
   switch(sa) {
   case "foobar":
     print("MATCH")
@@ -119,7 +119,7 @@ testNSMutableStringMatch("foobar")
 // CHECK-NEXT: nomatch
 testNSMutableStringMatch("nope")
 
-func testAnyObjectDowncast(obj: AnyObject!) {
+func testAnyObjectDowncast(_ obj: AnyObject!) {
   switch obj {
   case let str as String:
     print("String: \(str)")
@@ -142,27 +142,27 @@ func testAnyObjectDowncast(obj: AnyObject!) {
 }
 
 // CHECK-NEXT: String: hello
-testAnyObjectDowncast("hello")
+testAnyObjectDowncast("hello" as NSString)
 
 // CHECK-NEXT: Int: 5
-testAnyObjectDowncast(5)
+testAnyObjectDowncast(5 as NSNumber)
 
 // CHECK-NEXT: NSString array: [hello, swift, world]
 testAnyObjectDowncast(["hello", "swift", "world"] as NSArray)
 
 // CHECK-NEXT: Int array: [1, 2, 3, 4, 5]
-testAnyObjectDowncast([1, 2, 3, 4, 5])
+testAnyObjectDowncast([1, 2, 3, 4, 5] as NSArray)
 
 // CHECK: Dictionary<String, Int>: [
 // CHECK-DAG: "hello": 1
 // CHECK-DAG: "world": 2
 // CHECK: ]
-testAnyObjectDowncast(["hello" : 1, "world" : 2])
+testAnyObjectDowncast(["hello" : 1, "world" : 2] as NSDictionary)
 
 // CHECK-NEXT: Did not match
 testAnyObjectDowncast(nil)
 
-func testNSArrayDowncast(nsArr: NSArray?) {
+func testNSArrayDowncast(_ nsArr: NSArray?) {
   switch nsArr {
   case let strArr as [String]:
     print("[String]: \(strArr)")

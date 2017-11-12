@@ -1,2 +1,2 @@
 
-func fooHelperExplicitFrameworkFunc1(a: Int32) -> Int32
+func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32

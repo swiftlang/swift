@@ -1,18 +1,18 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
-struct IntRange<Int> : SequenceType, GeneratorType {
+struct IntRange<Int> : Sequence, IteratorProtocol {
   typealias Element = (Int, Int)
   func next() -> (Int, Int)? {}
 
-  typealias Generator = IntRange<Int>
-  func generate() -> IntRange<Int> { return self }
+  typealias Iterator = IntRange<Int>
+  func makeIterator() -> IntRange<Int> { return self }
 }
 
-func for_each(r: Range<Int>, iir: IntRange<Int>) {
+func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note {{did you mean 'r'?}}
   var sum = 0
 
   // Simple foreach loop, using the variable in the body
-  for i in r {
+  for i in CountableRange(r) {
     sum = sum + i
   }
   // Check scoping of variable introduced with foreach loop
@@ -30,10 +30,11 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) {
   }
 
   // Parse errors
-  for i r { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{use of unresolved identifier 'i'}}
-  }
-  for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
-  for let x in 0..<10 {} // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
-
-  for var x in 0..<10 {} // expected-error {{Use of 'var' binding here is not allowed}} {{7-11=}}
+  // FIXME: Bad diagnostics; should be just 'expected 'in' after for-each patter'.
+  for i r { // expected-error {{found an unexpected second identifier in constant declaration}}
+  }         // expected-note @-1 {{join the identifiers together}}
+            // expected-note @-2 {{join the identifiers together with camel-case}}
+            // expected-error @-3 {{expected 'in' after for-each pattern}}
+            // expected-error @-4 {{expected Sequence expression for for-each loop}}
+  for i in CountableRange(r) sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
 }

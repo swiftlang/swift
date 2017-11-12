@@ -1,12 +1,12 @@
-//===--- GenMeta.h - Swift IR generation for metadata ----------*- C++ -*-===//
+//===--- GenMeta.h - Swift IR generation for metadata -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -23,6 +23,8 @@
 namespace llvm {
   template <class T> class ArrayRef;
   class Constant;
+  class Function;
+  class GlobalVariable;
   class Value;
 }
 
@@ -36,14 +38,18 @@ namespace swift {
   enum class SpecialProtocol : uint8_t;
   
 namespace irgen {
-  class AbstractCallee;
   class Callee;
+  class ConstantReference;
   class Explosion;
   class FieldTypeInfo;
+  class FunctionPointer;
+  class GenericTypeRequirements;
   class IRGenFunction;
   class IRGenModule;
   class Size;
   class StructLayout;
+  enum class SymbolReferenceKind : unsigned char;
+  struct ClassLayout;
 
   /// Is the given class known to have Swift-compatible metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
@@ -56,12 +62,6 @@ namespace irgen {
   /// Is the given class-like type known to have Swift-compatible
   /// metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
-
-  /// Is the given class known to have an implementation in Swift?
-  bool hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass);
-  
-  /// Is the given method known to be callable by vtable dispatch?
-  bool hasKnownVTableEntry(IRGenModule &IGM, AbstractFunctionDecl *theMethod);
 
   /// Emit the body of a lazy cache access function.
   void emitLazyCacheAccessFunction(IRGenModule &IGM,
@@ -76,8 +76,20 @@ namespace irgen {
   /// Emit a reference to a compile-time constant piece of type metadata, or
   /// return a null pointer if the type's metadata cannot be represented by a
   /// constant.
+  ConstantReference tryEmitConstantTypeMetadataRef(IRGenModule &IGM,
+                                                   CanType type,
+                                                   SymbolReferenceKind refKind);
+
+  /// Get the type as it exists in Swift's runtime type system, removing any
+  /// erased generic parameters.
+  CanType getRuntimeReifiedType(IRGenModule &IGM, CanType type);
+
+  /// Emit a reference to a compile-time constant piece of heap metadata, or
+  /// return a null pointer if the type's heap metadata cannot be represented
+  /// by a constant.
   llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
-                                                 CanType type);
+                                                 CanType type,
+                                                 bool allowUninitialized);
 
   enum class MetadataValueType { ObjCClass, TypeMetadata };
 
@@ -103,7 +115,8 @@ namespace irgen {
 
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
-                         const StructLayout &layout);
+                         const StructLayout &layout,
+                         const ClassLayout &fieldLayout);
 
   /// Emit the constant initializer of the type metadata candidate for
   /// the given foreign class declaration.
@@ -116,7 +129,13 @@ namespace irgen {
 
   /// Emit the metadata associated with the given enum declaration.
   void emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum);
-  
+
+  /// Get what will be the index into the generic type argument array at the end
+  /// of a nominal type's metadata.
+  int32_t getIndexOfGenericArgument(IRGenModule &IGM,
+                                    NominalTypeDecl *decl,
+                                    ArchetypeType *archetype);
+
   /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to the parent type metadata.  There must be a
   /// parent type.
@@ -125,26 +144,22 @@ namespace irgen {
                                      llvm::Value *metadata);
 
   /// Given a reference to nominal type metadata of the given type,
-  /// derive a reference to the nth argument metadata.  The type must
-  /// have generic arguments.
+  /// derive a reference to the type metadata stored in the nth
+  /// requirement slot.  The type must have generic arguments.
   llvm::Value *emitArgumentMetadataRef(IRGenFunction &IGF,
                                        NominalTypeDecl *theDecl,
-                                       unsigned argumentIndex,
+                                       const GenericTypeRequirements &reqts,
+                                       unsigned reqtIndex,
                                        llvm::Value *metadata);
 
   /// Given a reference to nominal type metadata of the given type,
-  /// derive a reference to a protocol witness table for the nth
-  /// argument metadata.  The type must have generic arguments.
+  /// derive a reference to a protocol witness table stored in the nth
+  /// requirement slot.  The type must have generic arguments.
   llvm::Value *emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                            NominalTypeDecl *theDecl,
-                                           unsigned argumentIndex,
-                                           ProtocolDecl *targetProtocol,
+                                           const GenericTypeRequirements &reqts,
+                                           unsigned reqtIndex,
                                            llvm::Value *metadata);
-
-  /// Get the offset of a field in the class type metadata.
-  Size getClassFieldOffset(IRGenModule &IGM,
-                           ClassDecl *theClass,
-                           VarDecl *field);
 
   /// Given a reference to class type metadata of the given type,
   /// decide the offset to the given field.  This assumes that the
@@ -185,6 +200,10 @@ namespace irgen {
                                            SILType objectType,
                                            bool suppressCast = false);
 
+  /// Given a non-tagged object pointer, load a pointer to its class object.
+  llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
+                                             llvm::Value *object);
+
   /// Given a heap-object instance, with some heap-object type, produce a
   /// reference to its heap metadata by dynamically asking the runtime for it.
   llvm::Value *emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
@@ -204,18 +223,14 @@ namespace irgen {
                                                 SILType objectType,
                                                 bool suppressCast = false);
 
-  /// Derive the abstract callee for a virtual call to the given method.
-  AbstractCallee getAbstractVirtualCallee(IRGenFunction &IGF,
-                                          FuncDecl *method);
-
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
-  llvm::Value *emitVirtualMethodValue(IRGenFunction &IGF,
-                                      llvm::Value *base,
-                                      SILType baseType,
-                                      SILDeclRef method,
-                                      CanSILFunctionType methodType,
-                                      bool useSuperVTable);
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *base,
+                                         SILType baseType,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType,
+                                         bool useSuperVTable);
 
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///
@@ -237,7 +252,14 @@ namespace irgen {
                              NominalTypeDecl *type,
                              llvm::Function *fn,
                              ArrayRef<FieldTypeInfo> fieldTypes);
-  
+
+  /// \brief Initialize the field offset vector within the given class or struct
+  /// metadata.
+  llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+                                               SILType T,
+                                               llvm::Value *metadata,
+                                               llvm::Value *vwtable);
+
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {
@@ -267,17 +289,21 @@ namespace irgen {
 
     /// There is no unique accessor function for the given type metadata, but
     /// one should be made automatically.
-    NonUniqueAccessor,
-
-    /// The given type metadata should be accessed directly.
-    Direct,
+    NonUniqueAccessor
   };
 
+  /// Is it basically trivial to access the given metadata?  If so, we don't
+  /// need a cache variable in its accessor.
+  bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type);
+
   /// Determine how the given type metadata should be accessed.
-  MetadataAccessStrategy getTypeMetadataAccessStrategy(IRGenModule &IGM,
-                                                       CanType type,
-                                                       bool preferDirectAccess);
-  
+  MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
+
+  /// Return the address of a function that will return type metadata 
+  /// for the given non-dependent type.
+  llvm::Function *getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                        CanType type);
+
   /// Get the runtime identifier for a special protocol, if any.
   SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);
 

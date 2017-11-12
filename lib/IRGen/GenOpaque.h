@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -52,130 +52,162 @@ namespace irgen {
                                                         Address destBuffer,
                                                         Address srcBuffer);
 
+  /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
+  llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
+                                                        SILType T,
+                                                        Address destBuffer,
+                                                        Address srcBuffer);
+
   /// Emit a call to do an 'initializeBufferWithTakeOfBuffer' operation.
   llvm::Value *emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
                                                         llvm::Value *metadata,
                                                         Address destBuffer,
                                                         Address srcBuffer);
 
-  /// Emit a call to do an 'allocateBuffer' operation.
-  llvm::Value *emitAllocateBufferCall(IRGenFunction &IGF,
-                                      SILType T,
-                                      Address buffer);
-
-  /// Emit a call to do a 'projectBuffer' operation.
-  llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
-                                     llvm::Value *metadata,
-                                     Address buffer);
+  /// Emit a call to do an 'initializeBufferWithTakeOfBuffer' operation.
+  llvm::Value *emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
+                                                        SILType T,
+                                                        Address destBuffer,
+                                                        Address srcBuffer);
 
   /// Emit a call to do an 'initializeWithCopy' operation.
   void emitInitializeWithCopyCall(IRGenFunction &IGF,
                                   SILType T,
-                                  llvm::Value *destObject,
-                                  llvm::Value *srcObject);
-
-  /// Emit a call to do an 'initializeBufferWithCopy' operation.
-  llvm::Value *emitInitializeBufferWithCopyCall(IRGenFunction &IGF,
-                                                SILType T,
-                                                llvm::Value *destObject,
-                                                llvm::Value *srcObject);
-
-  /// Emit a call to do an 'initializeBufferWithTake' operation.
-  llvm::Value *emitInitializeBufferWithTakeCall(IRGenFunction &IGF,
-                                                SILType T,
-                                                llvm::Value *destObject,
-                                                llvm::Value *srcObject);
+                                  Address destObject,
+                                  Address srcObject);
+  llvm::Value *emitInitializeWithCopyCall(IRGenFunction &IGF,
+                                          llvm::Value *metadata, Address dest,
+                                          Address src);
 
   /// Emit a call to do an 'initializeArrayWithCopy' operation.
   void emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
                                        SILType T,
-                                       llvm::Value *destObject,
-                                       llvm::Value *srcObject,
+                                       Address destObject,
+                                       Address srcObject,
                                        llvm::Value *count);
 
   /// Emit a call to do an 'initializeWithTake' operation.
   void emitInitializeWithTakeCall(IRGenFunction &IGF,
                                   SILType T,
-                                  llvm::Value *destObject,
-                                  llvm::Value *srcObject);
+                                  Address destObject,
+                                  Address srcObject);
+  llvm::Value *emitInitializeWithTakeCall(IRGenFunction &IGF,
+                                          llvm::Value *metadata, Address dest,
+                                          Address src);
+
+  /// Emit a call to do an 'initializeArrayWithTakeNoAlias' operation.
+  void emitInitializeArrayWithTakeNoAliasCall(IRGenFunction &IGF, SILType T,
+                                              Address destObject,
+                                              Address srcObject,
+                                              llvm::Value *count);
 
   /// Emit a call to do an 'initializeArrayWithTakeFrontToBack' operation.
   void emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
                                                   SILType T,
-                                                  llvm::Value *destObject,
-                                                  llvm::Value *srcObject,
+                                                  Address destObject,
+                                                  Address srcObject,
                                                   llvm::Value *count);
 
   /// Emit a call to do an 'initializeArrayWithTakeBackToFront' operation.
   void emitInitializeArrayWithTakeBackToFrontCall(IRGenFunction &IGF,
                                                   SILType T,
-                                                  llvm::Value *destObject,
-                                                  llvm::Value *srcObject,
+                                                  Address destObject,
+                                                  Address srcObject,
                                                   llvm::Value *count);
 
   /// Emit a call to do an 'assignWithCopy' operation.
   void emitAssignWithCopyCall(IRGenFunction &IGF,
                               SILType T,
-                              llvm::Value *destObject,
-                              llvm::Value *srcObject);
+                              Address destObject,
+                              Address srcObject);
   void emitAssignWithCopyCall(IRGenFunction &IGF,
                               llvm::Value *metadata,
-                              llvm::Value *destObject,
-                              llvm::Value *srcObject);
+                              Address destObject,
+                              Address srcObject);
+
+  /// Emit a call to do an 'assignArrayWithCopyNoAlias' operation.
+  void emitAssignArrayWithCopyNoAliasCall(IRGenFunction &IGF, SILType T,
+                                          Address destObject, Address srcObject,
+                                          llvm::Value *count);
+
+  /// Emit a call to do an 'assignArrayWithCopyFrontToBack' operation.
+  void emitAssignArrayWithCopyFrontToBackCall(IRGenFunction &IGF, SILType T,
+                                              Address destObject,
+                                              Address srcObject,
+                                              llvm::Value *count);
+
+  /// Emit a call to do an 'assignArrayWithCopyBackToFront' operation.
+  void emitAssignArrayWithCopyBackToFrontCall(IRGenFunction &IGF, SILType T,
+                                              Address destObject,
+                                              Address srcObject,
+                                              llvm::Value *count);
 
   /// Emit a call to do an 'assignWithTake' operation.
   void emitAssignWithTakeCall(IRGenFunction &IGF,
                               SILType T,
-                              llvm::Value *destObject,
-                              llvm::Value *srcObject);
+                              Address destObject,
+                              Address srcObject);
+
+  /// Emit a call to do an 'assignArrayWithTake' operation.
+  void emitAssignArrayWithTakeCall(IRGenFunction &IGF, SILType T,
+                                   Address destObject, Address srcObject,
+                                   llvm::Value *count);
 
   /// Emit a call to do a 'destroy' operation.
   void emitDestroyCall(IRGenFunction &IGF,
                        SILType T,
-                       llvm::Value *object);
+                       Address object);
+
+  void emitDestroyCall(IRGenFunction &IGF, llvm::Value *metadata,
+                       Address object);
 
   /// Emit a call to do a 'destroyArray' operation.
   void emitDestroyArrayCall(IRGenFunction &IGF,
                             SILType T,
-                            llvm::Value *object,
+                            Address object,
                             llvm::Value *count);
 
-  /// Emit a call to do a 'destroyBuffer' operation.
-  void emitDestroyBufferCall(IRGenFunction &IGF,
-                             llvm::Value *metadata,
-                             Address buffer);
-  
-  /// Emit a call to do a 'deallocateBuffer' operation.
-  void emitDeallocateBufferCall(IRGenFunction &IGF,
-                                SILType T,
-                                Address buffer);
-  void emitDeallocateBufferCall(IRGenFunction &IGF,
-                                llvm::Value *metadata,
-                                Address buffer);
-  
   /// Emit a call to the 'getExtraInhabitantIndex' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
                                                SILType T,
-                                               llvm::Value *srcObject);
+                                               Address srcObject);
   
   /// Emit a call to the 'storeExtraInhabitant' operation.
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitStoreExtraInhabitantCall(IRGenFunction &IGF,
                                             SILType T,
                                             llvm::Value *index,
-                                            llvm::Value *destObject);
+                                            Address destObject);
+
+  /// Emit a call to the 'getEnumTagSinglePayload' operation.
+  llvm::Value *emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF, SILType T,
+                                               llvm::Value *numEmptyCases,
+                                               Address destObject);
+
+  /// Emit a call to the 'storeEnumTagSinglePayload' operation.
+  llvm::Value *emitStoreEnumTagSinglePayloadCall(IRGenFunction &IGF, SILType T,
+                                                 llvm::Value *whichCase,
+                                                 llvm::Value *numEmptyCases,
+                                                 Address destObject);
 
   /// Emit a call to the 'getEnumTag' operation.
   llvm::Value *emitGetEnumTagCall(IRGenFunction &IGF,
                                   SILType T,
-                                  llvm::Value *srcObject);
+                                  Address srcObject);
 
   /// Emit a call to the 'destructiveProjectEnumData' operation.
   /// The type must be dynamically known to have enum witnesses.
   void emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
                                           SILType T,
-                                          llvm::Value *srcObject);
+                                          Address srcObject);
+
+  /// Emit a call to the 'destructiveInjectEnumTag' operation.
+  /// The type must be dynamically known to have enum witnesses.
+  void emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
+                                        SILType T,
+                                        unsigned tag,
+                                        Address srcObject);
 
   /// Emit a load of the 'size' value witness.
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, SILType T);
@@ -202,6 +234,41 @@ namespace irgen {
   /// The type must be dynamically known to have extra inhabitant witnesses.
   llvm::Value *emitLoadOfExtraInhabitantCount(IRGenFunction &IGF, SILType T);
 
+  /// Emit a dynamic alloca call to allocate enough memory to hold an object of
+  /// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
+  /// false.
+  struct DynamicAlloca {
+    llvm::Value *Alloca;
+    llvm::Value *SavedSP;
+    DynamicAlloca(llvm::Value *A, llvm::Value *SP) : Alloca(A), SavedSP(SP) {}
+  };
+  DynamicAlloca emitDynamicAlloca(IRGenFunction &IGF, SILType T,
+                                  bool isInEntryBlock);
+
+  /// Deallocate dynamic alloca's memory if the stack address has an SP restore
+  /// point associated with it.
+  void emitDeallocateDynamicAlloca(IRGenFunction &IGF, StackAddress address);
+
+  /// Returns the IsInline flag and the loaded flags value.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *metadata);
+
+  /// Emits the alignment mask value from a loaded flags value.
+  llvm::Value *emitAlignMaskFromFlags(IRGenFunction &IGF, llvm::Value *flags);
+
+  llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *metadata);
+
+  /// Allocate/project/allocate memory for a value of the type in the fixed size
+  /// buffer.
+  Address emitAllocateValueInBuffer(IRGenFunction &IGF,
+                               SILType type,
+                               Address buffer);
+  Address emitProjectValueInBuffer(IRGenFunction &IGF,
+                              SILType type,
+                              Address buffer);
+  void emitDeallocateValueInBuffer(IRGenFunction &IGF,
+                                   SILType type,
+                                   Address buffer);
 } // end namespace irgen
 } // end namespace swift
 

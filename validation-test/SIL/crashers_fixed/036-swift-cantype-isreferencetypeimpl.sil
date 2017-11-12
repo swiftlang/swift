@@ -1,0 +1,2 @@
+// RUN: not %target-sil-opt %s
+func l<X{weak var c:X

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,7 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/SourceManager.h"
@@ -35,10 +41,11 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
 
 void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
                                  ASTContext &Context) {
+  SourceLoc loc = D->getStartLoc();
   bool hasPrintedName = false;
   if (auto *named = dyn_cast<ValueDecl>(D)) {
     if (named->hasName()) {
-      out << '\'' << named->getName() << '\'';
+      out << '\'' << named->getFullName() << '\'';
       hasPrintedName = true;
     } else if (auto *fn = dyn_cast<FuncDecl>(named)) {
       if (auto *ASD = fn->getAccessorStorageDecl()) {
@@ -71,16 +78,27 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
           
           out << " for " << ASD->getFullName();
           hasPrintedName = true;
+          loc = ASD->getStartLoc();
         }
       }
+    }
+  } else if (auto *extension = dyn_cast<ExtensionDecl>(D)) {
+    Type extendedTy = extension->getExtendedType();
+    if (extendedTy) {
+      out << "extension of " << extendedTy;
+      hasPrintedName = true;
     }
   }
 
   if (!hasPrintedName)
     out << "declaration " << (const void *)D;
 
-  out << " at ";
-  D->getStartLoc().print(out, Context.SourceMgr);
+  if (loc.isValid()) {
+    out << " at ";
+    loc.print(out, Context.SourceMgr);
+  } else {
+    out << " in module '" << D->getModuleContext()->getName() << '\'';
+  }
   out << '\n';
 }
 
@@ -153,7 +171,7 @@ namespace {
       return type->getDecl();
     }
   };
-}
+} // end anonymous namespace
 
 void PrettyStackTraceType::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
@@ -168,9 +186,11 @@ void swift::printTypeDescription(llvm::raw_ostream &out, Type type,
                                  ASTContext &Context) {
   out << "type '" << type << '\'';
   if (Decl *decl = InterestingDeclForType().visit(type)) {
-    out << " (declared at ";
-    decl->getSourceRange().print(out, Context.SourceMgr);
-    out << ')';
+    if (decl->getSourceRange().isValid()) {
+      out << " (declared at ";
+      decl->getSourceRange().print(out, Context.SourceMgr);
+      out << ')';
+    }
   }
   out << '\n';
 }
@@ -194,4 +214,13 @@ void swift::printSourceLocDescription(llvm::raw_ostream &out,
 void PrettyStackTraceLocation::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " starting at ";
   printSourceLocDescription(out, Loc, Context);
+}
+
+void PrettyStackTraceGenericSignature::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " generic signature ";
+  GenericSig->print(out);
+  if (Requirement) {
+    out << " in requirement #" << *Requirement;
+  }
+  out << '\n';
 }

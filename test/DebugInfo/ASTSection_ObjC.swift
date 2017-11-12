@@ -1,17 +1,17 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 
 // RUN: cp %S/Inputs/serialized-objc-header.h %t
 // RUN: %target-build-swift -emit-executable %S/ASTSection.swift -g -o %t/ASTSection-with-ObjC -import-objc-header %t/serialized-objc-header.h -DOBJC -module-name ASTSection -emit-module
-// RUN: %lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
+// RUN: %lldb-moduleimport-test %t/ASTSection-with-ObjC | %FileCheck %s
 
 // RUN: rm %t/serialized-objc-header.h
-// RUN: %lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
+// RUN: %lldb-moduleimport-test %t/ASTSection-with-ObjC | %FileCheck %s
 
 // RUN: %target-build-swift -emit-executable %S/ASTSection.swift -gline-tables-only -o %t/ASTSection -emit-module
-// RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
+// RUN: %lldb-moduleimport-test %t/ASTSection | %FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
 
 // REQUIRES: executable_test
-// UNSUPPORTED: OS=linux-gnu
+// REQUIRES: objc_interop
 
 // CHECK: Loaded module ASTSection from
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}

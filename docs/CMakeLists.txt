@@ -11,7 +11,7 @@ SET(SWIFT_SPHINX_PAPER_SIZE "letter"
 
 SET(SPHINX_ARGS
   -W
-  -D latex_paper_size=${SWIFT_SPHINX_PAPER_SIZE}
+  -D latex_elements.papersize=${SWIFT_SPHINX_PAPER_SIZE}
   -d ${CMAKE_BINARY_DIR}/doctrees)
 
 if(SPHINX_EXECUTABLE)
@@ -42,18 +42,18 @@ if(LITRE_EXECUTABLE)
   set(subdir_CMakeLists)
 
   foreach(rst ${rst_files})
-    # Prepare a testing directory containing a CMakeLists.txt 
+    # Prepare a testing directory containing a CMakeLists.txt
     # and example files extracted from the .rst
     set(test_dir "litre-tests/${rst}.litre-tests")
 
     add_custom_command(
-      OUTPUT 
+      OUTPUT
         ${test_dir}/CMakeLists.txt
-      COMMAND 
-        ${LITRE_EXECUTABLE} 
+      COMMAND
+        ${LITRE_EXECUTABLE}
         --default_compiler=${CMAKE_BINARY_DIR}/bin/swift
         "--dump_dir=${test_dir}"
-        --traceback 
+        --traceback
         --report=severe  # suppress most .rst errors.  We have lots of them.
         ${CMAKE_CURRENT_SOURCE_DIR}/${rst}
       DEPENDS
@@ -71,7 +71,7 @@ if(LITRE_EXECUTABLE)
     OUTPUT
       litre-top-CMakeLists.cmake
     COMMAND
-      ${CMAKE_COMMAND} -DOUTPUT=litre-top-CMakeLists.cmake 
+      ${CMAKE_COMMAND} -DOUTPUT=litre-top-CMakeLists.cmake
                       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
           -P ${CMAKE_CURRENT_SOURCE_DIR}/GenerateTopLevelLitreCMakeLists.cmake
           ${rst_files}
@@ -82,7 +82,7 @@ if(LITRE_EXECUTABLE)
     VERBATIM
     )
 
-  # Only update the real top-level CMakeLists.txt if something  changed
+  # Only update the real top-level CMakeLists.txt if something changed
   add_custom_command(
     OUTPUT
       "litre-tests/CMakeLists.txt"
@@ -134,7 +134,7 @@ if (LLVM_ENABLE_DOXYGEN)
 if (DOXYGEN_FOUND)
   set(abs_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
   set(abs_builddir ${CMAKE_CURRENT_BINARY_DIR})
-  
+
   if (HAVE_DOT)
     set(DOT ${LLVM_PATH_DOT})
   endif()
@@ -152,7 +152,7 @@ if (DOXYGEN_FOUND)
     set(enable_external_search "NO")
     set(extra_search_mappings "")
   endif()
-  
+
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doxygen.cfg.in
     ${CMAKE_CURRENT_BINARY_DIR}/doxygen.cfg @ONLY)
 
@@ -164,11 +164,11 @@ if (DOXYGEN_FOUND)
   set(enable_server_based_search)
   set(enable_external_search)
   set(extra_search_mappings)
-  
+
   add_custom_target(doxygen-swift
     ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/doxygen.cfg
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Generating swift doxygen documentation." VERBATIM)  
+    COMMENT "Generating swift doxygen documentation." VERBATIM)
 
   if(LLVM_BUILD_DOCS)
     add_dependencies(doxygen doxygen-swift)

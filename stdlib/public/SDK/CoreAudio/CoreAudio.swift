@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,10 +14,12 @@
 
 extension UnsafeBufferPointer {
   /// Initialize an `UnsafeBufferPointer<Element>` from an `AudioBuffer`.
+  /// Binds the buffer's memory type to `Element`.
   public init(_ audioBuffer: AudioBuffer) {
-    self.init(
-      start: UnsafePointer<Element>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(Element))
+    let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
+    let elementPtr = audioBuffer.mData?.bindMemory(
+      to: Element.self, capacity: count)
+    self.init(start: elementPtr, count: count)
   }
 }
 
@@ -25,9 +27,10 @@ extension UnsafeMutableBufferPointer {
   /// Initialize an `UnsafeMutableBufferPointer<Element>` from an
   /// `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
-    self.init(
-      start: UnsafeMutablePointer<Element>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(Element))
+    let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
+    let elementPtr = audioBuffer.mData?.bindMemory(
+      to: Element.self, capacity: count)
+    self.init(start: elementPtr, count: count)
   }
 }
 
@@ -39,19 +42,19 @@ extension AudioBuffer {
     numberOfChannels: Int
   ) {
     self.mNumberChannels = UInt32(numberOfChannels)
-    self.mData = UnsafeMutablePointer<Void>(typedBuffer.baseAddress)
-    self.mDataByteSize = UInt32(typedBuffer.count * strideof(Element))
+    self.mData = UnsafeMutableRawPointer(typedBuffer.baseAddress)
+    self.mDataByteSize = UInt32(typedBuffer.count * MemoryLayout<Element>.stride)
   }
 }
 
 extension AudioBufferList {
   /// - Returns: the size in bytes of an `AudioBufferList` that can hold up to
   ///   `maximumBuffers` `AudioBuffer`s.
-  public static func sizeInBytes(maximumBuffers maximumBuffers: Int) -> Int {
+  public static func sizeInBytes(maximumBuffers: Int) -> Int {
     _precondition(maximumBuffers >= 1,
       "AudioBufferList should contain at least one AudioBuffer")
-    return sizeof(AudioBufferList) +
-      (maximumBuffers - 1) * strideof(AudioBuffer)
+    return MemoryLayout<AudioBufferList>.size +
+      (maximumBuffers - 1) * MemoryLayout<AudioBuffer>.stride
   }
 
   /// Allocate an `AudioBufferList` with a capacity for the specified number of
@@ -61,15 +64,17 @@ extension AudioBufferList {
   /// `maximumBuffers`.
   ///
   /// The memory should be freed with `free()`.
-  public static func allocate(maximumBuffers maximumBuffers: Int)
+  public static func allocate(maximumBuffers: Int)
     -> UnsafeMutableAudioBufferListPointer {
     let byteSize = sizeInBytes(maximumBuffers: maximumBuffers)
     let ablMemory = calloc(byteSize, 1)
     _precondition(ablMemory != nil,
       "failed to allocate memory for an AudioBufferList")
 
-    let abl = UnsafeMutableAudioBufferListPointer(
-        UnsafeMutablePointer<AudioBufferList>(ablMemory))
+    let listPtr = ablMemory!.bindMemory(to: AudioBufferList.self, capacity: 1)
+    (ablMemory! + MemoryLayout<AudioBufferList>.stride).bindMemory(
+      to: AudioBuffer.self, capacity: maximumBuffers)
+    let abl = UnsafeMutableAudioBufferListPointer(listPtr)
     abl.count = maximumBuffers
     return abl
   }
@@ -86,14 +91,20 @@ public struct UnsafeMutableAudioBufferListPointer {
     unsafeMutablePointer = p
   }
 
+  /// Construct from an `AudioBufferList` pointer.
+  public init?(_ p: UnsafeMutablePointer<AudioBufferList>?) {
+    guard let unwrapped = p else { return nil }
+    self.init(unwrapped)
+  }
+
   /// The number of `AudioBuffer`s in the `AudioBufferList`
   /// (`mNumberBuffers`).
   public var count: Int {
     get {
-      return Int(unsafeMutablePointer.memory.mNumberBuffers)
+      return Int(unsafeMutablePointer.pointee.mNumberBuffers)
     }
     nonmutating set(newValue) {
-      unsafeMutablePointer.memory.mNumberBuffers = UInt32(newValue)
+      unsafeMutablePointer.pointee.mNumberBuffers = UInt32(newValue)
     }
   }
 
@@ -102,7 +113,8 @@ public struct UnsafeMutableAudioBufferListPointer {
     // AudioBufferList has one AudioBuffer in a "flexible array member".
     // Position the pointer after that, and skip one AudioBuffer back.  This
     // brings us to the start of AudioBuffer array.
-    return UnsafeMutablePointer<AudioBuffer>(unsafeMutablePointer + 1) - 1
+    let rawPtr = UnsafeMutableRawPointer(unsafeMutablePointer + 1)
+    return rawPtr.assumingMemoryBound(to: AudioBuffer.self) - 1
   }
 
   // FIXME: the properties 'unsafePointer' and 'unsafeMutablePointer' should be
@@ -120,7 +132,11 @@ public struct UnsafeMutableAudioBufferListPointer {
   public var unsafeMutablePointer: UnsafeMutablePointer<AudioBufferList>
 }
 
-extension UnsafeMutableAudioBufferListPointer : MutableCollectionType {
+extension UnsafeMutableAudioBufferListPointer
+  : MutableCollection, RandomAccessCollection {
+
+  public typealias Index = Int
+
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
     return 0
@@ -136,13 +152,25 @@ extension UnsafeMutableAudioBufferListPointer : MutableCollectionType {
     get {
       _precondition(index >= 0 && index < self.count,
         "subscript index out of range")
-      return (_audioBuffersPointer + index).memory
+      return (_audioBuffersPointer + index).pointee
     }
     nonmutating set(newValue) {
       _precondition(index >= 0 && index < self.count,
         "subscript index out of range")
-      (_audioBuffersPointer + index).memory = newValue
+      (_audioBuffersPointer + index).pointee = newValue
     }
   }
+
+  public subscript(bounds: Range<Int>)
+    -> MutableRandomAccessSlice<UnsafeMutableAudioBufferListPointer> {
+    get {
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+
+  public typealias Indices = CountableRange<Int>
 }
 

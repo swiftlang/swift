@@ -1,0 +1,5 @@
+module MacrosDeliberateRedefB {
+  module Newer {
+    header "Newer.h"
+  }
+}

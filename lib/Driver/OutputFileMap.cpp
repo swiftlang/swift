@@ -1,12 +1,12 @@
-//===-- OutputFileMap.cpp - Driver output file map -------------*- C++ -*--===//
+//===--- OutputFileMap.cpp - Driver output file map -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -105,7 +105,7 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   if (!Root)
     return true;
 
-  llvm::yaml::MappingNode *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
+  auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
   if (!Map)
     return true;
 
@@ -119,7 +119,7 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     if (!Value)
       return true;
 
-    llvm::yaml::ScalarNode *InputPath = dyn_cast<llvm::yaml::ScalarNode>(Key);
+    auto *InputPath = dyn_cast<llvm::yaml::ScalarNode>(Key);
     if (!InputPath)
       return true;
 
@@ -134,11 +134,11 @@ bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
       llvm::yaml::Node *Key = OutputPair.getKey();
       llvm::yaml::Node *Value = OutputPair.getValue();
 
-      llvm::yaml::ScalarNode *KindNode = dyn_cast<llvm::yaml::ScalarNode>(Key);
+      auto *KindNode = dyn_cast<llvm::yaml::ScalarNode>(Key);
       if (!KindNode)
         return true;
 
-      llvm::yaml::ScalarNode *Path = dyn_cast<llvm::yaml::ScalarNode>(Value);
+      auto *Path = dyn_cast<llvm::yaml::ScalarNode>(Value);
       if (!Path)
         return true;
 

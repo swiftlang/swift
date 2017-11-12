@@ -1,0 +1,252 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-print-debuginfo -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
+
+// Linux doesn't have the same symbol name for _ArrayBuffer.
+// XFAIL: linux
+
+import Swift
+import Builtin
+
+//////////
+// Data //
+//////////
+
+class TrivialDestructor {
+  var int : Builtin.Int32
+  var ptr : Builtin.NativeObject
+  init()
+  deinit { }
+}
+
+// Remove a dead array.
+// rdar://20980377 Add dead array elimination to DeadObjectElimination
+// Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
+sil [_semantics "array.uninitialized"] @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+
+// CHECK-LABEL: sil @deadarray
+// CHECK-NOT: apply
+// CHECK-NOT: store
+sil @deadarray : $@convention(thin) (@owned TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor):
+// CHECK: strong_retain %0 : $TrivialDestructor
+  %2 = integer_literal $Builtin.Word, 2
+  // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+// CHECK-NEXT: strong_release %0 : $TrivialDestructor, loc "{{.*}}":[[@LINE+1]]:3
+  store %0 to %7 : $*TrivialDestructor
+  %9 = integer_literal $Builtin.Word, 1
+  %10 = index_addr %7 : $*TrivialDestructor, %9 : $Builtin.Word
+// CHECK-NEXT: strong_release %0 : $TrivialDestructor, loc "{{.*}}":[[@LINE+1]]:3
+  store %0 to %10 : $*TrivialDestructor
+  %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  strong_retain %0 : $TrivialDestructor
+  strong_release %15 : $Builtin.BridgeObject
+// CHECK-NEXT: tuple ()
+  %18 = tuple ()
+// CHECK-NEXT: return
+  return %18 : $()
+}
+
+// Test the sanity check in dead object elimination which checks that all stores
+// to the array are within the array's liferange.
+
+// CHECK-LABEL: sil @malformed_deadarray
+// CHECK: apply
+// CHECK: store
+// CHECK: return
+sil @malformed_deadarray : $@convention(thin) (@owned TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor):
+  %2 = integer_literal $Builtin.Word, 2
+  // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  strong_retain %0 : $TrivialDestructor
+  strong_release %15 : $Builtin.BridgeObject
+
+  // This store is after the last release of the dead array. This should actually
+  // never happen.
+  store %0 to %7 : $*TrivialDestructor
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: sil @not_all_paths_release_the_dead_array
+// CHECK: bb0(%0 : $TrivialDestructor):
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: unreachable
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK: return
+sil @not_all_paths_release_the_dead_array : $@convention(thin) (@owned TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor):
+  %2 = integer_literal $Builtin.Word, 2
+  // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  strong_retain %0 : $TrivialDestructor
+  store %0 to %7 : $*TrivialDestructor
+  strong_release %15 : $Builtin.BridgeObject
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: sil @tuple_extract_in_different_block
+// CHECK: bb0(%0 : $TrivialDestructor):
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: strong_release %0
+// CHECK: return
+sil @tuple_extract_in_different_block : $@convention(thin) (@owned TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor):
+  %2 = integer_literal $Builtin.Word, 2
+  // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  strong_retain %0 : $TrivialDestructor
+  store %0 to %7 : $*TrivialDestructor
+  br bb1
+
+bb1:
+  %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  strong_release %15 : $Builtin.BridgeObject
+  %18 = tuple ()
+  return %18 : $()
+}
+
+
+// CHECK-LABEL: sil @multiple_tuple_extracts
+// CHECK: apply
+// CHECK: store
+// CHECK: load
+// CHECK: strong_release
+// CHECK: return
+sil @multiple_tuple_extracts : $@convention(thin) (@owned TrivialDestructor) -> @owned TrivialDestructor {
+bb0(%0 : $TrivialDestructor):
+  %2 = integer_literal $Builtin.Word, 2
+  // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %10 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %11 = pointer_to_address %10 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  strong_retain %0 : $TrivialDestructor
+  store %0 to %11 : $*TrivialDestructor
+
+  %20 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %21 = pointer_to_address %20 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  %22 = load %21 : $*TrivialDestructor
+
+  %12 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %13 = struct_extract %12 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  strong_release %15 : $Builtin.BridgeObject
+
+  return %22 : $TrivialDestructor
+}
+
+// CHECK-LABEL: sil @release_dead_array_on_two_branches
+// CHECK: bb0(%0 : $TrivialDestructor, %1 : $TrivialDestructor):
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain %1
+// CHECK-NEXT: strong_release %1
+// CHECK: return
+sil @release_dead_array_on_two_branches : $@convention(thin) (@owned TrivialDestructor, @owned TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor, %1 : $TrivialDestructor):
+  %2 = integer_literal $Builtin.Word, 2
+  // function_ref Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $TrivialDestructor
+  store %0 to %7 : $*TrivialDestructor
+  strong_release %15 : $Builtin.BridgeObject
+  br bb3
+
+bb2:
+  strong_retain %1 : $TrivialDestructor
+  store %1 to %7 : $*TrivialDestructor
+  strong_release %15 : $Builtin.BridgeObject
+  br bb3
+
+bb3:
+  %18 = tuple ()
+  return %18 : $()
+}
+
+// CHECK-LABEL: sil @dead_array_in_single_cycle_loop
+// CHECK: bb0(%0 : $TrivialDestructor):
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: cond_br
+// CHECK: bb2:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @dead_array_in_single_cycle_loop : $@convention(thin) (@guaranteed TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor):
+  br bb1
+
+bb1:
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  strong_retain %0 : $TrivialDestructor
+  store %0 to %7 : $*TrivialDestructor
+  strong_release %15 : $Builtin.BridgeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  %18 = tuple ()
+  return %18 : $()
+}
+

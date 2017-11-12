@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
 
 // REQUIRES: objc_interop
 
@@ -38,9 +38,8 @@ class SwiftGizmo : A {
   // expected-error@+1{{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   @NSManaged var nonobjc_var: SwiftProto?
 
-  @NSManaged class var d: Int = 4  // expected-error {{@NSManaged only allowed on an instance property or method}} \
-            // expected-error {{class stored properties not yet supported}}
-
+  @NSManaged class var d: Int = 4  // expected-error {{@NSManaged only allowed on an instance property or method}}
+  // expected-error@-1 {{class stored properties not supported in classes; did you mean 'static'?}}
 
   @NSManaged var e: Int { return 4 } // expected-error {{@NSManaged not allowed on computed properties}}
 
@@ -49,6 +48,9 @@ class SwiftGizmo : A {
   @NSManaged func mutableArrayValueForA() // no-warning
   @NSManaged func mutableArrayValueForB() {} // expected-error {{NSManaged method cannot have a body; it must be provided at runtime}}
   @NSManaged class func mutableArrayValueForA() {} // expected-error {{@NSManaged only allowed on an instance property or method}}
+
+  // SR-1050: don't assert
+  @NSManaged var multiA, multiB, multiC : NSNumber?
 
   override init() {}
 }

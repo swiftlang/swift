@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=tvos
@@ -15,31 +15,31 @@ final class Foo<T: NSCoding>: NSObject, NSCoding {
   }
 
   @objc required convenience init(coder: NSCoder) {
-    let one = coder.decodeObjectForKey("one") as! T
-    let two = coder.decodeObjectForKey("two") as! T
+    let one = coder.decodeObject(forKey: "one") as! T
+    let two = coder.decodeObject(forKey :"two") as! T
     self.init(one: one, two: two)
   }
 
-  @objc func encodeWithCoder(encoder: NSCoder) {
-    encoder.encodeObject(one, forKey: "one")
-    encoder.encodeObject(two, forKey: "two")
+  @objc(encodeWithCoder:) func encode(with encoder: NSCoder) {
+    encoder.encode(one, forKey: "one")
+    encoder.encode(two, forKey: "two")
   }
 }
 
 // FIXME: W* macro equivalents should be in the Darwin/Glibc overlay
-func WIFEXITED(status: Int32) -> Bool {
+func WIFEXITED(_ status: Int32) -> Bool {
   return (status & 0o177) == 0
 }
-func WEXITSTATUS(status: Int32) -> Int32 {
+func WEXITSTATUS(_ status: Int32) -> Int32 {
   return (status >> 8) & 0xFF
 }
 
 // FIXME: "environ" should be in the Darwin overlay too
 @_silgen_name("_NSGetEnviron")
-func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
 
-var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
-  return _NSGetEnviron().memory
+var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
+  return _NSGetEnviron().pointee
 }
 
 func driver() {
@@ -55,7 +55,7 @@ func driver() {
 
   do {
     // Set up the archiver's stdout to feed into our pipe.
-    var archiverActions = posix_spawn_file_actions_t()
+    var archiverActions: posix_spawn_file_actions_t?
     guard posix_spawn_file_actions_init(&archiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }
@@ -70,12 +70,13 @@ func driver() {
     }
 
     // Spawn the archiver process.
-    let archiverArgv: [UnsafeMutablePointer<Int8>] = [
-      Process.unsafeArgv[0],
-      UnsafeMutablePointer(("-archive" as StaticString).utf8Start),
-      nil
+    let str: StaticString = "-archive"
+    let optStr = UnsafeMutableRawPointer(mutating: str.utf8Start).bindMemory(
+      to: CChar.self, capacity: str.utf8CodeUnitCount)
+    let archiverArgv: [UnsafeMutablePointer<Int8>?] = [
+      CommandLine.unsafeArgv[0], optStr, nil
     ]
-    guard posix_spawn(&archiver, Process.unsafeArgv[0],
+    guard posix_spawn(&archiver, CommandLine.unsafeArgv[0],
                       &archiverActions, nil,
                       archiverArgv, envp) == 0 else {
       fatalError("posix_spawn failed")
@@ -84,7 +85,7 @@ func driver() {
 
   do {
     // Set up the unarchiver's stdin to read from our pipe.
-    var unarchiverActions = posix_spawn_file_actions_t()
+    var unarchiverActions: posix_spawn_file_actions_t?
     guard posix_spawn_file_actions_init(&unarchiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }
@@ -99,13 +100,14 @@ func driver() {
     }
 
     // Spawn the unarchiver process.
+    let str = "-unarchive" as StaticString
+    let optStr = UnsafeMutableRawPointer(mutating: str.utf8Start).bindMemory(
+      to: CChar.self, capacity: str.utf8CodeUnitCount)
     var unarchiver: pid_t = 0
-    let unarchiverArgv: [UnsafeMutablePointer<Int8>] = [
-      Process.unsafeArgv[0],
-      UnsafeMutablePointer(("-unarchive" as StaticString).utf8Start),
-      nil
+    let unarchiverArgv: [UnsafeMutablePointer<Int8>?] = [
+      CommandLine.unsafeArgv[0], optStr, nil
     ]
-    guard posix_spawn(&unarchiver, Process.unsafeArgv[0],
+    guard posix_spawn(&unarchiver, CommandLine.unsafeArgv[0],
                       &unarchiverActions, nil,
                       unarchiverArgv, envp) == 0 else {
       fatalError("posix_spawn failed")
@@ -138,11 +140,9 @@ func driver() {
 
 func archive() {
   let data = NSMutableData()
-  let archiver = NSKeyedArchiver(forWritingWithMutableData: data)
-  archiver.encodeObject(Foo<NSString>(one: "one", two: "two"),
-                        forKey: "strings")
-  archiver.encodeObject(Foo<NSNumber>(one: 1, two: 2),
-                        forKey: "numbers")
+  let archiver = NSKeyedArchiver(forWritingWith: data)
+  archiver.encode(Foo<NSString>(one: "one", two: "two"), forKey: "strings")
+  archiver.encode(Foo<NSNumber>(one: 1, two: 2), forKey: "numbers")
   archiver.finishEncoding()
 
   // Output the archived data over stdout, which should be piped to stdin
@@ -165,7 +165,7 @@ func unarchive() {
   // written it.
   var rawData: [UInt8] = []
 
-  var buffer = [UInt8](count: 4096, repeatedValue: 0)
+  var buffer = [UInt8](repeating: 0, count: 4096)
 
   while true {
     let count = read(STDIN_FILENO, &buffer, 4096)
@@ -179,21 +179,21 @@ func unarchive() {
 
   // Feed it into an unarchiver.
   let data = NSData(bytes: rawData, length: rawData.count)
-  let unarchiver = NSKeyedUnarchiver(forReadingWithData: data)
+  let unarchiver = NSKeyedUnarchiver(forReadingWith: data as Data)
 
   guard let strings
-      = unarchiver.decodeObjectForKey("strings") as? Foo<NSString> else {
+      = unarchiver.decodeObject(forKey: "strings") as? Foo<NSString> else {
     fatalError("unable to unarchive Foo<NSString>")
   }
   guard let numbers
-      = unarchiver.decodeObjectForKey("numbers") as? Foo<NSNumber> else {
+      = unarchiver.decodeObject(forKey: "numbers") as? Foo<NSNumber> else {
     fatalError("unable to unarchive Foo<NSNumber>")
   }
 
-  // CHECK-LABEL: Foo<NSString>
+  // CHECK-LABEL: <_TtGC4main3FooCSo8NSString_: {{0x[0-9a-f]+}}> #0
   // CHECK:         one: one
   // CHECK:         two: two
-  // CHECK-LABEL: Foo<NSNumber>
+  // CHECK-LABEL: <_TtGC4main3FooCSo8NSNumber_: {{0x[0-9a-f]+}}> #0
   // CHECK:         one: 1
   // CHECK:         two: 2
   dump(strings)
@@ -203,11 +203,11 @@ func unarchive() {
 // Pick a mode based on the command-line arguments.
 // The test launches as a "driver" which then respawns itself into reader
 // and writer subprocesses.
-if Process.arguments.count < 2 {
+if CommandLine.arguments.count < 2 {
   driver()
-} else if Process.arguments[1] == "-archive" {
+} else if CommandLine.arguments[1] == "-archive" {
   archive()
-} else if Process.arguments[1] == "-unarchive" {
+} else if CommandLine.arguments[1] == "-unarchive" {
   unarchive()
 } else {
   fatalError("invalid commandline argument")

@@ -27,7 +27,7 @@ behavior of our implementations would work against these goals.
 Almost all languages provide some amount of abstraction of implementation. For
 example, functions are usually opaque data types which fully abstract away the
 exact sequence of operations performed.  Similarly, adding a new field to a C
-struct does not break programs which refer to a different field — those programs
+struct does not break programs which refer to a different field -- those programs
 may need to be recompiled, but once recompiled, they should continue to
 work. (This would not necessarily be true if, say, fields were accessed by index
 rather than by name.)
@@ -42,7 +42,7 @@ program may depend on some number of other components; this graph of
 dependencies can be assumed to be acyclic.
 
 Because a component is distributed as a unit, ABI resilience within the
-component is not required. It may still help to serve as a build- time
+component is not required. It may still help to serve as a build-time
 optimization, but Swift aims to offer substantially better build times than
 C/C++ programs due to other properties of the language (the module system, the
 lack of a preprocessor, the instantiation model, etc.).
@@ -254,7 +254,7 @@ versioned [fragile] attribute. There is also a [resilient] attribute, exclusive
 to any form of [fragile], to explicitly describe a declaration as resilient.
 
 Resilience is lexically inherited. It is not lexically constrained; a resilient
-language structure may have fragile sub-structures and vice- versa. The global
+language structure may have fragile sub-structures and vice-versa. The global
 context is resilient, although since it is also [public] (and not [api]),
 objects are not in practice constrained by resilience.
 
@@ -317,14 +317,14 @@ Swift's struct layout algorithm takes as input a list of fields, and does the
 following:
 
 1. The fields are ranked:
-   
+
    * The universally fragile fields rank higher than the others.
-   
+
    * If two fields A and B are both universally fragile,
-   
+
    * If no other condition applies, fields that appear earlier in the original
      sequence have higher rank.
-   
+
 2. The size of the structure is initially 0.
 
    representations and A's type is more aligned than B's type, or otherwise if A
@@ -351,7 +351,7 @@ change a
 Resilience affects pretty much every language feature.
 
 Execution-time abstraction does not come without cost, and we do not wish to
-incur those costs where unnecessary. Many forms of execution- time abstraction
+incur those costs where unnecessary. Many forms of execution-time abstraction
 are unnecessary except as a build-time optimization, because in practice the
 software is deployed in large chunks that can be compiled at the same
 time. Within such a resilience unit , many execution-time abstractions can be
@@ -364,7 +364,7 @@ outside its resilience unit.
 
 A structure is said to be resilient if accesses to it rely only on its
 
-A structure is said to be universally non-resilient if it is non- resilient in
+A structure is said to be universally non-resilient if it is non-resilient in
 all contexts in which it is accessible.
 
 Many APIs are willing to selectively "lock down" some of their component
@@ -405,8 +405,8 @@ non-resilient.
 
 Named types declared within a function are universally non-resilient.
 
-Named types with the [unchanging] annotation are universally non-
-resilient. Problem, because of the need/desire to make things depend on whether
+Named types with the [unchanging] annotation are universally non-resilient.
+Problem, because of the need/desire to make things depend on whether
 a type is universally non-resilient. Makes it impossible to add [unchanging]
 without breaking ABI. See the call section.
 
@@ -433,9 +433,9 @@ Named types
 
 It is an error to place the [unchanging] annotation on any of these types:
 
-* a struct type with member types that are not universally non- resilient
+* a struct type with member types that are not universally non-resilient
 
-* an enum type with an enumerator whose type is not universally non- resilient
+* an enum type with an enumerator whose type is not universally non-resilient
 
 * a class extension
 
@@ -450,8 +450,8 @@ It is an error to place the [unchanging] annotation on a class extension.
 It is an error to place the [unchanging] annotation on a class whose primary
 definition contains a field whose type is potentially resilient in a context
 where the class is accessible. That is, if the class is exported, all of its
-fields must be universally non- resilient. If it is not exported, all of its
-fields must be non- resilient within its resilience unit.
+fields must be universally non-resilient. If it is not exported, all of its
+fields must be non-resilient within its resilience unit.
 
 It is allowed to add fields to an [unchanging] class in a class extension. Such
 fields are always side-stored, even if they are declared within the same
@@ -466,25 +466,25 @@ range of generic operations can be
 1. the size and layout of first-class objects:
 
    * local variables
-   
+
    * global variables
-   
+
    * dynamically*allocated objects
-   
+
    * member sub*objects of a structure
-   
+
    * base sub*objects of a class
-   
+
    * element sub*objects of an array
-   
+
    * parameters of functions
-   
+
    * results of functions
 
 2. the set of operations on an object:
 
    * across all protocols
-   
+
    * for a particular protocol (?)
 
 3. the set of operations on an object
@@ -517,7 +517,7 @@ of this: [born_unchanging] for things that are universally non-resilient,
 
 Global functions always export a maximally-resilient entrypoint. If there exist
 any [fragile] arguments, and there do not exist any resilient arguments, they
-also export a [fragile] copy. Callers do… something? Have to know what they're
+also export a [fragile] copy. Callers do... something? Have to know what they're
 deploying against, I guess.
 
 Want some concrete representation for [ref] arguments.
@@ -611,7 +611,7 @@ Break it down by types of declarations.
 
 * typealias has no resilience
 
-* struct — the set/order of fields can change — means size/alignment, layout,
+* struct -- the set/order of fields can change -- means size/alignment, layout,
   copy/destruction semantics, etc. can all change
 
 * fields - direct access vs. getter/setter
@@ -620,27 +620,27 @@ Break it down by types of declarations.
 
 * types - as if top level
 
-* class — same as a structs, plus
+* class -- same as a structs, plus
 
-* base classes — can't completely remove a base class (breaks interface), but
+* base classes -- can't completely remove a base class (breaks interface), but
   can introduce a new intermediate base
 
-* virtual dispatch — table vs. dictionary, devirtualization (to which
+* virtual dispatch -- table vs. dictionary, devirtualization (to which
   decl?). Some amount of table lookup can be done as static vs. dynamic offsets
 
-* funcs — inlineability
+* funcs -- inlineability
 
-* vars — direct access vs. getter/setter. Direct accesses for types that aren't
+* vars -- direct access vs. getter/setter. Direct accesses for types that aren't
   inherently fragile need to be indirected because they may need to be
   dynamically allocated. In general, might be actor-local, this is for when the
   model does say "global variable".
 
-* extensions of classes — like class. Fields are always side-allocated if we're
+* extensions of classes -- like class. Fields are always side-allocated if we're
   extending a class not defined in this component (w/i domain?). Making a class
   fragile is also a promise not to add more fields in extensions in this
   component; probably need a way to force a side-table.
 
-* protocols — can't remove/change existing methods, but can add defaulted
+* protocols -- can't remove/change existing methods, but can add defaulted
   methods. Doing this resiliently requires load-time checking.  vtable for
   non-defaulted methods, ? for rest?
 

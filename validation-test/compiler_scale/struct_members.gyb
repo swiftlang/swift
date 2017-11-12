@@ -1,0 +1,19 @@
+// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select validateDecl %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+struct Struct${N} {
+% if int(N) > 1:
+    func method(_: Struct${int(N)-1}) {}
+    var prop: Struct${int(N)-1} { return Struct${int(N)-1}() }
+    static var prop = Struct${int(N)-1}()
+    subscript(n: Int) -> Struct${int(N)-1} { return Struct${int(N)-1}() }
+% else:
+    func method() {}
+    var prop: Int { return 0 }
+    static var prop = 0
+    subscript(n: Int) -> Int { return 0 }
+% end
+
+    struct Nested {}
+}

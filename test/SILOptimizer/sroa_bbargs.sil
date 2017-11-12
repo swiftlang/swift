@@ -1,0 +1,139 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sroa-bb-args %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+///////////
+// Types //
+///////////
+
+enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+struct S1 {
+  var x : Builtin.Int1
+  var y : Builtin.Int32
+  var z : Builtin.Int64
+}
+
+struct S1_B {
+  var x : Builtin.Int1
+  var y : Builtin.NativeObject
+  var z : Builtin.Int64
+}
+
+struct S1_C {
+  var x : Builtin.Int1
+  var y : Builtin.NativeObject
+  var z : Builtin.NativeObject
+}
+
+struct S2 {
+  var s1 : S1_B
+  var s2 : (Builtin.NativeObject, Builtin.NativeObject)
+  var s5 : FakeOptional<(Builtin.Int32, Builtin.Int64)>
+}
+
+struct S3 {
+  var s1 : S2
+  var s2 : S2
+  var s3 : Builtin.NativeObject
+  var s4 : S2
+  var s5 : FakeOptional<S2>
+}
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil @do_not_split_struct_with_only_trivial_fields : $@convention(thin) (Builtin.NativeObject, S1, Builtin.NativeObject, @in S1, Builtin.NativeObject) -> Builtin.Int32 {
+// CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $S1, {{.*}} : $Builtin.NativeObject, {{.*}} : $*S1, {{.*}} : $Builtin.NativeObject):
+sil @do_not_split_struct_with_only_trivial_fields : $@convention(thin) (Builtin.NativeObject, S1, Builtin.NativeObject, @in S1, Builtin.NativeObject) -> Builtin.Int32 {
+bb0(%0 : $Builtin.NativeObject, %1 : $S1, %2 : $Builtin.NativeObject, %3 : $*S1, %4 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S1, %2 : $Builtin.NativeObject, %3 : $*S1, %4 : $Builtin.NativeObject)
+
+bb1:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S1, %2 : $Builtin.NativeObject, %3 : $*S1, %4 : $Builtin.NativeObject)
+
+bb2(%5 : $Builtin.NativeObject, %6 : $S1, %7 : $Builtin.NativeObject, %8 : $*S1, %9 : $Builtin.NativeObject):
+  %10 = struct_extract %6 : $S1, #S1.y
+  return %10 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @do_not_split_struct_with_only_one_non_trivial_field : $@convention(thin) (Builtin.NativeObject, S1_B, Builtin.NativeObject, @in S1_B, Builtin.NativeObject) -> Builtin.NativeObject {
+// CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $Builtin.NativeObject, {{.*}} : $*S1_B, {{.*}} : $Builtin.NativeObject):
+sil @do_not_split_struct_with_only_one_non_trivial_field : $@convention(thin) (Builtin.NativeObject, S1_B, Builtin.NativeObject, @in S1_B, Builtin.NativeObject) -> Builtin.NativeObject {
+bb0(%0 : $Builtin.NativeObject, %1 : $S1_B, %2 : $Builtin.NativeObject, %3 : $*S1_B, %4 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S1_B, %2 : $Builtin.NativeObject, %3 : $*S1_B, %4 : $Builtin.NativeObject)
+
+bb1:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S1_B, %2 : $Builtin.NativeObject, %3 : $*S1_B, %4 : $Builtin.NativeObject)
+
+bb2(%5 : $Builtin.NativeObject, %6 : $S1_B, %7 : $Builtin.NativeObject, %8 : $*S1_B, %9 : $Builtin.NativeObject):
+  %10 = struct_extract %6 : $S1_B, #S1_B.y
+  return %10 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil @split_struct_with_multiple_non_trivial_fields : $@convention(thin) (Builtin.NativeObject, S1_C, Builtin.NativeObject, @in S1_C, Builtin.NativeObject) -> (Builtin.NativeObject, Builtin.NativeObject) {
+// CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $*S1_C, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject):
+sil @split_struct_with_multiple_non_trivial_fields : $@convention(thin) (Builtin.NativeObject, S1_C, Builtin.NativeObject, @in S1_C, Builtin.NativeObject) -> (Builtin.NativeObject, Builtin.NativeObject) {
+bb0(%0 : $Builtin.NativeObject, %1 : $S1_C, %2 : $Builtin.NativeObject, %3 : $*S1_C, %4 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S1_C, %2 : $Builtin.NativeObject, %3 : $*S1_C, %4 : $Builtin.NativeObject)
+
+bb1:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S1_C, %2 : $Builtin.NativeObject, %3 : $*S1_C, %4 : $Builtin.NativeObject)
+
+bb2(%5 : $Builtin.NativeObject, %6 : $S1_C, %7 : $Builtin.NativeObject, %8 : $*S1_C, %9 : $Builtin.NativeObject):
+  %10 = struct_extract %6 : $S1_C, #S1_C.y
+  %11 = struct_extract %6 : $S1_C, #S1_C.z
+  %12 = tuple(%10 : $Builtin.NativeObject, %11 : $Builtin.NativeObject)
+  return %12 : $(Builtin.NativeObject, Builtin.NativeObject)
+}
+
+// Make sure our rules apply nicely at multiple levels. We split S2 into an S1_B and a native object
+// CHECK-LABEL: sil @two_level_struct_with_differing_levels_of_splitting : $@convention(thin) (Builtin.NativeObject, S2, Builtin.NativeObject, @in S2, Builtin.NativeObject) -> (Builtin.Int1, Builtin.NativeObject) {
+// CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $*S2, {{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $Builtin.NativeObject):
+sil @two_level_struct_with_differing_levels_of_splitting : $@convention(thin) (Builtin.NativeObject, S2, Builtin.NativeObject, @in S2, Builtin.NativeObject) -> (Builtin.Int1, Builtin.NativeObject) {
+bb0(%0 : $Builtin.NativeObject, %1 : $S2, %2 : $Builtin.NativeObject, %3 : $*S2, %4 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S2, %2 : $Builtin.NativeObject, %3 : $*S2, %4 : $Builtin.NativeObject)
+
+bb1:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S2, %2 : $Builtin.NativeObject, %3 : $*S2, %4 : $Builtin.NativeObject)
+
+bb2(%5 : $Builtin.NativeObject, %6 : $S2, %7 : $Builtin.NativeObject, %8 : $*S2, %9 : $Builtin.NativeObject):
+  %10 = struct_extract %6 : $S2, #S2.s2
+  %11 = tuple_extract %10 : $(Builtin.NativeObject, Builtin.NativeObject), 1
+  %12 = struct_extract %6 : $S2, #S2.s1
+  %13 = struct_extract %12 : $S1_B, #S1_B.x
+  %14 = tuple(%13 : $Builtin.Int1, %11 : $Builtin.NativeObject)
+  return %14 : $(Builtin.Int1, Builtin.NativeObject)
+}
+
+// CHECK-LABEL: sil @large_struct_split : $@convention(thin) (Builtin.NativeObject, S3, Builtin.NativeObject, @in S3, Builtin.NativeObject) -> S3 {
+// CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $*S3, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $FakeOptional<S2>, {{.*}} : $S1_B, {{.*}} : $FakeOptional<(Builtin.Int32, Builtin.Int64)>, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $FakeOptional<(Builtin.Int32, Builtin.Int64)>, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $FakeOptional<(Builtin.Int32, Builtin.Int64)>, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject):
+sil @large_struct_split : $@convention(thin) (Builtin.NativeObject, S3, Builtin.NativeObject, @in S3, Builtin.NativeObject) -> S3 {
+bb0(%0 : $Builtin.NativeObject, %1 : $S3, %2 : $Builtin.NativeObject, %3 : $*S3, %4 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S3, %2 : $Builtin.NativeObject, %3 : $*S3, %4 : $Builtin.NativeObject)
+
+bb1:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S3, %2 : $Builtin.NativeObject, %3 : $*S3, %4 : $Builtin.NativeObject)
+
+bb2(%5 : $Builtin.NativeObject, %6 : $S3, %7 : $Builtin.NativeObject, %8 : $*S3, %9 : $Builtin.NativeObject):
+  return %6 : $S3
+}
+
+
+sil @bb_arg_dont_process_switch_enum : $@convention(thin) (FakeOptional<S1>) -> () {
+bb0(%0 : $FakeOptional<S1>):
+  switch_enum %0 : $FakeOptional<S1>, case #FakeOptional.none!enumelt: bb2, case #FakeOptional.some!enumelt.1: bb1
+
+bb1(%1 : $S1):
+  unreachable
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}

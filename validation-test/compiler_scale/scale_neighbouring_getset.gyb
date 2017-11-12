@@ -1,0 +1,11 @@
+// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select typeCheckAbstractFunctionBody %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+struct Struct${N} {
+% if int(N) > 1:
+    var Field : Struct${int(N)-1}?
+% else:
+    var Field : Int?
+% end
+}

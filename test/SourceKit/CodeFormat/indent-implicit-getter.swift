@@ -16,6 +16,15 @@ class Foo {
     }
 }
 
+class Foo1 {
+var foo: Int {
+    return 1
+  }
+class var foo: Int {
+  return 1
+  }
+}
+// FIXME: may be crashing non-deterministically
 
 // RUN: %sourcekitd-test -req=format -line=1 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=2 -length=1 %s >>%t.response
@@ -34,8 +43,10 @@ class Foo {
 // RUN: %sourcekitd-test -req=format -line=15 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=16 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=17 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=20 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=23 -length=1 %s >>%t.response
 
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "class Foo {"
 // CHECK: key.sourcetext: "    var test: Int {"
@@ -54,3 +65,5 @@ class Foo {
 // CHECK: key.sourcetext: "        return x"
 // CHECK: key.sourcetext: "    }"
 // CHECK: key.sourcetext: "}"
+// CHECK: key.sourcetext: "    var foo: Int {"
+// CHECK: key.sourcetext: "    class var foo: Int {"

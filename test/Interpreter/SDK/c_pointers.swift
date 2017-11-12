@@ -1,6 +1,6 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -23,9 +23,9 @@ typealias XXColor = UIColor
 //
 
 let rgb = CGColorSpaceCreateDeviceRGB()
-let cgRed = CGColorCreate(rgb, [1.0, 0.0, 0.0, 1.0])!
+let cgRed = CGColor(colorSpace: rgb, components: [1.0, 0.0, 0.0, 1.0])!
 
-let nsRed = XXColor(CGColor: cgRed)
+let nsRed = XXColor(cgColor: cgRed)
 
 var r: CGFloat = 0.5, g: CGFloat = 0.5, b: CGFloat = 0.5, a: CGFloat = 0.5
 #if os(OSX)
@@ -44,10 +44,10 @@ print("<\(r) \(g) \(b) \(a)>") // CHECK-NEXT: <1.0 0.0 0.0 1.0>
 
 // FIXME: Array type annotation should not be required
 let data = NSData(bytes: [1.5, 2.25, 3.125] as [Double], 
-                  length: sizeof(Double.self) * 3)
+                  length: MemoryLayout<Double>.size * 3)
 var fromData = [0.25, 0.25, 0.25]
 let notFromData = fromData
-data.getBytes(&fromData, length: sizeof(Double.self) * 3)
+data.getBytes(&fromData, length: MemoryLayout<Double>.size * 3)
 
 // CHECK-LABEL: Data is:
 print("Data is:")
@@ -75,7 +75,7 @@ var CanaryAssocObjectHandle: UInt8 = 0
 
 // Attach an associated object with a loud deinit so we can see that the
 // error died.
-func hangCanary(o: AnyObject) {
+func hangCanary(_ o: AnyObject) {
   objc_setAssociatedObject(o, &CanaryAssocObjectHandle, Canary(),
                            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 }
@@ -85,7 +85,7 @@ print("NSError out:")
 autoreleasepool {
   do {
     let s = try NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
-                         encoding: NSUTF8StringEncoding)
+                         encoding: String.Encoding.utf8.rawValue)
     _preconditionFailure("file should not actually exist")
   } catch {
     print(error._code) // CHECK-NEXT: 260
@@ -95,10 +95,10 @@ autoreleasepool {
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
 class DumbString: NSString {
-  override func characterAtIndex(x: Int) -> unichar { _preconditionFailure("nope") }
+  override func character(at x: Int) -> unichar { _preconditionFailure("nope") }
   override var length: Int { return 0 }
 
-  convenience init(contentsOfFile s: String, encoding: NSStringEncoding) throws {
+  convenience init(contentsOfFile s: String, encoding: String.Encoding) throws {
     self.init()
     throw NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
   }
@@ -108,7 +108,7 @@ class DumbString: NSString {
 print("NSError in:")
 autoreleasepool {
   do {
-    try DumbString(contentsOfFile: "foo", encoding: NSUTF8StringEncoding)
+    try DumbString(contentsOfFile: "foo", encoding: .utf8)
   } catch {
     print(error._domain) // CHECK-NEXT: Malicious Mischief
     print(error._code) // CHECK-NEXT: 594
@@ -127,8 +127,8 @@ puts(s)
 //
 
 var unsorted = [3, 14, 15, 9, 2, 6, 5]
-qsort(&unsorted, unsorted.count, sizeofValue(unsorted[0])) { a, b in
-  return Int32(UnsafePointer<Int>(a).memory - UnsafePointer<Int>(b).memory)
+qsort(&unsorted, unsorted.count, MemoryLayout.size(ofValue: unsorted[0])) { a, b in
+  return Int32(a!.load(as: Int.self) - b!.load(as: Int.self))
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
 print(unsorted)

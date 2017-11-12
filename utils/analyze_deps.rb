@@ -27,7 +27,7 @@ YAML::dump(files)
 
 # We cheat here and dump everything into the same bucket.
 names = {}
-files.each do |k,v|
+files.each do |k, v|
   v['provides'].each do |name|
     names[name] ||= []
     names[name] << k
@@ -44,7 +44,7 @@ end
 
 all_deps = {}
 all_private_deps = {}
-files.each do |k,v|
+files.each do |k, v|
   deps = Set.new()
   private_deps = Set.new()
   v['top-level'].each do |name|
@@ -80,7 +80,7 @@ end
 
 # Graphviz output!
 puts 'digraph dependencies {'
-all_deps.each do |k,v|
+all_deps.each do |k, v|
   v.each do |dep|
     puts "\t\"#{dep}\" -> \"#{k}\""
   end
@@ -88,7 +88,7 @@ all_deps.each do |k,v|
     puts "\t\"#{k}\""
   end
 end
-all_private_deps.each do |k,v|
+all_private_deps.each do |k, v|
   v.each do |dep|
     puts "\t\"#{dep}\" -> \"#{k}\" [style=dotted]"
   end

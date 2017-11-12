@@ -1,7 +1,7 @@
 #!/usr/bin/swift
 class Foo {}
 // Check that we diagnose and skip the hashbang in the REPL.
-// RUN: %target-repl-run-simple-swift | FileCheck %s
+// RUN: %target-repl-run-simple-swift | %FileCheck %s
 
 // REQUIRES: swift_repl
 

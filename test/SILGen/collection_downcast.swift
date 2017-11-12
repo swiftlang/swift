@@ -1,36 +1,38 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
+
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self {
+    var result: Self?
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
 
 class BridgedObjC : NSObject { }
 
 func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
 
 struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   var hashValue: Int { return 0 }
 
-  static func _getObjectiveCType() -> Any.Type {
-    return BridgedObjC.self
-  }
-  
   func _bridgeToObjectiveC() -> BridgedObjC {
     return BridgedObjC()
   }
 
   static func _forceBridgeFromObjectiveC(
-    x: BridgedObjC,
-    inout result: BridgedSwift?
+    _ x: BridgedObjC,
+    result: inout BridgedSwift?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: BridgedObjC,
-    inout result: BridgedSwift?
+    _ x: BridgedObjC,
+    result: inout BridgedSwift?
   ) -> Bool {
     return true
   }
@@ -38,170 +40,235 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
 
 func == (x: BridgedSwift, y: BridgedSwift) -> Bool { return true }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast17testArrayDowncast
+// CHECK-LABEL: sil hidden @_T019collection_downcast17testArrayDowncast{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
-func testArrayDowncast(array: [AnyObject]) -> [BridgedObjC] {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs15_arrayForceCast
-  // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+func testArrayDowncast(_ array: [AnyObject]) -> [BridgedObjC] {
+  // CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+  // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[BORROWED_ARRAY]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s15_arrayForceCast{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+  // CHECK: destroy_value [[ARRAY]]
   return array as! [BridgedObjC]
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast27testArrayDowncastFromObject
+// CHECK-LABEL: sil hidden @_T019collection_downcast27testArrayDowncastFromObject{{.*}}F
 // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-func testArrayDowncastFromObject(obj: AnyObject) -> [BridgedObjC] {
-  // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Array<BridgedObjC>
+func testArrayDowncastFromObject(_ obj: AnyObject) -> [BridgedObjC] {
+  // CHECK: unconditional_checked_cast_addr AnyObject in [[OBJECT_ALLOC:%[0-9]+]] : $*AnyObject to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]] : $*Array<BridgedObjC>
   return obj as! [BridgedObjC]
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast28testArrayDowncastFromNSArray
+// CHECK-LABEL: sil hidden @_T019collection_downcast28testArrayDowncastFromNSArray{{.*}}F
 // CHECK: bb0([[NSARRAY_OBJ:%[0-9]+]] : $NSArray):
-func testArrayDowncastFromNSArray(obj: NSArray) -> [BridgedObjC] {
-  // CHECK: unconditional_checked_cast_addr take_always NSArray in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*NSArray to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Array<BridgedObjC>
+func testArrayDowncastFromNSArray(_ obj: NSArray) -> [BridgedObjC] {
+  // CHECK: unconditional_checked_cast_addr NSArray in [[OBJECT_ALLOC:%[0-9]+]] : $*NSArray to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]] : $*Array<BridgedObjC>
   return obj as! [BridgedObjC]
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast28testArrayDowncastConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast28testArrayDowncastConditional{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
-func testArrayDowncastConditional(array: [AnyObject]) -> [BridgedObjC]? {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs21_arrayConditionalCast
-  // CHECK-NEXT:  apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+func testArrayDowncastConditional(_ array: [AnyObject]) -> [BridgedObjC]? {
+  // CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+  // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[BORROWED_ARRAY]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s21_arrayConditionalCast{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+  // CHECK: destroy_value [[ARRAY]]
   return array as? [BridgedObjC]
 }
+// CHECK: } // end sil function '_T019collection_downcast28testArrayDowncastConditional{{.*}}F'
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast12testArrayIsa
+// CHECK-LABEL: sil hidden @_T019collection_downcast12testArrayIsa{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>)
-func testArrayIsa(array: [AnyObject]) -> Bool {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs21_arrayConditionalCast
-  // CHECK-NEXT: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+func testArrayIsa(_ array: [AnyObject]) -> Bool {
+  // CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+  // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[BORROWED_ARRAY]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s21_arrayConditionalCast{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedObjC>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+  // CHECK: destroy_value [[ARRAY]]
   return array is [BridgedObjC] ? true : false
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast24testArrayDowncastBridged
+// CHECK-LABEL: sil hidden @_T019collection_downcast24testArrayDowncastBridged{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
-func testArrayDowncastBridged(array: [AnyObject]) -> [BridgedSwift] {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs15_arrayForceCast
-  // CHECK-NEXT: apply [[BRIDGE_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+func testArrayDowncastBridged(_ array: [AnyObject]) -> [BridgedSwift] {
+  // CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+  // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[BORROWED_ARRAY]]
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_T0s15_arrayForceCast{{.*}}F
+  // CHECK: apply [[BRIDGE_FN]]<AnyObject, BridgedSwift>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+  // CHECK: destroy_value [[ARRAY]]
   return array as! [BridgedSwift]
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast35testArrayDowncastBridgedConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast35testArrayDowncastBridgedConditional{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>):
-func testArrayDowncastBridgedConditional(array: [AnyObject]) -> [BridgedSwift]?{
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs21_arrayConditionalCast
-  // CHECK-NEXT: apply [[BRIDGE_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+func testArrayDowncastBridgedConditional(_ array: [AnyObject]) -> [BridgedSwift]?{
+  // CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+  // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[BORROWED_ARRAY]]
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_T0s21_arrayConditionalCast{{.*}}F
+  // CHECK: apply [[BRIDGE_FN]]<AnyObject, BridgedSwift>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+  // CHECK: destroy_value [[ARRAY]]
   return array as? [BridgedSwift]
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast19testArrayIsaBridged
+// CHECK-LABEL: sil hidden @_T019collection_downcast19testArrayIsaBridged{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : $Array<AnyObject>)
-func testArrayIsaBridged(array: [AnyObject]) -> Bool {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs21_arrayConditionalCast
-  // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedSwift>([[ARRAY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+func testArrayIsaBridged(_ array: [AnyObject]) -> Bool {
+  // CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+  // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[BORROWED_ARRAY]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s21_arrayConditionalCast{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<AnyObject, BridgedSwift>([[ARRAY_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+  // CHECK: end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+  // CHECK: destroy_value [[ARRAY]]
   return array is [BridgedSwift] ? true : false
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast32testDictionaryDowncastFromObject
+// CHECK-LABEL: sil hidden @_T019collection_downcast32testDictionaryDowncastFromObject{{.*}}F
 // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-func testDictionaryDowncastFromObject(obj: AnyObject) 
+func testDictionaryDowncastFromObject(_ obj: AnyObject) 
        -> Dictionary<BridgedObjC, BridgedObjC> {
-  // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Dictionary<BridgedObjC, BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Dictionary<BridgedObjC, BridgedObjC>
+  // CHECK: unconditional_checked_cast_addr AnyObject in [[OBJECT_ALLOC:%[0-9]+]] : $*AnyObject to Dictionary<BridgedObjC, BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]] : $*Dictionary<BridgedObjC, BridgedObjC>
   return obj as! Dictionary<BridgedObjC, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast22testDictionaryDowncast
+// CHECK-LABEL: sil hidden @_T019collection_downcast22testDictionaryDowncast{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
-func testDictionaryDowncast(dict: Dictionary<NSObject, AnyObject>) 
+func testDictionaryDowncast(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedObjC> {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs19_dictionaryDownCast
-  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, AnyObject, BridgedObjC, BridgedObjC>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+  // CHECK: [[DICT_COPY:%.*]] = copy_value [[BORROWED_DICT]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s19_dictionaryDownCast{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<NSObject, AnyObject, BridgedObjC, BridgedObjC>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: end_borrow [[BORROWED_DICT]] from [[DICT]]
+  // CHECK: destroy_value [[DICT]]
   return dict as! Dictionary<BridgedObjC, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast33testDictionaryDowncastConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast33testDictionaryDowncastConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
-func testDictionaryDowncastConditional(dict: Dictionary<NSObject, AnyObject>) 
-       -> Dictionary<BridgedObjC, BridgedObjC>? {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs30_dictionaryDownCastConditional
-  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, AnyObject, BridgedObjC, BridgedObjC>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+func testDictionaryDowncastConditional(_ dict: Dictionary<NSObject, AnyObject>) 
+-> Dictionary<BridgedObjC, BridgedObjC>? {
+  // CHECK: [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+  // CHECK: [[DICT_COPY:%.*]] = copy_value [[BORROWED_DICT]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s30_dictionaryDownCastConditional{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<NSObject, AnyObject, BridgedObjC, BridgedObjC>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: end_borrow [[BORROWED_DICT]] from [[DICT]]
+  // CHECK: destroy_value [[DICT]]
   return dict as? Dictionary<BridgedObjC, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast41testDictionaryDowncastBridgedVConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast41testDictionaryDowncastBridgedVConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
-func testDictionaryDowncastBridgedVConditional(dict: Dictionary<NSObject, AnyObject>) 
+func testDictionaryDowncastBridgedVConditional(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedSwift>? {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs42_dictionaryBridgeFromObjectiveCConditional
-  // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedObjC, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>> // user: %6
+  // CHECK: [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+  // CHECK: [[DICT_COPY:%.*]] = copy_value [[BORROWED_DICT]]
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_T0s30_dictionaryDownCastConditional{{.*}}F
+  // CHECK: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedObjC, BridgedSwift>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>{{.*}}
+  // CHECK: end_borrow [[BORROWED_DICT]] from [[DICT]]
+  // CHECK: destroy_value [[DICT]]
   return dict as? Dictionary<BridgedObjC, BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast41testDictionaryDowncastBridgedKConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast41testDictionaryDowncastBridgedKConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
-func testDictionaryDowncastBridgedKConditional(dict: Dictionary<NSObject, AnyObject>) 
-       -> Dictionary<BridgedSwift, BridgedObjC>? {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs42_dictionaryBridgeFromObjectiveCConditional
-  // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedObjC>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+func testDictionaryDowncastBridgedKConditional(_ dict: Dictionary<NSObject, AnyObject>) 
+-> Dictionary<BridgedSwift, BridgedObjC>? {
+  // CHECK: [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+  // CHECK: [[DICT_COPY:%.*]] = copy_value [[BORROWED_DICT]]
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_T0s30_dictionaryDownCastConditional{{.*}}F
+  // CHECK: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedObjC>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: end_borrow [[BORROWED_DICT]] from [[DICT]]
+  // CHECK: destroy_value [[DICT]]
   return dict as? Dictionary<BridgedSwift, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast31testDictionaryDowncastBridgedKV
+// CHECK-LABEL: sil hidden @_T019collection_downcast31testDictionaryDowncastBridgedKV{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
-func testDictionaryDowncastBridgedKV(dict: Dictionary<NSObject, AnyObject>) 
-       -> Dictionary<BridgedSwift, BridgedSwift> {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs31_dictionaryBridgeFromObjectiveC
-  // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+func testDictionaryDowncastBridgedKV(_ dict: Dictionary<NSObject, AnyObject>) 
+-> Dictionary<BridgedSwift, BridgedSwift> {
+  // CHECK: [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+  // CHECK: [[DICT_COPY:%.*]] = copy_value [[BORROWED_DICT]]
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_T0s19_dictionaryDownCast{{.*}}F
+  // CHECK: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: end_borrow [[BORROWED_DICT]] from [[DICT]]
+  // CHECK: destroy_value [[DICT]]
   return dict as! Dictionary<BridgedSwift, BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast42testDictionaryDowncastBridgedKVConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast42testDictionaryDowncastBridgedKVConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
-func testDictionaryDowncastBridgedKVConditional(dict: Dictionary<NSObject, AnyObject>) 
+func testDictionaryDowncastBridgedKVConditional(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedSwift, BridgedSwift>? {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs42_dictionaryBridgeFromObjectiveCConditional
-  // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
+  // CHECK: [[DICT_COPY:%.*]] = copy_value [[BORROWED_DICT]]
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_T0s30_dictionaryDownCastConditional{{.*}}F
+  // CHECK: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: end_borrow [[BORROWED_DICT]] from [[DICT]]
+  // CHECK: destroy_value [[DICT]]
   return dict as? Dictionary<BridgedSwift, BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast25testSetDowncastFromObject
+// CHECK-LABEL: sil hidden @_T019collection_downcast25testSetDowncastFromObject{{.*}}F
 // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
-func testSetDowncastFromObject(obj: AnyObject) 
+func testSetDowncastFromObject(_ obj: AnyObject) 
        -> Set<BridgedObjC> {
-  // CHECK: unconditional_checked_cast_addr take_always AnyObject in [[OBJECT_ALLOC:%[0-9]+]]#1 : $*AnyObject to Set<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]]#1 : $*Set<BridgedObjC>
+  // CHECK: unconditional_checked_cast_addr AnyObject in [[OBJECT_ALLOC:%[0-9]+]] : $*AnyObject to Set<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]] : $*Set<BridgedObjC>
   return obj as! Set<BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast15testSetDowncast
+// CHECK-LABEL: sil hidden @_T019collection_downcast15testSetDowncast{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
-func testSetDowncast(dict: Set<NSObject>) 
+func testSetDowncast(_ dict: Set<NSObject>) 
        -> Set<BridgedObjC> {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs12_setDownCast
-  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedObjC>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
+  // CHECK: [[SET_COPY:%.*]] = copy_value [[BORROWED_SET]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s12_setDownCast{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<NSObject, BridgedObjC>([[SET_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: end_borrow [[BORROWED_SET]] from [[SET]]
+  // CHECK: destroy_value [[SET]]
   return dict as! Set<BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast26testSetDowncastConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast26testSetDowncastConditional{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
-func testSetDowncastConditional(dict: Set<NSObject>) 
+func testSetDowncastConditional(_ dict: Set<NSObject>) 
        -> Set<BridgedObjC>? {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs23_setDownCastConditional
-  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedObjC>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+  // CHECK: [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
+  // CHECK: [[SET_COPY:%.*]] = copy_value [[BORROWED_SET]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s23_setDownCastConditional{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<NSObject, BridgedObjC>([[SET_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+  // CHECK: end_borrow [[BORROWED_SET]] from [[SET]]
+  // CHECK: destroy_value [[SET]]
   return dict as? Set<BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast22testSetDowncastBridged
+// CHECK-LABEL: sil hidden @_T019collection_downcast22testSetDowncastBridged{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
-func testSetDowncastBridged(dict: Set<NSObject>) 
+func testSetDowncastBridged(_ dict: Set<NSObject>) 
        -> Set<BridgedSwift> {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs24_setBridgeFromObjectiveC
-  // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
+  // CHECK: [[SET_COPY:%.*]] = copy_value [[BORROWED_SET]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s12_setDownCast{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
+  // CHECK: end_borrow [[BORROWED_SET]] from [[SET]]
+  // CHECK: destroy_value [[SET]]
   return dict as! Set<BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @_TF19collection_downcast33testSetDowncastBridgedConditional
+// CHECK-LABEL: sil hidden @_T019collection_downcast33testSetDowncastBridgedConditional{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
-func testSetDowncastBridgedConditional(dict: Set<NSObject>) 
+func testSetDowncastBridgedConditional(_ dict: Set<NSObject>) 
        -> Set<BridgedSwift>? {
+  // CHECK: [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
+  // CHECK: [[SET_COPY:%.*]] = copy_value [[BORROWED_SET]]
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_T0s23_setDownCastConditional{{.*}}F
+  // CHECK: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
+  // CHECK: end_borrow [[BORROWED_SET]] from [[SET]]
+  // CHECK: destroy_value [[SET]]
   return dict as? Set<BridgedSwift>
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs35_setBridgeFromObjectiveCConditional
-  // CHECK: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
 }

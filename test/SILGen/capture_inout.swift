@@ -1,17 +1,28 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 typealias Int = Builtin.Int64
 
-// CHECK: sil hidden @_TF13capture_inout3foo
-// CHECK: bb0([[X_INOUT:%.*]] : $*Builtin.Int64):
-// CHECK:   [[X_LOCAL:%.*]] = alloc_box $Builtin.Int64
-// CHECK:   [[FUNC:%.*]] = function_ref [[CLOSURE:@.*]] : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
-// CHECK:   partial_apply [[FUNC]]([[X_LOCAL]]#0, [[X_LOCAL]]#1)
+// CHECK: sil hidden @_T013capture_inout8localFooyBi64_z1x_tF
+// CHECK: bb0([[X_INOUT:%.*]] : @trivial $*Builtin.Int64):
+// CHECK-NOT: alloc_box
+// CHECK:   [[FUNC:%.*]] = function_ref [[CLOSURE:@.*]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
+// CHECK:   apply [[FUNC]]([[X_INOUT]])
 // CHECK: }
-// CHECK: sil shared [[CLOSURE]] : $@convention(thin) (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
-func foo(inout x: Int) -> () -> Int {
+// CHECK: sil private [[CLOSURE]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
+func localFoo(x: inout Int) {
   func bar() -> Int {
     return x
   }
-  return bar
+  bar()
+}
+
+// CHECK: sil hidden @_T013capture_inout7anonFooyBi64_z1x_tF
+// CHECK: bb0([[X_INOUT:%.*]] : @trivial $*Builtin.Int64):
+// CHECK-NOT: alloc_box
+// CHECK:   [[FUNC:%.*]] = function_ref [[CLOSURE:@.*]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
+// CHECK:   apply [[FUNC]]([[X_INOUT]])
+// CHECK: }
+// CHECK: sil private [[CLOSURE]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
+func anonFoo(x: inout Int) {
+  { return x }()
 }

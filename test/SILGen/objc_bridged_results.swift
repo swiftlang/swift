@@ -1,132 +1,168 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -import-objc-header %S/Inputs/objc_bridged_results.h | FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %build-silgen-test-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results11testNonnullFCSo4TestGSaPs9AnyObject__
-func testNonnull(obj: Test) -> [AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullArray!getter.1.foreign : Test -> () -> [AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Array<AnyObject>
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results11testNonnullSayypGSo4TestCF
+// CHECK: bb0([[ARG:%.*]] : @owned $Test):
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nonnullArray!getter.1.foreign : (Test) -> () -> [Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+// CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+// CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
+// CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_VAL]], [[ARRAY_META]])
+// CHECK: destroy_value %0 : $Test
+// CHECK: return [[RESULT]] : $Array<Any>
+func testNonnull(_ obj: Test) -> [Any] {
   return obj.nonnullArray
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_T020objc_bridged_results11testNonnullSayypGSo4TestCF'
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results12testNullableFCSo4TestGSqGSaPs9AnyObject___
-func testNullable(obj: Test) -> [AnyObject]? {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullableArray!getter.1.foreign : Test -> () -> [AnyObject]? , $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  
-  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $Optional<NSArray>
-  // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
-
-  // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $Optional<NSArray>, #Optional.Some!enumelt.1
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
-  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[COCOA_VAL_NON_NIL]]
-  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.Some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
-  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<AnyObject>>)
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results12testNullableSayypGSgSo4TestCF
+func testNullable(_ obj: Test) -> [Any]? {
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
+  //
+  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : @owned $NSArray):
+  // CHECK-NOT: unchecked_enum_data
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
+  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
+  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
+  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt.1, [[RESULT_VAL]] : $Array<Any>
+  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<Any>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<AnyObject>>, #Optional.None!enumelt
-  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<AnyObject>>)
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.none!enumelt
+  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
   
-  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $Optional<Array<AnyObject>>):
-  // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Optional<Array<AnyObject>>
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : @owned $Optional<Array<Any>>):
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: destroy_value [[ARG]] : $Test
+  // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullableArray
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_T020objc_bridged_results12testNullableSayypGSgSo4TestCF'
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testNullUnspecifiedFCSo4TestGSQGSaPs9AnyObject___
-func testNullUnspecified(obj: Test) -> [AnyObject]! {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : Test -> () -> [AnyObject]! , $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased ImplicitlyUnwrappedOptional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>
-  // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results19testNullUnspecifiedSQySayypGGSo4TestCF
+func testNullUnspecified(_ obj: Test) -> [Any]! {
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]!, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
+  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
 
-  // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $ImplicitlyUnwrappedOptional<NSArray>, #ImplicitlyUnwrappedOptional.Some!enumelt.1
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
-  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[COCOA_VAL_NON_NIL]]
-  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_SOME_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[RESULT_VAL]] : $Array<AnyObject>
-  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
+  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : @owned $NSArray):
+  // CHECK-NOT: unchecked_enum_data
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
+  // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
+  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
+  // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
+  // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt.1, [[RESULT_VAL]] : $Array<Any>
+  // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<Any>>)
   
   // CHECK: [[CASE_NIL]]:
-  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $ImplicitlyUnwrappedOptional<Array<AnyObject>>, #ImplicitlyUnwrappedOptional.None!enumelt
-  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>)
+  // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.none!enumelt
+  // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
 
-  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>):
-  // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $ImplicitlyUnwrappedOptional<Array<AnyObject>>
+  // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : @owned $Optional<Array<Any>>):
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: destroy_value [[ARG]] : $Test
+  // CHECK: return [[RESULT]] : $Optional<Array<Any>>
   return obj.nullUnspecifiedArray
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_T020objc_bridged_results19testNullUnspecifiedSQySayypGGSo4TestCF'
 
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results21testNonnullDictionaryFCSo4TestGVs10DictionaryCSo8NSObjectPs9AnyObject__
-func testNonnullDictionary(obj: Test) -> [NSObject: AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullDictionary!getter.1.foreign : Test -> () -> [NSObject : AnyObject] , $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject, AnyObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned Optional<NSDictionary>) -> @owned Dictionary<τ_0_0, τ_0_1>
-  // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Dictionary<NSObject, AnyObject>
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results21testNonnullDictionarys0F0Vys11AnyHashableVypGSo4TestCF
+func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [AnyHashable : Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0s10DictionaryV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxq_GSo12NSDictionaryCSgFZ
+  // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<AnyHashable, Any>.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable, Any>([[COCOA_VAL]], [[DICT_META]])
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: destroy_value [[ARG]] : $Test
+  // CHECK: return [[RESULT]] : $Dictionary<AnyHashable, Any>
   return obj.nonnullDictionary
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_T020objc_bridged_results21testNonnullDictionarys0F0Vys11AnyHashableVypGSo4TestCF'
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results14testNonnullSetFCSo4TestGVs3SetCSo8NSObject_
-func testNonnullSet(obj: Test) -> Set<NSObject> {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullSet!getter.1.foreign : Test -> () -> Set<NSObject> , $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation18_convertNSSetToSet
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<NSObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0 where τ_0_0 : NSObject, τ_0_0 : Hashable> (@owned Optional<NSSet>) -> @owned Set<τ_0_0>
-  // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Set<NSObject>
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results14testNonnullSets0F0Vys11AnyHashableVGSo4TestCF
+func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<AnyHashable>, $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCAByxGSo5NSSetCSgFZ
+  // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<AnyHashable>.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable>([[COCOA_VAL]], [[SET_META]])
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: destroy_value [[ARG]] : $Test
+  // CHECK: return [[RESULT]] : $Set<AnyHashable>
   return obj.nonnullSet
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_T020objc_bridged_results14testNonnullSets0F0Vys11AnyHashableVGSo4TestCF'
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results17testNonnullStringFCSo4TestSS
-func testNonnullString(obj: Test) -> String {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.nonnullString!getter.1.foreign : Test -> () -> String , $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]](%0) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @swift_NSStringToString : $@convention(thin) (@owned Optional<NSString>) -> @owned String
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]]) : $@convention(thin) (@owned Optional<NSString>) -> @owned String
-  // CHECK: strong_release %0 : $Test
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results17testNonnullStringSSSo4TestCF
+func testNonnullString(_ obj: Test) -> String {
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.nonnullString!getter.1.foreign : (Test) -> () -> String, $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
+  // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: destroy_value [[ARG]] : $Test
   // CHECK: return [[RESULT]] : $String
   return obj.nonnullString
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_T020objc_bridged_results17testNonnullStringSSSo4TestCF'
+
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results13testClassPropSSyF
+func testClassProp() -> String {
+  // CHECK: [[CLASS:%.+]] = metatype $@objc_metatype Test.Type
+  // CHECK: [[METHOD:%.+]] = objc_method [[CLASS]] : $@objc_metatype Test.Type, #Test.nonnullSharedString!getter.1.foreign : (Test.Type) -> () -> String, $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[CLASS]]) : $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
+  // CHECK: [[STRING_META:%[0-9]+]] = metatype $@thin String.Type
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]([[COCOA_VAL]], [[STRING_META]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK: return [[RESULT]] : $String
+  return Test.nonnullSharedString
+} // CHECK: } // end sil function '_T020objc_bridged_results13testClassPropSSyF'
 
 
 // Note: This doesn't really "work" in that it doesn't accept a nil value the
 // way the others do, because subscripts are thunked. But the main thing is
 // not to crash trying to generate the thunk.
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results20testNonnullSubscriptFCSo4TestGSaPs9AnyObject__
-func testNonnullSubscript(obj: Test) -> [AnyObject] {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $Test, #Test.subscript!getter.1.foreign : Test -> (Int) -> [AnyObject] , $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
-  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, %0) : $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
-  // CHECK: strong_retain_autoreleased [[COCOA_VAL]]
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_TF10Foundation22_convertNSArrayToArray
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyObject>([[COCOA_VAL]]) : $@convention(thin) <τ_0_0> (@owned Optional<NSArray>) -> @owned Array<τ_0_0>
-  // CHECK: strong_release %0 : $Test
-  // CHECK: return [[RESULT]] : $Array<AnyObject>
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results20testNonnullSubscriptSayypGSo4TestCF
+func testNonnullSubscript(_ obj: Test) -> [Any] {
+  // CHECK: bb0([[ARG:%.*]] : @owned $Test):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $Test, #Test.subscript!getter.1.foreign : (Test) -> (Int) -> [Any], $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, [[BORROWED_ARG]]) : $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
+  // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type,
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_VAL]], [[ARRAY_META]])
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: destroy_value [[ARG]] : $Test
+  // CHECK: return [[RESULT]] : $Array<Any>
   return obj[0]
-} // CHECK: {{^}$}}
+} // CHECK: } // end sil function '_T020objc_bridged_results20testNonnullSubscriptSayypGSo4TestCF'
 
 
-// CHECK-LABEL: sil hidden @_TF20objc_bridged_results19testPerformSelectorFCSo8NSObjectT_
-func testPerformSelector(obj: NSObject) {
-  // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] %0 : $NSObject, #NSObject.performSelector!1.foreign
-  // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, %0)
-  _ = obj.performSelector("foo", withObject: nil)
+// CHECK-LABEL: sil hidden @_T020objc_bridged_results19testPerformSelectorySo8NSObjectCF
+func testPerformSelector(_ obj: NSObject) {
+  // CHECK: bb0([[ARG:%.*]] : @owned $NSObject):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[METHOD:%[0-9]+]] = objc_method [[BORROWED_ARG]] : $NSObject, #NSObject.perform!1.foreign
+  // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, [[BORROWED_ARG]])
+  _ = obj.perform("foo", with: nil)
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
-} // CHECK: {{^}$}}
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
+} // CHECK: } // end sil function '_T020objc_bridged_results19testPerformSelectorySo8NSObjectCF'

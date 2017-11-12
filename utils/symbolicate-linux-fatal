@@ -1,0 +1,210 @@
+#!/usr/bin/env python
+# symbolicate-linux-fatal - Symbolicate Linux stack traces -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ----------------------------------------------------------------------------
+#
+# Symbolicates fatalError stack traces on Linux. Takes the main binary
+# and a log file containing a stack trace. Non-stacktrace lines are output
+# unmodified. Stack trace elements are analyzed using reconstructed debug
+# target matching the original process in where shared libs where mapped.
+#
+# TODOs:
+# * verbose output
+# * search symbols by name for the not <unavailable> ones
+#
+# ----------------------------------------------------------------------------
+
+from __future__ import print_function
+
+import argparse
+import os
+import subprocess
+
+try:
+    import lldb
+except ImportError:
+    from distutils import spawn
+    swift_exec = spawn.find_executable('swift')
+    if swift_exec is not None:
+        site_packages = os.path.join(os.path.dirname(swift_exec),
+                                     '../lib/python2.7/site-packages/')
+        import sys
+        sys.path.append(site_packages)
+        import lldb
+
+
+def process_ldd(lddoutput):
+    dyn_libs = {}
+    for line in lddoutput.splitlines():
+        ldd_tokens = line.split()
+        if len(ldd_tokens) >= 2:
+            lib = ldd_tokens[-2]
+            dyn_libs[ldd_tokens[0]] = lib
+            real_name = os.path.basename(os.path.realpath(lib))
+            dyn_libs[real_name] = lib
+    return dyn_libs
+
+
+def create_lldb_target(binary, memmap):
+    lldb_debugger = lldb.SBDebugger.Create()
+    lldb_target = lldb_debugger.CreateTargetWithFileAndArch(
+        binary, lldb.LLDB_ARCH_DEFAULT)
+    module = lldb_target.GetModuleAtIndex(0)
+    for dynlib_path in memmap:
+        module = lldb_target.AddModule(
+            dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
+        text_section = module.FindSection(".text")
+        slide = text_section.GetFileAddress() - text_section.GetFileOffset()
+        lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path] - slide)
+    return lldb_target
+
+
+def add_lldb_target_modules(lldb_target, memmap):
+    for dynlib_path in memmap:
+        module = lldb_target.AddModule(
+            dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
+        lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path])
+
+
+lldb_target = None
+known_memmap = {}
+
+
+def check_base_address(dynlib_path, dynlib_baseaddr, memmap):
+    global known_memmap
+    if dynlib_path in memmap or dynlib_path in known_memmap:
+        if dynlib_path in memmap:
+            existing_baseaddr = memmap[dynlib_path]
+        else:
+            existing_baseaddr = known_memmap[dynlib_path]
+        if existing_baseaddr != dynlib_baseaddr:
+            error_msg = "Mismatched base address for: {0:s}, " \
+                        "had: {1:x}, now got {2:x}"
+            error_msg = error_msg.format(
+                dynlib_path, existing_baseaddr, dynlib_baseaddr)
+            raise Exception(error_msg)
+
+
+def symbolicate_one(frame_addr, frame_idx, dynlib_fname):
+    global lldb_target
+    so_addr = lldb_target.ResolveLoadAddress(frame_addr - 1)
+    sym_ctx = so_addr.GetSymbolContext(lldb.eSymbolContextEverything)
+    frame_fragment = "{0: <4d} {1:20s} 0x{2:016x}".format(
+        frame_idx, dynlib_fname, frame_addr)
+    symbol = sym_ctx.GetSymbol()
+    if not symbol.IsValid():
+        raise Exception("symbol isn't valid")
+
+    symbol_base = symbol.GetStartAddress().GetLoadAddress(lldb_target)
+    symbol_fragment = "{0:s} + {1:d}".format(
+        symbol.GetName(), frame_addr - symbol_base)
+    line_entry = sym_ctx.GetLineEntry()
+    if line_entry.IsValid():
+        line_fragment = "at {0:s}:{1:d}".format(
+            line_entry.GetFileSpec().GetFilename(), line_entry.GetLine())
+    else:
+        line_fragment = ""
+
+    return "{0:s}    {1:s} {2:s}".format(
+           frame_fragment, symbol_fragment, line_fragment)
+
+
+def process_stack(binary, dyn_libs, stack):
+    global lldb_target
+    global known_memmap
+    if len(stack) == 0:
+        return
+    memmap = {}
+    full_stack = []
+    for line in stack:
+        stack_tokens = line.split()
+        dynlib_fname = stack_tokens[1]
+        if dynlib_fname in dyn_libs:
+            dynlib_path = dyn_libs[dynlib_fname]
+        elif dynlib_fname in binary:
+            dynlib_path = binary
+        else:
+            dynlib_path = None
+
+        try:
+            framePC = int(stack_tokens[2], 16)
+            symbol_offset = int(stack_tokens[-1], 10)
+        except:
+            full_stack.append({"line": line, "framePC": 0, "dynlib_fname": ""})
+            continue
+
+        if "<unavailable>" in stack_tokens[3]:
+            dynlib_baseaddr = framePC - symbol_offset
+            check_base_address(dynlib_path, dynlib_baseaddr, memmap)
+            known_memmap[dynlib_path] = dynlib_baseaddr
+            memmap[dynlib_path] = dynlib_baseaddr
+        else:
+            framePC = framePC + symbol_offset
+        full_stack.append(
+            {"line": line, "framePC": framePC, "dynlib_fname": dynlib_fname})
+
+    if lldb_target is None:
+        lldb_target = create_lldb_target(binary, memmap)
+    else:
+        add_lldb_target_modules(lldb_target, memmap)
+    frame_idx = 0
+    for frame in full_stack:
+        frame_addr = frame["framePC"]
+        dynlib_fname = frame["dynlib_fname"]
+        try:
+            sym_line = symbolicate_one(frame_addr, frame_idx, dynlib_fname)
+            print(sym_line)
+        except:
+            print(frame["line"].rstrip())
+        frame_idx = frame_idx + 1
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""Symbolicates stack traces in Linux log files.""")
+    parser.add_argument(
+        "binary", help="Executable which produced the log file")
+    parser.add_argument(
+        "log", nargs='?', type=argparse.FileType("rU"), default="-",
+        help="Log file for symbolication. Defaults to stdin.")
+    args = parser.parse_args()
+
+    binary = args.binary
+
+    lddoutput = subprocess.check_output(
+        ['ldd', binary], stderr=subprocess.STDOUT)
+    dyn_libs = process_ldd(lddoutput)
+
+    instack = False
+    stackidx = 0
+    stack = []
+
+    while True:
+        line = args.log.readline()
+        if not line:
+            break
+        if instack and line.startswith(str(stackidx)):
+            stack.append(line)
+            stackidx = stackidx + 1
+        else:
+            instack = False
+            stackidx = 0
+            process_stack(binary, dyn_libs, stack)
+            stack = []
+            print(line.rstrip())
+        if line.startswith("Current stack trace:"):
+            instack = True
+    process_stack(binary, dyn_libs, stack)
+
+
+if __name__ == '__main__':
+    main()

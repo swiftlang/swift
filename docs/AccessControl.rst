@@ -6,22 +6,28 @@ The general guiding principle of Swift access control:
 
   **No entity can be defined in terms of another entity that has a lower
   access level.**
-	
-There are three levels of access: "private", "internal", and "public".
-Private entities can only be accessed from within the source file where they
-are defined. Internal entities can be accessed anywhere within the module they
-are defined. Public entities can be accessed from anywhere within the module
-and from any other context that imports the current module.
+
+There are four levels of access: "private", "fileprivate", "internal", and
+"public". Private entities can only be accessed from within the lexical scope
+where they are defined. File-private entities can only be accessed from within
+the source file where they are defined. Internal entities can be accessed
+anywhere within the module they are defined. Public entities can be accessed
+from anywhere within the module and from any other context that imports the
+current module.
 
 The names ``public`` and ``private`` have precedent in many languages;
-``internal`` comes from C#. In the future, ``public`` may be used for both API
-and SPI, at which point we may design additional annotations to distinguish the
-two.
+``internal`` comes from C# and ``fileprivate`` from the Swift community. In the
+future, ``public`` may be used for both API and SPI, at which point we may
+design additional annotations to distinguish the two.
 
 By default, most entities in a source file have ``internal`` access.
-This optimizes for the most common case—a single-target application
-project—while not accidentally revealing entities to clients of a framework
+This optimizes for the most common case--a single-target application
+project--while not accidentally revealing entities to clients of a framework
 module.
+
+.. warning:: This document has not yet been updated for SE-0117, which adds the
+  "open" level of access.
+
 
 .. contents:: :local:
 
@@ -29,10 +35,10 @@ Rules
 ======
 
 Access to a particular entity is considered relative to the current
-*access context.* The access context of an entity is the current
-file (if ``private``), the current module (if ``internal``), or the current
-program (if ``public``). A reference to an entity may only be written within
-the entity's access context.
+*access scope.* The access scope of an entity is its immediate lexical scope
+(if ``private``), the current file (if ``fileprivate``), the current module (if
+``internal``), or the current program (if ``public``). A reference to an entity
+may only be written within the entity's access scope.
 
 If a particular entity is not accessible, it does not appear in name lookup,
 unlike in C++. However, access control does not restrict access to members via
@@ -43,9 +49,13 @@ visibility of symbols in a linked binary.
 Globals and Members
 -------------------
 
-A global function, constant, or variable may have any access level less than
-or equal to the access level of its type. That is, a ``private`` constant can
-have ``public`` type, but not the other way around.
+All globals and members have a default access level of ``internal``, except
+within extensions (as described below).
+
+A declaration may have any access level less than or equal to the access level
+of its type. That is, a ``private`` constant can have ``public`` type, but not
+the other way around. It is legal for a member to have greater access than its
+enclosing type, but this has no effect.
 
 Accessors for variables have the same access level as their associated variable.
 The setter may be explicitly annotated with an access level less than or equal
@@ -55,10 +65,6 @@ to the access level of the variable; this is written as ``private(set)`` or
 An initializer, method, subscript, or property may have any access level less
 than or equal to the access level of its type (including the implicit 'Self'
 type), with a few additional rules:
-
-- If the type's access level is ``private``, the access level of members
-  defaults to ``private``. If the type's access level is ``internal`` or
-  ``public``, the access level of members defaults to ``internal``.
 
 - If a member is used to satisfy a protocol requirement, its access level must
   be at least as high as the protocol conformance's; see :ref:`Protocols` below.
@@ -90,7 +96,7 @@ Protocols
 
 A protocol may have any access level less than or equal to the access levels
 of the protocols it refines. That is, a ``private`` ExtendedWidget protocol can
-refine an ``public`` Widget protocol, but not the other way around.
+refine a ``public`` Widget protocol, but not the other way around.
 
 The access level of a requirement is the access level of the enclosing
 protocol, even when the protocol is ``public``. Currently, requirements may not
@@ -130,10 +136,13 @@ struct, enum, or class may be extended whenever it is accessible.
 A class may be subclassed whenever it is accessible. A class may have any
 access level less than or equal to the access level of its superclass.
 
-Members in an extension have the same default access level as members declared
-within the extended type. However, an extension may be marked with an explicit
-access modifier (e.g. ``private extension``), in which case the default
-access level of members within the extension is changed to match.
+Members within constrained extensions must have access less than or equal to
+the access level of the types used in the constraints.
+
+An extension may be marked with an explicit access modifier (e.g. ``private
+extension``), in which case the default access level of members within the
+extension is changed to match. No member within such an extension may have
+broader access than the new default.
 
 Extensions with explicit access modifiers may not add new protocol
 conformances, since Swift does not support private protocol conformances
@@ -154,7 +163,7 @@ elements. A function type's access level is the minimum of the access levels of
 its input and return types.
 
 A typealias may have any access level up to the access level of the type it
-aliases. That is, a ``private`` typealias can refer to an ``public`` type, but
+aliases. That is, a ``private`` typealias can refer to a ``public`` type, but
 not the other way around. This includes associated types used to satisfy
 protocol conformances.
 
@@ -167,9 +176,9 @@ or other extensions from outside the module. Therefore, members of a subclass
 or extension will not conflict with or inadvertently be considered to override
 non-accessible members of the superclass.
 
-Both ``private`` and ``internal`` increase opportunities for devirtualization,
+Access levels lower than ``public`` increase opportunities for devirtualization,
 though it is still possible to put a subclass of a ``private`` class within the
-same file.
+same scope.
 
 Most information about a non-``public`` entity still has to be put into a
 module file for now, since we don't have resilience implemented. This can be
@@ -186,9 +195,10 @@ selector for members, everything can be inspected at runtime, and even a
 private member can cause selector conflicts. In this case, access control is
 only useful for discipline purposes.
 
-Members explicitly marked ``private`` are *not* exposed to Objective-C unless
-they are also marked ``@objc`` (or ``@IBAction`` or similar), even if declared
-within a class implicitly or explicitly marked ``@objc``.
+Members explicitly marked ``private`` or ``fileprivate`` are *not* exposed to
+Objective-C unless they are also marked ``@objc`` (or ``@IBAction`` or
+similar), even if declared within a class implicitly or explicitly marked
+``@objc``.
 
 Any ``public`` entities will be included in the generated header. In an
 application or unit test target, ``internal`` entities will be exposed as well.
@@ -201,7 +211,7 @@ This proposal omits two forms of access control commonly found in other
 languages, a "class-implementation-only" access (often called "private"), and a
 "class and any subclasses" access (often called "protected"). We chose not to
 include these levels of access control because they do not add useful
-functionality beyond ``private``, ``internal``, and ``public``.
+functionality beyond ``private``, ``fileprivate``, ``internal``, and ``public``.
 
 "class-only"
   If "class-only" includes extensions of the class, it is clear that it
@@ -210,11 +220,10 @@ functionality beyond ``private``, ``internal``, and ``public``.
   limited with regards to extensions. Beyond that, however, a "class-only"
   limit forces code to be declared within the class that might otherwise
   naturally be a top-level helper or an extension method on another type.
-  
-  ``private`` serves the proper use case of limiting access to the
+
+  ``private`` and ``fileprivate`` serve the use case of limiting access to the
   implementation details of a class (even from the rest of the module!) while
-  not requiring that all of those implementation details be written lexically
-  inside the class.
+  not tying access to the notion of type.
 
 "protected"
   "protected" access provides no guarantees of information hiding, since any
@@ -223,7 +232,7 @@ functionality beyond ``private``, ``internal``, and ``public``.
   plans for resilient APIs. Additionally, it increases the complexity of the
   access control model for both the compiler and for developers, and like
   "class-only" it is not immediately clear how it interacts with extensions.
-  
+
   Though it is not compiler-enforced, members that might be considered
   "protected" are effectively publicly accessible, and thus should be marked
   ``public`` in Swift. They can still be documented as intended for overriding
@@ -235,7 +244,7 @@ Potential Future Directions
 ===========================
 
 - Allowing ``private`` or ``internal`` protocol conformances, which are only
-  accessible at compile-time from a particular access context.
+  accessible at compile-time from a particular access scope.
 
 - Limiting particular capabilities, such as marking something ``final(public)``
   to restrict subclassing or overriding outside of the current module.

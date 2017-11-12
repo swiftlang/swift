@@ -106,7 +106,7 @@ _ninja_complete()
 complete -F _swift_complete swiftc
 complete -F _swift_complete swift
 complete -F _swift_complete sil-opt
-complete -F _swift_complete sil-extract
+complete -F _swift_complete sil-func-extractor
 complete -F _swift_complete swift-demangle
 complete -F _swift_complete swift-llvm-opt
 complete -F _swift_complete swift-ide-test

@@ -1,0 +1,13 @@
+{
+  "./helper.swift": {
+    "object": "./helper.o",
+    "swift-dependencies": "./helper.swiftdeps",
+  },
+  "./main.swift": {
+    "object": "./main.o",
+    "swift-dependencies": "./main.swiftdeps",
+  },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
+}

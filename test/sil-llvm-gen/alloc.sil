@@ -1,0 +1,24 @@
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target x86_64-apple-macosx10.9 -module-name main %s -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target i386-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target x86_64-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target armv7-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target arm64-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target x86_64-unknown-linux-gnu %s -module-name main -o - | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=ARM
+
+import Builtin
+
+struct Pair<T> {
+  var fst: T, snd: T
+}
+
+struct Huge {
+  var pairs: Pair<Pair<Pair<Pair<Pair<Pair<Pair<Pair<Pair<Builtin.Int64>>>>>>>>>
+  var unalign: Builtin.Int8
+}
+
+// CHECK: define linkonce_odr hidden i8* @__swift_memcpy4097_8(i8*, i8*, %swift.type*)
+// CHECK:   call void @llvm.memcpy.p0i8.p0i8.{{(i64|i32)}}(i8* %0, i8* %1, {{(i64|i32)}} 4097, i32 8, i1 false)
+// CHECK:   ret i8* %0

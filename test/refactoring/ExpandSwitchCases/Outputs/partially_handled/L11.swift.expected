@@ -1,0 +1,15 @@
+enum E {
+  case e1
+  case e2
+  case e3
+  case e4
+}
+
+func foo(e: E) -> Int {
+  switch e {
+    case .e1: return 5
+   case .e2: <#code#>
+case .e3: <#code#>
+case .e4: <#code#>
+}
+}

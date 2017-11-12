@@ -1,0 +1,20 @@
+[
+  {
+    "key.name": "init(x:)",
+    "key.is_function_like": 1,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 37,
+        "key.column": 3,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 39,
+        "key.column": 5,
+        "key.nametype": source.syntacticrename.call
+      }
+    ]
+  }
+]
+

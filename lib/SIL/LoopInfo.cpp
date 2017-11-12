@@ -1,12 +1,12 @@
-//===-------------- LoopInfo.cpp - SIL Loop Analysis -----*- C++ -*--------===//
+//===--- LoopInfo.cpp - SIL Loop Analysis ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,25 +31,61 @@ void SILLoop::dump() const {
 #endif
 }
 
-SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
-  LI.analyze(*DT);
+SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) : Dominance(DT) {
+  LI.analyze(*Dominance);
 }
 
+bool SILLoop::canDuplicate(SILInstruction *I) const {
+  // The deallocation of a stack allocation must be in the loop, otherwise the
+  // deallocation will be fed by a phi node of two allocations.
+  if (I->isAllocatingStack()) {
+    for (auto *UI : cast<SingleValueInstruction>(I)->getUses()) {
+      if (UI->getUser()->isDeallocatingStack()) {
+        if (!contains(UI->getUser()->getParent()))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  // CodeGen can't build ssa for objc methods.
+  if (auto *Method = dyn_cast<MethodInst>(I)) {
+    if (Method->getMember().isForeign) {
+      for (auto *UI : Method->getUses()) {
+        if (!contains(UI->getUser()))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  // We can't have a phi of two openexistential instructions of different UUID.
+  if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
+      isa<OpenExistentialMetatypeInst>(I) ||
+      isa<OpenExistentialValueInst>(I) || isa<OpenExistentialBoxInst>(I) ||
+      isa<OpenExistentialBoxValueInst>(I)) {
+    SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
+    for (auto *UI : OI->getUses())
+      if (!contains(UI->getUser()))
+        return false;
+    return true;
+  }
+
+  if (auto *Dealloc = dyn_cast<DeallocStackInst>(I)) {
+    // The matching alloc_stack must be in the loop.
+    if (auto *Alloc = dyn_cast<AllocStackInst>(Dealloc->getOperand()))
+        return contains(Alloc->getParent());
+    return false;
+  }
+
+  if (isa<ThrowInst>(I))
+    return false;
+
+  assert(I->isTriviallyDuplicatable() &&
+    "Code here must match isTriviallyDuplicatable in SILInstruction");
+  return true;
+}
 
 void SILLoopInfo::verify() const {
-  llvm::DenseSet<const SILLoop*> Loops;
-  for (iterator I = begin(), E = end(); I != E; ++I) {
-    assert(!(*I)->getParentLoop() && "Top-level loop has a parent!");
-    (*I)->verifyLoopNest(&Loops);
-  }
-
-  // We need access to the map for this.
-  // Verify that blocks are mapped to valid loops.
-  for (llvm::DenseMap<const SILBasicBlock *, SILLoop *>::const_iterator
-           I = LI.getBlockMap().begin(),
-           E = LI.getBlockMap().end();
-       I != E; ++I) {
-    assert(Loops.count(I->second) && "orphaned loop");
-    assert(I->second->contains(I->first) && "orphaned block");
-  }
+  LI.verify(*Dominance);
 }

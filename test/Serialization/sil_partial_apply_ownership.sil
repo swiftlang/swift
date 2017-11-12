@@ -1,0 +1,45 @@
+// RUN: rm -rf %t
+// RUN: mkdir %t
+// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-module -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_partial_apply_ownership.swiftmodule %s
+// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-sil -Xfrontend -sil-link-all -I %t %s | %FileCheck %s
+
+import Builtin
+
+sil_stage canonical
+
+sil @subject : $@convention(thin) (Builtin.Int64) -> ()
+sil @generic_subject : $@convention(thin) <T> (@in T, @in T) -> ()
+
+// CHECK-LABEL: sil @partial_apply_callee_owned_by_default : $@convention(thin) () -> @callee_owned () -> () {
+sil @partial_apply_callee_owned_by_default : $@convention(thin) () -> @callee_owned () -> () {
+entry:
+  %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  // CHECK: [[PA:%.*]] = partial_apply {{.*}} $@convention(thin) (Builtin.Int64) -> ()
+  %g = partial_apply %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  // CHECK: return [[PA]] : $@callee_owned () -> ()
+  return %g : $@callee_owned () -> ()
+}
+
+// CHECK-LABEL: sil @partial_apply_callee_guaranteed_by_attr : $@convention(thin) () -> @callee_guaranteed () -> () {
+sil @partial_apply_callee_guaranteed_by_attr : $@convention(thin) () -> @callee_guaranteed () -> () {
+entry:
+  %f = function_ref @subject : $@convention(thin) (Builtin.Int64) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] {{.*}} $@convention(thin) (Builtin.Int64) -> ()
+  %g = partial_apply [callee_guaranteed] %f(%z) : $@convention(thin) (Builtin.Int64) -> ()
+  // CHECK: return [[PA]] : $@callee_guaranteed () -> ()
+  return %g : $@callee_guaranteed () -> ()
+}
+
+sil @partial_apply_generic : $@convention(thin) () -> @callee_owned (@in Builtin.Int64) -> () {
+entry:
+  %f = function_ref @generic_subject : $@convention(thin) <T> (@in T, @in T) -> ()
+  %z = integer_literal $Builtin.Int64, 0
+  %s = alloc_stack $Builtin.Int64
+  store %z to %s : $*Builtin.Int64
+  // CHECK: [[PA:%.*]] = partial_apply {{.*}}<Builtin.Int64>({{.*}}) : $@convention(thin)
+  %g = partial_apply %f<Builtin.Int64>(%s) : $@convention(thin) <T> (@in T, @in T) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  return %g : $@callee_owned (@in Builtin.Int64) -> ()
+}

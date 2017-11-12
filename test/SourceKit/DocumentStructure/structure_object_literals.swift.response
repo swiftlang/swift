@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 271,
+  key.length: 267,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -8,64 +8,59 @@
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "color",
       key.offset: 144,
-      key.length: 73,
+      key.length: 65,
       key.typename: "S",
       key.nameoffset: 148,
-      key.namelength: 5,
-      key.attributes: [
-        {
-          key.attribute: source.decl.attribute.__raw_doc_comment
-        }
-      ]
+      key.namelength: 5
     },
     {
       key.kind: source.lang.swift.expr.object_literal,
-      key.name: "Color",
+      key.name: "colorLiteral",
       key.offset: 159,
-      key.length: 58,
-      key.nameoffset: 161,
-      key.namelength: 5,
-      key.bodyoffset: 161,
-      key.bodylength: 54,
+      key.length: 50,
+      key.nameoffset: 160,
+      key.namelength: 12,
+      key.bodyoffset: 172,
+      key.bodylength: 36,
       key.substructure: [
         {
-          key.kind: source.lang.swift.decl.var.parameter,
-          key.name: "colorLiteralRed",
-          key.offset: 167,
-          key.length: 18,
-          key.nameoffset: 167,
-          key.namelength: 15,
-          key.bodyoffset: 184,
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "red",
+          key.offset: 173,
+          key.length: 6,
+          key.nameoffset: 173,
+          key.namelength: 3,
+          key.bodyoffset: 178,
           key.bodylength: 1
         },
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "green",
-          key.offset: 187,
+          key.offset: 181,
           key.length: 8,
-          key.nameoffset: 187,
+          key.nameoffset: 181,
           key.namelength: 5,
-          key.bodyoffset: 194,
+          key.bodyoffset: 188,
           key.bodylength: 1
         },
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "blue",
-          key.offset: 197,
+          key.offset: 191,
           key.length: 7,
-          key.nameoffset: 197,
+          key.nameoffset: 191,
           key.namelength: 4,
-          key.bodyoffset: 203,
+          key.bodyoffset: 197,
           key.bodylength: 1
         },
         {
-          key.kind: source.lang.swift.decl.var.parameter,
+          key.kind: source.lang.swift.expr.argument,
           key.name: "alpha",
-          key.offset: 206,
+          key.offset: 200,
           key.length: 8,
-          key.nameoffset: 206,
+          key.nameoffset: 200,
           key.namelength: 5,
-          key.bodyoffset: 213,
+          key.bodyoffset: 207,
           key.bodylength: 1
         }
       ]
@@ -74,30 +69,30 @@
       key.kind: source.lang.swift.decl.var.global,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "image",
-      key.offset: 218,
-      key.length: 52,
+      key.offset: 210,
+      key.length: 56,
       key.typename: "I?",
-      key.nameoffset: 222,
+      key.nameoffset: 214,
       key.namelength: 5
     },
     {
       key.kind: source.lang.swift.expr.object_literal,
-      key.name: "Image",
-      key.offset: 234,
-      key.length: 36,
-      key.nameoffset: 236,
-      key.namelength: 5,
-      key.bodyoffset: 236,
-      key.bodylength: 32,
+      key.name: "imageLiteral",
+      key.offset: 226,
+      key.length: 40,
+      key.nameoffset: 227,
+      key.namelength: 12,
+      key.bodyoffset: 239,
+      key.bodylength: 26,
       key.substructure: [
         {
-          key.kind: source.lang.swift.decl.var.parameter,
-          key.name: "imageLiteral",
-          key.offset: 242,
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "resourceName",
+          key.offset: 240,
           key.length: 25,
-          key.nameoffset: 242,
+          key.nameoffset: 240,
           key.namelength: 12,
-          key.bodyoffset: 256,
+          key.bodyoffset: 254,
           key.bodylength: 11
         }
       ]

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,20 +20,23 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/Formatting.h"
 #include "swift/IDE/SyntaxModel.h"
-#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Subsystems.h"
 
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
 
@@ -41,9 +44,11 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-void EditorDiagConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                          DiagnosticKind Kind, StringRef Text,
-                                          const DiagnosticInfo &Info) {
+void EditorDiagConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
+
   if (Kind == DiagnosticKind::Error) {
     HadAnyError = true;
   }
@@ -64,9 +69,21 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     // Is this possible?
     return;
 
+  if (Kind == DiagnosticKind::Remark) {
+    // FIXME: we may want to handle optimization remarks in sourcekitd.
+    LOG_WARN_FUNC("unhandled optimization remark");
+    return;
+  }
+
   DiagnosticEntryInfo SKInfo;
 
-  SKInfo.Description = Text;
+  // Actually substitute the diagnostic arguments into the diagnostic text.
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+  }
+  SKInfo.Description = Text.str();
 
   unsigned BufferID = SM.findBufferContainingLoc(Loc);
 
@@ -139,6 +156,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
       SKInfo.Severity = DiagnosticSeverityKind::Warning;
       break;
     case DiagnosticKind::Note:
+    case DiagnosticKind::Remark:
       llvm_unreachable("already covered");
   }
 
@@ -207,7 +225,7 @@ bool SwiftEditorDocumentFileMap::getOrUpdate(
       found = true;
     }
   });
-  
+
   return found;
 }
 
@@ -247,110 +265,261 @@ void mergeSplitRanges(unsigned Off1, unsigned Len1, unsigned Off2, unsigned Len2
   }
 }
 
-
 struct SwiftSyntaxToken {
-  unsigned Column;
+  unsigned Offset;
   unsigned Length:24;
-  swift::ide::SyntaxNodeKind Kind:8;
+  SyntaxNodeKind Kind:8;
 
-  SwiftSyntaxToken(unsigned Column, unsigned Length,
-                   swift::ide::SyntaxNodeKind Kind)
-    :Column(Column), Length(Length), Kind(Kind) { }
+  static SwiftSyntaxToken createInvalid() {
+    return {0, 0, SyntaxNodeKind::AttributeBuiltin};
+  }
+
+  SwiftSyntaxToken(unsigned Offset, unsigned Length, SyntaxNodeKind Kind)
+    : Offset(Offset), Length(Length), Kind(Kind) {}
+
+  unsigned endOffset() const { return Offset + Length; }
+
+  bool isInvalid() const { return Length == 0; }
+
+  bool operator==(const SwiftSyntaxToken &Other) const {
+    return Offset == Other.Offset && Length == Other.Length &&
+      Kind == Other.Kind;
+  }
+
+  bool operator!=(const SwiftSyntaxToken &Other) const {
+    return Offset != Other.Offset || Length != Other.Length ||
+      Kind != Other.Kind;
+  }
 };
 
-class SwiftSyntaxMap {
-  typedef std::vector<SwiftSyntaxToken> SwiftSyntaxLineMap;
-  std::vector<SwiftSyntaxLineMap> Lines;
+struct SwiftEditorCharRange {
+  unsigned Offset;
+  unsigned EndOffset;
 
-public:
-  bool matchesFirstTokenOnLine(unsigned Line,
-                               const SwiftSyntaxToken &Token) const {
-    assert(Line > 0);
-    if (Lines.size() < Line)
+  SwiftEditorCharRange(unsigned Offset, unsigned EndOffset) :
+    Offset(Offset), EndOffset(EndOffset) {}
+
+  SwiftEditorCharRange(SwiftSyntaxToken Token) :
+    Offset(Token.Offset), EndOffset(Token.endOffset()) {}
+
+  size_t length() const { return EndOffset - Offset; }
+  bool isEmpty() const { return Offset == EndOffset; }
+  bool intersects(const SwiftSyntaxToken &Token) const {
+    return this->Offset < (Token.endOffset()) && this->EndOffset > Token.Offset;
+  }
+  void extendToInclude(const SwiftEditorCharRange &Range) {
+    if (Range.Offset < Offset)
+      Offset = Range.Offset;
+    if (Range.EndOffset > EndOffset)
+      EndOffset = Range.EndOffset;
+  }
+  void extendToInclude(unsigned OtherOffset) {
+    extendToInclude({OtherOffset, OtherOffset});
+  }
+};
+
+/// Finds and represents the first mismatching tokens in two syntax maps,
+/// ignoring invalidated tokens.
+template <class Iter>
+struct TokenMismatch {
+  /// The begin and end iterators of the previous syntax map
+  Iter PrevTok, PrevEnd;
+  /// The begin and end iterators of the current syntax map
+  Iter CurrTok, CurrEnd;
+
+  TokenMismatch(Iter CurrTok, Iter CurrEnd, Iter PrevTok, Iter PrevEnd) :
+  PrevTok(PrevTok), PrevEnd(PrevEnd), CurrTok(CurrTok), CurrEnd(CurrEnd) {
+    skipInvalid();
+    while(advance());
+  }
+
+  /// Returns true if a mismatch was found
+  bool foundMismatch() const {
+    return CurrTok != CurrEnd || PrevTok != PrevEnd;
+  }
+
+  /// Returns the smallest start offset of the mismatched token ranges
+  unsigned mismatchStart() const {
+    assert(foundMismatch());
+    if (CurrTok != CurrEnd) {
+      if (PrevTok != PrevEnd)
+        return std::min(CurrTok->Offset, PrevTok->Offset);
+      return CurrTok->Offset;
+    }
+    return PrevTok->Offset;
+  }
+
+  /// Returns the largest end offset of the mismatched token ranges
+  unsigned mismatchEnd() const {
+    assert(foundMismatch());
+    if (CurrTok != CurrEnd) {
+      if (PrevTok != PrevEnd)
+        return std::max(CurrTok->endOffset(), PrevTok->endOffset());
+      return CurrTok->endOffset();
+    }
+    return PrevTok->endOffset();
+  }
+
+private:
+  void skipInvalid() {
+    while (PrevTok != PrevEnd && PrevTok->isInvalid())
+      ++PrevTok;
+  }
+
+  bool advance() {
+    if (CurrTok == CurrEnd || PrevTok == PrevEnd || *CurrTok != *PrevTok)
       return false;
-    
-    unsigned LineOffset = Line - 1;
-    const SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
-    if (LineMap.empty())
-      return false;
-    
-    const SwiftSyntaxToken &Tok = LineMap.front();
-    if (Tok.Column == Token.Column && Tok.Length == Token.Length
-        && Tok.Kind == Token.Kind) {
-      return true;
-    }
-    
-    return false;
+    ++CurrTok;
+    ++PrevTok;
+    skipInvalid();
+    return true;
+  }
+};
+
+/// Represents a the syntax highlighted token ranges in a source file
+struct SwiftSyntaxMap {
+  std::vector<SwiftSyntaxToken> Tokens;
+
+  explicit SwiftSyntaxMap(unsigned Capacity = 0) {
+    if (Capacity)
+      Tokens.reserve(Capacity);
   }
 
-  void addTokenForLine(unsigned Line, const SwiftSyntaxToken &Token) {
-    assert(Line > 0);
-    if (Lines.size() < Line) {
-      Lines.resize(Line);
-    }
-    unsigned LineOffset = Line - 1;
-    SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
-    // FIXME: Assert this token is after the last one
-    LineMap.push_back(Token);
+  void addToken(const SwiftSyntaxToken &Token) {
+    assert(Tokens.empty() || Token.Offset >= Tokens.back().Offset);
+    Tokens.push_back(Token);
   }
 
-  void mergeTokenForLine(unsigned Line, const SwiftSyntaxToken &Token) {
-    assert(Line > 0);
-    if (Lines.size() < Line) {
-      Lines.resize(Line);
+  /// Merge this nested token into the last token that was added
+  void mergeToken(const SwiftSyntaxToken &Token) {
+    if (Tokens.empty()) {
+      Tokens.push_back(Token);
+      return;
     }
-    unsigned LineOffset = Line - 1;
-    SwiftSyntaxLineMap &LineMap = Lines[LineOffset];
-    if (!LineMap.empty()) {
-      auto &LastTok = LineMap.back();
-      mergeSplitRanges(LastTok.Column, LastTok.Length,
-                       Token.Column, Token.Length,
-                       [&](unsigned BeforeOff, unsigned BeforeLen,
-                           unsigned AfterOff, unsigned AfterLen) {
-        auto LastKind = LastTok.Kind;
-        LineMap.pop_back();
-        if (BeforeLen)
-          LineMap.emplace_back(BeforeOff, BeforeLen, LastKind);
-        LineMap.push_back(Token);
-        if (AfterLen)
-          LineMap.emplace_back(AfterOff, AfterLen, LastKind);
-      });
+    auto &LastTok = Tokens.back();
+    assert(LastTok.Offset <= Token.Offset);
+    mergeSplitRanges(LastTok.Offset, LastTok.Length, Token.Offset, Token.Length,
+                     [&](unsigned BeforeOff, unsigned BeforeLen,
+                         unsigned AfterOff, unsigned AfterLen) {
+                       auto LastKind = LastTok.Kind;
+                       Tokens.pop_back();
+                       if (BeforeLen)
+                         Tokens.emplace_back(BeforeOff, BeforeLen, LastKind);
+                       Tokens.push_back(Token);
+                       if (AfterLen)
+                         Tokens.emplace_back(AfterOff, AfterLen, LastKind);
+                     });
+  }
+
+  /// Adjusts the token offsets and lengths in this syntax map to account for
+  /// replacing \p Len bytes at the given \p Offset with \p NewLen bytes. Tokens
+  /// before the replacement stay the same, tokens after it are shifted, and
+  /// tokens that intersect it are 'removed' (really just marked invalid).
+  /// Clients are expected to match this behavior.
+  ///
+  /// Returns the union of the replaced range and the token ranges it
+  /// intersected, or nothing if no tokens were intersected.
+  llvm::Optional<SwiftEditorCharRange>
+  adjustForReplacement(unsigned Offset, unsigned Len, unsigned NewLen) {
+    unsigned ReplacedStart = Offset;
+    unsigned ReplacedEnd = Offset + Len;
+    bool TokenIntersected = false;
+    SwiftEditorCharRange Affected = { /*Offset=*/ReplacedStart,
+                                      /*EndOffset=*/ReplacedEnd};
+    // Adjust the tokens
+    auto Token = Tokens.begin();
+    while (Token != Tokens.end() && Token->endOffset() <= ReplacedStart) {
+      // Completely before the replaced range – no change needed
+      ++Token;
     }
-    else {
-      // Not overlapping, just add the new token to the end
-      LineMap.push_back(Token);
+
+    while (Token != Tokens.end() && Token->Offset < ReplacedEnd) {
+      // Intersecting the replaced range – extend Affected and invalidate
+      TokenIntersected = true;
+      Affected.extendToInclude(*Token);
+      *Token = SwiftSyntaxToken::createInvalid();
+      ++Token;
+    }
+
+    while (Token != Tokens.end()) {
+      // Completely after the replaced range - shift to account for NewLen
+      if (NewLen >= Len)
+        Token->Offset += NewLen - Len;
+      else
+        Token->Offset -= Len - NewLen;
+      ++Token;
+    }
+
+    // If the replaced range didn't intersect with any existing tokens, there's
+    // no need to report an affected range
+    if (!TokenIntersected)
+      return None;
+
+    // Update the end of the affected range to account for NewLen
+    if (NewLen >= Len) {
+      Affected.EndOffset += NewLen - Len;
+    } else {
+      Affected.EndOffset -= Len - NewLen;
+    }
+
+    return Affected;
+  }
+
+  /// Passes each token in this SwiftSyntaxMap to the given \p Consumer
+  void forEach(EditorConsumer &Consumer) {
+    for (auto &Token: Tokens) {
+      auto Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Token.Kind);
+      Consumer.handleSyntaxMap(Token.Offset, Token.Length, Kind);
     }
   }
 
-  void clearLineRange(unsigned StartLine, unsigned Length) {
-    assert(StartLine > 0);
-    unsigned LineOffset = StartLine - 1;
-    for (unsigned Line = LineOffset; Line < LineOffset + Length
-                                    && Line < Lines.size(); ++Line) {
-      Lines[Line].clear();
+  /// Finds the delta between the given SwiftSyntaxMap, \p Prev, and this one.
+  /// It passes each token not in \p Prev to the given \p Consumer and, if
+  /// needed, also expands or sets the given \p Affected range to cover all
+  /// non-matching tokens in the two lists.
+  ///
+  /// Returns true if this SwiftSyntaxMap is different to \p Prev.
+  bool forEachChanged(const SwiftSyntaxMap &Prev,
+                      llvm::Optional<SwiftEditorCharRange> &Affected,
+                      EditorConsumer &Consumer) const {
+    typedef std::vector<SwiftSyntaxToken>::const_iterator ForwardIt;
+    typedef std::vector<SwiftSyntaxToken>::const_reverse_iterator ReverseIt;
+
+    // Find the first pair of tokens that don't match
+    TokenMismatch<ForwardIt>
+    Forward(Tokens.begin(), Tokens.end(), Prev.Tokens.begin(), Prev.Tokens.end());
+
+    // Exit early if there was no mismatch
+    if (!Forward.foundMismatch())
+      return Affected && !Affected->isEmpty();
+
+    // Find the last pair of tokens that don't match
+    TokenMismatch<ReverseIt>
+    Backward(Tokens.rbegin(), Tokens.rend(), Prev.Tokens.rbegin(), Prev.Tokens.rend());
+    assert(Backward.foundMismatch());
+
+    // Set or extend the affected range to include the  mismatched range
+    SwiftEditorCharRange
+    MismatchRange = {Forward.mismatchStart(),Backward.mismatchEnd()};
+    if (!Affected) {
+      Affected = MismatchRange;
+    } else {
+      Affected->extendToInclude(MismatchRange);
     }
-  }
 
-  void removeLineRange(unsigned StartLine, unsigned Length) {
-    assert(StartLine > 0 && Length > 0);
-
-    if (StartLine < Lines.size()) {
-      unsigned EndLine = StartLine + Length - 1;
-      // Delete all syntax map data from start line through end line
-      Lines.erase(Lines.begin() + StartLine - 1,
-                  EndLine >= Lines.size() ? Lines.end()
-                                          : Lines.begin() + EndLine);
+    // Report all tokens in the affected range to the EditorConsumer
+    auto From = Forward.CurrTok;
+    auto To = Backward.CurrTok;
+    while (From != Tokens.begin() && (From-1)->Offset >= Affected->Offset)
+      --From;
+    while (To != Tokens.rbegin() && (To-1)->endOffset() <= Affected->EndOffset)
+      --To;
+    for (; From < To.base(); ++From) {
+      auto Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(From->Kind);
+      Consumer.handleSyntaxMap(From->Offset, From->Length, Kind);
     }
-  }
 
-  void insertLineRange(unsigned StartLine, unsigned Length) {
-    Lines.insert(StartLine <= Lines.size() ? Lines.begin() + StartLine - 1
-                                           : Lines.end(),
-                 Length, SwiftSyntaxLineMap());
-  }
-
-  void reset() {
-    Lines.clear();
+    return true;
   }
 };
 
@@ -362,62 +531,14 @@ struct EditorConsumerSyntaxMapEntry {
     :Offset(Offset), Length(Length), Kind(Kind) { }
 };
 
-
-class SwiftEditorLineRange {
-  unsigned StartLine;
-  unsigned Length;
-
-public:
-  SwiftEditorLineRange()
-    :StartLine(0), Length(0) { }
-  SwiftEditorLineRange(unsigned StartLine, unsigned Length)
-    :StartLine(StartLine), Length(Length) { }
-  SwiftEditorLineRange(const SwiftEditorLineRange &Other)
-    :StartLine(Other.StartLine), Length(Other.Length) { }
-
-  bool isValid() const {
-    return Length != 0;
-  }
-
-  unsigned startLine() const {
-    return StartLine;
-  }
-  
-  unsigned endLine() const {
-    return isValid() ? StartLine + Length - 1 : 0;
-  }
-
-  unsigned lineCount() const {
-    return Length;
-  }
-  
-  void setRange(unsigned NewStartLine, unsigned NewLength) {
-    StartLine = NewStartLine;
-    Length = NewLength;
-  }
-
-  void extendToIncludeLine(unsigned Line) {
-    if (!isValid()) {
-      StartLine = Line;
-      Length = 1;
-    }
-    else if (Line >= StartLine + Length) {
-      Length = Line - StartLine + 1;
-    }
-  }
-
-};
-
-typedef std::pair<unsigned, unsigned> SwiftEditorCharRange;
-
 struct SwiftSemanticToken {
   unsigned ByteOffset;
   unsigned Length : 24;
   // The code-completion kinds are a good match for the semantic kinds we want.
   // FIXME: Maybe rename CodeCompletionDeclKind to a more general concept ?
   CodeCompletionDeclKind Kind : 6;
-  bool IsRef : 1;
-  bool IsSystem : 1;
+  unsigned IsRef : 1;
+  unsigned IsSystem : 1;
 
   SwiftSemanticToken(CodeCompletionDeclKind Kind,
                      unsigned ByteOffset, unsigned Length,
@@ -425,8 +546,12 @@ struct SwiftSemanticToken {
     : ByteOffset(ByteOffset), Length(Length), Kind(Kind),
       IsRef(IsRef), IsSystem(IsSystem) { }
 
+  bool getIsRef() const { return static_cast<bool>(IsRef); }
+
+  bool getIsSystem() const { return static_cast<bool>(IsSystem); }
+
   UIdent getUIdentForKind() const {
-    return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, IsRef);
+    return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
   }
 };
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
@@ -467,7 +592,7 @@ public:
 
   void readSemanticInfo(ImmutableTextSnapshotRef NewSnapshot,
                         std::vector<SwiftSemanticToken> &Tokens,
-                        std::vector<DiagnosticEntryInfo> &Diags,
+                        Optional<std::vector<DiagnosticEntryInfo>> &Diags,
                         ArrayRef<DiagnosticEntryInfo> ParserDiags);
 
   void processLatestSnapshotAsync(EditableTextBufferRef EditableBuffer);
@@ -485,7 +610,7 @@ private:
   std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
 
-  std::vector<DiagnosticEntryInfo> getSemanticDiagnostics(
+  Optional<std::vector<DiagnosticEntryInfo>> getSemanticDiagnostics(
       ImmutableTextSnapshotRef NewSnapshot,
       ArrayRef<DiagnosticEntryInfo> ParserDiags);
 };
@@ -538,7 +663,7 @@ public:
       Info.Files.push_back(std::make_pair(PrimaryFile, Text));
       TracedOp.start(trace::OperationKind::SimpleParse, Info);
     }
-    
+
     bool Done = false;
     while (!Done) {
       P.parseTopLevel();
@@ -567,7 +692,7 @@ public:
   }
 };
 
-} // anonymous namespace.
+} // anonymous namespace
 
 uint64_t SwiftDocumentSemanticInfo::getASTGeneration() const {
   llvm::sys::ScopedLock L(Mtx);
@@ -577,7 +702,7 @@ uint64_t SwiftDocumentSemanticInfo::getASTGeneration() const {
 void SwiftDocumentSemanticInfo::readSemanticInfo(
     ImmutableTextSnapshotRef NewSnapshot,
     std::vector<SwiftSemanticToken> &Tokens,
-    std::vector<DiagnosticEntryInfo> &Diags,
+    Optional<std::vector<DiagnosticEntryInfo>> &Diags,
     ArrayRef<DiagnosticEntryInfo> ParserDiags) {
 
   llvm::sys::ScopedLock L(Mtx);
@@ -632,155 +757,73 @@ SwiftDocumentSemanticInfo::takeSemanticTokens(
   return std::move(SemaToks);
 }
 
-static bool
-adjustDiagnosticRanges(SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges,
-                       unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  for (auto &Range : Ranges) {
-    unsigned RangeBegin = Range.first;
-    unsigned RangeEnd = Range.first +  Range.second;
-    unsigned RemoveEnd = ByteOffset + RemoveLen;
-    // If it intersects with the remove range, ignore the whole diagnostic.
-    if (!(RangeEnd < ByteOffset || RangeBegin > RemoveEnd))
-      return true; // Ignore.
-    if (RangeBegin > RemoveEnd)
-      Range.first += Delta;
-  }
-  return false;
-}
-
-static bool
-adjustDiagnosticFixits(SmallVectorImpl<DiagnosticEntryInfo::Fixit> &Fixits,
-                       unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  for (auto &Fixit : Fixits) {
-    unsigned FixitBegin = Fixit.Offset;
-    unsigned FixitEnd = Fixit.Offset +  Fixit.Length;
-    unsigned RemoveEnd = ByteOffset + RemoveLen;
-    // If it intersects with the remove range, ignore the whole diagnostic.
-    if (!(FixitEnd < ByteOffset || FixitBegin > RemoveEnd))
-      return true; // Ignore.
-    if (FixitBegin > FixitEnd)
-      Fixit.Offset += Delta;
-  }
-  return false;
-}
-
-static bool
-adjustDiagnosticBase(DiagnosticEntryInfoBase &Diag,
-                     unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  if (Diag.Offset >= ByteOffset && Diag.Offset < ByteOffset+RemoveLen)
-    return true; // Ignore.
-  bool Ignore = adjustDiagnosticRanges(Diag.Ranges, ByteOffset, RemoveLen, Delta);
-  if (Ignore)
-    return true;
-  Ignore = adjustDiagnosticFixits(Diag.Fixits, ByteOffset, RemoveLen, Delta);
-  if (Ignore)
-    return true;
-  if (Diag.Offset > ByteOffset)
-    Diag.Offset += Delta;
-  return false;
-}
-
-static bool
-adjustDiagnostic(DiagnosticEntryInfo &Diag, StringRef Filename,
-                 unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  for (auto &Note : Diag.Notes) {
-    if (Filename != Note.Filename)
-      continue;
-    bool Ignore = adjustDiagnosticBase(Note, ByteOffset, RemoveLen, Delta);
-    if (Ignore)
-      return true;
-  }
-  return adjustDiagnosticBase(Diag, ByteOffset, RemoveLen, Delta);
-}
-
-static std::vector<DiagnosticEntryInfo>
-adjustDiagnostics(std::vector<DiagnosticEntryInfo> Diags, StringRef Filename,
-                  unsigned ByteOffset, unsigned RemoveLen, int Delta) {
-  std::vector<DiagnosticEntryInfo> NewDiags;
-  NewDiags.reserve(Diags.size());
-
-  for (auto &Diag : Diags) {
-    bool Ignore = adjustDiagnostic(Diag, Filename, ByteOffset, RemoveLen, Delta);
-    if (!Ignore) {
-      NewDiags.push_back(std::move(Diag));
-    }
-  }
-
-  return NewDiags;
-}
-
-std::vector<DiagnosticEntryInfo>
+Optional<std::vector<DiagnosticEntryInfo>>
 SwiftDocumentSemanticInfo::getSemanticDiagnostics(
     ImmutableTextSnapshotRef NewSnapshot,
     ArrayRef<DiagnosticEntryInfo> ParserDiags) {
 
-  llvm::sys::ScopedLock L(Mtx);
+  std::vector<DiagnosticEntryInfo> curSemaDiags;
+  {
+    llvm::sys::ScopedLock L(Mtx);
 
-  if (SemaDiags.empty())
-    return SemaDiags;
-
-  assert(DiagSnapshot && "If we have diagnostics, we must have snapshot!");
-
-  if (!DiagSnapshot->precedesOrSame(NewSnapshot)) {
-    // It may happen that other thread has already updated the diagnostics to
-    // the version *after* NewSnapshot. This can happen in at least two cases:
-    //   (a) two or more editor.open or editor.replacetext queries are being
-    //       processed concurrently (not valid, but possible call pattern)
-    //   (b) while editor.replacetext processing is running, a concurrent
-    //       thread executes getBuffer()/getBufferForSnapshot() on the same
-    //       Snapshot/EditableBuffer (thus creating a new ImmutableTextBuffer)
-    //       and updates DiagSnapshot/SemaDiags
-    assert(NewSnapshot->precedesOrSame(DiagSnapshot));
-
-    // Since we cannot "adjust back" diagnostics, we just return an empty set.
-    // FIXME: add handling of the case#b above
-    return {};
-  }
-
-  SmallVector<unsigned, 16> ParserDiagLines;
-  for (auto Diag : ParserDiags)
-    ParserDiagLines.push_back(Diag.Line);
-  std::sort(ParserDiagLines.begin(), ParserDiagLines.end());
-
-  auto hasParserDiagAtLine = [&](unsigned Line) {
-    return std::binary_search(ParserDiagLines.begin(), ParserDiagLines.end(),
-                              Line);
-  };
-
-  // Adjust the position of the diagnostics.
-  DiagSnapshot->foreachReplaceUntil(NewSnapshot,
-    [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
-      if (SemaDiags.empty())
-        return false;
-
-      unsigned ByteOffset = Upd->getByteOffset();
-      unsigned RemoveLen = Upd->getLength();
-      unsigned InsertLen = Upd->getText().size();
-      int Delta = InsertLen - RemoveLen;
-      SemaDiags = adjustDiagnostics(std::move(SemaDiags), Filename,
-                                    ByteOffset, RemoveLen, Delta);
-      return true;
-    });
-
-  if (!SemaDiags.empty()) {
-    auto ImmBuf = NewSnapshot->getBuffer();
-    for (auto &Diag : SemaDiags) {
-      std::tie(Diag.Line, Diag.Column) = ImmBuf->getLineAndColumn(Diag.Offset);
+    if (!DiagSnapshot || DiagSnapshot->getStamp() != NewSnapshot->getStamp()) {
+      // The semantic diagnostics are out-of-date, ignore them.
+      return llvm::None;
     }
 
-    // If there is a parser diagnostic in a line, ignore diagnostics in the same
-    // line that we got from the semantic pass.
-    // Note that the semantic pass also includes parser diagnostics so this
-    // avoids duplicates.
-    SemaDiags.erase(std::remove_if(SemaDiags.begin(), SemaDiags.end(),
-                                   [&](const DiagnosticEntryInfo &Diag) -> bool {
-                                     return hasParserDiagAtLine(Diag.Line);
-                                   }),
-                    SemaDiags.end());
+    curSemaDiags = SemaDiags;
   }
 
-  DiagSnapshot = NewSnapshot;
-  return SemaDiags;
+  // Diagnostics from the AST and diagnostics from the parser are based on the
+  // same source text snapshot. But diagnostics from the AST may have excluded
+  // the parser diagnostics due to a fatal error, e.g. if the source has a
+  // 'so such module' error, which will suppress other diagnostics.
+  // We don't want to turn off the suppression to avoid a flood of diagnostics
+  // when a module import fails, but we also don't want to lose the parser
+  // diagnostics in such a case, so merge the parser diagnostics with the sema
+  // ones.
+
+  auto orderDiagnosticEntryInfos = [](const DiagnosticEntryInfo &LHS,
+                                      const DiagnosticEntryInfo &RHS) -> bool {
+    if (LHS.Filename != RHS.Filename)
+      return LHS.Filename < RHS.Filename;
+    if (LHS.Offset != RHS.Offset)
+      return LHS.Offset < RHS.Offset;
+    return LHS.Description < RHS.Description;
+  };
+
+  std::vector<DiagnosticEntryInfo> sortedParserDiags;
+  sortedParserDiags.reserve(ParserDiags.size());
+  sortedParserDiags.insert(sortedParserDiags.end(), ParserDiags.begin(),
+                           ParserDiags.end());
+  std::stable_sort(sortedParserDiags.begin(), sortedParserDiags.end(),
+                   orderDiagnosticEntryInfos);
+
+  std::vector<DiagnosticEntryInfo> finalDiags;
+  finalDiags.reserve(sortedParserDiags.size()+curSemaDiags.size());
+
+  // Add sema diagnostics unless it is an existing parser diagnostic.
+  // Note that we want to merge and eliminate diagnostics from the 'sema' set
+  // that also show up in the 'parser' set, but we don't want to remove
+  // duplicate diagnostics from within the same set (e.g. duplicates existing in
+  // the 'sema' set). We want to report the diagnostics as the compiler reported
+  // them, even if there's some duplicate one. This is why we don't just do a
+  // simple append/sort/keep-uniques step.
+  for (const auto &curDE : curSemaDiags) {
+    bool existsAsParserDiag = std::binary_search(sortedParserDiags.begin(),
+                                                 sortedParserDiags.end(),
+                                             curDE, orderDiagnosticEntryInfos);
+    if (!existsAsParserDiag) {
+      finalDiags.push_back(curDE);
+    }
+  }
+
+  finalDiags.insert(finalDiags.end(),
+                    sortedParserDiags.begin(), sortedParserDiags.end());
+  std::stable_sort(finalDiags.begin(), finalDiags.end(),
+                   orderDiagnosticEntryInfos);
+
+  return finalDiags;
 }
 
 void SwiftDocumentSemanticInfo::updateSemanticInfo(
@@ -791,7 +834,7 @@ void SwiftDocumentSemanticInfo::updateSemanticInfo(
 
   {
     llvm::sys::ScopedLock L(Mtx);
-    if(ASTGeneration > this->ASTGeneration) {
+    if (ASTGeneration > this->ASTGeneration) {
       SemaToks = std::move(Toks);
       SemaDiags = std::move(Diags);
       TokSnapshot = DiagSnapshot = std::move(Snapshot);
@@ -816,8 +859,10 @@ public:
     : SM(SM), BufferID(BufferID) {}
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T) override {
-    if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+                          ReferenceMetaData Data) override {
+      if (isa<VarDecl>(D) && D->hasName() &&
+          D->getFullName() == D->getASTContext().Id_self)
       return true;
 
     // Do not annotate references to unavailable decls.
@@ -833,7 +878,8 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type());
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {
@@ -954,21 +1000,17 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
   ASTMgr.processASTAsync(Invok, std::move(Consumer), OncePerASTToken);
 }
 
-
-struct SwiftEditorDocument::CodeFormatOptions {
-  bool UseTabs = false;
-  unsigned IndentWidth = 4;
-  unsigned TabWidth = 4;
-};
-
 struct SwiftEditorDocument::Implementation {
   SwiftLangSupport &LangSupport;
   const std::string FilePath;
   EditableTextBufferRef EditableBuffer;
 
+  /// The list of syntax highlighted token offsets and ranges in the document
   SwiftSyntaxMap SyntaxMap;
-  SwiftEditorLineRange EditedLineRange;
-  SwiftEditorCharRange AffectedRange;
+  /// The minimal range of syntax highlighted tokens affected by the last edit
+  llvm::Optional<SwiftEditorCharRange> AffectedRange;
+  /// Whether the last operation was an edit rather than a document open
+  bool Edited;
 
   std::vector<DiagnosticEntryInfo> ParserDiagnostics;
   RefPtr<SwiftDocumentSemanticInfo> SemanticInfo;
@@ -980,12 +1022,13 @@ struct SwiftEditorDocument::Implementation {
     llvm::sys::ScopedLock L(AccessMtx);
     return SyntaxInfo;
   }
-  
+
   llvm::sys::Mutex AccessMtx;
 
-  Implementation(StringRef FilePath, SwiftLangSupport &LangSupport)
-    : LangSupport(LangSupport), FilePath(FilePath) {
-    SemanticInfo = new SwiftDocumentSemanticInfo(FilePath, LangSupport);
+  Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
+                 CodeFormatOptions options)
+    : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
+      SemanticInfo = new SwiftDocumentSemanticInfo(FilePath, LangSupport);
   }
 
   void buildSwiftInv(trace::SwiftInvocation &Inv);
@@ -1006,42 +1049,58 @@ void SwiftEditorDocument::Implementation::buildSwiftInv(
 
 namespace  {
 
-static UIdent getAccessibilityUID(Accessibility Access) {
+static UIdent getAccessLevelUID(AccessLevel Access) {
+  static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
+  static UIdent AccessFilePrivate("source.lang.swift.accessibility.fileprivate");
   static UIdent AccessPrivate("source.lang.swift.accessibility.private");
 
   switch (Access) {
-  case Accessibility::Private:
+  case AccessLevel::Private:
     return AccessPrivate;
-  case Accessibility::Internal:
+  case AccessLevel::FilePrivate:
+    return AccessFilePrivate;
+  case AccessLevel::Internal:
     return AccessInternal;
-  case Accessibility::Public:
+  case AccessLevel::Public:
     return AccessPublic;
+  case AccessLevel::Open:
+    return AccessOpen;
   }
+
+  llvm_unreachable("Unhandled access level in switch.");
 }
 
-static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
-  if (ED->hasDefaultAccessibility())
-    return ED->getDefaultAccessibility();
+static Optional<AccessLevel> getAccessLevelStrictly(const ExtensionDecl *ED) {
+  if (ED->hasDefaultAccessLevel())
+    return ED->getDefaultAccessLevel();
 
-  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
-  // Assume "internal", which is the most common thing anyway.
-  return Accessibility::Internal;
+  return None;
 }
 
-/// If typechecking was performed we use the computed accessibility, otherwise
-/// we fallback to inferring accessibility syntactically. This may not be as
+static AccessLevel inferDefaultAccessLevel(const ExtensionDecl *ED) {
+  if (auto StrictAccess = getAccessLevelStrictly(ED))
+    return StrictAccess.getValue();
+
+  // Assume "internal", which is the most common thing anyway.
+  return AccessLevel::Internal;
+}
+
+/// If typechecking was performed we use the computed access level, otherwise
+/// we fallback to inferring access syntactically. This may not be as
 /// accurate but it's only until we have typechecked the AST.
-static Accessibility inferAccessibility(const ValueDecl *D) {
+static AccessLevel inferAccessLevel(const ValueDecl *D) {
   assert(D);
-  if (D->hasAccessibility())
+  if (D->hasAccess())
     return D->getFormalAccess();
 
-  // Check if the decl has an explicit accessibility attribute.
-  if (auto *AA = D->getAttrs().getAttribute<AccessibilityAttr>())
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
 
   DeclContext *DC = D->getDeclContext();
@@ -1051,24 +1110,27 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
   case DeclContextKind::Initializer:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractFunctionDecl:
-    return Accessibility::Private;
+  case DeclContextKind::SubscriptDecl:
+    return AccessLevel::Private;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
-    return Accessibility::Internal;
-  case DeclContextKind::NominalTypeDecl: {
-    auto Nominal = cast<NominalTypeDecl>(DC);
-    Accessibility Access = inferAccessibility(Nominal);
+    return AccessLevel::Internal;
+  case DeclContextKind::GenericTypeDecl: {
+    auto Nominal = cast<GenericTypeDecl>(DC);
+    AccessLevel Access = inferAccessLevel(Nominal);
     if (!isa<ProtocolDecl>(Nominal))
-      Access = std::min(Access, Accessibility::Internal);
+      Access = std::min(Access, AccessLevel::Internal);
     return Access;
   }
   case DeclContextKind::ExtensionDecl:
-    return inferDefaultAccessibility(cast<ExtensionDecl>(DC));
+    return inferDefaultAccessLevel(cast<ExtensionDecl>(DC));
   }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
-static Optional<Accessibility>
-inferSetterAccessibility(const AbstractStorageDecl *D) {
+static Optional<AccessLevel>
+inferSetterAccessLevel(const AbstractStorageDecl *D) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->isLet())
       return None;
@@ -1079,78 +1141,10 @@ inferSetterAccessibility(const AbstractStorageDecl *D) {
   // FIXME: Have the parser detect as read-only the syntactic form of generated
   // interfaces, which is "var foo : Int { get }"
 
-  if (auto *AA = D->getAttrs().getAttribute<SetterAccessibilityAttr>())
+  if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
   else
-    return inferAccessibility(D);
-}
-
-std::vector<UIdent> UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
-  std::vector<UIdent> AttrUIDs;
-
-#define ATTR(X) \
-  if (Attrs.has(AK_##X)) { \
-    static UIdent Attr_##X("source.decl.attribute."#X); \
-    AttrUIDs.push_back(Attr_##X); \
-  }
-#include "swift/AST/Attr.def"
-
-  for (auto Attr : Attrs) {
-    // Check special-case names first.
-    switch (Attr->getKind()) {
-    case DAK_IBAction: {
-      static UIdent Attr_IBAction("source.decl.attribute.ibaction");
-      AttrUIDs.push_back(Attr_IBAction);
-      continue;
-    }
-    case DAK_IBOutlet: {
-      static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
-      AttrUIDs.push_back(Attr_IBOutlet);
-      continue;
-    }
-    case DAK_IBDesignable: {
-      static UIdent Attr_IBDesignable("source.decl.attribute.ibdesignable");
-      AttrUIDs.push_back(Attr_IBDesignable);
-      continue;
-    }
-    case DAK_IBInspectable: {
-      static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
-      AttrUIDs.push_back(Attr_IBInspectable);
-      continue;
-    }
-    case DAK_ObjC: {
-      static UIdent Attr_Objc("source.decl.attribute.objc");
-      static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
-      if (cast<ObjCAttr>(Attr)->hasName()) {
-        AttrUIDs.push_back(Attr_ObjcNamed);
-      } else {
-        AttrUIDs.push_back(Attr_Objc);
-      }
-      continue;
-    }
-
-    // We handle accessibility explicitely.
-    case DAK_Accessibility:
-    case DAK_SetterAccessibility:
-      continue;
-    default:
-      break;
-    }
-
-    switch (Attr->getKind()) {
-    case DAK_Count:
-      break;
-#define DECL_ATTR(X, CLASS, ...)\
-    case DAK_##CLASS: {\
-      static UIdent Attr_##X("source.decl.attribute."#X); \
-      AttrUIDs.push_back(Attr_##X); \
-      break;\
-    }
-#include "swift/AST/Attr.def"
-    }
-  }
-
-  return AttrUIDs;
+    return inferAccessLevel(D);
 }
 
 class SwiftDocumentStructureWalker: public ide::SyntaxModelWalker {
@@ -1193,17 +1187,30 @@ public:
       BodyOffset = BodyEnd = 0;
     }
 
+    unsigned DocOffset = 0;
+    unsigned DocEnd = 0;
+    if (Node.DocRange.isValid()) {
+      DocOffset = SrcManager.getLocOffsetInBuffer(Node.DocRange.getStart(),
+                                                  BufferID);
+      DocEnd = SrcManager.getLocOffsetInBuffer(Node.DocRange.getEnd(),
+                                               BufferID);
+    }
+
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxStructureKind(Node.Kind);
     UIdent AccessLevel;
     UIdent SetterAccessLevel;
-    if (Node.Kind != SyntaxStructureKind::Parameter) {
+    if (Node.Kind != SyntaxStructureKind::Parameter &&
+        Node.Kind != SyntaxStructureKind::LocalVariable) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
-        AccessLevel = getAccessibilityUID(inferAccessibility(VD));
+        AccessLevel = getAccessLevelUID(inferAccessLevel(VD));
+      } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
+        if (auto StrictAccess = getAccessLevelStrictly(ED))
+          AccessLevel = getAccessLevelUID(StrictAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
-        Optional<Accessibility> SetAccess = inferSetterAccessibility(ASD);
+        Optional<swift::AccessLevel> SetAccess = inferSetterAccessLevel(ASD);
         if (SetAccess.hasValue()) {
-          SetterAccessLevel = getAccessibilityUID(SetAccess.getValue());
+          SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
         }
       }
     }
@@ -1237,12 +1244,33 @@ public:
     SmallString<64> SelectorNameBuf;
     StringRef SelectorName = getObjCSelectorName(Node.Dcl, SelectorNameBuf);
 
-    std::vector<UIdent> Attrs = UIDsFromDeclAttributes(Node.Attrs);
+    std::vector<std::tuple<UIdent, unsigned, unsigned>> Attrs;
+
+    for (auto Attr : Node.Attrs) {
+      if (auto AttrUID = SwiftLangSupport::getUIDForDeclAttribute(Attr)) {
+        unsigned AttrOffset = 0;
+        unsigned AttrEnd = 0;
+        auto AttrRange = Attr->getRangeWithAt();
+        if (AttrRange.isValid()) {
+          auto CharRange = Lexer::getCharSourceRangeFromSourceRange(SrcManager,
+                                                                    AttrRange);
+          AttrOffset = SrcManager.getLocOffsetInBuffer(CharRange.getStart(),
+                                                       BufferID);
+          AttrEnd = SrcManager.getLocOffsetInBuffer(CharRange.getEnd(),
+                                                    BufferID);
+        }
+
+        auto AttrTuple = std::make_tuple(AttrUID.getValue(), AttrOffset,
+                                         AttrEnd - AttrOffset);
+        Attrs.push_back(AttrTuple);
+      }
+    }
 
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, AccessLevel, SetterAccessLevel,
                                        NameStart, NameEnd - NameStart,
                                        BodyOffset, BodyEnd - BodyOffset,
+                                       DocOffset, DocEnd - DocOffset,
                                        DisplayName,
                                        TypeName, RuntimeName,
                                        SelectorName,
@@ -1263,10 +1291,17 @@ public:
   }
 
   StringRef getObjCRuntimeName(const Decl *D, SmallString<64> &Buf) {
-    if (!D)
+    if (!D || D->isInvalid())
       return StringRef();
     if (!isa<ClassDecl>(D) && !isa<ProtocolDecl>(D))
       return StringRef();
+    auto *VD = cast<ValueDecl>(D);
+    if (!VD->hasName())
+      return StringRef();
+    auto ident = VD->getBaseName().getIdentifier().str();
+    if (ident.empty() || Mangle::isDigit(ident.front()))
+      return StringRef();
+
     // We don't support getting the runtime name for nested classes.
     // This would require typechecking or at least name lookup, if the nested
     // class is in an extension.
@@ -1307,7 +1342,7 @@ public:
     UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
     Consumer.beginDocumentSubStructure(StartOffset, EndOffset - StartOffset,
                                        Kind, UIdent(), UIdent(), 0, 0,
-                                       0, 0,
+                                       0, 0, 0, 0,
                                        StringRef(),
                                        StringRef(), StringRef(),
                                        StringRef(),
@@ -1324,121 +1359,39 @@ public:
   }
 };
 
+/// Walks the syntax model to populate a given SwiftSyntaxMap with the token
+/// ranges to highlight and pass document structure information to the given
+/// EditorConsumer.
 class SwiftEditorSyntaxWalker: public ide::SyntaxModelWalker {
+  /// The syntax map to populate
   SwiftSyntaxMap &SyntaxMap;
-  SwiftEditorLineRange EditedLineRange;
-  SwiftEditorCharRange &AffectedRange;
   SourceManager &SrcManager;
-  EditorConsumer &Consumer;
   unsigned BufferID;
   SwiftDocumentStructureWalker DocStructureWalker;
-  std::vector<EditorConsumerSyntaxMapEntry> ConsumerSyntaxMap;
+  /// The current token nesting level (e.g. for a field in a doc comment)
   unsigned NestingLevel = 0;
 public:
   SwiftEditorSyntaxWalker(SwiftSyntaxMap &SyntaxMap,
-                          SwiftEditorLineRange EditedLineRange,
-                          SwiftEditorCharRange &AffectedRange,
                           SourceManager &SrcManager, EditorConsumer &Consumer,
                           unsigned BufferID)
-    : SyntaxMap(SyntaxMap), EditedLineRange(EditedLineRange),
-      AffectedRange(AffectedRange), SrcManager(SrcManager), Consumer(Consumer),
-      BufferID(BufferID),
+    : SyntaxMap(SyntaxMap), SrcManager(SrcManager), BufferID(BufferID),
       DocStructureWalker(SrcManager, BufferID, Consumer) { }
 
   bool walkToNodePre(SyntaxNode Node) override {
     if (Node.Kind == SyntaxNodeKind::CommentMarker)
       return DocStructureWalker.walkToNodePre(Node);
-
     ++NestingLevel;
-    SourceLoc StartLoc = Node.Range.getStart();
-    auto StartLineAndColumn = SrcManager.getLineAndColumn(StartLoc);
-    auto EndLineAndColumn = SrcManager.getLineAndColumn(Node.Range.getEnd());
-    unsigned StartLine = StartLineAndColumn.first;
-    unsigned EndLine = EndLineAndColumn.second > 1 ? EndLineAndColumn.first
-                                                   : EndLineAndColumn.first - 1;
-    unsigned Offset = SrcManager.getByteDistance(
-                           SrcManager.getLocForBufferStart(BufferID), StartLoc);
-    // Note that the length can span multiple lines.
-    unsigned Length = Node.Range.getByteLength();
 
-    SwiftSyntaxToken Token(StartLineAndColumn.second, Length,
-                           Node.Kind);
-    if (EditedLineRange.isValid()) {
-      if (StartLine < EditedLineRange.startLine()) {
-        if (EndLine < EditedLineRange.startLine()) {
-          // We're entirely before the edited range, no update needed.
-          return true;
-        }
+    auto End = SrcManager.getLocOffsetInBuffer(Node.Range.getEnd(), BufferID),
+      Start = SrcManager.getLocOffsetInBuffer(Node.Range.getStart(), BufferID);
 
-        // This token starts before the edited range, but doesn't end before it,
-        // we need to adjust edited line range and clear the affected syntax map
-        // line range.
-        unsigned AdjLineCount = EditedLineRange.startLine() - StartLine;
-        EditedLineRange.setRange(StartLine, AdjLineCount
-                                            + EditedLineRange.lineCount());
-        SyntaxMap.clearLineRange(StartLine, AdjLineCount);
-
-        // Also adjust the affected char range accordingly.
-        unsigned AdjCharCount = AffectedRange.first - Offset;
-        AffectedRange.first -= AdjCharCount;
-        AffectedRange.second += AdjCharCount;
-      }
-      else if (Offset > AffectedRange.first + AffectedRange.second) {
-        // We're passed the affected range and already synced up, just return.
-        return true;
-      }
-      else if (StartLine > EditedLineRange.endLine()) {
-        // We're after the edited line range, let's test if we're synced up.
-        if (SyntaxMap.matchesFirstTokenOnLine(StartLine, Token)) {
-          // We're synced up, mark the affected range and return.
-          AffectedRange.second =
-                 Offset - (StartLineAndColumn.second - 1) - AffectedRange.first;
-          return true;
-        }
-
-        // We're not synced up, continue replacing syntax map data on this line.
-        SyntaxMap.clearLineRange(StartLine, 1);
-        EditedLineRange.extendToIncludeLine(StartLine);
-      }
-
-      if (EndLine > StartLine) {
-        // The token spans multiple lines, make sure to replace syntax map data
-        // for affected lines.
-        EditedLineRange.extendToIncludeLine(EndLine);
-
-        unsigned LineCount = EndLine - StartLine + 1;
-        SyntaxMap.clearLineRange(StartLine, LineCount);
-      }
-
-    }
-
-    // Add the syntax map token.
-    if (NestingLevel > 1)
-      SyntaxMap.mergeTokenForLine(StartLine, Token);
-    else
-      SyntaxMap.addTokenForLine(StartLine, Token);
-
-    // Add consumer entry.
-    unsigned ByteOffset = SrcManager.getLocOffsetInBuffer(Node.Range.getStart(),
-                                                          BufferID);
-    UIdent Kind = SwiftLangSupport::getUIDForSyntaxNodeKind(Node.Kind);
     if (NestingLevel > 1) {
-      assert(!ConsumerSyntaxMap.empty());
-      auto &Last = ConsumerSyntaxMap.back();
-      mergeSplitRanges(Last.Offset, Last.Length, ByteOffset, Length,
-                       [&](unsigned BeforeOff, unsigned BeforeLen,
-                           unsigned AfterOff, unsigned AfterLen) {
-        auto LastKind = Last.Kind;
-        ConsumerSyntaxMap.pop_back();
-        if (BeforeLen)
-          ConsumerSyntaxMap.emplace_back(BeforeOff, BeforeLen, LastKind);
-        ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
-        if (AfterLen)
-          ConsumerSyntaxMap.emplace_back(AfterOff, AfterLen, LastKind);
-      });
+      // We're nested inside the previously reported token - merge
+      SyntaxMap.mergeToken({Start, End - Start, Node.Kind});
+    } else {
+      // We're a top-level token, add it after the previous one
+      SyntaxMap.addToken({Start, End - Start, Node.Kind});
     }
-    else
-      ConsumerSyntaxMap.emplace_back(ByteOffset, Length, Kind);
 
     return true;
   }
@@ -1446,14 +1399,7 @@ public:
   bool walkToNodePost(SyntaxNode Node) override {
     if (Node.Kind == SyntaxNodeKind::CommentMarker)
       return DocStructureWalker.walkToNodePost(Node);
-
-    if (--NestingLevel == 0) {
-      // We've unwound to the top level, so inform the consumer and drain
-      // the consumer syntax map queue.
-      for (auto &Entry: ConsumerSyntaxMap)
-        Consumer.handleSyntaxMap(Entry.Offset, Entry.Length, Entry.Kind);
-      ConsumerSyntaxMap.clear();
-    }
+    --NestingLevel;
 
     return true;
   }
@@ -1468,675 +1414,8 @@ public:
 
 };
 
-typedef llvm::SmallString<64> StringBuilder;
-
-static SourceLoc getVarDeclInitEnd(VarDecl *VD) {
-  return VD->getBracesRange().isValid() ? VD->getBracesRange().End :
-           VD->getParentInitializer() &&
-           VD->getParentInitializer()->getEndLoc().isValid() ?
-             VD->getParentInitializer()->getEndLoc() :
-             SourceLoc();
-}
-
-class FormatContext
-{
-  SourceManager &SM;
-  std::vector<swift::ASTWalker::ParentTy>& Stack;
-  std::vector<swift::ASTWalker::ParentTy>::reverse_iterator Cursor;
-  swift::ASTWalker::ParentTy Start;
-  swift::ASTWalker::ParentTy End;
-  bool InDocCommentBlock;
-  bool InCommentLine;
-  SourceLoc SiblingLoc;
-
-public:
-  FormatContext(SourceManager &SM,
-                std::vector<swift::ASTWalker::ParentTy>& Stack,
-                swift::ASTWalker::ParentTy Start = swift::ASTWalker::ParentTy(),
-                swift::ASTWalker::ParentTy End = swift::ASTWalker::ParentTy(),
-                bool InDocCommentBlock = false,
-                bool InCommentLine = false,
-                SourceLoc SiblingLoc = SourceLoc())
-    :SM(SM), Stack(Stack), Cursor(Stack.rbegin()), Start(Start), End(End),
-     InDocCommentBlock(InDocCommentBlock), InCommentLine(InCommentLine),
-     SiblingLoc(SiblingLoc) { }
-
-  FormatContext parent() {
-    assert(Cursor != Stack.rend());
-    FormatContext Parent(*this);
-    ++Parent.Cursor;
-    return Parent;
-  }
-
-  bool IsInDocCommentBlock() {
-    return InDocCommentBlock;
-  }
-
-  bool IsInCommentLine() {
-    return InCommentLine;
-  }
-
-  void padToSiblingColumn(StringBuilder &Builder) {
-    assert(SiblingLoc.isValid() && "No sibling to align with.");
-    CharSourceRange Range(SM, Lexer::getLocForStartOfLine(SM, SiblingLoc),
-                          SiblingLoc);
-    for (auto C : Range.str()) {
-      Builder.append(1, C == '\t' ? C : ' ');
-    }
-  }
-
-  bool HasSibling() {
-    return SiblingLoc.isValid();
-  }
-
-  std::pair<unsigned, unsigned> lineAndColumn() {
-    if (Cursor == Stack.rend())
-      return std::make_pair(0, 0);
-
-    if (Stmt *S = Cursor->getAsStmt()) {
-      SourceLoc SL = S->getStartLoc();
-      return SM.getLineAndColumn(SL);
-    }
-    if (Decl *D = Cursor->getAsDecl()) {
-      SourceLoc SL = D->getStartLoc();
-
-      // FIXME: put the attributes into forward source order so we don't need
-      // to iterate through them.
-      for (auto *Attr : D->getAttrs()) {
-        SourceLoc AttrLoc = Attr->getRangeWithAt().Start;
-        if (AttrLoc.isValid() && SM.isBeforeInBuffer(AttrLoc, SL))
-            SL = AttrLoc;
-      }
-
-      return SM.getLineAndColumn(SL);
-    }
-    if (Expr *E = Cursor->getAsExpr()) {
-      SourceLoc SL = E->getStartLoc();
-      return SM.getLineAndColumn(SL);
-    }
-
-    return std::make_pair(0, 0);
-  }
-
-  template <class T>
-  bool isStmtContext() {
-    if (Cursor == Stack.rend())
-      return false;
-    Stmt *ContextStmt = Cursor->getAsStmt();
-    return ContextStmt && isa<T>(ContextStmt);
-  }
-
-  bool isBraceContext() {
-    return isStmtContext<BraceStmt>();
-  }
-
-  bool isImplicitBraceContext() {
-    // If we're directly at the top, it's implicit.
-    if (Cursor == Stack.rend())
-      return true;
-
-    if (!isBraceContext())
-      return false;
-    auto Parent = parent();
-    // If the parent is directly at the top, it's implicit.
-    if (Parent.Cursor == Stack.rend())
-      return true;
-
-    // If we're within a case body, it's implicit.
-    // For example:
-    // case ...:
-    //     case body is implicitly wrapped in a brace statement
-    if (Parent.isCaseContext())
-      return true;
-
-    return false;
-  }
-
-  bool isCaseContext() {
-    return isStmtContext<CaseStmt>();
-  }
-
-  bool isSwitchContext() {
-    return isStmtContext<SwitchStmt>();
-  }
-
-  std::pair<unsigned, unsigned> indentLineAndColumn() {
-    if (Cursor == Stack.rend())
-      return std::make_pair(0, 0);
-
-    // Get the line and indent position for this context.
-    auto LineAndColumn = lineAndColumn();
-    auto SavedCursor = Cursor;
-
-    // Walk up the context stack to find the topmost applicable context.
-    while (++Cursor != Stack.rend()) {
-      auto ParentLineAndColumn = lineAndColumn();
-
-      if (ParentLineAndColumn.second == 0)
-        break;
-
-      if (ParentLineAndColumn.first != LineAndColumn.first) {
-        // The start line is not the same, see if this is at the 'else' clause.
-        if (IfStmt *If = dyn_cast_or_null<IfStmt>(Cursor->getAsStmt())) {
-          SourceLoc ElseLoc = If->getElseLoc();
-          // If we're at 'else', take the indent of 'if' and continue.
-          if (ElseLoc.isValid() &&
-              LineAndColumn.first == SM.getLineAndColumn(ElseLoc).first) {
-            LineAndColumn = ParentLineAndColumn;
-            continue;
-          }
-          // If we are at conditions, take the indent of 'if' and continue.
-          for (auto Cond : If->getCond()) {
-            if (LineAndColumn.first == SM.getLineNumber(Cond.getEndLoc())) {
-              LineAndColumn = ParentLineAndColumn;
-              continue;
-            }
-          }
-        }
-
-        // No extra indentation level for getters without explicit names.
-        // e.g.
-        // public var someValue: Int {
-        //   return 0; <- No indentation added because of the getter.
-        // }
-        if (auto VD = dyn_cast_or_null<VarDecl>(Cursor->getAsDecl())) {
-          if (auto Getter = VD->getGetter()) {
-            if (Getter->getAccessorKeywordLoc().isInvalid()) {
-              LineAndColumn = ParentLineAndColumn;
-              continue;
-            }
-          }
-        }
-
-        // Align with Func start instead of with param decls.
-        if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Cursor->getAsDecl())) {
-          if (LineAndColumn.first <= SM.getLineNumber(FD->getSignatureSourceRange().End)) {
-            LineAndColumn = ParentLineAndColumn;
-            continue;
-          }
-        }
-
-        // Break out if the line is no longer the same.
-        break;
-      }
-
-      LineAndColumn.second = ParentLineAndColumn.second;
-    }
-
-    Cursor = SavedCursor;
-    return LineAndColumn;
-  }
-
-  bool shouldAddIndentForLine(unsigned Line) {
-    if (Cursor == Stack.rend())
-      return false;
-
-    // Handle switch / case, indent unless at a case label.
-    if (CaseStmt *Case = dyn_cast_or_null<CaseStmt>(Cursor->getAsStmt())) {
-      auto LabelItems = Case->getCaseLabelItems();
-      SourceLoc Loc;
-      if (!LabelItems.empty())
-        Loc = LabelItems.back().getPattern()->getLoc();
-      if (Loc.isValid())
-        return Line > SM.getLineAndColumn(Loc).first;
-      return true;
-    }
-    if (isSwitchContext()) {
-      // If we're at the start of a case label, don't add indent.
-      // For example:
-      // switch ... {
-      // case xyz: <-- No indent here, should be at same level as switch.
-      Stmt *AtStmtStart = Start.getAsStmt();
-      if (AtStmtStart && isa<CaseStmt>(AtStmtStart))
-        return false;
-
-      // If we're at the open brace of the switch, don't add an indent.
-      // For example:
-      // switch ...
-      // { <-- No indent here, open brace should be at same level as switch.
-      auto *S = cast<SwitchStmt>(Cursor->getAsStmt());
-      if (SM.getLineAndColumn(S->getLBraceLoc()).first == Line)
-        return false;
-      if(IsInCommentLine()) {
-        for (auto Case : S->getCases()) {
-          // switch ...
-          // {
-          // // case comment <-- No indent here.
-          // case 0:
-          if (SM.getLineAndColumn(Case->swift::Stmt::getStartLoc()).first == Line + 1)
-            return false;
-        }
-      }
-    }
-
-    // If we're within an implicit brace context, don't add indent.
-    if (isImplicitBraceContext())
-      return false;
-
-    // If we're at the open brace of a no-name getter, don't add an indent.
-    // For example:
-    //  public var someValue: Int
-    //  { <- We add no indentation here.
-    //    return 0
-    //  }
-    if (auto FD = dyn_cast_or_null<FuncDecl>(Start.getAsDecl())) {
-      if(FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
-        if(SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
-          return false;
-      }
-    }
-
-    // If we're at the beginning of a brace on a separate line in the context
-    // of anything other than BraceStmt, don't add an indent.
-    // For example:
-    // func foo()
-    // { <-- No indent here, open brace should be at same level as func.
-    Stmt *AtStmtStart = Start.getAsStmt();
-    if (AtStmtStart && isa<BraceStmt>(AtStmtStart) && !isBraceContext())
-      return false;
-
-    // If we're at the end of a brace on a separate line in the context
-    // of anything other than BraceStmt, don't add an indent.
-    // For example:
-    if (Stmt *AtStmtEnd = End.getAsStmt()) {
-      if (!isBraceContext()) {
-        // func foo() {
-        // } <-- No indent here, close brace should be at same level as func.
-        if (isa<BraceStmt>(AtStmtEnd))
-          return false;
-        // do {
-        // }
-        // catch {
-        // } <-- No indent here, close brace should be at same level as do.
-        // catch {
-        // }
-        if (isa<CatchStmt>(AtStmtEnd))
-          return false;
-      }
-    }
-
-    // If we're at the open brace of a NominalTypeDecl or ExtensionDecl,
-    // don't add an indent.
-    // For example:
-    // class Foo
-    // { <-- No indent here, open brace should be at same level as class.
-    auto *NTD = dyn_cast_or_null<NominalTypeDecl>(Cursor->getAsDecl());
-    if (NTD && SM.getLineAndColumn(NTD->getBraces().Start).first == Line)
-      return false;
-    auto *ETD = dyn_cast_or_null<ExtensionDecl>(Cursor->getAsDecl());
-    if (ETD && SM.getLineAndColumn(ETD->getBraces().Start).first == Line)
-      return false;
-
-    // If we are at the start of a trailing closure, do not add indentation.
-    // For example:
-    // foo(1)
-    // { <-- No indent here.
-    auto *TE = dyn_cast_or_null<TupleExpr>(Cursor->getAsExpr());
-    if (TE && TE->hasTrailingClosure() &&
-        SM.getLineNumber(TE->getElements().back()->getStartLoc()) == Line) {
-      return false;
-    }
-
-    // If we're in an IfStmt and at the 'else', don't add an indent.
-    IfStmt *If = dyn_cast_or_null<IfStmt>(Cursor->getAsStmt());
-    if (If && If->getElseLoc().isValid() &&
-        SM.getLineAndColumn(If->getElseLoc()).first == Line)
-      return false;
-
-    // If we're in an DoCatchStmt and at a 'catch', don't add an indent.
-    if (auto *DoCatchS = dyn_cast_or_null<DoCatchStmt>(Cursor->getAsStmt())) {
-      for (CatchStmt *CatchS : DoCatchS->getCatches()) {
-        SourceLoc Loc = CatchS->getCatchLoc();
-        if (Loc.isValid() && SM.getLineAndColumn(Loc).first == Line)
-          return false;
-      }
-    }
-
-    // If we're at the end of a closure, paren or tuple expr, and the context
-    // is a paren/tuple expr ending with that sub expression, and it ends on the
-    // same line, don't add an indent.
-    // For example:
-    // foo(x, {
-    // }) <-- No indent here, the paren expr for the call ends on the same line.
-    Expr *AtExprEnd = End.getAsExpr();
-    if (AtExprEnd && (isa<ClosureExpr>(AtExprEnd) ||
-                      isa<ParenExpr>(AtExprEnd) ||
-                      isa<TupleExpr>(AtExprEnd))) {
-
-      if (auto *Paren = dyn_cast_or_null<ParenExpr>(Cursor->getAsExpr())) {
-        auto *SubExpr = Paren->getSubExpr();
-        if (SubExpr && SubExpr == AtExprEnd &&
-            SM.getLineAndColumn(Paren->getEndLoc()).first == Line)
-          return false;
-      }
-      else if (auto *Tuple = dyn_cast_or_null<TupleExpr>(Cursor->getAsExpr())) {
-        auto SubExprs = Tuple->getElements();
-        if (!SubExprs.empty() && SubExprs.back() == AtExprEnd &&
-            SM.getLineAndColumn(Tuple->getEndLoc()).first == Line) {
-          return false;
-        }
-      } else if (auto *VD = dyn_cast_or_null<VarDecl>(Cursor->getAsDecl())) {
-        SourceLoc Loc = getVarDeclInitEnd(VD);
-        if (Loc.isValid() && SM.getLineNumber(Loc) == Line) {
-          return false;
-        }
-      }
-    }
-
-    // Indent another level from the outer context by default.
-    return true;
-  }
-};
-
-class FormatWalker: public ide::SourceEntityWalker {
-  typedef std::vector<Token>::iterator TokenIt;
-  class SiblingCollector {
-    SourceLoc FoundSibling;
-    SourceManager &SM;
-    std::vector<Token> &Tokens;
-    SourceLoc &TargetLoc;
-    TokenIt TI;
-
-    bool isImmediateAfterSeparator(SourceLoc End, tok Seperator) {
-      auto BeforeE = [&]() {
-        return TI != Tokens.end() &&
-               !SM.isBeforeInBuffer(End, TI->getLoc());
-      };
-      if (!BeforeE())
-        return false;
-      for (; BeforeE(); TI ++);
-      if (TI == Tokens.end() || TI->getKind() != Seperator)
-        return false;
-      auto SeparatorLoc = TI->getLoc();
-      TI ++;
-      if (TI == Tokens.end())
-        return false;
-      auto NextLoc = TI->getLoc();
-      return SM.isBeforeInBuffer(SeparatorLoc, TargetLoc) &&
-            !SM.isBeforeInBuffer(NextLoc, TargetLoc);
-    }
-
-  public:
-    SiblingCollector(SourceManager &SM, std::vector<Token> &Tokens,
-                     SourceLoc &TargetLoc) : SM(SM), Tokens(Tokens),
-                      TargetLoc(TargetLoc), TI(Tokens.begin()) {}
-    void collect(ASTNode Node) {
-      if (FoundSibling.isValid())
-        return;
-      SourceLoc PrevLoc;
-      auto FindAlignLoc = [&](SourceLoc Loc) {
-        if (PrevLoc.isValid() &&
-            SM.getLineNumber(PrevLoc) == SM.getLineNumber(Loc))
-          return PrevLoc;
-        return PrevLoc = Loc;
-      };
-
-      auto addPair = [&](SourceLoc EndLoc, SourceLoc AlignLoc, tok Separator) {
-        if (isImmediateAfterSeparator(EndLoc, Separator))
-          FoundSibling = AlignLoc;
-      };
-
-      if (auto AE = dyn_cast_or_null<ApplyExpr>(Node.dyn_cast<Expr *>())) {
-        collect(AE->getArg());
-        return;
-      }
-
-      if (auto PE = dyn_cast_or_null<ParenExpr>(Node.dyn_cast<Expr *>())) {
-        if (auto Sub = PE->getSubExpr()) {
-          addPair(Sub->getEndLoc(), FindAlignLoc(Sub->getStartLoc()),
-                  tok::comma);
-        }
-      }
-
-      // Tuple elements are siblings.
-      if (auto TE = dyn_cast_or_null<TupleExpr>(Node.dyn_cast<Expr *>())) {
-        // Trailing closures are not considered siblings to other args.
-        unsigned EndAdjust = TE->hasTrailingClosure() ? 1 : 0;
-        for (unsigned I = 0, N = TE->getNumElements() - EndAdjust; I < N; I ++) {
-          addPair(TE->getElement(I)->getEndLoc(),
-                  FindAlignLoc(TE->getElement(I)->getStartLoc()), tok::comma);
-        }
-      }
-
-      if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(Node.dyn_cast<Decl*>())) {
-
-        // Generic type params are siblings to align.
-        if (auto GPL = AFD->getGenericParams()) {
-          const auto Params = GPL->getParams();
-          for (unsigned I = 0, N = Params.size(); I < N; I ++) {
-            addPair(Params[I]->getEndLoc(), FindAlignLoc(Params[I]->getStartLoc()),
-                    tok::comma);
-          }
-        }
-
-        // Function parameters are siblings.
-        for (auto P : AFD->getBodyParamPatterns()) {
-          if (auto TU = dyn_cast<TuplePattern>(P)) {
-            for (unsigned I = 0, N = TU->getNumElements(); I < N; I ++) {
-              addPair(TU->getElement(I).getPattern()->getEndLoc(),
-                      FindAlignLoc(TU->getElement(I).getLabelLoc()), tok::comma);
-            }
-          }
-        }
-      }
-
-      // Array/Dictionary elements are siblings to align with each other.
-      if (auto AE = dyn_cast_or_null<CollectionExpr>(Node.dyn_cast<Expr *>())) {
-        for (unsigned I = 0, N = AE->getNumElements(); I < N;  I ++) {
-          addPair(AE->getElement(I)->getEndLoc(),
-                  FindAlignLoc(AE->getElement(I)->getStartLoc()), tok::comma);
-        }
-      }
-    };
-
-    SourceLoc findSibling() {
-      return FoundSibling;
-    }
-  };
-
-  SourceFile &SF;
-  SourceManager &SM;
-  SourceLoc TargetLocation;
-  std::vector<swift::ASTWalker::ParentTy> Stack;
-  swift::ASTWalker::ParentTy AtStart;
-  swift::ASTWalker::ParentTy AtEnd;
-  bool InDocCommentBlock = false;
-  bool InCommentLine = false;
-  std::vector<Token> Tokens;
-  LangOptions Options;
-  TokenIt CurrentTokIt;
-  unsigned TargetLine;
-  SiblingCollector SCollector;
-
-  /// Sometimes, target is a part of "parent", for instance, "#else" is a part
-  /// of an ifconfigstmt, so that ifconfigstmt is not really the parent of "#else".
-  bool isTargetPartOf(swift::ASTWalker::ParentTy Parent) {
-    if(auto Conf = dyn_cast_or_null<IfConfigStmt>(Parent.getAsStmt())) {
-      for (auto Clause : Conf->getClauses()) {
-        if (Clause.Loc == TargetLocation)
-          return true;
-      }
-    } else if (auto Call = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
-      if(auto Clo = dyn_cast<ClosureExpr>(Call->getFn())) {
-        if (Clo->getBody()->getLBraceLoc() == TargetLocation ||
-            Clo->getBody()->getRBraceLoc() == TargetLocation) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  template <class T>
-  bool HandlePre(T* Node, SourceLoc Start, SourceLoc End) {
-    scanForComments(Start);
-    SCollector.collect(Node);
-
-    if (SM.isBeforeInBuffer(TargetLocation, Start))
-      return false; // Target is before start of Node, skip it.
-    if (SM.isBeforeInBuffer(End, TargetLocation))
-      return false; // Target is after end of Node, skip it.
-    if (TargetLocation == Start) {
-      // Target is right at the start of Node, mark it.
-      AtStart = Node;
-      return false;
-    }
-    if (TargetLocation == End) {
-      // Target is right at the end of Node, mark it.
-      AtEnd = Node;
-      return false;
-    }
-
-    // Target is within Node and Node is really the parent of Target, take it.
-    if (!isTargetPartOf(Node))
-      Stack.push_back(Node);
-    return true;
-  }
-
-  void scanForComments(SourceLoc Loc) {
-    if (InDocCommentBlock || InCommentLine)
-      return;
-    for (auto InValid = Loc.isInvalid(); CurrentTokIt != Tokens.end() &&
-         (InValid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
-         CurrentTokIt ++) {
-      if (CurrentTokIt->getKind() == tok::comment) {
-        auto StartLine = SM.getLineNumber(CurrentTokIt->getRange().getStart());
-        auto EndLine = SM.getLineNumber(CurrentTokIt->getRange().getEnd());
-        auto TokenStr = CurrentTokIt->getRange().str();
-        InDocCommentBlock |= TargetLine > StartLine && TargetLine <= EndLine &&
-                             TokenStr.startswith("/*");
-        InCommentLine |= StartLine == TargetLine && TokenStr.startswith("//");
-      }
-    }
-  }
-
-  template <typename T>
-  bool HandlePost(T* Node) {
-    if (SM.isBeforeInBuffer(TargetLocation, Node->getStartLoc()))
-      return false; // Target is before start of Node, terminate walking.
-
-    return true;
-  }
-
-public:
-  explicit FormatWalker(SourceFile &SF, SourceManager &SM)
-    :SF(SF), SM(SM),
-     Tokens(tokenize(Options, SM, SF.getBufferID().getValue())),
-     CurrentTokIt(Tokens.begin()),
-     SCollector(SM, Tokens, TargetLocation) {}
-
-  FormatContext walkToLocation(SourceLoc Loc) {
-    Stack.clear();
-    TargetLocation = Loc;
-    TargetLine = SM.getLineNumber(TargetLocation);
-    AtStart = AtEnd = swift::ASTWalker::ParentTy();
-    walk(SF);
-    scanForComments(SourceLoc());
-    return FormatContext(SM, Stack, AtStart, AtEnd, InDocCommentBlock,
-                         InCommentLine, SCollector.findSibling());
-  }
-
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    SourceLoc Start = D->getStartLoc();
-    SourceLoc End = D->getEndLoc();
-
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
-      // We'll treat properties with accessors as spanning the braces as well.
-      // This will ensure we can do indentation inside the braces.
-      auto Loc = getVarDeclInitEnd(VD);
-      End = Loc.isValid() ? Loc : End;
-    }
-
-    return HandlePre(D, Start, End);
-  }
-
-  bool walkToDeclPost(Decl *D) override {
-    return HandlePost(D);
-  }
-
-  bool walkToStmtPre(Stmt *S) override {
-    return HandlePre(S, S->getStartLoc(), S->getEndLoc());
-  }
-
-  bool walkToStmtPost(Stmt *S) override {
-    return HandlePost(S);
-  }
-
-  bool walkToExprPre(Expr *E) override {
-    return HandlePre(E, E->getStartLoc(), E->getEndLoc());
-  }
-
-  bool walkToExprPost(Expr *E) override {
-    return HandlePost(E);
-  }
-
-  bool shouldWalkInactiveConfigRegion() override {
-    return true;
-  }
-};
-
-class CodeFormatter {
-  SwiftEditorDocument &Doc;
-  EditorConsumer &Consumer;
-public:
-  CodeFormatter(SwiftEditorDocument &Doc, EditorConsumer& Consumer)
-    :Doc(Doc), Consumer(Consumer) { }
-
-  SwiftEditorLineRange indent(unsigned LineIndex, FormatContext &FC) {
-    auto &FmtOptions = Doc.getFormatOptions();
-
-    // If having sibling locs to align with, respect siblings.
-    if (FC.HasSibling()) {
-      StringRef Line = Doc.getTrimmedTextForLine(LineIndex);
-      StringBuilder Builder;
-      FC.padToSiblingColumn(Builder);
-      Builder.append(Line);
-      Consumer.recordFormattedText(Builder.str().str());
-      return SwiftEditorLineRange(LineIndex, 1);
-    }
-
-    // Take the current indent position of the outer context, then add another
-    // indent level if expected.
-    auto LineAndColumn = FC.indentLineAndColumn();
-    size_t ExpandedIndent = Doc.getExpandedIndentForLine(LineAndColumn.first);
-    auto AddIndentFunc = [&] () {
-      auto Width = FmtOptions.UseTabs ? FmtOptions.TabWidth
-                                      : FmtOptions.IndentWidth;
-      // Increment indent.
-      ExpandedIndent += Width;
-      // Normalize indent to align on proper column indent width.
-      ExpandedIndent -= ExpandedIndent % Width;
-    };
-
-    if (LineAndColumn.second > 0 && FC.shouldAddIndentForLine(LineIndex))
-      AddIndentFunc();
-    if (FC.IsInDocCommentBlock()) {
-
-      // Inside doc comment block, the indent is one space, e.g.
-      // /**
-      //  * <---Indent to align with the first star.
-      //  */
-      ExpandedIndent += 1;
-    }
-
-    // Reformat the specified line with the calculated indent.
-    StringRef Line = Doc.getTrimmedTextForLine(LineIndex);
-    std::string IndentedLine;
-    if (FmtOptions.UseTabs)
-      IndentedLine.assign(ExpandedIndent / FmtOptions.TabWidth, '\t');
-    else
-      IndentedLine.assign(ExpandedIndent, ' ');
-    IndentedLine.append(Line);
-
-    Consumer.recordFormattedText(IndentedLine);
-
-    // Return affected line range, which can later be more than one line.
-    return SwiftEditorLineRange(LineIndex, 1);
-  }
-
-};
-
 class PlaceholderExpansionScanner {
+
 public:
   struct Param {
     CharSourceRange NameRange;
@@ -2146,9 +1425,14 @@ public:
   };
 
 private:
+
+  struct ClosureInfo {
+    std::vector<Param> Params;
+    CharSourceRange ReturnTypeRange;
+  };
+
   SourceManager &SM;
-  std::vector<Param> Params;
-  CharSourceRange ReturnTypeRange;
+  ClosureInfo TargetClosureInfo;
   EditorPlaceholderExpr *PHE = nullptr;
 
   class PlaceholderFinder: public ASTWalker {
@@ -2170,61 +1454,79 @@ private:
     }
   };
 
+  class ClosureTypeWalker: public ASTWalker {
+    SourceManager &SM;
+    ClosureInfo &Info;
+  public:
+    bool FoundFunctionTypeRepr = false;
+    explicit ClosureTypeWalker(SourceManager &SM, ClosureInfo &Info) : SM(SM),
+      Info(Info) { }
+
+    bool walkToTypeReprPre(TypeRepr *T) override {
+      if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
+        FoundFunctionTypeRepr = true;
+        if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
+          for (auto &ArgElt : TTR->getElements()) {
+            CharSourceRange NR;
+            CharSourceRange TR;
+            auto name = ArgElt.Name;
+            if (!name.empty()) {
+              NR = CharSourceRange(ArgElt.NameLoc,
+                                   name.getLength());
+            }
+            SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
+                                                    ArgElt.Type->getEndLoc());
+            TR = CharSourceRange(SM, ArgElt.Type->getStartLoc(), SRE);
+            Info.Params.emplace_back(NR, TR);
+          }
+        } else if (FTR->getArgsTypeRepr()) {
+          CharSourceRange TR;
+          TR = CharSourceRange(SM, FTR->getArgsTypeRepr()->getStartLoc(),
+                               Lexer::getLocForEndOfToken(SM,
+                                        FTR->getArgsTypeRepr()->getEndLoc()));
+          Info.Params.emplace_back(CharSourceRange(), TR);
+        }
+        if (auto *RTR = FTR->getResultTypeRepr()) {
+          SourceLoc SRE = Lexer::getLocForEndOfToken(SM, RTR->getEndLoc());
+          Info.ReturnTypeRange = CharSourceRange(SM, RTR->getStartLoc(), SRE);
+        }
+      }
+      return !FoundFunctionTypeRepr;
+    }
+
+    bool walkToTypeReprPost(TypeRepr *T) override {
+      // If we just visited the FunctionTypeRepr, end traversal.
+      return !FoundFunctionTypeRepr;
+    }
+
+  };
+
+  bool containClosure(Expr *E) {
+    if (E->getStartLoc().isInvalid())
+      return false;
+    EditorPlaceholderExpr *Found = nullptr;
+    ClosureInfo Info;
+    ClosureTypeWalker ClosureWalker(SM, Info);
+    PlaceholderFinder Finder(E->getStartLoc(), Found);
+    E->walk(Finder);
+    if (Found) {
+      if (auto TR = Found->getTypeLoc().getTypeRepr()) {
+        TR->walk(ClosureWalker);
+        return ClosureWalker.FoundFunctionTypeRepr;
+      }
+    }
+    E->walk(ClosureWalker);
+    return ClosureWalker.FoundFunctionTypeRepr;
+  }
+
   bool scanClosureType(SourceFile &SF, SourceLoc PlaceholderLoc) {
-    Params.clear();
-    ReturnTypeRange = CharSourceRange();
+    TargetClosureInfo.Params.clear();
+    TargetClosureInfo.ReturnTypeRange = CharSourceRange();
     PlaceholderFinder Finder(PlaceholderLoc, PHE);
     SF.walk(Finder);
     if (!PHE || !PHE->getTypeForExpansion())
       return false;
-
-    class ClosureTypeWalker: public ASTWalker {
-    public:
-      PlaceholderExpansionScanner &S;
-      bool FoundFunctionTypeRepr = false;
-      explicit ClosureTypeWalker(PlaceholderExpansionScanner &S)
-        :S(S) { }
-
-      bool walkToTypeReprPre(TypeRepr *T) override {
-        if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
-          FoundFunctionTypeRepr = true;
-          if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
-            for (auto *ArgTR : TTR->getElements()) {
-              CharSourceRange NR;
-              CharSourceRange TR;
-              auto *NTR = dyn_cast<NamedTypeRepr>(ArgTR);
-              if (NTR && NTR->hasName()) {
-                NR = CharSourceRange(NTR->getNameLoc(),
-                                     NTR->getName().getLength());
-                ArgTR = NTR->getTypeRepr();
-              }
-              SourceLoc SRE = Lexer::getLocForEndOfToken(S.SM,
-                                                         ArgTR->getEndLoc());
-              TR = CharSourceRange(S.SM, ArgTR->getStartLoc(), SRE);
-              S.Params.emplace_back(NR, TR);
-            }
-          } else if (FTR->getArgsTypeRepr()) {
-            CharSourceRange TR;
-            TR = CharSourceRange(S.SM, FTR->getArgsTypeRepr()->getStartLoc(),
-                                 Lexer::getLocForEndOfToken(S.SM,
-                                   FTR->getArgsTypeRepr()->getEndLoc()));
-            S.Params.emplace_back(CharSourceRange(), TR);
-          }
-          if (auto *RTR = FTR->getResultTypeRepr()) {
-            SourceLoc SRE = Lexer::getLocForEndOfToken(S.SM, RTR->getEndLoc());
-            S.ReturnTypeRange = CharSourceRange(S.SM, RTR->getStartLoc(), SRE);
-          }
-        }
-        return !FoundFunctionTypeRepr;
-      }
-
-      bool walkToTypeReprPost(TypeRepr *T) override {
-        // If we just visited the FunctionTypeRepr, end traversal.
-        return !FoundFunctionTypeRepr;
-      }
-
-    } PW(*this);
-
+    ClosureTypeWalker PW(SM, TargetClosureInfo);
     PHE->getTypeForExpansion()->walk(PW);
     return PW.FoundFunctionTypeRepr;
   }
@@ -2236,7 +1538,7 @@ private:
   /// closure should not be applied to the inner call.
   std::pair<CallExpr *, bool> enclosingCallExpr(SourceFile &SF, SourceLoc SL) {
 
-    class CallExprFinder: public ide::SourceEntityWalker {
+    class CallExprFinder : public SourceEntityWalker {
     public:
       const SourceManager &SM;
       SourceLoc TargetLoc;
@@ -2269,8 +1571,13 @@ private:
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if(!EnclosingCall && !isa<BraceStmt>(S))
-            OuterStmt = S;
+          if (!EnclosingCall) {
+            if (isa<BraceStmt>(S))
+              // In case OuterStmt is already set, we should clear it to nullptr.
+              OuterStmt = nullptr;
+            else
+              OuterStmt = S;
+          }
         }
         return true;
       }
@@ -2296,6 +1603,22 @@ private:
       return std::make_pair(CE, false);
 
     return std::make_pair(CE, true);
+  }
+
+  bool shouldUseTrailingClosureInTuple(TupleExpr *TE,
+                                       SourceLoc PlaceHolderStartLoc) {
+    if (!TE->getElements().empty()) {
+      for (unsigned I = 0, N = TE->getNumElements(); I < N; ++ I) {
+        bool IsLast = I == N - 1;
+        Expr *E = TE->getElement(I);
+        if (IsLast) {
+          return E->getStartLoc() == PlaceHolderStartLoc;
+        } else if (containClosure(E)) {
+          return false;
+        }
+      }
+    }
+    return false;
   }
 
 public:
@@ -2329,24 +1652,23 @@ public:
       if (isa<ParenExpr>(Args)) {
         UseTrailingClosure = true;
       } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        if (!TE->getElements().empty())
-          UseTrailingClosure =
-            TE->getElements().back()->getStartLoc() == PlaceholderStartLoc;
+        UseTrailingClosure = shouldUseTrailingClosureInTuple(TE,
+                                                          PlaceholderStartLoc);
       }
     }
 
-    Callback(Args, UseTrailingClosure, Params, ReturnTypeRange);
+    Callback(Args, UseTrailingClosure, TargetClosureInfo.Params,
+             TargetClosureInfo.ReturnTypeRange);
     return true;
   }
 
 };
 
-
 } // anonymous namespace
 
 SwiftEditorDocument::SwiftEditorDocument(StringRef FilePath,
-    SwiftLangSupport &LangSupport)
-  :Impl(*new Implementation(FilePath, LangSupport)) { }
+    SwiftLangSupport &LangSupport, CodeFormatOptions Options)
+  :Impl(*new Implementation(FilePath, LangSupport, Options)) { }
 
 SwiftEditorDocument::~SwiftEditorDocument()
 {
@@ -2358,11 +1680,14 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
+  Impl.Edited = false;
   Impl.EditableBuffer =
       new EditableTextBuffer(Impl.FilePath, Buf->getBuffer());
-  Impl.SyntaxMap.reset();
-  Impl.EditedLineRange.setRange(0,0);
-  Impl.AffectedRange = std::make_pair(0, Buf->getBufferSize());
+
+  // Reset the syntax map data and affected range
+  Impl.SyntaxMap.Tokens.clear();
+  Impl.AffectedRange = {0, static_cast<unsigned>(Buf->getBufferSize())};
+
   Impl.SemanticInfo =
       new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.LangSupport);
   Impl.SemanticInfo->setCompilerArgs(Args);
@@ -2370,12 +1695,15 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 }
 
 ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
-    unsigned int Offset, unsigned int Length, llvm::MemoryBuffer *Buf,
+    unsigned Offset, unsigned Length, llvm::MemoryBuffer *Buf,
     bool ProvideSemanticInfo) {
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
+  Impl.Edited = true;
   llvm::StringRef Str = Buf->getBuffer();
+
+  // Update the buffer itself
   ImmutableTextSnapshotRef Snapshot =
       Impl.EditableBuffer->replace(Offset, Length, Str);
 
@@ -2384,60 +1712,25 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     if (Length != 0 || Buf->getBufferSize() != 0) {
       updateSemaInfo();
 
-      if (auto Invok = Impl.SemanticInfo->getInvocation()) {
-        // Update semantic info for open editor documents of the same module.
-        // FIXME: Detect edits that don't affect other files, e.g. whitespace,
-        // comments, inside a function body, etc.
-        CompilerInvocation CI;
-        Invok->applyTo(CI);
-        auto &EditorDocs = Impl.LangSupport.getEditorDocuments();
-        for (auto &Input : CI.getInputFilenames()) {
-          if (auto EditorDoc = EditorDocs.findByPath(Input)) {
-            if (EditorDoc.get() != this)
-              EditorDoc->updateSemaInfo();
-          }
-        }
-      }
+      // FIXME: we should also update any "interesting" ASTs that depend on this
+      // document here, e.g. any ASTs for files visible in an editor. However,
+      // because our API conflates this with any file with unsaved changes we do
+      // not update all open documents, since there could be too many of them.
     }
   }
 
-  SourceManager &SrcManager = Impl.SyntaxInfo->getSourceManager();
-  unsigned BufID = Impl.SyntaxInfo->getBufferID();
-  SourceLoc StartLoc = SrcManager.getLocForBufferStart(BufID).getAdvancedLoc(
-                                                                        Offset);
-  unsigned StartLine = SrcManager.getLineAndColumn(StartLoc).first;
-  unsigned EndLine = SrcManager.getLineAndColumn(
-                                         StartLoc.getAdvancedLoc(Length)).first;
-
-  // Delete all syntax map data from start line through end line.
-  unsigned OldLineCount = EndLine - StartLine + 1;
-  Impl.SyntaxMap.removeLineRange(StartLine, OldLineCount);
-
-  // Insert empty syntax map data for replaced lines.
-  unsigned NewLineCount = Str.count('\n') + 1;
-  Impl.SyntaxMap.insertLineRange(StartLine, NewLineCount);
-
-  // Update the edited line range.
-  Impl.EditedLineRange.setRange(StartLine, NewLineCount);
-
-  ImmutableTextBufferRef ImmBuf = Snapshot->getBuffer();
-
-  // The affected range starts from the previous newline.
-  if (Offset > 0) {
-    auto AffectedRangeOffset = ImmBuf->getText().rfind('\n', Offset);
-    Impl.AffectedRange.first =
-      AffectedRangeOffset != StringRef::npos ? AffectedRangeOffset + 1 : 0;
-  }
-  else
-    Impl.AffectedRange.first = 0;
-
-  Impl.AffectedRange.second = ImmBuf->getText().size() - Impl.AffectedRange.first;
+  // Update the old syntax map offsets to account for the replaced range.
+  // Also set the initial AffectedRange to cover any tokens that
+  // the replaced range intersected. This allows for clients that split
+  // multi-line tokens at line boundaries, and ensure all parts of these tokens
+  // will be cleared.
+  Impl.AffectedRange = Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
 
   return Snapshot;
 }
 
 void SwiftEditorDocument::updateSemaInfo() {
-  if (auto SemaInfo = Impl.SemanticInfo) {
+  if (Impl.SemanticInfo) {
     Impl.SemanticInfo->processLatestSnapshotAsync(Impl.EditableBuffer);
   }
 }
@@ -2484,17 +1777,34 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
 
-  SwiftEditorSyntaxWalker SyntaxWalker(Impl.SyntaxMap,
-                                       Impl.EditedLineRange,
-                                       Impl.AffectedRange,
+  SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
+
+  SwiftEditorSyntaxWalker SyntaxWalker(NewMap,
                                        Impl.SyntaxInfo->getSourceManager(),
                                        Consumer,
                                        Impl.SyntaxInfo->getBufferID());
-
   ModelContext.walk(SyntaxWalker);
 
-  Consumer.recordAffectedRange(Impl.AffectedRange.first,
-                               Impl.AffectedRange.second);
+  bool SawChanges = true;
+  if (Impl.Edited) {
+    // We're ansering an edit request. Report all highlighted token ranges not
+    // in the previous syntax map to the Consumer and extend the AffectedRange
+    // to contain all added/removed token ranges.
+    SawChanges = NewMap.forEachChanged(Impl.SyntaxMap, Impl.AffectedRange,
+                                       Consumer);
+  } else {
+    // The is an open/initialise. Report all highlighted token ranges to the
+    // Consumer.
+    NewMap.forEach(Consumer);
+  }
+  Impl.SyntaxMap = std::move(NewMap);
+
+  // Recording an affected length of 0 still results in the client updating its
+  // copy of the syntax map (by clearning all tokens on the line of the affected
+  // offset). We need to not record it at all to signal a no-op.
+  if (SawChanges)
+    Consumer.recordAffectedRange(Impl.AffectedRange->Offset,
+                                 Impl.AffectedRange->length());
 }
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
@@ -2507,10 +1817,7 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
   }
 
   std::vector<SwiftSemanticToken> SemaToks;
-  std::vector<DiagnosticEntryInfo> SemaDiags;
-
-  // FIXME: Parser diagnostics should be filtered out of the semantic ones,
-  // Then just merge the semantic ones with the current parse ones.
+  Optional<std::vector<DiagnosticEntryInfo>> SemaDiags;
   Impl.SemanticInfo->readSemanticInfo(Snapshot, SemaToks, SemaDiags,
                                       Impl.ParserDiagnostics);
 
@@ -2518,7 +1825,7 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
     unsigned Offset = SemaTok.ByteOffset;
     unsigned Length = SemaTok.Length;
     UIdent Kind = SemaTok.getUIdentForKind();
-    bool IsSystem = SemaTok.IsSystem;
+    bool IsSystem = SemaTok.getIsSystem();
     if (Kind.isValid())
       if (!Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem))
         break;
@@ -2527,16 +1834,17 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
   static UIdent SemaDiagStage("source.diagnostic.stage.swift.sema");
   static UIdent ParseDiagStage("source.diagnostic.stage.swift.parse");
 
-  if (!SemaDiags.empty() || !SemaToks.empty()) {
+  // If there's no value returned for diagnostics it means they are out-of-date
+  // (based on a different snapshot).
+  if (SemaDiags.hasValue()) {
     Consumer.setDiagnosticStage(SemaDiagStage);
+    for (auto &Diag : SemaDiags.getValue())
+      Consumer.handleDiagnostic(Diag, SemaDiagStage);
   } else {
     Consumer.setDiagnosticStage(ParseDiagStage);
+    for (auto &Diag : Impl.ParserDiagnostics)
+      Consumer.handleDiagnostic(Diag, ParseDiagStage);
   }
-
-  for (auto &Diag : Impl.ParserDiagnostics)
-    Consumer.handleDiagnostic(Diag, ParseDiagStage);
-  for (auto &Diag : SemaDiags)
-    Consumer.handleDiagnostic(Diag, SemaDiagStage);
 }
 
 void SwiftEditorDocument::removeCachedAST() {
@@ -2553,8 +1861,7 @@ void SwiftEditorDocument::applyFormatOptions(OptionsDictionary &FmtOptions) {
   FmtOptions.valueForOption(KeyTabWidth, Impl.FormatOptions.TabWidth);
 }
 
-const
-SwiftEditorDocument::CodeFormatOptions &SwiftEditorDocument::getFormatOptions() {
+const CodeFormatOptions &SwiftEditorDocument::getFormatOptions() {
   return Impl.FormatOptions;
 }
 
@@ -2584,14 +1891,21 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
     TracedOp.start(trace::OperationKind::FormatText, SwiftArgs, OpArgs);
   }
 
-  FormatWalker walker(SF, SM);
-  size_t Offset = getTrimmedLineOffset(Line);
-  SourceLoc Loc = SM.getLocForBufferStart(BufID).getAdvancedLoc(Offset);
-  FormatContext FC = walker.walkToLocation(Loc);
-  CodeFormatter CF(*this, Consumer);
-  SwiftEditorLineRange LineRange = CF.indent(Line, FC);
+  LineRange inputRange = LineRange(Line, Length);
+  CodeFormatOptions Options = getFormatOptions();
+  auto indented = reformat(inputRange, Options, SM, SF);
 
+  LineRange LineRange = indented.first;
+  StringRef ModifiedText = indented.second;
+  Consumer.recordFormattedText(ModifiedText);
   Consumer.recordAffectedLineRange(LineRange.startLine(), LineRange.lineCount());
+}
+
+bool isReturningVoid(SourceManager &SM, CharSourceRange Range) {
+  if (Range.isInvalid())
+    return false;
+  StringRef Text = SM.extractText(Range);
+  return "()" == Text || "Void" == Text;
 }
 
 void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
@@ -2656,7 +1970,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
               // For example:
               // foo.bar(a, <#closure#>) turns into foo.bar(a) <#closure#>.
 
-              // If the preceeding token in the call is the leading parameter
+              // If the preceding token in the call is the leading parameter
               // separator, we'll expand replacement to cover that.
               assert(Elems.size() > 1);
               SourceLoc BeforeLoc = Lexer::getLocForEndOfToken(SM,
@@ -2672,8 +1986,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
 
         OS << "{ ";
 
-        bool ReturningVoid = ClosureReturnTypeRange.isValid() &&
-                             "Void" == SM.extractText(ClosureReturnTypeRange);
+        bool ReturningVoid = isReturningVoid(SM, ClosureReturnTypeRange);
 
         bool HasSignature = !ClosureParams.empty() ||
                             (ClosureReturnTypeRange.isValid() && !ReturningVoid);
@@ -2712,7 +2025,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         }
         if (HasSignature)
           OS << "in";
-        OS << "\n<#code#>\n";
+        OS << "\n" << getCodePlaceholder() << "\n";
         OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);
@@ -2732,67 +2045,11 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
     });
 }
 
-size_t SwiftEditorDocument::getLineOffset(unsigned LineIndex) {
-  StringRef Text = Impl.EditableBuffer->getBuffer()->getText();
-  // FIXME: We should have a cached line map in EditableTextBuffer, for now
-  // we just do the slow naive thing here.
-  size_t LineOffset = 0;
-  unsigned CurrentLine = 0;
-  while (LineOffset < Text.size() && ++CurrentLine < LineIndex) {
-    LineOffset = Text.find_first_of("\r\n", LineOffset);
-    if (LineOffset != std::string::npos) {
-      ++LineOffset;
-      if (LineOffset < Text.size() &&
-          Text[LineOffset - 1] == '\r' && Text[LineOffset] == '\n')
-        ++LineOffset;
-    }
-
-  }
-  if (LineOffset == std::string::npos)
-    LineOffset = 0;
-  return LineOffset;
-}
-
-size_t SwiftEditorDocument::getTrimmedLineOffset(unsigned LineIndex) {
-  size_t LineOffset = getLineOffset(LineIndex);
-
-  // Skip leading whitespace.
-  StringRef Text = Impl.EditableBuffer->getBuffer()->getText();
-  size_t FirstNonWSOnLine = Text.find_first_not_of(" \t\v\f", LineOffset);
-  if (FirstNonWSOnLine != std::string::npos)
-    LineOffset = FirstNonWSOnLine;
-  
-  return LineOffset;
-}
-
-size_t SwiftEditorDocument::getExpandedIndentForLine(unsigned LineIndex) {
-  size_t LineOffset = getLineOffset(LineIndex);
-
-  // Tab-expand all leading whitespace
-  StringRef Text = Impl.EditableBuffer->getBuffer()->getText();
-  size_t FirstNonWSOnLine = Text.find_first_not_of(" \t\v\f", LineOffset);
-  size_t Indent = 0;
-  while (LineOffset < Text.size() && LineOffset < FirstNonWSOnLine) {
-    if (Text[LineOffset++] == '\t')
-      Indent += Impl.FormatOptions.TabWidth;
-    else
-      Indent += 1;
-  }
-  return Indent;
-}
-
-StringRef SwiftEditorDocument::getTrimmedTextForLine(unsigned LineIndex) {
-  StringRef Text = Impl.EditableBuffer->getBuffer()->getText();
-  size_t LineOffset = getTrimmedLineOffset(LineIndex);
-  size_t LineEnd = Text.find_first_of("\r\n", LineOffset);
-  return Text.slice(LineOffset, LineEnd);
-}
-
 ImmutableTextSnapshotRef SwiftEditorDocument::getLatestSnapshot() const {
   return Impl.EditableBuffer->getSnapshot();
 }
 
-void SwiftEditorDocument::reportDocumentStructure(swift::SourceFile &SrcFile,
+void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
                                                   EditorConsumer &Consumer) {
   ide::SyntaxModelContext ModelContext(SrcFile);
   SwiftDocumentStructureWalker Walker(SrcFile.getASTContext().SourceMgr,
@@ -2801,9 +2058,9 @@ void SwiftEditorDocument::reportDocumentStructure(swift::SourceFile &SrcFile,
   ModelContext.walk(Walker);
 }
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorOpen
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   bool EnableSyntaxMap,
@@ -2819,10 +2076,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
     EditorDoc->parse(Snapshot, *this);
     if (EditorDocuments.getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
-      // if we get OPEN request while the prevous document is not closed.
+      // if we get OPEN request while the previous document is not closed.
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);
       Snapshot = nullptr;
     }
+    auto numOpen = ++Stats.numOpenDocs;
+    Stats.maxOpenDocs.updateMax(numOpen);
   }
 
   if (!Snapshot) {
@@ -2833,29 +2092,33 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
   if (Consumer.needsSemanticInfo()) {
     EditorDoc->updateSemaInfo();
   }
-  
+
   EditorDoc->readSyntaxInfo(Consumer);
   EditorDoc->readSemanticInfo(Snapshot, Consumer);
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorClose
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
   auto Removed = EditorDocuments.remove(Name);
-  if (!Removed)
+  if (Removed) {
+    --Stats.numOpenDocs;
+  } else {
     IFaceGenContexts.remove(Name);
+  }
+
   if (Removed && RemoveCache)
     Removed->removeCachedAST();
   // FIXME: Report error if Name did not apply to anything ?
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorReplaceText
-//============================================================================//
+//===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                          unsigned Offset, unsigned Length,
@@ -2881,9 +2144,9 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
 }
 
 
-//============================================================================//
+//===----------------------------------------------------------------------===//
 // EditorFormatText
-//============================================================================//
+//===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorApplyFormatOptions(StringRef Name,
                                                 OptionsDictionary &FmtOptions) {
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
@@ -2899,7 +2162,7 @@ void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
     Consumer.handleRequestError("No associated Editor Document");
     return;
   }
-  
+
   EditorDoc->formatText(Line, Length, Consumer);
 }
 
@@ -2908,9 +2171,20 @@ void SwiftLangSupport::editorExtractTextFromComment(StringRef Source,
   Consumer.handleSourceText(extractPlainTextFromComment(Source));
 }
 
-//============================================================================//
+void SwiftLangSupport::editorConvertMarkupToXML(StringRef Source,
+                                                EditorConsumer &Consumer) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  if (convertMarkupToXML(Source, OS)) {
+    Consumer.handleRequestError("Conversion failed.");
+    return;
+  }
+  Consumer.handleSourceText(Result);
+}
+
+//===----------------------------------------------------------------------===//
 // EditorExpandPlaceholder
-//============================================================================//
+//===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
                                                unsigned Length,
                                                EditorConsumer &Consumer) {

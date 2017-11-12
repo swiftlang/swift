@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_switch %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_switch %s | %FileCheck %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_switch.f1
-func f1(x : Int32) {
+func f1(_ x : Int32) {
   switch (x) {
   case 1: // CHECK: [[@LINE]]:3 -> [[@LINE+1]]:10 : 2
     break
@@ -24,7 +24,7 @@ enum Algebraic {
 func nop() {}
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_switch.f2
-func f2(x : Algebraic) -> Int32 {
+func f2(_ x : Algebraic) -> Int32 {
   switch(x) {
   case let .Type1(y, z): // CHECK: [[@LINE]]:3 -> [[@LINE+1]]:10 : 2
     nop()
@@ -46,7 +46,7 @@ public enum Simple {
 }
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_switch.f3
-func f3(x : Simple) -> Int32 {
+func f3(_ x : Simple) -> Int32 {
   switch (x) {
   case .First: // CHECK: [[@LINE]]:3 -> [[@LINE+1]]:13 : 2
     return 1

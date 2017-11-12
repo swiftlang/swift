@@ -1,0 +1,86 @@
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 %s -o /dev/null
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+///////////
+// Tests //
+///////////
+
+// Test that an owned value used by the same cond_br instruction is properly
+// treated as a use in its destination block.
+sil @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  br bb3(%1 : $Builtin.NativeObject)
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  br bb3(%2 : $Builtin.NativeObject)
+
+bb3(%3 : @owned $Builtin.NativeObject):
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test that an owned value used by one side of same cond_br instruction is
+// properly treated as a use in its destination block.
+sil @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we handle properly a use in the same block as the cond_br.
+sil @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we can properly handle a loop with a split back edge.
+sil @test4 : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  cond_br undef, bb3, bb2(%1 : $Builtin.NativeObject)
+
+bb3:
+  br bb1(%1 : $Builtin.NativeObject)
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  return %2 : $Builtin.NativeObject
+}

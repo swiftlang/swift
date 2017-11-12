@@ -1,0 +1,13 @@
+[
+  {
+    key.kind: source.codecompletion.keyword,
+    key.hide: 1
+  },
+  {
+    key.kind: source.codecompletion.keyword,
+    key.hide: 0,
+    key.uids: [
+      source.lang.swift.keyword.func,
+    ]
+  }
+]

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -playground
+// RUN: %target-typecheck-verify-swift -playground
 
 var a = 1, b = 2
 let z = 3

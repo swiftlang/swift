@@ -1,0 +1,51 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg -cse | %FileCheck %s
+
+// Test if jump-threading is done to combine two enum instructions
+// into a single block.
+
+sil_stage canonical
+
+import Builtin
+
+enum E {
+  case A
+  case B
+}
+
+enum E2 {
+  case X
+  case Y(E)
+}
+
+// CHECK-LABEL: sil @testfunc
+
+sil @testfunc : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> E2 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  cond_br %0, bb1, bb4
+
+bb1:
+  %2 = enum $E, #E.A!enumelt
+  cond_br %1, bb2, bb3(%2 : $E)
+
+// CHECK: [[ENUM1:%[0-9]+]] = enum $E, #E.B
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $E2, #E2.Y!enumelt.1, [[ENUM1]]
+// CHECK-NEXT: br [[RETBB:bb[0-9]+]]([[ENUM2]] : $E2)
+bb2:
+  // This block should be jump-threaded
+  %3 = enum $E, #E.B!enumelt
+  br bb3(%3 : $E)
+
+bb3(%4 : $E):
+  %5 = enum $E2, #E2.Y!enumelt.1, %4 : $E
+  br bb5(%5 : $E2)
+
+bb4:
+  %6 = enum $E2, #E2.X!enumelt
+  br bb5(%6 : $E2)
+
+// CHECK: [[RETBB]]({{.*}}):
+// CHECK-NEXT: return
+bb5(%7 : $E2):
+  return %7 : $E2
+}
+

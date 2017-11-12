@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 // Generated from
 // var x : Int32 = 2
@@ -11,18 +11,13 @@ import Swift
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
-// CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
-sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
-
-// CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
-sil private @globalinit_func0 : $@convention(thin) () -> () {
-bb0:
-  %0 = global_addr @_Tv2ch1xSi : $*Int32
-  %1 = integer_literal $Builtin.Int32, 2
-  %2 = struct $Int32 (%1 : $Builtin.Int32)
-  store %2 to %0 : $*Int32
-  %4 = tuple ()
-  return %4 : $()
+// CHECK: sil_global @_Tv2ch1xSi : $Int32 = {
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:   %initval = struct $Int32 (%0 : $Builtin.Int32)
+// CHECK-NEXT: }
+sil_global @_Tv2ch1xSi : $Int32 = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %initval = struct $Int32 (%0 : $Builtin.Int32)
 }
 
 // CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {

@@ -1,0 +1,475 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class SomeClass {
+  func hash() -> Int
+}
+
+enum Numerals {
+  case One
+  case Two
+  case Three
+  case Four
+}
+
+sil @external_func: $@convention(thin) () -> ()
+
+//CHECK-LABEL: eliminate_sw_enum_addr
+//CHECK-NOT: switch_enum_addr
+//CHECK: switch_enum
+//CHECK: return
+sil @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
+bb0:
+  %0 = alloc_stack $Optional<SomeClass>, var, name "x" // users: %2, %4, %5, %17, %19
+  %1 = alloc_ref $SomeClass                       // user: %3
+  %2 = init_enum_data_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1 // user: %3
+  store %1 to %2 : $*SomeClass                    // id: %3
+  inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1 // id: %4
+  %5 = load %0 : $*Optional<SomeClass>          // users: %6, %8, %9, %14
+  retain_value %5 : $Optional<SomeClass>
+  %7 = alloc_stack $Optional<SomeClass>           // users: %9, %10, %11, %13
+  retain_value %5 : $Optional<SomeClass>
+  store %5 to %7 : $*Optional<SomeClass>        // id: %9
+  switch_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2 // id: %10
+
+bb1:                                              // Preds: bb0
+  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt.1 // user: %12
+  %12 = load %11 : $*SomeClass                    // users: %15, %16
+  dealloc_stack %7 : $*Optional<SomeClass> // id: %13
+  release_value %5 : $Optional<SomeClass>         // id: %14
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int // user: %16
+  %16 = apply %15(%12) : $@convention(method) (@guaranteed SomeClass) -> Int // user: %20
+  %17 = load %0 : $*Optional<SomeClass>         // user: %18
+  release_value %17 : $Optional<SomeClass>        // id: %18
+  dealloc_stack %0 : $*Optional<SomeClass> // id: %19
+  return %16 : $Int                               // id: %20
+
+bb2:                                              // Preds: bb0
+  unreachable                                     // id: %23
+}
+
+// CHECK-LABEL: sil @eliminate_select_enum_addr
+// CHECK-NOT: select_enum_addr
+// CHECK: select_enum
+// CHECK: return
+
+sil @eliminate_select_enum_addr : $@convention(thin) () -> Int {
+bb0:
+  %0 = alloc_stack $Optional<SomeClass>
+  %1 = alloc_ref $SomeClass
+  %2 = init_enum_data_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1
+  store %1 to %2 : $*SomeClass
+  inject_enum_addr %0 : $*Optional<SomeClass>, #Optional.some!enumelt.1
+  %5 = load %0 : $*Optional<SomeClass>
+  retain_value %5 : $Optional<SomeClass>
+  %7 = alloc_stack $Optional<SomeClass>
+  retain_value %5 : $Optional<SomeClass>
+  store %5 to %7 : $*Optional<SomeClass>
+  %t = integer_literal $Builtin.Int1, -1
+  %f = integer_literal $Builtin.Int1, 0
+  %b = select_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt.1: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
+  cond_br %b, bb1, bb2
+
+bb1:
+  %11 = unchecked_take_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt.1
+  %12 = load %11 : $*SomeClass                    // users: %15, %16
+  dealloc_stack %7 : $*Optional<SomeClass>
+  release_value %5 : $Optional<SomeClass>
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
+  %16 = apply %15(%12) : $@convention(method) (@guaranteed SomeClass) -> Int
+  %17 = load %0 : $*Optional<SomeClass>
+  release_value %17 : $Optional<SomeClass>
+  dealloc_stack %0 : $*Optional<SomeClass>
+  return %16 : $Int
+
+bb2:
+  // Invoke something here and jump to bb1. This prevents a cond_br(select_enum) -> switch_enum conversion,
+  // since it would introduce a critical edge.
+  %20 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %20(): $@convention(thin) () -> ()
+  br bb1
+}
+
+enum E {
+  case E0
+  case E1
+  case E2
+}
+
+// CHECK-LABEL: sil @canonicalize_select_enum
+// CHECK: select_enum {{.*}} case #E.E2!enumelt:
+// CHECK: return
+
+sil @canonicalize_select_enum : $@convention(thin) (E) -> Int32 {
+bb0(%0 : $E):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 2
+  %4 = select_enum %0 : $E, case #E.E0!enumelt: %1, case #E.E1!enumelt: %2, default %3 : $Builtin.Int32
+  %5 = struct $Int32 (%4 : $Builtin.Int32)
+  return %5 : $Int32
+}
+
+enum G<T> {
+  case E0
+  case E1(T)
+  case E2
+}
+
+// CHECK-LABEL: sil @canonicalize_select_enum_addr
+// CHECK: select_enum_addr {{.*}} case #G.E2!enumelt:
+// CHECK: return
+
+sil @canonicalize_select_enum_addr : $@convention(thin) <T> (@in G<T>) -> Int32 {
+bb0(%0 : $*G<T>):
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = integer_literal $Builtin.Int32, 2
+  %5 = select_enum_addr %0 : $*G<T>, case #G.E0!enumelt: %2, case #G.E1!enumelt: %3, default %4 : $Builtin.Int32
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  return %6 : $Int32
+}
+
+// CHECK-LABEL: sil @canonicalize_init_enum_data_addr
+// CHECK-NOT: init_enum_data_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK-NOT: inject_enum_addr
+// CHECK: return
+sil @canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+  %s1 = alloc_stack $Optional<Int32>
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  store %i to %0 : $*Int32
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  dealloc_stack %s1 : $*Optional<Int32>
+  return %i : $Int32
+}
+
+// CHECK-LABEL: sil @canonicalize_init_enum_data_addr_diff_basic_blocks
+// CHECK-NOT: init_enum_data_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK-NOT: inject_enum_addr
+// CHECK: return
+sil @canonicalize_init_enum_data_addr_diff_basic_blocks : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+  %s1 = alloc_stack $Optional<Int32>
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  br bb1
+
+bb1:                                              // Preds: bb0
+  store %i to %0 : $*Int32
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  dealloc_stack %s1 : $*Optional<Int32>
+  return %i : $Int32
+}
+
+// CHECK-LABEL: sil @fail_to_canonicalize_init_enum_data_addr_reach_entry
+// CHECK: init_enum_data_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK: return
+sil @fail_to_canonicalize_init_enum_data_addr_reach_entry : $@convention(thin) (@inout Int32, Builtin.Int32, Builtin.Int1) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1):
+  %s1 = alloc_stack $Optional<Int32>
+  %i2 = load %0 : $*Int32
+  %en = enum $Optional<Int32>, #Optional.none!enumelt
+  store %en to %s1 : $*Optional<Int32>
+  cond_br %2, bb1, bb2
+
+bb1:
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  store %i to %0 : $*Int32
+  br bb2
+
+bb2:                                              // Preds: bb0 bb1
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  dealloc_stack %s1 : $*Optional<Int32>
+  return %i2 : $Int32
+}
+
+// CHECK-LABEL: sil @fail_to_canonicalize_init_enum_data_addr
+// CHECK: init_enum_data_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK: return
+sil @fail_to_canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+  %s1 = alloc_stack $Optional<Int32>
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  br bb1
+
+bb1:
+  %o = enum $Optional<Int32>, #Optional.none!enumelt
+  store %o to %s1 : $*Optional<Int32>
+  br bb2
+
+bb2:
+  store %i to %0 : $*Int32
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  dealloc_stack %s1 : $*Optional<Int32>
+  return %i : $Int32
+}
+
+// Check the cond_br(select_enum) -> switch_enum conversion.
+//
+// CHECK-LABEL: sil @convert_select_enum_cond_br_to_switch_enum
+// CHECK-NOT: select_enum
+// CHECK: switch_enum
+// CHECK: return
+
+sil @convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Optional<SomeClass>) -> Int {
+bb0(%0 : $Optional<SomeClass>):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %2, case #Optional.some!enumelt.1: %1 : $Builtin.Int1
+  cond_br %3, bb2, bb1
+
+bb1:
+  %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt.1
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
+  fix_lifetime %5 : $SomeClass
+  strong_release %5 : $SomeClass
+  return %7 : $Int
+
+bb2:
+  cond_fail %2 : $Builtin.Int1
+  unreachable
+}
+
+// Check that cond_br(select_enum) is converted into switch_enum.
+// CHECK-LABEL: sil @convert_select_enum_cond_br_to_switch_enum2
+// CHECK: bb0
+// CHECK-NOT: select_enum
+// CHECK-NOT: return
+// CHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
+// CHECK: return
+// CHECK: }
+sil @convert_select_enum_cond_br_to_switch_enum2 : $@convention(thin) (Numerals) -> Builtin.Int64 {
+bb0(%0 : $Numerals):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // All cases but one are the same. So, they can be made a default for the switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, case #Numerals.Four!enumelt: %3 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
+  br bb1
+}
+
+// Check that cond_br(select_enum) is converted into switch_enum.
+// This test checks that select_enum instructions with default cases are handled correctly.
+// CHECK-LABEL: sil @convert_select_enum_cond_br_to_switch_enum3
+// CHECK: bb0
+// CHECK-NOT: select_enum
+// CHECK-NOT: return
+// CHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
+// CHECK: return
+// CHECK: }
+sil @convert_select_enum_cond_br_to_switch_enum3 : $@convention(thin) (Numerals) -> Builtin.Int64 {
+bb0(%0 : $Numerals):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // There is only one case, whose result is different from default and other cases
+  // Thus all other cases can be folded into a default cases of a switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, default %3 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
+  br bb1
+}
+
+
+// Check that cond_br(select_enum) is not converted into switch_enum as it would create a critical edge, which
+// is not originating from cond_br/br. And this is forbidden in a canonical SIL form.
+//
+// CHECK-LABEL: sil @dont_convert_select_enum_cond_br_to_switch_enum
+// CHECK: select_enum
+// CHECK-NOT: switch_enum
+// CHECK: return
+sil @dont_convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Optional<SomeClass>) -> Int {
+bb0(%0 : $Optional<SomeClass>):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %3, case #Optional.some!enumelt.1: %2 : $Builtin.Int1
+  cond_br %4, bb2, bb1
+
+bb1:
+  %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt.1
+  %6 = class_method %5 : $SomeClass, #SomeClass.hash!1 : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
+  fix_lifetime %5 : $SomeClass
+  strong_release %5 : $SomeClass
+  return %7 : $Int
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+}
+
+// Check that cond_br(select_enum) is not converted into switch_enum as it would create a critical edge, which
+// is not originating from cond_br/br. And this is forbidden in a canonical SIL form.
+//
+// CHECK-LABEL: sil @dont_convert_select_enum_cond_br_to_switch_enum2
+// CHECK: select_enum
+// CHECK-NOT: switch_enum
+// CHECK: return
+sil @dont_convert_select_enum_cond_br_to_switch_enum2 : $@convention(thin) (Numerals) -> Builtin.Int64 {
+bb0(%0 : $Numerals):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // There are two cases for each possible outcome.
+  // This means that we would always get a critical edge, if we convert it into a switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, case #Numerals.Four!enumelt: %2 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
+  br bb1
+}
+
+// Check that cond_br(select_enum) is not converted into switch_enum,
+// because the result of the default case is not an integer literal.
+// CHECK-LABEL: sil @dont_convert_select_enum_cond_br_to_switch_enum3
+// CHECK: select_enum
+// CHECK-NOT: switch_enum
+// CHECK: return
+sil @dont_convert_select_enum_cond_br_to_switch_enum3 : $@convention(thin) (Numerals, Builtin.Int1) -> Builtin.Int64 {
+bb0(%0 : $Numerals, %1 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // All cases but one are the same. So, they can be made a default for the switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, default %1 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
+  br bb1
+}
+
+public class C {}
+public struct S {}
+public struct T {
+  @sil_stored let c: C
+  @sil_stored let s: S
+}
+public enum X {
+  case none
+  case some(T)
+}
+public enum Y {
+  case none
+  case some(T)
+}
+
+// Verify that we do not optimize
+//   (unchecked_enum_data (unchecked_bitwise_cast V : $X to $Y), #Case)
+// where Case holds of a payload of type P into:
+//   (unchecked_ref_cast V : $X to $P)
+// even for single-payload enums, since we cannot know the layouts of
+// the types involved, and we'll generate a trap at IRGen-time if the
+// bitcasted types are not the same size.
+
+// CHECK-LABEL: sil @keep_unchecked_enum_data
+sil @keep_unchecked_enum_data : $@convention(thin) (@owned X, @owned T) -> @owned T {
+// CHECK: bb0
+bb0(%0 : $X, %1 : $T):
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $X to $Y
+  %4 = unchecked_bitwise_cast %0 : $X to $Y
+  switch_enum %4 : $Y, case #Y.none!enumelt: bb1, case #Y.some!enumelt.1: bb2
+
+// CHECK: bb1
+bb1:
+  %7 = struct_extract %1 : $T, #T.c
+  strong_retain %7 : $C
+  br bb3(%7 : $C)
+
+// CHECK: bb2
+bb2(%10 : $T):
+// CHECK: unchecked_enum_data [[CAST]] : $Y, #Y.some!enumelt.1
+  %11 = unchecked_enum_data %4 : $Y, #Y.some!enumelt.1
+  %12 = struct_extract %11 : $T, #T.c
+  br bb3(%12 : $C)
+
+// CHECK: bb3
+bb3(%14 : $C):
+  %15 = struct $S ()
+  %16 = struct $T (%14 : $C, %15 : $S)
+  %17 = struct_extract %1 : $T, #T.c
+  strong_release %17 : $C
+// CHECK: return
+  return %16 : $T
+}

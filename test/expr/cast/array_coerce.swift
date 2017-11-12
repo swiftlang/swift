@@ -1,7 +1,7 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class C {
-	var x = 0;
+	var x = 0
 }
 class D: C {}
 
@@ -21,7 +21,7 @@ da = ca // expected-error{{cannot assign value of type 'Array<C>' to type 'Array
 var caa = [ca]
 var daa = [da]
 
-caa = daa // expected-error{{cannot assign value of type '[Array<D>]' to type '[Array<C>]'}}
+caa = daa
 
 // Array slice type
 var cas: [C] = [c1]

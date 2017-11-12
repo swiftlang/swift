@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Verify the use of unbound generic types. They are permitted in
 // certain places where type inference can fill in the generic
@@ -8,17 +8,18 @@
 // Places where generic arguments are always required
 // --------------------------------------------------
 
-struct Foo<T> { // expected-note{{generic type 'Foo' declared here}} expected-note{{generic type 'Foo' declared here}}
-  struct Wibble { } // expected-error{{nested in generic type}}
+struct Foo<T> { // expected-note 3{{generic type 'Foo' declared here}}
+  struct Wibble { }
 }
 
 class Dict<K, V> { } // expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}}
 
-// Cannot alias a generic type without arguments.
-typealias Bar = Foo // expected-error{{reference to generic type 'Foo' requires arguments in <...>}}
-
-// Cannot refer to a member of a generic type without arguments.
+// The underlying type of a typealias can only have unbound generic arguments
+// at the top level.
+typealias F = Foo // OK
 typealias FW = Foo.Wibble // expected-error{{reference to generic type 'Foo' requires arguments in <...>}}
+typealias FFW = () -> Foo // expected-error{{reference to generic type 'Foo' requires arguments in <...>}}
+typealias OFW = Optional<() -> Foo> // expected-error{{reference to generic type 'Foo' requires arguments in <...>}}
 
 // Cannot inherit from a generic type without arguments.
 class MyDict : Dict { } // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
@@ -31,45 +32,6 @@ var x : Dict // expected-error{{reference to generic type 'Dict' requires argume
 // Cannot create parameters of generic type without arguments.
 func f(x: Dict) {} // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
 
-
-// ---------------------------------------------
-// Unbound name references within a generic type
-// ---------------------------------------------
-struct GS<T> {
-  func f() -> GS {
-    let gs = GS()
-    return gs
-  }
-
-  struct Nested { // expected-error{{nested in generic type}}
-    func ff() -> GS {
-      let gs = GS()
-      return gs
-    }
-  }
-
-  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}} // expected-error{{generic type 'NestedGeneric' nested in type}}
-    func fff() -> (GS, NestedGeneric) {
-      let gs = GS()
-      let ns = NestedGeneric()
-      return (gs, ns)
-    }
-  }
-
-  // FIXME: We're losing some sugar here by performing the substitution.
-  func ng() -> NestedGeneric { } // expected-error{{reference to generic type 'GS<T>.NestedGeneric' requires arguments in <...>}}
-}
-
-extension GS {
-  func g() -> GS {
-    let gs = GS()
-    return gs
-  }
-
-  func h() {
-    _ = GS() as GS<Int> // expected-error{{cannot convert value of type 'GS<T>' to type 'GS<Int>' in coercion}}
-  }
-}
 
 class GC<T, U> {
   init() {} 
@@ -97,7 +59,7 @@ class SomeClassWithInvalidMethod {
 // <rdar://problem/20792596> QoI: Cannot invoke with argument list (T), expected an argument list of (T)
 protocol r20792596P {}
 
-// expected-note @+1 {{in call to function 'foor20792596'}}
+// expected-note @+1 {{in call to function 'foor20792596(x:)'}}
 func foor20792596<T: r20792596P>(x: T) -> T {
   return x
 }
@@ -106,3 +68,8 @@ func callfoor20792596<T>(x: T) -> T {
   return foor20792596(x) // expected-error {{generic parameter 'T' could not be inferred}}
 }
 
+// <rdar://problem/31181895> parameter "not used in function signature" when part of a superclass constraint
+struct X1<T> {
+  func bar<U>() where T: X2<U> {}
+}
+class X2<T> {}

@@ -1,0 +1,102 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-sil %s | %FileCheck %s
+// REQUIRES: objc_interop
+
+// We want to check that casts between two types which are both Swift types or
+// both are ObjC types are not optimized by the cast optimizer into casts
+// to/from ObjC.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+import Foundation
+
+
+// CHECK-LABEL: sil @testSwiftToSwift : $@convention(thin) (@in Set<Int>, @guaranteed Set<Int>)
+// CHECK: bb0
+// CHECK-NOT: checked_cast_addr_br
+// CHECK-NOT: _bridgeToObjectiveC
+// CHECK-NOT: _conditionallyBridgeFromObjectiveC_bridgeable
+// CHECK: return
+sil @testSwiftToSwift : $@convention(thin) (@in Set<Int>, @guaranteed Set<Int>) -> @owned Set<Int> {
+bb0(%0 : $*Set<Int>, %1 : $Set<Int>):
+  %3 = alloc_stack $Set<Int>
+  copy_addr %0 to [initialization] %3 : $*Set<Int>
+  %5 = alloc_stack $Set<Int>
+  checked_cast_addr_br take_always Set<Int> in %3 : $*Set<Int> to Set<Int> in %5 : $*Set<Int>, bb1, bb3
+
+bb1:
+  destroy_addr %0 : $*Set<Int>
+  %8 = load %5 : $*Set<Int>
+  br bb2(%8 : $Set<Int>)
+
+bb2(%14 : $Set<Int>):
+  dealloc_stack %5 : $*Set<Int>
+  dealloc_stack %3 : $*Set<Int>
+  return %14 : $Set<Int>
+
+bb3:
+  br bb2(%1 : $Set<Int>)
+}
+
+// CHECK-LABEL: sil @testObjCToObjC : $@convention(thin) (NSSet, NSSet)
+// CHECK: bb0
+// CHECK-NOT: checked_cast_br
+// CHECK-NOT: BridgeFromObjectiveC
+// CHECK-NOT: bridgeToObjectiveC
+// CHECK: return
+sil @testObjCToObjC : $@convention(thin) (NSSet, NSSet) -> @owned NSSet {
+bb0(%0 : $NSSet, %1 : $NSSet):
+  checked_cast_br %0 : $NSSet to $NSSet, bb1, bb3
+
+bb1(%2 : $NSSet):
+  br bb2(%2 : $NSSet)
+
+bb2(%14 : $NSSet):
+  return %14 : $NSSet
+
+bb3:
+  br bb2(%1 : $NSSet)
+}
+
+sil @fail : $@convention(thin) () -> Never
+
+// CHECK-LABEL: sil @testCFToObjC
+// CHECK: bb0(
+// CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
+// CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString
+// CHECK-NEXT: store [[T1]] to %0 : $*NSString
+sil @testCFToObjC : $@convention(thin) (@in CFString) -> @out NSString {
+bb0(%0 : $*NSString, %1 : $*CFString):
+  checked_cast_addr_br take_always CFString in %1 : $*CFString to NSString in %0 : $*NSString, bb1, bb2
+
+bb1:
+  %ret = tuple ()
+  return %ret : $()
+
+bb2:
+  %fn = function_ref @fail : $@convention(thin) () -> Never
+  apply %fn() : $@convention(thin) () -> Never
+  unreachable
+}
+
+// CHECK-LABEL: sil @testCFToSwift
+// CHECK: bb0(
+// CHECK-NEXT: [[T0:%.*]] = load %1 : $*CFString
+// CHECK-NEXT: [[T1:%.*]] = unchecked_ref_cast [[T0]] : $CFString to $NSString
+// CHECK:      [[FN:%.*]] = function_ref @_T0SS10FoundationE34_conditionallyBridgeFromObjectiveCSbSo8NSStringC_SSSgz6resulttFZ : $@convention(method) (@owned NSString, @inout Optional<String>, @thin String.Type) -> Bool
+// CHECK: apply [[FN]]([[T1]], {{.*}}, {{.*}})
+sil @testCFToSwift : $@convention(thin) (@in CFString) -> @out String {
+bb0(%0 : $*String, %1 : $*CFString):
+  checked_cast_addr_br take_always CFString in %1 : $*CFString to String in %0 : $*String, bb1, bb2
+
+bb1:
+  %ret = tuple ()
+  return %ret : $()
+
+bb2:
+  %fn = function_ref @fail : $@convention(thin) () -> Never
+  apply %fn() : $@convention(thin) () -> Never
+  unreachable
+}

@@ -1,4 +1,5 @@
-// RUN: %target-swift-ide-test -print-comments -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -print-comments -source-filename %s | %FileCheck %s
+// REQUIRES: no_asan
 
 ///
 func briefLine1() {}

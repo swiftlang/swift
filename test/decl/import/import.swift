@@ -1,9 +1,16 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: echo "public struct X {}; public var x = X()" | %target-swift-frontend -module-name import_builtin -parse-stdlib -emit-module -o %t -
 // RUN: echo "public func foo() -> Int { return false }" > %t/import_text.swift
 // RUN: echo "public func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
-// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -enable-source-import -module-name main -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -enable-source-import -module-name main -verify -show-diagnostics-after-fatal -verify-ignore-unknown
+
+// -verify-ignore-unknown is for:
+// <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
+// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode
+// <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
+// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode
+// <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
+// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode
 
 import Builtin  // expected-error {{no such module 'Builtin'}}
 
@@ -22,12 +29,12 @@ func f0() {
 }
 
 import func Swift.print
-func f1(a: Swift.Int) -> Swift.Void { print(a) }
+func f1(_ a: Swift.Int) -> Swift.Void { print(a) }
 
 import func Swift.print
 
 // rdar://14418336
-#import something_nonexistant // expected-error {{expected expression}} expected-error {{no such module 'something_nonexistant'}}
+#import something_nonexistent // expected-error {{expected expression}} expected-error {{no such module 'something_nonexistent'}}
 
 // Import specific decls
 import typealias Swift.Int
@@ -36,15 +43,19 @@ import typealias Swift.ManagedBuffer
 import class Swift.ManagedBuffer
 import typealias Swift.Bool
 import struct Swift.Bool
-import protocol Swift.GeneratorType
+import protocol Swift.IteratorProtocol
 import var import_builtin.x
 import func Swift.min
 
 import var x // expected-error {{expected module name}}
-import struct Swift.nonexistent // expected-error {{no such decl in module}}
+import struct Swift.nonexistent // expected-error {{struct 'nonexistent' does not exist in module 'Swift'}}
 
-import Swift.import.abc // expected-error 2 {{expected identifier}}
+import Swift.import.abc // expected-error {{expected identifier in import declaration}}
+// expected-error @-1 {{keyword 'import' cannot be used as an identifier here}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}}
 import where Swift.Int // expected-error {{expected identifier}}
+// expected-error @-1 {{keyword 'where' cannot be used as an identifier here}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}}
 import 2 // expected-error {{expected identifier}}
 
 import really.nonexistent // expected-error {{no such module 'really.nonexistent'}}

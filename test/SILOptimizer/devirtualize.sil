@@ -1,0 +1,102 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer -dce | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Bar {
+  init()
+  func foo()
+}
+
+sil_global @x : $Bar
+
+
+//CHECK: function_with_cm
+//CHECK: function_ref @_TFC4main3Bar3foofS0_FT_T_
+//CHECK-NEXT: apply
+//CHECK-NOT: class_method
+//CHECK: return
+sil @function_with_cm : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @x : $*Bar                     // users: %2, %3
+  %1 = alloc_ref $Bar                             // user: %2
+  store %1 to %0 : $*Bar                          // id: %2
+  %3 = load %0 : $*Bar                            // users: %6, %5, %4
+  %5 = class_method %1 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %6 = apply %5(%1) : $@convention(method) (@guaranteed Bar) -> ()
+  release_value %1 : $Bar
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+}
+
+sil @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
+
+sil_vtable Bar {
+  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
+}
+
+private class Node {
+  @sil_stored var index: Int { get set }
+  init(index: Int)
+   deinit
+}
+
+// CHECK-LABEL: sil private @class_method_apply
+sil private @class_method_apply : $@convention(method) (@guaranteed Node) -> Int {
+bb0(%0 : $Node):
+  // CHECK: strong_retain %0
+  strong_retain %0 : $Node
+  // CHECK-NOT: class_method %0
+  // CHECK: [[FUNC:%.*]] = function_ref @transparent_target
+  %3 = class_method %0 : $Node, #Node.index!getter.1 : (Node) -> () -> Int, $@convention(method) (@guaranteed Node) -> Int
+  // CHECK: [[RESULT:%.*]] = apply [[FUNC]](%0)
+  %4 = apply %3(%0) : $@convention(method) (@guaranteed Node) -> Int
+  // CHECK: strong_release %0
+  strong_release %0 : $Node
+  // return [[RESULT]]
+  return %4 : $Int
+}
+
+// CHECK-LABEL: sil private [transparent] [noinline] @transparent_target
+sil private [transparent] [noinline] @transparent_target : $@convention(method) (@guaranteed Node) -> Int {
+bb0(%0 : $Node):
+  %2 = ref_element_addr %0 : $Node, #Node.index
+  %3 = load %2 : $*Int
+  // CHECK: return
+  return %3 : $Int
+}
+
+sil_vtable Node {
+  #Node.index!getter.1: transparent_target
+}
+
+private class B {
+  class func foo() -> Int
+}
+
+private class C : B { }
+
+sil @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si : $@convention(method) (@thick B.Type) -> Int
+
+// CHECK-LABEL: sil private [noinline] @_TF4metaP33_7026FC13D35FB9700BACF693F51A99016callerFMCS_P33_7026FC13D35FB9700BACF693F51A99011CT_
+sil private [noinline] @_TF4metaP33_7026FC13D35FB9700BACF693F51A99016callerFMCS_P33_7026FC13D35FB9700BACF693F51A99011CT_ : $@convention(method) (@thick C.Type) -> () {
+bb0(%0 : $@thick C.Type):
+  %2 = upcast %0 : $@thick C.Type to $@thick B.Type
+  // CHECK-NOT: class_method
+  // CHECK: function_ref @_TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+  %3 = class_method %2 : $@thick B.Type, #B.foo!1 : (B.Type) -> () -> Int, $@convention(method) (@thick B.Type) -> Int
+  %4 = apply %3(%2) : $@convention(method) (@thick B.Type) -> Int
+  %5 = tuple ()
+  // CHECK: return
+  return %5 : $()
+}
+
+sil_vtable B {
+  #B.foo!1: _TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+}
+
+sil_vtable C {
+  #B.foo!1: _TZFC4metaP33_7026FC13D35FB9700BACF693F51A99011B3foofMS0_FT_Si
+}

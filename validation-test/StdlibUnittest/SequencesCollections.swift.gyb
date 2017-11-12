@@ -1,0 +1,360 @@
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+%{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionForTraversal,
+    sliceTypeName,
+    protocolsForCollectionFeatures
+)
+
+}%
+
+import SwiftPrivate
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+
+%for traversal in TRAVERSALS:
+// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%  for mutable in [ False, True ]:
+// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%    SelfSlice = sliceTypeName(traversal=traversal, mutable=mutable, rangeReplaceable=False)
+%    Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+
+var ${Self}TestSuite = TestSuite("${Self}")
+
+${Self}TestSuite.test("startIndex/InterchangeableCollections") {
+  var c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  var c2 = c1
+
+  expectEqual(c1.startIndex, c1.startIndex)
+  expectEqual(c2.startIndex, c2.startIndex)
+  expectEqual(c1.startIndex, c2.startIndex)
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("startIndex/DifferentCollections") {
+  let c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  expectEqual(c1.startIndex, c1.startIndex)
+  expectEqual(c2.startIndex, c2.startIndex)
+  let i1 = c1.startIndex
+  let i2 = c2.startIndex
+
+  expectCrashLater()
+  _ = i1 == i2
+}
+
+${Self}TestSuite.test("endIndex/InterchangeableCollections") {
+  var c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = c1
+  expectEqual(c1.endIndex, c1.endIndex)
+  expectEqual(c2.endIndex, c2.endIndex)
+  expectEqual(c1.endIndex, c2.endIndex)
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("endIndex/DifferentCollections") {
+  let c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  expectEqual(c1.endIndex, c1.endIndex)
+  expectEqual(c2.endIndex, c2.endIndex)
+  let i1 = c1.endIndex
+  let i2 = c2.endIndex
+
+  expectCrashLater()
+  _ = i1 == i2
+}
+
+%    if mutable:
+${Self}TestSuite.test("subscript(_:Index)/InterchangeableCollections") {
+  var c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = c1
+  var i1 = c1.startIndex
+  c1[c1.startIndex] = OpaqueValue(4040)
+
+  var i2 = c1.startIndex
+  expectEqual(i1, i2)
+  expectEqual(1010, c2[i1].value)
+  expectEqual(4040, c1[i2].value)
+
+  i1 = c1.index(i1, offsetBy: 1)
+  i2 = c1.index(i2, offsetBy: 1)
+  expectEqual(i1, i2)
+  expectEqual(2020, c2[i1].value)
+  expectEqual(2020, c1[i2].value)
+
+  i1 = c1.index(i1, offsetBy: 1)
+  i2 = c1.index(i2, offsetBy: 1)
+  expectEqual(i1, i2)
+  expectEqual(3030, c2[i1].value)
+  expectEqual(3030, c1[i2].value)
+}
+
+${Self}TestSuite.test("subscript(_:Index)/Get/DifferentCollections") {
+  let c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+
+  expectCrashLater()
+  c2[c1.startIndex]
+}
+
+${Self}TestSuite.test("subscript(_:Index)/Set/DifferentCollections") {
+  let c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  var c2 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+
+  expectCrashLater()
+  c2[c1.startIndex] = OpaqueValue(4040)
+}
+%    end
+
+%  end
+%end
+
+%for traversal in TRAVERSALS:
+%  SelfSlice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=True)
+%  Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+
+func getTwoInterchangeable${Self}(_ elements: [Int])
+  -> (${Self}<OpaqueValue<Int>>, ${Self}<OpaqueValue<Int>>) {
+  var c1 = ${Self}<OpaqueValue<Int>>()
+  c1.append(contentsOf: elements.map(OpaqueValue.init))
+
+  var c2 = ${Self}<OpaqueValue<Int>>()
+  c2.append(contentsOf: elements.map(OpaqueValue.init))
+
+  return (c1, c2)
+}
+
+var ${Self}TestSuite = TestSuite("${Self}")
+
+${Self}TestSuite.test("startIndex/InterchangeableCollections") {
+  let (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  expectEqual(c1.startIndex, c1.startIndex)
+  expectEqual(c2.startIndex, c2.startIndex)
+  expectEqual(c1.startIndex, c2.startIndex)
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("startIndex/DifferentCollections") {
+  let c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  expectEqual(c1.startIndex, c1.startIndex)
+  expectEqual(c2.startIndex, c2.startIndex)
+  let i1 = c1.startIndex
+  let i2 = c2.startIndex
+
+  expectCrashLater()
+  _ = i1 == i2
+}
+
+${Self}TestSuite.test("endIndex/InterchangeableCollections") {
+  let (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  expectEqual(c1.endIndex, c1.endIndex)
+  expectEqual(c2.endIndex, c2.endIndex)
+  expectEqual(c1.endIndex, c2.endIndex)
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("endIndex/DifferentCollections") {
+  let c1 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  expectEqual(c1.endIndex, c1.endIndex)
+  expectEqual(c2.endIndex, c2.endIndex)
+  let i1 = c1.endIndex
+  let i2 = c2.endIndex
+
+  expectCrashLater()
+  _ = i1 == i2
+}
+
+${Self}TestSuite.test("reserveCapacity()/IndexInvalidation/DifferentCollections") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i = c1.startIndex
+  c1.reserveCapacity(0)
+
+  expectCrashLater()
+  _ = i == c1.startIndex
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("reserveCapacity()/IndexInvalidation/DifferentMutationEpoch") {
+  var c = ${Self}(elements: [ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let i = c.startIndex
+  c.reserveCapacity(0)
+
+  expectCrashLater()
+  _ = i == c.startIndex
+}
+
+${Self}TestSuite.test("append()/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i1 = c1.endIndex
+  c1.append(OpaqueValue(4040))
+  let i2 = c1.index(c1.startIndex, offsetBy: 3)
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("append(contentsOf:)/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i1 = c1.endIndex
+  c1.append(contentsOf: [ 4040, 5050 ].map(OpaqueValue.init))
+  let i2 = c1.index(c1.startIndex, offsetBy: 3)
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("replaceSubrange()/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i1 = c1.index(c1.startIndex, offsetBy: 1)
+  c1.replaceSubrange(
+    i1..<c1.index(i1, offsetBy: 2),
+    with: [ 4040, 5050 ].map(OpaqueValue.init))
+  let i2 = c1.index(c1.startIndex, offsetBy: 1)
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("insert()/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i1 = c1.index(c1.startIndex, offsetBy: 1)
+  c1.insert(OpaqueValue(4040), at: i1)
+  let i2 = c1.index(c1.startIndex, offsetBy: 1)
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("insert(contentsOf:at:)/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i1 = c1.index(c1.startIndex, offsetBy: 1)
+  c1.insert(contentsOf: [ 4040, 5050 ].map(OpaqueValue.init), at: i1)
+  let i2 = c1.index(c1.startIndex, offsetBy: 1)
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("remove(at:)/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i1 = c1.index(c1.startIndex, offsetBy: 1)
+  c1.remove(at: c1.index(c1.startIndex, offsetBy: 1))
+  let i2 = c1.index(c1.startIndex, offsetBy: 1)
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("removeLast()/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i2 = c2.endIndex
+  c1.removeLast()
+  let i1 = c1.endIndex
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("removeSubrange()/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i1 = c1.index(c1.startIndex, offsetBy: 1)
+  c1.removeSubrange(i1..<c1.index(i1, offsetBy: 1))
+  let i2 = c1.index(c1.startIndex, offsetBy: 1)
+
+  expectCrashLater()
+  _ = i1 == i2
+  _blackHole(c2)
+}
+
+${Self}TestSuite.test("removeAll()/IndexInvalidation") {
+  var (c1, c2) = getTwoInterchangeable${Self}([ 1010, 2020, 3030 ])
+  let i = c1.startIndex
+  c1.removeAll(keepingCapacity: true)
+
+  expectCrashLater()
+  _ = i == c1.startIndex
+  _blackHole(c2)
+}
+
+%end
+
+var SequenceTypeAlgorithms = TestSuite("SequenceTypeAlgorithms")
+
+SequenceTypeAlgorithms.test("forAllPermutations") {
+  do {
+    var permutations: [[Int]] = []
+    forAllPermutations(0) {
+      permutations.append($0)
+    }
+    expectEqualSequence([[]] as [[Int]], permutations) { $0 == $1 }
+  }
+
+  do {
+    var permutations: [[Int]] = []
+    forAllPermutations(1) {
+      permutations.append($0)
+    }
+    expectEqualSequence([[ 0 ]] as [[Int]], permutations) { $0 == $1 }
+  }
+
+  do {
+    var permutations: [[Int]] = []
+    forAllPermutations(2) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [[ 0, 1 ], [ 1, 0 ]] as [[Int]], permutations) { $0 == $1 }
+  }
+
+  do {
+    var permutations: [[Int]] = []
+    forAllPermutations(3) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [
+        [ 0, 1, 2 ],
+        [ 0, 2, 1 ],
+        [ 1, 0, 2 ],
+        [ 1, 2, 0 ],
+        [ 2, 0, 1 ],
+        [ 2, 1, 0 ],
+      ] as [[Int]],
+      permutations) { $0 == $1 }
+  }
+
+  do {
+    var permutations: [[Int]] = []
+    forAllPermutations([ 10, 20, 30 ]) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [
+        [ 10, 20, 30 ],
+        [ 10, 30, 20 ],
+        [ 20, 10, 30 ],
+        [ 20, 30, 10 ],
+        [ 30, 10, 20 ],
+        [ 30, 20, 10 ],
+      ] as [[Int]],
+      permutations) { $0 == $1 }
+  }
+}
+
+runAllTests()
+

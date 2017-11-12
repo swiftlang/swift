@@ -1,14 +1,14 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // Create a new array
-var a = [Int](count: 10, repeatedValue: 0)
+var a = [Int](repeating: 0, count: 10)
 for i in 0..<10 { a[i] = i }
 print(a)
 // CHECK: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 // Create a new unsigned array
-var u = [UInt64](count: 10, repeatedValue: 0)
+var u = [UInt64](repeating: 0, count: 10)
 for i in 0..<10 { u[i] = UInt64(i) }
 print(u)
 // CHECK: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -24,15 +24,15 @@ print(a)
 // CHECK: [0, 5, 6, 3, 6, 7, 8, 9, 8, 9]
 
 // Create another array and copy in a slice
-var b = [Int](count: 10, repeatedValue: 0)
+var b = [Int](repeating: 0, count: 10)
 b[3...6] = a[5..<9]
 print(b)
 // CHECK: [0, 0, 0, 7, 8, 9, 8, 0, 0, 0]
 
 // Create a 2D array
-var aa = [[Int]](count: 10, repeatedValue: [])
+var aa = [[Int]](repeating: [], count: 10)
 for i in 0..<10 {
-  var a = [Int](count: 10, repeatedValue: 0)
+  var a = [Int](repeating: 0, count: 10)
   for j in 0..<10 {
     a[j] = i*10 + j
   }
@@ -54,10 +54,15 @@ class Canary {
 
 print("")
 
+@inline(never)
+func return_array() -> [Canary] {
+  return [Canary(), Canary(), Canary()]
+}
+
 // CHECK: dead
 // CHECK: dead
 // CHECK: dead
-_ = { [Canary(), Canary(), Canary()] }()
+return_array()
 
 // Create an array of (String, Bool) pairs. <rdar://problem/16916422>
 repeat {
@@ -146,7 +151,7 @@ let afd: [Float] = [
 
 // Check equality on arrays
 func test() {
-  var a = [42]
+  let a = [42]
   print(a == [42])
 }
 test()

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -14,7 +14,7 @@
 ///
 /// This is a simple reimplementation of opt that includes support for Swift-
 /// specific LLVM passes. It is meant to make it easier to handle issues related
-/// to transitioning to the new LLVM pass manager (which lacks the dynamicism of
+/// to transitioning to the new LLVM pass manager (which lacks the dynamism of
 /// the old pass manager) and also problems during the code base transition to
 /// that pass manager. Additionally it will enable a user to exactly simulate
 /// Swift's LLVM pass pipeline by using the same pass pipeline building
@@ -24,6 +24,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
@@ -37,6 +38,7 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/CommandFlags.h"
+#include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -59,7 +61,6 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SystemUtils.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -133,9 +134,9 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
     return nullptr;
   }
 
-  return TheTarget->createTargetMachine(TheTriple.getTriple(), CPUStr,
-                                        FeaturesStr, Options, RelocModel,
-                                        CMModel, GetCodeGenOptLevel());
+  return TheTarget->createTargetMachine(
+      TheTriple.getTriple(), CPUStr, FeaturesStr, Options,
+      Optional<Reloc::Model>(RelocModel), CMModel, GetCodeGenOptLevel());
 }
 
 static void dumpOutput(llvm::Module &M, llvm::raw_ostream &os) {
@@ -183,11 +184,16 @@ static void runSpecificPasses(StringRef Binary, llvm::Module *M,
   Passes.add(createTargetTransformInfoWrapperPass(TM ? TM->getTargetIRAnalysis()
                                                      : TargetIRAnalysis()));
 
+  if (TM) {
+    // FIXME: We should dyn_cast this when supported.
+    auto &LTM = static_cast<LLVMTargetMachine &>(*TM);
+    Pass *TPC = LTM.createPassConfig(Passes);
+    Passes.add(TPC);
+  }
+
   for (const llvm::PassInfo *PassInfo : PassList) {
     llvm::Pass *P = nullptr;
-    if (PassInfo->getTargetMachineCtor())
-      P = PassInfo->getTargetMachineCtor()(TM);
-    else if (PassInfo->getNormalCtor())
+    if (PassInfo->getNormalCtor())
       P = PassInfo->getNormalCtor()();
     else
       errs() << Binary << ": cannot create pass: " << PassInfo->getPassName()
@@ -224,7 +230,7 @@ int main(int argc, char **argv) {
   // supported.
   initializeCodeGenPreparePass(Registry);
   initializeAtomicExpandPass(Registry);
-  initializeRewriteSymbolsPass(Registry);
+  initializeRewriteSymbolsLegacyPassPass(Registry);
   initializeWinEHPreparePass(Registry);
   initializeDwarfEHPreparePass(Registry);
   initializeSjLjEHPreparePass(Registry);
@@ -234,7 +240,8 @@ int main(int argc, char **argv) {
   initializeSwiftRCIdentityPass(Registry);
   initializeSwiftARCOptPass(Registry);
   initializeSwiftARCContractPass(Registry);
-  initializeSwiftStackPromotionPass(Registry);
+  initializeInlineTreePrinterPass(Registry);
+  initializeSwiftMergeFunctionsPass(Registry);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM optimizer\n");
 
@@ -245,7 +252,7 @@ int main(int argc, char **argv) {
 
   // Load the input module...
   std::unique_ptr<Module> M =
-      parseIRFile(InputFilename, Err, getGlobalContext());
+      parseIRFile(InputFilename, Err, getGlobalLLVMContext());
 
   if (!M) {
     Err.print(argv[0], errs());

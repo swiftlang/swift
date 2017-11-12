@@ -2,16 +2,16 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SOURCEMANAGER_H
-#define SWIFT_SOURCEMANAGER_H
+#ifndef SWIFT_BASIC_SOURCEMANAGER_H
+#define SWIFT_BASIC_SOURCEMANAGER_H
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/Optional.h"
@@ -40,7 +40,7 @@ class SourceManager {
     int LineOffset;
   };
   std::map<const char *, VirtualFile> VirtualFiles;
-  mutable std::pair<const char *, const VirtualFile*> CachedVFile = {};
+  mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
 public:
   llvm::SourceMgr &getLLVMSourceMgr() {
@@ -134,7 +134,7 @@ public:
   /// Returns the identifier for the buffer with the given ID.
   ///
   /// \p BufferID must be a valid buffer ID.
-  const char *getIdentifierForBuffer(unsigned BufferID) const;
+  StringRef getIdentifierForBuffer(unsigned BufferID) const;
 
   /// \brief Returns a SourceRange covering the entire specified buffer.
   ///
@@ -167,9 +167,9 @@ public:
   /// location.
   ///
   /// This respects #line directives.
-  const char *getBufferIdentifierForLoc(SourceLoc Loc) const {
+  StringRef getBufferIdentifierForLoc(SourceLoc Loc) const {
     if (auto VFile = getVirtualFile(Loc))
-      return VFile->Name.c_str();
+      return VFile->Name;
     else
       return getIdentifierForBuffer(findBufferContainingLoc(Loc));
   }
@@ -198,6 +198,8 @@ public:
     assert(Loc.isValid());
     return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
   }
+
+  StringRef getEntireTextForBuffer(unsigned BufferID) const;
 
   StringRef extractText(CharSourceRange Range,
                         Optional<unsigned> BufferID = None) const;
@@ -231,7 +233,7 @@ private:
   }
 };
 
-} // namespace swift
+} // end namespace swift
 
-#endif // LLVM_SWIFT_SOURCEMANAGER_H
+#endif // SWIFT_BASIC_SOURCEMANAGER_H
 

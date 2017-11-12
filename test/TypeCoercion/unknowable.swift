@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Refer to members of literals
@@ -16,14 +16,14 @@ func ovlLitA(_: Int32) -> Int32 {}
 func ovlLitA(_: Int64) -> Int64 {}
 func ovlLitB(_: Int32) -> Int32 {} // expected-note{{}}
 func ovlLitB(_: Int64) -> Int64 {} // expected-note{{}}
-func testLiteralOverloadinovlLitB() {
+func testLiteralOverloadingovlLitB() {
   var y32 : Int32 = ovlLitA(ovlLitB(0))
   var y64 : Int64 = ovlLitA(ovlLitB(0))
   var y /*: Int*/ = ovlLitA(ovlLitB(0))  // expected-error{{ambiguous use of 'ovlLitB'}}
 }
 
-func literalOverloadSameReturn(i: Int) -> Int {}
-func literalOverloadSameReturn(i: Int32) -> Int {}
+func literalOverloadSameReturn(_ i: Int) -> Int {}
+func literalOverloadSameReturn(_ i: Int32) -> Int {}
 func literalOverload2() {
   var _ : Int = literalOverloadSameReturn(literalOverloadSameReturn(1))
 }

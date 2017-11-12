@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -67,7 +67,8 @@ public:
 
   /// As a convenience, build a metadata object with internal linkage
   /// consisting solely of the standard heap metadata.
-  llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
+  llvm::Constant *getPrivateMetadata(IRGenModule &IGM,
+                                     llvm::Constant *captureDescriptor) const;
 };
 
 class HeapNonFixedOffsets : public NonFixedOffsetsImpl {
@@ -115,8 +116,12 @@ void emitDeallocatePartialClassInstance(IRGenFunction &IGF,
                                         llvm::Value *alignMask);
 
 /// Allocate a boxed value.
+///
+/// The interface type is required for emitting reflection metadata.
 OwnedAddress
-emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
+emitAllocateBox(IRGenFunction &IGF,
+                CanSILBoxType boxType,
+                GenericEnvironment *env,
                 const llvm::Twine &name);
 
 /// Deallocate a box whose value is uninitialized.
@@ -126,6 +131,14 @@ void emitDeallocateBox(IRGenFunction &IGF, llvm::Value *box,
 /// Project the address of the value inside a box.
 Address emitProjectBox(IRGenFunction &IGF, llvm::Value *box,
                        CanSILBoxType boxType);
+
+/// Allocate a boxed value based on the boxed type. Returns the address of the
+/// storage for the value.
+Address emitAllocateExistentialBoxInBuffer(IRGenFunction &IGF,
+                                           SILType boxedType,
+                                           Address destBuffer,
+                                           GenericEnvironment *env,
+                                           const llvm::Twine &name);
 
 } // end namespace irgen
 } // end namespace swift

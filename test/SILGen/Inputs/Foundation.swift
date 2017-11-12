@@ -32,105 +32,121 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
 }
 
 // NSSet bridging entry points
-func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
+func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
+func _convertNSSetToSet<T>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
 extension String : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSString.self
-  }
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSString,
-    inout result: String?
+    _ x: NSString,
+    result: inout String?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSString,
-    inout result: String?
+    _ x: NSString,
+    result: inout String?
   ) -> Bool {
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSString?
+  ) -> String {
+    return String()
   }
 }
 
 extension Int : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSNumber.self
-  }
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSNumber,
-    inout result: Int?
+    _ x: NSNumber,
+    result: inout Int?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSNumber,
-    inout result: Int?
+    _ x: NSNumber,
+    result: inout Int?
   ) -> Bool {
     return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSNumber?
+  ) -> Int {
+    return 0
   }
 }
 
 extension Array : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSArray.self
-  }
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSArray,
-    inout result: Array?
+    _ x: NSArray,
+    result: inout Array?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSArray,
-    inout result: Array?
+    _ x: NSArray,
+    result: inout Array?
   ) -> Bool {
-    return nil
+    return true
   }
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSArray?
+  ) -> Array {
+    return Array()
   }
 }
 
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _getObjectiveCType() -> Any.Type {
-    return NSDictionary.self
-  }
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
   public static func _forceBridgeFromObjectiveC(
-    x: NSDictionary,
-  inout result: Dictionary?
+    _ x: NSDictionary,
+  result: inout Dictionary?
   ) {
   }
   public static func _conditionallyBridgeFromObjectiveC(
-    x: NSDictionary,
-    inout result: Dictionary?
+    _ x: NSDictionary,
+    result: inout Dictionary?
   ) -> Bool {
     return true
   }
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSDictionary?
+  ) -> Dictionary {
+    return Dictionary()
+  }
+}
+
+extension Set : _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSSet {
+    return NSSet()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSSet,
+    result: inout Set?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSSet,
+    result: inout Set?
+  ) -> Bool {
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSSet?
+  ) -> Set {
+    return Set()
   }
 }
 
@@ -140,8 +156,29 @@ extension NSObject : Hashable {
 
 public func == (x: NSObject, y: NSObject) -> Bool { return true }
 
-extension NSError: ErrorType {
+extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
+extension AnyHashable : _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSObject {
+    fatalError()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) -> Bool {
+    fatalError()
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSObject?
+  ) -> AnyHashable {
+    fatalError()
+  }
+}

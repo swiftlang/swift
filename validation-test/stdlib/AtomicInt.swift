@@ -1,20 +1,17 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-build-swift -module-name a %s -o %t.out -O
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
+// UNSUPPORTED: nonatomic_rc
 
 import SwiftPrivate
 import StdlibUnittest
 
-// Also import modules which are used by StdlibUnittest internally. This
-// workaround is needed to link all required libraries in case we compile
-// StdlibUnittest with -sil-serialize-all.
-import SwiftPrivate
-import SwiftPrivatePthreadExtras
-#if _runtime(_ObjC)
-import ObjectiveC
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#elseif os(Linux)
+import Glibc
 #endif
 
 final class HeapBool {
@@ -72,7 +69,7 @@ final class AtomicInt4HeapInt2Int2RaceData {
   }
 }
 
-struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -86,7 +83,7 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     if raceData.writerStarted.fetchAndAdd(1) == 0 {
       // Writer.
@@ -121,7 +118,7 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {
@@ -143,17 +140,17 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 10, 20,  0, 40),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
@@ -168,7 +165,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     // Test release semantics of 'fetchAndAdd' and 'addAndFetch'.
     if raceData.writerStarted.fetchAndAdd(1) == 0 {
@@ -203,7 +200,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {
@@ -214,17 +211,17 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
@@ -239,7 +236,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     // Test release semantics of 'fetchAndAdd' and 'addAndFetch'.
     if raceData.writerStarted.fetchAndAdd(1) == 0 {
@@ -290,7 +287,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {
@@ -301,17 +298,17 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
 }
 
 struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
-  : RaceTestWithPerTrialDataType {
+  : RaceTestWithPerTrialData {
 
   typealias RaceData = AtomicInt4HeapInt2Int2RaceData
   typealias ThreadLocalData = Void
@@ -326,7 +323,7 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     // Test release semantics of 'fetchAndAdd' and 'addAndFetch' with regard to
     // non-atomic stores.
@@ -417,7 +414,7 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {
@@ -428,16 +425,16 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
            Observation(2, 10, 20,  0,  0, 100, 200, 999, 999),
            Observation(2, 10, 20, 30,  0, 100, 200, 300, 999),
            Observation(2, 10, 20, 30, 40, 100, 200, 300, 400):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
 }
 
-struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -452,7 +449,7 @@ struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     if raceData.writerStarted.fetchAndAdd(1) == 0 {
       // Writer.
@@ -487,7 +484,7 @@ struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {
@@ -509,16 +506,16 @@ struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2,  8, 16, -4, 64),
            Observation(2,  8, 16, 32, -4),
            Observation(2,  8, 16, 32, 64):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
 }
 
-struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -533,7 +530,7 @@ struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     if raceData.writerStarted.fetchAndAdd(1) == 0 {
       // Writer.
@@ -568,7 +565,7 @@ struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {
@@ -590,16 +587,16 @@ struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 11, 19,  3, 67),
            Observation(2, 11, 19, 35,  3),
            Observation(2, 11, 19, 35, 67):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
 }
 
-struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialData {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
   typealias Observation = Observation5Int
@@ -614,7 +611,7 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     if raceData.writerStarted.fetchAndAdd(1) == 0 {
       // Writer.
@@ -649,7 +646,7 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     for observation in observations {
@@ -671,10 +668,10 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 10, 18,  3, 66),
            Observation(2, 10, 18, 34,  3),
            Observation(2, 10, 18, 34, 66):
-        sink(.PassInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -683,7 +680,7 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
 
 var dummyObjectCount = _stdlib_ShardedAtomicCounter()
 
-struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
+struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
   class DummyObject {
     var payload: UInt = 0x12345678
     var randomInt: Int
@@ -703,7 +700,8 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
     var _atomicReference: AnyObject? = nil
 
     var atomicReferencePtr: UnsafeMutablePointer<AnyObject?> {
-      return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+      return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+        to: Optional<AnyObject>.self)
     }
 
     init() {}
@@ -721,11 +719,11 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
   }
 
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     var observation = Observation4UInt(0, 0, 0, 0)
-    var initializerDestroyed = HeapBool(false)
-    if true {
+    let initializerDestroyed = HeapBool(false)
+    do {
       let initializer = DummyObject(
         destroyedFlag: initializerDestroyed,
         randomInt: threadLocalData.randomInt())
@@ -735,7 +733,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
       if let ref =
         _stdlib_atomicLoadARCRef(object: raceData.atomicReferencePtr) {
         let dummy = ref as! DummyObject
-        observation.data2 = unsafeBitCast(ref, UInt.self)
+        observation.data2 = unsafeBitCast(ref, to: UInt.self)
         observation.data3 = dummy.payload
       }
     }
@@ -744,19 +742,19 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
   }
 
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     let ref = observations[0].data2
-    if observations.contains({ $0.data2 != ref }) {
+    if observations.contains(where: { $0.data2 != ref }) {
       for observation in observations {
-        sink(.FailureInteresting("mismatched reference, expected \(ref): \(observation)"))
+        sink(.failureInteresting("mismatched reference, expected \(ref): \(observation)"))
       }
       return
     }
-    if observations.contains({ $0.data3 != 0x12345678 }) {
+    if observations.contains(where: { $0.data3 != 0x12345678 }) {
       for observation in observations {
-        sink(.FailureInteresting("wrong data: \(observation)"))
+        sink(.failureInteresting("wrong data: \(observation)"))
       }
       return
     }
@@ -767,67 +765,71 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
       switch (observation.data1, observation.data4) {
       case (1, 0):
         // Won race, value not destroyed.
-        ++wonRace
+        wonRace += 1
       case (0, 1):
         // Lost race, value destroyed.
-        ++lostRace
+        lostRace += 1
       default:
-        sink(.FailureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
     if wonRace != 1 {
       for observation in observations {
-        sink(.FailureInteresting("zero or more than one thread won race: \(observation)"))
+        sink(.failureInteresting("zero or more than one thread won race: \(observation)"))
       }
       return
     }
     if lostRace < 1 {
       for observation in observations {
-        sink(.FailureInteresting("no thread lost race: \(observation)"))
+        sink(.failureInteresting("no thread lost race: \(observation)"))
       }
       return
     }
 
-    sink(.Pass)
+    sink(.pass)
   }
 }
 
 var AtomicIntTestSuite = TestSuite("AtomicInt")
 
 AtomicIntTestSuite.test("fetchAndAdd/1") {
-  runRaceTest(AtomicInt_fetchAndAdd_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndAdd_1_RaceTest.self,
+    operations: 6400, timeoutInSeconds: 60)
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseAtomicStores/1") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest.self,
-    operations: 12800)
+    operations: 12800, timeoutInSeconds: 60)
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseAtomicStores/2") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest.self,
-    operations: 12800)
+    operations: 12800, timeoutInSeconds: 60)
 }
 
 AtomicIntTestSuite.test("fetchAndAdd/ReleaseNonAtomicStores/1") {
   runRaceTest(
     AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest.self,
-    operations: 25600)
+    operations: 25600, timeoutInSeconds: 60)
 }
 
 AtomicIntTestSuite.test("fetchAndAnd/1") {
-  runRaceTest(AtomicInt_fetchAndAnd_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndAnd_1_RaceTest.self,
+    operations: 6400, timeoutInSeconds: 60)
 }
 // FIXME: add more tests for fetchAndAnd, like we have for fetchAndAdd.
 
 AtomicIntTestSuite.test("fetchAndOr/1") {
-  runRaceTest(AtomicInt_fetchAndOr_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndOr_1_RaceTest.self,
+    operations: 6400, timeoutInSeconds: 60)
 }
 // FIXME: add more tests for fetchAndOr, like we have for fetchAndAdd.
 
 AtomicIntTestSuite.test("fetchAndXor/1") {
-  runRaceTest(AtomicInt_fetchAndXor_1_RaceTest.self, operations: 6400)
+  runRaceTest(AtomicInt_fetchAndXor_1_RaceTest.self,
+    operations: 6400, timeoutInSeconds: 60)
 }
 // FIXME: add more tests for fetchAndXor, like we have for fetchAndAdd.
 
@@ -835,7 +837,8 @@ AtomicIntTestSuite.test("fetchAndXor/1") {
 var AtomicARCRefTestSuite = TestSuite("AtomicARCRef")
 
 AtomicARCRefTestSuite.test("initialize,load") {
-  runRaceTest(AtomicInitializeARCRefRaceTest.self, operations: 25600)
+  runRaceTest(AtomicInitializeARCRefRaceTest.self,
+    operations: 25600, timeoutInSeconds: 60)
   expectEqual(0, dummyObjectCount.getSum())
 }
 

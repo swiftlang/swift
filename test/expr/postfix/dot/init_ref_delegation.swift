@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Tests for initializer delegation via self.init(...).
 
@@ -101,7 +101,7 @@ enum Z2 {
 // Ill-formed initialization: wrong context.
 class Z3 {
   func f() {
-    self.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{9-9=.dynamicType}}
+    self.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{10-10=type(of: }} {{14-14=)}} 
   }
 
   init() { }
@@ -112,8 +112,8 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{10-10=.dynamicType}}
-    other.dynamicType.init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
+    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}} 
+    type(of: other).init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
   }
 }
 
@@ -121,7 +121,7 @@ class Z5 : Z4 {
   override init() { }
 
   convenience init(other: Z5) {
-    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{10-10=.dynamicType}}
+    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}} 
   }
 }
 
@@ -150,8 +150,8 @@ struct RDar16603812 {
    var i = 42
    init() {}
    func foo() {
-      self.init() // expected-error {{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{11-11=.dynamicType}}
-      self.dynamicType.init() // expected-warning{{result of initializer is unused}}
+      self.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{12-12=type(of: }} {{16-16=)}} 
+      type(of: self).init() // expected-warning{{result of 'RDar16603812' initializer is unused}}
    }
 }
 
@@ -168,7 +168,7 @@ class RDar16666631 {
       self.init(i: i, d: 0.1, s: s)
    }
 }
-let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{missing argument for parameter 's' in call}}
+let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{incorrect argument label in call (have 'i:d:', expected 'i:s:')}}
 
 
 struct S {
@@ -199,7 +199,7 @@ class D: C {
   }
 
   func foo() {
-    self.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{9-9=.dynamicType}}
+    self.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{10-10=type(of: }} {{14-14=)}} 
   }
   func bar() {
     super.init(x: 0) // expected-error{{'super.init' cannot be called outside of an initializer}}
@@ -254,30 +254,30 @@ protocol P {
   init(proto: String)
 }
 
-func foo<T: C where T: P>(x: T, y: T.Type) {
-  var c1 = x.dynamicType.init(required: 0)
-  var c2 = x.dynamicType.init(x: 0) // expected-error{{'required' initializer}}
-  var c3 = x.dynamicType.init() // expected-error{{'required' initializer}}
-  var c4 = x.dynamicType.init(proto: "")
+func foo<T: C>(_ x: T, y: T.Type) where T: P {
+  var c1 = type(of: x).init(required: 0)
+  var c2 = type(of: x).init(x: 0) // expected-error{{'required' initializer}}
+  var c3 = type(of: x).init() // expected-error{{'required' initializer}}
+  var c4 = type(of: x).init(proto: "")
 
-  var cf1: (Double) -> T = x.dynamicType.init
-  var cf2: (Int) -> T    = x.dynamicType.init // expected-error{{'required' initializer}}
-  var cf3: () -> T       = x.dynamicType.init // expected-error{{'required' initializer}}
-  var cf4: (String) -> T = x.dynamicType.init
+  var cf1: (Double) -> T = type(of: x).init
+  var cf2: (Int) -> T    = type(of: x).init // expected-error{{'required' initializer}}
+  var cf3: () -> T       = type(of: x).init // expected-error{{'required' initializer}}
+  var cf4: (String) -> T = type(of: x).init
 
-  var c1a = x.dynamicType.init(required: 0)
-  var c2a = x.dynamicType.init(x: 0) // expected-error{{'required' initializer}}
-  var c3a = x.dynamicType.init() // expected-error{{'required' initializer}}
-  var c4a = x.dynamicType.init(proto: "")
+  var c1a = type(of: x).init(required: 0)
+  var c2a = type(of: x).init(x: 0) // expected-error{{'required' initializer}}
+  var c3a = type(of: x).init() // expected-error{{'required' initializer}}
+  var c4a = type(of: x).init(proto: "")
 
-  var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
-  var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
-  var ci3 = x.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
-  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
+  var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}} 
+  var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}} 
+  var ci3 = x.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}} 
+  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}} 
 
   var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
-  var ci3a = x() // expected-error{{invalid use of '()' to call a value of non-function type 'T'}} {{15-17=}}
+  var ci3a = x() // expected-error{{cannot call value of non-function type 'T'}}{{15-17=}}
   var ci4a = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
 
   var cm1 = y.init(required: 0)
@@ -294,12 +294,13 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
   var cs2 = T.init(x: 0) // expected-error{{'required' initializer}}
   var cs3 = T.init() // expected-error{{'required' initializer}}
   var cs4 = T.init(proto: "")
-  var cs5 = T.init(notfound: "") // expected-error{{incorrect argument label}} {{20-28=proto}}
+  var cs5 = T.init(notfound: "") // expected-error{{argument labels '(notfound:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'T.Type.init' exist with these partially matching parameter lists: (x: Int), (required: Double), (proto: String)}}
 
-  var csf1: Double -> T = T.init
-  var csf2: Int -> T    = T.init // expected-error{{'required' initializer}}
+  var csf1: (Double) -> T = T.init
+  var csf2: (Int) -> T    = T.init // expected-error{{'required' initializer}}
   var csf3: () -> T     = T.init // expected-error{{'required' initializer}}
-  var csf4: String -> T = T.init
+  var csf4: (String) -> T = T.init
 
   var cs1a = T(required: 0)
   var cs2a = T(x: 0) // expected-error{{'required' initializer}}
@@ -333,88 +334,88 @@ class TestNestedExpr {
 
   convenience init(a: Int) {
     let x: () = self.init() // expected-error {{initializer delegation ('self.init') cannot be nested in another statement}}
-    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   }
 
   convenience init(b: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
   convenience init(c: Int) {
-    ((), self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    _ = ((), self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
   convenience init(d: Int) {
     let x: () = self.init(fail: true)! // expected-error {{initializer delegation ('self.init') cannot be nested in another statement}}
-    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   }
 
   convenience init(e: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
   convenience init(f: Int) {
-    ((), self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    _ = ((), self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
   convenience init(g: Int) {
     let x: () = try! self.init(error: true) // expected-error {{initializer delegation ('self.init') cannot be nested in another statement}}
-    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   }
 
   convenience init(h: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 
   convenience init(i: Int) {
-    ((), try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    _ = ((), try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 }
 
 class TestNestedExprSub : TestNestedExpr {
   init(a: Int) {
     let x: () = super.init() // expected-error {{initializer chaining ('super.init') cannot be nested in another statement}}
-    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   }
 
   init(b: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
   init(c: Int) {
-    ((), super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    _ = ((), super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
   init(d: Int) {
     let x: () = super.init(fail: true)! // expected-error {{initializer chaining ('super.init') cannot be nested in another statement}}
-    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   }
 
   init(e: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
   init(f: Int) {
-    ((), super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    _ = ((), super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
   init(g: Int) {
     let x: () = try! super.init(error: true) // expected-error {{initializer chaining ('super.init') cannot be nested in another statement}}
-    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   }
 
   init(h: Int) {
-    func use(x: ()) {}
+    func use(_ x: ()) {}
     use(try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 
   init(i: Int) {
-    ((), try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    _ = ((), try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
 }
 

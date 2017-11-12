@@ -1,3 +1,6 @@
-// RUN: for x in %platform-sdk-overlay-dir/*.swiftmodule; do [[ $(basename "$x") = Swift.swiftmodule ]] && continue; llvm-bcanalyzer $x | FileCheck %s; %target-sil-opt -enable-sil-verify-all $x > /dev/null; done
+// RUN: for x in %platform-sdk-overlay-dir/*.swiftmodule; do [[ $(basename "$x") = Swift.swiftmodule ]] && continue; llvm-bcanalyzer $x | %FileCheck %s; %target-sil-opt -sdk %sdk -enable-sil-verify-all $x > /dev/null; done
 
 // CHECK-NOT: Unknown
+
+// REQUIRES: long_test
+// REQUIRES: nonexecutable_test

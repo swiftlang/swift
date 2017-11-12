@@ -1,12 +1,12 @@
-//===-- driver.cpp - Swift Compiler Driver --------------------------------===//
+//===--- driver.cpp - Swift Compiler Driver -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -24,6 +24,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/FrontendTool/FrontendTool.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errno.h"
@@ -49,15 +50,16 @@ std::string getExecutablePath(const char *FirstArg) {
   return llvm::sys::fs::getMainExecutable(FirstArg, P);
 }
 
-extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
-                         void *MainAddr);
-
 /// Run 'swift-autolink-extract'.
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
 
 extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                            void *MainAddr);
+
+/// Run 'swift-format'
+extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
+                             void *MainAddr);
 
 /// Determine if the given invocation should run as a subcommand.
 ///
@@ -92,9 +94,9 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   StringRef Subcommand = Args[1];
   Args.erase(&Args[1]);
 
-  // If the subcommand is one of the "built-in" 'repl' or 'run', then use the
+  // If the subcommand is the "built-in" 'repl', then use the
   // normal driver.
-  if (Subcommand == "repl" || Subcommand == "run")
+  if (Subcommand == "repl")
     return false;
 
   // Form the subcommand name.
@@ -103,6 +105,8 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 
   return true;
 }
+
+extern int apinotes_main(ArrayRef<const char *> Args);
 
 int main(int argc_, const char **argv_) {
   INITIALIZE_LLVM(argc_, argv_);
@@ -150,17 +154,21 @@ int main(int argc_, const char **argv_) {
   }
 
   // Handle integrated tools.
-  if (argv.size() > 1){
+  if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
     if (FirstArg == "-frontend") {
-      return frontend_main(llvm::makeArrayRef(argv.data()+2,
-                                              argv.data()+argv.size()),
-                           argv[0], (void *)(intptr_t)getExecutablePath);
+      return performFrontend(llvm::makeArrayRef(argv.data()+2,
+                                                argv.data()+argv.size()),
+                             argv[0], (void *)(intptr_t)getExecutablePath);
     }
     if (FirstArg == "-modulewrap") {
       return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-apinotes") {
+      return apinotes_main(llvm::makeArrayRef(argv.data()+1,
+                                              argv.data()+argv.size()));
     }
   }
 
@@ -176,6 +184,10 @@ int main(int argc_, const char **argv_) {
   switch (TheDriver.getDriverKind()) {
   case Driver::DriverKind::AutolinkExtract:
     return autolink_extract_main(
+      TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
+      argv[0], (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SwiftFormat:
+    return swift_format_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
       argv[0], (void *)(intptr_t)getExecutablePath);
   default:

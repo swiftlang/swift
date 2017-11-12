@@ -1,0 +1,3 @@
+module BrokenAPINotes {
+  header "BrokenAPINotes.h"
+}

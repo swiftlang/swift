@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -37,17 +37,18 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
+import SwiftPrivateLibcExtras
 import SwiftPrivatePthreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
 #endif
 
 #if _runtime(_ObjC)
 import ObjectiveC
 #else
-func autoreleasepool(@noescape code: () -> Void) {
+func autoreleasepool(invoking code: () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code
   // directly.
   code()
@@ -62,21 +63,21 @@ func autoreleasepool(@noescape code: () -> Void) {
 /// Types conforming to this protocol should be structs.  (The type
 /// should be a struct to reduce unnecessary reference counting during
 /// the test.)  The types should be stateless.
-public protocol RaceTestWithPerTrialDataType {
+public protocol RaceTestWithPerTrialData {
 
   /// Input for threads.
   ///
   /// This type should be a class.  (The harness will not pass struct instances
   /// between threads correctly.)
-  typealias RaceData : AnyObject
+  associatedtype RaceData : AnyObject
 
   /// Type of thread-local data.
   ///
   /// Thread-local data is newly created for every trial.
-  typealias ThreadLocalData
+  associatedtype ThreadLocalData
 
   /// Results of the observation made after performing an operation.
-  typealias Observation
+  associatedtype Observation
 
   init()
 
@@ -88,12 +89,12 @@ public protocol RaceTestWithPerTrialDataType {
 
   /// Performs the operation under test and makes an observation.
   func thread1(
-    raceData: RaceData, inout _ threadLocalData: ThreadLocalData) -> Observation
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData) -> Observation
 
   /// Evaluates the observations made by all threads for a particular instance
   /// of `RaceData`.
   func evaluateObservations(
-    observations: [Observation],
+    _ observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> Void)
 }
 
@@ -103,27 +104,27 @@ public protocol RaceTestWithPerTrialDataType {
 /// according to it.
 public enum RaceTestObservationEvaluation : Equatable, CustomStringConvertible {
   /// Normal 'pass'.
-  case Pass
+  case pass
 
   /// An unusual 'pass'.
-  case PassInteresting(String)
+  case passInteresting(String)
 
   /// A failure.
-  case Failure
-  case FailureInteresting(String)
+  case failure
+  case failureInteresting(String)
 
   public var description: String {
     switch self {
-    case .Pass:
+    case .pass:
       return "Pass"
 
-    case .PassInteresting(let s):
+    case .passInteresting(let s):
       return "Pass(\(s))"
 
-    case .Failure:
+    case .failure:
       return "Failure"
 
-    case .FailureInteresting(let s):
+    case .failureInteresting(let s):
       return "Failure(\(s))"
     }
   }
@@ -133,11 +134,11 @@ public func == (
   lhs: RaceTestObservationEvaluation, rhs: RaceTestObservationEvaluation
 ) -> Bool {
   switch (lhs, rhs) {
-  case (.Pass, .Pass),
-       (.Failure, .Failure):
+  case (.pass, .pass),
+       (.failure, .failure):
     return true
 
-  case (.PassInteresting(let s1), .PassInteresting(let s2)):
+  case (.passInteresting(let s1), .passInteresting(let s2)):
     return s1 == s2
 
   default:
@@ -319,16 +320,16 @@ public func == (lhs: Observation9Int, rhs: Observation9Int) -> Bool {
 }
 
 /// A helper that is useful to implement
-/// `RaceTestWithPerTrialDataType.evaluateObservations()` in race tests.
-public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
+/// `RaceTestWithPerTrialData.evaluateObservations()` in race tests.
+public func evaluateObservationsAllEqual<T : Equatable>(_ observations: [T])
   -> RaceTestObservationEvaluation {
   let first = observations.first!
   for x in observations {
     if x != first {
-      return .Failure
+      return .failure
     }
   }
-  return .Pass
+  return .pass
 }
 
 struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
@@ -339,21 +340,21 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 
   init() {}
 
-  mutating func addEvaluation(evaluation: RaceTestObservationEvaluation) {
+  mutating func addEvaluation(_ evaluation: RaceTestObservationEvaluation) {
     switch evaluation {
-    case .Pass:
-      ++passCount
+    case .pass:
+      passCount += 1
 
-    case .PassInteresting(let s):
+    case .passInteresting(let s):
       if passInterestingCount[s] == nil {
         passInterestingCount[s] = 0
       }
       passInterestingCount[s] = passInterestingCount[s]! + 1
 
-    case .Failure:
-      ++failureCount
+    case .failure:
+      failureCount += 1
 
-    case .FailureInteresting(let s):
+    case .failureInteresting(let s):
       if failureInterestingCount[s] == nil {
         failureInterestingCount[s] = 0
       }
@@ -368,12 +369,12 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
   var description: String {
     var result = ""
     result += "Pass: \(passCount) times\n"
-    for desc in passInterestingCount.keys.sort() {
+    for desc in passInterestingCount.keys.sorted() {
       let count = passInterestingCount[desc]!
       result += "Pass \(desc): \(count) times\n"
     }
     result += "Failure: \(failureCount) times\n"
-    for desc in failureInterestingCount.keys.sort() {
+    for desc in failureInterestingCount.keys.sorted() {
       let count = failureInterestingCount[desc]!
       result += "Failure \(desc): \(count) times\n"
     }
@@ -382,15 +383,16 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 }
 
 // FIXME: protect this class against false sharing.
-class _RaceTestWorkerState<RT : RaceTestWithPerTrialDataType> {
+class _RaceTestWorkerState<RT : RaceTestWithPerTrialData> {
   // FIXME: protect every element of 'raceData' against false sharing.
   var raceData: [RT.RaceData] = []
   var raceDataShuffle: [Int] = []
   var observations: [RT.Observation] = []
 }
 
-class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
+class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   var racingThreadCount: Int
+  var stopNow = _stdlib_AtomicInt(0)
 
   var trialBarrier: _stdlib_Barrier
   var trialSpinBarrier: _stdlib_AtomicInt = _stdlib_AtomicInt()
@@ -411,34 +413,42 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
   }
 }
 
-func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
-  sharedState: _RaceTestSharedState<RT>
-) {
+func _masterThreadStopWorkers<RT>( _ sharedState: _RaceTestSharedState<RT>) {
+  // Workers are proceeding to the first barrier in _workerThreadOneTrial.
+  sharedState.stopNow.store(1)
+  // Allow workers to proceed past that first barrier. They will then see
+  // stopNow==true and stop.
+  sharedState.trialBarrier.wait()
+}
+
+func _masterThreadOneTrial<RT>(_ sharedState: _RaceTestSharedState<RT>) {
   let racingThreadCount = sharedState.racingThreadCount
   let raceDataCount = racingThreadCount * racingThreadCount
   let rt = RT()
 
-  sharedState.raceData.removeAll(keepCapacity: true)
-  sharedState.raceData.appendContentsOf(
-    (0..<raceDataCount).lazy.map { i in rt.makeRaceData() })
+  sharedState.raceData.removeAll(keepingCapacity: true)
+
+  sharedState.raceData.append(contentsOf: (0..<raceDataCount).lazy.map { _ in
+    rt.makeRaceData()
+  })
 
   let identityShuffle = Array(0..<sharedState.raceData.count)
-  sharedState.workerStates.removeAll(keepCapacity: true)
-  sharedState.workerStates.appendContentsOf(
-    (0..<racingThreadCount).lazy.map {
-      i in
-      let workerState = _RaceTestWorkerState<RT>()
+  sharedState.workerStates.removeAll(keepingCapacity: true)
+  
+  sharedState.workerStates.append(contentsOf: (0..<racingThreadCount).lazy.map {
+    _ in
+    let workerState = _RaceTestWorkerState<RT>()
 
-      // Shuffle the data so that threads process it in different order.
-      let shuffle = randomShuffle(identityShuffle)
-      workerState.raceData = scatter(sharedState.raceData, shuffle)
-      workerState.raceDataShuffle = shuffle
+    // Shuffle the data so that threads process it in different order.
+    let shuffle = randomShuffle(identityShuffle)
+    workerState.raceData = scatter(sharedState.raceData, shuffle)
+    workerState.raceDataShuffle = shuffle
 
-      workerState.observations = []
-      workerState.observations.reserveCapacity(sharedState.raceData.count)
+    workerState.observations = []
+    workerState.observations.reserveCapacity(sharedState.raceData.count)
 
-      return workerState
-    })
+    return workerState
+  })
 
   sharedState.trialSpinBarrier.store(0)
   sharedState.trialBarrier.wait()
@@ -466,22 +476,25 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
 
       let sink = { sharedState.aggregatedEvaluations.addEvaluation($0) }
       rt.evaluateObservations(observations, sink)
-      observations.removeAll(keepCapacity: true)
+      observations.removeAll(keepingCapacity: true)
     }
   }
 }
 
-func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
-  tid: Int, _ sharedState: _RaceTestSharedState<RT>
-) {
+func _workerThreadOneTrial<RT>(
+  _ tid: Int, _ sharedState: _RaceTestSharedState<RT>
+) -> Bool {
   sharedState.trialBarrier.wait()
+  if sharedState.stopNow.load() == 1 {
+    return true
+  }
   let racingThreadCount = sharedState.racingThreadCount
   let workerState = sharedState.workerStates[tid]
   let rt = RT()
   var threadLocalData = rt.makeThreadLocalData()
-  if true {
+  do {
     let trialSpinBarrier = sharedState.trialSpinBarrier
-    trialSpinBarrier.fetchAndAdd(1)
+    _ = trialSpinBarrier.fetchAndAdd(1)
     while trialSpinBarrier.load() < racingThreadCount {}
   }
   // Perform racy operations.
@@ -491,40 +504,111 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
     workerState.observations.append(rt.thread1(raceData, &threadLocalData))
   }
   sharedState.trialBarrier.wait()
+  return false
 }
 
-public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
+/// One-shot sleep in one thread, allowing interrupt by another.
+class _InterruptibleSleep {
+  let writeEnd: CInt
+  let readEnd: CInt
+  var completed = false
+
+  init() {
+    (readEnd: readEnd, writeEnd: writeEnd, _) = _stdlib_pipe()
+  }
+
+  deinit {
+    close(readEnd)
+    close(writeEnd)
+  }
+
+  /// Sleep for durationInSeconds or until another
+  /// thread calls wake(), whichever comes first.
+  func sleep(durationInSeconds duration: Int) {
+    if completed {
+      return
+    }
+
+    var timeout = timeval(tv_sec: duration, tv_usec: 0)
+
+    var readFDs = _stdlib_fd_set()
+    var writeFDs = _stdlib_fd_set()
+    var errorFDs = _stdlib_fd_set()
+    readFDs.set(readEnd)
+
+    let ret = _stdlib_select(&readFDs, &writeFDs, &errorFDs, &timeout)
+    precondition(ret >= 0)
+    completed = true
+  }
+
+  /// Wake the thread in sleep().
+  func wake() {
+    if completed { return }
+
+    let buffer: [UInt8] = [1]
+    let ret = write(writeEnd, buffer, 1)
+    precondition(ret >= 0)
+  }
+}
+
+public func runRaceTest<RT : RaceTestWithPerTrialData>(
   _: RT.Type,
   trials: Int,
+  timeoutInSeconds: Int? = nil,
   threads: Int? = nil
 ) {
   let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())
   let sharedState = _RaceTestSharedState<RT>(racingThreadCount: racingThreadCount)
 
-  let masterThreadBody: (_: ())->() = {
-    (_: ())->() in
-    for _ in 0..<trials {
+  // Alarm thread sets timeoutReached.
+  // Master thread sees timeoutReached and tells worker threads to stop.
+  let timeoutReached = _stdlib_AtomicInt(0)
+  let alarmTimer = _InterruptibleSleep()
+
+  let masterThreadBody = {
+    () -> Void in
+    for t in 0..<trials {
+      // Check for timeout.
+      // _masterThreadStopWorkers must run BEFORE the last _masterThreadOneTrial
+      // to make the thread coordination barriers work
+      // but we do want to run at least one trial even if the timeout occurs.
+      if timeoutReached.load() == 1 && t > 0 {
+        _masterThreadStopWorkers(sharedState)
+        break
+      }
+
       autoreleasepool {
         _masterThreadOneTrial(sharedState)
       }
     }
   }
 
-  let racingThreadBody: (Int)->() = {
-    (tid: Int)->() in
+  let racingThreadBody = {
+    (tid: Int) -> Void in
     for _ in 0..<trials {
-      _workerThreadOneTrial(tid, sharedState)
+      let stopNow = _workerThreadOneTrial(tid, sharedState)
+      if stopNow { break }
     }
   }
 
-  var allTids = [pthread_t]()
+  let alarmThreadBody = {
+    () -> Void in
+    guard let timeoutInSeconds = timeoutInSeconds
+    else { return }
+
+    alarmTimer.sleep(durationInSeconds: timeoutInSeconds)
+    _ = timeoutReached.fetchAndAdd(1)
+  }
+
+  var testTids = [pthread_t]()
+  var alarmTid: pthread_t
 
   // Create the master thread.
-  if true {
+  do {
     let (ret, tid) = _stdlib_pthread_create_block(
       nil, masterThreadBody, ())
     expectEqual(0, ret)
-    allTids.append(tid!)
+    testTids.append(tid!)
   }
 
   // Create racing threads.
@@ -532,12 +616,27 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
     let (ret, tid) = _stdlib_pthread_create_block(
       nil, racingThreadBody, i)
     expectEqual(0, ret)
-    allTids.append(tid!)
+    testTids.append(tid!)
   }
 
-  // Join all threads.
-  for tid in allTids {
+  // Create the alarm thread that enforces the timeout.
+  do {
+    let (ret, tid) = _stdlib_pthread_create_block(
+      nil, alarmThreadBody, ())
+    expectEqual(0, ret)
+    alarmTid = tid!
+  }
+
+  // Join all testing threads.
+  for tid in testTids {
     let (ret, _) = _stdlib_pthread_join(tid, Void.self)
+    expectEqual(0, ret)
+  }
+
+  // Tell the alarm thread to stop if it hasn't already, then join it.
+  do {
+    alarmTimer.wake()
+    let (ret, _) = _stdlib_pthread_join(alarmTid, Void.self)
     expectEqual(0, ret)
   }
 
@@ -546,13 +645,14 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   print(aggregatedEvaluations)
 }
 
-internal func _divideRoundUp(lhs: Int, _ rhs: Int) -> Int {
+internal func _divideRoundUp(_ lhs: Int, _ rhs: Int) -> Int {
   return (lhs + rhs) / rhs
 }
 
-public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
-  test: RT.Type,
+public func runRaceTest<RT : RaceTestWithPerTrialData>(
+  _ test: RT.Type,
   operations: Int,
+  timeoutInSeconds: Int? = nil,
   threads: Int? = nil
 ) {
   let racingThreadCount = threads ?? max(2, _stdlib_getHardwareConcurrency())
@@ -560,7 +660,8 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
   // Each trial runs threads^2 operations.
   let operationsPerTrial = racingThreadCount * racingThreadCount
   let trials = _divideRoundUp(operations, operationsPerTrial)
-  runRaceTest(test, trials: trials, threads: threads)
+  runRaceTest(test, trials: trials, timeoutInSeconds: timeoutInSeconds,
+    threads: threads)
 }
 
 public func consumeCPU(units amountOfWork: Int) {
@@ -571,3 +672,48 @@ public func consumeCPU(units amountOfWork: Int) {
     }
   }
 }
+
+internal struct ClosureBasedRaceTest : RaceTestWithPerTrialData {
+  static var thread: () -> Void = {}
+
+  class RaceData {}
+  typealias ThreadLocalData = Void
+  typealias Observation = Void
+
+  func makeRaceData() -> RaceData { return RaceData() }
+  func makeThreadLocalData() -> Void { return Void() }
+
+  func thread1(
+    _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
+  ) {
+    ClosureBasedRaceTest.thread()
+  }
+
+  func evaluateObservations(
+    _ observations: [Observation],
+    _ sink: (RaceTestObservationEvaluation) -> Void
+  ) {}
+}
+
+public func runRaceTest(
+  trials: Int,
+  timeoutInSeconds: Int? = nil,
+  threads: Int? = nil,
+  invoking body: @escaping () -> Void
+) {
+  ClosureBasedRaceTest.thread = body
+  runRaceTest(ClosureBasedRaceTest.self, trials: trials,
+    timeoutInSeconds: timeoutInSeconds, threads: threads)
+}
+
+public func runRaceTest(
+  operations: Int,
+  timeoutInSeconds: Int? = nil,
+  threads: Int? = nil,
+  invoking body: @escaping () -> Void
+) {
+  ClosureBasedRaceTest.thread = body
+  runRaceTest(ClosureBasedRaceTest.self, operations: operations,
+    timeoutInSeconds: timeoutInSeconds, threads: threads)
+}
+

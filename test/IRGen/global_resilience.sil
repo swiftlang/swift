@@ -1,0 +1,171 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+
+// CHECK: %swift.type = type { [[INT:i32|i64]] }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import resilient_struct
+
+//
+// Fits inside a buffer's inline storage.
+//
+
+public struct SmallResilientStruct {
+  let x: Int32 = 0
+}
+
+// CHECK: @smallGlobal = {{(protected )?}}global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer
+sil_global [let] @smallGlobal : $SmallResilientStruct
+
+//
+// Requires out-of-line allocation.
+//
+
+public struct LargeResilientStruct {
+  let w: Int64 = 0
+  let x: Int64 = 0
+  let y: Int64 = 0
+  let z: Int64 = 0
+}
+
+// CHECK: @largeGlobal = {{(protected )?}}global [[BUFFER]] zeroinitializer
+sil_global [let] @largeGlobal : $LargeResilientStruct
+
+//
+// Size is known in this resilience domain, and global is hidden,
+// so allocate it directly.
+//
+
+// CHECK: @fixedGlobal = hidden global %T17global_resilience20LargeResilientStructV zeroinitializer
+sil_global hidden @fixedGlobal : $LargeResilientStruct
+
+//
+// Unknown size -- must call value witness functions for buffer
+// management.
+//
+
+// CHECK: @otherGlobal = {{(protected )?}}global [[BUFFER]] zeroinitializer
+sil_global [let] @otherGlobal : $Size
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testSmallGlobal()
+sil @testSmallGlobal : $@convention(thin) () -> () {
+bb0:
+  // This is just a no-op
+  alloc_global @smallGlobal
+
+  %addr = global_addr @smallGlobal : $*SmallResilientStruct
+
+  // CHECK: [[VALUE:%.*]] = load i32, i32* getelementptr inbounds (%T17global_resilience20SmallResilientStructV, %T17global_resilience20SmallResilientStructV* bitcast ([[BUFFER]]* @smallGlobal to %T17global_resilience20SmallResilientStructV*), i32 0, i32 0, i32 0)
+  %x_addr = struct_element_addr %addr : $*SmallResilientStruct, #SmallResilientStruct.x
+  %x = load %x_addr : $*Int32
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testLargeGlobal()
+sil @testLargeGlobal : $@convention(thin) () -> () {
+bb0:
+  // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[INT]] 32, [[INT]] 7)
+  // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
+  alloc_global @largeGlobal
+
+  // CHECK: [[VALUE:%.*]] = load %T17global_resilience20LargeResilientStructV*, %T17global_resilience20LargeResilientStructV** bitcast ([[BUFFER]]* @largeGlobal to %T17global_resilience20LargeResilientStructV**)
+  %addr = global_addr @largeGlobal : $*LargeResilientStruct
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testFixedGlobal()
+sil @testFixedGlobal : $@convention(thin) () -> () {
+bb0:
+  alloc_global @fixedGlobal
+
+  %addr = global_addr @fixedGlobal : $*LargeResilientStruct
+
+  // CHECK:      load i64, i64* getelementptr inbounds (%T17global_resilience20LargeResilientStructV, %T17global_resilience20LargeResilientStructV* @fixedGlobal, i32 0, i32 1, i32 0)
+  %x_addr = struct_element_addr %addr : $*LargeResilientStruct, #LargeResilientStruct.x
+  %x = load %x_addr : $*Int64
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
+// CHECK-LABEL: define {{.*}} @testOtherGlobal
+sil @testOtherGlobal : $@convention(thin) () -> () {
+bb0:
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
+  // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
+    alloc_global @otherGlobal
+
+  // CHECK: call %swift.opaque* @__swift_project_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
+  %addr = global_addr @otherGlobal : $*Size
+
+  %tuple = tuple ()
+
+  // CHECK: ret void
+  return %tuple : $()
+}
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_allocate_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK: entry:
+// CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 10
+// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
+// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
+// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   br i1 [[ISINLINE]], label %done, label %outline.allocateValueInBuffer
+//
+// CHECK: outline.allocateValueInBuffer:
+// CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
+// CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
+// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
+// CHECK:   [[PTR:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
+// CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
+// CHECK:   store i8* [[PTR]], i8** [[ADDR]]
+// CHECK:   [[OUTLINEADDR:%.*]] = bitcast i8* [[PTR]] to %swift.opaque*
+// CHECK:   br label %done
+//
+// CHECK: done:
+// CHECK:   [[PHI:%.*]] = phi %swift.opaque* [ %1, %entry ], [ [[OUTLINEADDR]], %outline.allocateValueInBuffer ]
+// CHECK:   ret %swift.opaque* [[PHI]]
+
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @__swift_project_value_buffer(%swift.type*, %swift.opaque*)
+// CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 10
+// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
+// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
+// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   br i1 [[ISINLINE]], label %done, label %outline.projectValueInBuffer
+//
+// CHECK: outline.projectValueInBuffer:
+// CHECK:   [[CAST:%.*]] = bitcast %swift.opaque* %1 to %swift.opaque**
+// CHECK:   [[PTR_TO_BUFFER:%.*]] = load %swift.opaque*, %swift.opaque** [[CAST]]
+// CHECK:   br label %done
+//
+// CHECK: done:
+// CHECK:   [[PHI:%.*]] = phi %swift.opaque* [ %1, %entry ], [ [[PTR_TO_BUFFER]], %outline.projectValueInBuffer ]
+// CHECK:   ret %swift.opaque* [[PHI]]

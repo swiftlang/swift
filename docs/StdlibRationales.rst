@@ -49,7 +49,7 @@ e.g. ``Int(text: String)``, yielding a ``Int?``. When other forms provide
 added convenience, they may be provided as well. For example::
 
   String.Index(s.utf16.startIndex.successor(), within: s) // canonical
-  s.utf16.startIndex.successor().samePositionIn(s)        // alternate
+  s.utf16.startIndex.successor().samePosition(in: s)      // alternate
 
 Converting initializers generally take one parameter. A converting
 initializer's first parameter should not have an argument label unless
@@ -64,7 +64,7 @@ generally *should* use a keyword.  For example, ``String(33, radix:
    they're converting.  Secondly, avoiding method or property syntax
    provides a distinct context for code completion.  Rather than
    appearing in completions offered after ``.``, for example, the
-   available conversions could show up whenever the user hit the “tab”
+   available conversions could show up whenever the user hit the "tab"
    key after an expression.
 
 Protocols with restricted conformance rules
@@ -89,8 +89,8 @@ For example::
 
   // Public API that uses CVaListPointer, so CVarArgType has to be public, too.
   public func withVaList<R>(
-    args: [CVarArgType],
-    @noescape f: (CVaListPointer) -> R
+    _ args: [CVarArgType],
+    @noescape invoke body: (CVaListPointer) -> R
   ) -> R
 
 High-order functions on collections return ``Array``\ s
@@ -101,7 +101,7 @@ We can't make ``map()``, ``filter()``, etc. all return ``Self``:
 - ``map()`` takes a function ``(T) -> U`` and therefore can't return Self
   literally.  The required language feature for making ``map()`` return
   something like ``Self`` in generic code (higher-kinded types) doesn't exist
-  in Swift.  You can't write a method like ``func map(f: (T) -> U) -> Self<U>``
+  in Swift.  You can't write a method like ``func map(_ f: (T) -> U) -> Self<U>``
   today.
 
 - There are lots of sequences that don't have an appropriate form for the
@@ -118,7 +118,7 @@ We can't make ``map()``, ``filter()``, etc. all return ``Self``:
 
     func countFlattenedElements<
       S : SequenceType where S.Generator.Element == Set<Double>
-    >(sequence: S) -> Int {
+    >(_ sequence: S) -> Int {
       return sequence.map { $0.count }.reduce(0) { $0 + $1 }
     }
 
@@ -159,11 +159,16 @@ functions don't return lazy collection wrappers that refer to users' closures.
 The consequence is that all users' closures are ``@noescape``, except in an
 explicitly lazy context.
 
-Based on this rule, we conclude that ``enumeraate()``, ``zip()`` and
+Based on this rule, we conclude that ``enumerate()``, ``zip()`` and
 ``reverse()`` return lazy wrappers, but ``filter()`` and ``map()`` don't.  For
 the first three functions being lazy is the right default, since usually the
 result is immediately consumed by for-in, so we don't want to allocate memory
 for it.
+
+Note that neither of the two ``sorted()`` methods (neither one that accepts a
+custom comparator closure, nor one that uses the ``Comparable`` conformance)
+can't be lazy, because the lazy version would be less efficient than the eager
+one.
 
 A different design that was rejected is to preserve consistency with other
 strict functions by making these methods strict, but then client code needs to

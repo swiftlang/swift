@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,6 +17,7 @@
 #define SWIFT_CLANGIMPORTER_CLANGMODULE_H
 
 #include "swift/AST/Module.h"
+#include "swift/ClangImporter/ClangImporter.h"
 
 namespace clang {
   class ASTContext;
@@ -26,15 +27,14 @@ namespace clang {
 namespace swift {
 
 class ASTContext;
-class ClangImporter;
 class ModuleLoader;
 
 /// \brief Represents a Clang module that has been imported into Swift.
 class ClangModuleUnit final : public LoadedFile {
-  ClangImporter &owner;
+  ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> adapterModule;
-  mutable ArrayRef<Module::ImportedModule> importedModulesForLookup;
+  mutable ArrayRef<ModuleDecl::ImportedModule> importedModulesForLookup;
 
   ~ClangModuleUnit() = default;
 
@@ -42,7 +42,7 @@ public:
   /// True if the given Module contains an imported Clang module unit.
   static bool hasClangModule(ModuleDecl *M);
 
-  ClangModuleUnit(ModuleDecl &M, ClangImporter &owner,
+  ClangModuleUnit(ModuleDecl &M, ClangImporter::Implementation &owner,
                   const clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.
@@ -56,11 +56,20 @@ public:
   /// Returns the Swift module that overlays this Clang module.
   ModuleDecl *getAdapterModule() const;
 
+  /// Retrieve the "exported" name of the module, which is usually the module
+  /// name, but might be the name of the public module through which this
+  /// (private) module is re-exported.
+  std::string getExportedModuleName() const;
+
   virtual bool isSystemModule() const override;
 
   virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
                            DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
+
+  virtual TypeDecl *
+  lookupNestedType(Identifier name,
+                   const NominalTypeDecl *baseType) const override;
 
   virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
@@ -72,6 +81,10 @@ public:
   virtual void
   lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
+
+  void lookupObjCMethods(
+         ObjCSelector selector,
+         SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
@@ -94,7 +107,7 @@ public:
 
   virtual StringRef getFilename() const override;
 
-  virtual const clang::Module *getUnderlyingClangModule() override {
+  virtual const clang::Module *getUnderlyingClangModule() const override {
     return getClangModule();
   }
 

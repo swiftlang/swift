@@ -1,52 +1,70 @@
-//===--- SILSuccessor.h - Terminator Instruction Successor -------*- C++ -*-==//
+//===--- SILSuccessor.h - Terminator Instruction Successor ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILSuccessor_H
-#define SWIFT_SIL_SILSuccessor_H
+#ifndef SWIFT_SIL_SILSUCCESSOR_H
+#define SWIFT_SIL_SILSUCCESSOR_H
 
+#include "swift/Basic/ProfileCounter.h"
 #include <cassert>
 #include <cstddef>
 #include <iterator>
 
 namespace swift {
+
 class SILBasicBlock;
 class TermInst;
 
-/// SILSuccessor - This represents a reference to a SILBasicBlock in a
-/// terminator instruction, forming a list of TermInst references to
-/// BasicBlocks.  This forms the predecessor list, ensuring that it is always
-/// kept up to date.
+/// \brief An edge in the control flow graph.
+///
+/// A SILSuccessor is stored in the terminator instruction of the tail block of
+/// the CFG edge. Internally it has a back reference to the terminator that
+/// contains it (ContainingInst). It also contains the SuccessorBlock that is
+/// the "head" of the CFG edge. This makes it very simple to iterate over the
+/// successors of a specific block.
+///
+/// SILSuccessor also enables given a "head" edge the ability to iterate over
+/// predecessors. This is done by using an ilist that is embedded into
+/// SILSuccessors.
 class SILSuccessor {
-  friend class SILSuccessorIterator;
-  /// ContainingInst - This is the Terminator instruction that contains this
-  /// successor.
+  /// The terminator instruction that contains this SILSuccessor.
   TermInst *ContainingInst = nullptr;
   
-  /// SuccessorBlock - If non-null, this is the BasicBlock that the terminator
-  /// branches to.
+  /// If non-null, this is the BasicBlock that the terminator branches to.
   SILBasicBlock *SuccessorBlock = nullptr;
-  
-  /// This is the prev and next terminator reference to SuccessorBlock, or
-  /// null if SuccessorBlock is null.
-  SILSuccessor **Prev = nullptr, *Next = nullptr;
+
+  /// If hasValue, this is the profiled execution count of the edge
+  ProfileCounter Count;
+
+  /// A pointer to the SILSuccessor that represents the previous SILSuccessor in the
+  /// predecessor list for SuccessorBlock.
+  ///
+  /// Must be nullptr if SuccessorBlock is.
+  SILSuccessor **Prev = nullptr;
+
+  /// A pointer to the SILSuccessor that represents the next SILSuccessor in the
+  /// predecessor list for SuccessorBlock.
+  ///
+  /// Must be nullptr if SuccessorBlock is.
+  SILSuccessor *Next = nullptr;
+
 public:
-  SILSuccessor() {}
+  SILSuccessor(ProfileCounter Count = ProfileCounter()) : Count(Count) {}
 
-  SILSuccessor(TermInst *CI)
-    : ContainingInst(CI) {
-  }
+  SILSuccessor(TermInst *CI, ProfileCounter Count = ProfileCounter())
+      : ContainingInst(CI), Count(Count) {}
 
-  SILSuccessor(TermInst *CI, SILBasicBlock *Succ)
-    : ContainingInst(CI) {
+  SILSuccessor(TermInst *CI, SILBasicBlock *Succ,
+               ProfileCounter Count = ProfileCounter())
+      : ContainingInst(CI), Count(Count) {
     *this = Succ;
   }
   
@@ -58,44 +76,46 @@ public:
   
   operator SILBasicBlock*() const { return SuccessorBlock; }
   SILBasicBlock *getBB() const { return SuccessorBlock; }
-  
+
+  ProfileCounter getCount() const { return Count; }
+
   // Do not copy or move these.
   SILSuccessor(const SILSuccessor &) = delete;
   SILSuccessor(SILSuccessor &&) = delete;
+
+  /// This is an iterator for walking the predecessor list of a SILBasicBlock.
+  class pred_iterator {
+    SILSuccessor *Cur;
+
+  public:
+    using difference_type = std::ptrdiff_t;
+    using value_type = SILBasicBlock *;
+    using pointer = SILBasicBlock **;
+    using reference = SILBasicBlock *&;
+    using iterator_category = std::forward_iterator_tag;
+
+    pred_iterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
+
+    bool operator==(pred_iterator I2) const { return Cur == I2.Cur; }
+    bool operator!=(pred_iterator I2) const { return Cur != I2.Cur; }
+
+    pred_iterator &operator++() {
+      assert(Cur && "Trying to advance past end");
+      Cur = Cur->Next;
+      return *this;
+    }
+
+    pred_iterator operator++(int) {
+      pred_iterator copy = *this;
+      ++*this;
+      return copy;
+    }
+
+    SILSuccessor *getSuccessorRef() const { return Cur; }
+    SILBasicBlock *operator*();
+    const SILBasicBlock *operator*() const;
+  };
 };
-  
-/// SILSuccessorIterator - This is an iterator for walking the successor list of
-/// a SILBasicBlock.
-class SILSuccessorIterator {
-  SILSuccessor *Cur;
-public:
-  using difference_type = std::ptrdiff_t;
-  using value_type = SILBasicBlock *;
-  using pointer = SILBasicBlock **;
-  using reference = SILBasicBlock *&;
-  using iterator_category = std::forward_iterator_tag;
-  
-  SILSuccessorIterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
-  
-  bool operator==(SILSuccessorIterator I2) const { return Cur == I2.Cur; }
-  bool operator!=(SILSuccessorIterator I2) const { return Cur != I2.Cur; }
-
-  SILSuccessorIterator &operator++() {
-    assert(Cur && "Trying to advance past end");
-    Cur = Cur->Next;
-    return *this;
-  }
-
-  SILSuccessorIterator operator++(int) {
-    SILSuccessorIterator copy = *this;
-    ++copy;
-    return copy;
-  }
-
-  SILSuccessor *getSuccessorRef() const { return Cur; }
-  SILBasicBlock *operator*();
-};
-  
 
 } // end swift namespace
 

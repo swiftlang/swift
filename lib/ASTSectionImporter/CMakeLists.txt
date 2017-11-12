@@ -1,5 +1,5 @@
-add_swift_library(swiftASTSectionImporter
+add_swift_library(swiftASTSectionImporter STATIC
   ASTSectionImporter.cpp
   LINK_LIBRARIES swiftBasic
-  COMPONENT_DEPENDS core)
+  LLVM_COMPONENT_DEPENDS core)
 

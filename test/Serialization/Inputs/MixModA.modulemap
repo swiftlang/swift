@@ -1,0 +1,8 @@
+framework module MixModA {
+  export *
+  module * { export * }
+}
+
+module MixModA.Swift {
+    header "MixModA-Swift.h"
+}

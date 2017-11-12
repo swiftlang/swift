@@ -1,7 +1,7 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Other1.swiftmodule -module-name Other1 %S/Inputs/warn_unqualified_access_other.swift
 // RUN: %target-swift-frontend -emit-module-path %t/Other2.swiftmodule -module-name Other2 %S/Inputs/warn_unqualified_access_other.swift
-// RUN: %target-swift-frontend -I %t -parse %s -verify
+// RUN: %target-swift-frontend -I %t -typecheck %s -verify
 
 import Other1
 import Other2
@@ -53,7 +53,7 @@ class Sub : Base {
   }
 }
 
-func test(sub: Sub) {
+func test(_ sub: Sub) {
   sub.a()
   sub.b()
   sub.c()
@@ -68,7 +68,7 @@ class Recovery {
   @warn_unqualified_access
   func topLevel() {} // expected-note * {{declared here}}
   @warn_unqualified_access
-  func overloaded(x: Float) {} // expected-note * {{declared here}}
+  func overloaded(_ x: Float) {} // expected-note * {{declared here}}
 
   func test() {
     topLevel() // expected-warning {{use of 'topLevel' treated as a reference to instance method in class 'Recovery'}}

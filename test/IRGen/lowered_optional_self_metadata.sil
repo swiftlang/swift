@@ -1,0 +1,32 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s
+sil_stage canonical
+
+import Swift
+
+public protocol Protocol {
+  static func foo(_: Self?)
+}
+
+// SR-3021: Ensure we pass the Self type metadata for Optional methods using the
+// formal Optional type and not a lowered SIL type.
+
+// CHECK-LABEL: @_TMaGSqFT_T__
+
+sil @optional_method : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
+
+sil @call_optional_method_with_lowered_function : $@convention(thin) (@in_guaranteed Optional<@callee_owned (@in ()) -> @out ()>) -> () {
+entry(%x : $*Optional<@callee_owned (@in ()) -> @out ()>):
+  %f = function_ref @optional_method : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
+  apply %f<() -> ()>(%x) : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
+  %p = partial_apply %f<() -> ()>() : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
+  return undef : $()
+}
+
+// SR-3548: Ensure we correctly emit "metadata for layout" for lowered Optional types.
+
+sil @alloc_stack_optional_with_generic : $@convention(thin) <T> () -> () {
+  %a = alloc_stack $*Optional<(T, @convention(thin) () -> ())>
+  dealloc_stack %a : $*Optional<(T, @convention(thin) () -> ())>
+  %t = tuple ()
+  return %t : $()
+}

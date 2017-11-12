@@ -1,0 +1,71 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -parse-stdlib -module-name vtable -o %t/vtable.sib %s
+// RUN: %target-sil-opt %t/vtable.sib -o - -emit-sorted-sil | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+public class Base {
+  func m1()
+  func m2()
+}
+
+public class Derived : Base {
+  override func m2()
+  func m3()
+}
+
+sil hidden_external [serialized] @_T01x4BaseC2m1yyF : $@convention(method) (@guaranteed Base) -> ()
+
+sil hidden_external [serialized] @_T01x4BaseC2m2yyF : $@convention(method) (@guaranteed Base) -> ()
+
+sil hidden_external [serialized] @_T01x4BaseCfd : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
+
+sil hidden_external [serialized] @_T01x4BaseCfD : $@convention(method) (@owned Base) -> ()
+
+sil hidden_external [serialized] @_T01x4BaseCACycfC : $@convention(method) (@thick Base.Type) -> @owned Base
+
+sil hidden_external [serialized] @_T01x4BaseCACycfc : $@convention(method) (@owned Base) -> @owned Base
+
+sil hidden_external [serialized] @_T01x7DerivedC2m2yyF : $@convention(method) (@guaranteed Derived) -> ()
+
+sil hidden_external [serialized] @_T01x7DerivedC2m3yyF : $@convention(method) (@guaranteed Derived) -> ()
+
+sil hidden_external [serialized] @_T01x7DerivedCfd : $@convention(method) (@guaranteed Derived) -> @owned Builtin.NativeObject
+
+sil hidden_external [serialized] @_T01x7DerivedCfD : $@convention(method) (@owned Derived) -> ()
+
+sil hidden_external [serialized] @_T01x7DerivedCACycfC : $@convention(method) (@thick Derived.Type) -> @owned Derived
+
+sil hidden_external [serialized] @_T01x7DerivedCACycfc : $@convention(method) (@owned Derived) -> @owned Derived
+
+sil_vtable Base {
+  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF
+  #Base.m2!1: (Base) -> () -> () : _T01x4BaseC2m2yyF
+  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x4BaseCACycfc
+  #Base.deinit!deallocator: _T01x4BaseCfD
+}
+
+// CHECK-LABEL: sil_vtable Base {
+// CHECK-NEXT:  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF
+// CHECK-NEXT:  #Base.m2!1: (Base) -> () -> () : _T01x4BaseC2m2yyF
+// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x4BaseCACycfc
+// CHECK-NEXT:  #Base.deinit!deallocator: _T01x4BaseCfD
+// CHECK-NEXT: }
+
+sil_vtable Derived {
+  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF [inherited]
+  #Base.m2!1: (Base) -> () -> () : _T01x7DerivedC2m2yyF [override]
+  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x7DerivedCACycfc [override]
+  #Derived.m3!1: (Derived) -> () -> () : _T01x7DerivedC2m3yyF
+  #Derived.deinit!deallocator: _T01x7DerivedCfD
+}
+
+// CHECK-LABEL: sil_vtable Derived {
+// CHECK-NEXT:  #Base.m1!1: (Base) -> () -> () : _T01x4BaseC2m1yyF [inherited]
+// CHECK-NEXT:  #Base.m2!1: (Base) -> () -> () : _T01x7DerivedC2m2yyF [override]
+// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T01x7DerivedCACycfc [override]
+// CHECK-NEXT:  #Derived.m3!1: (Derived) -> () -> () : _T01x7DerivedC2m3yyF
+// CHECK-NEXT:  #Derived.deinit!deallocator: _T01x7DerivedCfD
+// CHECK-NEXT: }

@@ -8,7 +8,7 @@
       key.typename: "Foo",
       key.context: source.codecompletion.context.thisclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:FC20complete_constructor3FoocFT4arg1Si4arg2Si_S0_",
+      key.associated_usrs: "s:20complete_constructor3FooCACSi4arg1_Si4arg2tcfc",
       key.modulename: "complete_constructor"
     }
   ]

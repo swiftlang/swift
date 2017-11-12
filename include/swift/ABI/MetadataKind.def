@@ -1,12 +1,12 @@
-//===--- MetadataKind.def --------------------------------------*- C++ -*--===//
+//===--- MetadataKind.def ---------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -47,6 +47,9 @@ NOMINALTYPEMETADATAKIND(Struct, 1)
 /// If we add reference enums, that needs to go here.
 NOMINALTYPEMETADATAKIND(Enum, 2)
 
+/// An optional type.
+NOMINALTYPEMETADATAKIND(Optional, 3)
+
 /// A type whose value is not exposed in the metadata system.
 METADATAKIND(Opaque, 8)
 
@@ -70,7 +73,7 @@ METADATAKIND(ExistentialMetatype, 15)
 
 /// A foreign class, such as a Core Foundation class.
 METADATAKIND(ForeignClass, 16)
-  
+
 /// A heap-allocated local variable using statically-generated metadata.
 METADATAKIND(HeapLocalVariable, 64)
 
@@ -80,10 +83,8 @@ METADATAKIND(HeapGenericLocalVariable, 65)
 /// A native error object.
 METADATAKIND(ErrorObject, 128)
 
-/// All metadata kinds in this range are non-isa metadata. Any "metadata" values
-/// outside of this range are objective-c class isa pointers. These isa pointers
-/// are of course not "true" swift metadata.
-ABSTRACTMETADATAKIND(NonIsaMetadata, Class, ErrorObject)
+// getEnumeratedMetadataKind assumes that all the enumerated values here
+// will be <= LastEnumeratedMetadataKind.
 
 #undef ABSTRACTMETADATAKIND
 #undef NOMINALTYPEMETADATAKIND

@@ -1,50 +1,50 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -parse -verify %t_no_errors.swift
+// RUN: %target-swift-frontend -typecheck -verify %t_no_errors.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_AS_TYPE > %t.types.txt
-// RUN: FileCheck %s -check-prefix=STRUCT_TYPE_COUNT < %t.types.txt
-// RUN: FileCheck %s -check-prefix=STRUCT_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=STRUCT_TYPE_COUNT < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=STRUCT_TYPES < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_AS_EXPR > %t.types.txt
-// RUN: FileCheck %s -check-prefix=STRUCT_TYPES < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=STRUCT_TYPES < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE > %t.types.txt
-// RUN: FileCheck %s -check-prefix=STRUCT_INSTANCE < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=STRUCT_INSTANCE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_1 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOCIATED_TYPES_UNQUAL_2 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=ASSOCIATED_TYPES_UNQUAL < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BROKEN_CONFORMANCE_1 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=BROKEN_CONFORMANCE_1 < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=BROKEN_CONFORMANCE_1 < %t.types.txt
 
 // FIXME: extensions that introduce conformances?
 
 protocol FooBaseProtocolWithAssociatedTypes {
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonB = Int
-  typealias DefaultedTypeCommonC = Int
-  typealias DefaultedTypeCommonD = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonB = Int
+  associatedtype DefaultedTypeCommonC = Int
+  associatedtype DefaultedTypeCommonD = Int
 
-  typealias FooBaseDefaultedTypeA = Int
-  typealias FooBaseDefaultedTypeB = Int
-  typealias FooBaseDefaultedTypeC = Int
+  associatedtype FooBaseDefaultedTypeA = Int
+  associatedtype FooBaseDefaultedTypeB = Int
+  associatedtype FooBaseDefaultedTypeC = Int
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonB
-  typealias DeducedTypeCommonC
-  typealias DeducedTypeCommonD
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonB
+  associatedtype DeducedTypeCommonC
+  associatedtype DeducedTypeCommonD
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonB() -> DeducedTypeCommonB
   func deduceCommonC() -> DeducedTypeCommonC
   func deduceCommonD() -> DeducedTypeCommonD
 
-  typealias FooBaseDeducedTypeA
-  typealias FooBaseDeducedTypeB
-  typealias FooBaseDeducedTypeC
-  typealias FooBaseDeducedTypeD
+  associatedtype FooBaseDeducedTypeA
+  associatedtype FooBaseDeducedTypeB
+  associatedtype FooBaseDeducedTypeC
+  associatedtype FooBaseDeducedTypeD
   func deduceFooBaseA() -> FooBaseDeducedTypeA
   func deduceFooBaseB() -> FooBaseDeducedTypeB
   func deduceFooBaseC() -> FooBaseDeducedTypeC
@@ -52,35 +52,35 @@ protocol FooBaseProtocolWithAssociatedTypes {
 }
 protocol FooProtocolWithAssociatedTypes : FooBaseProtocolWithAssociatedTypes {
   // From FooBase.
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonB = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonB = Int
 
-  typealias FooBaseDefaultedTypeB = Double
+  associatedtype FooBaseDefaultedTypeB = Double
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonB
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonB
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonB() -> DeducedTypeCommonB
 
   func deduceFooBaseB() -> Int
 
   // New decls.
-  typealias FooDefaultedType = Int
+  associatedtype FooDefaultedType = Int
 
-  typealias FooDeducedTypeB
-  typealias FooDeducedTypeC
-  typealias FooDeducedTypeD
+  associatedtype FooDeducedTypeB
+  associatedtype FooDeducedTypeC
+  associatedtype FooDeducedTypeD
   func deduceFooB() -> FooDeducedTypeB
   func deduceFooC() -> FooDeducedTypeC
   func deduceFooD() -> FooDeducedTypeD
 }
 protocol BarBaseProtocolWithAssociatedTypes {
   // From FooBase.
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonC = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonC = Int
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonC
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonC
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonC() -> DeducedTypeCommonC
 
@@ -90,20 +90,20 @@ protocol BarBaseProtocolWithAssociatedTypes {
   func deduceFooC() -> Int
 
   // New decls.
-  typealias BarBaseDefaultedType = Int
+  associatedtype BarBaseDefaultedType = Int
 
-  typealias BarBaseDeducedTypeC
-  typealias BarBaseDeducedTypeD
+  associatedtype BarBaseDeducedTypeC
+  associatedtype BarBaseDeducedTypeD
   func deduceBarBaseC() -> BarBaseDeducedTypeC
   func deduceBarBaseD() -> BarBaseDeducedTypeD
 }
 protocol BarProtocolWithAssociatedTypes : BarBaseProtocolWithAssociatedTypes {
   // From FooBase.
-  typealias DefaultedTypeCommonA = Int
-  typealias DefaultedTypeCommonD = Int
+  associatedtype DefaultedTypeCommonA = Int
+  associatedtype DefaultedTypeCommonD = Int
 
-  typealias DeducedTypeCommonA
-  typealias DeducedTypeCommonD
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonD
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonD() -> DeducedTypeCommonD
 
@@ -116,9 +116,9 @@ protocol BarProtocolWithAssociatedTypes : BarBaseProtocolWithAssociatedTypes {
   func deduceBarBaseD() -> Int
 
   // New decls.
-  typealias BarDefaultedTypeA = Int
+  associatedtype BarDefaultedTypeA = Int
 
-  typealias BarDeducedTypeD
+  associatedtype BarDeducedTypeD
   func deduceBarD() -> BarDeducedTypeD
 }
 
@@ -209,7 +209,7 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonB[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-FIXME-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonB[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDefaultedType[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooDeducedTypeB[#Int#]{{; name=.+$}}
@@ -220,7 +220,7 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
-// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal: .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
+// STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
 // STRUCT_TYPES: End completions
 
 class DerivedFromClassWithAssociatedTypes : ClassWithAssociatedTypes {
@@ -246,14 +246,14 @@ class MoreDerivedFromClassWithAssociatedTypes : DerivedFromClassWithAssociatedTy
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: BarBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonB[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG-FIXME: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Int#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DeducedTypeCommonB[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDefaultedType[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeB[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeC[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooDeducedTypeD[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeA[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
+// ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDefaultedTypeB[#Double#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeA[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
@@ -266,38 +266,38 @@ struct StructWithBrokenConformance : FooProtocolWithAssociatedTypes {
 func testBrokenConformances1() {
   StructWithBrokenConformance.#^BROKEN_CONFORMANCE_1^#
 }
-// BROKEN_CONFORMANCE_1: Begin completions, 53 items
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonA[#DefaultedTypeCommonA#]; name=DefaultedTypeCommonA
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonB[#DefaultedTypeCommonB#]; name=DefaultedTypeCommonB
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeB[#FooBaseDefaultedTypeB#]; name=FooBaseDefaultedTypeB
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonA[#DeducedTypeCommonA#]; name=DeducedTypeCommonA
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonB[#DeducedTypeCommonB#]; name=DeducedTypeCommonB
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: StructWithBrokenConformance.Type#})[#() -> Self.DeducedTypeCommonA#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: StructWithBrokenConformance.Type#})[#() -> Self.DeducedTypeCommonB#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: StructWithBrokenConformance.Type#})[#() -> Int#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDefaultedType[#FooDefaultedType#]; name=FooDefaultedType
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDeducedTypeB[#FooDeducedTypeB#]; name=FooDeducedTypeB
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDeducedTypeC[#FooDeducedTypeC#]; name=FooDeducedTypeC
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDeducedTypeD[#FooDeducedTypeD#]; name=FooDeducedTypeD
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooB({#self: StructWithBrokenConformance.Type#})[#() -> Self.FooDeducedTypeB#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooC({#self: StructWithBrokenConformance.Type#})[#() -> Self.FooDeducedTypeC#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooD({#self: StructWithBrokenConformance.Type#})[#() -> Self.FooDeducedTypeD#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonC[#DefaultedTypeCommonC#]; name=DefaultedTypeCommonC
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonD[#DefaultedTypeCommonD#]; name=DefaultedTypeCommonD
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeA[#FooBaseDefaultedTypeA#]; name=FooBaseDefaultedTypeA
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeC[#FooBaseDefaultedTypeC#]; name=FooBaseDefaultedTypeC
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonC[#DeducedTypeCommonC#]; name=DeducedTypeCommonC
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonD[#DeducedTypeCommonD#]; name=DeducedTypeCommonD
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: StructWithBrokenConformance.Type#})[#() -> Self.DeducedTypeCommonA#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: StructWithBrokenConformance.Type#})[#() -> Self.DeducedTypeCommonB#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonC({#self: StructWithBrokenConformance.Type#})[#() -> Self.DeducedTypeCommonC#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonD({#self: StructWithBrokenConformance.Type#})[#() -> Self.DeducedTypeCommonD#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeA[#FooBaseDeducedTypeA#]; name=FooBaseDeducedTypeA
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeB[#FooBaseDeducedTypeB#]; name=FooBaseDeducedTypeB
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeC[#FooBaseDeducedTypeC#]; name=FooBaseDeducedTypeC
-// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeD[#FooBaseDeducedTypeD#]; name=FooBaseDeducedTypeD
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseA({#self: StructWithBrokenConformance.Type#})[#() -> Self.FooBaseDeducedTypeA#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: StructWithBrokenConformance.Type#})[#() -> Self.FooBaseDeducedTypeB#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseC({#self: StructWithBrokenConformance.Type#})[#() -> Self.FooBaseDeducedTypeC#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseD({#self: StructWithBrokenConformance.Type#})[#() -> Self.FooBaseDeducedTypeD#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1: Begin completions, 34 items
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonA[#StructWithBrokenConformance.DefaultedTypeCommonA#]; name=DefaultedTypeCommonA
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonB[#StructWithBrokenConformance.DefaultedTypeCommonB#]; name=DefaultedTypeCommonB
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeB[#StructWithBrokenConformance.FooBaseDefaultedTypeB#]; name=FooBaseDefaultedTypeB
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonA[#StructWithBrokenConformance.DeducedTypeCommonA#]; name=DeducedTypeCommonA
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonB[#StructWithBrokenConformance.DeducedTypeCommonB#]; name=DeducedTypeCommonB
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.DeducedTypeCommonA#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.DeducedTypeCommonB#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: StructWithBrokenConformance#})[#() -> Int#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDefaultedType[#StructWithBrokenConformance.FooDefaultedType#]; name=FooDefaultedType
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDeducedTypeB[#StructWithBrokenConformance.FooDeducedTypeB#]; name=FooDeducedTypeB
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDeducedTypeC[#StructWithBrokenConformance.FooDeducedTypeC#]; name=FooDeducedTypeC
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooDeducedTypeD[#StructWithBrokenConformance.FooDeducedTypeD#]; name=FooDeducedTypeD
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooB({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooDeducedTypeB#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooC({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooDeducedTypeC#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooD({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooDeducedTypeD#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonC[#StructWithBrokenConformance.DefaultedTypeCommonC#]; name=DefaultedTypeCommonC
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonD[#StructWithBrokenConformance.DefaultedTypeCommonD#]; name=DefaultedTypeCommonD
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeA[#StructWithBrokenConformance.FooBaseDefaultedTypeA#]; name=FooBaseDefaultedTypeA
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeC[#StructWithBrokenConformance.FooBaseDefaultedTypeC#]; name=FooBaseDefaultedTypeC
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonC[#StructWithBrokenConformance.DeducedTypeCommonC#]; name=DeducedTypeCommonC
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonD[#StructWithBrokenConformance.DeducedTypeCommonD#]; name=DeducedTypeCommonD
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.DeducedTypeCommonA#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.DeducedTypeCommonB#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonC({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.DeducedTypeCommonC#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonD({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.DeducedTypeCommonD#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeA[#StructWithBrokenConformance.FooBaseDeducedTypeA#]; name=FooBaseDeducedTypeA
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeB[#StructWithBrokenConformance.FooBaseDeducedTypeB#]; name=FooBaseDeducedTypeB
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeC[#StructWithBrokenConformance.FooBaseDeducedTypeC#]; name=FooBaseDeducedTypeC
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDeducedTypeD[#StructWithBrokenConformance.FooBaseDeducedTypeD#]; name=FooBaseDeducedTypeD
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseA({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeA#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeB#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseC({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeC#]{{; name=.+$}}
+// BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseD({#self: StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeD#]{{; name=.+$}}
 // BROKEN_CONFORMANCE_1: End completions

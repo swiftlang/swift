@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify
+// RUN: %swift -typecheck %s -verify
 // rdar://16172507
 // XFAIL: *
 

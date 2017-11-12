@@ -1,0 +1,1479 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -escapes-dump -o /dev/null | %FileCheck %s
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol ClassP : class {
+  func foo()
+}
+
+class X : ClassP {
+  func foo()
+  deinit
+}
+
+class Derived : X {
+}
+
+class Y {
+  @sil_stored var x: X
+
+  init(newx: X)
+}
+
+class Z {
+  @sil_stored var x: X
+  init(newx: X)
+  deinit
+}
+
+protocol P {
+  func foo()
+}
+
+struct Pointer : P {
+  let y : Y
+  func foo()
+}
+
+enum PointerEnum {
+  case B(Pointer, Pointer)
+}
+
+enum PointerEnum2 {
+  case A
+  case B(Pointer)
+  case C
+}
+
+class LinkedNode {
+  @sil_stored var next: LinkedNode;
+
+  init(_ n: LinkedNode)
+}
+
+struct MyError : Error {
+}
+
+final class ErrorClass : Error {
+}
+
+struct SomeData {
+  let x : X
+}
+
+struct FourFields {
+  let a : SomeData
+  let b : Pointer
+  let c : Builtin.RawPointer
+  let d : Y
+}
+
+// Sanity check with a simple function.
+
+// CHECK-LABEL: CG of test_simple
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %2
+// CHECK-NEXT:    Arg %1 Esc: G, Succ:
+// CHECK-NEXT:    Val %2 Esc: A, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: A, Succ: (%2.2)
+// CHECK-NEXT:    Con %2.2 Esc: G, Succ: %1
+// CHECK-NEXT:  End
+sil @test_simple : $@convention(thin) (@inout Y, @owned X) -> () {
+bb0(%0 : $*Y, %1 : $X):
+  %2 = alloc_ref $Y
+  %3 = ref_element_addr %2 : $Y, #Y.x
+  store %1 to %3 : $*X
+  %5 = load %0 : $*Y
+  store %2 to %0 : $*Y
+  strong_release %5 : $Y
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Test if a deferring edge is created for a block argument.
+
+// CHECK-LABEL: CG of deferringEdge
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%3.1)
+// CHECK-NEXT:    Arg %1 Esc: A, Succ:
+// CHECK-NEXT:    Val %3 Esc: %3, Succ: (%3.1), %0
+// CHECK-NEXT:    Con %3.1 Esc: A, Succ: (%3.2)
+// CHECK-NEXT:    Con %3.2 Esc: A, Succ: %1
+// CHECK-NEXT:    Ret Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @deferringEdge : $@convention(thin) (@owned LinkedNode, @owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode, %1 : $LinkedNode):
+  br bb1(%0 : $LinkedNode)
+
+bb1(%3 : $LinkedNode):
+  %4 = ref_element_addr %3 : $LinkedNode, #LinkedNode.next
+  store %1 to %4 : $*LinkedNode
+  return %0 : $LinkedNode
+}
+
+// Test a local object just escaping via return.
+
+// CHECK-LABEL: CG of escapes_via_return
+// CHECK-NEXT:    Val %0 Esc: R, Succ:
+// CHECK-NEXT:    Ret Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @escapes_via_return : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $X
+  return %0 : $X
+}
+
+// A linear chain of assignments is collapsed to a single node.
+
+// CHECK-LABEL: CG of test_linked_list
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Val %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%11.1)
+// CHECK-NEXT:    Val %4 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Val %7 Esc: %11, Succ: (%1.1)
+// CHECK-NEXT:    Val %11 Esc: %11, Succ: (%1.1), %7, %11.1
+// CHECK-NEXT:    Con %11.1 Esc: A, Succ: (%1.1), %0, %1, %4
+// CHECK-NEXT:    Ret Esc: R, Succ: %11.1
+// CHECK-NEXT:  End
+sil @test_linked_list : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  %1 = alloc_ref $LinkedNode
+  %2 = ref_element_addr %1 : $LinkedNode, #LinkedNode.next
+  store %0 to %2 : $*LinkedNode
+  %4 = alloc_ref $LinkedNode
+  %5 = ref_element_addr %4 : $LinkedNode, #LinkedNode.next
+  store %1 to %5 : $*LinkedNode
+  %7 = alloc_ref $LinkedNode
+  %8 = ref_element_addr %7 : $LinkedNode, #LinkedNode.next
+  store %4 to %8 : $*LinkedNode
+  br bb1(%7 : $LinkedNode)
+
+// This "x = x.next" loop let's the chain collapse to a single node.
+bb1(%11 : $LinkedNode):
+  %12 = ref_element_addr %11 : $LinkedNode, #LinkedNode.next
+  %13 = load %12 : $*LinkedNode
+  cond_br undef, bb1(%13 : $LinkedNode), bb2
+
+bb2:
+  return %13 : $LinkedNode
+}
+
+// The same example as above but distributed over two functions.
+
+// CHECK-LABEL: CG of create_chain
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%7.1)
+// CHECK-NEXT:    Val %1 Esc: A, Succ: (%7.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: %0, %1, %4
+// CHECK-NEXT:    Val %4 Esc: A, Succ: (%7.1)
+// CHECK-NEXT:    Val %7 Esc: %11, Succ: (%7.1)
+// CHECK-NEXT:    Con %7.1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Val %11 Esc: R, Succ: (%7.1), %1.1
+// CHECK-NEXT:    Ret Esc: R, Succ: %11
+// CHECK-NEXT:  End
+sil @create_chain : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  %1 = alloc_ref $LinkedNode
+  %2 = ref_element_addr %1 : $LinkedNode, #LinkedNode.next
+  store %0 to %2 : $*LinkedNode
+  %4 = alloc_ref $LinkedNode
+  %5 = ref_element_addr %4 : $LinkedNode, #LinkedNode.next
+  store %1 to %5 : $*LinkedNode
+  %7 = alloc_ref $LinkedNode
+  %8 = ref_element_addr %7 : $LinkedNode, #LinkedNode.next
+  store %4 to %8 : $*LinkedNode
+
+  %10 = function_ref @loadNext : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %11 = apply %10(%7) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  return %11 : $LinkedNode
+}
+
+// CHECK-LABEL: CG of loadNext
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%2.1)
+// CHECK-NEXT:    Val %2 Esc: %2, Succ: (%2.1), %0, %2.2
+// CHECK-NEXT:    Con %2.1 Esc: A, Succ: (%2.2)
+// CHECK-NEXT:    Con %2.2 Esc: A, Succ: (%2.1)
+// CHECK-NEXT:    Ret Esc: R, Succ: %2.2
+// CHECK-NEXT:  End
+sil @loadNext : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  br bb1(%0 : $LinkedNode)
+
+bb1(%2 : $LinkedNode):
+  %3 = ref_element_addr %2 : $LinkedNode, #LinkedNode.next
+  %4 = load %3 : $*LinkedNode
+  cond_br undef, bb1(%4 : $LinkedNode), bb2
+
+bb2:
+  return %4 : $LinkedNode
+}
+
+// Content nodes in the callee are duplicated in the caller.
+
+// CHECK-LABEL: CG of call_load_next3
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: A, Succ: (%0.4)
+// CHECK-NEXT:    Con %0.4 Esc: A, Succ: (%0.5)
+// CHECK-NEXT:    Con %0.5 Esc: A, Succ: (%0.6)
+// CHECK-NEXT:    Con %0.6 Esc: A, Succ:
+// CHECK-NEXT:    Val %2 Esc: R, Succ: %0.6
+// CHECK-NEXT:    Ret Esc: R, Succ: %2
+// CHECK-NEXT:  End
+sil @call_load_next3 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  %1 = function_ref @load_next3 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %2 = apply %1(%0) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  return %2 : $LinkedNode
+}
+
+// CHECK-LABEL: CG of load_next3
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: A, Succ: (%0.4)
+// CHECK-NEXT:    Con %0.4 Esc: A, Succ: (%0.5)
+// CHECK-NEXT:    Con %0.5 Esc: A, Succ: (%0.6)
+// CHECK-NEXT:    Con %0.6 Esc: A, Succ:
+// CHECK-NEXT:    Ret Esc: R, Succ: %0.6
+// CHECK-NEXT:  End
+sil @load_next3 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  %1 = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
+  %2 = load %1 : $*LinkedNode
+  %3 = ref_element_addr %2 : $LinkedNode, #LinkedNode.next
+  %4 = load %3 : $*LinkedNode
+  %5 = ref_element_addr %4 : $LinkedNode, #LinkedNode.next
+  %6 = load %5 : $*LinkedNode
+  return %6 : $LinkedNode
+}
+
+sil_global @global_pointer : $Pointer
+sil_global @global_x : $X
+
+// The argument escapes because it is stored to a global variable in the callee.
+
+// CHECK-LABEL: CG of call_store_pointer
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:    Ret Esc: R, Succ: %0.2
+// CHECK-NEXT:  End
+sil @call_store_pointer : $@convention(thin) (@owned Pointer) -> @owned X {
+bb0(%0 : $Pointer):
+  debug_value %0 : $Pointer
+  %2 = function_ref @store_pointer : $@convention(thin) (@owned Pointer) -> ()
+  %3 = struct_extract %0 : $Pointer, #Pointer.y
+  %5 = apply %2(%0) : $@convention(thin) (@owned Pointer) -> ()
+  %6 = ref_element_addr %3 : $Y, #Y.x
+  %7 = load %6 : $*X
+  return %7 : $X
+}
+
+// CHECK-LABEL: CG of store_pointer
+// CHECK-NEXT:    Arg %0 Esc: G, Succ:
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ: %0
+// CHECK-NEXT:  End
+sil  @store_pointer : $@convention(thin) (@owned Pointer) -> () {
+bb0(%0 : $Pointer):
+  %1 = global_addr @global_pointer : $*Pointer
+  store %0 to %1 : $*Pointer
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// The argument does not escape because only the content is stored to a
+// global variable in the callee.
+
+// CHECK-LABEL: CG of store_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ: %0.2
+// CHECK-NEXT:  End
+sil  @store_content : $@convention(thin) (@owned Pointer) -> () {
+bb0(%0 : $Pointer):
+  %1 = global_addr @global_x : $*X
+  %3 = struct_extract %0 : $Pointer, #Pointer.y
+  %4 = ref_element_addr %3 : $Y, #Y.x
+  %5 = load %4 : $*X
+  store %5 to %1 : $*X
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: CG of call_store_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:    Ret Esc: R, Succ: %0.2
+// CHECK-NEXT:  End
+sil @call_store_content : $@convention(thin) (@owned Pointer) -> @owned X {
+bb0(%0 : $Pointer):
+  %2 = function_ref @store_content : $@convention(thin) (@owned Pointer) -> ()
+  %3 = struct_extract %0 : $Pointer, #Pointer.y
+  %5 = apply %2(%0) : $@convention(thin) (@owned Pointer) -> ()
+  %6 = ref_element_addr %3 : $Y, #Y.x
+  %7 = load %6 : $*X
+  return %7 : $X
+}
+
+// CHECK-LABEL: CG of copy_addr_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr %1 to [initialization] %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of copy_addr_take_content
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_take_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr [take] %1 to [initialization] %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of copy_addr_noinit_content
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ:
+// CHECK-NEXT:    Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @copy_addr_noinit_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+bb0(%0: $*Int32, %1: $*Int32):
+  copy_addr [take] %1 to %0 : $*Int32
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of call_copy_addr_content
+// CHECK-NEXT:    Val %0 Esc: %3, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: %3, Succ: %1.1
+// CHECK-NEXT:    Val %1 Esc: %3, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: %3, Succ:
+// CHECK-NEXT:  End
+sil @call_copy_addr_content : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int32
+  %1 = alloc_stack $Int32
+  %2 = function_ref @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
+  %3 = apply %2(%0, %1) : $@convention(thin) (@in_guaranteed Int32) -> @out Int32
+  %4 = tuple()
+  dealloc_stack %1 : $*Int32
+  dealloc_stack %0 : $*Int32
+  return %4 : $()
+}
+
+// Test partial_apply. The partial_apply and the boxes do not escape.
+// The X parameter does escape because it is stored in Y and the release
+// of Y's box _could_ capture Y.x in Y's deinit.
+
+// CHECK-LABEL: CG of test_partial_apply
+// CHECK-NEXT:    Arg %1 Esc: G, Succ:
+// CHECK-NEXT:    Arg %2 Esc: A, Succ: (%6.3)
+// CHECK-NEXT:    Val %3 Esc: %14,%15,%17, Succ: (%6.1)
+// CHECK-NEXT:    Val %6 Esc: %14,%15,%16, Succ: (%6.1)
+// CHECK-NEXT:    Con %6.1 Esc: %14,%15,%16,%17, Succ: (%6.2)
+// CHECK-NEXT:    Con %6.2 Esc: %14,%15,%16,%17, Succ: %2
+// CHECK-NEXT:    Con %6.3 Esc: G, Succ:
+// CHECK-NEXT:    Val %12 Esc: %14,%15, Succ: %3, %6
+// CHECK-NEXT:  End
+sil @test_partial_apply : $@convention(thin) (Int64, @owned X, @owned Y) -> Int64 {
+bb0(%0 : $Int64, %1 : $X, %2 : $Y):
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>
+  %4 = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  store %0 to %4 : $*Int64
+  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <Y>
+  %7 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Y>, 0
+  store %2 to %7 : $*Y
+  %9 = function_ref @closure1 : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Int64>, @owned <τ_0_0> { var τ_0_0 } <Y>) -> Int64
+  strong_retain %3 : $<τ_0_0> { var τ_0_0 } <Int64>
+  strong_retain %6 : $<τ_0_0> { var τ_0_0 } <Y>
+  %12 = partial_apply %9(%3, %6) : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Int64>, @owned <τ_0_0> { var τ_0_0 } <Y>) -> Int64
+  strong_retain %12 : $@callee_owned (@owned X) -> Int64
+  %14 = apply %12(%1) : $@callee_owned (@owned X) -> Int64
+  strong_release %12 : $@callee_owned (@owned X) -> Int64
+  strong_release %6 : $<τ_0_0> { var τ_0_0 } <Y>
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int64>
+  return %14 : $Int64
+}
+
+// CHECK-LABEL: CG of closure1
+// CHECK-NEXT:    Arg %0 Esc: G, Succ:
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ:
+// CHECK-NEXT:    Arg %2 Esc: A, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: A, Succ: (%2.2)
+// CHECK-NEXT:    Con %2.2 Esc: A, Succ: (%2.3)
+// CHECK-NEXT:    Con %2.3 Esc: G, Succ:
+// CHECK-NEXT:    Val %7 Esc: %8, Succ: %2
+// CHECK-NEXT:  End
+sil @closure1 : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Int64>, @owned <τ_0_0> { var τ_0_0 } <Y>) -> Int64 {
+bb0(%0 : $X, %1 : $<τ_0_0> { var τ_0_0 } <Int64>, %2 : $<τ_0_0> { var τ_0_0 } <Y>):
+  %3 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  %4 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Y>, 0
+  %5 = load %3 : $*Int64
+  %6 = function_ref @closure2 : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Y>) -> ()
+  %7 = partial_apply %6(%2) : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Y>) -> ()
+  %8 = apply %7(%0) : $@callee_owned (@owned X) -> ()
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int64>
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: CG of closure2
+// CHECK-NEXT:    Arg %0 Esc: G, Succ:
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ: (%1.4)
+// CHECK-NEXT:    Con %1.4 Esc: G, Succ: %0
+// CHECK-NEXT:  End
+sil @closure2 : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Y>) -> () {
+bb0(%0 : $X, %1 : $<τ_0_0> { var τ_0_0 } <Y>):
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Y>, 0
+  %3 = load %2 : $*Y
+  %4 = ref_element_addr %3 : $Y, #Y.x
+  store %0 to %4 : $*X
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Y>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Test partial_apply. The box escapes in the callee.
+
+// CHECK-LABEL: CG of test_escaped_box
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: G, Succ: (%1.3)
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ:
+// CHECK-NEXT:    Val %6 Esc: G, Succ: %1
+// CHECK-NEXT:  End
+sil @test_escaped_box : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  store %0 to %2 : $*Int64
+
+  %4 = function_ref @let_box_escape : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> Int64
+  strong_retain %1 : $<τ_0_0> { var τ_0_0 } <Int64>
+  %6 = partial_apply %4(%1) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> Int64
+  strong_retain %6 : $@callee_owned () -> Int64
+  %8 = apply %6() : $@callee_owned () -> Int64
+  strong_release %6 : $@callee_owned () -> Int64
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int64>
+  return %8 : $Int64
+}
+
+// CHECK-LABEL: CG of let_box_escape
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @let_box_escape : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  %2 = load %1 : $*Int64
+
+  %3 = function_ref @takebox : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> ()
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int64>
+  return %2 : $Int64
+}
+
+sil @takebox :  $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> ()
+
+
+// The partial_apply itself escapes and therefore also the box escapes.
+
+// CHECK-LABEL: CG of test_escaped_partial_apply
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:    Val %6 Esc: G, Succ: %1
+// CHECK-NEXT:  End
+sil @test_escaped_partial_apply : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  store %0 to %2 : $*Int64
+  %4 = function_ref @closure3 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> Int64
+  strong_retain %1 : $<τ_0_0> { var τ_0_0 } <Int64>
+  %6 = partial_apply %4(%1) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> Int64
+  strong_retain %6 : $@callee_owned () -> Int64
+  %7 = function_ref @take_partial_apply : $@convention(thin) (@owned @callee_owned () -> Int64) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@owned @callee_owned () -> Int64) -> ()
+  %9 = tuple()
+  return %9 : $()
+}
+
+// CHECK-LABEL: CG of closure3
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @closure3 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int64>) -> Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  %2 = load %1 : $*Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int64>
+  return %2 : $Int64
+}
+
+sil @take_partial_apply : $@convention(thin) (@owned @callee_owned () -> Int64) -> ()
+
+// Test if the global escape state is propagated through recursive functions.
+
+sil_global @global_ln : $LinkedNode
+
+// CHECK-LABEL: CG of load_next_recursive
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:    Val %4 Esc: G, Succ: %0.2
+// CHECK-NEXT:    Ret Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @load_next_recursive : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  %1 = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
+  %2 = load %1 : $*LinkedNode
+  %3 = function_ref @let_escape : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %4 = apply %3(%2) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  return %4 : $LinkedNode
+}
+
+// CHECK-LABEL: CG of let_escape
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ:
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ: %0
+// CHECK-NEXT:    Val %4 Esc: G, Succ: %0
+// CHECK-NEXT:    Ret Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @let_escape : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  %1 = global_addr @global_ln : $*LinkedNode
+  store %0 to %1 : $*LinkedNode
+  %3 = function_ref @return_same : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %4 = apply %3(%0) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  return %4 : $LinkedNode
+}
+
+// CHECK-LABEL: CG of return_same
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Val %3 Esc: G, Succ: (%0.1), %0.2
+// CHECK-NEXT:    Val %5 Esc: R, Succ: %0, %3
+// CHECK-NEXT:    Ret Esc: R, Succ: %5
+// CHECK-NEXT:  End
+sil @return_same : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  cond_br undef, bb1, bb2(%0 : $LinkedNode)
+
+bb1:
+  %2 = function_ref @load_next_recursive : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %3 = apply %2(%0) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  br bb2(%3 : $LinkedNode)
+
+bb2(%5 : $LinkedNode):
+  return %5 : $LinkedNode
+}
+
+// Another recursion test.
+
+// CHECK-LABEL: CG of loadNext2
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: A, Succ: (%0.4)
+// CHECK-NEXT:    Con %0.4 Esc: A, Succ: (%4.1)
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %0.4
+// CHECK-NEXT:    Con %4.1 Esc: A, Succ: (%4.2)
+// CHECK-NEXT:    Con %4.2 Esc: A, Succ: (%4.1)
+// CHECK-NEXT:    Ret Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @loadNext2 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  %1 = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
+  %2 = load %1 : $*LinkedNode
+  %3 = function_ref @returnNext2 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %4 = apply %3(%2) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  return %4 : $LinkedNode
+}
+
+// CHECK-LABEL: CG of returnNext2
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: A, Succ: (%0.4)
+// CHECK-NEXT:    Con %0.4 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Val %3 Esc: R, Succ: (%0.3), %0.4
+// CHECK-NEXT:    Val %8 Esc: R, Succ: %0.2, %3
+// CHECK-NEXT:    Ret Esc: R, Succ: %8
+// CHECK-NEXT:  End
+sil @returnNext2 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = function_ref @loadNext2 : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %3 = apply %2(%0) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  br bb3(%3 : $LinkedNode)
+
+bb2:
+  %5 = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
+  %6 = load %5 : $*LinkedNode
+  br bb3(%6 : $LinkedNode)
+
+bb3(%8 : $LinkedNode):
+  return %8 : $LinkedNode
+}
+
+// A single-cycle recursion test.
+
+// CHECK-LABEL: CG of single_cycle_recursion
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Val %5 Esc: R, Succ: (%0.2), %0.1
+// CHECK-NEXT:    Val %7 Esc: R, Succ: %0, %5
+// CHECK-NEXT:    Ret  Esc: R, Succ: %7
+// CHECK-NEXT:  End
+sil @single_cycle_recursion : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode {
+bb0(%0 : $LinkedNode):
+  cond_br undef, bb1, bb2(%0 : $LinkedNode)
+
+bb1:
+  %1 = ref_element_addr %0 : $LinkedNode, #LinkedNode.next
+  %2 = load %1 : $*LinkedNode
+  %3 = function_ref @single_cycle_recursion : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  %4 = apply %3(%2) : $@convention(thin) (@owned LinkedNode) -> @owned LinkedNode
+  br bb2(%4 : $LinkedNode)
+
+bb2(%5 : $LinkedNode):
+  return %5 : $LinkedNode
+}
+
+// Test if a try_apply is represented correctly in the connection graph.
+
+// CHECK-LABEL: CG of call_throwing_func
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Val %3 Esc: R, Succ: %0
+// CHECK-NEXT:    Ret Esc: R, Succ: %3
+// CHECK-NEXT:  End
+sil @call_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
+bb0(%0 : $X):
+  %1 = function_ref @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error Error), normal bb1, error bb2
+
+bb1(%3 : $X):
+  return %3 : $X
+
+bb2(%5 : $Error):
+  throw %5 : $Error
+}
+
+// CHECK-LABEL: CG of throwing_func
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Val %3 Esc: G, Succ: (%3.1)
+// CHECK-NEXT:    Con %3.1 Esc: G, Succ:
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
+bb0(%0 : $X):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = alloc_existential_box $Error, $MyError
+  %3 = project_existential_box $MyError in %2 : $Error
+  %4 = struct $MyError ()
+  store %4 to %3 : $*MyError
+  throw %2 : $Error
+
+bb2:
+  return %0 : $X
+}
+
+// Test if a try_apply to an unknown function is handled correctly.
+
+// CHECK-LABEL: CG of call_unknown_throwing_func
+// CHECK-NEXT:    Arg %0 Esc: G, Succ:
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ:
+// CHECK-NEXT:    Val %3 Esc: G, Succ:
+// CHECK-NEXT:    Con %3.1 Esc: G, Succ:
+// CHECK-NEXT:    Ret Esc: R, Succ: %3
+// CHECK-NEXT:  End
+sil @call_unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
+bb0(%0 : $X):
+  %1 = function_ref @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error Error), normal bb1, error bb2
+
+bb1(%3 : $X):
+  return %3 : $X
+
+bb2(%5 : $Error):
+  throw %5 : $Error
+}
+
+sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
+
+// Test that the deinit of a box itself does not capture anything.
+
+// CHECK-LABEL: CG of test_release_of_partial_apply_with_box
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%1.3)
+// CHECK-NEXT:    Val %1 Esc: %6, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: %6, Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: %6, Succ: %0
+// CHECK-NEXT:    Con %1.3 Esc: G, Succ:
+// CHECK-NEXT:    Val %5 Esc: %6, Succ: %1
+// CHECK-NEXT:  End
+sil @test_release_of_partial_apply_with_box : $@convention(thin) (@owned Y) -> () {
+bb0(%0 : $Y):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Y>
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Y>, 0
+  store %0 to %2 : $*Y
+  %3 = function_ref @take_y_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Y>) -> ()
+  %4 = partial_apply %3(%1) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Y>) -> ()
+  strong_release %4 : $@callee_owned () -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @take_y_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Y>) -> ()
+
+// Test is an unknown value is merged correctly into the caller graph.
+
+// CHECK-LABEL: CG of store_to_unknown_reference
+// CHECK-NEXT:    Arg %0 Esc: G, Succ:
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: (%2.2)
+// CHECK-NEXT:    Con %2.2 Esc: G, Succ: %0
+// CHECK-NEXT:  End
+sil @store_to_unknown_reference : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  %1 = function_ref @get_reference : $@convention(thin) () -> @owned Y
+  %2 = apply %1() : $@convention(thin) () -> @owned Y
+  %3 = ref_element_addr %2 : $Y, #Y.x
+  store %0 to %3 : $*X
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: CG of get_reference
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:    Ret Esc: R, Succ: %1
+// CHECK-NEXT:  End
+sil @get_reference : $@convention(thin) () -> @owned Y {
+bb0:
+  %0 = function_ref @unknown_get_reference : $@convention(thin) () -> @owned Y
+  %1 = apply %0() : $@convention(thin) () -> @owned Y
+  return %1 : $Y
+}
+
+sil @unknown_get_reference : $@convention(thin) () -> @owned Y
+
+// A test for a specific case of callee->caller graph merging.
+
+sil @unknown_set_y : $@convention(thin) () -> @out Y
+
+// CHECK-LABEL: CG of get_y
+// CHECK-NEXT:    Val %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ:
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0.1
+// CHECK-NEXT:  End
+sil @get_y : $@convention(thin) () -> @owned Y {
+bb0:
+  %0 = alloc_stack $Y
+  %f = function_ref @unknown_set_y : $@convention(thin) () -> @out Y
+  %a = apply %f(%0) : $@convention(thin) () -> @out Y
+  %r = load %0 : $*Y
+  dealloc_stack %0 : $*Y
+  return %r : $Y
+}
+
+// CHECK-LABEL: CG of create_and_store_x
+// CHECK-NEXT:    Val %0 Esc: G, Succ:
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: (%2.2)
+// CHECK-NEXT:    Con %2.2 Esc: G, Succ: %0
+// CHECK-NEXT:  End
+sil @create_and_store_x : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  %f = function_ref @get_y : $@convention(thin) () -> @owned Y
+  %y = apply %f() : $@convention(thin) () -> @owned Y
+  %x = ref_element_addr %y : $Y, #Y.x
+  store %0 to %x : $*X
+  %r = tuple()
+  return %r : $()
+}
+
+// Test types which are considered as pointers.
+
+// CHECK-LABEL: CG of pointer_types
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: %1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ:
+// CHECK-NEXT:    Val %7 Esc: R, Succ: %0
+// CHECK-NEXT:    Ret Esc: R, Succ: %7
+// CHECK-NEXT:  End
+sil @pointer_types : $@convention(thin) (@owned Y, @owned Y) -> @owned Y {
+bb0(%0 : $Y, %1 : $Y):
+  %2 = struct $Pointer (%0 : $Y)
+  %3 = struct $Pointer (%1 : $Y)
+  %4 = tuple (%2 : $Pointer, %3 : $Pointer)
+  %5 = enum $PointerEnum, #PointerEnum.B!enumelt.1, %4 : $(Pointer, Pointer)
+  switch_enum %5 : $PointerEnum, case #PointerEnum.B!enumelt.1: bb1
+
+bb1(%7 : $(Pointer, Pointer)):
+  %8 = tuple_extract %7 : $(Pointer, Pointer), 1
+  %9 = struct_extract %8 : $Pointer, #Pointer.y
+  return %9 : $Y
+}
+
+// CHECK-LABEL: CG of defer_edge_cycle
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.1
+// CHECK-NEXT:    Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:    Con %0.3 Esc: A, Succ:
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%0.2), %0.1
+// CHECK-NEXT:  End
+sil @defer_edge_cycle : $@convention(thin) (@inout Y, @inout Y) -> () {
+entry(%0 : $*Y, %1 : $*Y):
+  %l1 = load %0 : $*Y
+  store %l1 to %1 : $*Y
+  %l2 = load %1 : $*Y
+  store %l2 to %0 : $*Y
+  %x = ref_element_addr %l1 : $Y, #Y.x
+  %l3 = load %x : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of take_c_func
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: G, Succ:
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> () {
+bb0(%0 : $@convention(c) () -> ()):
+  %3 = apply %0() : $@convention(c) () -> ()
+  return %0 : $@convention(c) () -> ()
+}
+
+// CHECK-LABEL: CG of c_func
+// CHECK-NEXT:  End
+sil @c_func : $@convention(c) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: CG of pass_c_func
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @pass_c_func : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @take_c_func : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %1 = function_ref @c_func : $@convention(c) () -> ()
+  %2 = apply %0(%1) : $@convention(thin) (@convention(c) () -> ()) -> @convention(c) () -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+
+// CHECK-LABEL: CG of test_select_enum
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Arg %1 Esc: A, Succ:
+// CHECK-NEXT:    Arg %2 Esc: A, Succ:
+// CHECK-NEXT:    Arg %3 Esc: A, Succ:
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %1, %2, %3
+// CHECK-NEXT:    Ret  Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @test_select_enum : $@convention(thin) (PointerEnum2, @owned X, @owned X, @owned X) -> @owned X {
+bb0(%0 : $PointerEnum2, %1 : $X, %2 : $X, %3 : $X):
+  %4 = select_enum %0 : $PointerEnum2, case #PointerEnum2.A!enumelt: %1, case #PointerEnum2.B!enumelt: %2, default %3 : $X
+  return %4 : $X
+}
+
+// CHECK-LABEL: CG of test_select_enum_addr
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Arg %1 Esc: A, Succ:
+// CHECK-NEXT:    Arg %2 Esc: A, Succ:
+// CHECK-NEXT:    Arg %3 Esc: A, Succ:
+// CHECK-NEXT:    Val %4 Esc: R, Succ: %1, %2, %3
+// CHECK-NEXT:    Ret  Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @test_select_enum_addr : $@convention(thin) (@in PointerEnum2, @owned X, @owned X, @owned X) -> @owned X {
+bb0(%0 : $*PointerEnum2, %1 : $X, %2 : $X, %3 : $X):
+  %4 = select_enum_addr %0 : $*PointerEnum2, case #PointerEnum2.A!enumelt: %1, case #PointerEnum2.B!enumelt: %2, default %3 : $X
+  return %4 : $X
+}
+
+// CHECK-LABEL: CG of test_select_value
+// CHECK-NEXT:    Arg %1 Esc: A, Succ:
+// CHECK-NEXT:    Arg %2 Esc: A, Succ:
+// CHECK-NEXT:    Arg %3 Esc: A, Succ:
+// CHECK-NEXT:    Val %6 Esc: R, Succ: %1, %2, %3
+// CHECK-NEXT:    Ret  Esc: R, Succ: %6
+// CHECK-NEXT:  End
+sil @test_select_value : $@convention(thin) (Builtin.Int64, @owned X, @owned X, @owned X) -> @owned X {
+bb0(%0 : $Builtin.Int64, %1 : $X, %2 : $X, %3 : $X):
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = select_value %0 : $Builtin.Int64, case %4: %1, case %5: %2, default %3 : $X
+  return %6 : $X
+}
+
+// CHECK-LABEL: CG of test_existential_addr
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: , Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: , Succ: %0
+// CHECK-NEXT:  End
+sil @test_existential_addr : $@convention(thin) (@owned Pointer) -> () {
+bb0(%0 : $Pointer):
+  %1 = alloc_stack $P
+  %2 = init_existential_addr %1 : $*P, $Pointer
+  store %0 to %2 : $*Pointer
+  %4 = open_existential_addr immutable_access %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
+  %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo!1, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %1 : $*P
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: CG of test_existential_ref
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @test_existential_ref : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  %1 = init_existential_ref %0 : $X : $X, $ClassP
+  %2 = open_existential_ref %1 : $ClassP to $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP
+  %3 = witness_method $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP, #ClassP.foo!1, %2 : $@opened("EC6B6A86-9887-11E5-926E-685B35C48C83") ClassP : $@convention(witness_method: ClassP) <τ_0_0 where τ_0_0 : ClassP> (@guaranteed τ_0_0) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// We don't handle existential boxes currently.
+// Check that we don't crash on this.
+
+// CHECK-LABEL: CG of test_unknown_store
+// CHECK-NEXT:    Arg %0 Esc: G, Succ:
+// CHECK-NEXT:    Val %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:    Con %2.1 Esc: G, Succ: %0
+// CHECK-NEXT:  End
+sil @test_unknown_store : $@convention(thin) (@owned ErrorClass) -> () {
+bb0(%0 : $ErrorClass):
+  %2 = alloc_existential_box $Error, $ErrorClass
+  %3 = project_existential_box $ErrorClass in %2 : $Error
+  store %0 to %3 : $*ErrorClass
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: CG of test_raw_pointer_to_ref
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_raw_pointer_to_ref : $@convention(thin) (@owned X) -> @owned X {
+bb0(%0 : $X):
+  %1 = ref_to_raw_pointer %0 : $X to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $X
+  return %2 : $X
+}
+
+// CHECK-LABEL: CG of test_bridge_object_to_ref
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_bridge_object_to_ref : $@convention(thin) (@owned X, Builtin.Word) -> @owned X {
+bb0(%0 : $X, %1 : $Builtin.Word):
+  %2 = ref_to_bridge_object %0 : $X, %1 : $Builtin.Word
+  %3 = bridge_object_to_ref %2 : $Builtin.BridgeObject to $X
+  return %3 : $X
+}
+
+// CHECK-LABEL: CG of test_address_to_pointer
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @test_address_to_pointer : $@convention(thin) (@owned X) -> @out X {
+bb0(%0 : $*X, %1 : $X):
+  %2 = address_to_pointer %0 : $*X to $Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*X
+  store %1 to %3 : $*X
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: CG of test_casts
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_casts : $@convention(thin) (@owned AnyObject) -> @owned X {
+bb0(%0 : $AnyObject):
+  %1 = unchecked_ref_cast %0 : $AnyObject to $Derived
+  %2 = upcast %1 : $Derived to $X
+  return %2 : $X
+}
+
+// CHECK-LABEL: CG of test_unchecked_ref_cast_addr
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: %1
+// CHECK-NEXT:    Arg %1 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @test_unchecked_ref_cast_addr : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
+bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
+  unchecked_ref_cast_addr T in %1 : $*T to U in %0 : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: CG of test_pin
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Ret  Esc: R, Succ: %0
+// CHECK-NEXT:  End
+sil @test_pin : $@convention(thin) (Builtin.NativeObject) -> Optional<Builtin.NativeObject> {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = strong_pin %0 : $Builtin.NativeObject
+  return %1 : $Optional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: CG of test_unpin
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @test_unpin : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : $Optional<Builtin.NativeObject>):
+  strong_unpin %0 : $Optional<Builtin.NativeObject>
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil_global @global_y : $SomeData
+
+// CHECK-LABEL: CG of test_node_merge_during_struct_inst
+// CHECK-NEXT:    Arg %0 Esc: G, Succ: (%4.1)
+// CHECK-NEXT:    Val %1 Esc: G, Succ: (%4.1)
+// CHECK-NEXT:    Val %4 Esc: G, Succ: (%4.1)
+// CHECK-NEXT:    Con %4.1 Esc: G, Succ: (%4.1), %0, %1, %4
+// CHECK-NEXT:  End
+sil @test_node_merge_during_struct_inst : $@convention(thin) (Y) -> () {
+bb0(%0 : $Y):
+  %1 = global_addr @global_y : $*SomeData
+  %2 = address_to_pointer %1 : $*SomeData to $Builtin.RawPointer
+  %3 = raw_pointer_to_ref %2 : $Builtin.RawPointer to $Y
+
+  %4 = alloc_stack $Pointer
+  %5 = struct_element_addr %4 : $*Pointer, #Pointer.y
+  store %3 to %5 : $*Y
+
+  %7 = load %1 : $*SomeData
+  %8 = load %4 : $*Pointer
+  %9 = address_to_pointer %4 : $*Pointer to $Builtin.RawPointer
+
+  // Analyzing this instruction causes a node merge.
+  // Check that we don't crash on this.
+  %l = struct $FourFields(%7 : $SomeData, %8 : $Pointer, %9 : $Builtin.RawPointer, %0 : $Y)
+
+  dealloc_stack %4 : $*Pointer
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_is_native_no_typecheck
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @arraysemantics_is_native_no_typecheck : $@convention(thin) (Array<X>) -> () {
+bb0(%0 : $Array<X>):
+  %f = function_ref @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
+  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<X>) -> Bool
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_check_subscript
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @arraysemantics_check_subscript : $@convention(thin) (Array<X>) -> () {
+bb0(%0 : $Array<X>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+  %bl = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%bl : $Builtin.Int1)
+
+  %f = function_ref @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
+  %a = apply %f(%i, %b, %0) : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_check_index
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @arraysemantics_check_index : $@convention(thin) (Array<X>) -> () {
+bb0(%0 : $Array<X>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+
+  %f = function_ref @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()
+  %a = apply %f(%i, %0) : $@convention(method) (Int32, @guaranteed Array<X>) -> ()
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_get_element
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ: %1.2
+// CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
+// CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%1.2)
+// CHECK-NEXT:    Con %1.2 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @arraysemantics_get_element : $@convention(thin) (Array<X>) -> @out X {
+bb0(%io : $*X, %1 : $Array<X>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+  %bl = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%bl : $Builtin.Int1)
+
+  %f = function_ref @get_element : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<X>) -> @out X
+  %a = apply %f(%io, %i, %b, %b, %1) : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<X>) -> @out X
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_make_mutable
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @arraysemantics_make_mutable : $@convention(thin) (@inout Array<X>) -> () {
+bb0(%0 : $*Array<X>):
+  %f = function_ref @make_mutable : $@convention(method) (@inout Array<X>) -> ()
+  %a = apply %f(%0) : $@convention(method) (@inout Array<X>) -> ()
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_get_element_address
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:    Con %0.1 Esc: A, Succ:
+// CHECK-NEXT:    Val %4 Esc: , Succ: %0.1
+// CHECK-NEXT:  End
+sil @arraysemantics_get_element_address : $@convention(thin) (Array<X>) -> () {
+bb0(%0 : $Array<X>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+
+  %f = function_ref @get_element_address : $@convention(method) (Int32, @guaranteed Array<X>) -> UnsafeMutablePointer<X>
+  %a = apply %f(%i, %0) : $@convention(method) (Int32, @guaranteed Array<X>) -> UnsafeMutablePointer<X>
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_get_count
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @arraysemantics_get_count : $@convention(thin) (Array<X>) -> () {
+bb0(%0 : $Array<X>):
+
+  %f = function_ref @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32
+  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_get_capacity
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @arraysemantics_get_capacity : $@convention(thin) (Array<X>) -> () {
+bb0(%0 : $Array<X>):
+
+  %f = function_ref @get_capacity : $@convention(method) (@guaranteed Array<X>) -> Int32
+  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_withUnsafeMutableBufferPointer
+// CHECK-NEXT:   Arg %0 Esc: A, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK-NEXT:   Con %0.2 Esc: A, Succ: (%0.3)
+// CHECK-NEXT:   Con %0.3 Esc: G, Succ:
+// CHECK-NEXT:   Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:   Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %3 Esc: %4, Succ:
+// CHECK-NEXT: End
+sil @arraysemantics_withUnsafeMutableBufferPointer : $@convention(thin) (@inout Array<X>, @owned @callee_owned (@inout X) -> (@out (), @error Error)) -> () {
+bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error Error)):
+
+  %2 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
+  %3 = alloc_stack $()
+  %4 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
+  dealloc_stack %3 : $*()
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: CG of arraysemantics_createUninitialized
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:    Val %2 Esc: R, Succ: (%4.2)
+// CHECK-NEXT:    Val %4 Esc: R, Succ: (%4.1)
+// CHECK-NEXT:    Con %4.1 Esc: R, Succ: %2
+// CHECK-NEXT:    Con %4.2 Esc: R, Succ: %0
+// CHECK-NEXT:    Ret  Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @arraysemantics_createUninitialized : $@convention(thin) (@owned X) -> @owned Array<X> {
+bb0(%0 : $X):
+  %1 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %2 = apply %1() : $@convention(thin) () -> @owned AnyObject
+  %3 = function_ref @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %4 = apply %3(%2) : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %5 = tuple_extract %4 : $(Array<X>, UnsafeMutablePointer<X>), 0
+  %6 = tuple_extract %4 : $(Array<X>, UnsafeMutablePointer<X>), 1
+  %7 = struct_extract %6 : $UnsafeMutablePointer<X>, #UnsafeMutablePointer._rawValue
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to $*X
+  store %0 to %8 : $*X
+  return %5 : $Array<X>
+}
+
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error Error), @inout Array<X>) -> (@out (), @error Error)
+sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
+sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
+sil [_semantics "array.check_index"] @check_index : $@convention(method) (Int32, @guaranteed Array<X>) -> ()
+sil [_semantics "array.get_element"] @get_element : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<X>) -> @out X
+sil [_semantics "array.make_mutable"] @make_mutable : $@convention(method) (@inout Array<X>) -> ()
+sil [_semantics "array.get_element_address"] @get_element_address : $@convention(method) (Int32, @guaranteed Array<X>) -> UnsafeMutablePointer<X>
+sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed Array<X>) -> Int32
+sil [_semantics "array.get_capacity"] @get_capacity : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
+sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
+sil [_semantics "array.uninitialized"] @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+
+// A simplified version of swift_bufferAllocate
+sil @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+
+// CHECK-LABEL: CG of semantics_pair_no_escaping_closure
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:   Arg %1 Esc: A, Succ:
+// CHECK-NEXT:   Arg %2 Esc: G, Succ: (%2.1)
+// CHECK-NEXT:   Con %2.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %4 Esc: %5, Succ:
+// CHECK-NEXT: End
+sil @semantics_pair_no_escaping_closure : $@convention(thin) (@owned X, @guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error Error)) -> () {
+bb(%0 : $X, %1 : $X, %2: $@callee_owned (X, X) -> (@out X, @error Error)):
+  %3 = function_ref @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
+  %4 = alloc_stack $X
+  %6 = apply [nothrow] %3(%4, %0, %2, %1) : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
+  dealloc_stack %4 : $*X
+  %7 = tuple()
+	return %7 : $()
+}
+
+// CHECK-LABEL: CG of semantics_self_no_escaping_closure
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:   Arg %1 Esc: G, Succ: (%1.1)
+// CHECK-NEXT:   Con %1.1 Esc: G, Succ:
+// CHECK-NEXT:   Val %3 Esc: %4, Succ:
+// CHECK-NEXT: End
+sil @semantics_self_no_escaping_closure : $@convention(thin) (@guaranteed X, @owned @callee_owned (X, X) -> (@out X, @error Error)) -> () {
+bb(%0 : $X, %1: $@callee_owned (X, X) -> (@out X, @error Error)):
+  %2 = function_ref @unsafeWithNotEscapedSelfPointer : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
+  %3 = alloc_stack $X
+  %6 = apply [nothrow] %2(%3, %1, %0) : $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error Error), @guaranteed X) -> (@out X, @error Error)
+  dealloc_stack %3 : $*X
+  %7 = tuple()
+	return %7 : $()
+}
+
+// CHECK-LABEL: CG of check_dealloc_ref
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @check_dealloc_ref : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  dealloc_ref %0 : $X
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: CG of check_set_deallocating
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @check_set_deallocating : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  set_deallocating %0 : $X
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// Escape analysis should analyze the implicit destructor call which may
+// happen due to strong_release and figure out that the object will not
+// globally escape.
+// CHECK-LABEL: CG of check_non_escaping_implicit_destructor_invocation_via_strong_release
+// CHECK-NEXT:   Val %0 Esc: %1, Succ:
+// CHECK-NEXT:  End
+sil @check_non_escaping_implicit_destructor_invocation_via_strong_release : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $X
+  strong_release %0 : $X
+  dealloc_ref [stack] %0 : $X
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Escape analysis should analyze the implicit destructor call which may
+// happen due to strong_release and figure out that the object will not
+// globally escape.
+// CHECK-LABEL: CG of check_non_escaping_implicit_destructor_invocation_via_release_value
+// CHECK-NEXT:   Val %0 Esc: %1, Succ:
+// CHECK-NEXT:  End
+sil @check_non_escaping_implicit_destructor_invocation_via_release_value : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $X
+  release_value %0 : $X
+  dealloc_ref [stack] %0 : $X
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Escape analysis should analyze the implicit destructor call which may
+// happen due to strong_release and figure out that the object will
+// globally escape.
+// CHECK-LABEL: CG of check_escaping_implicit_destructor_invocation_via_strong_release
+// CHECK-NEXT:   Val %0 Esc: %1, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: %1, Succ: (%0.2)
+// CHECK-NEXT:   Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @check_escaping_implicit_destructor_invocation_via_strong_release : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $Z
+  strong_release %0 : $Z
+  dealloc_ref [stack] %0 : $Z
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Escape analysis should analyze the implicit destructor call which may
+// happen due to strong_release and figure out that the object will
+// globally escape.
+// CHECK-LABEL: CG of check_escaping_implicit_destructor_invocation_via_release_value
+// CHECK-NEXT:   Val %0 Esc: %1, Succ: (%0.1)
+// CHECK-NEXT:   Con %0.1 Esc: %1, Succ: (%0.2)
+// CHECK-NEXT:   Con %0.2 Esc: G, Succ:
+// CHECK-NEXT:  End
+sil @check_escaping_implicit_destructor_invocation_via_release_value : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $Z
+  release_value %0 : $Z
+  dealloc_ref [stack] %0 : $Z
+  %3 = tuple ()
+  return %3 : $()
+}
+
+
+// Check that escape analysis can look through bb arguments and figure
+// out that all objects are local. By analyzing a destructor implicitly
+// invoked by strong_release it would also determine that these objects
+// do not escape from the function.
+// CHECK-LABEL: CG of check_is_local_object_through_bb_args
+// CHECK-LABEL:  Val %2 Esc: %6,%7, Succ:
+// CHECK-LABEL:  Val %4 Esc: %6,%7, Succ:
+// CHECK-LABEL:  Val %6 Esc: %6,%7, Succ: %2, %4
+// CHECK-LABEL: End
+sil @check_is_local_object_through_bb_args: $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = alloc_ref $X
+  br bb3(%2 : $X)
+
+bb2:
+  %4 = alloc_ref $X
+  br bb3(%4 : $X)
+
+bb3(%6: $X):
+  strong_release %6 : $X
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: CG of check_look_through_thin_to_thick
+// CHECK-NEXT:    Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @check_look_through_thin_to_thick: $(@convention(thin) () -> ()) -> () {
+bb0(%0 : $@convention(thin) () -> ()):
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_owned () -> ()
+  %2 = apply %1() : $@callee_owned () -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// X.deinit
+// CHECK-LABEL: CG of _T04main1XCfD
+// CHECK:        Arg %0 Esc: A, Succ:
+// CHECKL:      End
+sil @_T04main1XCfD: $@convention(method) (@owned X) -> () {
+bb0(%0 : $X):
+  fix_lifetime %0 : $X
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// Z.deinit
+// CHECK-LABEL: CG of _T04main1ZCfD
+// CHECK:        Arg %0 Esc: A, Succ: (%0.1)
+// CHECK:        Con %0.1 Esc: A, Succ: (%0.2)
+// CHECK:        Con %0.2 Esc: G, Succ:
+// CHECK:        Val %3 Esc: G, Succ: (%3.1)
+// CHECK:        Con %3.1 Esc: G, Succ: %0.2
+// CHECKL:      End
+sil @_T04main1ZCfD: $@convention(method) (@owned Z) -> () {
+bb0(%0 : $Z):
+  %1 = ref_element_addr %0 : $Z, #Z.x
+  %2 = load %1 : $*X
+  %3 = global_addr @global_x : $*X
+  store %2 to %3 : $*X
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil_vtable X {
+  #X.deinit!deallocator: _T04main1XCfD
+}
+
+sil_vtable Z {
+  #Z.deinit!deallocator: _T04main1ZCfD
+}

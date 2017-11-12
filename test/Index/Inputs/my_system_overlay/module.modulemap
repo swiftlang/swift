@@ -1,0 +1,3 @@
+module my_system_overlay [system] {
+  header "my_system_overlay_header.h"
+}

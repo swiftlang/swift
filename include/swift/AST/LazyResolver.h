@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,14 +17,16 @@
 #ifndef SWIFT_AST_LAZYRESOLVER_H
 #define SWIFT_AST_LAZYRESOLVER_H
 
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeLoc.h"
-#include "llvm/ADT/Fixnum.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
 
 class AssociatedTypeDecl;
 class Decl;
 class DeclContext;
+class IterableDeclContext;
 class ExtensionDecl;
 class Identifier;
 class NominalTypeDecl;
@@ -34,23 +36,13 @@ class ProtocolDecl;
 class Substitution;
 class TypeDecl;
 class ValueDecl;
+class VarDecl;
 
 /// Abstract interface used to lazily resolve aspects of the AST, such as the
 /// types of declarations or protocol conformance structures.
 class LazyResolver {
 public:
   virtual ~LazyResolver();
-
-  /// Completely check the given normal protocol conformance.
-  ///
-  /// \param conformance The normal protocol conformance.
-  ///
-  /// FIXME: We shouldn't need this as an entry to the lazy resolver, because
-  /// completely checking of conformances is only interesting when we're doing
-  /// complete checking of the declaration context. However, it is needed now
-  /// to maintain the order of checking, because resolveTypeWitness/
-  /// resolveWitness aren't lazy enough.
-  virtual void checkConformance(NormalProtocolConformance *conformance) = 0;
 
   /// Resolve the type witnesses for the given associated type within the given
   /// protocol conformance.
@@ -62,21 +54,10 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve a member type.
-  ///
-  /// \param dc The context in which to resolve the type.
-  /// \param type The type in which we will search for the member type.
-  /// \param name The name of the member type.
-  ///
-  /// \returns the member type, or an empty type if no such type could be
-  /// found.
-  virtual Type resolveMemberType(DeclContext *dc, Type type,
-                                 Identifier name) = 0;
-
-  /// Resolve the accessibility of a value.
+  /// Resolve the access of a value.
   ///
   /// It does no type-checking.
-  virtual void resolveAccessibility(ValueDecl *VD) = 0;
+  virtual void resolveAccessControl(ValueDecl *VD) = 0;
 
   /// Resolve the type and declaration attributes of a value.
   ///
@@ -100,6 +81,9 @@ public:
   /// Resolve the inherited protocols of a given protocol.
   virtual void resolveInheritedProtocols(ProtocolDecl *protocol) = 0;
 
+  /// Bind an extension to its extended type.
+  virtual void bindExtension(ExtensionDecl *ext) = 0;
+
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be
@@ -109,6 +93,9 @@ public:
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
 
+  /// Resolve an implicitly-generated member with the given name.
+  virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
+
   /// Resolve any implicitly-generated members and conformances for generated
   /// external decls.
   virtual void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) = 0;
@@ -117,97 +104,163 @@ public:
   /// is usable for the given type.
   virtual bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                          ExtensionDecl *protocolExtension) = 0;
+
+  /// Mark the given conformance as "used" from the given declaration context.
+  virtual void markConformanceUsed(ProtocolConformanceRef conformance,
+                                   DeclContext *dc) = 0;
 };
 
+/// An implementation of LazyResolver that delegates to another.
+class DelegatingLazyResolver : public LazyResolver {
+protected:
+  LazyResolver &Principal;
+public:
+  DelegatingLazyResolver(LazyResolver &principal) : Principal(principal) {}
+  ~DelegatingLazyResolver(); // v-table anchor
+
+  void resolveTypeWitness(const NormalProtocolConformance *conformance,
+                          AssociatedTypeDecl *assocType) override {
+    Principal.resolveTypeWitness(conformance, assocType);
+  }
+
+  void resolveWitness(const NormalProtocolConformance *conformance,
+                      ValueDecl *requirement) override {
+    Principal.resolveWitness(conformance, requirement);
+  }
+
+  void resolveAccessControl(ValueDecl *VD) override {
+    Principal.resolveAccessControl(VD);
+  }
+
+  void resolveDeclSignature(ValueDecl *VD) override {
+    Principal.resolveDeclSignature(VD);
+  }
+
+  void resolveInheritanceClause(
+                llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) override {
+    Principal.resolveInheritanceClause(decl);
+  }
+
+  void resolveSuperclass(ClassDecl *classDecl) override {
+    Principal.resolveSuperclass(classDecl);
+  }
+
+  void resolveRawType(EnumDecl *enumDecl) override {
+    Principal.resolveRawType(enumDecl);
+  }
+
+  void resolveInheritedProtocols(ProtocolDecl *protocol) override {
+    Principal.resolveInheritedProtocols(protocol);
+  }
+
+  void bindExtension(ExtensionDecl *ext) override {
+    Principal.bindExtension(ext);
+  }
+
+  void resolveExtension(ExtensionDecl *ext) override {
+    Principal.resolveExtension(ext);
+  }
+
+  void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
+    Principal.resolveImplicitConstructors(nominal);
+  }
+
+  void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
+    Principal.resolveImplicitMember(nominal, member);
+  }
+
+  void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
+    Principal.resolveExternalDeclImplicitMembers(nominal);
+  }
+
+  bool isProtocolExtensionUsable(DeclContext *dc, Type type,
+                                 ExtensionDecl *protocolExtension) override {
+    return Principal.isProtocolExtensionUsable(dc, type, protocolExtension);
+  }
+
+  void markConformanceUsed(ProtocolConformanceRef conformance,
+                           DeclContext *dc) override {
+    return Principal.markConformanceUsed(conformance, dc);
+  }
+};
+
+class LazyMemberLoader;
+
+/// Context data for lazy deserialization.
+class LazyContextData {
+public:
+  /// The lazy member loader for this context.
+  LazyMemberLoader *loader;
+};
+
+/// Context data for generic contexts.
+class LazyGenericContextData : public LazyContextData {
+public:
+  /// The context data used for loading the generic environment.
+  uint64_t genericEnvData = 0;
+};
+
+/// Context data for iterable decl contexts.
+class LazyIterableDeclContextData : public LazyGenericContextData {
+public:
+  /// The context data used for loading all of the members of the iterable
+  /// context.
+  uint64_t memberData = 0;
+
+  /// The context data used for loading all of the conformances of the
+  /// iterable context.
+  uint64_t allConformancesData = 0;
+};
 
 /// A class that can lazily load members from a serialized format.
 class alignas(void*) LazyMemberLoader {
   virtual void anchor();
+
 public:
   virtual ~LazyMemberLoader() = default;
 
-  /// Populates the given vector with all member decls for \p D.
+  /// Populates a given decl \p D with all of its members.
   ///
   /// The implementation should add the members to D.
-  ///
-  /// \param[out] hasMissingRequiredMembers If present, set to true if any
-  /// members failed to import and were non-optional protocol requirements.
   virtual void
-  loadAllMembers(Decl *D, uint64_t contextData,
-                 bool *hasMissingRequiredMembers = nullptr) {
-    llvm_unreachable("unimplemented");
-  }
+  loadAllMembers(Decl *D, uint64_t contextData) = 0;
+
+  /// Populates a vector with all members of \p IDC that have DeclName
+  /// matching \p N.
+  ///
+  /// Returns None if an error occurred \em or named member-lookup
+  /// was otherwise unsupported in this implementation or Decl.
+  virtual Optional<TinyPtrVector<ValueDecl *>>
+  loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
+                   uint64_t contextData) = 0;
 
   /// Populates the given vector with all conformances for \p D.
   ///
   /// The implementation should \em not call setConformances on \p D.
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
-                      SmallVectorImpl<ProtocolConformance *> &Conformances) {
-    llvm_unreachable("unimplemented");
-  }
-
-  /// Populates the given vector with all conformances for \p D.
-  virtual void
-  finishNormalConformance(NormalProtocolConformance *conformance,
-                          uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                      SmallVectorImpl<ProtocolConformance *> &Conformances) = 0;
 
   /// Returns the default definition type for \p ATD.
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) {
-    llvm_unreachable("unimplemented");
-  }
+                                            uint64_t contextData) = 0;
+
+  /// Returns the generic environment.
+  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
+                                                     uint64_t contextData) = 0;
 };
 
-/// A placeholder for either an array or a member loader.
-template <typename T>
-class LazyLoaderArray {
-  using LengthTy = llvm::Fixnum<31>;
-  PointerUnion<LengthTy, LazyMemberLoader *> lengthOrLoader;
-  uint64_t data = 0;
+/// A class that can lazily load conformances from a serialized format.
+class alignas(void*) LazyConformanceLoader {
+  virtual void anchor();
+
 public:
-  explicit LazyLoaderArray() = default;
+  virtual ~LazyConformanceLoader() = default;
 
-  /*implicit*/ LazyLoaderArray(ArrayRef<T> members) {
-    *this = members;
-  }
-
-  LazyLoaderArray(LazyMemberLoader *loader, uint64_t contextData) {
-    setLoader(loader, contextData);
-  }
-
-  LazyLoaderArray &operator=(ArrayRef<T> members) {
-    lengthOrLoader = members.size();
-    data = reinterpret_cast<uint64_t>(members.data());
-    return *this;
-  }
-
-  void setLoader(LazyMemberLoader *loader, uint64_t contextData) {
-    lengthOrLoader = loader;
-    data = contextData;
-  }
-
-  ArrayRef<T> getArray() const {
-    assert(!isLazy());
-    return llvm::makeArrayRef(reinterpret_cast<T *>(data),
-                              lengthOrLoader.get<LengthTy>());
-  }
-
-  LazyMemberLoader *getLoader() const {
-    assert(isLazy());
-    return lengthOrLoader.get<LazyMemberLoader *>();
-  }
-
-  uint64_t getLoaderContextData() const {
-    assert(isLazy());
-    return data;
-  }
-
-  bool isLazy() const {
-    return lengthOrLoader.is<LazyMemberLoader *>();
-  }
+  /// Populates the given protocol conformance.
+  virtual void
+  finishNormalConformance(NormalProtocolConformance *conformance,
+                          uint64_t contextData) = 0;
 };
 
 }

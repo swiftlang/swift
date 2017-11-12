@@ -1,11 +1,10 @@
 // Please keep this file in alphabetical order!
 
-// RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules/ -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules/ -parse-as-library %t/imports.swiftmodule -parse -emit-objc-header-path %t/imports.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/imports.h
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t/imports.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules/ -parse-as-library %t/imports.swiftmodule -typecheck -emit-objc-header-path %t/imports.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck %s < %t/imports.h
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/imports.h
 // RUN: %check-in-clang %t/imports.h -I %S/Inputs/custom-modules/
 
 // REQUIRES: objc_interop
@@ -25,16 +24,16 @@ import ctypes.bits
 import Foundation
 
 import Base
-import Base.ImplicitSub;
-import Base.ImplicitSub.ImSub;
-import Base.ImplicitSub.ExSub;
-import Base.ExplicitSub;
-import Base.ExplicitSub.ImSub;
-import Base.ExplicitSub.ExSub;
+import Base.ImplicitSub
+import Base.ImplicitSub.ImSub
+import Base.ImplicitSub.ExSub
+import Base.ExplicitSub
+import Base.ExplicitSub.ImSub
+import Base.ExplicitSub.ExSub
 
 @objc class Test {
   let word: DWORD = 0
-  let number: NSTimeInterval = 0.0
+  let number: TimeInterval = 0.0
 
   let baseI: BaseI = 0
   let baseII: BaseII = 0

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,15 +17,16 @@
 #ifndef SWIFT_BASIC_DWARF_H
 #define SWIFT_BASIC_DWARF_H
 
-#include "llvm/Support/Dwarf.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 
 namespace swift {
   /// The DWARF version emitted by the Swift compiler.
-  const unsigned DWARFVersion = 3;
+  const unsigned DWARFVersion = 4;
+
   static const char MachOASTSegmentName[] = "__SWIFT";
   static const char MachOASTSectionName[] = "__ast";
   static const char ELFASTSectionName[] = ".swift_ast";
   static const char COFFASTSectionName[] = "swiftast";
-}
+} // end namespace swift
 
-#endif
+#endif // SWIFT_BASIC_DWARF_H

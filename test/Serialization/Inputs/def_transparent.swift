@@ -3,7 +3,7 @@
 }
 
 @_transparent public func testBuiltin() -> Int32 {
-  var y: Int32 = 300;
+  var y: Int32 = 300
   var z = "foo"
   return y
 }
@@ -11,20 +11,21 @@
 @_transparent public func standalone_function(x x: Int32, y: Int32) -> Int32 {
   return x
 }
-@_transparent public func curried_function(x x: Int32)(y: Int32) -> Int32 {
-  return standalone_function(x: x, y: y)
-}
-@_transparent public func calls(i i: Int32, j: Int32) {
-  var f1 = curried_function(x: i)
-  f1(y: j);
-}
+
+@_inlineable
 public func foo() -> Int32 { return 0 }
+@_inlineable
 public func runced() -> Bool { return true }
 
+@_inlineable
 public func a() {}
+@_inlineable
 public func b() {}
+@_inlineable
 public func c() {}
+@_inlineable
 public func d() {}
+@_inlineable
 public func e() {}
 
 @_transparent public func test_br() {
@@ -43,6 +44,7 @@ public enum MaybePair {
   case Right(String)
   case Both(Int32, String)
 }
+@_inlineable
 public func do_switch(u u: MaybePair) {
   switch u {
   case .Neither:
@@ -76,7 +78,8 @@ public struct Wrapper {
   }
 }
 
-@_transparent public extension Wrapper {
+public extension Wrapper {
+  @_transparent
   func getValueAgain() -> Int32 {
     return self.value
   }

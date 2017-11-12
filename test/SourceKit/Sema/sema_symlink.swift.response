@@ -19,6 +19,15 @@
         key.offset: 15,
         key.length: 3
       }
+    ],
+    key.diagnostics: [
+      {
+        key.line: 1,
+        key.column: 16,
+        key.filepath: real.swift,
+        key.severity: source.diagnostic.severity.note,
+        key.description: "did you mean 'Bool'? (Swift.Bool)"
+      }
     ]
   }
 ]

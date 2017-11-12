@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 {
   init() // expected-note{{protocol requires initializer 'init()' with type '()'}}
@@ -45,3 +45,25 @@ extension C2c : P1 {
   convenience init() { self.init(x: 0) } // expected-error{{initializer requirement 'init()' can only be satisfied by a `required` initializer in the definition of non-final class 'C2c'}}
 }
 
+// rdar://problem/24575507
+protocol P2 {
+  init()
+  init(int: Int)
+}
+
+extension P2 {
+  init() {
+    self.init(int: 17)
+  }
+}
+
+
+class Foo : P2 {
+  var value: Int
+
+  // okay: init() requirement satisfied by protocol extension
+
+  required init(int value: Int) {
+    self.value = value
+  }
+}

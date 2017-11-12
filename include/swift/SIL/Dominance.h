@@ -1,12 +1,12 @@
-//===--- Dominance.h - SIL dominance analysis ------------------*- C++ -*-===//
+//===--- Dominance.h - SIL dominance analysis -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,27 +21,45 @@
 #include "llvm/Support/GenericDomTree.h"
 #include "swift/SIL/CFG.h"
 
-extern template class llvm::DominatorTreeBase<swift::SILBasicBlock>;
-extern template class llvm::DominatorBase<swift::SILBasicBlock>;
+extern template class llvm::DominatorTreeBase<swift::SILBasicBlock, false>;
+extern template class llvm::DominatorTreeBase<swift::SILBasicBlock, true>;
 extern template class llvm::DomTreeNodeBase<swift::SILBasicBlock>;
+
+namespace llvm {
+namespace DomTreeBuilder {
+using SILDomTree = llvm::DomTreeBase<swift::SILBasicBlock>;
+using SILPostDomTree = llvm::PostDomTreeBase<swift::SILBasicBlock>;
+
+extern template void Calculate<SILDomTree, swift::SILFunction>(
+    SILDomTree &DT, swift::SILFunction &F);
+extern template void Calculate<SILPostDomTree, swift::SILFunction>(
+    SILPostDomTree &DT, swift::SILFunction &F);
+} // namespace DomTreeBuilder
+} // namespace llvm
 
 namespace swift {
 
+using DominatorTreeBase = llvm::DominatorTreeBase<swift::SILBasicBlock, false>;
+using PostDominatorTreeBase = llvm::DominatorTreeBase<swift::SILBasicBlock, true>;
 using DominanceInfoNode = llvm::DomTreeNodeBase<SILBasicBlock>;
 
 /// A class for computing basic dominance information.
-class DominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
+class DominanceInfo : public DominatorTreeBase {
+  using super = DominatorTreeBase;
 public:
   DominanceInfo(SILFunction *F);
 
   /// Does instruction A properly dominate instruction B?
   bool properlyDominates(SILInstruction *a, SILInstruction *b);
 
+  /// Does value A properly dominate instruction B?
+  bool properlyDominates(SILValue a, SILInstruction *b);
+
   void verify() const;
 
   /// Return true if the other dominator tree does not match this dominator
   /// tree.
-  inline bool errorOccuredOnComparison(const DominanceInfo &Other) const {
+  inline bool errorOccurredOnComparison(const DominanceInfo &Other) const {
     const auto *R = getRootNode();
     const auto *OtherR = Other.getRootNode();
 
@@ -61,7 +79,7 @@ public:
     return getNode(&F->front()) != nullptr;
   }
   void reset() {
-    llvm::DominatorTreeBase<SILBasicBlock>::reset();
+    super::reset();
   }
 };
 
@@ -121,7 +139,8 @@ public:
 };
 
 /// A class for computing basic post-dominance information.
-class PostDominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
+class PostDominanceInfo : public PostDominatorTreeBase {
+  using super = PostDominatorTreeBase;
 public:
   PostDominanceInfo(SILFunction *F);
 
@@ -131,12 +150,22 @@ public:
 
   /// Return true if the other dominator tree does not match this dominator
   /// tree.
-  inline bool errorOccuredOnComparison(const PostDominanceInfo &Other) const {
+  inline bool errorOccurredOnComparison(const PostDominanceInfo &Other) const {
     const auto *R = getRootNode();
     const auto *OtherR = Other.getRootNode();
 
     if (!R || !OtherR || R->getBlock() != OtherR->getBlock())
       return true;
+
+    if (!R->getBlock()) {
+      // The post dom-tree has multiple roots. The compare() function can not
+      // cope with multiple roots if at least one of the roots is caused by
+      // an infinite loop in the CFG (it crashes because no nodes are allocated
+      // for the blocks in the infinite loop).
+      // So we return a conservative false in this case.
+      // TODO: eventually fix the DominatorTreeBase::compare() function.
+      return false;
+    }
 
     // Returns *false* if they match.
     if (compare(Other))
@@ -147,36 +176,32 @@ public:
 
   bool isValid(SILFunction *F) const { return getNode(&F->front()) != nullptr; }
 
-  using DominatorTreeBase::properlyDominates;
+  using super::properlyDominates;
 };
 
 
-}  // end namespace swift
+} // end namespace swift
 
 namespace llvm {
 
 /// DominatorTree GraphTraits specialization so the DominatorTree can be
 /// iterable by generic graph iterators.
 template <> struct GraphTraits<swift::DominanceInfoNode *> {
-  using NodeType = swift::DominanceInfoNode;
-  using ChildIteratorType = NodeType::iterator;
+  using ChildIteratorType = swift::DominanceInfoNode::iterator;
+  typedef swift::DominanceInfoNode *NodeRef;
 
-  static NodeType *getEntryNode(NodeType *N) { return N; }
-  static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->begin();
-  }
-  static inline ChildIteratorType child_end(NodeType *N) { return N->end(); }
+  static NodeRef getEntryNode(NodeRef N) { return N; }
+  static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static inline ChildIteratorType child_end(NodeRef N) { return N->end(); }
 };
 
 template <> struct GraphTraits<const swift::DominanceInfoNode *> {
-  using NodeType = const swift::DominanceInfoNode;
-  using ChildIteratorType = NodeType::const_iterator;
+  using ChildIteratorType = swift::DominanceInfoNode::const_iterator;
+  typedef const swift::DominanceInfoNode *NodeRef;
 
-  static NodeType *getEntryNode(NodeType *N) { return N; }
-  static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->begin();
-  }
-  static inline ChildIteratorType child_end(NodeType *N) { return N->end(); }
+  static NodeRef getEntryNode(NodeRef N) { return N; }
+  static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static inline ChildIteratorType child_end(NodeRef N) { return N->end(); }
 };
 
 } // end namespace llvm

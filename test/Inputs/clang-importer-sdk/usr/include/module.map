@@ -45,25 +45,25 @@ module CoreGraphics {
   export *
 }
 module CoreFoundation {
-  header "CoreFoundation.h" 
+  header "CoreFoundation.h"
   export *
 }
 
 module Foundation {
-  header "Foundation.h" 
+  header "Foundation.h"
   export *
 }
 module AppKit {
-  header "AppKit.h" 
+  header "AppKit.h"
   export *
 }
 module UIKit {
-  header "UIKit.h" 
+  header "UIKit.h"
   export *
 }
 
 module NotificationCenter {
-  header "NotificationCenter.h" 
+  header "NotificationCenter.h"
   export *
 }
 
@@ -98,6 +98,10 @@ module objc_structs {
   export *
 }
 
+module enums_using_attributes {
+  header "enums_using_attributes.h"
+}
+
 module errors {
   header "errors.h"
   export *
@@ -105,5 +109,20 @@ module errors {
 
 module c_simd {
   header "simd.h"
+  export *
+}
+
+module objc_generics {
+  header "objc_generics.h"
+  export *
+}
+
+module CoreMedia {
+  header "CoreMedia.h"
+  export *
+}
+
+module OtherSubscripts {
+  header "OtherSubscripts.h"
   export *
 }

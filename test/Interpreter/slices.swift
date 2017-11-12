@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 protocol Showable {
@@ -13,7 +13,7 @@ extension Int : Showable {
 
 /*FIXME crashes irgen
 
-func show_slice<T : Showable>(xs: [T]) {
+func show_slice<T : Showable>(_ xs: [T]) {
   for x in xs {
     x.show()
   }
@@ -40,7 +40,7 @@ for x in [9, 8, 1, 0, 5] {
 // CHECK: 0
 // CHECK: 5
 
-func slice_from_varargs(xs: Int...) {
+func slice_from_varargs(_ xs: Int...) {
   for x in xs {
     x.show()
   }

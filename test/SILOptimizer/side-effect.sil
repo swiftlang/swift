@@ -1,0 +1,490 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
+
+// REQUIRES: asserts
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+enum Never {}
+
+struct Int32 {
+  var _value : Builtin.Int32
+}
+
+struct Array<T> {
+  var _value : Builtin.NativeObject
+}
+
+struct Bool {
+  var _value: Builtin.Int1
+}
+
+struct UnsafeMutablePointer<T> {
+  var _value: Builtin.RawPointer
+}
+
+class X {
+  @sil_stored var a: Int32
+  @sil_stored var x: X
+
+  init()
+}
+
+sil [_semantics "arc.programtermination_point"] @exitfunc : $@convention(thin) () -> Never
+sil [readnone] @pure_func : $@convention(thin) () -> ()
+sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
+sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
+
+sil @unknown_func : $@convention(thin) () -> ()
+
+
+struct SP {
+  var value: Builtin.BridgeObject
+}
+
+enum EP {
+  case none
+  case data(SP, Builtin.Int1)
+}
+
+sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
+sil [_semantics "array.check_subscript"] @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
+sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<Int32>) -> @out Int32
+sil [_semantics "array.make_mutable"] @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
+sil [_semantics "array.get_element_address"] @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
+sil [_semantics "array.get_count"] @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+sil [_semantics "array.get_capacity"] @get_capacity_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+sil [_semantics "array.get_count"] @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil @load_store_to_args
+// CHECK: <func=,param0=r,param1=w,param2=w>
+sil @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %l1 = load %0 : $*Int32
+  store %l1 to %1  : $*Int32
+  %a = ref_element_addr %2 : $X, #X.a
+  store %l1 to %a : $*Int32
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_load_store_to_args1
+// CHECK: <func=,param0=w,param1=r,param2=>
+sil @call_load_store_to_args1 : $@convention(thin) (@guaranteed X, @inout Int32, @inout Int32) -> () {
+bb0(%0 : $X, %1 : $*Int32, %2 : $*Int32):
+  %s = alloc_stack $Int32
+
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %f(%1, %s, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+
+  dealloc_stack %s : $*Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_load_store_to_args2
+// CHECK: <func=w,param0=rw,param1=r>
+sil @call_load_store_to_args2 : $@convention(thin) (@guaranteed X, @inout Int32) -> () {
+bb0(%0 : $X, %1 : $*Int32):
+  %xa = ref_element_addr %0 : $X, #X.x
+  %x2 = load %xa : $*X
+  %a = ref_element_addr %x2 : $X, #X.a
+
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %f(%1, %a, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @partial_apply_load_store_to_args
+// The apply may call deinit of the callee_owned thick function. Therefore the
+// function effects are conservative.
+// CHECK: <func=rw+-,param0=,param1=r,param2=;alloc;trap;readrc>
+sil @partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c = partial_apply %f(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  // %c is implicitly released which may call deinit of the boxed X.
+  %ap = apply %c(%0) : $@callee_owned (@inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @load_store_to_unknown
+// CHECK: <func=rw,param0=,param1=r>
+sil @load_store_to_unknown : $@convention(thin) (Int32, @guaranteed X) -> () {
+bb0(%0 : $Int32, %1 : $X):
+  %xa = ref_element_addr %1 : $X, #X.x
+  %x2 = load %xa : $*X
+  %a = ref_element_addr %x2 : $X, #X.a
+  store %0 to %a  : $*Int32
+  %l = load %a : $*Int32
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @retain_and_store
+// CHECK: <func=,param0=w,param1=+>
+sil @retain_and_store : $@convention(thin) (@guaranteed X) -> @out X {
+bb0(%0 : $*X, %1 : $X):
+  strong_retain %1 : $X
+  store %1 to %0  : $*X
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @release_owned
+// CHECK: <func=rw+-,param0=-;alloc;trap;readrc>
+sil @release_owned : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  strong_release %0 : $X
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_unknown
+// CHECK: <func=rw+-;alloc;trap;readrc>
+sil @call_unknown : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @unknown_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @load_store_to_local
+// CHECK: <func=,param0=;alloc>
+sil @load_store_to_local : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %x = alloc_ref $X
+  %a = ref_element_addr %x : $X, #X.a
+  store %0 to %a : $*Int32
+  %l1 = load %a : $*Int32
+
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int32>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int32>, 0
+  store %0 to %ba : $*Int32
+  %l2 = load %ba : $*Int32
+
+  %s = alloc_stack $Int32
+  store %0 to %s : $*Int32
+  %l3 = load %s : $*Int32
+  dealloc_stack %s : $*Int32
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @condfail
+// CHECK: <func=,param0=;trap>
+sil @condfail : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_fail %0 : $Builtin.Int1
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @checkedcast
+// CHECK: <func=,param0=r;trap>
+sil @checkedcast : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  unconditional_checked_cast %0 : $Builtin.NativeObject to $X
+  %r = tuple ()
+  return %r : $()
+}
+
+
+sil_global public @sil_global1 : $Int32
+
+// Test the propagation of side-effects through the call graph.
+
+// CHECK-LABEL: sil @recursive1
+// CHECK: <func=rw,param0=;alloc;trap>
+sil @recursive1 : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %f = function_ref @recursive2 : $@convention(thin) (Int32) -> Int32
+  %r = apply %f(%0) : $@convention(thin) (Int32) -> Int32
+
+  return %r : $Int32
+}
+
+// CHECK-LABEL: sil @recursive2
+// CHECK: <func=rw,param0=;alloc;trap>
+sil @recursive2 : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %f = function_ref @recursive3 : $@convention(thin) (Int32) -> Int32
+  %r = apply %f(%0) : $@convention(thin) (Int32) -> Int32
+
+  %x = alloc_ref $X
+
+  %ga = global_addr @sil_global1 : $*Int32
+  %l = load %ga : $*Int32
+
+  return %l : $Int32
+}
+
+// CHECK-LABEL: sil @recursive3
+// CHECK: <func=rw,param0=;alloc;trap>
+sil @recursive3 : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %f = function_ref @recursive4 : $@convention(thin) (Int32) -> Int32
+  %r = apply %f(%0) : $@convention(thin) (Int32) -> Int32
+
+  %ga = global_addr @sil_global1 : $*Int32
+  store %0 to %ga : $*Int32
+
+  return %r : $Int32
+}
+
+// CHECK-LABEL: sil @recursive4
+// CHECK: <func=rw,param0=;alloc;trap>
+sil @recursive4 : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %f = function_ref @recursive5 : $@convention(thin) (Int32) -> Int32
+  %r = apply %f(%0) : $@convention(thin) (Int32) -> Int32
+
+  %f2 = function_ref @condfail : $@convention(thin) (Builtin.Int1) -> ()
+  %r2 = apply %f2(undef) : $@convention(thin) (Builtin.Int1) -> ()
+
+  return %r : $Int32
+}
+
+// CHECK-LABEL: sil @recursive5
+// CHECK: <func=rw,param0=;alloc;trap>
+sil @recursive5 : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %f = function_ref @recursive1 : $@convention(thin) (Int32) -> Int32
+  %r = apply %f(%0) : $@convention(thin) (Int32) -> Int32
+
+  return %r : $Int32
+}
+
+// CHECK-LABEL: sil @test_project_box
+// CHECK: <func=,param0=r>
+sil @test_project_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> Builtin.Int32 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+  %a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %l = load %a : $*Builtin.Int32
+  return %l : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @projections
+// CHECK: <func=,param0=r>
+sil @projections : $@convention(thin) (EP) -> Builtin.Int32 {
+bb0(%0 : $EP):
+  %ee = unchecked_enum_data %0 : $EP, #EP.data!enumelt.1
+  %te = tuple_extract %ee : $(SP, Builtin.Int1), 0
+  %se = struct_extract %te : $SP, #SP.value
+  %utbc = unchecked_trivial_bit_cast %se : $Builtin.BridgeObject to $Builtin.RawPointer
+  %idx = integer_literal $Builtin.Int32, 0
+  %irp = index_raw_pointer %utbc : $Builtin.RawPointer, %idx : $Builtin.Int32
+  %pta = pointer_to_address %irp : $Builtin.RawPointer to [strict] $*Int32
+  %sea = struct_element_addr %pta : $*Int32, #Int32._value
+  %l = load %sea : $*Builtin.Int32
+  return %l : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @arraysemantics_is_native_no_typecheck
+// CHECK: <func=,param0=>
+sil @arraysemantics_is_native_no_typecheck : $@convention(thin) (Array<Int32>) -> () {
+bb0(%0 : $Array<Int32>):
+  %f = function_ref @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
+  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<Int32>) -> Bool
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_check_subscript
+// CHECK: <func=,param0=r;trap>
+sil @arraysemantics_check_subscript : $@convention(thin) (Array<Int32>) -> () {
+bb0(%0 : $Array<Int32>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+  %bl = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%bl : $Builtin.Int1)
+
+  %f = function_ref @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
+  %a = apply %f(%i, %b, %0) : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_check_index
+// CHECK: <func=,param0=r;trap>
+sil @arraysemantics_check_index : $@convention(thin) (Array<Int32>) -> () {
+bb0(%0 : $Array<Int32>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+
+  %f = function_ref @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
+  %a = apply %f(%i, %0) : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_get_element
+// CHECK: <func=,param0=w,param1=r>
+sil @arraysemantics_get_element : $@convention(thin) (Array<Int32>) -> @out Int32 {
+bb0(%io : $*Int32, %1 : $Array<Int32>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+  %bl = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%bl : $Builtin.Int1)
+
+  %f = function_ref @get_element_Int : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<Int32>) -> @out Int32
+  %a = apply %f(%io, %i, %b, %b, %1) : $@convention(method) (Int32, Bool, Bool, @guaranteed Array<Int32>) -> @out Int32
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_make_mutable
+// CHECK: <func=-,param0=w;alloc;readrc>
+sil @arraysemantics_make_mutable : $@convention(thin) (@inout Array<Int32>) -> () {
+bb0(%0 : $*Array<Int32>):
+  %f = function_ref @make_mutable_Int : $@convention(method) (@inout Array<Int32>) -> ()
+  %a = apply %f(%0) : $@convention(method) (@inout Array<Int32>) -> ()
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_get_element_address
+// CHECK: <func=,param0=r>
+sil @arraysemantics_get_element_address : $@convention(thin) (Array<Int32>) -> () {
+bb0(%0 : $Array<Int32>):
+  %il = integer_literal $Builtin.Int32, 0
+  %i = struct $Int32(%il : $Builtin.Int32)
+
+  %f = function_ref @get_element_address_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
+  %a = apply %f(%i, %0) : $@convention(method) (Int32, @guaranteed Array<Int32>) -> UnsafeMutablePointer<Int32>
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_get_count
+// CHECK: <func=,param0=r>
+sil @arraysemantics_get_count : $@convention(thin) (Array<Int32>) -> () {
+bb0(%0 : $Array<Int32>):
+
+  %f = function_ref @get_count_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_get_count_X
+// CHECK: <func=rw+-,param0=;alloc;trap;readrc>
+sil @arraysemantics_get_count_X : $@convention(thin) (Array<X>) -> () {
+bb0(%0 : $Array<X>):
+
+  %f = function_ref @get_count_X : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+  // Could be an NSArray which can do everything
+  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<X>) -> Int32
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @arraysemantics_get_capacity
+// CHECK: <func=,param0=r>
+sil @arraysemantics_get_capacity : $@convention(thin) (Array<Int32>) -> () {
+bb0(%0 : $Array<Int32>):
+
+  %f = function_ref @get_capacity_Int : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+  %a = apply %f(%0) : $@convention(method) (@guaranteed Array<Int32>) -> Int32
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_noreturn
+// CHECK: <func=;trap>
+sil @call_noreturn : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %t = builtin "int_trap"() : $()
+  %b = builtin "conditionallyUnreachable"() : $()
+  %u = function_ref @exitfunc : $@convention(thin) () -> Never
+  %a = apply %u() : $@convention(thin) () -> Never
+  unreachable
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_readnone
+// CHECK: <func=>
+sil @call_readnone : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @pure_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_readonly_owned
+// CHECK: <func=rw+-,param0=;alloc;trap;readrc>
+sil @call_readonly_owned : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  %u = function_ref @readonly_owned : $@convention(thin) (@owned X) -> ()
+  %a = apply %u(%0) : $@convention(thin) (@owned X) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_readonly_guaranteed
+// CHECK: <func=r,param0=>
+sil @call_readonly_guaranteed : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  %u = function_ref @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
+  %a = apply %u(%0) : $@convention(thin) (@guaranteed X) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @fix_lifetime_test
+// CHECK: <func=,param0=r>
+sil @fix_lifetime_test : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  fix_lifetime %0 : $X
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @indirect_parameter_to_partial_apply
+// CHECK-NEXT: <func=,param0=r;alloc>
+
+sil @indirect_parameter_to_partial_apply : $@convention(thin) (@in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
+bb0(%0 : $*Int32):
+  %2 = function_ref @closure : $@convention(thin) (Bool, @in Int32) -> Int32
+  %3 = partial_apply %2(%0) : $@convention(thin) (Bool, @in Int32) -> Int32
+  return %3 : $@callee_owned (Bool) -> Int32
+}
+
+sil @closure : $@convention(thin) (Bool, @in Int32) -> Int32

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallVector.h"
@@ -37,62 +38,126 @@ namespace swift {
 /// variables, there should be separate callbacks for adding a
 /// getter/setter pair, for just adding a getter, and for adding a
 /// physical projection (if we decide to support that).
+///
+/// You must override the following methods:
+/// - addOutOfLineBaseProtocol()
+/// - addMethod()
+/// - addConstructor()
+/// - addAssociatedType()
 
 template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
 
 public:
   void visitProtocolDecl(ProtocolDecl *protocol) {
-    // Visit inherited protocols.
-    // TODO: We need to figure out all the guarantees we want here.
-    // It would be abstractly good to allow conversion to a base
-    // protocol to be trivial, but it's not clear that there's
-    // really a structural guarantee we can rely on here.
-    for (auto baseProto : protocol->getInheritedProtocols(nullptr)) {
-      // ObjC protocols do not have witnesses.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(baseProto))
+    // Associated types get added after the inherited conformances, but
+    // before all the function requirements.
+    bool haveAddedAssociatedTypes = false;
+    auto addAssociatedTypes = [&] {
+      if (haveAddedAssociatedTypes) return;
+      haveAddedAssociatedTypes = true;
+
+      for (Decl *member : protocol->getMembers()) {
+        if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
+          // TODO: only add associated types when they're new?
+          asDerived().addAssociatedType(AssociatedType(associatedType));
+        }
+      }
+    };
+
+    for (const auto &reqt : protocol->getRequirementSignature()) {
+      switch (reqt.getKind()) {
+      // These requirements don't show up in the witness table.
+      case RequirementKind::Superclass:
+      case RequirementKind::SameType:
+      case RequirementKind::Layout:
         continue;
 
-      asDerived().addOutOfLineBaseProtocol(baseProto);
+      case RequirementKind::Conformance: {
+        auto type = reqt.getFirstType()->getCanonicalType();
+        assert(type->isTypeParameter());
+        auto requirement =
+          cast<ProtocolType>(reqt.getSecondType()->getCanonicalType())
+            ->getDecl();
+
+        // ObjC protocols do not have witnesses.
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(requirement))
+          continue;
+
+        // If the type parameter is 'self', consider this to be protocol
+        // inheritance.  In the canonical signature, these should all
+        // come before any protocol requirements on associated types.
+        if (auto parameter = dyn_cast<GenericTypeParamType>(type)) {
+          assert(type->isEqual(protocol->getSelfInterfaceType()));
+          assert(!haveAddedAssociatedTypes &&
+                 "unexpected ordering of conformances");
+          assert(parameter->getDepth() == 0 && parameter->getIndex() == 0 &&
+                 "non-self type parameter in protocol");
+          asDerived().addOutOfLineBaseProtocol(requirement);
+          continue;
+        }
+
+        // Add the associated types if we haven't yet.
+        addAssociatedTypes();
+
+        // Otherwise, add an associated requirement.
+        AssociatedConformance assocConf(protocol, type, requirement);
+        asDerived().addAssociatedConformance(assocConf);
+        continue;
+      }
+      }
+      llvm_unreachable("bad requirement kind");
     }
 
-    /// Visit the witnesses for the direct members of a protocol.
+    // Add the associated types if we haven't yet.
+    addAssociatedTypes();
+
+    // Visit the witnesses for the direct members of a protocol.
     for (Decl *member : protocol->getMembers())
       ASTVisitor<T>::visit(member);
   }
 
   /// Fallback for unexpected protocol requirements.
   void visitDecl(Decl *d) {
+#ifndef NDEBUG
     d->print(llvm::errs());
+#endif
     llvm_unreachable("unhandled protocol requirement");
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
-    asDerived().addMethod(sd->getGetter());
+    asDerived().addMethod(SILDeclRef(sd->getGetter(),
+                                     SILDeclRef::Kind::Func));
     if (sd->isSettable(sd->getDeclContext())) {
-      asDerived().addMethod(sd->getSetter());
+      asDerived().addMethod(SILDeclRef(sd->getSetter(),
+                                       SILDeclRef::Kind::Func));
       if (sd->getMaterializeForSetFunc())
-        asDerived().addMethod(sd->getMaterializeForSetFunc());
+        asDerived().addMethod(SILDeclRef(sd->getMaterializeForSetFunc(),
+                                         SILDeclRef::Kind::Func));
     }
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    asDerived().addConstructor(cd);
+    asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
   void visitFuncDecl(FuncDecl *func) {
-    // Accessors are emitted by their var/subscript declaration.
+    // Accessors are emitted by visitAbstractStorageDecl, above.
     if (func->isAccessor())
       return;
-    asDerived().addMethod(func);
+    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+  }
+
+  void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
+    asDerived().addPlaceholder(placeholder);
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
-    SmallVector<ProtocolDecl *, 4> protos;
-    for (auto p : td->getConformingProtocols(nullptr))
-      protos.push_back(p);
-    ProtocolType::canonicalizeProtocols(protos);
-    asDerived().addAssociatedType(td, protos);
+    // We already visited these in the first pass.
+  }
+    
+  void visitTypeAliasDecl(TypeAliasDecl *tad) {
+    // We don't care about these by themselves for witnesses.
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {

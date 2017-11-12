@@ -1,0 +1,46 @@
+//===--- Analysis.def -------------------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file allows for metaprogramming with Analyses. By adding an analysis
+// name here, one is assured that all places in the compiler that the analysis
+// will have a kind created for it and that the analysis will be registered in
+// all locations where analyses are registered.
+//
+//===----------------------------------------------------------------------===//
+
+/// ANALYSIS(NAME) This represents the name of an analysis. It is assumed that
+///                the actual analysis is called `NAME ## ANALYSIS'.
+#ifndef ANALYSIS
+#define ANALYSIS(NAME)
+#endif
+
+ANALYSIS(AccessSummary)
+ANALYSIS(Alias)
+ANALYSIS(BasicCallee)
+ANALYSIS(Caller)
+ANALYSIS(ClassHierarchy)
+ANALYSIS(ClosureScope)
+ANALYSIS(Destructor)
+ANALYSIS(Dominance)
+ANALYSIS(EpilogueARC)
+ANALYSIS(Escape)
+ANALYSIS(InductionVariable)
+ANALYSIS(Loop)
+ANALYSIS(LoopRegion)
+ANALYSIS(OptimizerStats)
+ANALYSIS(PostDominance)
+ANALYSIS(PostOrder)
+ANALYSIS(RCIdentity)
+ANALYSIS(SideEffect)
+ANALYSIS(TypeExpansion)
+
+#undef ANALYSIS

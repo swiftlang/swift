@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 var foo: Int {
@@ -49,7 +49,7 @@ struct WillSetDidSetStruct {
   }
 }
 
-struct WillSetDidSetClass {
+class WillSetDidSetClass {
   var x : Int {
     didSet {
       print("got \(x)")
@@ -119,26 +119,40 @@ func test() {
   // CHECK: 654321
   print(Bar.staticStoredBar)
   
-  
+
+  func increment(_ x: inout Int) {
+    x += 1
+  }
+
   var ds = WillSetDidSetStruct()
   print("start is \(ds.x)")
   ds.x = 42
+  print("now is \(ds.x)")
+  increment(&ds.x)
   print("now is \(ds.x)")
   
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
   // CHECK: now is 42
+  // CHECK: from 42 to 43
+  // CHECK: got 43
+  // CHECK: now is 43
 
-  var dsc = WillSetDidSetClass()
+  let dsc = WillSetDidSetClass()
   print("start is \(dsc.x)")
   dsc.x = 42
+  print("now is \(dsc.x)")
+  increment(&dsc.x)
   print("now is \(dsc.x)")
   
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
   // CHECK: now is 42
+  // CHECK: from 42 to 43
+  // CHECK: got 43
+  // CHECK: now is 43
 
 
   // Properties should be dynamically dispatched.
@@ -158,63 +172,6 @@ func test() {
   // CHECK: didSet Y from base to base!
 }
 test()
-
-func lazyInitFunction() -> Int {
-  print("lazy property initialized")
-  return 0
-}
-
-
-class LazyPropertyClass {
-  var id : Int
-  lazy var lazyProperty = lazyInitFunction()
-
-  lazy var lazyProperty2 : Int = {
-    print("other lazy property initialized")
-    return 0
-  }()
-
-
-  init(_ ident : Int) {
-    id = ident
-    print("LazyPropertyClass.init #\(id)")
-  }
-
-  deinit {
-    print("LazyPropertyClass.deinit #\(id)")
-  }
-  
-
-}
-
-
-func testLazyProperties() {
-  print("testLazyPropertiesStart") // CHECK: testLazyPropertiesStart
-  if true {
-    var a = LazyPropertyClass(1)      // CHECK-NEXT: LazyPropertyClass.init #1
-    _ = a.lazyProperty                // CHECK-NEXT: lazy property initialized
-    _ = a.lazyProperty    // executed only once, lazy init not called again.
-    a.lazyProperty = 42   // nothing interesting happens
-    _ = a.lazyProperty2               // CHECK-NEXT: other lazy property initialized
-
-    // CHECK-NEXT: LazyPropertyClass.init #2
-    // CHECK-NEXT: LazyPropertyClass.deinit #1
-    a = LazyPropertyClass(2)
-
-    a = LazyPropertyClass(3)
-    a.lazyProperty = 42   // Store don't trigger lazy init.
-
-    // CHECK-NEXT: LazyPropertyClass.init  #3
-    // CHECK-NEXT: LazyPropertyClass.deinit #2
-    // CHECK-NEXT: LazyPropertyClass.deinit #3
-  }
-  print("testLazyPropertiesDone")    // CHECK: testLazyPropertiesDone
-}
-
-
-
-testLazyProperties()
-
 
 
 /// rdar://16805609 - <rdar://problem/16805609> Providing a 'didSet' in a generic override doesn't work
@@ -249,7 +206,7 @@ class r17192398Failure {
 let x = r17192398Failure()
 x.testLazy()
 
-// <rdar://problem/17226384> Setting an lazy optional property to nil has a strange behavior (Swift)
+// <rdar://problem/17226384> Setting a lazy optional property to nil has a strange behavior (Swift)
 class r17226384Class {
   lazy var x : Int? = { print("propertyRun"); return 42 }()
 }
@@ -278,3 +235,16 @@ assert(HasStaticVar.a === DerivesHasStaticVar.a)
 assert(HasStaticVar.i == DerivesHasStaticVar.i)
 HasStaticVar.i = 2020
 assert(HasStaticVar.i == DerivesHasStaticVar.i)
+
+var _x: Int = 0
+
+class HasClassVar {
+  class var x: Int {
+    get { return _x }
+    set { _x = newValue }
+  }
+}
+
+assert(HasClassVar.x == 0)
+HasClassVar.x += 10
+assert(HasClassVar.x == 10)

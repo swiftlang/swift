@@ -1,0 +1,157 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil @test_jump_threading
+// CHECK: bb4(%{{[0-9]+}} : $Builtin.Int64):
+// CHECK-NEXT: br bb1
+sil @test_jump_threading : $@convention(thin)  (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb2, bb3
+
+// Blocks are handled from last to first. Block bb1 is placed here so that its argument
+// is not optimized before jump threading is done in bb2 and bb3.
+bb1(%i4 : $Builtin.Int64):
+  %f3 = function_ref @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
+  %c1 = apply %f3(%i3) : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
+  %i5 = integer_literal $Builtin.Int64, 27
+  cond_br %c1, bb1(%i5 : $Builtin.Int64), bb5
+
+bb2:
+  %f1 = function_ref @get_int1 : $@convention(thin)  () -> Builtin.Int64
+  %i1 = apply %f1() : $@convention(thin)  () -> Builtin.Int64
+  br bb4(%i1 : $Builtin.Int64)
+
+bb3:
+  %f2 = function_ref @get_int1 : $@convention(thin)  () -> Builtin.Int64
+  %i2 = apply %f2() : $@convention(thin)  () -> Builtin.Int64
+  br bb4(%i2 : $Builtin.Int64)
+
+// Jump threading must not be done for this block because the argument %i3 is also
+// used in bb1.
+bb4(%i3 : $Builtin.Int64):
+  br bb1(%i3 : $Builtin.Int64)
+
+bb5:
+  %r1 = tuple ()
+  return %r1 : $()
+
+}
+
+sil @get_int1 : $@convention(thin)  () -> Builtin.Int64
+sil @get_int2 : $@convention(thin)  () -> Builtin.Int64
+sil @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
+
+
+public final class AA {
+}
+public final class BB {
+  @sil_stored internal weak final var n:  BB!
+  @sil_stored internal final var o: AA!
+}
+
+// Test that SimplifyCFG does not hang when compiling an infinite loop with switch_enum.
+// CHECK-LABEL: test_inifite_loop
+sil hidden @test_inifite_loop : $@convention(method) (@owned BB) -> () {
+bb0(%0 : $BB):
+  %31 = enum $Optional<BB>, #Optional.some!enumelt.1, %0 : $BB
+  br bb4(%31 : $Optional<BB>)
+
+bb4(%36 : $Optional<BB>):
+  switch_enum %36 : $Optional<BB>, case #Optional.some!enumelt.1: bb6, default bb5
+
+bb5:
+  br bb7
+
+bb6:
+  %39 = unchecked_enum_data %36 : $Optional<BB>, #Optional.some!enumelt.1
+  %40 = ref_element_addr %39 : $BB, #BB.o
+  %41 = load %40 : $*Optional<AA>
+  release_value %41 : $Optional<AA>
+  br bb7
+
+bb7:
+  switch_enum %36 : $Optional<BB>, case #Optional.none!enumelt: bb8, case #Optional.some!enumelt.1: bb9
+
+bb8:
+  br bb4(%36 : $Optional<BB>)
+
+bb9:
+  %48 = unchecked_enum_data %36 : $Optional<BB>, #Optional.some!enumelt.1
+  %49 = ref_element_addr %48 : $BB, #BB.n
+  %50 = load_weak %49 : $*@sil_weak Optional<BB>
+  release_value %36 : $Optional<BB>
+  switch_enum %50 : $Optional<BB>, case #Optional.some!enumelt.1: bb11, case #Optional.none!enumelt: bb10
+
+bb10:
+  br bb4(%50 : $Optional<BB>)
+
+bb11:
+  %54 = unchecked_enum_data %50 : $Optional<BB>, #Optional.some!enumelt.1
+  %55 = ref_to_raw_pointer %54 : $BB to $Builtin.RawPointer
+  %56 = ref_to_raw_pointer %0 : $BB to $Builtin.RawPointer
+  %57 = builtin "cmp_eq_RawPointer"(%55 : $Builtin.RawPointer, %56 : $Builtin.RawPointer) : $Builtin.Int1
+  cond_br %57, bb13, bb12
+
+bb12:
+  br bb4(%50 : $Optional<BB>)
+
+bb13:
+  release_value %50 : $Optional<BB>
+  strong_release %0 : $BB
+  %65 = tuple ()
+  return %65 : $()
+}
+
+sil @some_function : $@convention(thin) (AA) -> Optional<AA>
+
+// Another test for checking that SimplifyCFG does not hang.
+// CHECK-LABEL: test_other_infinite_loop
+sil hidden @test_other_infinite_loop : $@convention(method) (@owned AA) -> () {
+bb0(%5 : $AA):
+  strong_retain %5 : $AA
+  %6 = enum $Optional<AA>, #Optional.some!enumelt.1, %5 : $AA
+  br bb1(%6 : $Optional<AA>)
+
+bb1(%8 : $Optional<AA>):
+  retain_value %8 : $Optional<AA>
+  switch_enum %8 : $Optional<AA>, case #Optional.some!enumelt.1: bb3, default bb2
+
+bb2:
+  release_value %8 : $Optional<AA>
+  br bb6
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  %85 = tuple ()
+  return %85 : $()
+
+bb5:
+  br bb6
+
+bb6:
+  switch_enum %8 : $Optional<AA>, case #Optional.none!enumelt: bb7, default bb8
+
+bb7:
+  br bb9(%8 : $Optional<AA>)
+
+bb8:
+  %23 = unchecked_enum_data %8 : $Optional<AA>, #Optional.some!enumelt.1
+  strong_retain %23 : $AA
+  %25 = function_ref @some_function : $@convention(thin) (AA) -> Optional<AA>
+  %26 = apply %25(%23) : $@convention(thin) (AA) -> Optional<AA>
+  strong_release %23 : $AA
+  br bb9(%26 : $Optional<AA>)
+
+bb9(%29 : $Optional<AA>):
+  release_value %8 : $Optional<AA>
+  br bb1(%29 : $Optional<AA>)
+
+}
+

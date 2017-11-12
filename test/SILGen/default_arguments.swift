@@ -1,100 +1,100 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
+
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main
 // CHECK:         string_literal utf16 "default_arguments"
 
 // Default argument for first parameter.
-// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@convention(thin) () -> Int
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSiC
+// CHECK-LABEL: sil hidden @_T017default_arguments7defarg1ySi1i_Sd1dSS1stFfA_ : $@convention(thin) () -> Int
 // CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 17
-// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK: return [[RESULT]] : $Int
 
 // Default argument for third parameter.
-// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@convention(thin) () -> @owned String
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSSC
-// CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
+// CHECK-LABEL: sil hidden @_T017default_arguments7defarg1ySi1i_Sd1dSS1stFfA1_ : $@convention(thin) () -> @owned String
 // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "Hello"
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
-// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@convention(thin)
+// CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_T0S2S{{[_0-9a-zA-Z]*}}fC
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@convention(method)
 // CHECK: return [[RESULT]] : $String
-func defarg1(i i: Int = 17, d: Double, s: String = "Hello") { }
+func defarg1(i: Int = 17, d: Double, s: String = "Hello") { }
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments15testDefaultArg1FT_T_
+// CHECK-LABEL: sil hidden @_T017default_arguments15testDefaultArg1yyF
 func testDefaultArg1() {
-  // CHECK: [[FNREF:%[0-9]+]] = function_ref @_TF17default_arguments7defarg1{{.*}}
-  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_TFSdC
   // CHECK: [[FLOAT64:%[0-9]+]] = metatype $@thin Double.Type
   // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4009000000000000|0x4000C800000000000000}}
+  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_T0S2d{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[FLOATVAL:%[0-9]+]] = apply [[LITFN]]([[FLOATLIT]], [[FLOAT64]])
-  // CHECK: [[DEF0FN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg1{{.*}}_A_
+  // CHECK: [[DEF0FN:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{.*}}A_
   // CHECK: [[DEF0:%[0-9]+]] = apply [[DEF0FN]]()
-  // CHECK: [[DEF2FN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg1{{.*}}_A1_
+  // CHECK: [[DEF2FN:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{.*}}A1_
   // CHECK: [[DEF2:%[0-9]+]] = apply [[DEF2FN]]()
+  // CHECK: [[FNREF:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FNREF]]([[DEF0]], [[FLOATVAL]], [[DEF2]])
   defarg1(d:3.125)
 }
 
-func defarg2(i: Int, d: Double = 3.125, s: String = "Hello") { }
+func defarg2(_ i: Int, d: Double = 3.125, s: String = "Hello") { }
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments15testDefaultArg2
+// CHECK-LABEL: sil hidden @_T017default_arguments15testDefaultArg2{{[_0-9a-zA-Z]*}}F
 func testDefaultArg2() {
-// CHECK:  [[FNREF:%[0-9]+]] = function_ref @_TF17default_arguments7defarg2{{.*}} : $@convention(thin) (Int, Double, @owned String) -> ()
-// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_TFSiC
 // CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-// CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:  [[DFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A0_ : $@convention(thin) () -> Double
+// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC
+// CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:  [[DFN:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{.*}}A0_ : $@convention(thin) () -> Double
 // CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@convention(thin) () -> Double
-// CHECK:  [[SFN:%[0-9]+]] = function_ref @_TIF17default_arguments7defarg2{{.*}}_A1_ : $@convention(thin) () -> @owned String
+// CHECK:  [[SFN:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{.*}}A1_ : $@convention(thin) () -> @owned String
 // CHECK:  [[S:%[0-9]+]] = apply [[SFN]]() : $@convention(thin) () -> @owned String
+// CHECK:  [[FNREF:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Double, @owned String) -> ()
 // CHECK:  apply [[FNREF]]([[I]], [[D]], [[S]]) : $@convention(thin) (Int, Double, @owned String) -> ()
   defarg2(5)
 }
 
-func autocloseFile(@autoclosure x: () -> String = __FILE__,
-                   @autoclosure y: () -> Int = __LINE__) { }
-// CHECK-LABEL: sil hidden @_TF17default_arguments17testAutocloseFileFT_T_
+func autocloseFile(x: @autoclosure () -> String = #file,
+                   y: @autoclosure () -> Int = #line) { }
+// CHECK-LABEL: sil hidden @_T017default_arguments17testAutocloseFileyyF
 func testAutocloseFile() {
-  // CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments17testAutocloseFileFT_T_u_KT_SS : $@convention(thin) () -> @owned String
+  // CHECK-LABEL: sil private [transparent] @_T017default_arguments17testAutocloseFileyyFSSyXKfu_ : $@convention(thin) () -> @owned String
   // CHECK: string_literal utf16{{.*}}default_arguments.swift
 
-  // CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments17testAutocloseFileFT_T_u0_KT_Si : $@convention(thin) () -> Int
+  // CHECK-LABEL: sil private [transparent] @_T017default_arguments17testAutocloseFileyyFSiyXKfu0_ : $@convention(thin) () -> Int
   // CHECK: integer_literal $Builtin.Int2048, [[@LINE+1]]
   autocloseFile()
 }
 
-func testMagicLiterals(file file: String = __FILE__,
-                       function: String = __FUNCTION__,
-                       line: Int = __LINE__,
-                       column: Int = __COLUMN__) {}
+func testMagicLiterals(file: String = #file,
+                       function: String = #function,
+                       line: Int = #line,
+                       column: Int = #column) {}
 
 // Check that default argument generator functions don't leak information about
 // user's source.
 //
-// CHECK-LABEL: sil hidden @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A_
-// CHECK: string_literal utf16 ""
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA_
 //
-// CHECK-LABEL: sil hidden @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A0_
-// CHECK: string_literal utf16 ""
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA0_
 //
-// CHECK-LABEL: sil hidden @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A1_
-// CHECK: integer_literal $Builtin.Int2048, 0
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA1_
 //
-// CHECK-LABEL: sil hidden @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A2_
-// CHECK: integer_literal $Builtin.Int2048, 0
+// NEGATIVE-NOT: sil hidden @_T017default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
 
 func closure(_: () -> ()) {}
-func autoclosure(@autoclosure _: () -> ()) {}
+func autoclosure(_: @autoclosure () -> ()) {}
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments25testCallWithMagicLiteralsFT_T_
+// CHECK-LABEL: sil hidden @_T017default_arguments25testCallWithMagicLiteralsyyF
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil shared @_TFF17default_arguments25testCallWithMagicLiteralsFT_T_U_FT_T_
+// CHECK-LABEL: sil private @_T017default_arguments25testCallWithMagicLiteralsyyFyycfU_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil shared [transparent] @_TFF17default_arguments25testCallWithMagicLiteralsFT_T_u_KT_T_
+// CHECK-LABEL: sil private [transparent] @_T017default_arguments25testCallWithMagicLiteralsyyFyyXKfu_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 func testCallWithMagicLiterals() {
   testMagicLiterals()
@@ -103,7 +103,7 @@ func testCallWithMagicLiterals() {
   autoclosure(testMagicLiterals())
 }
 
-// CHECK-LABEL: sil hidden @_TF17default_argumentsg25testPropWithMagicLiteralsSi
+// CHECK-LABEL: sil hidden @_T017default_arguments25testPropWithMagicLiteralsSivg
 // CHECK:         string_literal utf16 "testPropWithMagicLiterals"
 var testPropWithMagicLiterals: Int {
   testMagicLiterals()
@@ -114,15 +114,15 @@ var testPropWithMagicLiterals: Int {
 
 class Foo {
 
-  // CHECK-LABEL: sil hidden @_TFC17default_arguments3Fooc{{.*}} : $@convention(method) (Int, @owned String, @owned Foo) -> @owned Foo
+  // CHECK-LABEL: sil hidden @_T017default_arguments3FooCACSi3int_SS6stringtcfc : $@convention(method) (Int, @owned String, @owned Foo) -> @owned Foo
   // CHECK:         string_literal utf16 "init(int:string:)"
-  init(int: Int, string: String) {
+  init(int: Int, string: String = #function) {
     testMagicLiterals()
     closure { testMagicLiterals() }
     autoclosure(testMagicLiterals())
   }
 
-  // CHECK-LABEL: sil hidden @_TFC17default_arguments3Food
+  // CHECK-LABEL: sil hidden @_T017default_arguments3FooCfd
   // CHECK:         string_literal utf16 "deinit"
   deinit {
     testMagicLiterals()
@@ -130,7 +130,7 @@ class Foo {
     autoclosure(testMagicLiterals())
   }
 
-  // CHECK-LABEL: sil hidden @_TFC17default_arguments3Foog9subscriptFSiSi
+  // CHECK-LABEL: sil hidden @_T017default_arguments3FooCS2icig
   // CHECK:         string_literal utf16 "subscript"
   subscript(x: Int) -> Int {
     testMagicLiterals()
@@ -138,6 +138,11 @@ class Foo {
     autoclosure(testMagicLiterals())
     return x
   }
+ 
+  // CHECK-LABEL: sil private @globalinit_33_E52D764B1F2009F2390B2B8DF62DAEB8_func0
+  // CHECK:         string_literal utf16 "Foo" 
+  static let x = Foo(int:0)
+
 }
 
 // Test at top level.
@@ -145,15 +150,18 @@ testMagicLiterals()
 closure { testMagicLiterals() }
 autoclosure(testMagicLiterals())
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments16testSelectorCallFTSi17withMagicLiteralsSi_T_
+// CHECK: string_literal utf16 "default_arguments"
+let y : String = #function 
+
+// CHECK-LABEL: sil hidden @_T017default_arguments16testSelectorCallySi_Si17withMagicLiteralstF
 // CHECK:         string_literal utf16 "testSelectorCall(_:withMagicLiterals:)"
-func testSelectorCall(x: Int, withMagicLiterals y: Int) {
+func testSelectorCall(_ x: Int, withMagicLiterals y: Int) {
   testMagicLiterals()
 }
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments32testSelectorCallWithUnnamedPieceFTSiSi_T_
+// CHECK-LABEL: sil hidden @_T017default_arguments32testSelectorCallWithUnnamedPieceySi_SitF
 // CHECK:         string_literal utf16 "testSelectorCallWithUnnamedPiece"
-func testSelectorCallWithUnnamedPiece(x: Int, _ y: Int) {
+func testSelectorCallWithUnnamedPiece(_ x: Int, _ y: Int) {
   testMagicLiterals()
 }
 
@@ -162,38 +170,38 @@ class SuperDefArg {
   init(int i: Int = 10) { }
 }
 
-// CHECK: sil hidden @_TIFC17default_arguments11SuperDefArgcFT3intSi_S0_A_ : $@convention(thin) () -> Int
+// CHECK: sil hidden @_T017default_arguments11SuperDefArgCACSi3int_tcfcfA_ : $@convention(thin) () -> Int
 
-// CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFT3intSi_S0_A_ : $@convention(thin) () -> Int
+// CHECK-NOT: sil hidden @_T017default_arguments9SubDefArgCACSi3int_tcfcfA_ : $@convention(thin) () -> Int
 
 class SubDefArg : SuperDefArg { }
 
-// CHECK: sil hidden @_TF17default_arguments13testSubDefArgFT_CS_9SubDefArg : $@convention(thin) () -> @owned SubDefArg
+// CHECK: sil hidden @_T017default_arguments13testSubDefArgAA0deF0CyF : $@convention(thin) () -> @owned SubDefArg
 func testSubDefArg() -> SubDefArg {
-  // CHECK: function_ref @_TFC17default_arguments9SubDefArgC
-  // CHECK: function_ref @_TIFC17default_arguments11SuperDefArgcFT3intSi_S0_A_
+  // CHECK: function_ref @_T017default_arguments11SuperDefArgCACSi3int_tcfcfA_
+  // CHECK: function_ref @_T017default_arguments9SubDefArgC{{[_0-9a-zA-Z]*}}fC
   // CHECK: return
   return SubDefArg()
 }
 
-// CHECK-NOT: sil hidden @_TIFC17default_arguments9SubDefArgcFT3intSi_S0_A_ : $@convention(thin) () -> Int
+// CHECK-NOT: sil hidden @_T017default_arguments9SubDefArgCACSi3int_tcfcfA_ : $@convention(thin) () -> Int
 
 // <rdar://problem/17379550>
-func takeDefaultArgUnnamed(x: Int = 5) { }
+func takeDefaultArgUnnamed(_ x: Int = 5) { }
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments25testTakeDefaultArgUnnamed
-func testTakeDefaultArgUnnamed(i: Int) {
-  // CHECK: bb0([[I:%[0-9]+]] : $Int):
-  // CHECK:   [[FN:%[0-9]+]] = function_ref @_TF17default_arguments21takeDefaultArgUnnamedFTSi_T_ : $@convention(thin) (Int) -> ()
+// CHECK-LABEL: sil hidden @_T017default_arguments25testTakeDefaultArgUnnamed{{[_0-9a-zA-Z]*}}F
+func testTakeDefaultArgUnnamed(_ i: Int) {
+  // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int):
+  // CHECK:   [[FN:%[0-9]+]] = function_ref @_T017default_arguments21takeDefaultArgUnnamedySiF : $@convention(thin) (Int) -> ()
   // CHECK:   apply [[FN]]([[I]]) : $@convention(thin) (Int) -> ()
   takeDefaultArgUnnamed(i)
 }
 
-func takeDSOHandle(handle: UnsafeMutablePointer<Void> = __DSO_HANDLE__) { }
+func takeDSOHandle(_ handle: UnsafeRawPointer = #dsohandle) { }
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments13testDSOHandleFT_T_
+// CHECK-LABEL: sil hidden @_T017default_arguments13testDSOHandleyyF
 func testDSOHandle() {
-  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @_Tv17default_arguments12__dso_handleGSpT__ : $*UnsafeMutablePointer<()>
+  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @__dso_handle : $*Builtin.RawPointer
   takeDSOHandle()
 }
 
@@ -209,47 +217,58 @@ class ReabstractDefaultArgument<T> {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments32testDefaultArgumentReabstractionFT_T_
+// CHECK-LABEL: sil hidden @_T017default_arguments32testDefaultArgumentReabstractionyyF
 // function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
-// CHECK: [[INITFN:%[0-9]+]] = function_ref @_TFC17default_arguments25ReabstractDefaultArgumentC
-// %1 = metatype $@thick ReabstractDefaultArgument<Int>.Type
-// function_ref default_arguments.ReabstractDefaultArgument.(init <A>(default_arguments.ReabstractDefaultArgument<A>.Type) -> (a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>).(default argument 0)
-// CHECK: %2 = function_ref @_TIFC17default_arguments25ReabstractDefaultArgumentc{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: %3 = apply %2<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK: [[FN:%.*]] = function_ref @_T017default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
 // CHECK-NEXT: function_ref reabstraction thunk helper from @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
-// CHECK-NEXT: %4 = function_ref @_TTRXFo_iSiiSi_dSb_XFo_dSidSi_dSb_ : $@convention(thin) (Int, Int, @owned @callee_owned (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: %5 = partial_apply %4(%3) : $@convention(thin) (Int, Int, @owned @callee_owned (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: [[THUNK:%.*]] = function_ref @_T0S2iSbIxiid_S2iSbIxyyd_TR : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [[THUNK]]([[RESULT]]) : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: [[CONV_FN:%.*]] = convert_function [[FN]]
 // function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
-// CHECK: %6 = function_ref @_TTRXFo_dSidSi_dSb_XFo_iSiiSi_dSb_ : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: %7 = partial_apply %6(%5) : $@convention(thin) (@in Int, @in Int, @owned @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: apply [[INITFN]]<Int>(%7, 
+// CHECK: [[THUNK:%.*]] = function_ref @_T0S2iSbIxyyd_S2iSbIxiid_TR : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: [[CONV_FN:%.*]] = convert_function [[FN]]
+// CHECK: [[INITFN:%[0-9]+]] = function_ref @_T017default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
+// CHECK-NEXT: apply [[INITFN]]<Int>([[CONV_FN]], 
 
 func testDefaultArgumentReabstraction() {
-  ReabstractDefaultArgument<Int>()
+  _ = ReabstractDefaultArgument<Int>()
 }
 
 // <rdar://problem/20494437> SILGen crash handling default arguments
-// CHECK-LABEL: sil hidden @_TF17default_arguments18r20494437onSuccessFPS_25r20494437ExecutionContext_T_
-// CHECK: function_ref @_TF17default_arguments19r20494437onCompleteFTPS_25r20494437ExecutionContext__T_
+// CHECK-LABEL: sil hidden @_T017default_arguments18r20494437onSuccessyAA25r20494437ExecutionContext_pF
+// CHECK: function_ref @_T017default_arguments19r20494437onCompleteyAA25r20494437ExecutionContext_pF
 // <rdar://problem/20494437> SILGen crash handling default arguments
 protocol r20494437ExecutionContext {}
 let r20494437Default: r20494437ExecutionContext
-func r20494437onComplete(executionContext: r20494437ExecutionContext = r20494437Default) {}
-func r20494437onSuccess(a: r20494437ExecutionContext) {
+func r20494437onComplete(_ executionContext: r20494437ExecutionContext = r20494437Default) {}
+func r20494437onSuccess(_ a: r20494437ExecutionContext) {
   r20494437onComplete(a)
 }
 
 // <rdar://problem/18400194> Parenthesized function expression crashes the compiler
-func r18400194(a: Int, x: Int = 97) {}
+func r18400194(_ a: Int, x: Int = 97) {}
 
-// CHECK-LABEL: sil hidden @_TIF17default_arguments9r18400194FTSi1xSi_T_A0_
+// CHECK-LABEL: sil hidden @_T017default_arguments9r18400194ySi_Si1xtFfA0_
 // CHECK: integer_literal $Builtin.Int2048, 97
 
-// CHECK-LABEL: sil hidden @_TF17default_arguments14test_r18400194FT_T_
-// CHECK: function_ref @_TF17default_arguments9r18400194FTSi1xSi_T_ : $@convention(thin) (Int, Int) -> () // user: %7
+// CHECK-LABEL: sil hidden @_T017default_arguments14test_r18400194yyF
 // CHECK: integer_literal $Builtin.Int2048, 1
-// CHECK:  function_ref @_TIF17default_arguments9r18400194FTSi1xSi_T_A0_ : $@convention(thin) () -> Int
+// CHECK:  function_ref @_T017default_arguments9r18400194ySi_Si1xtFfA0_ : $@convention(thin) () -> Int
+// CHECK: function_ref @_T017default_arguments9r18400194ySi_Si1xtF : $@convention(thin) (Int, Int) -> (){{.*}}
 func test_r18400194() {
   (r18400194)(1)
 }
 
+// rdar://24242783
+//   Don't add capture arguments to local default argument generators.
+func localFunctionWithDefaultArg() {
+  var z = 5
+  func bar(_ x: Int? = nil) {
+    z += 1
+  }
+  bar()
+}
+// CHECK-LABEL: sil private @_T017default_arguments27localFunctionWithDefaultArgyyF3barL_ySiSgFfA_
+// CHECK-SAME: $@convention(thin) () -> Optional<Int>

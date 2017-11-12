@@ -2,155 +2,134 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
-//  To create a SequenceType or CollectionType that forwards
-//  requirements to an underlying SequenceType or CollectionType,
-//  have it conform to one of these protocols.
+//  To create a Sequence that forwards requirements to an
+//  underlying Sequence, have it conform to this protocol.
 //
 //===----------------------------------------------------------------------===//
 
 /// A type that is just a wrapper over some base Sequence
+@_show_in_interface
 public // @testable
-protocol _SequenceWrapperType {
-  typealias Base : SequenceType
-  typealias Generator : GeneratorType = Base.Generator
+protocol _SequenceWrapper : Sequence {
+  associatedtype Base : Sequence where Base.Element == Element
+  associatedtype Iterator = Base.Iterator
+  associatedtype SubSequence = Base.SubSequence
   
-  var _base: Base {get}
+  var _base: Base { get }
 }
 
-extension SequenceType
-  where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> Base.Generator {
-    return self._base.generate()
+extension _SequenceWrapper  {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
   }
 
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _preprocessingPass<R>(
+    _ preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try _base._preprocessingPass(preprocess)
   }
+}
 
-  @warn_unused_result
+extension _SequenceWrapper where Iterator == Base.Iterator {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func makeIterator() -> Iterator {
+    return self._base.makeIterator()
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  @discardableResult
+  public func _copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    return _base._copyContents(initializing: buf)
+  }
+}
+
+extension _SequenceWrapper {
+  @_inlineable // FIXME(sil-serialize-all)
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) throws -> T
-  ) rethrows -> [T] {
+    _ transform: (Element) throws -> T
+) rethrows -> [T] {
     return try _base.map(transform)
   }
-
-  @warn_unused_result
+  
+  @_inlineable // FIXME(sil-serialize-all)
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) throws -> Bool
-  ) rethrows -> [Base.Generator.Element] {
-    return try _base.filter(includeElement)
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _base.filter(isIncluded)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func forEach(_ body: (Element) throws -> Void) rethrows {
+    return try _base.forEach(body)
   }
   
+  @_inlineable // FIXME(sil-serialize-all)
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    _ element: Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
-    return _base._preprocessingPass { _ in preprocess(self) }
-  }
-
-  /// Create a native array buffer containing the elements of `self`,
-  /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
-    return _base._copyToNativeArrayBuffer()
-  }
-
-  /// Copy a Sequence into an array, returning one past the last
-  /// element initialized.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
-    return _base._initializeTo(ptr)
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
 }
 
-public // @testable
-protocol _CollectionWrapperType : _SequenceWrapperType {
-  typealias Base : CollectionType
-  typealias Index : ForwardIndexType = Base.Index
-  var _base: Base {get}
-}
+extension _SequenceWrapper where SubSequence == Base.SubSequence {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return _base.dropFirst(n)
+  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public func dropLast(_ n: Int) -> SubSequence {
+    return _base.dropLast(n)
+  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    return _base.prefix(maxLength)
+  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return _base.suffix(maxLength)
+  }
 
-extension CollectionType
-  where Self : _CollectionWrapperType, Self.Index == Self.Base.Index {
-  /// The position of the first element in a non-empty collection.
-  ///
-  /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Base.Index {
-    return _base.startIndex
+  @_inlineable // FIXME(sil-serialize-all)
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.drop(while: predicate)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.prefix(while: predicate)
   }
   
-  /// The collection's "past the end" position.
-  ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public var endIndex: Base.Index {
-    return _base.endIndex
-  }
-
-  /// Access the element at `position`.
-  ///
-  /// - Requires: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
-  public subscript(position: Base.Index) -> Base.Generator.Element {
-    return _base[position]
-  }
-
-  //===--- Restatements From SequenceWrapperType break ambiguity ----------===//
-  @warn_unused_result
-  public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
-  ) -> [T] {
-    return _base.map(transform)
-  }
-
-  @warn_unused_result
-  public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
-    return _base.filter(includeElement)
-  }
-  
-  public func _customContainsEquatableElement(
-    element: Base.Generator.Element
-  ) -> Bool? { 
-    return _base._customContainsEquatableElement(element)
-  }
-  
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
-    return _base._preprocessingPass { _ in preprocess(self) }
-  }
-
-  /// Create a native array buffer containing the elements of `self`,
-  /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
-    return _base._copyToNativeArrayBuffer()
-  }
-
-  /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
-    return _base._initializeTo(ptr)
+  @_inlineable // FIXME(sil-serialize-all)
+  public func split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    whereSeparator isSeparator: (Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    return try _base.split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      whereSeparator: isSeparator
+    )
   }
 }

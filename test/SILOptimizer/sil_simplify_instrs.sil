@@ -1,0 +1,315 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+import Builtin
+import Swift
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_add_with_overflow_zeros : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = builtin "int_sadd_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_add_with_overflow_zeros
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin "int_sadd_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_add_with_overflow_zeros2 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = builtin "int_sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %x : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_add_with_overflow_zeros2
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin "int_sadd_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_sub_with_overflow_zeros : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = builtin "int_ssub_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_sub_with_overflow_zeros
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin "int_ssub_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_mul_with_overflow_zeros : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = builtin "int_smul_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_mul_with_overflow_zeros
+// CHECK-NOT: builtin "int_smul_with_overflow_Int64"
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a one and the other is not a constant
+sil @fold_mul_with_overflow_ones : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %0 = integer_literal $Builtin.Int64, 1
+ %18 = builtin "int_smul_with_overflow_Int64"(%x : $Builtin.Int64, %0 : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_mul_with_overflow_ones
+// CHECK-NOT: builtin "int_smul_with_overflow_Int64"
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify trunc(zext(x)) -> x
+sil @fold_trunc_zext : $@convention(thin) (Builtin.Word) -> Builtin.Word {
+bb0(%x : $Builtin.Word):
+  %78 = builtin "zextOrBitCast_Word_Int64"(%x : $Builtin.Word) : $Builtin.Int64 // user: %80
+  %80 = builtin "truncOrBitCast_Int64_Word"(%78 : $Builtin.Int64) : $Builtin.Word // users: %81, %85
+  return %80 : $Builtin.Word
+
+// CHECK-LABEL: sil @fold_trunc_zext
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Word
+}
+
+// Simplify trunc(sext(x)) -> x
+sil @fold_trunc_sext : $@convention(thin) (Builtin.Word) -> Builtin.Word {
+bb0(%x : $Builtin.Word):
+  %78 = builtin "sextOrBitCast_Word_Int64"(%x : $Builtin.Word) : $Builtin.Int64 // user: %80
+  %80 = builtin "truncOrBitCast_Int64_Word"(%78 : $Builtin.Int64) : $Builtin.Word // users: %81, %85
+  return %80 : $Builtin.Word
+
+// CHECK-LABEL: sil @fold_trunc_sext
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Word
+}
+
+// Simplify trunc((x)) -> x with same type
+sil @fold_trunc_n_to_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+  %trunc = builtin "truncOrBitCast_Int64_Word"(%x : $Builtin.Int64) : $Builtin.Int64
+  return %trunc : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_trunc_n_to_n
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify sext((x)) -> x with same type
+sil @fold_sext_n_to_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+  %trunc = builtin "sextOrBitCast_Int64_Int64"(%x : $Builtin.Int64) : $Builtin.Int64
+  return %trunc : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_sext_n_to_n
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify zext((x)) -> x with same type
+sil @fold_zext_n_to_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+  %trunc = builtin "zextOrBitCast_Int64_Int64"(%x : $Builtin.Int64) : $Builtin.Int64
+  return %trunc : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_zext_n_to_n
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
+}
+
+class IntClass {
+  @sil_stored var value: Builtin.Int32 { get set }
+  init(value: Builtin.Int32)
+  @objc deinit
+}
+
+enum SortaOptional1 {
+  case Nope, Yup(IntClass)
+}
+
+sil @rewrap_optional_1 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional1 {
+bb0(%0 : $SortaOptional1):
+  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
+
+bb1:
+// CHECK-NOT: unchecked_enum_data
+// CHECK: return %0
+  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt.1
+  %3 = enum $SortaOptional1, #SortaOptional1.Yup!enumelt.1, %2 : $IntClass
+  return %3 : $SortaOptional1
+
+bb2:
+  %5 = integer_literal $Builtin.Int1, -1
+  cond_fail %5 : $Builtin.Int1
+  unreachable
+}
+
+enum SortaOptional2 {
+  case Nope, Yup(IntClass)
+}
+
+sil @rewrap_optional_2 : $@convention(thin) (@owned SortaOptional1) -> @owned SortaOptional2 {
+bb0(%0 : $SortaOptional1):
+  switch_enum %0 : $SortaOptional1, case #SortaOptional1.Yup!enumelt.1: bb1, case #SortaOptional1.Nope!enumelt: bb2
+
+bb1:
+// CHECK: [[DATA:%[0-9a-zA-Z]+]] = unchecked_enum_data %0
+// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $SortaOptional2, #SortaOptional2.Yup!enumelt.1, [[DATA]] : $IntClass
+// CHECK: return [[RESULT]]
+  %2 = unchecked_enum_data %0 : $SortaOptional1, #SortaOptional1.Yup!enumelt.1
+  %3 = enum $SortaOptional2, #SortaOptional2.Yup!enumelt.1, %2 : $IntClass // user: %4
+  return %3 : $SortaOptional2                      // id: %4
+
+bb2:
+  %5 = integer_literal $Builtin.Int1, -1
+  cond_fail %5 : $Builtin.Int1
+  unreachable
+}
+
+public enum GenericEnum<T> {
+	case A(T)
+	case B(Int)
+}
+
+// CHECK-LABEL: sil @combine_enum_data_and_enum
+// CHECK: [[RESULT:%[0-9]+]] = load %0
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: enum $GenericEnum
+// CHECK: return [[RESULT]]
+sil @combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Int> {
+bb0(%0 : $*GenericEnum<Int>):
+  %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
+  %24 = enum $GenericEnum<Int>, #GenericEnum.B!enumelt.1, %23 : $Int
+  return %24 : $GenericEnum<Int>
+}
+
+// CHECK-LABEL: sil @dont_combine_enum_data_and_enum
+// CHECK: load
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: enum $GenericEnum
+// CHECK-NEXT: return
+sil @dont_combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Double> {
+bb0(%0 : $*GenericEnum<Int>):
+  %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
+  %24 = enum $GenericEnum<Double>, #GenericEnum.B!enumelt.1, %23 : $Int
+  return %24 : $GenericEnum<Double>
+}
+
+public enum Ternary {
+case First
+case Second
+case Third
+
+  public subscript(_: Builtin.Word) -> Ternary {get}
+}
+
+// CHECK-LABEL: sil @do_not_use_switch_enum_operand
+sil @do_not_use_switch_enum_operand : $@convention(method) (Builtin.Word, Ternary) -> Ternary {
+bb0(%0 : $Builtin.Word, %1 : $Ternary):
+// CHECK: bb0
+// CHECK-NEXT: switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: [[FIRST:bb[0-9a-zA-Z]+]], default [[SECOND:bb[0-9a-zA-Z]+]]
+  switch_enum %1 : $Ternary, case #Ternary.Second!enumelt: bb1, default bb2
+
+bb1:
+// CHECK: [[FIRST]]
+// CHECK: enum $Ternary, #Ternary.Third!enumelt
+  %5 = enum $Ternary, #Ternary.Third!enumelt
+  br bb3(%5 : $Ternary)
+
+bb2:
+// CHECK: [[SECOND]]
+// CHECK: [[RESULT:%[0-9a-zA-Z]+]] = enum $Ternary, #Ternary.First!enumelt
+  %9 = enum $Ternary, #Ternary.First!enumelt
+// CHECK: br bb3([[RESULT]] : $Ternary)
+  br bb3(%9 : $Ternary)
+
+bb3(%11 : $Ternary):
+  return %11 : $Ternary
+}
+
+// xor(xor (a, b), b) -> a
+// CHECK-LABEL: sil @simplify_xor1
+// CHECK: bb0
+// CHECK-NEXT: return %0 : $Builtin.Int32
+sil @simplify_xor1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = builtin "xor_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+
+// xor(xor (a, b), a) -> b
+// CHECK-LABEL: sil @simplify_xor2
+// CHECK: bb0
+// CHECK-NEXT: return %1 : $Builtin.Int32
+sil @simplify_xor2 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = builtin "xor_Int32"(%2 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+
+
+// CHECK-LABEL: sil @simplify_xor3
+// CHECK: bb0
+// xor(b, xor (a, b)) -> a
+// CHECK-NEXT: return %0 : $Builtin.Int32
+sil @simplify_xor3 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = builtin "xor_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int32
+  %3 = builtin "xor_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  return %3 : $Builtin.Int32
+}
+
+struct BitwiseStruct1 {
+  var a: Int64
+  var b: Int32
+}
+struct BitwiseStruct2 {
+  var a: Int64
+  var b: Int32
+}
+
+// CHECK-LABEL: sil @simplify_unchecked_bitwise_cast
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @simplify_unchecked_bitwise_cast : $@convention(thin) (BitwiseStruct1) -> (BitwiseStruct1, BitwiseStruct1) {
+bb0(%0 : $BitwiseStruct1):
+  %1 = unchecked_bitwise_cast %0 : $BitwiseStruct1 to $BitwiseStruct1
+  %2 = unchecked_bitwise_cast %0 : $BitwiseStruct1 to $BitwiseStruct2
+  %3 = unchecked_bitwise_cast %2 : $BitwiseStruct2 to $BitwiseStruct1
+  %4 = tuple (%1 : $BitwiseStruct1, %3 : $BitwiseStruct1)
+  return %4 : $(BitwiseStruct1, BitwiseStruct1)
+}
+
+// simplify_shifts_by_zero
+sil @simplify_shifts_by_zero : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = builtin "ashr_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %3 = builtin "lshr_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %4 = builtin "shl_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  %5 = tuple (%2 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int64)
+  return %5 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+
+// CHECK-LABEL: sil @simplify_shifts_by_zero
+// CHECK: bb0
+// CHECK-NEXT: %1 = tuple (%0 : $Builtin.Int64, %0 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK-NEXT: return %1 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+}
+

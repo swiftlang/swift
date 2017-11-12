@@ -1,0 +1,76 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables -enable-resilience | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=witness_tables -enable-resilience | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables -enable-resilience -O | %FileCheck %s
+
+sil_stage raw
+
+public protocol Proto {}
+
+public protocol ResilientProtocol {
+  associatedtype T : Proto
+  func noDefaultA()
+  func noDefaultB()
+  func defaultC()
+  func defaultD()
+  func defaultE()
+}
+
+// CHECK-LABEL: sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: sil @defaultE
+sil public_external @defaultE : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
+
+
+protocol InternalProtocol {
+  func defaultF()
+}
+
+// CHECK-LABEL: sil hidden @defaultF
+sil hidden @defaultF : $@convention(witness_method: InternalProtocol) <Self where Self : InternalProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+
+// CHECK-LABEL: sil_default_witness_table ResilientProtocol {
+// CHECK: no_default
+// CHECK: no_default
+// CHECK: no_default
+// CHECK: no_default
+// CHECK: method #ResilientProtocol.defaultC!1: {{.*}} : @defaultC
+// CHECK: method #ResilientProtocol.defaultD!1: {{.*}} : @defaultD
+// CHECK: method #ResilientProtocol.defaultE!1: {{.*}} : @defaultE
+// CHECK: }
+
+sil_default_witness_table ResilientProtocol {
+  no_default
+  no_default
+  no_default
+  no_default
+  method #ResilientProtocol.defaultC!1: @defaultC
+  method #ResilientProtocol.defaultD!1: @defaultD
+  method #ResilientProtocol.defaultE!1: @defaultE
+}
+
+
+// CHECK-LABEL: sil_default_witness_table hidden InternalProtocol {
+// CHECK: method #InternalProtocol.defaultF!1: {{.*}} : @defaultF
+// CHECK: }
+
+sil_default_witness_table hidden InternalProtocol {
+  method #InternalProtocol.defaultF!1: @defaultF
+}

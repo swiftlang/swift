@@ -1,28 +1,28 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t/comments.framework/Modules/comments.swiftmodule/
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/comments.framework/Modules/comments.swiftmodule)
 
 // RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.framework/Modules/comments.swiftmodule/%target-swiftmodule-name -emit-module-doc-path %t/comments.framework/Modules/comments.swiftmodule/%target-swiftdoc-name %s
-// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -F %t | FileCheck %s
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -F %t | %FileCheck %s
 
 // RUN: cp -r %t/comments.framework/Modules/comments.swiftmodule %t/comments.swiftmodule
-// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | FileCheck %s
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | %FileCheck %s
 
 // XFAIL: linux
 
 /// first_decl_class_1 Aaa.
-class first_decl_class_1 {
+public class first_decl_class_1 {
 
   /// decl_func_1 Aaa.
-  func decl_func_1() {}
+  public func decl_func_1() {}
 
   /**
    * decl_func_3 Aaa.
    */
-  func decl_func_2() {}
+  public func decl_func_2() {}
 
   /// decl_func_3 Aaa.
   /** Bbb. */
-  func decl_func_3() {}
+  public func decl_func_3() {}
 }
 
 // CHECK: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]

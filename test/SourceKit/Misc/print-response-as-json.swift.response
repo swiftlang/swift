@@ -1,0 +1,29 @@
+{
+  "key.offset": 0,
+  "key.length": 27,
+  "key.diagnostic_stage": "source.diagnostic.stage.swift.parse",
+  "key.substructure": [
+    {
+      "key.kind": "source.lang.swift.decl.function.free",
+      "key.accessibility": "source.lang.swift.accessibility.internal",
+      "key.name": "🐶🐮(_:)",
+      "key.offset": 0,
+      "key.length": 26,
+      "key.nameoffset": 5,
+      "key.namelength": 18,
+      "key.bodyoffset": 25,
+      "key.bodylength": 0,
+      "key.substructure": [
+        {
+          "key.kind": "source.lang.swift.decl.var.parameter",
+          "key.name": "x",
+          "key.offset": 14,
+          "key.length": 8,
+          "key.typename": "Int",
+          "key.nameoffset": 0,
+          "key.namelength": 0
+        }
+      ]
+    }
+  ]
+}

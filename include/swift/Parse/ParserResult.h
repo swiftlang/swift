@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,6 +14,7 @@
 #define SWIFT_PARSER_PARSER_RESULT_H
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "swift/AST/ParameterList.h"
 #include <type_traits>
 
 namespace swift {
@@ -49,7 +50,7 @@ public:
 
   /// Construct a successful parser result.
   explicit ParserResult(T *Result) : PtrAndBits(Result) {
-    assert(Result && "a successful parser result can not be null");
+    assert(Result && "a successful parser result cannot be null");
   }
 
   /// Convert from a different but compatible parser result.
@@ -125,8 +126,8 @@ static inline ParserResult<T> makeParserCodeCompletionResult(T *Result =
 /// \brief Same as \c ParserResult, but just the status bits without the AST
 /// node.
 ///
-/// Useful when the AST node is returned by some other means (for example, a in
-/// vector out parameter).
+/// Useful when the AST node is returned by some other means (for example, in
+/// a vector out parameter).
 ///
 /// If you want to use 'bool' as a result type in the Parser, consider using
 /// ParserStatus instead.
@@ -216,64 +217,6 @@ template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
   if (Status.hasCodeCompletion())
     setHasCodeCompletion();
 }
-
-enum class ConfigExprKind {
-  Unknown,
-  Error,
-  OS,
-  Arch,
-  CompilerVersion,
-  Binary,
-  Paren,
-  DeclRef,
-  Boolean,
-  Integer
-};
-
-class ConfigParserState {
-
-  unsigned ConditionActive : 1;
-  ConfigExprKind Kind;
-public:
-  friend class ConfigParserState;
-
-  ConfigParserState() : ConditionActive(false), Kind(ConfigExprKind::Unknown) {}
-
-  ConfigParserState(bool ConditionActive, ConfigExprKind Kind)
-    : ConditionActive(ConditionActive), Kind(Kind) {}
-
-  bool isConditionActive() const {
-    return ConditionActive;
-  }
-
-  void setConditionActive(bool A) {
-    ConditionActive = A;
-  }
-
-  ConfigExprKind getKind() const {
-    return Kind;
-  }
-
-  void setKind(ConfigExprKind K) {
-    Kind = K;
-  }
-
-  bool shouldParse() const {
-    if (Kind == ConfigExprKind::Error)
-      return true;
-    return ConditionActive || (Kind != ConfigExprKind::CompilerVersion);
-  }
-
-  static ConfigParserState error() {
-    return ConfigParserState(false, ConfigExprKind::Error);
-  }
-};
-
-ConfigParserState operator&&(const ConfigParserState lhs,
-                              const ConfigParserState rhs);
-ConfigParserState operator||(const ConfigParserState lhs,
-                              const ConfigParserState rhs);
-ConfigParserState operator!(const ConfigParserState Result);
 
 } // namespace swift
 

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -127,7 +127,7 @@ public:
                   Explosion &out) const override {
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);
-    asDerived().emitScalarRetain(IGF, value);
+    asDerived().emitScalarRetain(IGF, value, IGF.getDefaultAtomicity());
     out.add(value);
   }
 
@@ -153,31 +153,33 @@ public:
 
     // Release the old value if we need to.
     if (!Derived::IsScalarPOD) {
-      asDerived().emitScalarRelease(IGF, oldValue);
+      asDerived().emitScalarRelease(IGF, oldValue, IGF.getDefaultAtomicity());
     }
   }
 
-  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const override {
+  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out,
+            Atomicity atomicity) const override {
     llvm::Value *value = in.claimNext();
-    asDerived().emitScalarRetain(IGF, value);
+    asDerived().emitScalarRetain(IGF, value, atomicity);
     out.add(value);
   }
-  
-  void consume(IRGenFunction &IGF, Explosion &in) const override {
+
+  void consume(IRGenFunction &IGF, Explosion &in,
+               Atomicity atomicity) const override {
     llvm::Value *value = in.claimNext();
-    asDerived().emitScalarRelease(IGF, value);
+    asDerived().emitScalarRelease(IGF, value, atomicity);
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &in) const override {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarFixLifetime(IGF, value);
   }
-  
+
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);
       llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");
-      asDerived().emitScalarRelease(IGF, value);
+      asDerived().emitScalarRelease(IGF, value, IGF.getDefaultAtomicity());
     }
   }
   
@@ -193,6 +195,15 @@ public:
                              Explosion &dest,
                              unsigned offset) const override {
     dest.add(payload.extractValue(IGF, asDerived().getScalarType(), offset));
+  }
+
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    // Can't use getFixedSize because it returns the alloc size not the store
+    // size.
+    LoadableTypeInfo::addScalarToAggLowering(
+        IGM, lowering, asDerived().getScalarType(), offset,
+        Size(IGM.DataLayout.getTypeStoreSize(asDerived().getScalarType())));
   }
 };
 
@@ -214,11 +225,11 @@ private:
   friend class SingleScalarTypeInfo<Derived, Base>;
   static const bool IsScalarPOD = true;
 
-  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-  }
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const {}
 
-  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-  }
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const {}
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
   }

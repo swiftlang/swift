@@ -1,0 +1,134 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -release-devirtualizer -module-name=test | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class B {
+}
+
+
+// CHECK-LABEL: sil @devirtualize_object
+// CHECK: [[A:%[0-9]+]] = alloc_ref
+// CHECK-NEXT: set_deallocating [[A]]
+// CHECK-NOT: strong_release
+// CHECK: [[D:%[0-9]+]] = function_ref @_T04test1BCfD
+// CHECK-NEXT: apply [[D]]([[A]])
+// CHECK-NEXT: dealloc_ref [stack] [[A]]
+// CHECK: return
+sil @devirtualize_object : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  strong_release %1 : $B
+  dealloc_ref [stack] %1 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_devirtualize_heap_allocated
+// CHECK: alloc_ref
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: dealloc_ref
+// CHECK: return
+sil @dont_devirtualize_heap_allocated : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref $B
+  strong_release %1 : $B
+  dealloc_ref %1 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_devirtualize_wrong_release
+// CHECK: alloc_ref
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: dealloc_ref
+// CHECK: return
+sil @dont_devirtualize_wrong_release : $@convention(thin) (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_ref $B
+  strong_release %1 : $B
+  strong_release %0 : $B
+  dealloc_ref %1 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_devirtualize_unknown_release
+// CHECK: alloc_ref
+// CHECK-NEXT: strong_release
+// CHECK: [[F:%[0-9]+]] = function_ref @unknown_func
+// CHECK-NEXT: apply [[F]]()
+// CHECK-NEXT: dealloc_ref
+// CHECK: return
+sil @dont_devirtualize_unknown_release : $@convention(thin) (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_ref $B
+  strong_release %1 : $B
+  %f = function_ref @unknown_func : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  dealloc_ref %1 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_crash_with_missing_release
+// CHECK: [[A:%[0-9]+]] = alloc_ref
+// CHECK-NEXT: set_deallocating [[A]]
+// CHECK-NOT: strong_release
+// CHECK: [[D:%[0-9]+]] = function_ref @_T04test1BCfD
+// CHECK-NEXT: apply [[D]]([[A]])
+// CHECK-NEXT: dealloc_ref [stack] [[A]]
+// CHECK: return
+sil @dont_crash_with_missing_release : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  strong_release %1 : $B
+  dealloc_ref [stack] %1 : $B
+  %2 = alloc_ref [stack] $B
+  dealloc_ref [stack] %2 : $B
+  %r = tuple ()
+  return %r : $()
+}
+
+
+sil @unknown_func : $@convention(thin) () -> ()
+
+// test.B.__deallocating_deinit
+sil hidden @_T04test1BCfD : $@convention(method) (@owned B) -> () {
+// %0                                             // users: %1, %3
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self" // id: %1
+  // function_ref test.B.deinit
+  %2 = function_ref @_T04test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $B // user: %5
+  dealloc_ref %4 : $B                             // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+// test.B.deinit
+sil hidden @_T04test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject {
+// %0                                             // users: %1, %2
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self" // id: %1
+  %2 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject // user: %3
+  return %2 : $Builtin.NativeObject               // id: %3
+}
+
+// test.B.init () -> test.B
+sil hidden @_T04test1BCACycfc : $@convention(method) (@owned B) -> @owned B {
+// %0                                             // users: %1, %2
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self" // id: %1
+  return %0 : $B                                  // id: %2
+}
+
+sil_vtable B {
+  #B.deinit!deallocator: _T04test1BCfD	// test.B.__deallocating_deinit
+  #B.init!initializer.1: _T04test1BCACycfc	// test.B.init () -> test.B
+}
+

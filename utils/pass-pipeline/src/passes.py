@@ -5,6 +5,7 @@ from pass_pipeline import Pass
 # how to dump the passes and the pipelines themselves.
 AADumper = Pass('AADumper')
 ABCOpt = Pass('ABCOpt')
+AddressLowering = Pass('AddressLowering')
 AllocBoxToStack = Pass('AllocBoxToStack')
 CFGPrinter = Pass('CFGPrinter')
 COWArrayOpts = Pass('COWArrayOpts')
@@ -18,7 +19,6 @@ DCE = Pass('DCE')
 DeadFunctionElimination = Pass('DeadFunctionElimination')
 DeadObjectElimination = Pass('DeadObjectElimination')
 DefiniteInitialization = Pass('DefiniteInitialization')
-Devirtualizer = Pass('SpeculativeDevirtualizer')
 DiagnoseUnreachable = Pass('DiagnoseUnreachable')
 DiagnosticConstantPropagation = Pass('DiagnosticConstantPropagation')
 EarlyInliner = Pass('EarlyInliner')
@@ -28,7 +28,6 @@ GlobalARCOpts = Pass('GlobalARCOpts')
 GlobalLoadStoreOpts = Pass('GlobalLoadStoreOpts')
 GlobalOpt = Pass('GlobalOpt')
 IVInfoPrinter = Pass('IVInfoPrinter')
-InOutDeshadowing = Pass('InOutDeshadowing')
 InstCount = Pass('InstCount')
 LICM = Pass('LICM')
 LateInliner = Pass('LateInliner')
@@ -46,6 +45,7 @@ SILCombine = Pass('SILCombine')
 SILLinker = Pass('SILLinker')
 SROA = Pass('SROA')
 SimplifyCFG = Pass('SimplifyCFG')
+SpeculativeDevirtualizer = Pass('SpeculativeDevirtualizer')
 SplitAllCriticalEdges = Pass('SplitAllCriticalEdges')
 SplitNonCondBrCriticalEdges = Pass('SplitNonCondBrCriticalEdges')
 StripDebugInfo = Pass('StripDebugInfo')
@@ -54,6 +54,7 @@ SwiftArrayOpts = Pass('SwiftArrayOpts')
 PASSES = [
     AADumper,
     ABCOpt,
+    AddressLowering,
     AllocBoxToStack,
     CFGPrinter,
     COWArrayOpts,
@@ -67,7 +68,6 @@ PASSES = [
     DeadFunctionElimination,
     DeadObjectElimination,
     DefiniteInitialization,
-    SpeculativeDevirtualizer,
     DiagnoseUnreachable,
     DiagnosticConstantPropagation,
     EarlyInliner,
@@ -77,7 +77,6 @@ PASSES = [
     GlobalLoadStoreOpts,
     GlobalOpt,
     IVInfoPrinter,
-    InOutDeshadowing,
     InstCount,
     LICM,
     LateInliner,
@@ -95,6 +94,7 @@ PASSES = [
     SILLinker,
     SROA,
     SimplifyCFG,
+    SpeculativeDevirtualizer,
     SplitAllCriticalEdges,
     SplitNonCondBrCriticalEdges,
     StripDebugInfo,

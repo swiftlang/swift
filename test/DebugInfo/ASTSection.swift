@@ -1,7 +1,7 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection -emit-module
-// RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s
+// RUN: %lldb-moduleimport-test %t/ASTSection | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -20,7 +20,7 @@ var foo: Foo = Foo()
 Double(foo.bar())
 
 #if OBJC
-func objCUser(obj: ObjCClass) {}
+func objCUser(_ obj: ObjCClass) {}
 #endif
 
 // CHECK: Loaded module ASTSection from

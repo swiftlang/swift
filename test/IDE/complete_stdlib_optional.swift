@@ -1,59 +1,59 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_NO_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_NO_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DOT_1_SPACES > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT_SPACES < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT_SPACES < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_NO_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_NO_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_NO_DOT_3 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=UN_OPT_NO_DOT_INT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_INT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_DOT_3 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=UN_OPT_DOT_INT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_INT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DL_NO_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_NO_DOT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_NO_DOT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DL_NO_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_NO_DOT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_NO_DOT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DL_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_DOT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_DOT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DL_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_DOT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_DOT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_DL_FORCE_RETURN_OPTIONAL_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_NO_DOT_OBJCCLASS < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OPT_NO_DOT_OBJCCLASS < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_CAST_AS_RESULT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_NO_DOT_OBJCCLASS < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=OPT_NO_DOT_OBJCCLASS < %t.opt.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_1 | FileCheck %s -check-prefix=OPT_TUPLE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_2 | FileCheck %s -check-prefix=OPT_TUPLE_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_3 | FileCheck %s -check-prefix=OPT_TUPLE_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_4 | FileCheck %s -check-prefix=OPT_TUPLE_4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_5 | FileCheck %s -check-prefix=OPT_TUPLE_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_1 | %FileCheck %s -check-prefix=OPT_TUPLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_2 | %FileCheck %s -check-prefix=OPT_TUPLE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_3 | %FileCheck %s -check-prefix=OPT_TUPLE_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_4 | %FileCheck %s -check-prefix=OPT_TUPLE_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_5 | %FileCheck %s -check-prefix=OPT_TUPLE_5
 
 //===---
 //===--- Test code completion for stdlib Optional<T> type.
@@ -108,11 +108,11 @@ class ObjcClass {
 // UN_OPT_DOT_FOOSTRUCT: End completions
 
 // UN_OPT_NO_DOT_INT: Begin completions
-// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: .successor()[#Int#]{{; name=.+$}}
+// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: .nonzeroBitCount[#Int#]{{; name=.+$}}
 // UN_OPT_NO_DOT_INT: End completions
 
 // UN_OPT_DOT_INT: Begin completions
-// UN_OPT_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: successor()[#Int#]{{; name=.+$}}
+// UN_OPT_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: nonzeroBitCount[#Int#]{{; name=.+$}}
 // UN_OPT_DOT_INT: End completions
 
 // OPT_NO_DOT_OBJCCLASS: Begin completions

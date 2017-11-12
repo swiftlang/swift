@@ -17,19 +17,19 @@ public struct MMExplicit1 : MMP1 { }
 
 extension MMExplicit1 : MMP3a { }
 
-public class MMSuper1 : MMP1 { }
+open class MMSuper1 : MMP1 { }
 extension MMSuper1 : MMP3a { }
 
-public class MMSub1 : MMSuper1 { }
+open class MMSub1 : MMSuper1 { }
 
-public class MMSuper2 : MMP1 { }
+open class MMSuper2 : MMP1 { }
 extension MMSuper2 : MMP3a { }
 
-public class MMSub2 : MMSuper2 { }
+open class MMSub2 : MMSuper2 { }
 
-public class MMSuper3 : MMP1 { }
-public class MMSub3 : MMSuper3 { }
+open class MMSuper3 : MMP1 { }
+open class MMSub3 : MMSuper3 { }
 
-public class MMSuper4 : MMP1 { }
+open class MMSuper4 : MMP1 { }
 
 // FIXME: Enums, once the standard library deserialization is working

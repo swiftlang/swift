@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
-func markUsed<T>(t: T) {}
+func markUsed<T>(_ t: T) {}
 
 class Class <T> {
   var x: T
@@ -8,8 +8,8 @@ class Class <T> {
   init(_x : T) {x = _x}
 
   // Verify that the mangling of the decl context of the type U is correct.
-  // CHECK: !DICompositeType({{.*}}name: "{{[^"]*}}_TtQq_FC14dynamic_layout5Class3foo{{[^"]*}}"
-  func foo <U> (y : U) -> (T,U) {
+  // CHECK: !DICompositeType({{.*}}name: "{{[^"]*}}_T014dynamic_layout5ClassC3foox_qd__tqd__lFQq_{{[^"]*}}"
+  func foo <U> (_ y : U) -> (T,U) {
     var tuple = (x,y)
     return tuple
   }

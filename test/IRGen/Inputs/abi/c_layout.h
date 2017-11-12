@@ -27,6 +27,9 @@ struct A {
 };
 struct A createA(void);
 
+enum CrappyColor {
+  Red, Green, Blue
+};
 
 struct BitfieldSeparatorReference {
   unsigned char a;
@@ -63,6 +66,13 @@ void takesSIMDStruct(struct SIMDStruct);
 struct HasRecursivePointers {
   struct HasRecursivePointers *next;
   void (*getNext)(struct HasRecursivePointers);
+};
+
+struct HasNestedUnion {
+  struct {
+    int x;
+    float f;
+  } s;
 };
 
 // Test sign extension behavior

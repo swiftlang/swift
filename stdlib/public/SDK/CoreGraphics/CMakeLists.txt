@@ -1,9 +1,21 @@
-add_swift_library(swiftCoreGraphics IS_SDK_OVERLAY
+cmake_minimum_required(VERSION 3.4.3)
+include("../../../../cmake/modules/StandaloneOverlay.cmake")
+
+add_swift_library(swiftCoreGraphics ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CoreGraphics.swift
   CGFloat.swift.gyb
-  CoreGraphicsMirrors.swift.gyb
-  # rdar://problem/20891746
-  # SWIFT_COMPILE_FLAGS -Xfrontend -sil-serialize-all
-  SWIFT_MODULE_DEPENDS ObjectiveC Dispatch Darwin
-  FRAMEWORK_DEPENDS CoreGraphics)
+  Private.swift
 
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-swift-version" "3"
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation Dispatch IOKit ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
+  FRAMEWORK_DEPENDS CoreGraphics
+
+  DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_COREGRAPHICS_OSX}
+  DEPLOYMENT_VERSION_IOS ${SWIFTLIB_DEPLOYMENT_VERSION_COREGRAPHICS_IOS}
+  DEPLOYMENT_VERSION_TVOS ${SWIFTLIB_DEPLOYMENT_VERSION_COREGRAPHICS_TVOS}
+  DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_DEPLOYMENT_VERSION_COREGRAPHICS_WATCHOS}
+)

@@ -1,0 +1,6 @@
+source.edit.kind.active:
+  2:7-2:9 "new_name"
+source.edit.kind.active:
+  3:3-3:5 "new_name"
+source.edit.kind.active:
+  3:8-3:10 "new_name"

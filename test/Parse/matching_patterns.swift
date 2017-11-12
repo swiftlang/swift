@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-experimental-patterns -I %S/Inputs -enable-source-import
+// RUN: %target-typecheck-verify-swift -swift-version 4 -I %S/Inputs -enable-source-import
 
 import imported_enums
 
@@ -10,10 +10,10 @@ func ~= (x: (Int,Int,Int), y: (Int,Int,Int)) -> Bool {
 
 var x:Int
 
-func square(x: Int) -> Int { return x*x }
+func square(_ x: Int) -> Int { return x*x }
 
 struct A<B> {
-  struct C<D> { } // expected-error{{generic type 'C' nested in type}}
+  struct C<D> { }
 }
 
 switch x {
@@ -25,21 +25,23 @@ case 1 + 2:
 case square(9):
   ()
 
-// 'let' patterns.
-case let a:
+// 'var' and 'let' patterns.
+case var a:
+  a = 1
+case let a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   a = 1         // expected-error {{cannot assign}}
-case let (let b): // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-  print(b)
-
-// 'var' patterns (not allowed)
-case var a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
+case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
+                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   a += 1
-case var let a: // expected-error {{Use of 'var' binding here is not allowed}} {{6-9=let}}
-  // expected-error@-1 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+                // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
   print(a, terminator: "")
+case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
+                  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+  b += 1
 
 // 'Any' pattern.
-case _:
+case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 
 // patterns are resolved in expression-only positions are errors.
@@ -48,16 +50,15 @@ case 1 + (_): // expected-error{{'_' can only appear in a pattern or on the left
 }
 
 switch (x,x) {
-case (let a, let a): // expected-error {{definition conflicts with previous value}} expected-note {{previous definition of 'a' is here}}
+case (var a, var a): // expected-error {{definition conflicts with previous value}} expected-note {{previous definition of 'a' is here}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   fallthrough
-case _:
+case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 }
 
+var e : Any = 0
 
-var e : protocol<> = 0
-
-switch e {
+switch e { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
 // 'is' pattern.
 case is Int,
      is A<Int>,
@@ -78,31 +79,35 @@ enum Voluntary<T> : Equatable {
   case Twain(T, T)
 
 
-  func enumMethod(other: Voluntary<T>, foo: Foo) {
+  func enumMethod(_ other: Voluntary<T>, foo: Foo) {
     switch self {
     case other:
       ()
 
-    case Naught,
-         Naught(),
-         Naught(_, _): // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+    case .Naught,
+         .Naught(), // expected-error {{pattern with associated values does not match enum case 'Naught'}}
+                    // expected-note@-1 {{remove associated values to make the pattern match}} {{17-19=}}
+         .Naught(_), // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                     // expected-note@-1 {{remove associated values to make the pattern match}} {{17-20=}}
+         .Naught(_, _): // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                        // expected-note@-1 {{remove associated values to make the pattern match}} {{17-23=}}
       ()
 
-    case Mere,
-         Mere(), // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
-         Mere(_),
-         Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
+    case .Mere,
+         .Mere(), // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
+         .Mere(_),
+         .Mere(_, _): // expected-error{{tuple pattern cannot match values of the non-tuple type 'T'}}
       ()
 
-    case Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
-         Twain(_),
-         Twain(_, _),
-         Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
+    case .Twain(), // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
+         .Twain(_),
+         .Twain(_, _),
+         .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(T, T)'}}
       ()
     }
 
     switch foo {
-    case Naught: // expected-error{{enum case 'Naught' is not a member of type 'Foo'}}
+    case .Naught: // expected-error{{pattern cannot match values of type 'Foo'}}
       ()
     case .A, .B, .C:
       ()
@@ -111,13 +116,21 @@ enum Voluntary<T> : Equatable {
 }
 
 var n : Voluntary<Int> = .Naught
+if case let .Naught(value) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                                  // expected-note@-1 {{remove associated values to make the pattern match}} {{20-27=}}
+if case let .Naught(value1, value2, value3) = n {} // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                                                   // expected-note@-1 {{remove associated values to make the pattern match}} {{20-44=}}
+
+
 
 switch n {
 case Foo.A: // expected-error{{enum case 'A' is not a member of type 'Voluntary<Int>'}}
   ()
 case Voluntary<Int>.Naught,
-     Voluntary<Int>.Naught(),
-     Voluntary<Int>.Naught(_, _), // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+     Voluntary<Int>.Naught(), // expected-error {{pattern with associated values does not match enum case 'Naught'}}
+                              // expected-note@-1 {{remove associated values to make the pattern match}} {{27-29=}}
+     Voluntary<Int>.Naught(_, _), // expected-error{{pattern with associated values does not match enum case 'Naught'}}
+                                  // expected-note@-1 {{remove associated values to make the pattern match}} {{27-33=}}
      Voluntary.Naught,
      .Naught:
   ()
@@ -139,33 +152,37 @@ case .Twain,
 var notAnEnum = 0
 
 switch notAnEnum {
-case .Foo: // expected-error{{enum case 'Foo' not found in type 'Int'}}
+case .Foo: // expected-error{{pattern cannot match values of type 'Int'}}
   ()
 }
 
 struct ContainsEnum {
-  enum Possible<T> { // expected-error{{generic type 'Possible' nested in type}}
+  enum Possible<T> {
     case Naught
     case Mere(T)
     case Twain(T, T)
   }
 
-  func member(n: Possible<Int>) {
-    switch n {
+  func member(_ n: Possible<Int>) {
+    switch n { // expected-error {{switch must be exhaustive}}
+    // expected-note@-1 {{missing case: '.Mere(_)'}}
+    // expected-note@-2 {{missing case: '.Twain(_, _)'}}
     case ContainsEnum.Possible<Int>.Naught,
-         ContainsEnum.Possible.Naught,
-         Possible<Int>.Naught,
-         Possible.Naught,
-         .Naught:
+         ContainsEnum.Possible.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+         Possible<Int>.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+         Possible.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+         .Naught: // expected-warning {{case is already handled by previous patterns; consider removing it}}
       ()
     }
   }
 }
 
-func nonmemberAccessesMemberType(n: ContainsEnum.Possible<Int>) {
-  switch n {
+func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
+  switch n { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 {{missing case: '.Mere(_)'}}
+  // expected-note@-2 {{missing case: '.Twain(_, _)'}}
   case ContainsEnum.Possible<Int>.Naught,
-       .Naught:
+       .Naught: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     ()
   }
 }
@@ -174,15 +191,15 @@ var m : ImportedEnum = .Simple
 
 switch m {
 case imported_enums.ImportedEnum.Simple,
-     ImportedEnum.Simple,
-     .Simple:
+     ImportedEnum.Simple, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     .Simple: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 case imported_enums.ImportedEnum.Compound,
-     imported_enums.ImportedEnum.Compound(_),
-     ImportedEnum.Compound,
-     ImportedEnum.Compound(_),
-     .Compound,
-     .Compound(_):
+     imported_enums.ImportedEnum.Compound(_), // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     ImportedEnum.Compound, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     ImportedEnum.Compound(_), // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     .Compound, // expected-warning {{case is already handled by previous patterns; consider removing it}}
+     .Compound(_): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
 }
 
@@ -204,22 +221,22 @@ case .Payload(name: 0):
 case let .Payload(x):
   acceptInt(x)
   acceptString("\(x)")
-case let .Payload(name: x):
+case let .Payload(name: x): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case let .Payload((name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
+case let .Payload((name: x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
+case .Payload(let (name: x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
+case .Payload(let (name: x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let x):
+case .Payload(let x): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload((let x)):
+case .Payload((let x)): // expected-warning {{case is already handled by previous patterns; consider removing it}}
   acceptInt(x)
   acceptString("\(x)")
 }
@@ -236,86 +253,38 @@ struct S {
   func nonProperty() {}
 }
 
-struct T {}
 
-var s: S
 
-switch s {
-case S():
-  ()
-case S(stat: _): // expected-error{{cannot match type property 'stat' of type 'S' in a 'case' pattern}}
-  ()
-case S(x: 0, y: 0, comp: 0):
-  ()
-case S(w: 0): // expected-error{{property 'w' not found in type 'S'}}
-  ()
-case S(nonProperty: 0): // expected-error{{member 'nonProperty' of type 'S' is not a property}}
-  ()
-case S(0): // expected-error{{subpattern of a struct or class pattern must have a keyword name}}
-  ()
-case S(x: 0, 0): // expected-error{{subpattern of a struct or class pattern must have a keyword name}}
-  ()
 
-case T(): // expected-error{{type 'T' of pattern does not match deduced type 'S'}}
-  ()
-}
-
-struct SG<A> { var x: A }
-
-var sgs: SG<S>
-
-switch sgs {
-case SG(x: S()):
-  ()
-case SG<S>(x: S()):
-  ()
-case SG<T>(x: T()): // expected-error{{type 'SG<T>' of pattern does not match deduced type 'SG<S>'}}
-  ()
-}
-
-func sg_generic<B : Equatable>(sgb: SG<B>, b: B) {
-  switch sgb {
-  case SG(x: b):
-    ()
-  }
-}
-
-typealias NonNominal = (foo: Int, bar: UnicodeScalar)
-var nn = NonNominal.self
-
-switch nn {
-case NonNominal(): // expected-error{{non-nominal type 'NonNominal' (aka '(foo: Int, bar: UnicodeScalar)') cannot be used with property pattern syntax}}
-  ()
-}
 
 // Tuple patterns.
 
 var t = (1, 2, 3)
 
-prefix operator +++ {}
-infix operator +++ {}
+prefix operator +++
+infix operator +++
 prefix func +++(x: (Int,Int,Int)) -> (Int,Int,Int) { return x }
 func +++(x: (Int,Int,Int), y: (Int,Int,Int)) -> (Int,Int,Int) {
   return (x.0+y.0, x.1+y.1, x.2+y.2)
 }
 
 switch t {
-case (_, let a, 3):
-  var a = a
+case (_, var a, 3):
   a += 1
-case let (_, b, 3):
-  var b = b
+case var (_, b, 3):
   b += 1
-case let (_, let c, 3): // expected-error{{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-  var c = c
+case var (_, var c, 3): // expected-error{{'var' cannot appear nested inside another 'var'}}
   c += 1
 case (1, 2, 3):
   ()
 
 // patterns in expression-only positions are errors.
-case +++(_, let d, 3): // expected-error{{invalid pattern}}
+case +++(_, var d, 3):
+// expected-error@-1{{'+++' is not a prefix unary operator}}
   ()
-case (_, let e, 3) +++ (1, 2, 3): // expected-error{{invalid pattern}}
+case (_, var e, 3) +++ (1, 2, 3):
+// expected-error@-1{{'_' can only appear in a pattern}}
+// expected-error@-2{{'var' binding pattern cannot appear in an expression}}
   ()
 }
 
@@ -326,7 +295,9 @@ class Derived : Base { }
 
 
 switch [Derived(), Derived(), Base()] {
-case let ds as [Derived]: // expected-error{{downcast pattern value of type '[Derived]' cannot be used}}
+case let ds as [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
+  ()
+case is [Derived]: // expected-error{{collection downcast in cast pattern is not implemented; use an explicit downcast to '[Derived]' instead}}
   ()
 
 default:
@@ -335,8 +306,8 @@ default:
 
 
 // Optional patterns.
-let op1 : Int? = nil
-let op2 : Int?? = nil
+let op1 : Int?
+let op2 : Int??
 
 switch op1 {
 case nil: break
@@ -348,17 +319,14 @@ switch op2 {
 case nil: break
 case _?: break
 case (1?)?: break
-case (_?)?: break
+case (_?)?: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
 }
 
 
 
 // <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
-// expected-error @+3 {{label is not allowed on single element tuple pattern}}
-// expected-note @+2 {{remove the parentheses to make this a type annotation}} {{5-6=}} {{26-27=}}
-// expected-note @+1 {{remove the label to make this a tuple pattern}} {{6-21=}}
 let (responseObject: Int?) = op1
-// expected-error @-1 2 {{expected ',' separator}} {{25-25=,}} {{25-25=,}}
+// expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
 
 

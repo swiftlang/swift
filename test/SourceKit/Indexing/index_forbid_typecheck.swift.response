@@ -13,19 +13,19 @@
     {
       key.kind: source.lang.swift.decl.var.global,
       key.name: "globalPrim",
-      key.usr: "s:v18forbid_typecheck_210globalPrimSi",
+      key.usr: "s:18forbid_typecheck_210globalPrimSivp",
       key.line: 1,
       key.column: 5,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
-          key.usr: "s:F18forbid_typecheck_2g10globalPrimSi",
+          key.usr: "s:18forbid_typecheck_210globalPrimSivg",
           key.line: 1,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
-          key.usr: "s:F18forbid_typecheck_2s10globalPrimSi",
+          key.usr: "s:18forbid_typecheck_210globalPrimSivs",
           key.line: 1,
           key.column: 5
         }
@@ -34,37 +34,62 @@
     {
       key.kind: source.lang.swift.ref.var.global,
       key.name: "globalSec",
-      key.usr: "s:v18forbid_typecheck_29globalSecSi",
+      key.usr: "s:18forbid_typecheck_29globalSecSivp",
       key.line: 1,
-      key.column: 18
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.function.accessor.getter,
+          key.usr: "s:18forbid_typecheck_29globalSecSivg",
+          key.line: 1,
+          key.column: 18
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "primFn()",
-      key.usr: "s:F18forbid_typecheck_26primFnFT_T_",
+      key.usr: "s:18forbid_typecheck_26primFnyyF",
       key.line: 3,
       key.column: 6,
       key.entities: [
         {
           key.kind: source.lang.swift.ref.function.free,
           key.name: "secFn()",
-          key.usr: "s:F18forbid_typecheck_25secFnFT_T_",
+          key.usr: "s:18forbid_typecheck_25secFnyyF",
           key.line: 4,
           key.column: 3
         },
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "ClsSec",
-          key.usr: "s:C18forbid_typecheck_26ClsSec",
+          key.usr: "s:18forbid_typecheck_26ClsSecC",
+          key.line: 5,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.name: "init()",
+          key.usr: "s:18forbid_typecheck_26ClsSecCACycfc",
           key.line: 5,
           key.column: 11
         },
         {
           key.kind: source.lang.swift.ref.var.instance,
           key.name: "member",
-          key.usr: "s:vC18forbid_typecheck_26ClsSec6memberSi",
+          key.usr: "s:18forbid_typecheck_26ClsSecC6memberSivp",
           key.line: 5,
-          key.column: 20
+          key.column: 20,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:18forbid_typecheck_26ClsSecC6memberSivg",
+              key.line: 5,
+              key.column: 20,
+              key.receiver_usr: "s:18forbid_typecheck_26ClsSecC",
+              key.is_dynamic: 1
+            }
+          ]
         }
       ]
     }

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -11,7 +11,7 @@ protocol Hashish {
 
 extension NSObject: Hashish {}
 
-func getHash<T: Hashish>(x: T) -> Int { return x.hash }
+func getHash<T: Hashish>(_ x: T) -> Int { return x.hash }
 
 let u = NSURL(string: "http://www.example.com")!
 

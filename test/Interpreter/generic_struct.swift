@@ -1,6 +1,6 @@
-// RUN: rm -rf %t  &&  mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 protocol MyPrintable {
@@ -41,7 +41,7 @@ enum State : MyPrintable {
   }
 }
 
-func printPair<A : MyPrintable, B : MyPrintable>(p: BufferedPair<A,B>) {
+func printPair<A : MyPrintable, B : MyPrintable>(_ p: BufferedPair<A,B>) {
   print("\(p.front) ", terminator: "")
   p.first.myPrint()
   print(" ", terminator: "")

@@ -1,10 +1,10 @@
-// RUN: %target-repl-run-simple-swift | FileCheck %s
+// RUN: %target-repl-run-simple-swift | %FileCheck %s
 
 // REQUIRES: swift_repl
 
 :print_decl String
 // CHECK: struct String
-// CHECK: extension String : StringInterpolationConvertible
+// CHECK: extension String : _ExpressibleByStringInterpolation
 
 false // CHECK: Bool = false
 (1,2) // CHECK: (Int, Int) = (1, 2)
@@ -72,7 +72,7 @@ f1 +
 -1.75
 // CHECK: Double = -1.75{{$}}
 
-func r13792487(x: Float64) -> Float64 { return x }
+func r13792487(_ x: Float64) -> Float64 { return x }
 r13792487(1234.0)
 // CHECK: Float64 = 1234.0{{$}}
 r13792487(1234)
@@ -148,7 +148,7 @@ for c in "foobar".unicodeScalars { print(c) }
 // CHECK-NEXT: r
 
 var vec = Array<String>()
-// CHECK: vec : Array<String> = []
+// CHECK: vec : [String] = []
 
 // Error recovery
 var a : [int]
@@ -193,15 +193,15 @@ pr = "foo"
 // CHECK: String: foo
 pr.foo()
 
-var _ : ([Int]).Type = [4].dynamicType
+var _ : ([Int]).Type = type(of: [4])
 // CHECK: : ([Int]).Type
-var _ : (Int -> Int)? = .None
-// CHECK: : (Int -> Int)?
-func chained(f f: Int -> ()) -> Int { return 0 }
+var _ : ((Int) -> Int)? = .none
+// CHECK: : ((Int) -> Int)?
+func chained(f f: @escaping (Int) -> ()) -> Int { return 0 }
 chained
-// CHECK: : (f: Int -> ()) -> Int
+// CHECK: : (@escaping (Int) -> ()) -> Int
 [chained]
-// CHECK: : [(f: Int -> ()) -> Int]
+// CHECK: : [(@escaping (Int) -> ()) -> Int]
 
 ({97210}())
 // CHECK: = 97210

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class A {
   init(int i: Int) { }
@@ -58,7 +58,8 @@ class NotInherited1 : D {
 
 func testNotInherited1() {
   var n1 = NotInherited1(int: 5)
-  var n2 = NotInherited1(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}} {{26-32=float}}
+  var n2 = NotInherited1(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'NotInherited1' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
 }
 
 class NotInherited1Sub : NotInherited1 {
@@ -70,7 +71,8 @@ class NotInherited1Sub : NotInherited1 {
 func testNotInherited1Sub() {
   var n1 = NotInherited1Sub(int: 5)
   var n2 = NotInherited1Sub(float: 3.14159)
-  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}} {{29-35=float}}
+  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
+  // expected-note @-1 {{overloads for 'NotInherited1Sub' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
 }
 
 // Having a stored property without an initial value prevents
@@ -101,11 +103,32 @@ class SuperUnnamed {
 
 class SubUnnamed : SuperUnnamed { }
 
-func testSubUnnamed(i: Int, d: Double, s: String, f: Float) {
+func testSubUnnamed(_ i: Int, d: Double, s: String, f: Float) {
   _ = SubUnnamed(int: i)
   _ = SubUnnamed(d)
   _ = SubUnnamed(string: s)
   _ = SubUnnamed(f)
+}
+
+// rdar://problem/17960407 - Inheritance of generic initializers
+class ConcreteBase {
+  required init(i: Int) {}
+}
+
+class GenericDerived<T> : ConcreteBase {}
+
+class GenericBase<T> {
+  required init(t: T) {}
+}
+
+class GenericDerived2<U> : GenericBase<(U, U)> {}
+
+class ConcreteDerived : GenericBase<Int> {}
+
+func testGenericInheritance() {
+  _ = GenericDerived<Int>(i: 10)
+  _ = GenericDerived2<Int>(t: (10, 100))
+  _ = ConcreteDerived(t: 1000)
 }
 
 // FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers
@@ -119,3 +142,67 @@ class SuperVariadic {
 
 class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a variadic inherited initializer for subclass 'SubVariadic' is unsupported}}
 
+// Don't crash with invalid nesting of class in generic function
+
+func testClassInGenericFunc<T>(t: T) {
+  class A { init(t: T) {} } // expected-error {{type 'A' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
+  class B : A {} // expected-error {{type 'B' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
+
+  _ = B(t: t)
+}
+
+// rdar://problem/34789779
+public class Node {
+  var data : Data
+
+  public struct Data {
+    var index: Int32 = 0// for helpers
+  }
+
+ init(data: inout Data/*, context: Context*/) {
+   self.data = data
+ }
+
+ public required init(node: Node) {
+   data = node.data
+ }
+}
+
+class SubNode : Node {
+  var a: Int
+
+  required init(node: Node) {
+    a = 1
+    super.init(node: node)
+  }
+
+  init(data: inout Data, additionalParam: Int) {
+    a = additionalParam
+    super.init(data: &data)
+  }
+}
+
+class GenericSubNode<T> : SubNode {
+  required init(node: Node) {
+    super.init(node: node)
+  }
+
+  init(data: inout Data, value: T) {
+    super.init(data: &data, additionalParam: 1)
+  }
+}
+
+protocol HasValue {
+  associatedtype Value
+  func getValue() -> Value
+}
+
+class GenericWrapperNode<T : HasValue> : GenericSubNode<T.Value> {
+  required init(node: Node) {
+    super.init(node: node)
+  }
+
+  init(data: inout Data, otherValue: T) {
+    super.init(data: &data, value: otherValue.getValue())
+  }
+}

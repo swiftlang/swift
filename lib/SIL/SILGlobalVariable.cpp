@@ -2,21 +2,22 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
 
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
-                                             bool IsFragile,
+                                             IsSerialized_t isSerialized,
                                              StringRef name,
                                              SILType loweredType,
                                              Optional<SILLocation> loc,
@@ -25,12 +26,12 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
   if (!name.empty()) {
-    entry = &*M.GlobalVariableTable.insert(std::make_pair(name, nullptr)).first;
+    entry = &*M.GlobalVariableMap.insert(std::make_pair(name, nullptr)).first;
     assert(!entry->getValue() && "global variable already exists");
     name = entry->getKey();
   }
 
-  auto var = new (M) SILGlobalVariable(M, linkage, IsFragile, name,
+  auto var = new (M) SILGlobalVariable(M, linkage, isSerialized, name,
                                        loweredType, loc, Decl);
 
   if (entry) entry->setValue(var);
@@ -39,7 +40,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 
 
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
-                                     bool IsFragile,
+                                     IsSerialized_t isSerialized,
                                      StringRef Name, SILType LoweredType,
                                      Optional<SILLocation> Loc, VarDecl *Decl)
   : Module(Module),
@@ -47,105 +48,80 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
     LoweredType(LoweredType),
     Location(Loc),
     Linkage(unsigned(Linkage)),
-    Fragile(IsFragile),
-	VDecl(Decl) {
+    VDecl(Decl) {
+  setSerialized(isSerialized);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(Decl ? Decl->isLet() : false);
-  InitializerF = nullptr;
   Module.silGlobals.push_back(this);
 }
 
-void SILGlobalVariable::setInitializer(SILFunction *InitF) {
-  if (InitializerF)
-    InitializerF->decrementRefCount();
-  // Increment the ref count to make sure it will not be eliminated.
-  InitF->incrementRefCount();
-  InitializerF = InitF;
-}
-
 SILGlobalVariable::~SILGlobalVariable() {
-  getModule().GlobalVariableTable.erase(Name);
+  getModule().GlobalVariableMap.erase(Name);
 }
 
-static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
-                                     SILGlobalVariable *&GVar) {
-  Val = nullptr;
-  GVar = nullptr;
-  // We only handle a single SILBasicBlock for now.
-  if (F->size() != 1)
-    return false;
-
-  SILBasicBlock *BB = &F->front();
-  GlobalAddrInst *SGA = nullptr;
-  bool HasStore = false;
-  for (auto &I : *BB) {
-    // Make sure we have a single GlobalAddrInst and a single StoreInst.
-    // And the StoreInst writes to the GlobalAddrInst.
-    if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
-      if (SGA)
-        return false;
-      SGA = sga;
-      GVar = SGA->getReferencedGlobal();
-    } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-      if (HasStore || SI->getDest().getDef() != SGA)
-        return false;
-      HasStore = true;
-      Val = dyn_cast<SILInstruction>(SI->getSrc().getDef());
-
-      // We only handle StructInst and TupleInst being stored to a
-      // global variable for now.
-      if (!isa<StructInst>(Val) && !isa<TupleInst>(Val))
-        return false;
-    } else {
-
-      if (auto *bi = dyn_cast<BuiltinInst>(&I)) {
-        switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::FPTrunc:
-          if (isa<LiteralInst>(bi->getArguments()[0]))
-            continue;
-          break;
-        default:
-          return false;
-        }
-      }
-
-      if (I.getKind() != ValueKind::ReturnInst &&
-          I.getKind() != ValueKind::StructInst &&
-          I.getKind() != ValueKind::TupleInst &&
-          I.getKind() != ValueKind::IntegerLiteralInst &&
-          I.getKind() != ValueKind::FloatLiteralInst &&
-          I.getKind() != ValueKind::StringLiteralInst)
-        return false;
-    }
-  }
-  return true;
+/// Get this global variable's fragile attribute.
+IsSerialized_t SILGlobalVariable::isSerialized() const {
+  return Serialized ? IsSerialized : IsNotSerialized;
 }
-
-bool SILGlobalVariable::canBeStaticInitializer(SILFunction *F) {
-  SILInstruction *dummySI;
-  SILGlobalVariable *dummyGV;
-  return analyzeStaticInitializer(F, dummySI, dummyGV);
-}
-
-/// Check if a given SILFunction can be a static initializer. If yes, return
-/// the SILGlobalVariable that it writes to.
-SILGlobalVariable *SILGlobalVariable::getVariableOfStaticInitializer(
-                     SILFunction *F) {
-  SILInstruction *dummySI;
-  SILGlobalVariable *GV;
-  if(analyzeStaticInitializer(F, dummySI, GV))
-    return GV;
-  return nullptr;
+void SILGlobalVariable::setSerialized(IsSerialized_t isSerialized) {
+  assert(isSerialized != IsSerializable);
+  Serialized = isSerialized ? 1 : 0;
 }
 
 /// Return the value that is written into the global variable.
-SILInstruction *SILGlobalVariable::getValueOfStaticInitializer() {
-  if (!InitializerF)
+SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
+  if (StaticInitializerBlock.empty())
     return nullptr;
 
-  SILInstruction *SI;
-  SILGlobalVariable *dummyGV;
-  if(analyzeStaticInitializer(InitializerF, SI, dummyGV))
-    return SI;
-  return nullptr;
+  return &StaticInitializerBlock.back();
+}
+
+bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
+                                                     SILModule &M) {
+  switch (I->getKind()) {
+    case SILInstructionKind::BuiltinInst: {
+      auto *bi = cast<BuiltinInst>(I);
+      switch (M.getBuiltinInfo(bi->getName()).ID) {
+        case BuiltinValueKind::PtrToInt:
+          if (isa<LiteralInst>(bi->getArguments()[0]))
+            return true;
+          break;
+        default:
+          break;
+      }
+      return false;
+    }
+    case SILInstructionKind::StringLiteralInst:
+      switch (cast<StringLiteralInst>(I)->getEncoding()) {
+        case StringLiteralInst::Encoding::UTF8:
+        case StringLiteralInst::Encoding::UTF16:
+          return true;
+        case StringLiteralInst::Encoding::ObjCSelector:
+          // Objective-C selector string literals cannot be used in static
+          // initializers.
+          return false;
+      }
+      return false;
+    case SILInstructionKind::StructInst:
+    case SILInstructionKind::TupleInst:
+    case SILInstructionKind::IntegerLiteralInst:
+    case SILInstructionKind::FloatLiteralInst:
+    case SILInstructionKind::ObjectInst:
+      return true;
+    default:
+      return false;
+  }
+}
+
+/// Return whether this variable corresponds to a Clang node.
+bool SILGlobalVariable::hasClangNode() const {
+  return (VDecl ? VDecl->hasClangNode() : false);
+}
+
+/// Return the Clang node associated with this variable if it has one.
+ClangNode SILGlobalVariable::getClangNode() const {
+  return (VDecl ? VDecl->getClangNode() : ClangNode());
+}
+const clang::Decl *SILGlobalVariable::getClangDecl() const {
+  return (VDecl ? VDecl->getClangDecl() : nullptr);
 }

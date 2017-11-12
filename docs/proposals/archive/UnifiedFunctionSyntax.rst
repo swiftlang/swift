@@ -1,4 +1,4 @@
-:orphan: 
+:orphan:
 
 Unified Function Syntax via Selector Splitting
 ==============================================
@@ -19,7 +19,7 @@ as well as what its various arguments are. For example,
   - (void)moveRowAtIndex:(NSInteger)oldIndex toIndex:(NSInteger)newIndex;
 
 Note that there are three pieces of information in the selector
-``moveRowAtIndex:toIndex:``: 
+``moveRowAtIndex:toIndex:``:
 
 1. What the method is doing ("moving a row").
 2. What the first argument is ("the index of the row we're moving").
@@ -86,7 +86,7 @@ aren't available, e.g.,::
 
 as well as variadic methods::
 
-  NSString.string(withFormat: "%@ : %@", key, value)
+  NSString(stringwithFormat: "%@ : %@", key, value)
 
 Declaration Syntax
 ------------------
@@ -102,14 +102,14 @@ eliminate the "selector-style" declaration syntax entirely. We can use
 the existing ("tuple-style") declaration syntax to mirror the call
 syntax directly::
 
-  func moveRow(atIndex: Int, toIndex: Int)
+  func moveRow(_ atIndex: Int, toIndex: Int)
 
 Now, sometimes the argument name that works well at the call site
 doesn't work well for the body of the function. For example, splitting
 the selector for ``UIView``'s ``contentHuggingPriorityForAxis:``
 results in::
 
-  func contentHuggingPriority(forAxis: UILayoutConstraintAxis) -> UILayoutPriority
+  func contentHuggingPriority(_ forAxis: UILayoutConstraintAxis) -> UILayoutPriority
 
 The name ``forAxis`` works well at the call site, but not within the
 function body. So, we allow one to specify the name of the parameter
@@ -151,7 +151,7 @@ To refer to the complete method name, place the method name in
 backticks, as in this reference to an optional method in a delegate::
 
   if let method = delegate.`tableView(_:viewForTableColumn:row:)` {
-    // ... 
+    // ...
   }
 
 Initializers
@@ -193,7 +193,7 @@ Swift method name for that Objective-C API. For example, by default,
 the ``NSURL`` method ``+bookmarkDataWithContentsOfURL:error:`` will
 come into Swift as::
 
-  class func bookmarkDataWithContents(ofURL bookmarkFileURL: NSURL, inout error: NSError) -> NSData
+  class func bookmarkDataWithContents(ofURL bookmarkFileURL: NSURL, error: inout NSError) -> NSData
 
 However, one can provide a different mapping with the ``method_name``
 attribute::
@@ -230,7 +230,7 @@ Optionality and Ordering of Keyword Arguments
 A number of programming languages have keyword arguments in one form
 or another, including Ada, C#, Fortran 95, Lua, OCaml,
 Perl 6, Python, and Ruby. Objective-C and Smalltalk's use of selectors
-is roughly equivalent, in the sense that the arguments get names. 
+is roughly equivalent, in the sense that the arguments get names.
 The languages with keyword arguments (but not Objective-C and
 Smalltalk) all allow re-ordering of
 arguments at the call site, and many allow one to
@@ -243,7 +243,7 @@ indicates that keyword arguments are required and cannot be reordered
 in calls to that function, i.e.::
 
   @call_arguments(strict)
-  func moveRow(atIndex:Int, toIndex:Int)
+  func moveRow(_ atIndex:Int, toIndex:Int)
 
 Swift's Objective-C importer will automatically add this to all
 imported Objective-C methods, so that Cocoa APIs will retain their
@@ -273,7 +273,7 @@ rename parameters as often at the declaration site, i.e., this::
 
 becomes::
 
-  class func color(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) -> NSColor
+  class func color(_ red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) -> NSColor
 
 Note that we only perform this removal for ``with`` and ``for``; other
 prepositions tend to have important meaning associated with them, and
@@ -406,7 +406,7 @@ circumstances that affect inclusion or exclusion from the list.
 +----------------+---------+---------+----------------------------+
 | **From**       | Yes     | No      |                            |
 +----------------+---------+---------+----------------------------+
-| **Given**      | Yes*    | No      | Never splits a slector     |
+| **Given**      | Yes*    | No      | Never splits a selector    |
 +----------------+---------+---------+----------------------------+
 | **In**         | Yes     | No      |                            |
 +----------------+---------+---------+----------------------------+
@@ -503,4 +503,4 @@ circumstances that affect inclusion or exclusion from the list.
 | Worth          | No      |         |                            |
 +----------------+---------+---------+----------------------------+
 
-.. _the english club: http://www.englishclub.com/grammar/prepositions-list.htm
+.. _the english club: https://www.englishclub.com/grammar/prepositions-list.htm

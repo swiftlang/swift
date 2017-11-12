@@ -1,0 +1,3 @@
+module HasSubmodule {
+    explicit module Sub {}
+}

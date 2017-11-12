@@ -1,30 +1,33 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
+
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self {
+    var result: Self?
+    _forceBridgeFromObjectiveC(source!, result: &result)
+    return result!
+  }
+}
 
 class A {
   var x = 0
 }
 
 struct B : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> A {
     return A()
   }
   static func _forceBridgeFromObjectiveC(
-    x: A,
-    inout result: B?
+    _ x: A,
+    result: inout B?
   ){
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: A,
-    inout result: B?
+    _ x: A,
+    result: inout B?
   ) -> Bool {
     return true
   }
@@ -33,7 +36,7 @@ struct B : _ObjectiveCBridgeable {
 var a: [A] = []
 var b: [B] = []
 
-a = b
+a = b as [A]
 
 b = a // expected-error {{cannot assign value of type '[A]' to type '[B]'}}
 
@@ -41,6 +44,7 @@ var aa: [[A]] = []
 var bb: [[B]] = []
 
 aa = bb // expected-error {{cannot assign value of type '[[B]]' to type '[[A]]'}}
+bb = aa // expected-error {{cannot assign value of type '[[A]]' to type '[[B]]'}}
 
 class C {
 }
@@ -51,24 +55,17 @@ class E {
 }
 
 struct F : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
-  static func _getObjectiveCType() -> Any.Type {
-    return E.self
-  }
   func _bridgeToObjectiveC() -> E {
     return E()
   }
   static func _forceBridgeFromObjectiveC(
-    x: E,
-    inout result: F?
+    _ x: E,
+    result: inout F?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: E,
-    inout result: F?
+    _ x: E,
+    result: inout F?
   ) -> Bool {
     return true
   }
@@ -77,7 +74,7 @@ struct F : _ObjectiveCBridgeable {
 var e: [E] = []
 var f: [F] = []
 
-e = f
+e = f as [E]
 f = e // expected-error {{cannot assign value of type '[E]' to type '[F]'}}
 
 class G {
@@ -85,53 +82,40 @@ class G {
 }
 
 struct H : _ObjectiveCBridgeable {
-  static func _getObjectiveCType() -> Any.Type {
-    return G.self
-  }
   func _bridgeToObjectiveC() -> G {
     return G()
   }
   static func _forceBridgeFromObjectiveC(
-    x: G,
-    inout result: H?
+    _ x: G,
+    result: inout H?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: G,
-    inout result: H?
+    _ x: G,
+    result: inout H?
   ) -> Bool {
     return true
-  }
-  static func _isBridgedToObjectiveC() -> Bool {
-    return false
   }
 }
 
 var g: [G] = []
 var h: [H] = []
 
-g = h // should type check, but cause a failure at runtime
+g = h as [G] // should type check, but cause a failure at runtime
 
 
 struct I : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
-  static func _getObjectiveCType() -> Any.Type {
-    return A.self
-  }
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }
   static func _forceBridgeFromObjectiveC(
-    x: AnyObject,
-    inout result: I?
+    _ x: AnyObject,
+    result: inout I?
   ) {
   }
   static func _conditionallyBridgeFromObjectiveC(
-    x: AnyObject,
-    inout result: I?
+    _ x: AnyObject,
+    result: inout I?
   ) -> Bool {
     return true
   }
@@ -140,5 +124,5 @@ struct I : _ObjectiveCBridgeable {
 var aoa: [AnyObject] = []
 var i: [I] = []
 
-aoa = i
+aoa = i as [AnyObject]
 i = aoa // expected-error {{cannot assign value of type '[AnyObject]' to type '[I]'}}

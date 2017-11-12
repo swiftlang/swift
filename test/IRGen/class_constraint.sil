@@ -1,0 +1,26 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
+
+protocol P {}
+class A : P {}
+
+sil_vtable A {}
+
+// <rdar://25695389>
+//   Ensure that an "abstract" conformance that minimization
+//   resolves as concrete doesn't mess up IRGen.  Note that this test case
+//   is only meaningful if type-checking actually resolves the conformance
+//   as abstract, which it does today for both Swift and SIL inputs.
+//   If it stops doing that, we can drop the special case in IRGen.
+sil @foo : $@convention(thin) <T where T : A, T : P> (@guaranteed T) -> () {
+bb0(%0 : $T):
+  %1 = alloc_stack $P
+  %2 = init_existential_addr %1 : $*P, $T
+  strong_retain %0 : $T
+  store %0 to %2 : $*T
+  destroy_addr %1 : $*P
+  dealloc_stack %1 : $*P
+  %3 = tuple ()
+  return %3 : $()
+}
+// CHECK: define {{.*}}void @foo(%T16class_constraint1AC*, %swift.type* %T)
+// CHECK: store i8** @_T016class_constraint1ACAA1PAAWP,

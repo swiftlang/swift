@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,15 +17,17 @@
 #ifndef SWIFT_IRGEN_GENEXISTENTIAL_H
 #define SWIFT_IRGEN_GENEXISTENTIAL_H
 
-#include "swift/Basic/LLVM.h"
+#include "Address.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILInstruction.h"
 
 namespace llvm {
   class Value;
 }
 
 namespace swift {
-  class ProtocolConformance;
+  class ProtocolConformanceRef;
   class SILType;
 
 namespace irgen {
@@ -40,7 +42,7 @@ namespace irgen {
                                    SILType destType,
                                    CanType formalSrcType,
                                    SILType loweredSrcType,
-                                   ArrayRef<ProtocolConformance*> conformances);
+                                 ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Emit an existential metatype container from a metatype value
   /// as an explosion.
@@ -49,7 +51,7 @@ namespace irgen {
                                         SILType outType,
                                         llvm::Value *metatype,
                                         SILType metatypeType,
-                                 ArrayRef<ProtocolConformance*> conformances);
+                                 ArrayRef<ProtocolConformanceRef> conformances);
   
   
   /// Emit a class existential container from a class instance value
@@ -60,22 +62,14 @@ namespace irgen {
                                  llvm::Value *instance,
                                  CanType instanceFormalType,
                                  SILType instanceLoweredType,
-                                 ArrayRef<ProtocolConformance*> conformances);
+                                 ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Allocate a boxed existential container with uninitialized space to hold a
   /// value of a given type.
-  Address emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
-                                  Explosion &dest,
+  OwnedAddress emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
-                                  SILType loweredSrcType,
-                                  ArrayRef<ProtocolConformance *> conformances);
-  
-  /// "Deinitialize" an existential container whose contained value is allocated
-  /// but uninitialized, by deallocating the buffer owned by the container if any.
-  void emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
-                                            Address container,
-                                            SILType type);
+                                 ArrayRef<ProtocolConformanceRef> conformances);
   
   /// Deallocate a boxed existential container with uninitialized space to hold
   /// a value of a given type.
@@ -83,17 +77,27 @@ namespace irgen {
                                                  Explosion &container,
                                                  SILType containerType,
                                                  CanType valueType);
-  
-  /// Emit a projection from an existential container address to the address
-  /// of its concrete value buffer.
-  ///
-  /// \param openedArchetype If non-null, the archetype that will capture the
-  /// metadata and witness tables produced by projecting the archetype.
-  Address emitOpaqueExistentialProjection(IRGenFunction &IGF,
-                                          Address base,
-                                          SILType baseTy,
-                                          CanArchetypeType openedArchetype);
-  
+
+  /// Allocate the storage for an opaque existential in the existential
+  /// container.
+  /// If the value is not inline, this will allocate a box for the value and
+  /// store the reference to the box in the existential container's buffer.
+  Address emitAllocateBoxedOpaqueExistentialBuffer(IRGenFunction &IGF,
+                                                   SILType destType,
+                                                   SILType valueType,
+                                                   Address existentialContainer,
+                                                   GenericEnvironment *genEnv);
+  /// Deallocate the storage for an opaque existential in the existential
+  /// container.
+  /// If the value is not stored inline, this will deallocate the box for the
+  /// value.
+  void emitDeallocateBoxedOpaqueExistentialBuffer(IRGenFunction &IGF,
+                                                  SILType existentialType,
+                                                  Address existentialContainer);
+  Address emitOpaqueBoxedExistentialProjection(
+      IRGenFunction &IGF, OpenedExistentialAccess accessKind, Address base,
+      SILType existentialType, CanArchetypeType openedArchetype);
+
   /// Extract the instance pointer from a class existential value.
   ///
   /// \param openedArchetype If non-null, the archetype that will capture the
@@ -112,12 +116,18 @@ namespace irgen {
                                                  SILType baseTy,
                                                  CanType openedTy);
 
+  /// Project the address of the value inside a boxed existential container.
+  ContainedAddress emitBoxedExistentialProjection(IRGenFunction &IGF,
+                                                  Explosion &base,
+                                                  SILType baseTy,
+                                                  CanType projectedType);
+
   /// Project the address of the value inside a boxed existential container,
   /// and open an archetype to its contained type.
-  Address emitBoxedExistentialProjection(IRGenFunction &IGF,
-                                         Explosion &base,
-                                         SILType baseTy,
-                                         CanArchetypeType openedArchetype);
+  Address emitOpenExistentialBox(IRGenFunction &IGF,
+                                 Explosion &base,
+                                 SILType baseTy,
+                                 CanArchetypeType openedArchetype);
 
   /// Emit the existential metatype of an opaque existential value.
   void emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
@@ -136,12 +146,6 @@ namespace irgen {
   void emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
                               SILType existentialType, Explosion &out);
 
-  std::pair<Address, llvm::Value*>
-  emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
-                                                Address base,
-                                                SILType baseTy,
-                                                CanType openedArchetype);
-  
 } // end namespace irgen
 } // end namespace swift
 
