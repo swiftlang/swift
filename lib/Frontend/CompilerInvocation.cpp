@@ -103,48 +103,95 @@ class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const ArgList &Args;
   FrontendInputs &Inputs;
-
-  const llvm::opt::Arg *FilelistPathOrNull;
-  const llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FilelistBuffer;
+  
   /// A primary file is one that the compiler will generate code for,
   /// a secondary file supplies definitions used by the primaries.
   enum class FileKind { Primary, Secondary };
-  std::vector<std::pair<StringRef, FileKind>> Files;
+  
+  std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
   llvm::StringMap<unsigned> FileIndices;
+  
+  struct FilesInfo {
+    bool hadError;
+    std::vector<std::pair<StringRef, FileKind>> files;
+    char const * const fileListPath;
+    
+    static FilesInfo error() {
+      return {
+        true,
+        std::vector<std::pair<StringRef, FileKind>>(),
+        nullptr
+      };
+    }
+    static FilesInfo fromFileList(char const * const path, std::vector<std::pair<StringRef, FileKind>> &&files) {
+      return {false, std::move(files), path};
+    }
+    static FilesInfo fromCommandLine(std::vector<std::pair<StringRef, FileKind>> &&files) {
+      return {false, std::move(files), nullptr};
+    }
+    bool mustAddPrimariesToAllFiles() const {
+      return fileListPath == nullptr;
+    }
+  };
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
                                 FrontendInputs &Inputs)
-      : Diags(Diags), Args(Args), Inputs(Inputs),
-        FilelistPathOrNull(Args.getLastArg(options::OPT_filelist)),
-        FilelistBuffer(getFilelistBuffer(Diags, FilelistPathOrNull)) {}
+      : Diags(Diags), Args(Args), Inputs(Inputs)
+  {}
+  
+  bool convert() {
+    if (enforceFilelistExclusion())
+      return true;
+    const FilesInfo info = getFiles();
+    if (info.hadError)
+      return true;
+    setInputFilesAndIndices(info);
+    return setPrimaryFiles(info);
+  }
 
 private:
-  static llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  getFilelistBuffer(DiagnosticEngine &diags, const llvm::opt::Arg *pathOrNull) {
-    if (!pathOrNull)
-      return llvm::MemoryBuffer::getMemBuffer("");
-    char const *const path = pathOrNull->getValue();
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-        llvm::MemoryBuffer::getFile(path);
-    if (!buffer) {
-      diags.diagnose(SourceLoc(), diag::cannot_open_file, path,
-                     buffer.getError().message());
+ 
+  bool enforceFilelistExclusion() {
+    if (Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_cannot_have_input_files_with_file_list);
+      return true;
     }
-    return buffer;
+    return false;
+  }
+  
+  FilesInfo getFiles() {
+    if (const llvm::opt::Arg *filelistPathArg = Args.getLastArg(options::OPT_filelist)) {
+      char const * const filelistPath = filelistPathArg->getValue();
+      return getFilesFromFilelist(filelistPath);
+    }
+    return getFilesFromCommandLine();
   }
 
-  bool hasFilelist() const { return FilelistPathOrNull != nullptr; }
-  enum class PrimaryInclusion {
-    PrimariesMustBeAdded,
-    PrimariesAreAlreadyIncluded
-  };
-  PrimaryInclusion whichPrimaryInclusion() {
-    return hasFilelist() ? PrimaryInclusion::PrimariesAreAlreadyIncluded
-                         : PrimaryInclusion::PrimariesMustBeAdded;
-  }
 
-  void getFilesFromArgs() {
+  FilesInfo getFilesFromFilelist(char const * const filelistPath) {
+    
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =  llvm::MemoryBuffer::getFile(filelistPath);
+    
+    if (!filelistBufferOrError) {
+      Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
+                     filelistBufferOrError.getError().message());
+      return FilesInfo::error();
+    }
+    // Keep buffer alive because code passes around StringRefs.
+    FilelistBuffer = std::move(*filelistBufferOrError);
+    std::vector<StringRef> inputFilesFromFilelist(
+                                                  llvm::line_iterator(*FilelistBuffer), {});
+    std::vector<std::pair<StringRef, FileKind>> files;
+    for (auto file : inputFilesFromFilelist) {
+      files.push_back(std::make_pair(file, FileKind::Secondary));
+    }
+    return FilesInfo::fromFileList(filelistPath, std::move(files));
+  }
+  
+  FilesInfo getFilesFromCommandLine() {
+    std::vector<std::pair<StringRef, FileKind>> files;
     for (const Arg *A :
          Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
       FileKind fileType;
@@ -155,31 +202,16 @@ private:
       } else {
         llvm_unreachable("Unknown input-related argument!");
       }
-      Files.push_back(std::make_pair(A->getValue(), fileType));
+      files.push_back(std::make_pair(A->getValue(), fileType));
     }
+    return FilesInfo::fromCommandLine(std::move(files));
   }
 
-  void getFilesFromFilelist() {
-    std::vector<StringRef> inputFilesFromFilelist(
-        llvm::line_iterator(*FilelistBuffer->get()), {});
-    for (auto file : inputFilesFromFilelist) {
-      Files.push_back(std::make_pair(file, FileKind::Secondary));
-    }
-  }
 
-  bool enforceFilelistExclusion() {
-    if (Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
-      Diags.diagnose(SourceLoc(),
-                     diag::error_cannot_have_input_files_with_file_list);
-      return true;
-    }
-    return false;
-  }
-
-  void setInputFilesAndIndices() {
-    for (std::pair<StringRef, FileKind> p : Files) {
+  void setInputFilesAndIndices(const FilesInfo &info) {
+    for (std::pair<StringRef, FileKind> p : info.files) {
       if (p.second == FileKind::Secondary ||
-          whichPrimaryInclusion() == PrimaryInclusion::PrimariesMustBeAdded) {
+          info.mustAddPrimariesToAllFiles()) {
         unsigned index = Inputs.inputFilenameCount();
         auto file = p.first;
         Inputs.addInputFilename(file);
@@ -187,35 +219,21 @@ private:
       }
     }
   }
-  bool setPrimaryFiles() {
-    for (std::pair<StringRef, FileKind> p : Files) {
+  bool setPrimaryFiles(const FilesInfo &info) {
+    for (std::pair<StringRef, FileKind> p : info.files) {
       if (p.second != FileKind::Primary)
         continue;
       auto file = p.first;
       const auto iterator = FileIndices.find(file);
       if (iterator == FileIndices.end()) {
+        assert(info.fileListPath != nullptr && "Missing primary with no filelist");
         Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                       FilelistPathOrNull->getValue());
+                       info.fileListPath);
         return true;
       }
       Inputs.addPrimaryInputFilename(file, iterator->second);
     }
     return false;
-  }
-
-public:
-  bool convert() {
-    if (enforceFilelistExclusion())
-      return true;
-
-    if (!FilelistBuffer)
-      return true;
-
-    getFilesFromArgs();
-    getFilesFromFilelist();
-
-    setInputFilesAndIndices();
-    return setPrimaryFiles();
   }
 };
 
