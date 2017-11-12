@@ -47,7 +47,7 @@ public struct DropLastTest {
   }
 }
 
-public struct ElementsEqualTest {
+public struct ElementsEqualInIterationOrderTest {
   public let expected: Bool
   public let sequence: [Int]
   public let other: [Int]
@@ -70,8 +70,8 @@ public struct ElementsEqualTest {
     self.loc = SourceLoc(file, line, comment: "test data" + comment)
   }
 
-  func flip() -> ElementsEqualTest {
-    return ElementsEqualTest(
+  func flip() -> ElementsEqualInIterationOrderTest {
+    return ElementsEqualInIterationOrderTest(
       expected, other, sequence,
       expectedLeftoverOther, expectedLeftoverSequence,
       file: loc.file, line: loc.line, comment: " (flipped)")
@@ -437,17 +437,17 @@ public struct ZipTest {
 }
 
 
-public let elementsEqualTests: [ElementsEqualTest] = [
-  ElementsEqualTest(true, [], [], [], []),
+public let elementsEqualInIterationOrderTests = [
+  ElementsEqualInIterationOrderTest(true, [], [], [], []),
 
-  ElementsEqualTest(false, [ 1 ], [], [], []),
-  ElementsEqualTest(false, [], [ 1 ], [], []),
+  ElementsEqualInIterationOrderTest(false, [ 1 ], [], [], []),
+  ElementsEqualInIterationOrderTest(false, [], [ 1 ], [], []),
 
-  ElementsEqualTest(false, [ 1, 2 ], [], [ 2 ], []),
-  ElementsEqualTest(false, [], [ 1, 2 ], [], [ 2 ]),
+  ElementsEqualInIterationOrderTest(false, [ 1, 2 ], [], [ 2 ], []),
+  ElementsEqualInIterationOrderTest(false, [], [ 1, 2 ], [], [ 2 ]),
 
-  ElementsEqualTest(false, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
-  ElementsEqualTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
+  ElementsEqualInIterationOrderTest(false, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
+  ElementsEqualInIterationOrderTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
 ].flatMap { [ $0, $0.flip() ] }
 
 public let enumerateTests = [
