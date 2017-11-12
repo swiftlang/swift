@@ -12,11 +12,11 @@ from argparse import (ArgumentDefaultsHelpFormatter, ArgumentError,
                       Namespace, RawDescriptionHelpFormatter,
                       RawTextHelpFormatter)
 
-from argparse import SUPPRESS, OPTIONAL, ZERO_OR_MORE, ONE_OR_MORE
+from argparse import ONE_OR_MORE, OPTIONAL, SUPPRESS, ZERO_OR_MORE
 
 from .actions import Action, Nargs
 from .parser import ArgumentParser
-from .types import PathType, RegexType, ClangVersionType, SwiftVersionType
+from .types import ClangVersionType, PathType, RegexType, SwiftVersionType
 
 
 __all__ = [

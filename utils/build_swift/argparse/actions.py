@@ -126,12 +126,15 @@ class AppendAction(Action):
             **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
+        if isinstance(values, str):
+            values = [values]
+
         for dest in self.dests:
             if getattr(namespace, dest) is None:
                 setattr(namespace, dest, [])
 
             items = copy.copy(getattr(namespace, dest))
-            items.append(values)
+            items += values
 
             setattr(namespace, dest, items)
 
