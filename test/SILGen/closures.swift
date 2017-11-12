@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen -enable-guaranteed-closure-contexts %s | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 
@@ -394,6 +395,17 @@ func closeOverLetLValue() {
 // CHECK:   return [[INT_IN_CLASS]]
 // CHECK: } // end sil function '_T08closures18closeOverLetLValueyyFSiycfU_'
 
+// GUARANTEED-LABEL: sil private @_T08closures18closeOverLetLValueyyFSiycfU_ : $@convention(thin) (@guaranteed ClassWithIntProperty) -> Int {
+// GUARANTEED: bb0(%0 : @guaranteed $ClassWithIntProperty):
+// GUARANTEED:   [[TMP:%.*]] = alloc_stack $ClassWithIntProperty
+// GUARANTEED:   [[COPY:%.*]] = copy_value %0 : $ClassWithIntProperty
+// GUARANTEED:   store [[COPY]] to [init] [[TMP]] : $*ClassWithIntProperty
+// GUARANTEED:   [[LOADED_COPY:%.*]] = load [copy] [[TMP]]
+// GUARANTEED:   [[BORROWED:%.*]] = begin_borrow [[LOADED_COPY]]
+// GUARANTEED:   end_borrow [[BORROWED]] from [[LOADED_COPY]]
+// GUARANTEED:   destroy_value [[LOADED_COPY]]
+// GUARANTEED:   destroy_addr [[TMP]]
+// GUARANTEED: } // end sil function '_T08closures18closeOverLetLValueyyFSiycfU_'
 
 
 // Use an external function so inout deshadowing cannot see its body.
