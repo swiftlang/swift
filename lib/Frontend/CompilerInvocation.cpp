@@ -245,7 +245,9 @@ private:
   DiagnosticEngine &Diags;
   const llvm::opt::ArgList &Args;
   FrontendOptions &Opts;
-
+  
+  llvm::Optional<const std::vector<std::string>> cachedOutputFilenamesFromCommandLineOrFilelist;
+  
   // This is a separate function so that it shows up in stack traces.
   LLVM_ATTRIBUTE_NOINLINE
   static void debugFailWithAssertion() {
@@ -270,17 +272,17 @@ private:
   FrontendOptions::ActionType determineRequestedAction() const;
   bool setupForSILOrLLVM();
   void setModuleName();
-  StringRef determineFallbackModuleName() const;
+  StringRef determineFallbackModuleName();
   bool setOutputFilenames();
-  bool deriveOutputFilenamesFromInputsAndSuffix();
+  bool deriveOutputFilenamesFromInputsAndSuffix(const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist);
   std::vector<std::string> computeBaseNamesOfOutputs();
   void determineSupplementaryOutputFilenames();
-  std::vector<std::string> getUnprocessedOutputFilenames() const;
+  llvm::ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
   bool hasAnUnusableOutputPath() const;
   void setImportObjCHeaderOptions();
   void setImplicitImportModuleNames();
   void setLLVMArgs();
-  std::vector<std::string>
+  const std::vector<std::string>
   readOutputFileList(const StringRef filelistPath) const;
 
 public:
@@ -640,7 +642,7 @@ void FrontendArgsToOptionsConverter::setModuleName() {
   Opts.ModuleName = "__bad__";
 }
 
-StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() const {
+StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() {
   // Note: this code path will only be taken when running the frontend
   // directly; the driver should always pass -module-name when invoking the
   // frontend.
@@ -652,7 +654,7 @@ StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() const {
   if (!Opts.Inputs.hasInputFilenames()) {
     return StringRef();
   }
-  std::vector<std::string> outputFilenames = getUnprocessedOutputFilenames();
+  std::vector<std::string> outputFilenames = getOutputFilenamesFromCommandLineOrFilelist();
   bool isOutputAUniqueOrdinaryFile =
       outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
       !llvm::sys::fs::is_directory(outputFilenames[0]);
@@ -663,16 +665,16 @@ StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() const {
 }
 
 bool FrontendArgsToOptionsConverter::setOutputFilenames() {
-  const std::vector<std::string> unprocessedOutputFilenames =
-      getUnprocessedOutputFilenames();
+  const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist =
+      getOutputFilenamesFromCommandLineOrFilelist();
 
-  if (!unprocessedOutputFilenames.empty() &&
-      !llvm::sys::fs::is_directory(unprocessedOutputFilenames.back())) {
-    Opts.OutputFilenames = unprocessedOutputFilenames;
+  if (!outputFilenamesFromCommandLineOrFilelist.empty() &&
+      !llvm::sys::fs::is_directory(outputFilenamesFromCommandLineOrFilelist.back())) {
+    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
-  if (Opts.Inputs.isReadingFromStdin() && unprocessedOutputFilenames.empty()) {
-    Opts.OutputFilenames = unprocessedOutputFilenames;
+  if (Opts.Inputs.isReadingFromStdin() && outputFilenamesFromCommandLineOrFilelist.empty()) {
+    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
 
@@ -688,30 +690,28 @@ bool FrontendArgsToOptionsConverter::setOutputFilenames() {
   assert(
       FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
       !FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction));
-  if (unprocessedOutputFilenames.empty() &&
+  if (outputFilenamesFromCommandLineOrFilelist.empty() &&
       (Opts.Inputs.isReadingFromStdin() ||
        FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction))) {
     Opts.setOutputFilenameToStdout();
     return false;
   }
-  return deriveOutputFilenamesFromInputsAndSuffix();
+  return deriveOutputFilenamesFromInputsAndSuffix(outputFilenamesFromCommandLineOrFilelist);
 }
 
 bool FrontendArgsToOptionsConverter::
-    deriveOutputFilenamesFromInputsAndSuffix() {
-  const std::vector<std::string> unprocessedOutputFilenames =
-      getUnprocessedOutputFilenames();
-  {
-    const unsigned unprocessedOutputFilenameCount =
-        unprocessedOutputFilenames.size();
+    deriveOutputFilenamesFromInputsAndSuffix(const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist) {
+   {
+    const unsigned filenameCount =
+        outputFilenamesFromCommandLineOrFilelist.size();
     const unsigned primaryFilenameCount =
         Opts.Inputs.primaryInputFilenameCount();
     if (Opts.Inputs.havePrimaryInputsFilenames() &&
-        primaryFilenameCount != unprocessedOutputFilenameCount &&
-        unprocessedOutputFilenameCount != 0) {
+        primaryFilenameCount != filenameCount &&
+        filenameCount != 0) {
       Diags.diagnose(SourceLoc(),
                      diag::error_output_filenames_dont_match_primary_filenames,
-                     unprocessedOutputFilenameCount, primaryFilenameCount);
+                     filenameCount, primaryFilenameCount);
       return true;
     }
   }
@@ -720,9 +720,9 @@ bool FrontendArgsToOptionsConverter::
       Opts.RequestedAction);
   std::vector<std::string> baseNames = computeBaseNamesOfOutputs();
   for (unsigned index : indices(baseNames)) {
-    std::string outputStem = unprocessedOutputFilenames.empty()
+    std::string outputStem = outputFilenamesFromCommandLineOrFilelist.empty()
                                  ? ""
-                                 : unprocessedOutputFilenames[index];
+                                 : outputFilenamesFromCommandLineOrFilelist[index];
     llvm::SmallString<128> Path(outputStem);
     llvm::sys::path::append(Path, baseNames[index]);
     llvm::sys::path::replace_extension(Path, Suffix);
@@ -875,19 +875,23 @@ void FrontendArgsToOptionsConverter::setLLVMArgs() {
   }
 }
 
-std::vector<std::string>
-FrontendArgsToOptionsConverter::getUnprocessedOutputFilenames() const {
+llvm::ArrayRef<std::string> FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
+  if (cachedOutputFilenamesFromCommandLineOrFilelist) {
+    return *cachedOutputFilenamesFromCommandLineOrFilelist;
+  }
+  
   if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
     assert(!Args.hasArg(options::OPT_o) &&
            "don't use -o with -output-filelist");
-    return readOutputFileList(A->getValue());
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(readOutputFileList(A->getValue()));
   } else {
-    return Args.getAllArgValues(options::OPT_o);
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(Args.getAllArgValues(options::OPT_o));
   }
+  return *cachedOutputFilenamesFromCommandLineOrFilelist;
 }
 
 /// Try to read an output file list file.
-std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
+const std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
     const StringRef filelistPath) const {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
       llvm::MemoryBuffer::getFile(filelistPath);
