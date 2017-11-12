@@ -2990,9 +2990,8 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   // Apply any ABI-compatible conversions before doing thin-to-thick.
   if (fnType != newFnType) {
     SILType resTy = SILType::getPrimitiveObjectType(newFnType);
-    fn = ManagedValue(
-        SGF.B.createConvertFunction(Loc, fn.getValue(), resTy),
-        fn.getCleanup());
+    fn = SGF.emitManagedRValueWithCleanup(
+        SGF.B.createConvertFunction(Loc, fn.forward(SGF), resTy));
   }
 
   // Now do thin-to-thick if necessary.
