@@ -225,6 +225,7 @@ private:
         continue;
       auto file = p.first;
       const auto iterator = FileIndices.find(file);
+      // Catch "swiftc -frontend -c -filelist foo -primary-file some-file-not-in-foo".
       if (iterator == FileIndices.end()) {
         assert(info.fileListPath != nullptr && "Missing primary with no filelist");
         Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
