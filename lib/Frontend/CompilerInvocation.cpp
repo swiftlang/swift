@@ -826,7 +826,7 @@ bool FrontendArgsToOptionsConverter::hasAnUnusableOutputPath() const {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     return true;
   }
-  if (Opts.hasUnusableModuleOutputDocPath()) {
+  if (Opts.hasUnusableModuleDocOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
