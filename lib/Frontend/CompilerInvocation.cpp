@@ -98,50 +98,47 @@ namespace swift {
 /// must match the order given on the command line or the file list. Side note:
 /// since each input file will cause a lot of work for the compiler, this code
 /// is biased towards clarity and not optimized.
-/// In the near future, it will be possible to put primary files in the filelist,
-/// or to have a separate filelist for primaries. The organization here anticipates that evolution.
+/// In the near future, it will be possible to put primary files in the
+/// filelist, or to have a separate filelist for primaries. The organization
+/// here anticipates that evolution.
 
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const ArgList &Args;
   FrontendInputs &Inputs;
-  
+
   /// A primary file is one that the compiler will generate code for,
   /// a secondary file supplies definitions used by the primaries.
   enum class FileKind { Primary, Secondary };
-  
+
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
   llvm::StringMap<unsigned> FileIndices;
-  
+
   struct FilesInfo {
     bool hadError;
     std::vector<std::pair<StringRef, FileKind>> files;
-    char const * const fileListPath;
-    
+    char const *const fileListPath;
+
     static FilesInfo error() {
-      return {
-        true,
-        std::vector<std::pair<StringRef, FileKind>>(),
-        nullptr
-      };
+      return {true, std::vector<std::pair<StringRef, FileKind>>(), nullptr};
     }
-    static FilesInfo fromFileList(char const * const path, std::vector<std::pair<StringRef, FileKind>> &&files) {
+    static FilesInfo
+    fromFileList(char const *const path,
+                 std::vector<std::pair<StringRef, FileKind>> &&files) {
       return {false, std::move(files), path};
     }
-    static FilesInfo fromCommandLine(std::vector<std::pair<StringRef, FileKind>> &&files) {
+    static FilesInfo
+    fromCommandLine(std::vector<std::pair<StringRef, FileKind>> &&files) {
       return {false, std::move(files), nullptr};
     }
-    bool mustAddPrimariesToAllFiles() const {
-      return fileListPath == nullptr;
-    }
+    bool mustAddPrimariesToAllFiles() const { return fileListPath == nullptr; }
   };
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
                                 FrontendInputs &Inputs)
-      : Diags(Diags), Args(Args), Inputs(Inputs)
-  {}
-  
+      : Diags(Diags), Args(Args), Inputs(Inputs) {}
+
   bool convert() {
     if (enforceFilelistExclusion())
       return true;
@@ -153,7 +150,6 @@ public:
   }
 
 private:
- 
   bool enforceFilelistExclusion() {
     if (Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
       Diags.diagnose(SourceLoc(),
@@ -162,20 +158,21 @@ private:
     }
     return false;
   }
-  
+
   FilesInfo getFiles() {
-    if (const llvm::opt::Arg *filelistPathArg = Args.getLastArg(options::OPT_filelist)) {
-      char const * const filelistPath = filelistPathArg->getValue();
+    if (const llvm::opt::Arg *filelistPathArg =
+            Args.getLastArg(options::OPT_filelist)) {
+      char const *const filelistPath = filelistPathArg->getValue();
       return getFilesFromFilelist(filelistPath);
     }
     return getFilesFromCommandLine();
   }
 
+  FilesInfo getFilesFromFilelist(char const *const filelistPath) {
 
-  FilesInfo getFilesFromFilelist(char const * const filelistPath) {
-    
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =  llvm::MemoryBuffer::getFile(filelistPath);
-    
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
+        llvm::MemoryBuffer::getFile(filelistPath);
+
     if (!filelistBufferOrError) {
       Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
                      filelistBufferOrError.getError().message());
@@ -184,14 +181,14 @@ private:
     // Keep buffer alive because code passes around StringRefs.
     FilelistBuffer = std::move(*filelistBufferOrError);
     std::vector<StringRef> inputFilesFromFilelist(
-                                                  llvm::line_iterator(*FilelistBuffer), {});
+        llvm::line_iterator(*FilelistBuffer), {});
     std::vector<std::pair<StringRef, FileKind>> files;
     for (auto file : inputFilesFromFilelist) {
       files.push_back(std::make_pair(file, FileKind::Secondary));
     }
     return FilesInfo::fromFileList(filelistPath, std::move(files));
   }
-  
+
   FilesInfo getFilesFromCommandLine() {
     std::vector<std::pair<StringRef, FileKind>> files;
     for (const Arg *A :
@@ -208,7 +205,6 @@ private:
     }
     return FilesInfo::fromCommandLine(std::move(files));
   }
-
 
   void setInputFilesAndIndices(const FilesInfo &info) {
     for (std::pair<StringRef, FileKind> p : info.files) {
@@ -227,9 +223,11 @@ private:
         continue;
       auto file = p.first;
       const auto iterator = FileIndices.find(file);
-      // Catch "swiftc -frontend -c -filelist foo -primary-file some-file-not-in-foo".
+      // Catch "swiftc -frontend -c -filelist foo -primary-file
+      // some-file-not-in-foo".
       if (iterator == FileIndices.end()) {
-        assert(info.fileListPath != nullptr && "Missing primary with no filelist");
+        assert(info.fileListPath != nullptr &&
+               "Missing primary with no filelist");
         Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
                        info.fileListPath);
         return true;
@@ -245,9 +243,10 @@ private:
   DiagnosticEngine &Diags;
   const llvm::opt::ArgList &Args;
   FrontendOptions &Opts;
-  
-  llvm::Optional<const std::vector<std::string>> cachedOutputFilenamesFromCommandLineOrFilelist;
-  
+
+  llvm::Optional<const std::vector<std::string>>
+      cachedOutputFilenamesFromCommandLineOrFilelist;
+
   // This is a separate function so that it shows up in stack traces.
   LLVM_ATTRIBUTE_NOINLINE
   static void debugFailWithAssertion() {
@@ -274,7 +273,8 @@ private:
   void setModuleName();
   StringRef determineFallbackModuleName();
   bool setOutputFilenames();
-  bool deriveOutputFilenamesFromInputsAndSuffix(const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist);
+  bool deriveOutputFilenamesFromInputsAndSuffix(
+      const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist);
   std::vector<std::string> computeBaseNamesOfOutputs();
   void determineSupplementaryOutputFilenames();
   llvm::ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
@@ -654,7 +654,8 @@ StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() {
   if (!Opts.Inputs.hasInputFilenames()) {
     return StringRef();
   }
-  std::vector<std::string> outputFilenames = getOutputFilenamesFromCommandLineOrFilelist();
+  std::vector<std::string> outputFilenames =
+      getOutputFilenamesFromCommandLineOrFilelist();
   bool isOutputAUniqueOrdinaryFile =
       outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
       !llvm::sys::fs::is_directory(outputFilenames[0]);
@@ -669,11 +670,13 @@ bool FrontendArgsToOptionsConverter::setOutputFilenames() {
       getOutputFilenamesFromCommandLineOrFilelist();
 
   if (!outputFilenamesFromCommandLineOrFilelist.empty() &&
-      !llvm::sys::fs::is_directory(outputFilenamesFromCommandLineOrFilelist.back())) {
+      !llvm::sys::fs::is_directory(
+          outputFilenamesFromCommandLineOrFilelist.back())) {
     Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
-  if (Opts.Inputs.isReadingFromStdin() && outputFilenamesFromCommandLineOrFilelist.empty()) {
+  if (Opts.Inputs.isReadingFromStdin() &&
+      outputFilenamesFromCommandLineOrFilelist.empty()) {
     Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
@@ -696,19 +699,19 @@ bool FrontendArgsToOptionsConverter::setOutputFilenames() {
     Opts.setOutputFilenameToStdout();
     return false;
   }
-  return deriveOutputFilenamesFromInputsAndSuffix(outputFilenamesFromCommandLineOrFilelist);
+  return deriveOutputFilenamesFromInputsAndSuffix(
+      outputFilenamesFromCommandLineOrFilelist);
 }
 
-bool FrontendArgsToOptionsConverter::
-    deriveOutputFilenamesFromInputsAndSuffix(const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist) {
-   {
+bool FrontendArgsToOptionsConverter::deriveOutputFilenamesFromInputsAndSuffix(
+    const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist) {
+  {
     const unsigned filenameCount =
         outputFilenamesFromCommandLineOrFilelist.size();
     const unsigned primaryFilenameCount =
         Opts.Inputs.primaryInputFilenameCount();
     if (Opts.Inputs.havePrimaryInputsFilenames() &&
-        primaryFilenameCount != filenameCount &&
-        filenameCount != 0) {
+        primaryFilenameCount != filenameCount && filenameCount != 0) {
       Diags.diagnose(SourceLoc(),
                      diag::error_output_filenames_dont_match_primary_filenames,
                      filenameCount, primaryFilenameCount);
@@ -720,9 +723,10 @@ bool FrontendArgsToOptionsConverter::
       Opts.RequestedAction);
   std::vector<std::string> baseNames = computeBaseNamesOfOutputs();
   for (unsigned index : indices(baseNames)) {
-    std::string outputStem = outputFilenamesFromCommandLineOrFilelist.empty()
-                                 ? ""
-                                 : outputFilenamesFromCommandLineOrFilelist[index];
+    std::string outputStem =
+        outputFilenamesFromCommandLineOrFilelist.empty()
+            ? ""
+            : outputFilenamesFromCommandLineOrFilelist[index];
     llvm::SmallString<128> Path(outputStem);
     llvm::sys::path::append(Path, baseNames[index]);
     llvm::sys::path::replace_extension(Path, Suffix);
@@ -875,23 +879,27 @@ void FrontendArgsToOptionsConverter::setLLVMArgs() {
   }
 }
 
-llvm::ArrayRef<std::string> FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
+llvm::ArrayRef<std::string>
+FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   if (cachedOutputFilenamesFromCommandLineOrFilelist) {
     return *cachedOutputFilenamesFromCommandLineOrFilelist;
   }
-  
+
   if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
     assert(!Args.hasArg(options::OPT_o) &&
            "don't use -o with -output-filelist");
-    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(readOutputFileList(A->getValue()));
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
+        readOutputFileList(A->getValue()));
   } else {
-    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(Args.getAllArgValues(options::OPT_o));
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
+        Args.getAllArgValues(options::OPT_o));
   }
   return *cachedOutputFilenamesFromCommandLineOrFilelist;
 }
 
 /// Try to read an output file list file.
-const std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
+const std::vector<std::string>
+FrontendArgsToOptionsConverter::readOutputFileList(
     const StringRef filelistPath) const {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
       llvm::MemoryBuffer::getFile(filelistPath);
