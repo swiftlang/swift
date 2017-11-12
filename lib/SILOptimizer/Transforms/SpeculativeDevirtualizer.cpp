@@ -559,6 +559,10 @@ namespace {
           SILOptions::SILOptMode::OptimizeForSize)
         return;
 
+      // Don't speculatively devirtualize calls inside thunks.
+      if (CurFn.isThunk())
+        return;
+
       ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
 
       bool Changed = false;

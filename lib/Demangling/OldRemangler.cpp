@@ -1668,6 +1668,10 @@ void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {
   Out << "<curry-thunk>";
 }
 
+void Remangler::mangleDispatchThunk(Node *node, EntityContext &ctx) {
+  Out << "<dispatch-thunk>";
+}
+
 void Remangler::mangleEmptyList(Node *node) {
   Out << "<empty>";
 }
