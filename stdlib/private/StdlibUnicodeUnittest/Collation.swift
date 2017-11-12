@@ -203,7 +203,7 @@ public func == <Element>(
   lhs: HashableArray<Element>,
   rhs: HashableArray<Element>
 ) -> Bool {
-  return lhs._elements.elementsEqual(rhs._elements)
+  return lhs._elements.elementsEqualInIterationOrder(rhs._elements)
 }
 
 extension HashableArray : ExpressibleByArrayLiteral {

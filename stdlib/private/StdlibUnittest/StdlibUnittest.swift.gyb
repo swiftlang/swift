@@ -2382,7 +2382,7 @@ public func expectEqualSequence<
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
 
-  if !expected.elementsEqual(actual, by: sameValue) {
+  if !expected.elementsEqualInIterationOrder(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
@@ -2546,7 +2546,7 @@ public func expectEqualUnicodeScalars(
   let actualUnicodeScalars = Array(
     actual.unicodeScalars.lazy.map { $0.value })
 
-  if !expected.elementsEqual(actualUnicodeScalars) {
+  if !expected.elementsEqualInIterationOrder(actualUnicodeScalars) {
     expectationFailure(
       "expected elements: \"\(asHex(expected))\"\n"
       + "actual: \"\(asHex(actualUnicodeScalars))\"",

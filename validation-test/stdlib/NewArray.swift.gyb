@@ -79,7 +79,7 @@ func checkEqual<
 where
 S1.Iterator.Element == S2.Iterator.Element, 
 S1.Iterator.Element : Equatable {
-  if a1.elementsEqual(a2) != expected {
+  if a1.elementsEqualInIterationOrder(a2) != expected {
     let un = expected ? "un" : ""
     print("unexpectedly \(un)equal sequences!")
   }

@@ -375,8 +375,8 @@ SequenceTypeTests.test("starts(with:)/Predicate") {
 // equal()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
-  for test in elementsEqualTests {
+SequenceTypeTests.test("elementsEqualInIterationOrder/WhereElementIsEquatable") {
+  for test in elementsEqualInIterationOrderTests {
     do {
       let s = MinimalSequence<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
@@ -384,7 +384,7 @@ SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
         elements: test.other.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.elementsEqual(other),
+        s.elementsEqualInIterationOrder(other),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -402,7 +402,7 @@ SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
         elements: test.other.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.elementsEqual(other),
+        s.elementsEqualInIterationOrder(other),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -414,8 +414,8 @@ SequenceTypeTests.test("elementsEqual/WhereElementIsEquatable") {
   }
 }
 
-SequenceTypeTests.test("elementsEqual/Predicate") {
-  for test in elementsEqualTests {
+SequenceTypeTests.test("elementsEqualInIterationOrder/Predicate") {
+  for test in elementsEqualInIterationOrderTests {
     do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
@@ -423,7 +423,7 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
         elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.elementsEqual(other) { $0.value == $1.value },
+        s.elementsEqualInIterationOrder(other) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -441,7 +441,7 @@ SequenceTypeTests.test("elementsEqual/Predicate") {
         elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.elementsEqual(other) { $0.value == $1.value },
+        s.elementsEqualInIterationOrder(other) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },

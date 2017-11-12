@@ -961,7 +961,8 @@ func testEquals(_ a: UnsafeRawPointer,
                 _ count: Int) -> Bool {
   numberOfEqualsOperations += 1
   return UnsafeRawBufferPointer(start: a, count: count)
-    .elementsEqual(UnsafeRawBufferPointer(start: b, count: count))
+    .elementsEqualInIterationOrder(
+      UnsafeRawBufferPointer(start: b, count: count))
 }
 
 var numberOfHashOperations = 0

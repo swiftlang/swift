@@ -117,7 +117,7 @@ func pickRandom<T>(_ a: [T]) -> T {
 }
 
 func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
-  return lhs.sorted().elementsEqual(rhs.sorted()) {
+  return lhs.sorted().elementsEqualInIterationOrder(rhs.sorted()) {
     $0 == $1
   }
 }

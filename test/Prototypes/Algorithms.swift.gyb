@@ -559,7 +559,7 @@ extension ${Collection} {
   ///
   ///     let a = [10, 20, 30, 40, 50, 60, 70]
   ///     let r = a.rotated(shiftingToStart: 3)
-  ///     // r.elementsEqual([40, 50, 60, 70, 10, 20, 30])
+  ///     // r.elementsEqualInIterationOrder([40, 50, 60, 70, 10, 20, 30])
   ///
   /// - Parameter i: The position in the collection that should be first in the
   ///   result. `i` must be a valid index of the collection.

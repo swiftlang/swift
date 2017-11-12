@@ -88,7 +88,7 @@ func _equalsWithoutElementIdentity(
     return list.map { ExpectedArrayElement(value: $0.value) }
   }
 
-  return stripIdentity(lhs).elementsEqual(stripIdentity(rhs))
+  return stripIdentity(lhs).elementsEqualInIterationOrder(stripIdentity(rhs))
 }
 
 struct ExpectedArrayElement : Comparable, CustomStringConvertible {
