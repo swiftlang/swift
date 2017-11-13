@@ -198,20 +198,20 @@ public final class _DataStorage {
         switch _backing {
         case .swift: fallthrough
         case .mutable:
-            return try apply(UnsafeMutableRawBufferPointer(start: _bytes!.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, _length - range.lowerBound)))
+            return try apply(UnsafeMutableRawBufferPointer(start: _bytes!.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, _length)))
         case .customMutableReference(let d):
             let len = d.length
-            return try apply(UnsafeMutableRawBufferPointer(start: d.mutableBytes.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, len - range.lowerBound)))
+            return try apply(UnsafeMutableRawBufferPointer(start: d.mutableBytes.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, len)))
         case .immutable(let d):
             let data = d.mutableCopy() as! NSMutableData
             _backing = .mutable(data)
             _bytes = data.mutableBytes
-            return try apply(UnsafeMutableRawBufferPointer(start: _bytes!.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, _length - range.lowerBound)))
+            return try apply(UnsafeMutableRawBufferPointer(start: _bytes!.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, _length)))
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             _backing = .customMutableReference(data)
             let len = data.length
-            return try apply(UnsafeMutableRawBufferPointer(start: data.mutableBytes.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, len - range.lowerBound)))
+            return try apply(UnsafeMutableRawBufferPointer(start: data.mutableBytes.advanced(by:range.lowerBound - _offset), count: Swift.min(range.count, len)))
         }
     }
 
