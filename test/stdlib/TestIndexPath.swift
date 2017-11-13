@@ -77,7 +77,7 @@ class TestIndexPath: TestIndexPathSuper {
     
     func testDropLast() {
         let ip: IndexPath = [1, 2, 3, 4]
-        let ip2 = ip.dropLast()
+        let ip2 = ip.removingLast()
         expectEqual(ip2.count, 3)
         expectEqual(ip2[0], 1)
         expectEqual(ip2[1], 2)
@@ -86,26 +86,26 @@ class TestIndexPath: TestIndexPathSuper {
     
     func testDropLastFromEmpty() {
         let ip: IndexPath = []
-        let ip2 = ip.dropLast()
+        let ip2 = ip.removingLast()
         expectEqual(ip2.count, 0)
     }
     
     func testDropLastFromSingle() {
         let ip: IndexPath = [1]
-        let ip2 = ip.dropLast()
+        let ip2 = ip.removingLast()
         expectEqual(ip2.count, 0)
     }
     
     func testDropLastFromPair() {
         let ip: IndexPath = [1, 2]
-        let ip2 = ip.dropLast()
+        let ip2 = ip.removingLast()
         expectEqual(ip2.count, 1)
         expectEqual(ip2[0], 1)
     }
     
     func testDropLastFromTriple() {
         let ip: IndexPath = [1, 2, 3]
-        let ip2 = ip.dropLast()
+        let ip2 = ip.removingLast()
         expectEqual(ip2.count, 2)
         expectEqual(ip2[0], 1)
         expectEqual(ip2[1], 2)
@@ -714,18 +714,18 @@ class TestIndexPath: TestIndexPathSuper {
 
     func test_slice_1ary() {
         let indexPath: IndexPath = [0]
-        let res = indexPath.dropFirst()
+        let res = indexPath.removingFirst()
         expectEqual(0, res.count)
 
         let slice = indexPath[1..<1]
         expectEqual(0, slice.count)
     }
 
-    func test_dropFirst() {
+    func test_removingFirst() {
         var pth = IndexPath(indexes:[1,2,3,4])
         while !pth.isEmpty {
             // this should not crash 
-            pth = pth.dropFirst()
+            pth = pth.removingFirst()
         }
     }
 }
@@ -780,6 +780,6 @@ IndexPathTests.test("test_AnyHashableContainingIndexPath") { TestIndexPath().tes
 IndexPathTests.test("test_AnyHashableCreatedFromNSIndexPath") { TestIndexPath().test_AnyHashableCreatedFromNSIndexPath() }
 IndexPathTests.test("test_unconditionallyBridgeFromObjectiveC") { TestIndexPath().test_unconditionallyBridgeFromObjectiveC() }
 IndexPathTests.test("test_slice_1ary") { TestIndexPath().test_slice_1ary() }
-IndexPathTests.test("test_dropFirst") { TestIndexPath().test_dropFirst() }
+IndexPathTests.test("test_removingPrefix") { TestIndexPath().test_removingFirst() }
 runAllTests()
 #endif

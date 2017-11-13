@@ -88,7 +88,7 @@ public func run_DropFirstCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -99,7 +99,7 @@ public func run_DropFirstSequence(_ N: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -110,7 +110,7 @@ public func run_DropFirstAnySequence(_ N: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -121,7 +121,7 @@ public func run_DropFirstAnySeqCntRange(_ N: Int) {
   let s = AnySequence(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -132,7 +132,7 @@ public func run_DropFirstAnySeqCRangeIter(_ N: Int) {
   let s = AnySequence((0..<sequenceCount).makeIterator())
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -143,7 +143,7 @@ public func run_DropFirstAnyCollection(_ N: Int) {
   let s = AnyCollection(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -154,7 +154,7 @@ public func run_DropFirstArray(_ N: Int) {
   let s = Array(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -165,7 +165,7 @@ public func run_DropFirstCountableRangeLazy(_ N: Int) {
   let s = (0..<sequenceCount).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -176,7 +176,7 @@ public func run_DropFirstSequenceLazy(_ N: Int) {
   let s = (sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -187,7 +187,7 @@ public func run_DropFirstAnySequenceLazy(_ N: Int) {
   let s = (AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -198,7 +198,7 @@ public func run_DropFirstAnySeqCntRangeLazy(_ N: Int) {
   let s = (AnySequence(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -209,7 +209,7 @@ public func run_DropFirstAnySeqCRangeIterLazy(_ N: Int) {
   let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -220,7 +220,7 @@ public func run_DropFirstAnyCollectionLazy(_ N: Int) {
   let s = (AnyCollection(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)
@@ -231,7 +231,7 @@ public func run_DropFirstArrayLazy(_ N: Int) {
   let s = (Array(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropFirst(dropCount) {
+    for element in s.removingPrefix(dropCount) {
       result += element
     }
     CheckResults(result == sumCount)

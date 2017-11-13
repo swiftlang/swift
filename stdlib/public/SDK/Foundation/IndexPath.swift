@@ -52,7 +52,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             }
         }
         
-        func dropLast() -> Storage {
+        func removingLast() -> Storage {
             switch self {
             case .empty:
                 return .empty
@@ -65,7 +65,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                 case 3:
                     return .pair(indexes[0], indexes[1])
                 default:
-                    return .array(Array<Int>(indexes.dropLast()))
+                    return .array(Array<Int>(indexes.removingLast()))
                 }
             }
         }
@@ -563,8 +563,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     }
     
     /// Return a new `IndexPath` containing all but the last element.
-    public func dropLast() -> IndexPath {
-        return IndexPath(storage: _indexes.dropLast())
+    public func removingLast() -> IndexPath {
+        return IndexPath(storage: _indexes.removingLast())
     }
     
     /// Append an `IndexPath` to `self`.

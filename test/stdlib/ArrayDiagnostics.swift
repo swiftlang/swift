@@ -32,4 +32,16 @@ func test_SE0132Deprecations() {
   
   _ = a.removeLast(1) // expected-warning {{'removeLast' is deprecated: renamed to 'removeSuffix(_:)'}}
   // expected-note @-1 {{use 'removeSuffix(_:)' instead}} {{9-19=removeSuffix}}
+  
+  _ = a.dropFirst(1) // expected-warning {{'dropFirst' is deprecated: renamed to 'removingPrefix(_:)'}}
+  // expected-note @-1 {{use 'removingPrefix(_:)' instead}} {{9-18=removingPrefix}}
+  
+  _ = a.dropLast(1) // expected-warning {{'dropLast' is deprecated: renamed to 'removingSuffix(_:)'}}
+  // expected-note @-1 {{use 'removingSuffix(_:)' instead}} {{9-17=removingSuffix}}
+  
+  _ = a.dropFirst() // expected-warning {{'dropFirst()' is deprecated: renamed to 'removingFirst()'}}
+  // expected-note @-1 {{use 'removingFirst()' instead}} {{9-18=removingFirst}}
+  
+  _ = a.dropLast() // expected-warning {{'dropLast()' is deprecated: renamed to 'removingLast()'}}
+  // expected-note @-1 {{use 'removingLast()' instead}} {{9-17=removingLast}}
 }

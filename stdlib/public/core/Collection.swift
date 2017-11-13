@@ -1240,9 +1240,9 @@ extension Collection {
   /// the collection, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropFirst(2))
+  ///     print(numbers.removingPrefix(2))
   ///     // Prints "[3, 4, 5]"
-  ///     print(numbers.dropFirst(10))
+  ///     print(numbers.removingPrefix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
@@ -1253,11 +1253,17 @@ extension Collection {
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from
   ///   the beginning of the collection.
   @_inlineable
-  public func dropFirst(_ n: Int) -> SubSequence {
+  public func removingPrefix(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
       offsetBy: numericCast(n), limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
+  }
+    
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
+  @_inlineable
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return removingPrefix(n)
   }
 
   /// Returns a subsequence containing all but the specified number of final
@@ -1267,9 +1273,9 @@ extension Collection {
   /// collection, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast(2))
+  ///     print(numbers.removingSuffix(2))
   ///     // Prints "[1, 2, 3]"
-  ///     print(numbers.dropLast(10))
+  ///     print(numbers.removingSuffix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop off the end of the
@@ -1279,13 +1285,19 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public func dropLast(_ n: Int) -> SubSequence {
+  public func removingSuffix(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
     let end = index(startIndex,
       offsetBy: numericCast(amount), limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
+  @_inlineable
+  public func dropLast(_ n: Int) -> SubSequence {
+    return removingSuffix(n)
   }
   
   /// Returns a subsequence by skipping elements while `predicate` returns

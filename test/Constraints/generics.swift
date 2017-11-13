@@ -499,8 +499,8 @@ extension Sequence {
 
 func rdar27700622<E: Comparable>(_ input: [E]) -> [E] {
   let pivot = input.first!
-  let lhs = input.dropFirst().filter { $0 <= pivot }
-  let rhs = input.dropFirst().filter { $0 > pivot }
+  let lhs = input.removingFirst().filter { $0 <= pivot }
+  let rhs = input.removingFirst().filter { $0 > pivot }
 
   return rdar27700622(lhs) + [pivot] + rdar27700622(rhs) // Ok
 }

@@ -970,7 +970,7 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
 /// do not use one with methods that read the entire sequence before
 /// returning, such as `map(_:)`, `filter(_:)`, or `suffix(_:)`. It is safe to
 /// use operations that put an upper limit on the number of elements they
-/// access, such as `prefix(_:)` or `dropFirst(_:)`, and operations that you
+/// access, such as `prefix(_:)` or `removingPrefix(_:)`, and operations that you
 /// can guarantee will terminate, such as passing a closure you know will
 /// eventually return `true` to `first(where:)`.
 ///
@@ -1168,7 +1168,7 @@ extension Strideable where Stride: SignedInteger {
   /// indefinitely, do not use one with methods such as `map(_:)`,
   /// `filter(_:)`, or `suffix(_:)` that read the entire sequence before
   /// returning. It is safe to use operations that put an upper limit on the
-  /// number of elements they access, such as `prefix(_:)` or `dropFirst(_:)`,
+  /// number of elements they access, such as `prefix(_:)` or `removingPrefix(_:)`,
   /// and operations that you can guarantee will terminate, such as passing a
   /// closure you know will eventually return `true` to `first(where:)`.
   ///

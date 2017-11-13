@@ -703,7 +703,7 @@ extension Substring {
 extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.popFirst()'.")
+    "Please use 'first', 'removingFirst()', or 'Substring.popFirst()'.")
   public mutating func popFirst() -> String.Element? {
     guard !isEmpty else { return nil }
     let element = first!
@@ -715,7 +715,7 @@ extension String {
 extension String.CharacterView {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.CharacterView.popFirst()'.")
+    "Please use 'first', 'removingFirst()', or 'Substring.CharacterView.popFirst()'.")
   public mutating func popFirst() -> String.CharacterView.Element? {
     guard !isEmpty else { return nil }
     let element = first!
@@ -727,7 +727,7 @@ extension String.CharacterView {
 extension String.UnicodeScalarView {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
+    "Please use 'first', 'removingFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
   public mutating func popFirst() -> String.UnicodeScalarView.Element? {
     guard !isEmpty else { return nil }
     let element = first!

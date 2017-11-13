@@ -280,9 +280,9 @@ extension BidirectionalCollection {
   /// collection, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast(2))
+  ///     print(numbers.removingSuffix(2))
   ///     // Prints "[1, 2, 3]"
-  ///     print(numbers.dropLast(10))
+  ///     print(numbers.removingSuffix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop off the end of the
@@ -291,7 +291,7 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop.
   @_inlineable // FIXME(sil-serialize-all)
-  public func dropLast(_ n: Int) -> SubSequence {
+  public func removingSuffix(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(
@@ -299,6 +299,12 @@ extension BidirectionalCollection {
       offsetBy: numericCast(-n),
       limitedBy: startIndex) ?? startIndex
     return self[startIndex..<end]
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
+  @_inlineable // FIXME(sil-serialize-all)
+  public func dropLast(_ n: Int) -> SubSequence {
+    return removingSuffix(n)
   }
 
   /// Returns a subsequence, up to the given maximum length, containing the

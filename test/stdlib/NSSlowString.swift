@@ -37,9 +37,9 @@ func check(
 
 	// Substring tests
 	checkSingleForm(s[...], expectedCount: count, expectedCodeUnitCount: cuCount)
-	checkSingleForm(s.dropFirst(), expectedCount: count-1, expectedCodeUnitCount: nil)
-	checkSingleForm(s.dropLast(), expectedCount: count-1, expectedCodeUnitCount: nil)
-	checkSingleForm(s.dropLast().dropFirst(), expectedCount: count-2, expectedCodeUnitCount: nil)
+	checkSingleForm(s.removingFirst(), expectedCount: count-1, expectedCodeUnitCount: nil)
+	checkSingleForm(s.removingLast(), expectedCount: count-1, expectedCodeUnitCount: nil)
+	checkSingleForm(s.removingLast().removingFirst(), expectedCount: count-2, expectedCodeUnitCount: nil)
 }
 
 tests.test("Unicode 9 grapheme breaking") {

@@ -144,7 +144,7 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
             return .notFound(resumeAt: nil)
           }
           // backtrack
-          src0 = src0.dropLast()
+          src0 = src0.removingLast()
         }
       case .notFound(let j):
         return .notFound(resumeAt: j)
@@ -170,7 +170,7 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   , C.SubSequence : Collection  
   {
     var lastEnd = c.startIndex
-    var rest = c.dropFirst(0)
+    var rest = c.removingPrefix(0)
     var data: MatchData = []
 
   searchLoop:

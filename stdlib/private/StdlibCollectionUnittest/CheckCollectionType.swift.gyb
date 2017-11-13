@@ -903,13 +903,13 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-    // dropFirst()
+    // removingPrefix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).dropFirst/semantics") {
-      for test in dropFirstTests {
+    self.test("\(testNamePrefix).removingPrefix/semantics") {
+      for test in removingPrefixTests {
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
-        let result = s.dropFirst(test.dropElements)
+        let result = s.removingPrefix(test.dropElements)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
@@ -917,13 +917,13 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-    // dropLast()
+    // removingSuffix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).dropLast/semantics") {
-      for test in dropLastTests {
+    self.test("\(testNamePrefix).removingSuffix/semantics") {
+      for test in removingSuffixTests {
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
-        let result = s.dropLast(test.dropElements)
+        let result = s.removingSuffix(test.dropElements)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
@@ -1455,13 +1455,13 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-    // dropLast()
+    // removingSuffix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).dropLast/semantics") {
-      for test in dropLastTests {
+    self.test("\(testNamePrefix).removingSuffix/semantics") {
+      for test in removingSuffixTests {
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
-        let result = s.dropLast(test.dropElements)
+        let result = s.removingSuffix(test.dropElements)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))

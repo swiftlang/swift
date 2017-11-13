@@ -377,7 +377,7 @@ StringTests.test("UnicodeScalarView.Iterator.Lifetime") {
   for s in sources {
     // Append something to s so that it creates a dynamically-allocated buffer.
     let i = (s + "X").unicodeScalars.makeIterator()
-    expectEqualSequence(s.unicodeScalars, IteratorSequence(i).dropLast(),
+    expectEqualSequence(s.unicodeScalars, IteratorSequence(i).removingLast(),
       "Actual Contents: \(Array(IteratorSequence(i)))")
   }
 }

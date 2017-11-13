@@ -943,23 +943,23 @@ SequenceTypeTests.test("forEach/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// dropFirst()
+// removingPrefix()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("dropFirst/dispatch") {
+SequenceTypeTests.test("removingPrefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.dropFirst(1)
-  expectCustomizable(tester, tester.log.dropFirst)
+  _ = tester.removingPrefix(1)
+  expectCustomizable(tester, tester.log.removingPrefix)
 }
 
 //===----------------------------------------------------------------------===//
-// dropLast()
+// removingSuffix()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("dropLast/dispatch") {
+SequenceTypeTests.test("removingSuffix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.dropLast(1)
-  expectCustomizable(tester, tester.log.dropLast)
+  _ = tester.removingSuffix(1)
+  expectCustomizable(tester, tester.log.removingSuffix)
 }
 
 //===----------------------------------------------------------------------===//

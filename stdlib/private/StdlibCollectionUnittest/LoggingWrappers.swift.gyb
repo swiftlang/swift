@@ -82,8 +82,8 @@ public class SequenceLog {
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var forEach = TypeIndexed(0)
-  public static var dropFirst = TypeIndexed(0)
-  public static var dropLast = TypeIndexed(0)
+  public static var removingPrefix = TypeIndexed(0)
+  public static var removingSuffix = TypeIndexed(0)
   public static var dropWhile = TypeIndexed(0)
   public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
@@ -248,14 +248,14 @@ public struct ${Self}<
 
   public typealias SubSequence = Base.SubSequence
 
-  public func dropFirst(_ n: Int) -> SubSequence {
-    Log.dropFirst[selfType] += 1
-    return base.dropFirst(n)
+  public func removingPrefix(_ n: Int) -> SubSequence {
+    Log.removingPrefix[selfType] += 1
+    return base.removingPrefix(n)
   }
 
-  public func dropLast(_ n: Int) -> SubSequence {
-    Log.dropLast[selfType] += 1
-    return base.dropLast(n)
+  public func removingSuffix(_ n: Int) -> SubSequence {
+    Log.removingSuffix[selfType] += 1
+    return base.removingSuffix(n)
   }
 
   public func drop(

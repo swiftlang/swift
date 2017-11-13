@@ -91,12 +91,12 @@ extension _SequenceWrapper {
 
 extension _SequenceWrapper where SubSequence == Base.SubSequence {
   @_inlineable // FIXME(sil-serialize-all)
-  public func dropFirst(_ n: Int) -> SubSequence {
-    return _base.dropFirst(n)
+  public func removingPrefix(_ n: Int) -> SubSequence {
+    return _base.removingPrefix(n)
   }
   @_inlineable // FIXME(sil-serialize-all)
-  public func dropLast(_ n: Int) -> SubSequence {
-    return _base.dropLast(n)
+  public func removingSuffix(_ n: Int) -> SubSequence {
+    return _base.removingSuffix(n)
   }
   @_inlineable // FIXME(sil-serialize-all)
   public func prefix(_ maxLength: Int) -> SubSequence {

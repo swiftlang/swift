@@ -17,7 +17,7 @@ internal enum TestError : Error {
   case error2
 }
 
-public struct DropFirstTest {
+public struct RemovingPrefixTest {
   public var sequence: [Int]
   public let dropElements: Int
   public let expected: [Int]
@@ -28,11 +28,11 @@ public struct DropFirstTest {
     self.sequence = sequence
     self.dropElements = dropElements
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "dropFirst() test data")
+    self.loc = SourceLoc(file, line, comment: "removingPrefix() test data")
   }
 }
 
-public struct DropLastTest {
+public struct RemovingSuffixTest {
   public var sequence: [Int]
   public let dropElements: Int
   public let expected: [Int]
@@ -43,7 +43,7 @@ public struct DropLastTest {
     self.sequence = sequence
     self.dropElements = dropElements
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "dropLast() test data")
+    self.loc = SourceLoc(file, line, comment: "removingSuffix() test data")
   }
 }
 
@@ -680,66 +680,66 @@ public let flatMapToOptionalTests = [
 ]
 
 
-public let dropFirstTests = [
-  DropFirstTest(
+public let removingPrefixTests = [
+  RemovingPrefixTest(
     sequence: [],
     dropElements: 0,
     expected: []
   ),
-  DropFirstTest(
+  RemovingPrefixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 1,
     expected: [2020, 3030]
   ),
-  DropFirstTest(
+  RemovingPrefixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 2,
     expected: [3030]
   ),
-  DropFirstTest(
+  RemovingPrefixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 3,
     expected: []
   ),
-  DropFirstTest(
+  RemovingPrefixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 777,
     expected: []
   ),
-  DropFirstTest(
+  RemovingPrefixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 0,
     expected: [1010, 2020, 3030]
   ),
 ]
 
-public let dropLastTests = [
-  DropLastTest(
+public let removingSuffixTests = [
+  RemovingSuffixTest(
     sequence: [],
     dropElements: 0,
     expected: []
   ),
-  DropLastTest(
+  RemovingSuffixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 1,
     expected: [1010, 2020]
   ),
-  DropLastTest(
+  RemovingSuffixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 2,
     expected: [1010]
   ),
-  DropLastTest(
+  RemovingSuffixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 3,
     expected: []
   ),
-  DropLastTest(
+  RemovingSuffixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 777,
     expected: []
   ),
-  DropLastTest(
+  RemovingSuffixTest(
     sequence: [1010, 2020, 3030],
     dropElements: 0,
     expected: [1010, 2020, 3030]
@@ -1592,28 +1592,28 @@ self.test("\(testNamePrefix).contains()/WhereElementIsEquatable/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// dropFirst()
+// removingPrefix()
 //===----------------------------------------------------------------------===//
-self.test("\(testNamePrefix).dropFirst/semantics") {
-  for test in dropFirstTests {
+self.test("\(testNamePrefix).removingPrefix/semantics") {
+  for test in removingPrefixTests {
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
-    let result = s.dropFirst(test.dropElements)
+    let result = s.removingPrefix(test.dropElements)
     expectEqualSequence(
       test.expected, result.map { extractValue($0).value },
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-self.test("\(testNamePrefix).dropFirst/semantics/equivalence") {
-  // Calling dropFirst(1) twice on a sequence should be the same as
-  // calling dropFirst(2) once on an equivalent sequence.
+self.test("\(testNamePrefix).removingPrefix/semantics/equivalence") {
+  // Calling removingPrefix(1) twice on a sequence should be the same as
+  // calling removingPrefix(2) once on an equivalent sequence.
   if true {
     let s1 = makeWrappedSequence([1010, 2020, 3030, 4040].map(OpaqueValue.init))
     let s2 = makeWrappedSequence([1010, 2020, 3030, 4040].map(OpaqueValue.init))
 
-    let result0 = s1.dropFirst(1)
-    let result1 = result0.dropFirst(1)
-    let result2 = s2.dropFirst(2)
+    let result0 = s1.removingPrefix(1)
+    let result1 = result0.removingPrefix(1)
+    let result2 = s2.removingPrefix(2)
 
     expectEqualSequence(
       result1.map { extractValue($0).value },
@@ -1622,12 +1622,12 @@ self.test("\(testNamePrefix).dropFirst/semantics/equivalence") {
   }
 }
 
-self.test("\(testNamePrefix).dropFirst/semantics/dropFirst()==dropFirst(1)") {
+self.test("\(testNamePrefix).removingPrefix/semantics/removingFirst()==removingPrefix(1)") {
   let s1 = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   let s2 = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
 
-  let result1 = s1.dropFirst()
-  let result2 = s2.dropFirst(1)
+  let result1 = s1.removingFirst()
+  let result2 = s2.removingPrefix(1)
 
   expectEqualSequence(
     result1.map { extractValue($0).value },
@@ -1635,44 +1635,44 @@ self.test("\(testNamePrefix).dropFirst/semantics/dropFirst()==dropFirst(1)") {
   )
 }
 
-self.test("\(testNamePrefix).dropFirst/semantics/negative") {
+self.test("\(testNamePrefix).removingPrefix/semantics/negative") {
   let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  _ = s.dropFirst(-1)
+  _ = s.removingPrefix(-1)
 }
 
 //===----------------------------------------------------------------------===//
-// dropLast()
+// removingSuffix()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).dropLast/semantics") {
-  for test in dropLastTests {
+self.test("\(testNamePrefix).removingSuffix/semantics") {
+  for test in removingSuffixTests {
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
-    let result = s.dropLast(test.dropElements)
+    let result = s.removingSuffix(test.dropElements)
     expectEqualSequence(test.expected, result.map { extractValue($0).value },
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-self.test("\(testNamePrefix).dropLast/semantics/equivalence") {
-  // Calling `dropLast(2)` twice on a sequence is equivalent to calling
-  // `dropLast(4)` once.
+self.test("\(testNamePrefix).removingSuffix/semantics/equivalence") {
+  // Calling `removingSuffix(2)` twice on a sequence is equivalent to calling
+  // `removingSuffix(4)` once.
   if true {
     let s1 = makeWrappedSequence(
       [1010, 2020, 3030, 4040, 5050].map(OpaqueValue.init))
     let s2 = makeWrappedSequence(
       [1010, 2020, 3030, 4040, 5050].map(OpaqueValue.init))
 
-    let droppedOnce = s1.dropLast(4)
+    let droppedOnce = s1.removingSuffix(4)
 
     // FIXME: this line should read:
     //
-    //   let droppedTwice_ = s2.dropLast(2).dropLast(2)
+    //   let droppedTwice_ = s2.removingSuffix(2).removingSuffix(2)
     //
     // We can change it when we have real default implementations in protocols
     // that don't affect regular name lookup.
-    let droppedTwice_ = s2.dropLast(2)
-    let droppedTwice = droppedTwice_.dropLast(2)
+    let droppedTwice_ = s2.removingSuffix(2)
+    let droppedTwice = droppedTwice_.removingSuffix(2)
 
     expectEqualSequence(droppedOnce, droppedTwice) {
       extractValue($0).value == extractValue($1).value
@@ -1680,10 +1680,10 @@ self.test("\(testNamePrefix).dropLast/semantics/equivalence") {
   }
 }
 
-self.test("\(testNamePrefix).dropLast/semantics/negative") {
+self.test("\(testNamePrefix).removingSuffix/semantics/negative") {
   let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  _ = s.dropLast(-1)
+  _ = s.removingSuffix(-1)
 }
 
 //===----------------------------------------------------------------------===//

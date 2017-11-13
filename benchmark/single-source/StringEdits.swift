@@ -39,19 +39,19 @@ func edits(_ word: String) -> Set<String> {
   
   for (left, right) in splits {
     // drop a character
-    result.append(left + right.dropFirst())
+    result.append(left + right.removingFirst())
     
     // transpose two characters
     if let fst = right.first {
-      let drop1 = right.dropFirst()
+      let drop1 = right.removingFirst()
       if let snd = drop1.first {
-        result.append(left + [snd,fst] + drop1.dropFirst())
+        result.append(left + [snd,fst] + drop1.removingFirst())
       }
     }
     
     // replace each character with another
     for letter in alphabet {
-      result.append(left + [letter] + right.dropFirst())
+      result.append(left + [letter] + right.removingFirst())
     }
     
     // insert rogue characters

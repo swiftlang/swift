@@ -99,7 +99,7 @@ public struct SourceLocStack {
   public func print() {
     let top = locs.first!
     Swift.print("check failed at \(top.file), line \(top.line)")
-    _printStackTrace(SourceLocStack(_locs: Array(locs.dropFirst())))
+    _printStackTrace(SourceLocStack(_locs: Array(locs.removingFirst())))
   }
 }
 
