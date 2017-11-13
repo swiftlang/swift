@@ -249,7 +249,7 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusableDependenciesFilePath() const {
+bool FrontendOptions::hasUnusedDependenciesFilePath() const {
   return !DependenciesFilePath.empty() &&
          !canActionEmitDependencies(RequestedAction);
 }
@@ -285,7 +285,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusableObjCHeaderOutputPath() const {
+bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
   return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
 }
 
@@ -320,7 +320,7 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusableLoadedModuleTracePath() const {
+bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
   return !LoadedModuleTracePath.empty() &&
          !canActionEmitLoadedModuleTrace(RequestedAction);
 }
@@ -356,11 +356,11 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusableModuleOutputPath() const {
+bool FrontendOptions::hasUnusedModuleOutputPath() const {
   return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
-bool FrontendOptions::hasUnusableModuleDocOutputPath() const {
+bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
   return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
