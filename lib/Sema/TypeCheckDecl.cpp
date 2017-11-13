@@ -8193,56 +8193,23 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
     requestClassLayout(classDecl);
 
-  if (extendedType->hasUnboundGenericType()) {
+  if (nominal->getGenericParamsOfContext()) {
     auto genericParams = ext->getGenericParams();
-
-    // The debugger synthesizes typealiases of unbound generic types
-    // to produce its extensions, which subverts bindExtensionDecl's
-    // ability to create the generic parameter lists. Create the list now.
-    if (!genericParams && Context.LangOpts.DebuggerSupport) {
-      genericParams = cloneGenericParams(Context, ext,
-                                         nominal->getGenericParams());
-      ext->setGenericParams(genericParams);
-    }
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
     GenericEnvironment *env;
     std::tie(env, extendedType) = checkExtensionGenericParams(
-        *this, ext, ext->getExtendedType(), ext->getGenericParams());
+        *this, ext, ext->getExtendedType()->getCanonicalType(),
+        genericParams);
 
     ext->getExtendedTypeLoc().setType(extendedType);
     ext->setGenericEnvironment(env);
-    return;
-  }
-  
-  // If we're extending a protocol, check the generic parameters.
-  //
-  // Canonicalize the type to work around the fact that getAs<> cannot
-  // "look through" protocol<X, Y> where X and Y both desugar to the same
-  // thing.
-  //
-  // FIXME: Probably the above comes up elsewhere, perhaps getAs<>()
-  // should be fixed.
-  if (auto proto = extendedType->getCanonicalType()->getAs<ProtocolType>()) {
-    GenericEnvironment *env;
-    std::tie(env, extendedType) =
-        checkExtensionGenericParams(*this, ext, proto, ext->getGenericParams());
-
-    ext->getExtendedTypeLoc().setType(extendedType);
-    ext->setGenericEnvironment(env);
-    return;
-  }
-
-  // If the nominal type has a generic signature that we didn't otherwise
-  // handle yet, use it directly.
-  if (auto genericSig = nominal->getGenericSignature()) {
-    auto genericEnv = genericSig->createGenericEnvironment();
-    ext->setGenericEnvironment(genericEnv);
     return;
   }
 
   assert(extendedType->is<NominalType>());
+  assert(!nominal->isGenericContext());
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
