@@ -478,6 +478,22 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testRoundTripTypeCoercionFailure(of: [0.0, 1.0] as [Double], as: [Bool].self)
   }
 
+  func testDecodingConcreteTypeParameter() {
+      let encoder = JSONEncoder()
+      guard let json = try? encoder.encode(Employee.testValue) else {
+          expectUnreachable("Unable to encode Employee.")
+          return
+      }
+
+      let decoder = JSONDecoder()
+      guard let decoded = try? decoder.decode(Employee.self as Person.Type, from: json) else {
+          expectUnreachable("Failed to decode Employee as Person from JSON.")
+          return
+      }
+
+      expectEqual(type(of: decoded), Employee.self, "Expected decoded value to be of type Employee; got \(type(of: decoded)) instead.")
+  }
+
   // MARK: - Helper Functions
   private var _jsonEmptyDictionary: Data {
     return "{}".data(using: .utf8)!
@@ -1104,5 +1120,6 @@ JSONEncoderTests.test("testSuperEncoderCodingPaths") { TestJSONEncoder().testSup
 JSONEncoderTests.test("testInterceptDecimal") { TestJSONEncoder().testInterceptDecimal() }
 JSONEncoderTests.test("testInterceptURL") { TestJSONEncoder().testInterceptURL() }
 JSONEncoderTests.test("testTypeCoercion") { TestJSONEncoder().testTypeCoercion() }
+JSONEncoderTests.test("testDecodingConcreteTypeParameter") { TestJSONEncoder().testDecodingConcreteTypeParameter() }
 runAllTests()
 #endif
