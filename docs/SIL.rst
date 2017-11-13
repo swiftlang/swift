@@ -3161,7 +3161,7 @@ except:
 - the callee value must have a ``yield_once`` coroutine type,
 
 - control returns to this function not when the coroutine performs a
-  ``return``, but when it performs a ``yield`, and
+  ``return``, but when it performs a ``yield``, and
 
 - the instruction results are derived from the yields of the coroutine
   instead of its normal results.
