@@ -1333,6 +1333,7 @@ private:
     case TypeKind::Module:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILBox:
+    case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
 
       DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();

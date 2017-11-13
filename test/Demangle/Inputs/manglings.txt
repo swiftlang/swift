@@ -4,6 +4,7 @@ _TtBw ---> Builtin.Word
 _TtBO ---> Builtin.UnknownObject
 _TtBo ---> Builtin.NativeObject
 _TtBp ---> Builtin.RawPointer
+_TtBt ---> Builtin.SILToken
 _TtBv4Bi8_ ---> Builtin.Vec4xInt8
 _TtBv4Bf16_ ---> Builtin.Vec4xFloat16
 _TtBv4Bp ---> Builtin.Vec4xRawPointer

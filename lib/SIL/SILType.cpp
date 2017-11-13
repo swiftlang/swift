@@ -71,6 +71,10 @@ SILType SILType::getOptionalType(SILType type) {
   return getPrimitiveType(CanType(optType), type.getCategory());
 }
 
+SILType SILType::getSILTokenType(const ASTContext &C) {
+  return getPrimitiveObjectType(C.TheSILTokenType);
+}
+
 bool SILType::isTrivial(SILModule &M) const {
   return M.getTypeLowering(*this).isTrivial();
 }
