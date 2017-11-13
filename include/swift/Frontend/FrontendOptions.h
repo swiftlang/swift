@@ -20,11 +20,7 @@
 #include <vector>
 
 namespace llvm {
-  class MemoryBuffer;
-  namespace opt {
-  class ArgList;
-  class Arg;
-  } // namespace opt
+class MemoryBuffer;
 }
 
 namespace swift {
@@ -68,6 +64,8 @@ enum class InputFileKind {
 
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
+  friend class ArgsToFrontendInputsConverter;
+
 private:
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
@@ -75,9 +73,11 @@ private:
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
-  /// The input for which output should be generated. If not set, output will
-  /// be generated for the whole module.
-  Optional<SelectedInput> PrimaryInput;
+  /// The inputs for which output should be generated. If empty, output will
+  /// be generated for the whole module, in other words, whole-module mode.
+  /// Even if every input file is mentioned here, it is not the same as
+  /// whole-module mode.
+  std::vector<SelectedInput> PrimaryInputs;
 
 public:
   // Readers:
@@ -110,21 +110,79 @@ public:
 
   // Primary input readers
 
-  Optional<SelectedInput> getPrimaryInput() const { return PrimaryInput; }
-  bool hasPrimaryInput() const { return getPrimaryInput().hasValue(); }
+private:
+  void mustNotBeMoreThanOnePrimaryInput() const {
+    assert(PrimaryInputs.size() < 2 &&
+           "have not implemented >1 primary input yet");
+  }
 
-  bool isWholeModule() { return !hasPrimaryInput(); }
+public:
+  bool havePrimaryInputsFilenames() const {
+    for (const SelectedInput &SI : getPrimaryInputs())
+      if (SI.isFilename())
+        return true;
+    return false;
+  }
+  unsigned primaryInputFilenameCount() const {
+    unsigned r = 0;
+    for (const SelectedInput &SI : getPrimaryInputs())
+      r += SI.isFilename() ? 1 : 0;
+    return r;
+  }
+  std::vector<std::string> primaryFilenames() const {
+    std::vector<std::string> r;
+    for (const SelectedInput &SI : getPrimaryInputs()) {
+      if (!SI.isFilename())
+        continue;
+      r.push_back(getInputFilenames()[SI.Index]);
+    }
+    return r;
+  }
+
+  const ArrayRef<SelectedInput> getPrimaryInputs() const {
+    return PrimaryInputs;
+  }
+
+private:
+  std::vector<SelectedInput> &getMutablePrimaryInputs() {
+    mustNotBeMoreThanOnePrimaryInput();
+    return PrimaryInputs;
+  }
+
+public:
+  unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+
+  bool havePrimaryInputs() const { return primaryInputCount() > 0; }
+
+  bool isWholeModule() { return !havePrimaryInputs(); }
+
+  Optional<SelectedInput> getOptionalPrimaryInput() const {
+    return havePrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
+                               : Optional<SelectedInput>();
+  }
 
   bool isPrimaryInputAFileAt(unsigned i) {
-    return hasPrimaryInput() && getPrimaryInput()->isFilename() &&
-           getPrimaryInput()->Index == i;
+    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename() &&
+           getOptionalPrimaryInput()->Index == i;
   }
   bool haveAPrimaryInputFile() const {
-    return hasPrimaryInput() && getPrimaryInput()->isFilename();
+    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename();
   }
+
+  bool hasUniquePrimaryInputFilename() const {
+    return primaryInputCount() == 1 && getPrimaryInputs()[0].isFilename();
+  }
+
+  llvm::Optional<StringRef> uniquePrimaryInputFilename() const {
+    return hasUniquePrimaryInputFilename()
+               ? llvm::Optional<StringRef>(
+                     getInputFilenames()[getPrimaryInputs()[0].Index])
+               : llvm::Optional<StringRef>();
+  }
+
   Optional<unsigned> primaryInputFileIndex() const {
     return haveAPrimaryInputFile()
-               ? Optional<unsigned>(getPrimaryInput()->Index)
+               ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
                : None;
   }
 
@@ -135,9 +193,8 @@ public:
     return StringRef();
   }
 
+public:
   // Multi-facet readers
-  StringRef baseNameOfOutput(const llvm::opt::ArgList &Args,
-                             StringRef ModuleName) const;
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
@@ -158,8 +215,25 @@ public:
 
   // Primary input writers
 
-  void setPrimaryInput(SelectedInput si) { PrimaryInput = si; }
-  void clearPrimaryInput() { PrimaryInput = 0; }
+  void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
+
+  void setPrimaryInputToFirstFile() {
+    clearPrimaryInputs();
+    addPrimaryInput(SelectedInput(0, SelectedInput::InputKind::Filename));
+  }
+
+  void addPrimaryInput(SelectedInput si) { PrimaryInputs.push_back(si); }
+
+  void setPrimaryInput(SelectedInput si) {
+    clearPrimaryInputs();
+    getMutablePrimaryInputs().push_back(si);
+  }
+
+  void addPrimaryInputFilename(const std::string &inputFilename,
+                               unsigned index) {
+    addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
+  }
+
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
     setPrimaryInput(!inputFilename.empty() && inputFilename != "-"
                         ? SelectedInput(inputFilenameCount(),
@@ -174,16 +248,12 @@ public:
     InputFilenames.clear();
     InputBuffers.clear();
   }
-
-  void setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags,
-                                        llvm::opt::ArgList &Args);
-
-  void readInputFileList(DiagnosticEngine &diags, llvm::opt::ArgList &Args,
-                         const llvm::opt::Arg *filelistPath);
 };
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
+  friend class FrontendArgsToOptionsConverter;
+
 public:
   FrontendInputs Inputs;
 
@@ -213,12 +283,9 @@ public:
     return getSingleOutputFilename() == "-";
   }
   bool isOutputFileDirectory() const;
-  bool isOutputFilePlainFile() const;
   bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
-  void setOutputFileList(DiagnosticEngine &Diags,
-                         const llvm::opt::ArgList &Args);
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -299,15 +366,15 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
-  enum ActionType {
-    NoneAction, ///< No specific action
-    Parse, ///< Parse only
-    Typecheck, ///< Parse and type-check only
-    DumpParse, ///< Parse only and dump AST
+  enum class ActionType {
+    NoneAction,        ///< No specific action
+    Parse,             ///< Parse only
+    Typecheck,         ///< Parse and type-check only
+    DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
-    EmitSyntax, ///< Parse and dump Syntax tree as JSON
-    DumpAST, ///< Parse, type-check, and dump AST
-    PrintAST, ///< Parse, type-check, and pretty-print AST
+    EmitSyntax,        ///< Parse and dump Syntax tree as JSON
+    DumpAST,           ///< Parse, type-check, and dump AST
+    PrintAST,          ///< Parse, type-check, and pretty-print AST
 
     /// Parse and dump scope map.
     DumpScopeMaps,
@@ -316,30 +383,30 @@ public:
     DumpTypeRefinementContexts,
 
     EmitImportedModules, ///< Emit the modules that this one imports
-    EmitPCH, ///< Emit PCH of imported bridging header
+    EmitPCH,             ///< Emit PCH of imported bridging header
 
     EmitSILGen, ///< Emit raw SIL
-    EmitSIL, ///< Emit canonical SIL
+    EmitSIL,    ///< Emit canonical SIL
 
     EmitModuleOnly, ///< Emit module only
-    MergeModules, ///< Merge modules only
+    MergeModules,   ///< Merge modules only
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
-    EmitSIB, ///< Emit serialized AST + canonical SIL
+    EmitSIB,    ///< Emit serialized AST + canonical SIL
 
     Immediate, ///< Immediate mode
-    REPL, ///< REPL mode
+    REPL,      ///< REPL mode
 
     EmitAssembly, ///< Emit assembly
-    EmitIR, ///< Emit LLVM IR
-    EmitBC, ///< Emit LLVM BC
-    EmitObject, ///< Emit object file
+    EmitIR,       ///< Emit LLVM IR
+    EmitBC,       ///< Emit LLVM BC
+    EmitObject    ///< Emit object file
   };
 
-  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
 
   /// Indicates the action the user requested that the frontend perform.
-  ActionType RequestedAction = NoneAction;
+  ActionType RequestedAction = ActionType::NoneAction;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
@@ -354,7 +421,7 @@ public:
   /// If set, dumps wall time taken to check each expression.
   bool DebugTimeExpressionTypeChecking = false;
 
-  /// If set, prints the time taken in each major compilation phase to 
+  /// If set, prints the time taken in each major compilation phase to
   /// llvm::errs().
   ///
   /// \sa swift::SharedTimer
@@ -411,7 +478,7 @@ public:
 
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
-  
+
   /// Indicates whether the AST should be instrumented to simulate a debugger's
   /// program counter. Similar to the PlaygroundTransform, this will instrument
   /// the AST with function calls that get called when you would see a program
@@ -448,9 +515,9 @@ public:
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
-    None, ///< Don't automatically crash.
+    None,             ///< Don't automatically crash.
     AssertAfterParse, ///< Automatically assert after parsing.
-    CrashAfterParse, ///< Automatically crash after parsing.
+    CrashAfterParse,  ///< Automatically crash after parsing.
   };
 
   /// Indicates a debug crash mode for the frontend.
@@ -468,22 +535,32 @@ public:
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
-  llvm::hash_code getPCHHashComponents() const {
-    return llvm::hash_value(0);
-  }
+  llvm::hash_code getPCHHashComponents() const { return llvm::hash_value(0); }
 
   StringRef originalPath() const;
-
-  StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift &&
            Inputs.hasUniqueInputFilename();
   }
 
-  void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
-};
+private:
+  static const char *suffixForPrincipalOutputFileForAction(ActionType);
 
-}
+  bool hasUnusedDependenciesFilePath() const;
+  static bool canActionEmitDependencies(ActionType);
+  bool hasUnusedObjCHeaderOutputPath() const;
+  static bool canActionEmitHeader(ActionType);
+  bool hasUnusedLoadedModuleTracePath() const;
+  static bool canActionEmitLoadedModuleTrace(ActionType);
+  bool hasUnusedModuleOutputPath() const;
+  static bool canActionEmitModule(ActionType);
+  bool hasUnusedModuleDocOutputPath() const;
+  static bool canActionEmitModuleDoc(ActionType);
+
+  static bool doesActionProduceOutput(ActionType);
+  static bool doesActionProduceTextualOutput(ActionType);
+};
+} // namespace swift
 
 #endif
