@@ -7891,7 +7891,11 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
 }
 
 void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
-  // FIXME: Check a flag in the class...
+  if (classDecl->hasValidatedLayout())
+    return;
+
+  classDecl->setHasValidatedLayout();
+
   if (isa<SourceFile>(classDecl->getModuleScopeContext()))
     DeclsToFinalize.insert(classDecl);
 }
