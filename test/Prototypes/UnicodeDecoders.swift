@@ -280,7 +280,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
       expectEqual(1, errorCount)
       let x = (expected + expectedRepairedTail).reversed()
       expectTrue(
-        x.starts(with: decoded),
+        x.hasPrefix(decoded),
         "reverse, repairing: false\n\t\(Array(x)) does not start with \(decoded)")
       decoded.removeAll(keepingCapacity: true)
     }

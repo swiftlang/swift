@@ -190,9 +190,9 @@ ErrorHandlingTests.test("ErrorHandling/min") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
+ErrorHandlingTests.test("ErrorHandling/hasPrefix(_:)") {
   do {
-    let x: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
+    let x: Bool = try [1, 2, 3].hasPrefix([1, 2]) { _, _ in
       throw SillyError.JazzHands
       return false
     }

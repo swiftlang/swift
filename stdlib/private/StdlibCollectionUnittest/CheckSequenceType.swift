@@ -389,7 +389,7 @@ public struct SplitTest {
   }
 }
 
-public struct StartsWithTest {
+public struct HasPrefixTest {
   public let expected: Bool
   public let sequence: [Int]
   public let prefix: [Int]
@@ -1410,30 +1410,30 @@ public let prefixTests = [
   ),
 ]
 
-public let startsWithTests = [
+public let hasPrefixTests = [
   // Corner cases.
-  StartsWithTest(true, [], [], [], []),
+  HasPrefixTest(true, [], [], [], []),
 
-  StartsWithTest(false, [], [ 1 ], [], []),
-  StartsWithTest(true, [ 1 ], [], [], []),
+  HasPrefixTest(false, [], [ 1 ], [], []),
+  HasPrefixTest(true, [ 1 ], [], [], []),
 
   // Equal sequences.
-  StartsWithTest(true, [ 1 ], [ 1 ], [], []),
-  StartsWithTest(true, [ 1, 2 ], [ 1, 2 ], [], []),
+  HasPrefixTest(true, [ 1 ], [ 1 ], [], []),
+  HasPrefixTest(true, [ 1, 2 ], [ 1, 2 ], [], []),
 
   // Proper prefix.
-  StartsWithTest(true, [ 0, 1, 2 ], [ 0, 1 ], [], []),
-  StartsWithTest(false, [ 0, 1 ], [ 0, 1, 2 ], [], []),
+  HasPrefixTest(true, [ 0, 1, 2 ], [ 0, 1 ], [], []),
+  HasPrefixTest(false, [ 0, 1 ], [ 0, 1, 2 ], [], []),
 
-  StartsWithTest(true, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
-  StartsWithTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
+  HasPrefixTest(true, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
+  HasPrefixTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
 
   // Not a prefix.
-  StartsWithTest(false, [ 1, 2, 3, 4 ], [ 1, 2, 10 ], [ 4 ], []),
-  StartsWithTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
+  HasPrefixTest(false, [ 1, 2, 3, 4 ], [ 1, 2, 10 ], [ 4 ], []),
+  HasPrefixTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
 
-  StartsWithTest(false, [ 1, 2, 3, 4, 10 ], [ 1, 2, 10 ], [ 4, 10 ], []),
-  StartsWithTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4, 10 ], [], [ 4, 10 ]),
+  HasPrefixTest(false, [ 1, 2, 3, 4, 10 ], [ 1, 2, 10 ], [ 4, 10 ], []),
+  HasPrefixTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4, 10 ], [], [ 4, 10 ]),
 ]
 
 
