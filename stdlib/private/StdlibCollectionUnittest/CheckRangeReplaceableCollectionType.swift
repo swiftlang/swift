@@ -142,7 +142,7 @@ internal struct RemoveAtIndexTest {
   }
 }
 
-internal struct RemoveLastNTest {
+internal struct RemoveSuffixTest {
   let collection: [OpaqueValue<Int>]
   let numberToRemove: Int
   let expectedCollection: [Int]
@@ -155,7 +155,7 @@ internal struct RemoveLastNTest {
     self.collection = collection.map(OpaqueValue.init)
     self.numberToRemove = numberToRemove
     self.expectedCollection = expectedCollection
-    self.loc = SourceLoc(file, line, comment: "removeLast(n: Int) test data")
+    self.loc = SourceLoc(file, line, comment: "removeSuffix(n: Int) test data")
   }
 }
 
@@ -223,43 +223,43 @@ internal struct OperatorPlusTest {
   }
 }
 
-let removeLastTests: [RemoveLastNTest] = [
-  RemoveLastNTest(
+let removeSuffixTests: [RemoveSuffixTest] = [
+  RemoveSuffixTest(
     collection: [1010],
     numberToRemove: 0,
     expectedCollection: [1010]
   ),
-  RemoveLastNTest(
+  RemoveSuffixTest(
     collection: [1010],
     numberToRemove: 1,
     expectedCollection: []
   ),
-  RemoveLastNTest(
+  RemoveSuffixTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 0,
     expectedCollection: [1010, 2020, 3030, 4040, 5050]
   ),
-  RemoveLastNTest(
+  RemoveSuffixTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 1,
     expectedCollection: [1010, 2020, 3030, 4040]
   ),
-  RemoveLastNTest(
+  RemoveSuffixTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 2,
     expectedCollection: [1010, 2020, 3030]
   ),
-  RemoveLastNTest(
+  RemoveSuffixTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 3,
     expectedCollection: [1010, 2020]
   ),
-  RemoveLastNTest(
+  RemoveSuffixTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 4,
     expectedCollection: [1010]
   ),
-  RemoveLastNTest(
+  RemoveSuffixTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 5,
     expectedCollection: []
@@ -798,7 +798,7 @@ self.test("\(testNamePrefix).remove(at:)/semantics") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).removeFirst()/semantics") {
-  for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
+  for test in removePrefixTests.filter({ $0.numberToRemove == 1 }) {
     var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
     let removedElement = c.removeFirst()
     expectEqual(test.collection.first, extractValue(removedElement).value)
@@ -817,13 +817,13 @@ self.test("\(testNamePrefix).removeFirst()/empty/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// removeFirst(n: Int)
+// removePrefix(n: Int)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).removeFirst(n: Int)/semantics") {
-  for test in removeFirstTests {
+self.test("\(testNamePrefix).removePrefix(n: Int)/semantics") {
+  for test in removePrefixTests {
     var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    c.removeFirst(test.numberToRemove)
+    c.removePrefix(test.numberToRemove)
     expectEqualSequence(
       test.expectedCollection,
       c.map { extractValue($0).value },
@@ -833,22 +833,22 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/semantics") {
   }
 }
 
-self.test("\(testNamePrefix).removeFirst(n: Int)/empty/semantics") {
+self.test("\(testNamePrefix).removePrefix(n: Int)/empty/semantics") {
   var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
   expectCrashLater()
-  c.removeFirst(1) // Should trap.
+  c.removePrefix(1) // Should trap.
 }
 
-self.test("\(testNamePrefix).removeFirst(n: Int)/removeNegative/semantics") {
+self.test("\(testNamePrefix).removePrefix(n: Int)/removeNegative/semantics") {
   var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  c.removeFirst(-1) // Should trap.
+  c.removePrefix(-1) // Should trap.
 }
 
-self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
+self.test("\(testNamePrefix).removePrefix(n: Int)/removeTooMany/semantics") {
   var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  c.removeFirst(5) // Should trap.
+  c.removePrefix(5) // Should trap.
 }
 
 //===----------------------------------------------------------------------===//
@@ -1222,7 +1222,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics") {
-  for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
+  for test in removeSuffixTests.filter({ $0.numberToRemove == 1 }) {
     var c = makeWrappedCollection(test.collection)
     let removedElement = c.removeLast()
     expectEqual(
@@ -1244,37 +1244,37 @@ self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/empty/semant
 }
 
 //===----------------------------------------------------------------------===//
-// removeLast(n: Int)
+// removeSuffix(n: Int)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/semantics") {
-  for test in removeLastTests {
+self.test("\(testNamePrefix).removeSuffix(n: Int)/whereIndexIsBidirectional/semantics") {
+  for test in removeSuffixTests {
     var c = makeWrappedCollection(test.collection)
-    c.removeLast(test.numberToRemove)
+    c.removeSuffix(test.numberToRemove)
     expectEqualSequence(
       test.expectedCollection,
       c.map { extractValue($0).value },
-      "removeLast() shouldn't mutate the head of the collection",
+      "removeSuffix(_:) shouldn't mutate the head of the collection",
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/empty/semantics") {
+self.test("\(testNamePrefix).removeSuffix(n: Int)/whereIndexIsBidirectional/empty/semantics") {
   var c = makeWrappedCollection([])
   expectCrashLater()
-  c.removeLast(1) // Should trap.
+  c.removeSuffix(1) // Should trap.
 }
 
-self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/removeNegative/semantics") {
+self.test("\(testNamePrefix).removeSuffix(n: Int)/whereIndexIsBidirectional/removeNegative/semantics") {
   var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
   expectCrashLater()
-  c.removeLast(-1) // Should trap.
+  c.removeSuffix(-1) // Should trap.
 }
 
-self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/removeTooMany/semantics") {
+self.test("\(testNamePrefix).removeSuffix(n: Int)/whereIndexIsBidirectional/removeTooMany/semantics") {
   var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
   expectCrashLater()
-  c.removeLast(3) // Should trap.
+  c.removeSuffix(3) // Should trap.
 }
 
 //===----------------------------------------------------------------------===//

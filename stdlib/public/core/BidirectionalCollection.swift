@@ -257,12 +257,18 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
   @_inlineable // FIXME(sil-serialize-all)
-  public mutating func removeLast(_ n: Int) {
+  public mutating func removeSuffix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "Can't remove more items from a collection than it contains")
     self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removeSuffix(_:)")
+  @_inlineable
+  public mutating func removeLast(_ n: Int) {
+    removeSuffix(n)
   }
 }
 

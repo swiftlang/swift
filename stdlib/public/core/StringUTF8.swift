@@ -224,7 +224,7 @@ extension String {
         // We reached a scalar boundary; compute the underlying utf16's width
         // based on the number of utf8 code units
         scalarLength16 = n8 >> 2 + 1
-        nextBuffer.removeFirst(n8)
+        nextBuffer.removePrefix(n8)
       }
 
       if _fastPath(!nextBuffer.isEmpty) {        

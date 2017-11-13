@@ -69,7 +69,7 @@ extension TestSuite {
     //===------------------------------------------------------------------===//
 
     self.test("\(testNamePrefix).removeFirst()/semantics") {
-      for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
+      for test in removePrefixTests.filter({ $0.numberToRemove == 1 }) {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices = _allIndices(
           into: c,
@@ -98,49 +98,49 @@ extension TestSuite {
     }
 
     //===----------------------------------------------------------------------===//
-    // removeFirst(n: Int)
+    // removePrefix(n: Int)
     //===----------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).removeFirst(n: Int)/semantics") {
-      for test in removeFirstTests {
+    self.test("\(testNamePrefix).removePrefix(n: Int)/semantics") {
+      for test in removePrefixTests {
         var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let survivingIndices = _allIndices(
           into: c,
           in: c.index(c.startIndex, offsetBy: numericCast(test.numberToRemove)) ..<
             c.endIndex
         )
-        c.removeFirst(test.numberToRemove)
+        c.removePrefix(test.numberToRemove)
         expectEqualSequence(
           test.expectedCollection,
           c.map { extractValue($0).value },
-          "removeFirst() shouldn't mutate the tail of the collection",
+          "removePrefix(_:) shouldn't mutate the tail of the collection",
           stackTrace: SourceLocStack().with(test.loc)
         )
         expectEqualSequence(
           test.expectedCollection,
           survivingIndices.map { extractValue(c[$0]).value },
-          "removeFirst() shouldn't invalidate indices",
+          "removePrefix(_:) shouldn't invalidate indices",
           stackTrace: SourceLocStack().with(test.loc)
         )
       }
     }
 
-    self.test("\(testNamePrefix).removeFirst(n: Int)/empty/semantics") {
+    self.test("\(testNamePrefix).removePrefix(n: Int)/empty/semantics") {
       var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       expectCrashLater()
-      c.removeFirst(1) // Should trap.
+      c.removePrefix(1) // Should trap.
     }
 
-    self.test("\(testNamePrefix).removeFirst(n: Int)/removeNegative/semantics") {
+    self.test("\(testNamePrefix).removePrefix(n: Int)/removeNegative/semantics") {
       var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
       expectCrashLater()
-      c.removeFirst(-1) // Should trap.
+      c.removePrefix(-1) // Should trap.
     }
 
-    self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
+    self.test("\(testNamePrefix).removePrefix(n: Int)/removeTooMany/semantics") {
       var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
       expectCrashLater()
-      c.removeFirst(3) // Should trap.
+      c.removePrefix(3) // Should trap.
     }
 
     //===----------------------------------------------------------------------===//
@@ -211,7 +211,7 @@ extension TestSuite {
     //===------------------------------------------------------------------===//
 
     self.test("\(testNamePrefix).removeLast()/semantics") {
-      for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
+      for test in removeSuffixTests.filter({ $0.numberToRemove == 1 }) {
         var c = makeWrappedCollection(test.collection)
         let survivingIndices = _allIndices(
           into: c,
@@ -242,49 +242,49 @@ extension TestSuite {
     }
 
     //===----------------------------------------------------------------------===//
-    // removeLast(n: Int)
+    // removeSuffix(n: Int)
     //===----------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).removeLast(n: Int)/semantics") {
-      for test in removeLastTests {
+    self.test("\(testNamePrefix).removeSuffix(n: Int)/semantics") {
+      for test in removeSuffixTests {
         var c = makeWrappedCollection(test.collection)
         let survivingIndices = _allIndices(
           into: c,
           in: c.startIndex ..<
             c.index(c.endIndex, offsetBy: numericCast(-test.numberToRemove))
         )
-        c.removeLast(test.numberToRemove)
+        c.removeSuffix(test.numberToRemove)
         expectEqualSequence(
           test.expectedCollection,
           c.map { extractValue($0).value },
-          "removeLast() shouldn't mutate the head of the collection",
+          "removeSuffix(_:) shouldn't mutate the head of the collection",
           stackTrace: SourceLocStack().with(test.loc)
         )
         expectEqualSequence(
           test.expectedCollection,
           survivingIndices.map { extractValue(c[$0]).value },
-          "removeLast() shouldn't invalidate indices",
+          "removeSuffix(_:) shouldn't invalidate indices",
           stackTrace: SourceLocStack().with(test.loc)
         )
       }
     }
 
-    self.test("\(testNamePrefix).removeLast(n: Int)/empty/semantics") {
+    self.test("\(testNamePrefix).removeSuffix(n: Int)/empty/semantics") {
       var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       expectCrashLater()
-      c.removeLast(1) // Should trap.
+      c.removeSuffix(1) // Should trap.
     }
 
-    self.test("\(testNamePrefix).removeLast(n: Int)/removeNegative/semantics") {
+    self.test("\(testNamePrefix).removeSuffix(n: Int)/removeNegative/semantics") {
       var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
       expectCrashLater()
-      c.removeLast(-1) // Should trap.
+      c.removeSuffix(-1) // Should trap.
     }
 
-    self.test("\(testNamePrefix).removeLast(n: Int)/removeTooMany/semantics") {
+    self.test("\(testNamePrefix).removeSuffix(n: Int)/removeTooMany/semantics") {
       var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
       expectCrashLater()
-      c.removeLast(3) // Should trap.
+      c.removeSuffix(3) // Should trap.
     }
 
     //===----------------------------------------------------------------------===//

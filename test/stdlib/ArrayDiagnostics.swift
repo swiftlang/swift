@@ -10,7 +10,7 @@ func test_ArrayOfNotEquatableIsNotEquatable() {
 }
 
 func test_SE0132Deprecations() {
-  let a = [1, 2, 3]
+  var a = [1, 2, 3]
   
   _ = a.index(of: 2)  // expected-warning {{'index(of:)' is deprecated: renamed to 'firstIndex(of:)'}}
   // expected-note @-1 {{use 'firstIndex(of:)' instead}} {{9-14=firstIndex}}
@@ -26,4 +26,10 @@ func test_SE0132Deprecations() {
   
   _ = a.starts(with: [1, 2], by: ==) // expected-warning {{'starts(with:by:)' is deprecated: renamed to 'hasPrefix(_:by:)'}}
   // expected-note @-1 {{use 'hasPrefix(_:by:)' instead}} {{9-15=hasPrefix}} {{16-22=}}
+  
+  _ = a.removeFirst(1) // expected-warning {{'removeFirst' is deprecated: renamed to 'removePrefix(_:)'}}
+  // expected-note @-1 {{use 'removePrefix(_:)' instead}} {{9-20=removePrefix}}
+  
+  _ = a.removeLast(1) // expected-warning {{'removeLast' is deprecated: renamed to 'removeSuffix(_:)'}}
+  // expected-note @-1 {{use 'removeSuffix(_:)' instead}} {{9-19=removeSuffix}}
 }

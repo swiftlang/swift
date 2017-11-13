@@ -298,11 +298,11 @@ public protocol RangeReplaceableCollection : Collection
   /// - Returns: A non-nil value if the operation was performed.
   mutating func _customRemoveLast() -> Element?
 
-  /// Customization point for `removeLast(_:)`.  Implement this function if you
+  /// Customization point for `removeSuffix(_:)`.  Implement this function if you
   /// want to replace the default implementation.
   ///
   /// - Returns: `true` if the operation was performed.
-  mutating func _customRemoveLast(_ n: Int) -> Bool
+  mutating func _customRemoveSuffix(_ n: Int) -> Bool
 
   /// Removes and returns the first element of the collection.
   ///
@@ -326,7 +326,7 @@ public protocol RangeReplaceableCollection : Collection
   /// collection.
   ///
   ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
-  ///     bugs.removeFirst(3)
+  ///     bugs.removePrefix(3)
   ///     print(bugs)
   ///     // Prints "["Damselfly", "Earwig"]"
   ///
@@ -338,7 +338,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   number of elements in the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeFirst(_ n: Int)
+  mutating func removePrefix(_ n: Int)
 
   /// Removes all elements from the collection.
   ///
@@ -573,7 +573,7 @@ extension RangeReplaceableCollection {
   /// collection.
   ///
   ///     var bugs = ["Aphid", "Bumblebee", "Cicada", "Damselfly", "Earwig"]
-  ///     bugs.removeFirst(3)
+  ///     bugs.removePrefix(3)
   ///     print(bugs)
   ///     // Prints "["Damselfly", "Earwig"]"
   ///
@@ -586,13 +586,19 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public mutating func removeFirst(_ n: Int) {
+  public mutating func removePrefix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "Can't remove more items from a collection than it has")
     let end = index(startIndex, offsetBy: numericCast(n))
     removeSubrange(startIndex..<end)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removePrefix(_:)")
+  @_inlineable
+  public mutating func removeFirst(_ n: Int) {
+      removePrefix(n)
   }
 
   /// Removes and returns the first element of the collection.
@@ -616,7 +622,7 @@ extension RangeReplaceableCollection {
     _precondition(!isEmpty,
       "Can't remove first element from an empty collection")
     let firstElement = first!
-    removeFirst(1)
+    removePrefix(1)
     return firstElement
   }
 
@@ -727,7 +733,7 @@ extension RangeReplaceableCollection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public mutating func removeFirst(_ n: Int) {
+  public mutating func removePrefix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -814,7 +820,7 @@ extension RangeReplaceableCollection {
   }
 
   @_inlineable
-  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+  public mutating func _customRemoveSuffix(_ n: Int) -> Bool {
     return false
   }
 }
@@ -832,7 +838,7 @@ extension RangeReplaceableCollection
   }
 
   @_inlineable
-  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+  public mutating func _customRemoveSuffix(_ n: Int) -> Bool {
     self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
     return true
   }
@@ -876,16 +882,22 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the specified number of elements.
   @_inlineable
-  public mutating func removeLast(_ n: Int) {
+  public mutating func removeSuffix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "Can't remove more items from a collection than it contains")
-    if _customRemoveLast(n) {
+    if _customRemoveSuffix(n) {
       return
     }
     let end = endIndex
     removeSubrange(index(end, offsetBy: numericCast(-n))..<end)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removeSuffix(_:)")
+  @_inlineable
+  public mutating func removeLast(_ n: Int) {
+    removeSuffix(n)
   }
 }
 
@@ -933,16 +945,22 @@ extension RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the specified number of elements.
   @_inlineable
-  public mutating func removeLast(_ n: Int) {
+  public mutating func removeSuffix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "Can't remove more items from a collection than it contains")
-    if _customRemoveLast(n) {
+    if _customRemoveSuffix(n) {
       return
     }
     let end = endIndex
     removeSubrange(index(end, offsetBy: numericCast(-n))..<end)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removeSuffix(_:)")
+  @_inlineable
+  public mutating func removeLast(_ n: Int) {
+    removeSuffix(n)
   }
 }
 

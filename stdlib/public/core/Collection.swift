@@ -1675,7 +1675,7 @@ extension Collection where SubSequence == Self {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*).
   @_inlineable
-  public mutating func removeFirst(_ n: Int) {
+  public mutating func removePrefix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),

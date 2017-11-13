@@ -493,9 +493,9 @@ public struct ${Self}<
     return base._customRemoveLast()
   }
 
-  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+  public mutating func _customRemoveSuffix(_ n: Int) -> Bool {
     Log._customRemoveLastN[selfType] += 1
-    return base._customRemoveLast(n)
+    return base._customRemoveSuffix(n)
   }
 
   public mutating func append(_ newElement: Base.Iterator.Element) {
@@ -541,9 +541,9 @@ public struct ${Self}<
     return base.removeFirst()
   }
 
-  public mutating func removeFirst(_ n: Int) {
+  public mutating func removePrefix(_ n: Int) {
     Log.removeFirstN[selfType] += 1
-    base.removeFirst(n)
+    base.removePrefix(n)
   }
 
   public mutating func removeSubrange(_ bounds: Range<Index>) {
