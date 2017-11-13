@@ -1,8 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// FIXME: Should be part of the standard library.
-extension Array: Equatable where Element: Equatable { }
-
 struct NotEquatable { }
 
 enum WithArrayOfNotEquatables : Equatable { // expected-error{{type 'WithArrayOfNotEquatables' does not conform to protocol 'Equatable'}}
