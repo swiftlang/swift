@@ -198,6 +198,22 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     _testRoundTripTypeCoercionFailure(of: [0.0, 1.0] as [Double], as: [Bool].self)
   }
 
+  func testDecodingConcreteTypeParameter() {
+      let encoder = PropertyListEncoder()
+      guard let plist = try? encoder.encode(Employee.testValue) else {
+          expectUnreachable("Unable to encode Employee.")
+          return
+      }
+
+      let decoder = PropertyListDecoder()
+      guard let decoded = try? decoder.decode(Employee.self as Person.Type, from: plist) else {
+          expectUnreachable("Failed to decode Employee as Person from plist.")
+          return
+      }
+
+      expectEqual(type(of: decoded), Employee.self, "Expected decoded value to be of type Employee; got \(type(of: decoded)) instead.")
+  }
+
   // MARK: - Helper Functions
   private var _plistEmptyDictionaryBinary: Data {
     return Data(base64Encoded: "YnBsaXN0MDDQCAAAAAAAAAEBAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAJ")!
@@ -731,5 +747,6 @@ PropertyListEncoderTests.test("testEncodingTopLevelData") { TestPropertyListEnco
 PropertyListEncoderTests.test("testInterceptData") { TestPropertyListEncoder().testInterceptData() }
 PropertyListEncoderTests.test("testInterceptDate") { TestPropertyListEncoder().testInterceptDate() }
 PropertyListEncoderTests.test("testTypeCoercion") { TestPropertyListEncoder().testTypeCoercion() }
+PropertyListEncoderTests.test("testDecodingConcreteTypeParameter") { TestPropertyListEncoder().testDecodingConcreteTypeParameter() }
 runAllTests()
 #endif
