@@ -261,13 +261,11 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   return *boolType;
 }
 
-namespace swift {
-
 /// Clone the given generic parameters in the given list. We don't need any
 /// of the requirements, because they will be inferred.
-GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                     DeclContext *dc,
-                                     GenericParamList *fromParams) {
+static GenericParamList *cloneGenericParams(ASTContext &ctx,
+                                            DeclContext *dc,
+                                            GenericParamList *fromParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
@@ -292,12 +290,6 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 
   return toParams;
 }
-} // namespace swift
-
-// FIXME: total hack
-GenericParamList *createProtocolGenericParams(ASTContext &ctx,
-                                              ProtocolDecl *proto,
-                                              DeclContext *dc);
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())

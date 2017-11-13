@@ -7891,7 +7891,11 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
 }
 
 void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
-  // FIXME: Check a flag in the class...
+  if (classDecl->hasValidatedLayout())
+    return;
+
+  classDecl->setHasValidatedLayout();
+
   if (isa<SourceFile>(classDecl->getModuleScopeContext()))
     DeclsToFinalize.insert(classDecl);
 }
@@ -8156,15 +8160,6 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
     env->mapTypeIntoContext(extInterfaceType);
   return { env, extContextType };
 }
-
-// FIXME: In TypeChecker.cpp; only needed because LLDB creates
-// extensions of typealiases to unbound generic types, which is
-// ill-formed but convenient.
-namespace swift {
-GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                     DeclContext *dc,
-                                     GenericParamList *fromParams);
-} // namespace swift
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // If we're currently validating, or have already validated this extension,
