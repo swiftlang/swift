@@ -690,7 +690,8 @@ static bool performCompile(CompilerInstance &Instance,
 
       // Print the resulting map.
       scope.print(llvm::errs());
-    } else if (Action == FrontendOptions::ActionType::DumpTypeRefinementContexts)
+    } else if (Action ==
+               FrontendOptions::ActionType::DumpTypeRefinementContexts)
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
     else if (Action == FrontendOptions::ActionType::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
@@ -910,7 +911,7 @@ static bool performCompile(CompilerInstance &Instance,
     SharedTimer timer("SIL optimization");
     if (Action != FrontendOptions::ActionType::MergeModules &&
         Invocation.getSILOptions().Optimization >
-          SILOptions::SILOptMode::None) {
+            SILOptions::SILOptMode::None) {
 
       runSILOptPreparePasses(*SM);
 
@@ -1326,7 +1327,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   if (Invocation.getFrontendOptions().RequestedAction ==
-        FrontendOptions::ActionType::NoneAction) {
+      FrontendOptions::ActionType::NoneAction) {
     Instance->getDiags().diagnose(SourceLoc(),
                                  diag::error_missing_frontend_action);
     return finishDiagProcessing(1);

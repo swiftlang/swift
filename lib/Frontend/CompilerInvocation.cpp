@@ -335,7 +335,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
 
   if (Opts.Inputs.verifyInputs(
-          Diags, TreatAsSIL, Opts.RequestedAction == FrontendOptions::ActionType::REPL,
+          Diags, TreatAsSIL,
+          Opts.RequestedAction == FrontendOptions::ActionType::REPL,
           Opts.RequestedAction == FrontendOptions::ActionType::NoneAction)) {
     return true;
   }
@@ -542,16 +543,16 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.FixitsOutputPath = A->getValue();
   }
 
-  bool IsSIB =
-    Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB ||
-    Opts.RequestedAction == FrontendOptions::ActionType::EmitSIBGen;
+  bool IsSIB = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB ||
+               Opts.RequestedAction == FrontendOptions::ActionType::EmitSIBGen;
   bool canUseMainOutputForModule =
-    Opts.RequestedAction == FrontendOptions::ActionType::MergeModules ||
-    Opts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
-    IsSIB;
+      Opts.RequestedAction == FrontendOptions::ActionType::MergeModules ||
+      Opts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
+      IsSIB;
   auto ext = IsSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
-  auto sibOpt = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB ?
-    OPT_emit_sib : OPT_emit_sibgen;
+  auto sibOpt = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB
+                    ? OPT_emit_sib
+                    : OPT_emit_sibgen;
   determineOutputFilename(Opts.ModuleOutputPath,
                           IsSIB ? sibOpt : OPT_emit_module,
                           OPT_emit_module_path,
