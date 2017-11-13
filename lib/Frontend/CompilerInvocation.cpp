@@ -844,24 +844,24 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
 }
 
 bool FrontendArgsToOptionsConverter::hasAnUnusableOutputPath() const {
-  if (Opts.hasUnusableDependenciesFilePath()) {
+  if (Opts.hasUnusedDependenciesFilePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
-  if (Opts.hasUnusableObjCHeaderOutputPath()) {
+  if (Opts.hasUnusedObjCHeaderOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }
-  if (Opts.hasUnusableLoadedModuleTracePath()) {
+  if (Opts.hasUnusedLoadedModuleTracePath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return true;
   }
-  if (Opts.hasUnusableModuleOutputPath()) {
+  if (Opts.hasUnusedModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     return true;
   }
-  if (Opts.hasUnusableModuleOutputPath()) {
+  if (Opts.hasUnusedModuleOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }

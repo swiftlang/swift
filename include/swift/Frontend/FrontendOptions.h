@@ -547,15 +547,15 @@ public:
 private:
   static const char *suffixForPrincipalOutputFileForAction(ActionType);
 
-  bool hasUnusableDependenciesFilePath() const;
+  bool hasUnusedDependenciesFilePath() const;
   static bool canActionEmitDependencies(ActionType);
-  bool hasUnusableObjCHeaderOutputPath() const;
+  bool hasUnusedObjCHeaderOutputPath() const;
   static bool canActionEmitHeader(ActionType);
-  bool hasUnusableLoadedModuleTracePath() const;
+  bool hasUnusedLoadedModuleTracePath() const;
   static bool canActionEmitLoadedModuleTrace(ActionType);
-  bool hasUnusableModuleOutputPath() const;
+  bool hasUnusedModuleOutputPath() const;
   static bool canActionEmitModule(ActionType);
-  bool hasUnusableModuleDocOutputPath() const;
+  bool hasUnusedModuleDocOutputPath() const;
   static bool canActionEmitModuleDoc(ActionType);
 
   static bool doesActionProduceOutput(ActionType);
