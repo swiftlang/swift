@@ -18,8 +18,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
   where
   // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
-  Bound : _Strideable & Comparable,
-  Bound.Stride : BinaryInteger {
+  Bound : _Strideable & Comparable {
   case pastEnd
   case inRange(Bound)
 }
@@ -36,7 +35,7 @@ public struct ClosedRangeIndex<Bound>
   // CountableClosedRange is not interchangeable with CountableRange in all
   // contexts.
   Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
+  Bound.Stride : SignedNumeric {
   /// Creates the "past the end" position.
   @_inlineable
   @_versioned

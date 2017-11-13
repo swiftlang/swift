@@ -100,7 +100,10 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).underflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 30)
   defer { buffer.deallocate() }
   let source = stride(from: 5 as Int64, to: 0, by: -1)
-  var (it,bound) = buffer.initializeMemory(as: Int64.self, from: source)
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
   let idx = bound.endIndex * MemoryLayout<Int64>.stride
   expectEqual(it.next()!, 2)
   expectEqual(idx, 24)
