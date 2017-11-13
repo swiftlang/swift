@@ -458,8 +458,12 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     unsigned HasLazyConformances : 1;
+
+    /// Whether we have already validated all members of the type that
+    /// affect layout.
+    unsigned HasValidatedLayout : 1;
   };
-  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 3 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 4 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -2817,6 +2821,7 @@ protected:
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     NominalTypeDeclBits.HasLazyConformances = false;
+    NominalTypeDeclBits.HasValidatedLayout = false;
   }
 
   friend class ProtocolType;
@@ -2859,11 +2864,23 @@ public:
     return NominalTypeDeclBits.AddedImplicitInitializers;
   }
 
-  /// Note that we have attempted to
+  /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     NominalTypeDeclBits.AddedImplicitInitializers = true;
   }
-              
+
+  /// Determine whether we have already validated any members
+  /// which affect layout.
+  bool hasValidatedLayout() const {
+    return NominalTypeDeclBits.HasValidatedLayout;
+  }
+
+  /// Note that we have attempted to validate any members
+  /// which affect layout.
+  void setHasValidatedLayout() {
+    NominalTypeDeclBits.HasValidatedLayout = true;
+  }
+
   /// Compute the type of this nominal type.
   void computeType();
 

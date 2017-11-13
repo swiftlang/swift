@@ -741,12 +741,6 @@ public:
   /// will need to compute captures for.
   std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
 
-  /// Describes an attempt to capture a local function.
-  struct LocalFunctionCapture {
-    FuncDecl *LocalFunction;
-    SourceLoc CaptureLoc;
-  };
-
   /// Local functions that have been captured before their definitions.
   ///
   /// We need this to guard against functions that would transitively capture
