@@ -52,6 +52,7 @@ protocol Bindable: class { }
 extension Bindable {
   func test<Value>(to targetKeyPath: ReferenceWritableKeyPath<Self, Value>, change: Value?) {
     if self[keyPath:targetKeyPath] != change {  // expected-error{{}}
+      // expected-note@-1{{overloads for '!=' exist with these partially matching parameter lists: (_OptionalNilComparisonType, T?), (Self, Self)}}
       self[keyPath: targetKeyPath] = change!
     }
   }

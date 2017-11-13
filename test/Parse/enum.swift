@@ -144,7 +144,7 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
 }
 
 enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
-  // expected-error@-1{{'ExpressibleByRawTypeNotLiteral' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error@-1 {{RawRepresentable conformance cannot be synthesized because raw type 'Array<Int>' is not Equatable}}
+  // expected-error@-1{{'ExpressibleByRawTypeNotLiteral' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
 
