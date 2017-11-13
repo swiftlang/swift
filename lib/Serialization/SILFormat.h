@@ -362,7 +362,9 @@ namespace sil_block {
     SIL_PARTIAL_APPLY,
     SIL_BUILTIN,
     SIL_TRY_APPLY,
-    SIL_NON_THROWING_APPLY
+    SIL_NON_THROWING_APPLY,
+    SIL_BEGIN_APPLY,
+    SIL_NON_THROWING_BEGIN_APPLY
   };
   
   using SILInstApplyLayout = BCRecordLayout<

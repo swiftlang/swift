@@ -1073,9 +1073,8 @@ public:
     *this << '>';
   }
 
-  void visitApplyInst(ApplyInst *AI) {
-    if (AI->isNonThrowing())
-      *this << "[nothrow] ";
+  template <class Inst>
+  void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutions());
     *this << '(';
@@ -1085,14 +1084,20 @@ public:
     *this << ") : " << AI->getCallee()->getType();
   }
 
+  void visitApplyInst(ApplyInst *AI) {
+    if (AI->isNonThrowing())
+      *this << "[nothrow] ";
+    visitApplyInstBase(AI);
+  }
+
+  void visitBeginApplyInst(BeginApplyInst *AI) {
+    if (AI->isNonThrowing())
+      *this << "[nothrow] ";
+    visitApplyInstBase(AI);
+  }
+
   void visitTryApplyInst(TryApplyInst *AI) {
-    *this << Ctx.getID(AI->getCallee());
-    printSubstitutions(AI->getSubstitutions());
-    *this << '(';
-    interleave(AI->getArguments(),
-               [&](const SILValue &arg) { *this << Ctx.getID(arg); },
-               [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee()->getType();
+    visitApplyInstBase(AI);
     *this << ", normal " << Ctx.getID(AI->getNormalBB());
     *this << ", error " << Ctx.getID(AI->getErrorBB());
   }
@@ -1115,13 +1120,15 @@ public:
     case ParameterConvention::Indirect_InoutAliasable:
       llvm_unreachable("unexpected callee convention!");
     }
-    *this << Ctx.getID(CI->getCallee());
-    printSubstitutions(CI->getSubstitutions());
-    *this << '(';
-    interleave(CI->getArguments(),
-               [&](const SILValue &arg) { *this << Ctx.getID(arg); },
-               [&] { *this << ", "; });
-    *this << ") : " << CI->getCallee()->getType();
+    visitApplyInstBase(CI);
+  }
+
+  void visitAbortApplyInst(AbortApplyInst *AI) {
+    *this << Ctx.getID(AI->getOperand());
+  }
+
+  void visitEndApplyInst(EndApplyInst *AI) {
+    *this << Ctx.getID(AI->getOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {

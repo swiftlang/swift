@@ -1018,6 +1018,10 @@ public:
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitTailAddrInst(TailAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);
+
+  void visitBeginApplyInst(BeginApplyInst *i);
+  void visitEndApplyInst(EndApplyInst *i);
+  void visitAbortApplyInst(AbortApplyInst *i);
   
   void visitUnreachableInst(UnreachableInst *i);
   void visitBranchInst(BranchInst *i);
@@ -2484,6 +2488,33 @@ void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
                     "yield instruction");
   Builder.CreateUnreachable();
   Builder.emitBlock(createBasicBlock("yield"));
+}
+
+void IRGenSILFunction::visitBeginApplyInst(BeginApplyInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(),
+                    "begin_apply instruction");
+
+  // Set undef lowered values for all the results.
+  for (auto result : i->getYieldedValues()) {
+    auto &resultTI = getTypeInfo(result->getType());
+    if (result->getType().isAddress()) {
+      setLoweredAddress(result, resultTI.getUndefAddress());
+    } else {
+      Explosion undef;
+      emitFakeExplosion(resultTI, undef);
+      setLoweredExplosion(result, undef);
+    }
+  }
+}
+
+void IRGenSILFunction::visitEndApplyInst(EndApplyInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(),
+                    "end_apply instruction");
+}
+
+void IRGenSILFunction::visitAbortApplyInst(AbortApplyInst *i) {
+  IGM.unimplemented(i->getLoc().getSourceLoc(),
+                    "abort_apply instruction");
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchValue(

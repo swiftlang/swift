@@ -2009,6 +2009,129 @@ public:
   }
 };
 
+class BeginApplyInst;
+class BeginApplyResult final : public MultipleValueInstructionResult {
+public:
+  BeginApplyResult(unsigned index, SILType type,
+                   ValueOwnershipKind ownershipKind)
+      : MultipleValueInstructionResult(ValueKind::BeginApplyResult,
+                                       index, type, ownershipKind) {}
+
+  BeginApplyInst *getParent(); // inline below
+  const BeginApplyInst *getParent() const {
+    return const_cast<BeginApplyResult *>(this)->getParent();
+  }
+
+  /// Is this result the token result of the begin_apply, which abstracts
+  /// over the implicit coroutine state?
+  bool isTokenResult() const; // inline below
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::BeginApplyResult;
+  }
+};
+
+/// BeginApplyInst - Represents the beginning of the full application of
+/// a yield_once coroutine (up until the coroutine yields a value back).
+class BeginApplyInst final
+    : public InstructionBase<SILInstructionKind::BeginApplyInst,
+                             ApplyInstBase<BeginApplyInst,
+                                           MultipleValueInstruction>>,
+      public MultipleValueInstructionTrailingObjects<
+          BeginApplyInst, BeginApplyResult,
+          // These must be earlier trailing objects because their
+          // count fields are initialized by an earlier base class.
+          InitialTrailingObjects<Operand, Substitution>> {
+  friend SILBuilder;
+
+  template <class, class...>
+  friend class llvm::TrailingObjects;
+  using InstructionBase::numTrailingObjects;
+  using MultipleValueInstructionTrailingObjects::numTrailingObjects;
+
+  friend class ApplyInstBase<BeginApplyInst, MultipleValueInstruction, false>;
+  using MultipleValueInstructionTrailingObjects::getTrailingObjects;
+
+  BeginApplyInst(SILDebugLocation debugLoc, SILValue callee,
+                 SILType substCalleeType,
+                 ArrayRef<SILType> allResultTypes,
+                 ArrayRef<ValueOwnershipKind> allResultOwnerships,
+                 SubstitutionList substitutions,
+                 ArrayRef<SILValue> args,
+                 ArrayRef<SILValue> typeDependentOperands,
+                 bool isNonThrowing,
+                 const GenericSpecializationInformation *specializationInfo);
+
+  static BeginApplyInst *
+  create(SILDebugLocation debugLoc, SILValue Callee,
+         SubstitutionList substitutions, ArrayRef<SILValue> args,
+         bool isNonThrowing, Optional<SILModuleConventions> moduleConventions,
+         SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
+         const GenericSpecializationInformation *specializationInfo);
+
+public:
+  using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
+
+  SILValue getTokenResult() const {
+    return &getAllResultsBuffer().back();
+  }
+
+  SILInstructionResultArray getYieldedValues() const {
+    return getAllResultsBuffer().drop_back();
+  }
+
+  /// Returns true if the called coroutine has an error result but is not
+  /// actually throwing an error.
+  bool isNonThrowing() const {
+    return isNonThrowingApply();
+  }
+};
+
+inline BeginApplyInst *BeginApplyResult::getParent() {
+  auto *Parent = MultipleValueInstructionResult::getParent();
+  return cast<BeginApplyInst>(Parent);
+}
+inline bool BeginApplyResult::isTokenResult() const {
+  return getIndex() == getParent()->getNumResults() - 1;
+}
+
+/// AbortApplyInst - Unwind the full application of a yield_once coroutine.
+class AbortApplyInst
+    : public UnaryInstructionBase<SILInstructionKind::AbortApplyInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  AbortApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
+      : UnaryInstructionBase(debugLoc, beginApplyToken) {
+    assert(isa<BeginApplyResult>(beginApplyToken) &&
+           cast<BeginApplyResult>(beginApplyToken)->isTokenResult());
+  }
+
+public:
+  BeginApplyInst *getBeginApply() const {
+    return cast<BeginApplyResult>(getOperand())->getParent();
+  }
+};
+
+/// EndApplyInst - Resume the full application of a yield_once coroutine
+/// normally.
+class EndApplyInst
+    : public UnaryInstructionBase<SILInstructionKind::EndApplyInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  EndApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
+      : UnaryInstructionBase(debugLoc, beginApplyToken) {
+    assert(isa<BeginApplyResult>(beginApplyToken) &&
+           cast<BeginApplyResult>(beginApplyToken)->isTokenResult());
+  }
+
+public:
+  BeginApplyInst *getBeginApply() const {
+    return cast<BeginApplyResult>(getOperand())->getParent();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Literal instructions.
 //===----------------------------------------------------------------------===//
@@ -7169,6 +7292,7 @@ public:
   ApplySite(ApplyInst *inst) : Inst(inst) {}
   ApplySite(PartialApplyInst *inst) : Inst(inst) {}
   ApplySite(TryApplyInst *inst) : Inst(inst) {}
+  ApplySite(BeginApplyInst *inst) : Inst(inst) {}
 
   SILModule &getModule() const {
     return Inst->getModule();
@@ -7178,6 +7302,8 @@ public:
     switch (node->getKind()) {
     case SILNodeKind::ApplyInst:
       return ApplySite(cast<ApplyInst>(node));
+    case SILNodeKind::BeginApplyInst:
+      return ApplySite(cast<BeginApplyInst>(node));
     case SILNodeKind::TryApplyInst:
       return ApplySite(cast<TryApplyInst>(node));
     case SILNodeKind::PartialApplyInst:
@@ -7199,11 +7325,13 @@ public:
 
 #define FOREACH_IMPL_RETURN(OPERATION) do {                             \
     switch (Inst->getKind()) {                                          \
-    case SILInstructionKind::ApplyInst:                                          \
+    case SILInstructionKind::ApplyInst:                                 \
       return cast<ApplyInst>(Inst)->OPERATION;                          \
-    case SILInstructionKind::PartialApplyInst:                                   \
+    case SILInstructionKind::BeginApplyInst:                            \
+      return cast<BeginApplyInst>(Inst)->OPERATION;                     \
+    case SILInstructionKind::PartialApplyInst:                          \
       return cast<PartialApplyInst>(Inst)->OPERATION;                   \
-    case SILInstructionKind::TryApplyInst:                                       \
+    case SILInstructionKind::TryApplyInst:                              \
       return cast<TryApplyInst>(Inst)->OPERATION;                       \
     default:                                                            \
       llvm_unreachable("not an apply instruction!");                    \
@@ -7321,6 +7449,8 @@ public:
     switch (Inst->getKind()) {
     case SILInstructionKind::ApplyInst:
       return cast<ApplyInst>(Inst)->getArgumentsWithoutSelf();
+    case SILInstructionKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getArgumentsWithoutSelf();
     case SILInstructionKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getArgumentsWithoutSelf();
     default:
@@ -7333,6 +7463,7 @@ public:
   unsigned getCalleeArgIndexOfFirstAppliedArg() const {
     switch (Inst->getKind()) {
     case SILInstructionKind::ApplyInst:
+    case SILInstructionKind::BeginApplyInst:
     case SILInstructionKind::TryApplyInst:
       return 0;
     case SILInstructionKind::PartialApplyInst:
@@ -7371,6 +7502,8 @@ public:
     switch (Inst->getKind()) {
     case SILInstructionKind::ApplyInst:
       return cast<ApplyInst>(Inst)->hasSelfArgument();
+    case SILInstructionKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->hasSelfArgument();
     case SILInstructionKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->hasSelfArgument();
     default:
@@ -7383,6 +7516,8 @@ public:
     switch (Inst->getKind()) {
     case SILInstructionKind::ApplyInst:
       return cast<ApplyInst>(Inst)->getSelfArgument();
+    case SILInstructionKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getSelfArgument();
     case SILInstructionKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getSelfArgument();
     default:
@@ -7395,6 +7530,8 @@ public:
     switch (Inst->getKind()) {
     case SILInstructionKind::ApplyInst:
       return cast<ApplyInst>(Inst)->getSelfArgumentOperand();
+    case SILInstructionKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getSelfArgumentOperand();
     case SILInstructionKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getSelfArgumentOperand();
     default:
@@ -7419,6 +7556,7 @@ public:
 
   static bool classof(const SILInstruction *inst) {
     return (inst->getKind() == SILInstructionKind::ApplyInst ||
+            inst->getKind() == SILInstructionKind::BeginApplyInst ||
             inst->getKind() == SILInstructionKind::PartialApplyInst ||
             inst->getKind() == SILInstructionKind::TryApplyInst);
   }
@@ -7434,12 +7572,15 @@ public:
     assert(classof(inst) && "not an apply instruction?");
   }
   FullApplySite(ApplyInst *inst) : ApplySite(inst) {}
+  FullApplySite(BeginApplyInst *inst) : ApplySite(inst) {}
   FullApplySite(TryApplyInst *inst) : ApplySite(inst) {}
 
   static FullApplySite isa(SILNode *node) {
     switch (node->getKind()) {
     case SILNodeKind::ApplyInst:
       return FullApplySite(cast<ApplyInst>(node));
+    case SILNodeKind::BeginApplyInst:
+      return FullApplySite(cast<BeginApplyInst>(node));
     case SILNodeKind::TryApplyInst:
       return FullApplySite(cast<TryApplyInst>(node));
     default:
@@ -7469,6 +7610,7 @@ public:
 
   static bool classof(const SILInstruction *inst) {
     return (inst->getKind() == SILInstructionKind::ApplyInst ||
+            inst->getKind() == SILInstructionKind::BeginApplyInst ||
             inst->getKind() == SILInstructionKind::TryApplyInst);
   }
 };

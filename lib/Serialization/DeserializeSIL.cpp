@@ -805,6 +805,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
       IsNonThrowingApply = true;
       break;
+    case SIL_BEGIN_APPLY:
+      RawOpCode = (unsigned)SILInstructionKind::BeginApplyInst;
+      break;
+    case SIL_NON_THROWING_BEGIN_APPLY:
+      RawOpCode = (unsigned)SILInstructionKind::BeginApplyInst;
+      IsNonThrowingApply = true;
+      break;
         
     default:
       llvm_unreachable("unexpected apply inst kind");
@@ -1066,7 +1073,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
-  case SILInstructionKind::ApplyInst: {
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::BeginApplyInst: {
     // Format: attributes such as transparent, the callee's type, a value for
     // the callee and a list of values for the arguments. Each value in the list
     // is represented with 2 IDs: ValueID and ValueResultNumber.
@@ -1091,9 +1099,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
-                                    Substitutions, Args,
-                                    IsNonThrowingApply != 0);
+    if (OpCode == SILInstructionKind::ApplyInst) {
+      ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
+                                      Substitutions, Args,
+                                      IsNonThrowingApply != 0);
+    } else {
+      ResultVal = Builder.createBeginApply(Loc, getLocalValue(ValID, FnTy),
+                                           Substitutions, Args,
+                                           IsNonThrowingApply != 0);
+    }
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -1416,6 +1430,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
+  UNARY_INSTRUCTION(AbortApply)
+  UNARY_INSTRUCTION(EndApply)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 

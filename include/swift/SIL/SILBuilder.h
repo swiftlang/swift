@@ -381,6 +381,25 @@ public:
                                            SpecializationInfo));
   }
 
+  BeginApplyInst *createBeginApply(
+      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      ArrayRef<SILValue> Args, bool isNonThrowing,
+      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
+    return insert(BeginApplyInst::create(getSILDebugLocation(Loc), Fn, Subs,
+                                         Args, isNonThrowing, silConv, *F,
+                                         OpenedArchetypes, SpecializationInfo));
+  }
+
+  AbortApplyInst *createAbortApply(SILLocation loc, SILValue beginApply) {
+    return insert(new (getModule()) AbortApplyInst(getSILDebugLocation(loc),
+                                                   beginApply));
+  }
+
+  EndApplyInst *createEndApply(SILLocation loc, SILValue beginApply) {
+    return insert(new (getModule()) EndApplyInst(getSILDebugLocation(loc),
+                                                 beginApply));
+  }
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionList Subs,
                              ArrayRef<SILValue> Args) {

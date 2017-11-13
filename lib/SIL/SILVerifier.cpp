@@ -683,7 +683,11 @@ public:
   }
 
   static bool isLegalSILTokenProducer(SILValue value) {
-    // TODO: add cases here
+    if (auto beginApply = dyn_cast<BeginApplyResult>(value))
+      return beginApply->isTokenResult();
+
+    // Add more token cases here as they arise.
+
     return false;
   }
 
@@ -989,6 +993,43 @@ public:
                     calleeConv.getSILErrorType(),
                     "error destination of try_apply must take argument "
                     "of error result type");
+  }
+
+  void checkBeginApplyInst(BeginApplyInst *AI) {
+    checkFullApplySite(AI);
+
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    auto yieldResults = AI->getYieldedValues();
+    auto yields = calleeConv.getYields();
+    require(yields.size() == yieldResults.size(),
+            "length mismatch in callee yields vs. begin_apply results");
+    for (auto i : indices(yields)) {
+      require(yieldResults[i]->getType() == calleeConv.getSILType(yields[i]),
+              "callee yield type does not match begin_apply result type");
+    }
+
+    if (AI->isNonThrowing()) {
+      require(calleeConv.funcTy->hasErrorResult(),
+              "nothrow flag used for callee without error result");
+    } else {
+      require(!calleeConv.funcTy->hasErrorResult(),
+              "begin_apply instruction cannot call function with error result");
+    }
+
+    require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
+            "must call yield_once coroutine with begin_apply");
+  }
+
+  void checkAbortApplyInst(AbortApplyInst *AI) {
+    require(isa<BeginApplyResult>(AI->getOperand()) &&
+            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+            "operand of abort_apply must be a begin_apply");
+  }
+
+  void checkEndApplyInst(EndApplyInst *AI) {
+    require(isa<BeginApplyResult>(AI->getOperand()) &&
+            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+            "operand of end_apply must be a begin_apply");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
@@ -4207,7 +4248,10 @@ public:
     };
     struct BBState {
       std::vector<SingleValueInstruction*> Stack;
-      std::set<BeginAccessInst*> Accesses;
+
+      /// Contents: BeginAccessInst*, BeginApplyInst*.
+      std::set<SILInstruction*> ActiveOps;
+
       CFGState CFG = Normal;
     };
 
@@ -4235,25 +4279,24 @@ public:
                   "stack dealloc does not match most recent stack alloc");
           state.Stack.pop_back();
 
-        } else if (auto access = dyn_cast<BeginAccessInst>(&i)) {
-          bool notAlreadyPresent = state.Accesses.insert(access).second;
+        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i)) {
+          bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
           require(notAlreadyPresent,
-                  "access was not ended before re-beginning it");
+                  "operation was not ended before re-beginning it");
 
-        } else if (auto endAccess = dyn_cast<EndAccessInst>(&i)) {
-          // We don't call getBeginAccess() because this isn't the right
-          // place to assert on malformed SIL.
-          if (auto access = dyn_cast<BeginAccessInst>(endAccess->getOperand())){
-            bool present = state.Accesses.erase(access);
-            require(present, "access has already been ended");
+        } else if (isa<EndAccessInst>(i) || isa<AbortApplyInst>(i) ||
+                   isa<EndApplyInst>(i)) {
+          if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
+            bool present = state.ActiveOps.erase(beginOp);
+            require(present, "operation has already been ended");
           }
 
         } else if (auto term = dyn_cast<TermInst>(&i)) {
           if (term->isFunctionExiting()) {
             require(state.Stack.empty(),
                     "return with stack allocs that haven't been deallocated");
-            require(state.Accesses.empty(),
-                    "return with accesses that haven't been ended");
+            require(state.ActiveOps.empty(),
+                    "return with operations still active");
 
             if (isa<UnwindInst>(term)) {
               require(state.CFG == YieldUnwind,
@@ -4334,8 +4377,8 @@ public:
             const auto &foundState = insertResult.first->second;
             require(state.Stack == foundState.Stack || isUnreachable(),
                     "inconsistent stack heights entering basic block");
-            require(state.Accesses == foundState.Accesses || isUnreachable(),
-                    "inconsistent access sets entering basic block");
+            require(state.ActiveOps == foundState.ActiveOps || isUnreachable(),
+                    "inconsistent active-operations sets entering basic block");
             require(state.CFG == foundState.CFG,
                     "inconsistent coroutine states entering basic block");
           }

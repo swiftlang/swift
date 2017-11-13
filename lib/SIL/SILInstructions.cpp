@@ -411,6 +411,7 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
                       TypeDependentOperands, SpecializationInfo, Result) {
   setNonThrowing(isNonThrowing);
+  assert(!SubstCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
 
 ApplyInst *
@@ -438,6 +439,68 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionList Subs,
                                  Result, Subs, Args,
                                  TypeDependentOperands, isNonThrowing,
                                  SpecializationInfo);
+}
+
+BeginApplyInst::BeginApplyInst(SILDebugLocation loc, SILValue callee,
+                               SILType substCalleeTy,
+                               ArrayRef<SILType> allResultTypes,
+                               ArrayRef<ValueOwnershipKind> allResultOwnerships,
+                               SubstitutionList subs,
+                               ArrayRef<SILValue> args,
+                               ArrayRef<SILValue> typeDependentOperands,
+                               bool isNonThrowing,
+                     const GenericSpecializationInformation *specializationInfo)
+    : InstructionBase(loc, callee, substCalleeTy, subs, args,
+                      typeDependentOperands, specializationInfo),
+      MultipleValueInstructionTrailingObjects(this, allResultTypes,
+                                              allResultOwnerships) {
+  setNonThrowing(isNonThrowing);
+  assert(substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
+}
+
+BeginApplyInst *
+BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
+                       SubstitutionList subs, ArrayRef<SILValue> args,
+                       bool isNonThrowing,
+                       Optional<SILModuleConventions> moduleConventions,
+                       SILFunction &F,
+                       SILOpenedArchetypesState &openedArchetypes,
+                  const GenericSpecializationInformation *specializationInfo) {
+  SILType substCalleeSILType =
+      callee->getType().substGenericArgs(F.getModule(), subs);
+  auto substCalleeType = substCalleeSILType.castTo<SILFunctionType>();
+
+  SILFunctionConventions conv(substCalleeType,
+                              moduleConventions.hasValue()
+                                  ? moduleConventions.getValue()
+                                  : SILModuleConventions(F.getModule()));
+
+  SmallVector<SILType, 8> resultTypes;
+  SmallVector<ValueOwnershipKind, 8> resultOwnerships;
+
+  for (auto &yield : substCalleeType->getYields()) {
+    auto yieldType = conv.getSILType(yield);
+    auto convention = SILArgumentConvention(yield.getConvention());
+    resultTypes.push_back(yieldType);
+    resultOwnerships.push_back(
+      ValueOwnershipKind(F.getModule(), yieldType, convention));
+  }
+
+  resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
+  resultOwnerships.push_back(ValueOwnershipKind::Trivial);
+
+  SmallVector<SILValue, 32> typeDependentOperands;
+  collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
+                               substCalleeType, subs);
+  void *buffer =
+    allocateTrailingInst<BeginApplyInst, Operand, Substitution,
+                         MultipleValueInstruction*, BeginApplyResult>(
+      F, getNumAllOperands(args, typeDependentOperands), subs.size(),
+      1, resultTypes.size());
+  return ::new(buffer) BeginApplyInst(loc, callee, substCalleeSILType,
+                                      resultTypes, resultOwnerships, subs,
+                                      args, typeDependentOperands,
+                                      isNonThrowing, specializationInfo);
 }
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
