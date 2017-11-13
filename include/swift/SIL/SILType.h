@@ -539,6 +539,9 @@ public:
   /// Get the standard exception type.
   static SILType getExceptionType(const ASTContext &C);
 
+  /// Get the SIL token type.
+  static SILType getSILTokenType(const ASTContext &C);
+
   //
   // Utilities for treating SILType as a pointer-like type.
   //

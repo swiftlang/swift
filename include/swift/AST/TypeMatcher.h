@@ -109,6 +109,7 @@ class TypeMatcher {
     TRIVIAL_CASE(BuiltinUnknownObjectType)
     TRIVIAL_CASE(BuiltinUnsafeValueBufferType)
     TRIVIAL_CASE(BuiltinVectorType)
+    TRIVIAL_CASE(SILTokenType)
 
     bool visitTupleType(CanTupleType firstTuple, Type secondType,
                         Type sugaredFirstType) {

@@ -778,6 +778,9 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                "Builtin.RawPointer");
       break;
+    case 't':
+      Ty = createNode(Node::Kind::BuiltinTypeName, "Builtin.SILToken");
+      break;
     case 'w':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                "Builtin.Word");

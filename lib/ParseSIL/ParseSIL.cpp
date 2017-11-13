@@ -1942,11 +1942,30 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
   case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::TryApplyInst:
     if (parseCallInstruction(InstLoc, Opcode, B, ResultVal))
       return true;
     break;
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::EndApplyInst: {
+    UnresolvedValueName argName;
+    if (parseValueName(argName)) return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    SILType expectedTy = SILType::getSILTokenType(P.Context);
+    SILValue op = getLocalValue(argName, expectedTy, InstLoc, B);
+
+    if (Opcode == SILInstructionKind::AbortApplyInst) {
+      ResultVal = B.createAbortApply(InstLoc, op);
+    } else {
+      ResultVal = B.createEndApply(InstLoc, op);
+    }
+    break;
+  }
   case SILInstructionKind::IntegerLiteralInst: {
     SILType Ty;
     if (parseSILType(Ty) ||
@@ -4726,17 +4745,39 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   }
   SILFunctionConventions substConv(substFTI, B.getModule());
 
+  // Validate the operand count.
+  if (substConv.getNumSILArguments() != ArgNames.size() &&
+      Opcode != SILInstructionKind::PartialApplyInst) {
+    P.diagnose(TypeLoc, diag::expected_sil_type_kind,
+               "to have the same number of arg names as arg types");
+    return true;
+  }
+
+  // Validate the coroutine kind.
+  if (Opcode == SILInstructionKind::ApplyInst ||
+      Opcode == SILInstructionKind::TryApplyInst) {
+    if (FTI->getCoroutineKind() != SILCoroutineKind::None) {
+      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
+                 "to not be a coroutine");
+      return true;
+    }
+  } else if (Opcode == SILInstructionKind::BeginApplyInst) {
+    if (FTI->getCoroutineKind() != SILCoroutineKind::YieldOnce) {
+      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
+                 "to be a yield_once coroutine");
+      return true;
+    }
+  } else {
+    assert(Opcode == SILInstructionKind::PartialApplyInst);
+    // partial_apply accepts all kinds of function
+  }
+
   switch (Opcode) {
   default: llvm_unreachable("Unexpected case");
   case SILInstructionKind::ApplyInst : {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    if (substConv.getNumSILArguments() != ArgNames.size()) {
-      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
-                 "to have the same number of arg names as arg types");
-      return true;
-    }
-    
+
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames) {
@@ -4747,14 +4788,25 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     ResultVal = B.createApply(InstLoc, FnVal, subs, Args, IsNonThrowingApply);
     break;
   }
+  case SILInstructionKind::BeginApplyInst: {
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    
+    unsigned ArgNo = 0;
+    SmallVector<SILValue, 4> Args;
+    for (auto &ArgName : ArgNames) {
+      SILType expectedTy = substConv.getSILArgumentType(ArgNo++);
+      Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
+    }
+
+    ResultVal =
+      B.createBeginApply(InstLoc, FnVal, subs, Args, IsNonThrowingApply);
+    ResultVal->dump();
+    break;
+  }
   case SILInstructionKind::PartialApplyInst: {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    if (substFTI->getParameters().size() < ArgNames.size()) {
-      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
-                 "have the right argument types");
-      return true;
-    }
 
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
@@ -4784,12 +4836,6 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (substConv.getNumSILArguments() != ArgNames.size()) {
-      P.diagnose(TypeLoc, diag::expected_sil_type_kind,
-                 "to have the same number of arg names as arg types");
-      return true;
-    }
-    
     unsigned argNo = 0;
     SmallVector<SILValue, 4> args;
     for (auto &argName : ArgNames) {

@@ -479,6 +479,7 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
+CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, BeginAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, BeginUnpairedAccess)
@@ -491,6 +492,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DebugValueAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeinitExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DestroyAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndAccess)
+CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndApply)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndUnpairedAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IndexAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IndexRawPointer)
@@ -1086,6 +1088,11 @@ visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitBeginApplyInst(BeginApplyInst *I) {
+  return visitFullApply(I);
 }
 
 OwnershipUseCheckerResult
