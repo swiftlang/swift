@@ -299,7 +299,7 @@ public:
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
-  enum ActionType {
+  enum class ActionType {
     NoneAction, ///< No specific action
     Parse, ///< Parse only
     Typecheck, ///< Parse and type-check only
@@ -336,10 +336,10 @@ public:
     EmitObject, ///< Emit object file
   };
 
-  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
 
   /// Indicates the action the user requested that the frontend perform.
-  ActionType RequestedAction = NoneAction;
+  ActionType RequestedAction = ActionType::NoneAction;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
