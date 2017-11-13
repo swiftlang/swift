@@ -270,14 +270,15 @@ private:
   void setDumpScopeMapLocations();
   FrontendOptions::ActionType determineRequestedAction() const;
   bool setupForSILOrLLVM();
-  void setModuleName();
-  StringRef determineFallbackModuleName();
+  bool setModuleName();
+  bool computeFallbackModuleName();
   bool setOutputFilenames();
-  bool deriveOutputFilenamesFromInputsAndSuffix(
-      const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist);
-  std::vector<std::string> computeBaseNamesOfOutputs();
+  bool deriveOutputFilename();
+  bool deriveOutputFilenameForDirectory(llvm::StringRef outputDir);
+  std::string computeBaseNameOfOutput() const;
   void determineSupplementaryOutputFilenames();
-  llvm::ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
+  const llvm::Optional<const std::vector<std::string>> &
+  getOutputFilenamesFromCommandLineOrFilelist();
   bool hasAnUnusableOutputPath() const;
   void setImportObjCHeaderOptions();
   void setImplicitImportModuleNames();
@@ -353,7 +354,8 @@ bool FrontendArgsToOptionsConverter::convert() {
   if (setupForSILOrLLVM())
     return true;
 
-  setModuleName();
+  if (setModuleName())
+    return true;
 
   if (setOutputFilenames())
     return true;
@@ -614,7 +616,7 @@ bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
   return false;
 }
 
-void FrontendArgsToOptionsConverter::setModuleName() {
+bool FrontendArgsToOptionsConverter::setModuleName() {
   const Arg *A = Args.getLastArg(options::OPT_module_name);
   if (A) {
     Opts.ModuleName = A->getValue();
@@ -625,145 +627,152 @@ void FrontendArgsToOptionsConverter::setModuleName() {
     // Note: this code path will only be taken when running the frontend
     // directly; the driver should always pass -module-name when invoking the
     // frontend.
-    Opts.ModuleName = determineFallbackModuleName();
+    if (computeFallbackModuleName())
+      return true;
   }
 
   if (Lexer::isIdentifier(Opts.ModuleName) &&
       (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
-    return;
+    return false;
   }
   if (!Opts.actionHasOutput() || Opts.isCompilingExactlyOneSwiftFile()) {
     Opts.ModuleName = "main";
-    return;
+    return false;
   }
   auto DID = (Opts.ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
                                               : diag::error_bad_module_name;
   Diags.diagnose(SourceLoc(), DID, Opts.ModuleName, A == nullptr);
   Opts.ModuleName = "__bad__";
+  return true;
 }
 
-StringRef FrontendArgsToOptionsConverter::determineFallbackModuleName() {
+bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   // Note: this code path will only be taken when running the frontend
   // directly; the driver should always pass -module-name when invoking the
   // frontend.
   if (Opts.RequestedAction == FrontendOptions::ActionType::REPL) {
     // Default to a module named "REPL" if we're in REPL mode.
-    return "REPL";
+    Opts.ModuleName = "REPL";
+    return false;
   }
   // In order to pass Driver/options.swift test must leave ModuleName empty
   if (!Opts.Inputs.hasInputFilenames()) {
-    return StringRef();
+    Opts.ModuleName = StringRef();
+    return false;
   }
-  std::vector<std::string> outputFilenames =
+  const llvm::Optional<const std::vector<std::string>> &outputFilenames =
       getOutputFilenamesFromCommandLineOrFilelist();
+  if (!outputFilenames)
+    return true;
+
   bool isOutputAUniqueOrdinaryFile =
-      outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
-      !llvm::sys::fs::is_directory(outputFilenames[0]);
+      outputFilenames->size() == 1 && (*outputFilenames)[0] != "-" &&
+      !llvm::sys::fs::is_directory((*outputFilenames)[0]);
   std::string nameToStem = isOutputAUniqueOrdinaryFile
-                               ? outputFilenames[0]
+                               ? (*outputFilenames)[0]
                                : Opts.Inputs.getFilenameOfFirstInput();
-  return llvm::sys::path::stem(nameToStem);
+  Opts.ModuleName = llvm::sys::path::stem(nameToStem);
+  return false;
 }
 
 bool FrontendArgsToOptionsConverter::setOutputFilenames() {
-  const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist =
-      getOutputFilenamesFromCommandLineOrFilelist();
+  const llvm::Optional<const std::vector<std::string>>
+      &outputFilenamesFromCommandLineOrFilelist =
+          getOutputFilenamesFromCommandLineOrFilelist();
 
-  if (!outputFilenamesFromCommandLineOrFilelist.empty() &&
-      !llvm::sys::fs::is_directory(
-          outputFilenamesFromCommandLineOrFilelist.back())) {
-    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+  if (!outputFilenamesFromCommandLineOrFilelist)
+    return true;
+
+  if (Args.hasArg(options::OPT_output_filelist)) {
+    Opts.OutputFilenames = *outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
-  if (Opts.Inputs.isReadingFromStdin() &&
-      outputFilenamesFromCommandLineOrFilelist.empty()) {
-    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+  if (outputFilenamesFromCommandLineOrFilelist->empty()) {
+    return deriveOutputFilename();
+  }
+  assert(outputFilenamesFromCommandLineOrFilelist->size() == 1 &&
+         "Must not be > 1 -o");
+  StringRef outputFilename = (*outputFilenamesFromCommandLineOrFilelist)[0];
+  if (!llvm::sys::fs::is_directory(outputFilename)) {
+    Opts.OutputFilenames = *outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
-
-  // No output filename was specified, or an output directory was specified.
-  // Determine the correct output filename.
-
-  // Note: this should typically only be used when invoking the frontend
-  // directly, as the driver will always pass -o with an appropriate filename
-  // if output is required for the requested action.
-
-  assert(FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
-         Opts.OutputFilenames.empty());
   assert(
       FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
       !FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction));
-  if (outputFilenamesFromCommandLineOrFilelist.empty() &&
-      (Opts.Inputs.isReadingFromStdin() ||
-       FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction))) {
+  return deriveOutputFilenameForDirectory(outputFilename);
+}
+
+// No output filename was specified.
+// Determine the correct output filename.
+
+// Note: this should typically only be used when invoking the frontend
+// directly, as the driver will always pass -o with an appropriate filename
+// if output is required for the requested action.
+
+bool FrontendArgsToOptionsConverter::deriveOutputFilename() {
+  if (Opts.Inputs.isReadingFromStdin() ||
+      FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction)) {
     Opts.setOutputFilenameToStdout();
     return false;
   }
-  return deriveOutputFilenamesFromInputsAndSuffix(
-      outputFilenamesFromCommandLineOrFilelist);
-}
-
-bool FrontendArgsToOptionsConverter::deriveOutputFilenamesFromInputsAndSuffix(
-    const std::vector<std::string> outputFilenamesFromCommandLineOrFilelist) {
-  {
-    const unsigned filenameCount =
-        outputFilenamesFromCommandLineOrFilelist.size();
-    const unsigned primaryFilenameCount =
-        Opts.Inputs.primaryInputFilenameCount();
-    if (Opts.Inputs.havePrimaryInputsFilenames() &&
-        primaryFilenameCount != filenameCount && filenameCount != 0) {
-      Diags.diagnose(SourceLoc(),
-                     diag::error_output_filenames_dont_match_primary_filenames,
-                     filenameCount, primaryFilenameCount);
-      return true;
-    }
-  }
-
-  StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
-      Opts.RequestedAction);
-  std::vector<std::string> baseNames = computeBaseNamesOfOutputs();
-  for (unsigned index : indices(baseNames)) {
-    std::string outputStem =
-        outputFilenamesFromCommandLineOrFilelist.empty()
-            ? ""
-            : outputFilenamesFromCommandLineOrFilelist[index];
-    llvm::SmallString<128> Path(outputStem);
-    llvm::sys::path::append(Path, baseNames[index]);
-    llvm::sys::path::replace_extension(Path, Suffix);
-    Opts.OutputFilenames.push_back(Path.str());
-  }
-
-  if (Opts.OutputFilenames.empty()) {
+  std::string baseName = computeBaseNameOfOutput();
+  if (baseName == "") {
     if (Opts.RequestedAction != FrontendOptions::ActionType::REPL &&
         Opts.RequestedAction != FrontendOptions::ActionType::Immediate &&
         Opts.RequestedAction != FrontendOptions::ActionType::NoneAction) {
       Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
       return true;
     }
-  } else if (Opts.isOutputFileDirectory()) {
-    Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
-                   Opts.getSingleOutputFilename());
-    return true;
+    return false;
   }
+  llvm::SmallString<128> Path(baseName);
+  StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
+      Opts.RequestedAction);
+  llvm::sys::path::replace_extension(Path, Suffix);
+  Opts.OutputFilenames.push_back(Path.str());
   return false;
 }
 
-std::vector<std::string>
-FrontendArgsToOptionsConverter::computeBaseNamesOfOutputs() {
-  std::vector<std::string> namesToStem;
-  if (Opts.Inputs.havePrimaryInputsFilenames())
-    namesToStem = Opts.Inputs.primaryFilenames();
-  else if (auto UserSpecifiedModuleName =
-               Args.getLastArg(options::OPT_module_name)) {
-    namesToStem.push_back(std::string(UserSpecifiedModuleName->getValue()));
-  } else if (Opts.Inputs.inputFilenameCount() == 1) {
-    namesToStem.push_back(Opts.Inputs.getFilenameOfFirstInput());
-  }
+// An output directory was specified.
+// Determine the correct output filename.
 
-  std::vector<std::string> BaseNamesOfOutputs;
-  for (StringRef nameToStem : namesToStem)
-    BaseNamesOfOutputs.push_back(llvm::sys::path::stem(nameToStem).str());
-  return BaseNamesOfOutputs;
+// Note: this should typically only be used when invoking the frontend
+// directly, as the driver will always pass -o with an appropriate filename
+// if output is required for the requested action.
+bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
+    StringRef outputDir) {
+
+  std::string baseName = computeBaseNameOfOutput();
+  if (baseName == "") {
+    Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
+                   outputDir);
+    return true;
+  }
+  llvm::SmallString<128> Path(outputDir);
+  llvm::sys::path::append(Path, baseName);
+  StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
+      Opts.RequestedAction);
+  llvm::sys::path::replace_extension(Path, Suffix);
+  Opts.OutputFilenames.push_back(Path.str());
+  return false;
+}
+
+std::string FrontendArgsToOptionsConverter::computeBaseNameOfOutput() const {
+  std::string nameToStem;
+  if (Opts.Inputs.havePrimaryInputsFilenames()) {
+    assert(Opts.Inputs.primaryFilenames().size() == 1 &&
+           "Cannot handle multiple primaries yet");
+    nameToStem = Opts.Inputs.primaryFilenames()[0];
+  } else if (auto UserSpecifiedModuleName =
+                 Args.getLastArg(options::OPT_module_name)) {
+    nameToStem = std::string(UserSpecifiedModuleName->getValue());
+  } else if (Opts.Inputs.inputFilenameCount() == 1) {
+    nameToStem = Opts.Inputs.getFilenameOfFirstInput();
+  } else
+    nameToStem = "";
+
+  return llvm::sys::path::stem(nameToStem).str();
 }
 
 void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
@@ -879,10 +888,10 @@ void FrontendArgsToOptionsConverter::setLLVMArgs() {
   }
 }
 
-llvm::ArrayRef<std::string>
+const llvm::Optional<const std::vector<std::string>> &
 FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   if (cachedOutputFilenamesFromCommandLineOrFilelist) {
-    return *cachedOutputFilenamesFromCommandLineOrFilelist;
+    return cachedOutputFilenamesFromCommandLineOrFilelist;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
@@ -893,8 +902,10 @@ FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   } else {
     cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
         Args.getAllArgValues(options::OPT_o));
+    assert(cachedOutputFilenamesFromCommandLineOrFilelist->size() < 2 &&
+           "Caller assumes at most one -o");
   }
-  return *cachedOutputFilenamesFromCommandLineOrFilelist;
+  return cachedOutputFilenamesFromCommandLineOrFilelist;
 }
 
 /// Try to read an output file list file.
