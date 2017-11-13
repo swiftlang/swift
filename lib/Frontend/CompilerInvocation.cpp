@@ -259,20 +259,20 @@ private:
   LLVM_ATTRIBUTE_NOINLINE
   static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
 
-  void parseDebugCrashGroup();
-  void setDebugTimeOptions();
-  void setPrintStatsOptions();
-  void setTBDOptions();
+  void computeDebugCrashGroup();
+  void computeDebugTimeOptions();
+  void computePrintStatsOptions();
+  void computeTBDOptions();
   void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
                                   unsigned &valueToSet);
-  void setPlaygroundOptions();
-  void setHelpOptions();
-  void setDumpScopeMapLocations();
+  void computePlaygroundOptions();
+  void computeHelpOptions();
+  void computeDumpScopeMapLocations();
   FrontendOptions::ActionType determineRequestedAction() const;
   bool setupForSILOrLLVM();
-  bool setModuleName();
+  bool computeModuleName();
   bool computeFallbackModuleName();
-  bool setOutputFilenames();
+  bool computeOutputFilenames();
   bool deriveOutputFilename();
   bool deriveOutputFilenameForDirectory(llvm::StringRef outputDir);
   std::string computeBaseNameOfOutput() const;
@@ -280,9 +280,9 @@ private:
   const llvm::Optional<const std::vector<std::string>> &
   getOutputFilenamesFromCommandLineOrFilelist();
   bool hasAnUnusedOutputPath() const;
-  void setImportObjCHeaderOptions();
-  void setImplicitImportModuleNames();
-  void setLLVMArgs();
+  void computeImportObjCHeaderOptions();
+  void computeImplicitImportModuleNames();
+  void computeLLVMArgs();
   const std::vector<std::string>
   readOutputFileList(const StringRef filelistPath) const;
 
@@ -299,7 +299,7 @@ public:
 bool FrontendArgsToOptionsConverter::convert() {
   using namespace options;
 
-  parseDebugCrashGroup();
+  computeDebugCrashGroup();
 
   if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
     Opts.DumpAPIPath = A->getValue();
@@ -320,9 +320,9 @@ bool FrontendArgsToOptionsConverter::convert() {
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
-  setPrintStatsOptions();
-  setDebugTimeOptions();
-  setTBDOptions();
+  computePrintStatsOptions();
+  computeDebugTimeOptions();
+  computeTBDOptions();
 
   setUnsignedIntegerArgument(OPT_warn_long_function_bodies, 10,
                              Opts.WarnLongFunctionBodies);
@@ -331,18 +331,18 @@ bool FrontendArgsToOptionsConverter::convert() {
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
 
-  setPlaygroundOptions();
+  computePlaygroundOptions();
 
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
-  setHelpOptions();
+  computeHelpOptions();
   if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
     return true;
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
-  setDumpScopeMapLocations();
+  computeDumpScopeMapLocations();
   Opts.RequestedAction = determineRequestedAction();
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
@@ -354,10 +354,10 @@ bool FrontendArgsToOptionsConverter::convert() {
   if (setupForSILOrLLVM())
     return true;
 
-  if (setModuleName())
+  if (computeModuleName())
     return true;
 
-  if (setOutputFilenames())
+  if (computeOutputFilenames())
     return true;
   determineSupplementaryOutputFilenames();
 
@@ -375,14 +375,14 @@ bool FrontendArgsToOptionsConverter::convert() {
   Opts.EnableSerializationNestedTypeLookupTable &=
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
-  setImportObjCHeaderOptions();
-  setImplicitImportModuleNames();
-  setLLVMArgs();
+  computeImportObjCHeaderOptions();
+  computeImplicitImportModuleNames();
+  computeLLVMArgs();
 
   return false;
 }
 
-void FrontendArgsToOptionsConverter::parseDebugCrashGroup() {
+void FrontendArgsToOptionsConverter::computeDebugCrashGroup() {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
@@ -403,7 +403,7 @@ void FrontendArgsToOptionsConverter::parseDebugCrashGroup() {
   }
 }
 
-void FrontendArgsToOptionsConverter::setPrintStatsOptions() {
+void FrontendArgsToOptionsConverter::computePrintStatsOptions() {
   using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
@@ -413,7 +413,7 @@ void FrontendArgsToOptionsConverter::setPrintStatsOptions() {
 #endif
 }
 
-void FrontendArgsToOptionsConverter::setDebugTimeOptions() {
+void FrontendArgsToOptionsConverter::computeDebugTimeOptions() {
   using namespace options;
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressionTypeChecking |=
@@ -427,7 +427,7 @@ void FrontendArgsToOptionsConverter::setDebugTimeOptions() {
   }
 }
 
-void FrontendArgsToOptionsConverter::setTBDOptions() {
+void FrontendArgsToOptionsConverter::computeTBDOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
     using Mode = FrontendOptions::TBDValidationMode;
@@ -461,7 +461,7 @@ void FrontendArgsToOptionsConverter::setUnsignedIntegerArgument(
   }
 }
 
-void FrontendArgsToOptionsConverter::setPlaygroundOptions() {
+void FrontendArgsToOptionsConverter::computePlaygroundOptions() {
   using namespace options;
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
@@ -470,7 +470,7 @@ void FrontendArgsToOptionsConverter::setPlaygroundOptions() {
       Args.hasArg(OPT_playground_high_performance);
 }
 
-void FrontendArgsToOptionsConverter::setHelpOptions() {
+void FrontendArgsToOptionsConverter::computeHelpOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
@@ -483,7 +483,7 @@ void FrontendArgsToOptionsConverter::setHelpOptions() {
   }
 }
 
-void FrontendArgsToOptionsConverter::setDumpScopeMapLocations() {
+void FrontendArgsToOptionsConverter::computeDumpScopeMapLocations() {
   using namespace options;
   const Arg *A = Args.getLastArg(OPT_modes_Group);
   if (!A || !A->getOption().matches(OPT_dump_scope_maps))
@@ -616,7 +616,7 @@ bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
   return false;
 }
 
-bool FrontendArgsToOptionsConverter::setModuleName() {
+bool FrontendArgsToOptionsConverter::computeModuleName() {
   const Arg *A = Args.getLastArg(options::OPT_module_name);
   if (A) {
     Opts.ModuleName = A->getValue();
@@ -675,7 +675,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   return false;
 }
 
-bool FrontendArgsToOptionsConverter::setOutputFilenames() {
+bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
   const llvm::Optional<const std::vector<std::string>>
       &outputFilenamesFromCommandLineOrFilelist =
           getOutputFilenamesFromCommandLineOrFilelist();
@@ -867,7 +867,7 @@ bool FrontendArgsToOptionsConverter::hasAnUnusedOutputPath() const {
   return false;
 }
 
-void FrontendArgsToOptionsConverter::setImportObjCHeaderOptions() {
+void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
@@ -875,13 +875,13 @@ void FrontendArgsToOptionsConverter::setImportObjCHeaderOptions() {
         !Opts.Inputs.havePrimaryInputs() && !Opts.ModuleOutputPath.empty();
   }
 }
-void FrontendArgsToOptionsConverter::setImplicitImportModuleNames() {
+void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
   using namespace options;
   for (const Arg *A : Args.filtered(OPT_import_module)) {
     Opts.ImplicitImportModuleNames.push_back(A->getValue());
   }
 }
-void FrontendArgsToOptionsConverter::setLLVMArgs() {
+void FrontendArgsToOptionsConverter::computeLLVMArgs() {
   using namespace options;
   for (const Arg *A : Args.filtered(OPT_Xllvm)) {
     Opts.LLVMArgs.push_back(A->getValue());
