@@ -8065,9 +8065,6 @@ static Type formExtensionInterfaceType(Type type,
   if (auto unbound = type->getAs<UnboundGenericType>()) {
     parentType = unbound->getParent();
     nominal = cast<NominalTypeDecl>(unbound->getDecl());
-  } else if (auto bound = type->getAs<BoundGenericType>()) {
-    parentType = bound->getParent();
-    nominal = bound->getDecl();
   } else {
     auto nominalType = type->castTo<NominalType>();
     parentType = nominalType->getParent();
