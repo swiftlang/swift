@@ -658,6 +658,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   // In order to pass Driver/options.swift test must leave ModuleName empty
   if (!Opts.Inputs.hasInputFilenames()) {
     Opts.ModuleName = StringRef();
+    assert(false && "Jordan thinks this is a bug; report back");
     return false;
   }
   const llvm::Optional<const std::vector<std::string>> &outputFilenames =
