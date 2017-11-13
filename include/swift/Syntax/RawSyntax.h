@@ -212,6 +212,8 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
             const SourcePresence Presence)
       : Kind(Kind), Layout(Layout), Presence(Presence) {}
 
+  virtual ~RawSyntax() = default;
+
   /// Returns a raw syntax node of the given Kind, specified Layout,
   /// and source presence.
   static RC<RawSyntax> make(const SyntaxKind Kind, const LayoutList Layout,
