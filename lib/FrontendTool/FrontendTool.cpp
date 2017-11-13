@@ -511,6 +511,9 @@ static bool performCompile(CompilerInstance &Instance,
                            UnifiedStatsReporter *Stats) {
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
+  
+  if (Action == FrontendOptions::ActionType::EmitSyntax)
+    Instance.getASTContext().LangOpts.KeepSyntaxInfoInSourceFile = true;
 
   // We've been asked to precompile a bridging header; we want to
   // avoid touching any other inputs and just parse, emit and exit.
