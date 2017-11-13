@@ -419,13 +419,15 @@ struct NativeString {
   //   (conservatively) for tagging - 1 to designate native vs objc reference.
   // * 64 bits from the second word
 
-  var owner: _BuiltinNativeObject
+  @_versioned
+  var stringBuffer: _StringBuffer
 
-  var stringBuffer: _StringBuffer {
-      // TODO: Does this in practice incur overhead? Should we cast it?
-      return _StringBuffer(_StringBuffer._Storage(_nativeObject: owner))
+  @_versioned
+  @_inlineable
+  var nativeObject: AnyObject {
+    return stringBuffer._storage.buffer
   }
-
+  
   var unsafe: UnsafeString {
     return UnsafeString(
       baseAddress: self.baseAddress,
@@ -455,8 +457,11 @@ struct NativeString {
     return isSingleByte ? 1 : 2
   }
 
+  @_versioned
   init(_ native: _BuiltinNativeObject) {
-    self.owner = native
+    // TODO: Does this in practice incur overhead? Should we cast it?
+    let storage = _StringBuffer._Storage(_nativeObject: native)
+    self.stringBuffer = _StringBuffer(storage)
   }
 
   @_versioned
@@ -611,7 +616,7 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NativeString) {
     self.init(
-      _unflagged: _bridgeObject(fromNativeObject: s.owner),
+      _unflagged: _bridgeObject(fromNative: s.nativeObject),
       isSingleByte: s.isSingleByte,
       hasCocoaBuffer: false,
       otherBits: 0)
@@ -871,7 +876,7 @@ extension _StringGuts {
     internalDumpHex(_otherBits, newline: false)
     if let native = self._native {
       print(" native ", terminator: "")
-      internalDumpHex(_nativeObject(toNative: native.owner), newline: false)
+      internalDumpHex(native.nativeObject, newline: false)
       print(" @", terminator: "")
       internalDumpHex(native.baseAddress, newline: false)
       print(" ", terminator: "")
