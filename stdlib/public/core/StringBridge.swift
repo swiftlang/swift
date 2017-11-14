@@ -165,7 +165,7 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
   
   let (start, isUTF16) = _getCocoaStringPointer(cfImmutableValue)
   return _StringGuts(NonTaggedCocoaString(
-      cocoaString,
+      cfImmutableValue,
       isSingleByte: !isUTF16,
       start: start))
 }
