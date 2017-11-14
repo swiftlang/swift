@@ -1708,28 +1708,6 @@ extension Collection {
 
 // Compatibility aliases for Swift 4 names (see SE-0132)
 
-extension Collection {
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
-  @_inlineable
-  public func dropFirst(_ n: Int) -> SubSequence {
-    return removingPrefix(n)
-  }
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
-  @_inlineable
-  public func dropLast(_ n: Int) -> SubSequence {
-    return removingSuffix(n)
-  }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
-  @_inlineable
-  public func drop(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    return try removingPrefix(while: predicate)
-  }
-}
-
 extension Collection where SubSequence == Self {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removePrefix(_:)")
   @_inlineable

@@ -1460,16 +1460,16 @@ public struct IteratorSequence<
 
 // Compatibility aliases for Swift 4 names (see SE-0132)
 
-extension Sequence where SubSequence == AnySequence<Element> {
+extension Sequence {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
   @_inlineable
-  public func dropFirst(_ n: Int) -> AnySequence<Element> {
+  public func dropFirst(_ n: Int) -> SubSequence {
     return removingPrefix(n)
   }
-  
+
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
   @_inlineable
-  public func dropLast(_ n: Int) -> AnySequence<Element> {
+  public func dropLast(_ n: Int) -> SubSequence {
     return removingSuffix(n)
   }
   
@@ -1477,12 +1477,10 @@ extension Sequence where SubSequence == AnySequence<Element> {
   @_inlineable
   public func drop(
     while predicate: (Element) throws -> Bool
-  ) rethrows -> AnySequence<Element> {
+  ) rethrows -> SubSequence {
     return try removingPrefix(while: predicate)
   }
-}
-
-extension Sequence {
+  
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingFirst()")
   @_inlineable
   public func dropFirst() -> SubSequence { return removingFirst() }

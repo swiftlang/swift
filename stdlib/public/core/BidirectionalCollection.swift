@@ -335,11 +335,3 @@ extension BidirectionalCollection where SubSequence == Self {
     removeSuffix(n)
   }
 }
-
-extension BidirectionalCollection {
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
-  @_inlineable // FIXME(sil-serialize-all)
-  public func dropLast(_ n: Int) -> SubSequence {
-    return removingSuffix(n)
-  }
-}
