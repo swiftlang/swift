@@ -953,7 +953,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   }
   
   // Aggregate together all of the subelements into something that has the same
-  // type as the load did, and emit smaller) loads for any subelements that were
+  // type as the load did, and emit smaller loads for any subelements that were
   // not available.
   auto *Load = cast<LoadInst>(Inst);
   AvailableValueAggregator Agg(Load, AvailableValues, Uses);
