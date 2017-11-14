@@ -130,29 +130,29 @@ extension String {
   }
 }
 
-extension String : Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public static func == (lhs: String, rhs: String) -> Bool {
-#if _runtime(_ObjC)
-    // We only want to perform this optimization on objc runtimes. Elsewhere,
-    // we will make it follow the unicode collation algorithm even for ASCII.
-    // This is consistent with Foundation, but incorrect as defined by Unicode.
-    if lhs._guts.isASCII && rhs._guts.isASCII {
-      if lhs._core.count != rhs._core.count {
-        return false
-      }
-      if lhs._core.startASCII == rhs._core.startASCII {
-        return true
-      }
-      return _stdlib_memcmp(
-        lhs._core.startASCII, rhs._core.startASCII,
-        rhs._core.count) == (0 as CInt)
-    }
-#endif
-    return lhs._compareString(rhs) == 0
-  }
-}
+// extension String : Equatable {
+//   @_inlineable // FIXME(sil-serialize-all)
+//   @inline(__always)
+//   public static func == (lhs: String, rhs: String) -> Bool {
+// #if _runtime(_ObjC)
+//     // We only want to perform this optimization on objc runtimes. Elsewhere,
+//     // we will make it follow the unicode collation algorithm even for ASCII.
+//     // This is consistent with Foundation, but incorrect as defined by Unicode.
+//     if lhs._guts.isASCII && rhs._guts.isASCII {
+//       if lhs._guts.count != rhs._guts.count {
+//         return false
+//       }
+//       if lhs._core.startASCII == rhs._core.startASCII {
+//         return true
+//       }
+//       return _swift_stdlib_memcmp(
+//         lhs._core.startASCII, rhs._core.startASCII,
+//         rhs._guts.count) == (0 as CInt)
+//     }
+// #endif
+//     return lhs._compareString(rhs) == 0
+//   }
+// }
 
 extension String : Comparable {
   @_inlineable // FIXME(sil-serialize-all)
