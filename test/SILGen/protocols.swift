@@ -26,10 +26,10 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]] : $*[[OPENED]]
+// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]])
 // CHECK-NEXT: destroy_addr [[ALLOCSTACK]]
-// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: dealloc_stack [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: return [[RESULT]]
 
@@ -133,6 +133,7 @@ func use_property_rvalue_get() -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
 // CHECK: [[COPY:%.*]] = alloc_stack $[[OPENED]]
 // CHECK-NEXT: copy_addr [[PROJ]] to [initialization] [[COPY]] : $*[[OPENED]]
+// CHECK-NEXT: end_access [[READ]] : $*PropertyWithGetter
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[COPY]])
 
