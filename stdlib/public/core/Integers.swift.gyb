@@ -3208,7 +3208,7 @@ ${assignmentOperatorComment(x.operator, True)}
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : BidirectionalCollection {
     public typealias Indices = CountableRange<Int>
-    public typealias SubSequence = BidirectionalSlice<${Self}.Words>
+    public typealias SubSequence = Slice<${Self}.Words>
 
     @_versioned // FIXME(sil-serialize-all)
     internal var _value: ${Self}

@@ -10,32 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-%{
-from gyb_stdlib_support import (
-    TRAVERSALS,
-    collectionForTraversal,
-    defaultIndicesForTraversal,
-    documentationNameForTraversal
-)
-}%
-
-% for Traversal in TRAVERSALS:
-%   Self = defaultIndicesForTraversal(Traversal)
-%   collection = documentationNameForTraversal(Traversal)
-
-// FIXME(ABI)#42 (Conditional Conformance): There should be just one default
-// indices type that has conditional conformances to
-// `BidirectionalCollection` and `RandomAccessCollection`.
-// <rdar://problem/17144340>
-
-/// A collection of indices for an arbitrary ${collection}.
+/// A collection of indices for an arbitrary collection
 @_fixed_layout
-public struct ${Self}<
-  Elements : ${collectionForTraversal(Traversal)}
-> : ${collectionForTraversal(Traversal)} {
+public struct DefaultIndices<Elements: Collection> : Collection {
 
   public typealias Index = Elements.Index
-  public typealias Indices = ${Self}<Elements>
+  public typealias Indices = DefaultIndices<Elements>
 
   @_inlineable
   @_versioned
@@ -65,12 +45,12 @@ public struct ${Self}<
     return i
   }
 
-  public typealias SubSequence = ${Self}<Elements>
+  public typealias SubSequence = DefaultIndices<Elements>
 
   @_inlineable
-  public subscript(bounds: Range<Index>) -> ${Self}<Elements> {
+  public subscript(bounds: Range<Index>) -> DefaultIndices<Elements> {
     // FIXME: swift-3-indexing-model: range check.
-    return ${Self}(
+    return DefaultIndices(
       _elements: _elements,
       startIndex: bounds.lowerBound,
       endIndex: bounds.upperBound)
@@ -88,19 +68,6 @@ public struct ${Self}<
     _elements.formIndex(after: &i)
   }
 
-%     if Traversal in ['Bidirectional', 'RandomAccess']:
-  @_inlineable
-  public func index(before i: Index) -> Index {
-    // FIXME: swift-3-indexing-model: range check.
-    return _elements.index(before: i)
-  }
-
-  @_inlineable
-  public func formIndex(before i: inout Index) {
-    // FIXME: swift-3-indexing-model: range check.
-    _elements.formIndex(before: &i)
-  }
-%     end
 
   @_inlineable
   public var indices: Indices {
@@ -115,8 +82,25 @@ public struct ${Self}<
   internal var _endIndex: Elements.Index
 }
 
-extension ${collectionForTraversal(Traversal)}
-where Indices == ${Self}<Self> {
+extension DefaultIndices: BidirectionalCollection
+where Elements: BidirectionalCollection {
+  @_inlineable
+  public func index(before i: Index) -> Index {
+    // FIXME: swift-3-indexing-model: range check.
+    return _elements.index(before: i)
+  }
+
+  @_inlineable
+  public func formIndex(before i: inout Index) {
+    // FIXME: swift-3-indexing-model: range check.
+    _elements.formIndex(before: &i)
+  }
+}
+
+extension DefaultIndices: RandomAccessCollection
+where Elements: RandomAccessCollection { }
+
+extension Collection where Indices == DefaultIndices<Self> {
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///
@@ -135,15 +119,16 @@ where Indices == ${Self}<Self> {
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
   @_inlineable // FIXME(sil-serialize-all)
-  public var indices: ${Self}<Self> {
-    return ${Self}(
+  public var indices: DefaultIndices<Self> {
+    return DefaultIndices(
       _elements: self,
       startIndex: self.startIndex,
       endIndex: self.endIndex)
   }
 }
 
-% end
+public typealias DefaultBidirectionalIndices<T: BidirectionalCollection> = DefaultIndices<T>
+public typealias DefaultRandomAccessIndices<T: RandomAccessCollection> = DefaultIndices<T>
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

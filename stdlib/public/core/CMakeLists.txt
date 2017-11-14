@@ -72,7 +72,7 @@ set(SWIFTLIB_ESSENTIAL
   HeapBuffer.swift
   ICU.swift
   ImplicitlyUnwrappedOptional.swift
-  Indices.swift.gyb
+  Indices.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift.gyb
@@ -100,7 +100,7 @@ set(SWIFTLIB_ESSENTIAL
   Print.swift
   RandomAccessCollection.swift
   Range.swift.gyb
-  RangeReplaceableCollection.swift.gyb
+  RangeReplaceableCollection.swift
   ReflectionLegacy.swift
   Repeat.swift
   REPL.swift
@@ -115,7 +115,7 @@ set(SWIFTLIB_ESSENTIAL
   SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift
-  Slice.swift.gyb
+  Slice.swift
   Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb

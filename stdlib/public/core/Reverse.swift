@@ -65,14 +65,6 @@ public struct _ReverseIndexingIterator<
   internal var _position: Elements.Index
 }
 
-// FIXME(ABI)#59 (Conditional Conformance): we should have just one type,
-// `ReversedCollection`, that has conditional conformances to
-// `RandomAccessCollection`, and possibly `MutableCollection` and
-// `RangeReplaceableCollection`.
-// rdar://problem/17144340
-
-// FIXME: swift-3-indexing-model - should gyb ReversedXxx & ReversedRandomAccessXxx
-
 /// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
 @_fixed_layout
@@ -166,9 +158,7 @@ public struct ReversedIndex<Base : Collection> : Comparable {
 ///
 /// - See also: `ReversedRandomAccessCollection`
 @_fixed_layout
-public struct ReversedCollection<
-  Base : BidirectionalCollection
-> : BidirectionalCollection {
+public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -248,7 +238,8 @@ public struct ReversedCollection<
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { ReversedIndex($0) }
+    return _base.index(i.base, offsetBy: -n, limitedBy: limit.base)
+                .map(ReversedIndex.init)
   }
 
   @_inlineable
@@ -262,8 +253,8 @@ public struct ReversedCollection<
   }
 
   @_inlineable
-  public subscript(bounds: Range<Index>) -> BidirectionalSlice<ReversedCollection> {
-    return BidirectionalSlice(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice<ReversedCollection> {
+    return Slice(base: self, bounds: bounds)
   }
 
   public let _base: Base
@@ -272,7 +263,8 @@ public struct ReversedCollection<
 
 extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }
 
-typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
+@available(*, deprecated, renamed: "ReversedCollection")
+public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
 
 extension BidirectionalCollection {
   /// Returns a view presenting the elements of the collection in reverse

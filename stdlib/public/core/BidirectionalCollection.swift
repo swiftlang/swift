@@ -44,8 +44,8 @@ public typealias BidirectionalIndexable = BidirectionalCollection
 ///   `c.index(before: c.index(after: i)) == i`.
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
-public protocol BidirectionalCollection : Collection 
-{
+public protocol BidirectionalCollection: Collection
+where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
@@ -64,16 +64,6 @@ public protocol BidirectionalCollection : Collection
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   func formIndex(before i: inout Index)
-
-  /// A sequence that can represent a contiguous subrange of the collection's
-  /// elements.
-  associatedtype SubSequence : BidirectionalCollection
-    = BidirectionalSlice<Self>
-
-  /// A type that represents the indices that are valid for subscripting the
-  /// collection, in ascending order.
-  associatedtype Indices : BidirectionalCollection
-    = DefaultBidirectionalIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -198,17 +188,6 @@ extension BidirectionalCollection {
     }
 
     return count
-  }
-}
-
-/// Supply the default "slicing" `subscript` for `BidirectionalCollection`
-/// models that accept the default associated `SubSequence`,
-/// `BidirectionalSlice<Self>`.
-extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> {
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> BidirectionalSlice<Self> {
-    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-    return BidirectionalSlice(base: self, bounds: bounds)
   }
 }
 
