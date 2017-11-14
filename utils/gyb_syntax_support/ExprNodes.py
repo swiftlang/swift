@@ -177,9 +177,9 @@ EXPR_NODES = [
     Node('BooleanLiteralExpr', kind='Expr',
          children=[
              Child("BooleanLiteral", kind='Token',
-                    token_choices=[
+                   token_choices=[
                        'TrueToken',
                        'FalseToken',
-                    ])
+                   ])
          ])
 ]
