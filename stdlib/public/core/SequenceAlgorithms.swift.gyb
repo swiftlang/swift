@@ -285,6 +285,7 @@ ${equivalenceExplanation}
     return possiblePrefixIterator.next() == nil
   }
     
+  // Compatibility alias for Swift 4 name (see SE-0132)
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "hasPrefix(_:${"by:" if preds else ""})")
   @_inlineable
   public func starts<PossiblePrefix>(

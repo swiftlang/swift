@@ -1210,12 +1210,6 @@ extension Sequence where SubSequence == AnySequence<Element> {
     if n == 0 { return AnySequence(self) }
     return AnySequence(_RemovingPrefixSequence(_iterator: makeIterator(), limit: n))
   }
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
-  @_inlineable
-  public func dropFirst(_ n: Int) -> AnySequence<Element> {
-    return removingPrefix(n)
-  }
   
   /// Returns a subsequence containing all but the given number of final
   /// elements.
@@ -1262,12 +1256,6 @@ extension Sequence where SubSequence == AnySequence<Element> {
     return AnySequence(result)
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
-  @_inlineable
-  public func dropLast(_ n: Int) -> AnySequence<Element> {
-    return removingSuffix(n)
-  }
-
   /// Returns a subsequence by skipping the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -1299,14 +1287,6 @@ extension Sequence where SubSequence == AnySequence<Element> {
         iterator: makeIterator(), nextElement: nil, predicate: predicate))
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
-  @_inlineable
-  public func drop(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> AnySequence<Element> {
-    return try removingPrefix(while: predicate)
-  }
-
   /// Returns a subsequence, up to the specified maximum length, containing the
   /// initial elements of the sequence.
   ///
@@ -1395,10 +1375,6 @@ extension Sequence {
   /// - Complexity: O(1)
   @_inlineable
   public func removingFirst() -> SubSequence { return removingPrefix(1) }
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingFirst()")
-  @_inlineable
-  public func dropFirst() -> SubSequence { return removingFirst() }
     
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
@@ -1420,10 +1396,6 @@ extension Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_inlineable
   public func removingLast() -> SubSequence  { return removingSuffix(1) }
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingLast()")
-  @_inlineable
-  public func dropLast() -> SubSequence { return removingLast() }
 }
 
 extension Sequence {
@@ -1484,4 +1456,38 @@ public struct IteratorSequence<
 
   @_versioned
   internal var _base: Base
+}
+
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension Sequence where SubSequence == AnySequence<Element> {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
+  @_inlineable
+  public func dropFirst(_ n: Int) -> AnySequence<Element> {
+    return removingPrefix(n)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
+  @_inlineable
+  public func dropLast(_ n: Int) -> AnySequence<Element> {
+    return removingSuffix(n)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
+  @_inlineable
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> AnySequence<Element> {
+    return try removingPrefix(while: predicate)
+  }
+}
+
+extension Sequence {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingFirst()")
+  @_inlineable
+  public func dropFirst() -> SubSequence { return removingFirst() }
+
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingLast()")
+  @_inlineable
+  public func dropLast() -> SubSequence { return removingLast() }
 }

@@ -1260,12 +1260,6 @@ extension Collection {
     return self[start..<endIndex]
   }
     
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
-  @_inlineable
-  public func dropFirst(_ n: Int) -> SubSequence {
-    return removingPrefix(n)
-  }
-
   /// Returns a subsequence containing all but the specified number of final
   /// elements.
   ///
@@ -1294,12 +1288,6 @@ extension Collection {
     return self[startIndex..<end]
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
-  @_inlineable
-  public func dropLast(_ n: Int) -> SubSequence {
-    return removingSuffix(n)
-  }
-  
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///
@@ -1320,14 +1308,6 @@ extension Collection {
     return self[start..<endIndex]
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
-  @_inlineable
-  public func drop(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    return try removingPrefix(while: predicate)
-  }
-
   /// Returns a subsequence, up to the specified maximum length, containing
   /// the initial elements of the collection.
   ///
@@ -1724,4 +1704,36 @@ extension Collection {
 extension Collection {
   @available(swift, deprecated: 3.2, renamed: "Element")
   public typealias _Element = Element
+}
+
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension Collection {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
+  @_inlineable
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return removingPrefix(n)
+  }
+
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
+  @_inlineable
+  public func dropLast(_ n: Int) -> SubSequence {
+    return removingSuffix(n)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
+  @_inlineable
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try removingPrefix(while: predicate)
+  }
+}
+
+extension Collection where SubSequence == Self {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removePrefix(_:)")
+  @_inlineable
+  public mutating func removeFirst(_ n: Int) {
+    return removePrefix(n)
+  }
 }

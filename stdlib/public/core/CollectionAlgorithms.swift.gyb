@@ -68,12 +68,6 @@ extension Collection where Element : Equatable {
     }
     return nil
   }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "firstIndex(of:)")
-  @_inlineable
-  public func index(of element: Element) -> Index? {
-    return firstIndex(of: element)
-  }
 }
 
 extension Collection {
@@ -109,14 +103,6 @@ extension Collection {
       self.formIndex(after: &i)
     }
     return nil
-  }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "firstIndex(where:)")
-  @_inlineable
-  public func index(
-    where predicate: (Element) throws -> Bool
-  ) rethrows -> Index? {
-    return try firstIndex(where: predicate)
   }
 }
 
@@ -463,5 +449,25 @@ ${orderingExplanation}
         subRange: startIndex..<endIndex,
         by: areInIncreasingOrder)
     }
+  }
+}
+
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension Collection where Element : Equatable {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "firstIndex(of:)")
+  @_inlineable
+  public func index(of element: Element) -> Index? {
+    return firstIndex(of: element)
+  }
+}
+  
+extension Collection {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "firstIndex(where:)")
+  @_inlineable
+  public func index(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    return try firstIndex(where: predicate)
   }
 }

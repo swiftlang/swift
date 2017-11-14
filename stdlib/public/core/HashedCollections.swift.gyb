@@ -568,12 +568,6 @@ public struct Set<Element : Hashable> :
     return _variantBuffer.index(forKey: member)
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "firstIndex(of:)")
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(of member: Element) -> Index? {
-    return firstIndex(of: member)
-  }
-  
   /// Inserts the given element in the set if it is not already present.
   ///
   /// If an element equal to `newMember` is already contained in the set, this
@@ -6638,5 +6632,15 @@ extension Set {
         insert(member)
       }
     }
+  }
+}
+
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension Set {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "firstIndex(of:)")
+  @_inlineable // FIXME(sil-serialize-all)
+  public func index(of member: Element) -> Index? {
+    return firstIndex(of: member)
   }
 }

@@ -264,12 +264,6 @@ extension BidirectionalCollection where SubSequence == Self {
       "Can't remove more items from a collection than it contains")
     self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
   }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removeSuffix(_:)")
-  @_inlineable
-  public mutating func removeLast(_ n: Int) {
-    removeSuffix(n)
-  }
 }
 
 extension BidirectionalCollection {
@@ -301,12 +295,6 @@ extension BidirectionalCollection {
     return self[startIndex..<end]
   }
   
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
-  @_inlineable // FIXME(sil-serialize-all)
-  public func dropLast(_ n: Int) -> SubSequence {
-    return removingSuffix(n)
-  }
-
   /// Returns a subsequence, up to the given maximum length, containing the
   /// final elements of the collection.
   ///
@@ -338,3 +326,20 @@ extension BidirectionalCollection {
   }
 }
 
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension BidirectionalCollection where SubSequence == Self {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removeSuffix(_:)")
+  @_inlineable
+  public mutating func removeLast(_ n: Int) {
+    removeSuffix(n)
+  }
+}
+
+extension BidirectionalCollection {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
+  @_inlineable // FIXME(sil-serialize-all)
+  public func dropLast(_ n: Int) -> SubSequence {
+    return removingSuffix(n)
+  }
+}
