@@ -171,8 +171,8 @@ tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
     _ = s.removingSuffix(0)
   }
 
-  Log.dropWhile.expectIncrement(Base.self) {
-    _ = s.drop { (_) in true }
+  Log.removingPrefixWhile.expectIncrement(Base.self) {
+    _ = s.removingPrefix { (_) in true }
   }
 
   Log.prefixWhile.expectIncrement(Base.self) {

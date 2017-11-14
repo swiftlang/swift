@@ -1,4 +1,4 @@
-//===--- DropWhile.swift.gyb - Lazy views for drop(while:) ----*- swift -*-===//
+//===--- DropWhile.swift.gyb - Lazy views for removingPrefix(while:) ----*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -103,7 +103,7 @@ extension LazySequenceProtocol {
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   @_inlineable // FIXME(sil-serialize-all)
-  public func drop(
+  public func removingPrefix(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhileSequence<Self.Elements> {
     return LazyDropWhileSequence(_base: self.elements, predicate: predicate)
@@ -231,7 +231,7 @@ Elements : ${Collection}
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   @_inlineable // FIXME(sil-serialize-all)
-  public func drop(
+  public func removingPrefix(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhile${Collection}<Self.Elements> {
     return LazyDropWhile${Collection}(

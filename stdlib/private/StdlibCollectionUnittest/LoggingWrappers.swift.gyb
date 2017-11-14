@@ -84,7 +84,7 @@ public class SequenceLog {
   public static var forEach = TypeIndexed(0)
   public static var removingPrefix = TypeIndexed(0)
   public static var removingSuffix = TypeIndexed(0)
-  public static var dropWhile = TypeIndexed(0)
+  public static var removingPrefixWhile = TypeIndexed(0)
   public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
@@ -258,11 +258,11 @@ public struct ${Self}<
     return base.removingSuffix(n)
   }
 
-  public func drop(
+  public func removingPrefix(
     while predicate: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
-    Log.dropWhile[selfType] += 1
-    return try base.drop(while: predicate)
+    Log.removingPrefixWhile[selfType] += 1
+    return try base.removingPrefix(while: predicate)
   }
 
   public func prefix(_ maxLength: Int) -> SubSequence {

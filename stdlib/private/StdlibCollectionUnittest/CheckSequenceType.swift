@@ -1687,14 +1687,14 @@ self.test("\(testNamePrefix).removingSuffix/semantics/negative") {
 }
 
 //===----------------------------------------------------------------------===//
-// drop(while:)
+// removingPrefix(while:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).drop(while:)/semantics").forEach(in: findTests) {
+self.test("\(testNamePrefix).removingPrefix(while:)/semantics").forEach(in: findTests) {
   test in
   let s = makeWrappedSequenceWithEquatableElement(test.sequence)
   let closureLifetimeTracker = LifetimeTracked(0)
-  let remainingSequence = s.drop {
+  let remainingSequence = s.removingPrefix {
     _blackHole(closureLifetimeTracker)
     return $0 != wrapValueIntoEquatable(test.element)
   }

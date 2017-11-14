@@ -108,10 +108,10 @@ extension _SequenceWrapper where SubSequence == Base.SubSequence {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func drop(
+  public func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
-    return try _base.drop(while: predicate)
+    return try _base.removingPrefix(while: predicate)
   }
 
   @_inlineable // FIXME(sil-serialize-all)

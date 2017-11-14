@@ -1310,7 +1310,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public func drop(
+  public func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var start = startIndex
@@ -1318,6 +1318,14 @@ extension Collection {
       formIndex(after: &start)
     } 
     return self[start..<endIndex]
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
+  @_inlineable
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try removingPrefix(while: predicate)
   }
 
   /// Returns a subsequence, up to the specified maximum length, containing

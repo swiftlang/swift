@@ -44,4 +44,10 @@ func test_SE0132Deprecations() {
   
   _ = a.dropLast() // expected-warning {{'dropLast()' is deprecated: renamed to 'removingLast()'}}
   // expected-note @-1 {{use 'removingLast()' instead}} {{9-17=removingLast}}
+  
+  _ = a.drop(while: { $0 == 2 }) // expected-warning {{'drop(while:)' is deprecated: renamed to 'removingPrefix(while:)'}}
+  // expected-note @-1 {{use 'removingPrefix(while:)' instead}} {{9-13=removingPrefix}}
+  
+  _ = a.drop { $0 == 2 } // expected-warning {{'drop(while:)' is deprecated: renamed to 'removingPrefix(while:)'}}
+  // expected-note @-1 {{use 'removingPrefix(while:)' instead}} {{9-13=removingPrefix}}
 }

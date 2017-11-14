@@ -468,7 +468,7 @@ public protocol Sequence {
   ///   whether the element is a match.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  func drop(
+  func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence
 
@@ -785,7 +785,7 @@ internal struct _DropWhileSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func drop(
+  internal func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> AnySequence<Element> {
     // If this is already a _DropWhileSequence, avoid multiple
@@ -1271,13 +1271,13 @@ extension Sequence where SubSequence == AnySequence<Element> {
   /// Returns a subsequence by skipping the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
-  /// The following example uses the `drop(while:)` method to skip over the
+  /// The following example uses the `removingPrefix(while:)` method to skip over the
   /// positive numbers at the beginning of the `numbers` array. The result
   /// begins with the first element of `numbers` that does not satisfy
   /// `predicate`.
   ///
   ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
-  ///     let startingWithNegative = numbers.drop(while: { $0 > 0 })
+  ///     let startingWithNegative = numbers.removingPrefix(while: { $0 > 0 })
   ///     // startingWithNegative == [-2, 9, -6, 10, 1]
   ///
   /// If `predicate` matches every element in the sequence, the result is an
@@ -1291,12 +1291,20 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public func drop(
+  public func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> AnySequence<Element> {
     return try AnySequence(
       _DropWhileSequence(
         iterator: makeIterator(), nextElement: nil, predicate: predicate))
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
+  @_inlineable
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> AnySequence<Element> {
+    return try removingPrefix(while: predicate)
   }
 
   /// Returns a subsequence, up to the specified maximum length, containing the

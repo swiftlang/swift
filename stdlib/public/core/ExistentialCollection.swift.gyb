@@ -266,7 +266,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   override = 'override' if Kind != 'Sequence' else ''
   @_versioned
   @_inlineable
-  internal ${override} func _drop(
+  internal ${override} func _removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
     _abstract()
@@ -512,10 +512,10 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   }
   @_versioned
   @_inlineable
-  internal override func _drop(
+  internal override func _removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
-    return try _${Kind}Box<S.SubSequence>(_base: _base.drop(while: predicate))
+    return try _${Kind}Box<S.SubSequence>(_base: _base.removingPrefix(while: predicate))
   }
   @_versioned
   @_inlineable
@@ -817,10 +817,10 @@ extension Any${Kind} {
   }
 
   @_inlineable
-  public func drop(
+  public func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> Any${Kind}<Element> {
-    return try Any${Kind}(_box: _box._drop(while: predicate))
+    return try Any${Kind}(_box: _box._removingPrefix(while: predicate))
   }
 
   @_inlineable

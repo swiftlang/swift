@@ -963,13 +963,13 @@ SequenceTypeTests.test("removingSuffix/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// drop(while:)
+// removingPrefix(while:)
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("drop(while:)/dispatch") {
+SequenceTypeTests.test("removingPrefix(while:)/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.drop { _ in return false }
-  expectCustomizable(tester, tester.log.dropWhile)
+  tester.removingPrefix { _ in return false }
+  expectCustomizable(tester, tester.log.removingPrefixWhile)
 }
 
 //===----------------------------------------------------------------------===//
@@ -982,9 +982,9 @@ SequenceTypeTests.test("prefix/dispatch") {
   expectCustomizable(tester, tester.log.prefixMaxLength)
 }
 
-SequenceTypeTests.test("prefix/drop/dispatch") {
+SequenceTypeTests.test("prefix/removingPrefix/dispatch") {
   let xs = sequence(first: 1, next: {$0 < 10 ? $0 + 1 : nil})
-  expectEqualSequence([], Array(xs.prefix(3).drop(while: {$0 < 7})))
+  expectEqualSequence([], Array(xs.prefix(3).removingPrefix(while: {$0 < 7})))
 }
 
 //===----------------------------------------------------------------------===//
