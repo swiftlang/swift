@@ -1153,3 +1153,61 @@ internal var _emptyStringStorage: UInt32 = 0
 internal var _emptyStringBase: UnsafeRawPointer {
   return UnsafeRawPointer(Builtin.addressof(&_emptyStringStorage))
 }
+
+
+//
+// String API
+//
+// TODO: Reorganize to place these in right files. For now, useful to see diff
+// here.
+//
+extension Substring {
+  // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
+  // the return value.
+  @_versioned
+  internal
+  var _unmanagedContiguous: UnsafeString? {
+    let contigOpt = self._wholeString._guts._unmanagedContiguous
+    if _slowPath(contigOpt == nil) {
+      return nil
+    }
+    let contig = contigOpt._unsafelyUnwrappedUnchecked
+    return contig[self.startIndex.encodedOffset..<self.endIndex.encodedOffset]
+  }
+
+  // A potentially-unmanaged ephemeral string for very temporary purposes.
+  // Unlike _ephemeralString, caller must ensure lifetime.
+  //
+  // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
+  // the return value.
+  @_versioned
+  internal
+  var _unmanagedTransientString: String {
+    let contigOpt = self._unmanagedContiguous
+    if _slowPath(contigOpt == nil) {
+      return self._ephemeralString
+    }
+    return String(_StringGuts(contigOpt._unsafelyUnwrappedUnchecked))
+  }
+}
+
+extension Substring {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==(lhs: Substring, rhs: String) -> Bool {
+    let result = lhs._unmanagedTransientString == rhs
+    _fixLifetime(lhs)
+    return result
+  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==(lhs: Substring, rhs: Substring) -> Bool {
+    let result = lhs._unmanagedTransientString == rhs._unmanagedTransientString
+    _fixLifetime(lhs)
+    _fixLifetime(rhs)
+    return result
+  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==(lhs: String, rhs: Substring) -> Bool {
+    return rhs == lhs
+  }
+}
+

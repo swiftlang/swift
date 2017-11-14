@@ -378,15 +378,15 @@ extension Substring : LosslessStringConvertible {
 }
 
 extension StringProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func ==<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._ephemeralString == rhs._ephemeralString
-  }
+  // @_inlineable // FIXME(sil-serialize-all)
+  // public static func ==<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  //   return lhs._ephemeralString == rhs._ephemeralString
+  // }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func !=<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._ephemeralString != rhs._ephemeralString
-  }
+  // @_inlineable // FIXME(sil-serialize-all)
+  // public static func !=<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  //   return lhs._ephemeralString != rhs._ephemeralString
+  // }
 }
 
 extension StringProtocol {
