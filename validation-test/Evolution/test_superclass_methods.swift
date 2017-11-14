@@ -1,9 +1,6 @@
 // RUN: %target-resilience-test
 // REQUIRES: executable_test
 
-// rdar://35492775
-// REQUIRES: swift_test_mode_optimize_none
-
 import StdlibUnittest
 import superclass_methods
 
