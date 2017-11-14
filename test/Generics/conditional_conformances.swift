@@ -15,7 +15,7 @@ protocol P6: P2 {}
 protocol Assoc { associatedtype AT }
 
 func takes_P2<X: P2>(_: X) {}
-// expected-note@-1{{in call to function 'takes_P2'}}
+
 // expected-note@-2{{candidate requires that the types 'U' and 'V' be equivalent (requirement specified as 'U' == 'V')}}
 // expected-note@-3{{requirement from conditional conformance of 'SameTypeGeneric<U, V>' to 'P2'}}
 // expected-note@-4{{candidate requires that the types 'U' and 'Int' be equivalent (requirement specified as 'U' == 'Int')}}
@@ -91,13 +91,8 @@ struct SameType<T> {}
 // CHECK-NEXT: (normal_conformance type=SameType<Int> protocol=P2
 // CHECK-NEXT:   same_type: τ_0_0 Int)
 extension SameType: P2 where T == Int {}
-// FIXME: the compiler gets this... exactly backwards. :( For the incorrectly
-// accepted cases, it seems the compiler ends up with a (specialized_conformance
-// type=SameType<Float> ... same_type: Int Int ...) for the (normal_conformance
-// type=SameType<Int> ...).
 func same_type_good() {
     takes_P2(SameType<Int>())
-    // expected-error@-1{{generic parameter 'X' could not be inferred}}
 }
 func same_type_bad<U>(_: U) {
     takes_P2(SameType<U>())

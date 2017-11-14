@@ -563,15 +563,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
       }
 
-      if (conformance) {
-        assert(relationshipKind == SelfTypeRelationship::ConformsTo ||
-               relationshipKind == SelfTypeRelationship::ConformedToBy);
-
-        for (auto requirement : conformance->getConditionalRequirements()) {
-          cs.addConstraint(requirement, locator);
-        }
-      }
-
       bool fewerEffectiveParameters = false;
       switch (checkKind) {
       case CheckAll:
