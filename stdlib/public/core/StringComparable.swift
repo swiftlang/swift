@@ -64,11 +64,11 @@ extension String {
     else {
       compare = Int(truncatingIfNeeded: _stdlib_memcmp(
         self._core.startASCII, rhs._core.startASCII,
-        Swift.min(self._core.count, rhs._core.count)))      
+        Swift.min(self._guts.count, rhs._guts.count)))      
     }
 
     if compare == 0 {
-      compare = self._core.count - rhs._core.count
+      compare = self._guts.count - rhs._guts.count
     }
     // This efficiently normalizes the result to -1, 0, or 1 to match the
     // behavior of NSString's compare function.
@@ -98,19 +98,19 @@ extension String {
     switch (_guts.isASCII, rhs._guts.isASCII) {
     case (true, false):
       return Int(_swift_stdlib_unicode_compare_utf8_utf16(
-          _core.startASCII, Int32(_core.count),
-          rhs._core.startUTF16, Int32(rhs._core.count)))
+          _core.startASCII, Int32(_guts.count),
+          rhs._core.startUTF16, Int32(rhs._guts.count)))
     case (false, true):
       // Just invert it and recurse for this case.
       return -rhs._compareDeterministicUnicodeCollation(self)
     case (false, false):
       return Int(_swift_stdlib_unicode_compare_utf16_utf16(
-        _core.startUTF16, Int32(_core.count),
-        rhs._core.startUTF16, Int32(rhs._core.count)))
+        _core.startUTF16, Int32(_guts.count),
+        rhs._core.startUTF16, Int32(rhs._guts.count)))
     case (true, true):
       return Int(_swift_stdlib_unicode_compare_utf8_utf8(
-        _core.startASCII, Int32(_core.count),
-        rhs._core.startASCII, Int32(rhs._core.count)))
+        _core.startASCII, Int32(_guts.count),
+        rhs._core.startASCII, Int32(rhs._guts.count)))
     }
 #endif
   }

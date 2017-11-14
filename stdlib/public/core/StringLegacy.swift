@@ -36,7 +36,7 @@ extension String {
     precondition(count > 0, "Negative count not allowed")
     let s = repeatedValue
     self = String(_storage: _StringBuffer(
-        capacity: s._core.count * count,
+        capacity: s._guts.count * count,
         initialSize: 0,
         elementWidth: s._core.elementWidth))
     for _ in 0..<count {
@@ -47,7 +47,7 @@ extension String {
   /// A Boolean value indicating whether a string has no characters.
   @_inlineable // FIXME(sil-serialize-all)
   public var isEmpty: Bool {
-    return _core.count == 0
+    return _guts.count == 0
   }
 }
 

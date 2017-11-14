@@ -254,12 +254,12 @@ extension Character
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ s: String) {
     _precondition(
-      s._core.count != 0, "Can't form a Character from an empty String")
+      s._guts.count != 0, "Can't form a Character from an empty String")
     _debugPrecondition(
       s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    if _fastPath(s._core.count <= 4) {
+    if _fastPath(s._guts.count <= 4) {
       let b = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(s._core)
       if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
         _representation = .smallUTF16(

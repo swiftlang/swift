@@ -223,7 +223,7 @@ extension String {
         // `u` is a high-surrogate.  Sequence is well-formed if it
         // is followed by a low-surrogate.
         if _fastPath(
-               index + 1 < _core.count &&
+               index + 1 < _guts.count &&
                (_core[index + 1] &>> 10) == 0b1101_11) {
           return u
         }

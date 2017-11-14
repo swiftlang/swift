@@ -766,14 +766,14 @@ extension String._CharacterView : RangeReplaceableCollection {
   where S.Element == Character {
     if _fastPath(newElements is _SwiftStringView) {
       let v = newElements as! _SwiftStringView
-      if _fastPath(_core.count == 0) {
+      if _fastPath(_guts.count == 0) {
         _core = v._persistentContent._core
         return
       }
       _core.append(v._ephemeralContent._core)
       return
     }
-    reserveCapacity(_core.count + newElements.underestimatedCount)
+    reserveCapacity(_guts.count + newElements.underestimatedCount)
     for c in newElements { self.append(c) }
   }
 }

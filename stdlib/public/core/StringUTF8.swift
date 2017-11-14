@@ -170,7 +170,7 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned
     internal func _index(atEncodedOffset n: Int) -> Index {
-      if _fastPath(_core.isASCII) { return Index(encodedOffset: n) }
+      if _fastPath(_guts.isASCII) { return Index(encodedOffset: n) }
       if n == _core.endIndex { return endIndex }
       
       var p = UTF16.ForwardParser()
@@ -201,8 +201,8 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     @inline(__always)
     public func index(after i: Index) -> Index {
-      if _fastPath(_core.isASCII) {
-        precondition(i.encodedOffset < _core.count)
+      if _fastPath(_guts.isASCII) {
+        precondition(i.encodedOffset < _guts.count)
         return Index(encodedOffset: i.encodedOffset + 1)
       }
 
@@ -251,7 +251,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     public func index(before i: Index) -> Index {
-      if _fastPath(_core.isASCII) {
+      if _fastPath(_guts.isASCII) {
         precondition(i.encodedOffset > 0)
         return Index(encodedOffset: i.encodedOffset - 1)
       }
@@ -287,7 +287,7 @@ extension String {
     
     @_inlineable // FIXME(sil-serialize-all)
     public func distance(from i: Index, to j: Index) -> Int {
-      if _fastPath(_core.isASCII) {
+      if _fastPath(_guts.isASCII) {
         return j.encodedOffset - i.encodedOffset
       }
       return j >= i
@@ -578,7 +578,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
 extension String.UTF8View {
   @_inlineable // FIXME(sil-serialize-all)
   public var count: Int {
-    if _fastPath(_core.isASCII) { return _core.count }
+    if _fastPath(_guts.isASCII) { return _guts.count }
     let b = _core._unmanagedUTF16
     if _fastPath(b != nil) {
       defer { _fixLifetime(_core) }
