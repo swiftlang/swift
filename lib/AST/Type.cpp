@@ -3336,17 +3336,22 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
 
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
   Type t(this);
+
+  if (!t->getAnyNominal()) {
+    if (auto archetype = t->getAs<ArchetypeType>()) {
+      t = archetype->getSuperclass();
+    } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
+      t = dynamicSelfTy->getSelfType();
+    } else if (auto compositionTy = t->getAs<ProtocolCompositionType>()) {
+      t = compositionTy->getExistentialLayout().superclass;
+    }
+  }
+
   while (t) {
     // If we have a class-constrained archetype or class-constrained
     // existential, get the underlying superclass constraint.
     auto *nominalDecl = t->getAnyNominal();
-    if (!nominalDecl) {
-      assert(t->is<ArchetypeType>() || t->isExistentialType() &&
-             "expected a class, archetype or existential");
-      t = t->getSuperclass();
-      assert(t && "archetype or existential is not class constrained");
-      continue;
-    }
+    assert(nominalDecl && "expected nominal type here");
     assert(isa<ClassDecl>(nominalDecl) && "expected a class here");
 
     if (nominalDecl == baseClass)
@@ -3363,7 +3368,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(dc->isTypeContext());
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() && !baseTy->is<AnyMetatypeType>());
+  assert(!baseTy->hasLValueType() &&
+         !baseTy->is<AnyMetatypeType>() &&
+         !baseTy->is<ErrorType>());
 
   // The resulting set of substitutions. Always use this to ensure we
   // don't miss out on NRVO anywhere.
