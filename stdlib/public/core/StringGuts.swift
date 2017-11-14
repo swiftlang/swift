@@ -596,13 +596,10 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   var classification: Form {
     @inline(__always) get {
-      if _isNativePointer(_object) { return .native }
-      if _isNonTaggedObjCPointer(_object) { return .nonTaggedCocoa }
-
-      // Must be tagged
-      _sanityCheck(_isTagged)
-      if _objectBitPattern & _smallBit == 0 { return .unsafe }
-
+      if _isNative { return .native }
+      if _isNonTaggedCocoa { return .nonTaggedCocoa }
+      if _isUnsafe { return .unsafe }
+      _sanityCheck(_isSmallCocoa)
       return .smallCocoa
     }
   }
@@ -612,9 +609,12 @@ extension _StringGuts {
   //
   // Native Swift Strings
   //
+
   ///*fileprivate*/ internal // TODO: private in Swift 4
   public // TODO(StringGuts): for testing only
-  var _isNative: Bool { return classification == .native }
+  var _isNative: Bool {
+    return _isNativePointer(_object)
+  }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _native: NativeString? {
@@ -636,13 +636,15 @@ extension _StringGuts {
   //
   // Cocoa (non-tagged) Strings
   //
-  @_versioned
-  /*fileprivate*/ internal // TODO: private in Swift 4
-  var _isCocoa: Bool { return classification == .nonTaggedCocoa }
+  ///*fileprivate*/ internal // TODO: private in Swift 4
+  public // TODO(StringGuts): for testing only
+  var _isNonTaggedCocoa: Bool {
+    return _isNonTaggedObjCPointer(_object)
+  }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _cocoa: NonTaggedCocoaString? {
-    guard _isCocoa else { return nil }
+    guard _isNonTaggedCocoa else { return nil }
     return NonTaggedCocoaString(
       _bridgeObject(toNonTaggedObjC: _object),
       isSingleByte: self.isSingleByte,
@@ -662,7 +664,12 @@ extension _StringGuts {
   //
   // Unsafe Strings
   //
-  var _isUnsafe: Bool { return classification == .unsafe }
+
+  ///*fileprivate*/ internal // TODO: private in Swift 4
+  public // TODO(StringGuts): for testing only
+  var _isUnsafe: Bool {
+    return _isTagged && _objectBitPattern & _smallBit == 0
+  }
 
   @_versioned
   var _unsafeString: UnsafeString? {
@@ -693,8 +700,12 @@ extension _StringGuts {
   //
   // Tagged Cocoa Strings
   //
-  /*fileprivate*/ internal // TODO: private in Swift 4
-  var _isSmallCocoa: Bool { return classification == .smallCocoa }
+
+  ///*fileprivate*/ internal // TODO: private in Swift 4
+  public // TODO(StringGuts): for testing only
+  var _isSmallCocoa: Bool {
+    return _isTagged && _objectBitPattern & _smallBit != 0
+  }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _smallCocoa: SmallCocoaString? {
@@ -710,8 +721,9 @@ extension _StringGuts {
   //
   // Small Strings
   //
-  /*fileprivate*/ internal // TODO: private in Swift 4
-  var _isError: Bool { return classification == .error }
+  ///*fileprivate*/ internal // TODO: private in Swift 4
+  public // TODO(StringGuts): for testing only
+  var _isError: Bool { return false }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _error: FatalErrorString? {
