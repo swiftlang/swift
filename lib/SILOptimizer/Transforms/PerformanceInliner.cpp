@@ -438,7 +438,8 @@ bool SILPerformanceInliner::isProfitableToInline(
     ORE.emit([&]() {
       using namespace OptRemark;
       return RemarkMissed("NoInlinedCost", *AI.getInstruction())
-             << "Not profitable to inline (cost = " << NV("Cost", CalleeCost)
+             << "Not profitable to inline function " << NV("Callee", Callee)
+             << " (cost = " << NV("Cost", CalleeCost)
              << ", benefit = " << NV("Benefit", Benefit) << ")";
     });
     return false;
