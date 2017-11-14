@@ -1068,27 +1068,27 @@ internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 @_versioned // FIXME(sil-serialize-all)
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   var buffer = _StringBuffer(
-    capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
+    capacity: str._guts.count, initialSize: str._guts.count, elementWidth: 2)
 
   // Allocation of a StringBuffer requires binding the memory to the correct
   // encoding type.
   let dest = buffer.start.bindMemory(
-    to: UTF16.CodeUnit.self, capacity: str._core.count)
+    to: UTF16.CodeUnit.self, capacity: str._guts.count)
 
   // Try to write it out to the same length.
   let z = _swift_stdlib_unicode_strToLower(
-    dest, Int32(str._core.count),
-    str._core.startUTF16, Int32(str._core.count))
+    dest, Int32(str._guts.count),
+    str._core.startUTF16, Int32(str._guts.count))
   let correctSize = Int(z)
 
   // If more space is needed, do it again with the correct buffer size.
-  if correctSize != str._core.count {
+  if correctSize != str._guts.count {
     buffer = _StringBuffer(
       capacity: correctSize, initialSize: correctSize, elementWidth: 2)
     let dest = buffer.start.bindMemory(
-      to: UTF16.CodeUnit.self, capacity: str._core.count)
+      to: UTF16.CodeUnit.self, capacity: str._guts.count)
     _swift_stdlib_unicode_strToLower(
-      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.count))
+      dest, Int32(correctSize), str._core.startUTF16, Int32(str._guts.count))
   }
 
   return String(_storage: buffer)
@@ -1098,27 +1098,27 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
 @_versioned // FIXME(sil-serialize-all)
 internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
   var buffer = _StringBuffer(
-    capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
+    capacity: str._guts.count, initialSize: str._guts.count, elementWidth: 2)
 
   // Allocation of a StringBuffer requires binding the memory to the correct
   // encoding type.
   let dest = buffer.start.bindMemory(
-    to: UTF16.CodeUnit.self, capacity: str._core.count)
+    to: UTF16.CodeUnit.self, capacity: str._guts.count)
 
   // Try to write it out to the same length.
   let z = _swift_stdlib_unicode_strToUpper(
-    dest, Int32(str._core.count),
-    str._core.startUTF16, Int32(str._core.count))
+    dest, Int32(str._guts.count),
+    str._core.startUTF16, Int32(str._guts.count))
   let correctSize = Int(z)
 
   // If more space is needed, do it again with the correct buffer size.
-  if correctSize != str._core.count {
+  if correctSize != str._guts.count {
     buffer = _StringBuffer(
       capacity: correctSize, initialSize: correctSize, elementWidth: 2)
     let dest = buffer.start.bindMemory(
-      to: UTF16.CodeUnit.self, capacity: str._core.count)
+      to: UTF16.CodeUnit.self, capacity: str._guts.count)
     _swift_stdlib_unicode_strToUpper(
-      dest, Int32(correctSize), str._core.startUTF16, Int32(str._core.count))
+      dest, Int32(correctSize), str._core.startUTF16, Int32(str._guts.count))
   }
 
   return String(_storage: buffer)

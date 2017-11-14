@@ -326,7 +326,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   //
   @_versioned // FIXME(sil-serialize-all)
   @objc func substringFromIndex(_ start: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[Int(start)..<Int(_core.count)])
+    return _NSContiguousString(_core[Int(start)..<Int(_guts.count)])
   }
 
   @_versioned // FIXME(sil-serialize-all)
