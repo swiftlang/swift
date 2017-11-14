@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
 // RUN: not %target-swift-frontend %s -emit-ir
 protocol P{{}protocol A{typealias e{}}typealias a=A}extension P.a{protocol P

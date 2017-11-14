@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 class a<T where g:d{class A{class A<T>:A{init(){T{
