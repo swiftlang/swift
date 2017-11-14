@@ -180,3 +180,39 @@ bb0:
   %closure = partial_apply %f(%var) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
   unreachable
 }
+
+// Borrowed closure can be statically checked.
+//
+// CHECK-LABEL: sil @borrowedClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+// CHECK: begin_access [read] [static]
+// CHECK-LABEL: } // end sil function 'borrowedClosure'
+sil @borrowedClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %access = begin_access [read] [unknown] %0 : $*Builtin.Int64
+  %val = load [trivial] %access : $*Builtin.Int64
+  end_access %access : $*Builtin.Int64
+  %empty = tuple ()
+  return %empty : $()
+}
+
+// Borrow an escaping closure. The closure body will be dynamically checked.
+sil @borrowClosure : $@convention(thin) () -> () {
+  %box = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %addr = project_box %box : ${ var Builtin.Int64 }, 0
+  // box escapes.
+  %copy = copy_value %box : ${ var Builtin.Int64 }
+
+  %f = function_ref @borrowedClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply %f(%addr) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+
+  // closure is borrowed.
+  %borrow = begin_borrow %closure : $@callee_owned () -> ()
+  %closure_copy = copy_value %borrow : $@callee_owned () -> ()
+  end_borrow %borrow from %closure : $@callee_owned () -> (), $@callee_owned () -> ()
+
+  destroy_value %closure_copy : $@callee_owned () -> ()
+  destroy_value %copy : ${ var Builtin.Int64 }
+  destroy_value %box : ${ var Builtin.Int64 }
+  %empty = tuple ()
+  return %empty : $()
+}
