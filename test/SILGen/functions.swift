@@ -452,6 +452,37 @@ struct AlwaysInlinedMember : AlwaysInline {
   func alwaysInlined() {}
 }
 
+// CHECK-LABEL: sil hidden [Onone] @_T09functions10onone_funcyyF : $@convention(thin) () -> ()
+@_optimize(none)
+func onone_func() {}
+
+// CHECK-LABEL: sil hidden [Ospeed] @_T09functions11ospeed_funcyyF : $@convention(thin) () -> ()
+@_optimize(speed)
+func ospeed_func() {}
+
+// CHECK-LABEL: sil hidden [Osize] @_T09functions10osize_funcyyF : $@convention(thin) () -> ()
+@_optimize(size)
+func osize_func() {}
+
+struct OptmodeTestStruct {
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructV3fooyyF :
+  @_optimize(speed)
+  func foo() { }
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructVACycfC :
+  @_optimize(speed)
+  init() { }
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructV1xBi64_vg :
+  @_optimize(speed)
+  var x: Int { return getInt() }
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructVBi64_Bi64_cig :
+  @_optimize(speed)
+  subscript(l: Int) -> Int { return getInt() }
+}
+
 // CHECK-LABEL: sil hidden [_semantics "foo"] @_T09functions9semanticsyyF : $@convention(thin) () -> ()
 @_semantics("foo")
 func semantics() {}

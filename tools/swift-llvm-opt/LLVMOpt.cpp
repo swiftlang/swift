@@ -302,7 +302,7 @@ int main(int argc, char **argv) {
 
   if (Optimized) {
     IRGenOptions Opts;
-    Opts.Optimize = true;
+    Opts.OptMode = OptimizationMode::ForSpeed;
 
     // Then perform the optimizations.
     performLLVMOptimizations(Opts, M.get(), TM.get());

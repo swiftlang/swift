@@ -311,7 +311,7 @@ int main(int argc, char **argv) {
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
-    SILOpts.Optimization = SILOptions::SILOptMode::Optimize;
+    SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;

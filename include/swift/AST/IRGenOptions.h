@@ -21,6 +21,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/OptimizationMode.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
@@ -94,11 +95,7 @@ public:
   /// well-formed?
   unsigned Verify : 1;
 
-  /// Whether or not to run optimization passes.
-  unsigned Optimize : 1;
-
-  /// Whether or not to optimize for code size.
-  unsigned OptimizeForSize : 1;
+  OptimizationMode OptMode;
 
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
@@ -179,7 +176,7 @@ public:
 
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
-        Verify(true), Optimize(false), OptimizeForSize(false),
+        Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
         DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
@@ -202,9 +199,7 @@ public:
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.
   unsigned getLLVMCodeGenOptionsHash() {
-    unsigned Hash = 0;
-    Hash = (Hash << 1) | Optimize;
-    Hash = (Hash << 1) | OptimizeForSize;
+    unsigned Hash = (unsigned)OptMode;
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableLLVMARCOpts;
     return Hash;
@@ -220,6 +215,14 @@ public:
     } else {
       return OutputKind == IRGenOutputKind::LLVMAssembly;
     }
+  }
+
+  bool shouldOptimize() const {
+    return OptMode > OptimizationMode::NoOptimization;
+  }
+
+  bool optimizeForSize() const {
+    return OptMode == OptimizationMode::ForSize;
   }
 
   /// Return a hash code of any components from these options that should

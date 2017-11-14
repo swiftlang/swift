@@ -1148,8 +1148,7 @@ public:
     auto *F = getFunction();
 
     // Don't run function signature optimizations at -Os.
-    if (F->getModule().getOptions().Optimization ==
-        SILOptions::SILOptMode::OptimizeForSize)
+    if (F->optimizeForSize())
       return;
 
     // Don't optimize callees that should not be optimized.

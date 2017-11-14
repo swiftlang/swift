@@ -334,6 +334,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
+    if (auto *FDecl = dyn_cast<FuncDecl>(decl)) {
+      if (auto *StorageDecl = FDecl->getAccessorStorageDecl())
+        decl = StorageDecl;
+    }
     // Propagate @_semantics.
     auto Attrs = decl->getAttrs();
     for (auto *A : Attrs.getAttributes<SemanticsAttr>())
@@ -348,6 +352,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                       : SILSpecializeAttr::SpecializationKind::Partial;
       F->addSpecializeAttr(SILSpecializeAttr::create(
           *this, SA->getRequirements(), SA->isExported(), kind));
+    }
+
+    if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
+      F->setOptimizationMode(OA->getMode());
     }
 
     // @_silgen_name and @_cdecl functions may be called from C code somewhere.
@@ -513,8 +521,7 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   // compilation, simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
   if (F->isDefinition() &&
-      F->getModule().getOptions().Optimization <
-          SILOptions::SILOptMode::Optimize) {
+      !F->getModule().getOptions().shouldOptimize()) {
     F->convertToDeclaration();
   }
   if (F->isExternalDeclaration())
@@ -769,8 +776,7 @@ bool SILModule::isOnoneSupportModule() const {
 
 /// Returns true if it is the optimized OnoneSupport module.
 bool SILModule::isOptimizedOnoneSupportModule() const {
-  return getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
-         isOnoneSupportModule();
+  return getOptions().shouldOptimize() && isOnoneSupportModule();
 }
 
 void SILModule::setSerializeSILAction(SILModule::ActionCallback Action) {

@@ -2252,6 +2252,13 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case InlineDefault: break;
   }
 
+  switch (getOptimizationMode()) {
+    case OptimizationMode::NoOptimization: OS << "[Onone] "; break;
+    case OptimizationMode::ForSpeed: OS << "[Ospeed] "; break;
+    case OptimizationMode::ForSize: OS << "[Osize] "; break;
+    default: break;
+  }
+
   if (getEffectsKind() == EffectsKind::ReadOnly)
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)

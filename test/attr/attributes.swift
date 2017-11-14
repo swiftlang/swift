@@ -215,6 +215,11 @@ var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 @inline(__always) class FooClass2 { // expected-error {{@inline(__always) cannot be applied to this declaration}} {{1-19=}}
 }
 
+@_optimize(speed) func OspeedFunc() {}
+@_optimize(speed) var OpeedVar : Int // expected-error {{@_optimize(speed) cannot be applied to stored properties}} {{1-19=}}
+@_optimize(speed) class OspeedClass { // expected-error {{@_optimize(speed) cannot be applied to this declaration}} {{1-19=}}
+}
+
 class A {
   @inline(never) init(a : Int) {}
   var b : Int {
@@ -235,6 +240,18 @@ class B {
     @inline(__always) set {
     }
   }
+}
+
+class C {
+  @_optimize(speed) init(a : Int) {}
+  var b : Int {
+    @_optimize(none) get {
+      return 42
+    }
+    @_optimize(size) set {
+    }
+  }
+  @_optimize(size) var c : Int // expected-error {{@_optimize(size) cannot be applied to stored properties}}
 }
 
 class SILStored {
