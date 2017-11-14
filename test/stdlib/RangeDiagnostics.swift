@@ -37,10 +37,10 @@ func typeInference_Comparable<C : Comparable>(v: C) {
   do {
     let r1: Range<C>       = v...v // expected-error {{cannot convert value of type 'ClosedRange<C>' to specified type 'Range<C>'}}
     let r2: ClosedRange<C> = v..<v // expected-error {{cannot convert value of type 'Range<C>' to specified type 'ClosedRange<C>'}}
-    let r3: CountableRange<C>       = v..<v // expected-error {{type 'C' does not conform to protocol '_Strideable'}}
-    let r4: CountableClosedRange<C> = v...v // expected-error {{type 'C' does not conform to protocol '_Strideable'}}
-    let r5: CountableRange<C>       = v...v // expected-error {{type 'C' does not conform to protocol '_Strideable'}}
-    let r6: CountableClosedRange<C> = v..<v // expected-error {{type 'C' does not conform to protocol '_Strideable'}}
+    let r3: CountableRange<C>       = v..<v // expected-error {{type 'C' does not conform to protocol 'Strideable'}}
+    let r4: CountableClosedRange<C> = v...v // expected-error {{type 'C' does not conform to protocol 'Strideable'}}
+    let r5: CountableRange<C>       = v...v // expected-error {{type 'C' does not conform to protocol 'Strideable'}}
+    let r6: CountableClosedRange<C> = v..<v // expected-error {{type 'C' does not conform to protocol 'Strideable'}}
   }
 }
 
