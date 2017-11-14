@@ -442,33 +442,56 @@ void SelectEnforcement::updateAccess(BeginAccessInst *access) {
 }
 
 void SelectEnforcement::updateCapture(AddressCapture capture) {
+  auto captureIfEscaped = [&](SILInstruction *user) {
+    if (hasPotentiallyEscapedAt(user))
+      dynamicCaptures.recordCapture(capture);
+  };
   llvm::SmallSetVector<SingleValueInstruction *, 8> worklist;
   auto visitUse = [&](Operand *oper) {
     auto *user = oper->getUser();
     if (FullApplySite::isa(user)) {
       // A call is considered a closure access regardless of whether it calls
       // the closure or accepts the closure as an argument.
-      if (hasPotentiallyEscapedAt(user)) {
-        dynamicCaptures.recordCapture(capture);
-      }
+      captureIfEscaped(user);
       return;
     }
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
-      worklist.insert(CFI);
+    switch (user->getKind()) {
+    case SILInstructionKind::ConvertFunctionInst:
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::EnumInst:
+    case SILInstructionKind::StructInst:
+    case SILInstructionKind::TupleInst:
+    case SILInstructionKind::PartialApplyInst:
+      // Propagate the closure.
+      worklist.insert(cast<SingleValueInstruction>(user));
       return;
-    }
-    if (auto *PAI = dyn_cast<PartialApplyInst>(user)) {
-      assert(oper->get() != PAI->getCallee() && "cannot re-partially apply");
-      // The closure is capture by another closure. Transitively consider any
-      // calls to the parent closure as an access.
-      worklist.insert(PAI);
+    case SILInstructionKind::StrongRetainInst:
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::DebugValueInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::RetainValueInst:
+    case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::EndBorrowInst:
+      // Benign use.
       return;
+    case SILInstructionKind::TupleExtractInst:
+    case SILInstructionKind::StructExtractInst:
+    case SILInstructionKind::AssignInst:
+    case SILInstructionKind::BranchInst:
+    case SILInstructionKind::CondBranchInst:
+    case SILInstructionKind::ReturnInst:
+    case SILInstructionKind::StoreInst:
+      // These are all valid partial_apply users, however we don't expect them
+      // to occur with non-escaping closures. Handle them conservatively just in
+      // case they occur.
+      LLVM_FALLTHROUGH;
+    default:
+      DEBUG(llvm::dbgs() << "    Unrecognized partial_apply user: " << *user);
+
+      // Handle unknown uses conservatively by assuming a capture.
+      captureIfEscaped(user);
     }
-    DEBUG(llvm::dbgs() << "    Unrecognized partial_apply user: " << *user);
-    // If this user has no results, then we can safely assume it doesn't pass
-    // the closure to a call site. If it has results, then it might propagate
-    // the closure, in which case it needs to be handled above.
-    assert(user->getResults().empty());
   };
   SingleValueInstruction *PAIUser = dyn_cast<PartialApplyInst>(capture.site);
   while (true) {
