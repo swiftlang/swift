@@ -120,7 +120,7 @@ extension _StringGuts {
       return true
     case .error, .smallCocoa:
       return false
-    }   
+    }
   }
 
   var _unflaggedObject: _BuiltinBridgeObject {
@@ -279,7 +279,7 @@ internal struct UnsafeString {
 
   @_versioned
   internal var baseAddress: UnsafeRawPointer
-  
+
   @_versioned
   internal var count: Int
 
@@ -334,10 +334,10 @@ internal struct UnsafeString {
   internal subscript(position: Int) -> UTF16.CodeUnit {
     @inline(__always)
     get {
-      _precondition(
+      _sanityCheck(
         position >= 0,
         "subscript: index precedes String start")
-      _precondition(
+      _sanityCheck(
         position <= count,
         "subscript: index points past String end")
       if isSingleByte {
@@ -350,10 +350,10 @@ internal struct UnsafeString {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal subscript(bounds: Range<Int>) -> UnsafeString {
-    _precondition(
+    _sanityCheck(
       bounds.lowerBound >= 0,
       "subscript: subrange start precedes String start")
-    _precondition(
+    _sanityCheck(
       bounds.upperBound <= count,
       "subscript: subrange extends past String end")
     return UnsafeString(
@@ -382,8 +382,8 @@ internal struct UnsafeString {
   ) {
     _sanityCheck(width == 1 || width == 2)
     let elementShift = width &- 1
-    _precondition(capacityEnd >= dest + self.count &<< elementShift)
- 
+    _sanityCheck(capacityEnd >= dest + self.count &<< elementShift)
+
     if _fastPath(self.byteWidth == width) {
       _memcpy(
         dest: dest,
@@ -428,7 +428,7 @@ struct NativeString {
   var nativeObject: AnyObject {
     return stringBuffer._storage.buffer
   }
-  
+
   var unsafe: UnsafeString {
     return UnsafeString(
       baseAddress: self.baseAddress,
@@ -539,7 +539,7 @@ struct NativeString {
 internal struct OpaqueCocoaString {
   @_versioned
   let object: AnyObject
-  
+
   @_versioned
   let count: Int
 
@@ -603,7 +603,7 @@ extension _StringGuts {
   // Native Swift Strings
   //
   ///*fileprivate*/ internal // TODO: private in Swift 4
-  public // TODO(StringGuts): for testing only 
+  public // TODO(StringGuts): for testing only
   var _isNative: Bool { return classification == .native }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
@@ -810,13 +810,13 @@ extension _StringGuts {
       // without having properly sliced the backing Cocoa string itself. Detect
       // that situation in retrospect and create a Cocoa substring.
       Stats.numCocoaSelfSlice += 1
- 
+
       _sanityCheck(legacyCore._baseAddress != nil)
       let sliceStart = UnsafeRawPointer(
         legacyCore._baseAddress._unsafelyUnwrappedUnchecked)
       let sliceEnd =  UnsafeRawPointer(
         legacyCore._pointer(toElementAt: legacyCore.count))
-   
+
       let unsafeOpt = guts._unmanagedContiguous
       defer { _fixLifetime(guts) }
       _sanityCheck(unsafeOpt != nil)
@@ -939,7 +939,7 @@ extension _StringGuts {
     }
     return _copyToStringBuffer(capacity: self.count, byteWidth: self.byteWidth)
   }
-  
+
   @_versioned
   internal
   func _copyToStringBuffer(capacity: Int, byteWidth: Int) -> _StringBuffer {
@@ -959,7 +959,7 @@ extension _StringGuts {
       accomodatingElementWidth: byteWidth)
     return buffer
   }
-  
+
   @_inlineable
   // TODO: @_versioned
   // TODO: internal
