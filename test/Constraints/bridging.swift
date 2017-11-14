@@ -181,8 +181,9 @@ func dictionaryToNSDictionary() {
 struct NotEquatable {}
 func notEquatableError(_ d: Dictionary<Int, NotEquatable>) -> Bool {
   // FIXME: Another awful diagnostic.
-  return d == d // expected-error{{binary operator '==' cannot be applied to two 'Dictionary<Int, NotEquatable>' operands}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
+  return d == d // expected-error{{'<Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool' requires that 'NotEquatable' conform to 'Equatable'}}
+  // expected-note @-1 {{requirement specified as 'NotEquatable' : 'Equatable'}}
+  // expected-note @-2 {{requirement from conditional conformance of 'Dictionary<Int, NotEquatable>' to 'Equatable'}}
 }
 
 // NSString -> String
