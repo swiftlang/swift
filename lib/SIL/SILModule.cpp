@@ -334,6 +334,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
+    if (auto *FDecl = dyn_cast<FuncDecl>(decl)) {
+      if (auto *StorageDecl = FDecl->getAccessorStorageDecl())
+        decl = StorageDecl;
+    }
     // Propagate @_semantics.
     auto Attrs = decl->getAttrs();
     for (auto *A : Attrs.getAttributes<SemanticsAttr>())
