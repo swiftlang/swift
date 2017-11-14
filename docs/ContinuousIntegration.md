@@ -9,7 +9,9 @@
     - [Smoke Testing](#smoke-testing)
     - [Validation Testing](#validation-testing)
     - [Linting](#linting)
+    - [Source Compatibility Testing](#source-compatibility-testing)
     - [Specific Preset Testing](#specific-preset-testing)
+    - [Testing Compiler Performance](#testing-compiler-performance)
 - [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
 
@@ -31,6 +33,7 @@ Users with [commit access](https://swift.org/contributing/#commit-access) can tr
 4. Linting
 5. Source Compatibility Testing
 6. Specific Preset Testing
+7. Testing Compiler Performance
 
 We describe each in detail below:
 
