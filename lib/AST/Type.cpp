@@ -3368,7 +3368,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(dc->isTypeContext());
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() && !baseTy->is<AnyMetatypeType>());
+  assert(!baseTy->hasLValueType() &&
+         !baseTy->is<AnyMetatypeType>() &&
+         !baseTy->is<ErrorType>());
 
   // The resulting set of substitutions. Always use this to ensure we
   // don't miss out on NRVO anywhere.
