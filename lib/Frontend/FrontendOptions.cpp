@@ -170,33 +170,33 @@ void FrontendInputs::readInputFileList(DiagnosticEngine &diags,
 
 bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
-  case NoneAction:
-  case Parse:
-  case Typecheck:
-  case DumpParse:
-  case DumpAST:
-  case EmitSyntax:
-  case DumpInterfaceHash:
-  case PrintAST:
-  case DumpScopeMaps:
-  case DumpTypeRefinementContexts:
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
     return false;
-  case EmitPCH:
-  case EmitSILGen:
-  case EmitSIL:
-  case EmitSIBGen:
-  case EmitSIB:
-  case EmitModuleOnly:
-  case MergeModules:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
     return true;
-  case Immediate:
-  case REPL:
+  case ActionType::Immediate:
+  case ActionType::REPL:
     return false;
-  case EmitAssembly:
-  case EmitIR:
-  case EmitBC:
-  case EmitObject:
-  case EmitImportedModules:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -204,32 +204,32 @@ bool FrontendOptions::actionHasOutput() const {
 
 bool FrontendOptions::actionIsImmediate() const {
   switch (RequestedAction) {
-  case NoneAction:
-  case Parse:
-  case Typecheck:
-  case DumpParse:
-  case DumpAST:
-  case EmitSyntax:
-  case DumpInterfaceHash:
-  case PrintAST:
-  case DumpScopeMaps:
-  case DumpTypeRefinementContexts:
-  case EmitPCH:
-  case EmitSILGen:
-  case EmitSIL:
-  case EmitSIBGen:
-  case EmitSIB:
-  case EmitModuleOnly:
-  case MergeModules:
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
     return false;
-  case Immediate:
-  case REPL:
+  case ActionType::Immediate:
+  case ActionType::REPL:
     return true;
-  case EmitAssembly:
-  case EmitIR:
-  case EmitBC:
-  case EmitObject:
-  case EmitImportedModules:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
     return false;
   }
   llvm_unreachable("Unknown ActionType");
@@ -237,8 +237,8 @@ bool FrontendOptions::actionIsImmediate() const {
 
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
-  if (RequestedAction != FrontendOptions::EmitModuleOnly &&
-      RequestedAction != FrontendOptions::MergeModules) {
+  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
+      RequestedAction != FrontendOptions::ActionType::MergeModules) {
     for (const std::string &OutputFileName : OutputFilenames) {
       fn(OutputFileName);
     }
@@ -299,7 +299,7 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
   // Note: this code path will only be taken when running the frontend
   // directly; the driver should always pass -module-name when invoking the
   // frontend.
-  if (RequestedAction == FrontendOptions::REPL) {
+  if (RequestedAction == FrontendOptions::ActionType::REPL) {
     // Default to a module named "REPL" if we're in REPL mode.
     return "REPL";
   }
