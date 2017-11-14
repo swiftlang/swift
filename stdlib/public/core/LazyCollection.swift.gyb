@@ -162,8 +162,8 @@ extension ${Self} : ${TraversalCollection} {
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public subscript(bounds: Range<Index>) -> ${Slice}<${Self}<Base>> {
-    return ${Slice}(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice<${Self}<Base>> {
+    return Slice(base: self, bounds: bounds)
   }
 
   /// A Boolean value indicating whether the collection is empty.
