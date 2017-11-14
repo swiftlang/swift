@@ -97,7 +97,7 @@ extension _StringGuts {
       return (_objectBitPattern & _twoByteCodeUnitBit) == 0
     case .smallCocoa, .error:
       return false
-    }   
+    }
   }
 
   var byteWidth: Int {
@@ -106,6 +106,7 @@ extension _StringGuts {
 
   // NOTE: Currently, single byte representation is synonymous with ASCII. This
   // may change in the future in preference of either UTF8 or Latin1.
+  @_versioned
   var isASCII: Bool {
     return isSingleByte
   }
