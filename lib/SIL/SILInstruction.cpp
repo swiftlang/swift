@@ -1335,8 +1335,23 @@ SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
   return iterator(*this, getEndOffset());
 }
 
+SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rbegin() const {
+  return llvm::make_reverse_iterator(end());
+}
+
+SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rend() const {
+  return llvm::make_reverse_iterator(begin());
+}
+
 SILInstructionResultArray::range SILInstructionResultArray::getValues() const {
   return {begin(), end()};
+}
+
+SILInstructionResultArray::reverse_range
+SILInstructionResultArray::getReversedValues() const {
+  return {rbegin(), rend()};
 }
 
 const ValueBase *SILInstructionResultArray::front() const {
