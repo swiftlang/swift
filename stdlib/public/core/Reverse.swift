@@ -269,177 +269,10 @@ public struct ReversedCollection<
   public let _base: Base
 }
 
-/// An index that traverses the same positions as an underlying index,
-/// with inverted traversal direction.
-@_fixed_layout
-public struct ReversedRandomAccessIndex<
-  Base : RandomAccessCollection
-> : Comparable {
-  /// Creates a new index into a reversed collection for the position before
-  /// the specified index.
-  ///
-  /// When you create an index into a reversed collection using the index
-  /// passed as `base`, an index from the underlying collection, the resulting
-  /// index is the position of the element *before* the element referenced by
-  /// `base`. The following example creates a new `ReversedIndex` from the
-  /// index of the `"a"` character in a string's character view.
-  ///
-  ///     let name = "Horatio"
-  ///     let aIndex = name.index(of: "a")!
-  ///     // name[aIndex] == "a"
-  ///
-  ///     let reversedName = name.reversed()
-  ///     let i = ReversedIndex<String>(aIndex)
-  ///     // reversedName[i] == "r"
-  ///
-  /// The element at the position created using `ReversedIndex<...>(aIndex)` is
-  /// `"r"`, the character before `"a"` in the `name` string. Viewed from the
-  /// perspective of the `reversedCharacters` collection, of course, `"r"` is
-  /// the element *after* `"a"`.
-  ///
-  /// - Parameter base: The position after the element to create an index for.
-  @_inlineable
-  public init(_ base: Base.Index) {
-    self.base = base
-  }
 
-  /// The position after this position in the underlying collection.
-  ///
-  /// To find the position that corresponds with this index in the original,
-  /// underlying collection, use that collection's `index(before:)` method
-  /// with this index's `base` property.
-  ///
-  /// The following example declares a function that returns the index of the
-  /// last even number in the passed array, if one is found. First, the
-  /// function finds the position of the last even number as a `ReversedIndex`
-  /// in a reversed view of the array of numbers. Next, the function calls the
-  /// array's `index(before:)` method to return the correct position in the
-  /// passed array.
-  ///
-  ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
-  ///         let reversedNumbers = numbers.reversed()
-  ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
-  ///             else { return nil }
-  ///
-  ///         return numbers.index(before: i.base)
-  ///     }
-  ///
-  ///     let numbers = [10, 20, 13, 19, 30, 52, 17, 40, 51]
-  ///     if let lastEven = indexOfLastEven(numbers) {
-  ///         print("Last even number: \(numbers[lastEven])")
-  ///     }
-  ///     // Prints "Last even number: 40"
-  public let base: Base.Index
+extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }
 
-  @_inlineable
-  public static func == (
-    lhs: ReversedRandomAccessIndex<Base>,
-    rhs: ReversedRandomAccessIndex<Base>
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-
-  @_inlineable
-  public static func < (
-    lhs: ReversedRandomAccessIndex<Base>,
-    rhs: ReversedRandomAccessIndex<Base>
-  ) -> Bool {
-    // Note ReversedRandomAccessIndex has inverted logic compared to base Base.Index
-    return lhs.base > rhs.base
-  }
-}
-
-/// A collection that presents the elements of its base collection
-/// in reverse order.
-///
-/// - Note: This type is the result of `x.reversed()` where `x` is a
-///   collection having random access indices.
-/// - See also: `ReversedCollection`
-@_fixed_layout
-public struct ReversedRandomAccessCollection<
-  Base : RandomAccessCollection
-> : RandomAccessCollection {
-  // FIXME: swift-3-indexing-model: tests for ReversedRandomAccessIndex and
-  // ReversedRandomAccessCollection.
-
-  /// Creates an instance that presents the elements of `base` in
-  /// reverse order.
-  ///
-  /// - Complexity: O(1)
-  @_versioned
-  @_inlineable
-  internal init(_base: Base) {
-    self._base = _base
-  }
-
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = ReversedRandomAccessIndex<Base>
-
-  public typealias IndexDistance = Base.IndexDistance
-
-  public typealias Indices =
-    DefaultRandomAccessIndices<ReversedRandomAccessCollection<Base>>
-
-  /// A type that provides the sequence's iteration interface and
-  /// encapsulates its iteration state.
-  public typealias Iterator = IndexingIterator<
-    ReversedRandomAccessCollection
-  >
-
-  @_inlineable
-  public var startIndex: Index {
-    return ReversedRandomAccessIndex(_base.endIndex)
-  }
-
-  @_inlineable
-  public var endIndex: Index {
-    return ReversedRandomAccessIndex(_base.startIndex)
-  }
-
-  @_inlineable
-  public func index(after i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.index(before: i.base))
-  }
-
-  @_inlineable
-  public func index(before i: Index) -> Index {
-    return ReversedRandomAccessIndex(_base.index(after: i.base))
-  }
-
-  @_inlineable
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    // FIXME: swift-3-indexing-model: tests.
-    return ReversedRandomAccessIndex(_base.index(i.base, offsetBy: -n))
-  }
-
-  @_inlineable
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
-    // FIXME: swift-3-indexing-model: tests.
-    return _base.index(i.base, offsetBy: -n, limitedBy: limit.base).map { Index($0) }
-  }
-
-  @_inlineable
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
-    // FIXME: swift-3-indexing-model: tests.
-    return _base.distance(from: end.base, to: start.base)
-  }
-
-  @_inlineable
-  public subscript(position: Index) -> Base.Element {
-    return _base[_base.index(before: position.base)]
-  }
-
-  // FIXME: swift-3-indexing-model: the rest of methods.
-
-  public let _base: Base
-}
+typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
 
 extension BidirectionalCollection {
   /// Returns a view presenting the elements of the collection in reverse
@@ -473,40 +306,6 @@ extension BidirectionalCollection {
   }
 }
 
-extension RandomAccessCollection {
-  /// Returns a view presenting the elements of the collection in reverse
-  /// order.
-  ///
-  /// You can reverse a collection without allocating new space for its
-  /// elements by calling this `reversed()` method. A
-  /// `ReversedRandomAccessCollection` instance wraps an underlying collection
-  /// and provides access to its elements in reverse order. This example
-  /// prints the elements of an array in reverse order:
-  ///
-  ///     let numbers = [3, 5, 7]
-  ///     for number in numbers.reversed() {
-  ///         print(number)
-  ///     }
-  ///     // Prints "7"
-  ///     // Prints "5"
-  ///     // Prints "3"
-  ///
-  /// If you need a reversed collection of the same type, you may be able to
-  /// use the collection's sequence-based or collection-based initializer. For
-  /// example, to get the reversed version of an array, initialize a new
-  /// `Array` instance from the result of this `reversed()` method.
-  ///
-  ///     let reversedNumbers = Array(numbers.reversed())
-  ///     print(reversedNumbers)
-  ///     // Prints "[7, 5, 3]"
-  ///
-  /// - Complexity: O(1)
-  @_inlineable
-  public func reversed() -> ReversedRandomAccessCollection<Self> {
-    return ReversedRandomAccessCollection(_base: self)
-  }
-}
-
 extension LazyCollectionProtocol
   where
   Self : BidirectionalCollection,
@@ -520,22 +319,6 @@ extension LazyCollectionProtocol
     ReversedCollection<Elements>
   > {
     return ReversedCollection(_base: elements).lazy
-  }
-}
-
-extension LazyCollectionProtocol
-  where
-  Self : RandomAccessCollection,
-  Elements : RandomAccessCollection {
-
-  /// Returns the elements of the collection in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @_inlineable
-  public func reversed() -> LazyRandomAccessCollection<
-    ReversedRandomAccessCollection<Elements>
-  > {
-    return ReversedRandomAccessCollection(_base: elements).lazy
   }
 }
 
