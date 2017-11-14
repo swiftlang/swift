@@ -127,6 +127,16 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy.substGenericArgs(SGF.SGM.M, typeSubMap);
 
+  // We might have to re-abstract the 'self' value if it is an
+  // Optional.
+  AbstractionPattern origSelfType(witness->getInterfaceType());
+  origSelfType = origSelfType.getFunctionInputType();
+
+  swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
+                                        origSelfType,
+                                        swiftValueType,
+                                        SGFContext());
+
   // The witness may be more abstract than the concrete value we're bridging,
   // for instance, if the value is a concrete instantiation of a generic type.
   //
