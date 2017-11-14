@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_SOURCE_ENTITY_WALKER_H
-#define SWIFT_AST_SOURCE_ENTITY_WALKER_H
+#ifndef SWIFT_IDE_SOURCE_ENTITY_WALKER_H
+#define SWIFT_IDE_SOURCE_ENTITY_WALKER_H
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/LLVM.h"
@@ -36,6 +36,7 @@ namespace swift {
   class Stmt;
   class Expr;
   class Type;
+  struct ASTNode;
 
 
 /// An abstract class used to traverse the AST and provide source information.
@@ -61,6 +62,9 @@ public:
   /// Walks the provided Expr.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(Expr *E);
+  /// Walks the provided ASTNode.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(ASTNode N);
 
   /// This method is called when first visiting a decl, before walking into its
   /// children.  If it returns false, the subtree is skipped.
@@ -109,9 +113,11 @@ public:
   ///
   /// \param D the referenced decl.
   /// \param Range the source range of the source reference.
+  /// \param AccKind whether this is a read, write or read/write access.
   /// \param IsOpenBracket this is \c true when the method is called on an
   /// open bracket.
   virtual bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                                       Optional<AccessKind> AccKind,
                                        bool IsOpenBracket);
 
   /// This method is called for each keyword argument in a call expression.

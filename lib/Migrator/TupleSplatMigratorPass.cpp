@@ -15,6 +15,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Parse/Lexer.h"
 

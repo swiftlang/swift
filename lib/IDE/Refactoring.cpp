@@ -819,7 +819,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
 
   // We cannot extract expressions of l-value type.
   if (auto Ty = RangeInfo.getType()) {
-    if (Ty->hasLValueType() || Ty->getKind() == TypeKind::InOut)
+    if (Ty->hasLValueType() || Ty->is<InOutType>())
       return ExtractCheckResult();
 
     // Disallow extracting error type expressions/statements
@@ -941,7 +941,7 @@ static StringRef correctNewDeclName(DeclContext *DC, StringRef Name) {
 static Type sanitizeType(Type Ty) {
   // Transform lvalue type to inout type so that we can print it properly.
   return Ty.transform([](Type Ty) {
-    if (Ty->getKind() == TypeKind::LValue) {
+    if (Ty->is<LValueType>()) {
       return Type(InOutType::get(Ty->getRValueType()->getCanonicalType()));
     }
     return Ty;
@@ -1163,7 +1163,7 @@ bool RefactoringActionExtractFunction::performChange() {
     for (auto &RD : Parameters) {
 
       // Inout argument needs "&".
-      if (RD.Ty->getKind() == TypeKind::InOut)
+      if (RD.Ty->is<InOutType>())
         OS << "&";
       OS << RD.VD->getBaseName().userFacingName();
       if (&RD != &Parameters.back())
