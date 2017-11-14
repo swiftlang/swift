@@ -16,17 +16,18 @@
 # include "AppleHostVersionDetection.h"
 #endif
 
-#include "swift/Strings.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -82,6 +83,161 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
 
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
+
+namespace swift {
+
+/// Implement argument semantics in a way that will make it easier to have
+/// >1 primary file (or even a primary file list) in the future without
+/// breaking anything today.
+/// Semantics today:
+/// If input files are on command line, primary files on command line are also
+/// input files; they are not repeated without -primary-file. If input files are
+/// in a file list, the primary files on the command line are repeated in the
+/// file list. Thus, if there are any primary files, it is illegal to have both
+/// (non-primary) input files and a file list. Finally, the order of input files
+/// must match the order given on the command line or the file list. Side note:
+/// since each input file will cause a lot of work for the compiler, this code
+/// is biased towards clarity and not optimized.
+/// In the near future, it will be possible to put primary files in the
+/// filelist, or to have a separate filelist for primaries. The organization
+/// here anticipates that evolution.
+
+class ArgsToFrontendInputsConverter {
+  DiagnosticEngine &Diags;
+  const ArgList &Args;
+  FrontendInputs &Inputs;
+
+  /// A primary file is one that the compiler will generate code for,
+  /// a secondary file supplies definitions used by the primaries.
+  enum class FileKind { Primary, Secondary };
+
+  std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
+  llvm::StringMap<unsigned> FileIndices;
+
+  struct FilesInfo {
+    bool hadError;
+    std::vector<std::pair<StringRef, FileKind>> files;
+    char const *const fileListPath;
+
+    static FilesInfo error() {
+      return {true, std::vector<std::pair<StringRef, FileKind>>(), nullptr};
+    }
+    static FilesInfo
+    fromFileList(char const *const path,
+                 std::vector<std::pair<StringRef, FileKind>> &&files) {
+      return {false, std::move(files), path};
+    }
+    static FilesInfo
+    fromCommandLine(std::vector<std::pair<StringRef, FileKind>> &&files) {
+      return {false, std::move(files), nullptr};
+    }
+    bool mustAddPrimariesToAllFiles() const { return fileListPath == nullptr; }
+  };
+
+public:
+  ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
+                                FrontendInputs &Inputs)
+      : Diags(Diags), Args(Args), Inputs(Inputs) {}
+
+  bool convert() {
+    if (enforceFilelistExclusion())
+      return true;
+    const FilesInfo info = getFiles();
+    if (info.hadError)
+      return true;
+    setInputFilesAndIndices(info);
+    return setPrimaryFiles(info);
+  }
+
+private:
+  bool enforceFilelistExclusion() {
+    if (Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_cannot_have_input_files_with_file_list);
+      return true;
+    }
+    return false;
+  }
+
+  FilesInfo getFiles() {
+    if (const llvm::opt::Arg *filelistPathArg =
+            Args.getLastArg(options::OPT_filelist)) {
+      char const *const filelistPath = filelistPathArg->getValue();
+      return getFilesFromFilelist(filelistPath);
+    }
+    return getFilesFromCommandLine();
+  }
+
+  FilesInfo getFilesFromFilelist(char const *const filelistPath) {
+
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
+        llvm::MemoryBuffer::getFile(filelistPath);
+
+    if (!filelistBufferOrError) {
+      Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
+                     filelistBufferOrError.getError().message());
+      return FilesInfo::error();
+    }
+    // Keep buffer alive because code passes around StringRefs.
+    FilelistBuffer = std::move(*filelistBufferOrError);
+    std::vector<StringRef> inputFilesFromFilelist(
+        llvm::line_iterator(*FilelistBuffer), {});
+    std::vector<std::pair<StringRef, FileKind>> files;
+    for (auto file : inputFilesFromFilelist) {
+      files.push_back(std::make_pair(file, FileKind::Secondary));
+    }
+    return FilesInfo::fromFileList(filelistPath, std::move(files));
+  }
+
+  FilesInfo getFilesFromCommandLine() {
+    std::vector<std::pair<StringRef, FileKind>> files;
+    for (const Arg *A :
+         Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+      FileKind fileType;
+      if (A->getOption().matches(options::OPT_INPUT)) {
+        fileType = FileKind::Secondary;
+      } else if (A->getOption().matches(options::OPT_primary_file)) {
+        fileType = FileKind::Primary;
+      } else {
+        llvm_unreachable("Unknown input-related argument!");
+      }
+      files.push_back(std::make_pair(A->getValue(), fileType));
+    }
+    return FilesInfo::fromCommandLine(std::move(files));
+  }
+
+  void setInputFilesAndIndices(const FilesInfo &info) {
+    for (std::pair<StringRef, FileKind> p : info.files) {
+      if (p.second == FileKind::Secondary ||
+          info.mustAddPrimariesToAllFiles()) {
+        unsigned index = Inputs.inputFilenameCount();
+        auto file = p.first;
+        Inputs.addInputFilename(file);
+        FileIndices.insert({file, index});
+      }
+    }
+  }
+  bool setPrimaryFiles(const FilesInfo &info) {
+    for (std::pair<StringRef, FileKind> p : info.files) {
+      if (p.second != FileKind::Primary)
+        continue;
+      auto file = p.first;
+      const auto iterator = FileIndices.find(file);
+      // Catch "swiftc -frontend -c -filelist foo -primary-file
+      // some-file-not-in-foo".
+      if (iterator == FileIndices.end()) {
+        assert(info.fileListPath != nullptr &&
+               "Missing primary with no filelist");
+        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
+                       info.fileListPath);
+        return true;
+      }
+      Inputs.addPrimaryInputFilename(file, iterator->second);
+    }
+    return false;
+  }
+};
+} // namespace swift
 
 // This is a separate function so that it shows up in stack traces.
 LLVM_ATTRIBUTE_NOINLINE
@@ -225,7 +381,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.Inputs.setInputFilenamesAndPrimaryInput(Diags, Args);
+  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
+    return true;
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
@@ -324,7 +481,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
-      Opts.Inputs.hasPrimaryInput()) {
+      Opts.Inputs.havePrimaryInputs()) {
     Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
@@ -712,7 +869,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.getPrimaryInput() && !Opts.ModuleOutputPath.empty();
+        !Opts.Inputs.havePrimaryInputs() && !Opts.ModuleOutputPath.empty();
   }
 
   for (const Arg *A : Args.filtered(OPT_import_module)) {
@@ -1465,10 +1622,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (FrontendOpts.Inputs.getPrimaryInput() &&
-             FrontendOpts.Inputs.getPrimaryInput()->isFilename()) {
-    unsigned Index = FrontendOpts.Inputs.getPrimaryInput()->Index;
-    Opts.MainInputFilename = FrontendOpts.Inputs.getInputFilenames()[Index];
+  } else if (const llvm::Optional<StringRef> filename =
+                 FrontendOpts.Inputs.uniquePrimaryInputFilename()) {
+    Opts.MainInputFilename = filename.getValue();
   } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
@@ -1697,4 +1853,40 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
                         extendedInfo.getExtraClangImporterOptions().begin(),
                         extendedInfo.getExtraClangImporterOptions().end());
   return info.status;
+}
+
+llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+CompilerInvocation::setUpInputForSILTool(
+    StringRef InputFilename, StringRef ModuleNameArg,
+    bool alwaysSetModuleToMain,
+    serialization::ExtendedValidationInfo &extendedInfo) {
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
+  if (!FileBufOrErr) {
+    return FileBufOrErr;
+  }
+
+  // If it looks like we have an AST, set the source file kind to SIL and the
+  // name of the module to the file's name.
+  addInputBuffer(FileBufOrErr.get().get());
+
+  auto result = serialization::validateSerializedAST(
+      FileBufOrErr.get()->getBuffer(), &extendedInfo);
+  bool HasSerializedAST = result.status == serialization::Status::Valid;
+
+  if (HasSerializedAST) {
+    const StringRef Stem = !ModuleNameArg.empty()
+                               ? ModuleNameArg
+                               : llvm::sys::path::stem(InputFilename);
+    setModuleName(Stem);
+    setInputKind(InputFileKind::IFK_Swift_Library);
+  } else {
+    const StringRef Name = (alwaysSetModuleToMain || ModuleNameArg.empty())
+                               ? "main"
+                               : ModuleNameArg;
+    setModuleName(Name);
+    setInputKind(InputFileKind::IFK_SIL);
+  }
+  return FileBufOrErr;
 }
