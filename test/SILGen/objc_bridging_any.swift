@@ -738,6 +738,16 @@ class AnyHashableClass : NSObject {
   }
 }
 
+// CHECK-LABEL: sil hidden @_T017objc_bridging_any33bridgeOptionalFunctionToAnyObjectyXlyycSg2fn_tF : $@convention(thin) (@owned Optional<@callee_owned () -> ()>) -> @owned AnyObject
+// CHECK: [[BRIDGE:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
+// CHECK: [[FN:%.*]] = function_ref @_T0Iex_ytytIexir_TR
+// CHECK: partial_apply [[FN]]
+// CHECK: [[SELF:%.*]] = alloc_stack $Optional<@callee_owned (@in ()) -> @out ()>
+// CHECK: apply [[BRIDGE]]<() -> ()>([[SELF]])
+func bridgeOptionalFunctionToAnyObject(fn: (() -> ())?) -> AnyObject {
+  return fn as AnyObject
+}
+
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
 // CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @_T0SC13GenericOptionVs8Hashable13objc_genericssACP9hashValueSivgTW
