@@ -1428,6 +1428,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
   case tok::kw_true:
   case tok::kw_false: {
+    SyntaxParsingContextChild BoolContext(SyntaxContext,
+                                          SyntaxKind::BooleanLiteralExpr);
     bool isTrue = Tok.is(tok::kw_true);
     Result = makeParserResult(
                new (Context) BooleanLiteralExpr(isTrue, consumeToken()));
