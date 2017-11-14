@@ -1329,7 +1329,7 @@ static std::tuple<llvm::GlobalValue::LinkageTypes,
                   llvm::GlobalValue::VisibilityTypes,
                   llvm::GlobalValue::DLLStorageClassTypes>
 getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
-             bool isSILOnly, ForDefinition_t isDefinition,
+             ForDefinition_t isDefinition,
              bool isWeakImported) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   std::make_tuple(llvm::GlobalValue::LINKAGE##Linkage,                         \
@@ -1352,19 +1352,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   switch (linkage) {
   case SILLinkage::Public:
-    // Don't code-gen transparent functions. Internal linkage will enable llvm
-    // to delete transparent functions except they are referenced from somewhere
-    // (i.e. the function pointer is taken).
-    //
-    // In case we are generating multiple LLVM modules, we still have to use
-    // ExternalLinkage so that modules can cross-reference transparent
-    // functions.
-    //
-    // TODO: In non-whole-module-opt the generated swiftmodules are "linked" and
-    // this strips all serialized transparent functions. So we have to code-gen
-    // transparent functions in non-whole-module-opt.
-    if (isSILOnly && !info.HasMultipleIGMs && info.IsWholeModule)
-      return RESULT(Internal, Default, Default);
     return std::make_tuple(llvm::GlobalValue::ExternalLinkage,
                            PublicDefinitionVisibility, ExportedStorage);
 
@@ -1389,9 +1376,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   case SILLinkage::PublicExternal: {
     if (isDefinition) {
-      // Transparent function are not available externally.
-      if (isSILOnly)
-        return RESULT(LinkOnceODR, Hidden, Default);
       return std::make_tuple(llvm::GlobalValue::AvailableExternallyLinkage,
                              llvm::GlobalValue::DefaultVisibility,
                              ExportedStorage);
@@ -1426,7 +1410,6 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   UniversalLinkageInfo linkInfo(IGM);
   auto linkage =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   entity.isSILOnly(),
                    ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
   global->setVisibility(std::get<1>(linkage));
@@ -1458,7 +1441,6 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
       getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
-                   entity.isSILOnly(),
                    isDefinition, entity.isWeakImported(swiftModule));
 
   result.ForDefinition = isDefinition;
@@ -1469,14 +1451,13 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        StringRef name,
                        SILLinkage linkage,
-                       bool isSILOnly,
                        ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
 
   result.Name += name;
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-    getIRLinkage(linkInfo, linkage, isSILOnly,
+    getIRLinkage(linkInfo, linkage,
                  isDefinition, isWeakImported);
   result.ForDefinition = isDefinition;
   return result;
