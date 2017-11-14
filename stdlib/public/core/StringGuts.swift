@@ -106,7 +106,9 @@ extension _StringGuts {
 
   // NOTE: Currently, single byte representation is synonymous with ASCII. This
   // may change in the future in preference of either UTF8 or Latin1.
+  @_inlineable
   @_versioned
+  internal
   var isASCII: Bool {
     return isSingleByte
   }
@@ -299,6 +301,14 @@ internal struct UnsafeString {
   @_versioned
   internal var byteWidth: Int {
     return isSingleByte ? 1 : 2
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  var isASCII: Bool {
+    // NOTE: For now, single byte means ASCII. Might change in future
+    return isSingleByte
   }
 
   @_versioned
@@ -654,6 +664,7 @@ extension _StringGuts {
   //
   var _isUnsafe: Bool { return classification == .unsafe }
 
+  @_versioned
   var _unsafeString: UnsafeString? {
     guard _isUnsafe else { return nil }
 
@@ -1154,6 +1165,64 @@ internal var _emptyStringBase: UnsafeRawPointer {
   return UnsafeRawPointer(Builtin.addressof(&_emptyStringStorage))
 }
 
+//
+// TODO: Consider adding to, or replacing, _SwiftStringView instead
+//
+extension String {
+  // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
+  // the return value.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _unmanagedContiguous : UnsafeString? {
+    return self._guts._unmanagedContiguous
+  }
+}
+extension Substring {
+  // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
+  // the return value.
+  @_inlineable
+  @_versioned
+  internal
+  var _unmanagedContiguous: UnsafeString? {
+    return self._wholeString._unmanagedContiguous?[
+      self.startIndex.encodedOffset..<self.endIndex.encodedOffset]
+  }
+
+  // // A potentially-unmanaged ephemeral string for very temporary purposes.
+  // // Unlike _ephemeralString, caller must ensure lifetime.
+  // //
+  // // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
+  // // the return value.
+  // @_versioned
+  // internal
+  // var _unmanagedTransientString: String {
+  //   let contigOpt = self._unmanagedContiguous
+  //   if _slowPath(contigOpt == nil) {
+  //     return self._ephemeralString
+  //   }
+  //   return String(_StringGuts(contigOpt._unsafelyUnwrappedUnchecked))
+  // }
+}
+
+extension StringProtocol {
+  @_inlineable
+  @_versioned
+  internal
+  var _unmanagedContiguous: UnsafeString? {
+    @inline(__always)
+    get {
+      // FIXME: Is this really the best way to unify this?
+      if self is String {
+        return (
+          self as? String
+        )._unsafelyUnwrappedUnchecked._unmanagedContiguous
+      }
+      return (
+        self as? Substring
+      )._unsafelyUnwrappedUnchecked._unmanagedContiguous
+    }
+  }
+}
 
 //
 // String API
@@ -1161,53 +1230,97 @@ internal var _emptyStringBase: UnsafeRawPointer {
 // TODO: Reorganize to place these in right files. For now, useful to see diff
 // here.
 //
-extension Substring {
-  // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
-  // the return value.
-  @_versioned
-  internal
-  var _unmanagedContiguous: UnsafeString? {
-    let contigOpt = self._wholeString._guts._unmanagedContiguous
-    if _slowPath(contigOpt == nil) {
-      return nil
-    }
-    let contig = contigOpt._unsafelyUnwrappedUnchecked
-    return contig[self.startIndex.encodedOffset..<self.endIndex.encodedOffset]
-  }
 
-  // A potentially-unmanaged ephemeral string for very temporary purposes.
-  // Unlike _ephemeralString, caller must ensure lifetime.
-  //
-  // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
-  // the return value.
-  @_versioned
-  internal
-  var _unmanagedTransientString: String {
-    let contigOpt = self._unmanagedContiguous
-    if _slowPath(contigOpt == nil) {
-      return self._ephemeralString
+extension StringProtocol {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+#if _runtime(_ObjC)
+    let lhsContigOpt = lhs._unmanagedContiguous
+    let rhsContigOpt = rhs._unmanagedContiguous
+    if _slowPath(lhsContigOpt == nil || rhsContigOpt == nil) {
+      return lhs._ephemeralString._compareString(rhs._ephemeralString) == 0
     }
-    return String(_StringGuts(contigOpt._unsafelyUnwrappedUnchecked))
-  }
-}
-
-extension Substring {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func ==(lhs: Substring, rhs: String) -> Bool {
-    let result = lhs._unmanagedTransientString == rhs
-    _fixLifetime(lhs)
-    return result
-  }
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func ==(lhs: Substring, rhs: Substring) -> Bool {
-    let result = lhs._unmanagedTransientString == rhs._unmanagedTransientString
+    let result = lhsContigOpt._unsafelyUnwrappedUnchecked.equal(
+      to: rhsContigOpt._unsafelyUnwrappedUnchecked)
     _fixLifetime(lhs)
     _fixLifetime(rhs)
     return result
+#else
+    return lhs._ephemeralString._compareString(rhs._ephemeralString) == 0
+#endif
   }
+
   @_inlineable // FIXME(sil-serialize-all)
-  public static func ==(lhs: String, rhs: Substring) -> Bool {
-    return rhs == lhs
+  public static func !=<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+    return !(lhs == rhs)
   }
 }
+extension String : Equatable {
+  // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==(lhs: String, rhs: String) -> Bool {
+#if _runtime(_ObjC)
+    let lhsContigOpt = lhs._unmanagedContiguous
+    let rhsContigOpt = rhs._unmanagedContiguous
+    if _slowPath(lhsContigOpt == nil || rhsContigOpt == nil) {
+      dump(lhsContigOpt)
+      dump(rhsContigOpt)
+      return lhs._ephemeralString._compareString(rhs._ephemeralString) == 0
+    }
+    let result = lhsContigOpt._unsafelyUnwrappedUnchecked.equal(
+      to: rhsContigOpt._unsafelyUnwrappedUnchecked)
+    _fixLifetime(lhs)
+    _fixLifetime(rhs)
+    return result
+#else
+    return lhs._ephemeralString._compareString(rhs._ephemeralString) == 0
+#endif
+  }
+
+}
+extension Substring : Equatable {}
+
+extension UnsafeString {
+  @inline(__always)
+  @_versioned
+  internal func _sanityCheckIdentical(to other: UnsafeString) {
+    _sanityCheck(self.baseAddress == other.baseAddress)
+    _sanityCheck(self.count == other.count)
+    _sanityCheck(self.isSingleByte == other.isSingleByte)
+    _sanityCheck(self.hasCocoaBuffer == other.hasCocoaBuffer)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal func equal(to other: UnsafeString) -> Bool {
+    if self.baseAddress == other.baseAddress && self.count == other.count {
+      // Binary equivalence is always sufficient for canonical equivalence
+      _sanityCheckIdentical(to: other)
+      return true
+    }
+    if self.isASCII && other.isASCII {
+      // ASCII equivalence requires same size, same bits.
+      return self.count == other.count
+        && _swift_stdlib_memcmp(
+          self.baseAddress, other.baseAddress, self.count
+        ) == (0 as CInt)
+    }
+    return self._compareDeterministicUnicodeCollation(other) == 0
+  }
+
+  @inline(never) // Hide the CF/ICU dependency
+  @_versioned
+  internal func _compareDeterministicUnicodeCollation(
+    _ other: UnsafeString
+  ) -> Int {
+    let lhsStr = _NSContiguousString(_StringGuts(self))
+    let rhsStr = _NSContiguousString(_StringGuts(other))
+    let res = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+      return Int(
+          _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))
+    }
+    return res
+  }
+}
+
 
