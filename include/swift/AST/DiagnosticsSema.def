@@ -1024,8 +1024,6 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(transparent_stored_property,none,
-      "@_transparent cannot be applied to stored properties", ())
 ERROR(transparent_in_protocols_not_supported,none,
       "@_transparent is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,none,
@@ -3705,8 +3703,8 @@ ERROR(class_designated_init_inlineable_resilient,none,
       "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
-ERROR(inlineable_stored_property,
-      none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+ERROR(attribute_invalid_on_stored_property,
+      none, "@%0 cannot be applied to stored properties", (StringRef))
 
 ERROR(inlineable_dynamic_not_supported,
       none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())

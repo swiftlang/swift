@@ -2236,6 +2236,14 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  case DAK_Optimize: {
+    auto *theAttr = cast<OptimizeAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[OptimizeDeclAttrLayout::Code];
+    OptimizeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       (unsigned)theAttr->getMode());
+    return;
+  }
+
   case DAK_Effects: {
     auto *theAttr = cast<EffectsAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];

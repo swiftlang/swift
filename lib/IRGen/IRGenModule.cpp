@@ -88,7 +88,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getClangCodeGenOpts();
-  CGO.OptimizationLevel = Opts.Optimize ? 3 : 0;
+  CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoKind) {
@@ -818,7 +818,8 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
 }
 
 /// Construct initial function attributes from options.
-void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
+void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
+                                               OptimizationMode FuncOptMode) {
   // Add DisableFPElim. 
   if (!IRGen.Opts.DisableFPElim) {
     Attrs.addAttribute("no-frame-pointer-elim", "false");
@@ -851,7 +852,9 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs) {
     });
     Attrs.addAttribute("target-features", allFeatures);
   }
-  if (IRGen.Opts.OptimizeForSize)
+  if (FuncOptMode == OptimizationMode::NotSet)
+    FuncOptMode = IRGen.Opts.OptMode;
+  if (FuncOptMode == OptimizationMode::ForSize)
     Attrs.addAttribute(llvm::Attribute::MinSize);
 }
 

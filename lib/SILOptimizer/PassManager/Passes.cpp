@@ -51,7 +51,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
   auto &Ctx = Module.getASTContext();
 
-  SILPassManager PM(&Module);
+  SILPassManager PM(&Module, "", /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(
       SILPassPipelinePlan::getDiagnosticPassPipeline(Module.getOptions()));
 
@@ -119,7 +119,9 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
 
-  SILPassManager PM(&Module, "Onone");
+  // We want to run the Onone passes also for function which have an explicit
+  // Onone attribute.
+  SILPassManager PM(&Module, "Onone", /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(SILPassPipelinePlan::getOnonePassPipeline());
 
   // Verify the module, if required.
@@ -199,7 +201,7 @@ StringRef swift::PassKindName(PassKind Kind) {
 // convert it to a module pass to ensure that the SIL input is always at the
 // same stage of lowering.
 void swift::runSILLoweringPasses(SILModule &Module) {
-  SILPassManager PM(&Module, "LoweringPasses");
+  SILPassManager PM(&Module, "LoweringPasses", /*isMandatoryPipeline=*/ true);
   PM.executePassPipelinePlan(SILPassPipelinePlan::getLoweringPassPipeline());
 
   assert(Module.getStage() == SILStage::Lowered);

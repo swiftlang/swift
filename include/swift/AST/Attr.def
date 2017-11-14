@@ -299,6 +299,10 @@ SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional,
                  ImplicitlyUnwrappedOptional,
                  OnFunc | OnVar | OnSubscript | OnConstructor | RejectByParser, 72)
 
+DECL_ATTR(_optimize, Optimize,
+          OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar |
+          UserInaccessible, 73)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

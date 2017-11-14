@@ -24,6 +24,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -957,7 +958,9 @@ public:
   /// invalid.
   bool finalize();
 
-  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs);
+  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
+                                    OptimizationMode FuncOptMode =
+                                      OptimizationMode::NotSet);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);

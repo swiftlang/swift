@@ -407,10 +407,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
-      inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
+      inlineStrategy, optimizationMode, effect, numSpecAttrs,
+      hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
-                                isThunk, isGlobal, inlineStrategy, effect,
+                                isThunk, isGlobal, inlineStrategy,
+                                optimizationMode, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
                                 genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
@@ -474,6 +476,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         SubclassScope::NotApplicable, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
+    fn->setOptimizationMode((OptimizationMode)optimizationMode);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -2373,10 +2376,12 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
-    inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
+    inlineStrategy, optimizationMode, effect, numSpecAttrs,
+    hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
-                                isThunk, isGlobal, inlineStrategy, effect,
+                                isThunk, isGlobal, inlineStrategy,
+                                optimizationMode, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
                                 genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);

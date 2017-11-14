@@ -340,6 +340,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_AccessControl:
   case DAK_Ownership:
   case DAK_Effects:
+  case DAK_Optimize:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName());
     } else {
@@ -576,6 +577,18 @@ StringRef DeclAttribute::getAttrName() const {
       return "inline(__always)";
     }
     llvm_unreachable("Invalid inline kind");
+  }
+  case DAK_Optimize: {
+    switch (cast<OptimizeAttr>(this)->getMode()) {
+    case OptimizationMode::NoOptimization:
+      return "_optimize(none)";
+    case OptimizationMode::ForSpeed:
+      return "_optimize(speed)";
+    case OptimizationMode::ForSize:
+      return "_optimize(size)";
+    default:
+      llvm_unreachable("Invalid optimization kind");
+    }
   }
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {

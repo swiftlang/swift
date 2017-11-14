@@ -84,6 +84,9 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       SILFunction *Callee = Apply.getReferencedFunction();
       assert(Callee && "Expected to have a known callee");
 
+      if (!Callee->shouldOptimize())
+        continue;
+
       // We have a call that can potentially be specialized, so
       // attempt to do so.
       llvm::SmallVector<SILFunction *, 2> NewFunctions;

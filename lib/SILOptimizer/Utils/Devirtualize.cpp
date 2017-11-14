@@ -528,7 +528,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     return false;
   }
 
-  if (!F->shouldOptimize()) {
+  // Mandatory inlining does class method devirtualization. I'm not sure if this
+  // is really needed, but some test rely on this.
+  // So even for Onone functions we have to do it if the SILStage is raw.
+  if (F->getModule().getStage() != SILStage::Raw && !F->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
     DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
                        << " because it is marked no-opt: " << F->getName()
