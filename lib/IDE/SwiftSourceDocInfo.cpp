@@ -825,7 +825,7 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
 
   return Nodes.end() != std::find_if(Nodes.begin(), Nodes.end(), [](ASTNode N) {
     ThrowingEntityAnalyzer Analyzer;
-    N.walk(Analyzer);
+    Analyzer.walk(N);
     return Analyzer.isThrowing();
   });
 }
@@ -1194,7 +1194,7 @@ public:
   void postAnalysis(ASTNode EndNode) {
     // Visit the content of this node thoroughly, because the walker may
     // abort early.
-    EndNode.walk(CompleteWalker(this));
+    CompleteWalker(this).walk(EndNode);
 
     // Analyze whether declared decls in the range is referenced outside of it.
     FurtherReferenceWalker(this).walk(getImmediateContext());
@@ -1240,7 +1240,7 @@ public:
     };
     for (auto N : Nodes) {
       ControlFlowStmtSelector TheWalker;
-      N.walk(TheWalker);
+      TheWalker.walk(N);
       for (auto Pair : TheWalker.Ranges) {
 
         // If the entire range does not include the target's range, we find

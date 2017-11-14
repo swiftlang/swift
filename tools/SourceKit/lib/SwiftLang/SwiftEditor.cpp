@@ -23,7 +23,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/SourceManager.h"
@@ -33,6 +32,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Formatting.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/Subsystems.h"
 

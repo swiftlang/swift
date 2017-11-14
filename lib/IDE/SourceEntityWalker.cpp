@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/SourceEntityWalker.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -554,6 +554,17 @@ bool SourceEntityWalker::walk(Decl *D) {
 bool SourceEntityWalker::walk(DeclContext *DC) {
   SemaAnnotator Annotator(*this);
   return DC->walkContext(Annotator);
+}
+
+bool SourceEntityWalker::walk(ASTNode N) {
+  if (auto *E = N.dyn_cast<Expr*>())
+    return walk(E);
+  if (auto *S = N.dyn_cast<Stmt*>())
+    return walk(S);
+  if (auto *D = N.dyn_cast<Decl*>())
+    return walk(D);
+
+  llvm_unreachable("unsupported AST node");
 }
 
 bool SourceEntityWalker::visitDeclReference(ValueDecl *D, CharSourceRange Range,

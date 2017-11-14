@@ -21,11 +21,11 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_SOURCE_ENTITY_WALKER_H
-#define SWIFT_AST_SOURCE_ENTITY_WALKER_H
+#ifndef SWIFT_IDE_SOURCE_ENTITY_WALKER_H
+#define SWIFT_IDE_SOURCE_ENTITY_WALKER_H
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/LLVM.h"
@@ -36,6 +36,7 @@ namespace swift {
   class Stmt;
   class Expr;
   class Type;
+  struct ASTNode;
 
 
 /// An abstract class used to traverse the AST and provide source information.
@@ -61,6 +62,9 @@ public:
   /// Walks the provided Expr.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(Expr *E);
+  /// Walks the provided ASTNode.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(ASTNode N);
 
   /// This method is called when first visiting a decl, before walking into its
   /// children.  If it returns false, the subtree is skipped.
