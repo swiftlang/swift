@@ -156,8 +156,14 @@ public:
   iterator begin() const;
   iterator end() const;
 
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  reverse_iterator rbegin() const;
+  reverse_iterator rend() const;
+
   using range = llvm::iterator_range<iterator>;
   range getValues() const;
+  using reverse_range = llvm::iterator_range<reverse_iterator>;
+  reverse_range getReversedValues() const;
 
   using type_range = llvm::iterator_range<
       llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>>>;
@@ -200,9 +206,7 @@ private:
   }
 };
 
-class SILInstructionResultArray::iterator
-    : public std::iterator<std::bidirectional_iterator_tag, SILValue,
-                           ptrdiff_t> {
+class SILInstructionResultArray::iterator {
   /// Our "parent" array.
   ///
   /// This is actually a value type reference into a SILInstruction of some
@@ -214,14 +218,21 @@ class SILInstructionResultArray::iterator
   Optional<unsigned> Index;
 
 public:
+  using difference_type = int;
+  using value_type = SILValue;
+  using pointer = void;
+  using reference = SILValue;
+  using iterator_category = std::bidirectional_iterator_tag;
+
   iterator() = default;
   iterator(const SILInstructionResultArray &Parent,
            Optional<unsigned> Index = 0)
       : Parent(Parent), Index(Index) {}
 
   SILValue operator*() const { return Parent[Index.getValue()]; }
-
+  SILValue operator*() { return Parent[Index.getValue()]; }
   SILValue operator->() const { return operator*(); }
+  SILValue operator->() { return operator*(); }
 
   iterator &operator++() {
     ++Index.getValue();
