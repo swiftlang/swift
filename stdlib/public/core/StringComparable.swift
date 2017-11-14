@@ -95,7 +95,7 @@ extension String {
     return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(
       _bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()))
 #else
-    switch (_core.isASCII, rhs._core.isASCII) {
+    switch (_guts.isASCII, rhs._guts.isASCII) {
     case (true, false):
       return Int(_swift_stdlib_unicode_compare_utf8_utf16(
           _core.startASCII, Int32(_core.count),
@@ -122,7 +122,7 @@ extension String {
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
     // This is consistent with Foundation, but incorrect as defined by Unicode.
-    if _core.isASCII && rhs._core.isASCII {
+    if _guts.isASCII && rhs._guts.isASCII {
       return _compareASCII(rhs)
     }
 #endif
@@ -138,7 +138,7 @@ extension String : Equatable {
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
     // This is consistent with Foundation, but incorrect as defined by Unicode.
-    if lhs._core.isASCII && rhs._core.isASCII {
+    if lhs._guts.isASCII && rhs._guts.isASCII {
       if lhs._core.count != rhs._core.count {
         return false
       }
