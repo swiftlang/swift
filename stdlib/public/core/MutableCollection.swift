@@ -66,7 +66,7 @@ public typealias MutableIndexable = MutableCollection
 ///     a[i] = x
 ///     let y = x
 public protocol MutableCollection: Collection
-where SubSequence: MutableCollection, Indices: MutableCollection
+where SubSequence: MutableCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
