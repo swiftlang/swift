@@ -497,3 +497,25 @@ bb11(%128 : $Error):
 bb99:
   return %closure : $@callee_guaranteed (@guaranteed C) -> @error Error
 }
+
+// Make sure convert_function -> apply does the right thing with metatypes
+class Base {}
+class Derived {}
+
+sil @takesMetatype : $@convention(thin) (@thick Base.Type) -> ()
+
+// CHECK-LABEL: sil @passesMetatype
+// CHECK: [[METATYPE:%.*]] = metatype $@thick Derived.Type
+// CHECK: [[FN:%.*]] = function_ref @takesMetatype
+// CHECK: [[CONVERTED:%.*]] = unchecked_trivial_bit_cast [[METATYPE]] : $@thick Derived.Type to $@thick Base.Type
+// CHECK: [[RESULT:%.*]] = apply [[FN]]([[CONVERTED]])
+
+sil @passesMetatype : $@convention(thin) () -> () {
+bb0:
+  %metatype = metatype $@thick Derived.Type
+  %fn = function_ref @takesMetatype : $@convention(thin) (@thick Base.Type) -> ()
+  %converted = convert_function %fn : $@convention(thin) (@thick Base.Type) -> () to $@convention(thin) (@thick Derived.Type) -> ()
+  %result = apply %converted(%metatype) : $@convention(thin) (@thick Derived.Type) -> ()
+  %return = tuple ()
+  return %return : $()
+}

@@ -22,7 +22,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LangOptions.h"
@@ -35,6 +34,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Index/Index.h"
@@ -1254,9 +1254,10 @@ private:
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               Optional<AccessKind> AccKind,
                                bool IsOpenBracket) override {
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
   }
 
   bool visitCallArgName(Identifier Name, CharSourceRange Range,

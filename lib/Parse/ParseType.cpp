@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Parse/Lexer.h"
