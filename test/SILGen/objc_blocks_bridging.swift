@@ -188,3 +188,11 @@ struct GenericStruct<T> {
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Ix_Ixx_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_owned (@owned @noescape @callee_owned () -> ()) -> (), @convention(block) @noescape () -> ()) -> ()
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0IyB_Ix_TR : $@convention(thin) (@owned @convention(block) @noescape () -> ()) -> ()
 
+// rdar://35402696
+func takeOptStringFunction(fn: (String) -> String?) {}
+func testGlobalBlock() {
+  takeOptStringFunction(fn: GlobalBlock)
+}
+// CHECK-LABEL: sil hidden @_T020objc_blocks_bridging15testGlobalBlockyyF
+// CHECK: global_addr @GlobalBlock : $*@convention(block) (NSString) -> @autoreleased Optional<NSString>
+// CHECK: function_ref @_T0So8NSStringCABSgIeyBya_S2SIexxo_TR : $@convention(thin) (@owned String, @owned @convention(block) (NSString) -> @autoreleased Optional<NSString>) -> @owned String
