@@ -1212,8 +1212,22 @@ extension StringProtocol {
   public static func !=<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
     return !(lhs == rhs)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    let lhsContigOpt = lhs._unmanagedContiguous
+    let rhsContigOpt = rhs._unmanagedContiguous
+    if _slowPath(lhsContigOpt == nil || rhsContigOpt == nil) {
+      return lhs._ephemeralString._compareString(rhs._ephemeralString) < 0
+    }
+    let result = lhsContigOpt._unsafelyUnwrappedUnchecked.less(
+      than: rhsContigOpt._unsafelyUnwrappedUnchecked)
+    _fixLifetime(lhs)
+    _fixLifetime(rhs)
+    return result
+  }
 }
-extension String : Equatable {
+extension String : Equatable, Comparable {
   // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
   @_inlineable // FIXME(sil-serialize-all)
   public static func ==(lhs: String, rhs: String) -> Bool {
@@ -1233,6 +1247,21 @@ extension String : Equatable {
 #endif
   }
 
+  // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < (lhs: String, rhs: String) -> Bool {
+    let lhsContigOpt = lhs._unmanagedContiguous
+    let rhsContigOpt = rhs._unmanagedContiguous
+    if _slowPath(lhsContigOpt == nil || rhsContigOpt == nil) {
+      return lhs._ephemeralString._compareString(rhs._ephemeralString) < 0
+    }
+    let result = lhsContigOpt._unsafelyUnwrappedUnchecked.less(
+      than: rhsContigOpt._unsafelyUnwrappedUnchecked)
+    _fixLifetime(lhs)
+    _fixLifetime(rhs)
+    return result
+  }
+
 }
 extension Substring : Equatable {}
 
@@ -1248,20 +1277,32 @@ extension UnsafeString {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal func equal(to other: UnsafeString) -> Bool {
-    if self.baseAddress == other.baseAddress && self.count == other.count {
-      // Binary equivalence is always sufficient for canonical equivalence
-      _sanityCheckIdentical(to: other)
-      return true
-    }
+  internal func compare(to other: UnsafeString) -> Int {
     if self.isASCII && other.isASCII {
-      // ASCII equivalence requires same size, same bits.
-      return self.count == other.count
-        && _swift_stdlib_memcmp(
-          self.baseAddress, other.baseAddress, self.count
-        ) == (0 as CInt)
+      if self.baseAddress == other.baseAddress {
+        return self.count - other.count
+      }
+      let cmp = _swift_stdlib_memcmp(
+        self.baseAddress, other.baseAddress,
+        Swift.min(self.count, other.count))
+      if cmp == 0 {
+        return self.count - other.count
+      }
+      return Int(truncatingIfNeeded: cmp)
     }
-    return self._compareDeterministicUnicodeCollation(other) == 0
+    return _compareDeterministicUnicodeCollation(other)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal func equal(to other: UnsafeString) -> Bool {
+    return compare(to: other) == 0
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal func less(than other: UnsafeString) -> Bool {
+    return compare(to: other) < 0
   }
 
   @inline(never) // Hide the CF/ICU dependency
@@ -1277,6 +1318,56 @@ extension UnsafeString {
     }
     return res
   }
+
+  // TODO: comparison too!
 }
 
+// Hashing, originally from StringHashable.swift
+#if arch(i386) || arch(arm)
+    private let stringHashOffset = Int(bitPattern: 0x88dd_cc21)
+#else
+    private let stringHashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
+#endif // arch(i386) || arch(arm)
+extension UnsafeString {
+  @_versioned
+  @inline(never) // Hide the CF dependency
+  internal func _computeHashValue() -> Int {
+#if _runtime(_ObjC)
+    if self.isASCII {
+      return stringHashOffset ^ _stdlib_CFStringHashCString(
+                              OpaquePointer(self.baseAddress), self.count)
+    }
+    let stackAllocated = _NSContiguousString(_StringGuts(self))
+    return stringHashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
+      return _stdlib_NSStringHashValuePointer($0, false)
+    }
+#else
+    if self.isASCII {
+      return Unicode.hashASCII(UnsafeBufferPointer(
+        start: self.baseAddress,
+        count: self.count))
+    }
+    return Unicode.hashUTF16(self.utf16Buffer)
+#endif // _runtime(_ObjC)
+  }
+}
+extension _StringGuts {
+  @_versioned
+  @inline(never) // Hide the CF dependency
+  internal func _computeHashValue() -> Int {
+    // Mix random bits into NSString's hash so that clients don't rely on
+    // Swift.String.hashValue and NSString.hash being the same.
+    // If we have a contiguous string then we can use the stack optimization.
+    let contigOpt = self._unmanagedContiguous
+    if _slowPath(contigOpt == nil) {
+      let cocoaString = unsafeBitCast(
+        String(self)._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
+      return stringHashOffset ^ _stdlib_NSStringHashValue(
+        cocoaString, self.isASCII)
+    }
+    let result = contigOpt._unsafelyUnwrappedUnchecked._computeHashValue()
+    _fixLifetime(self)
+    return result
+  }
+}
 
