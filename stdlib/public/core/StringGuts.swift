@@ -626,9 +626,14 @@ extension _StringGuts {
   @_versioned
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NativeString) {
+    self.init(s.stringBuffer)
+  }
+
+  @_versioned
+  init(_ buffer: _StringBuffer) {
     self.init(
-      _unflagged: _bridgeObject(fromNative: s.nativeObject),
-      isSingleByte: s.isSingleByte,
+      _unflagged: _bridgeObject(fromNativeObject: buffer._nativeObject),
+      isSingleByte: buffer.elementWidth == 1,
       hasCocoaBuffer: false,
       otherBits: 0)
   }
@@ -883,12 +888,10 @@ extension _StringGuts {
     //
     guard !legacyCore._isNativeSelfSlice else {
       Stats.numNativeSelfSlice += 1
-      self.init(NativeString(legacyCore._copyToStringBuffer()))
+      self.init(legacyCore._copyToStringBuffer())
       return
     }
-
-    let nativeString = NativeString(owner)
-    self.init(nativeString)
+    self.init(nativeBuffer)
   }
 }
 
@@ -1017,7 +1020,7 @@ extension _StringGuts {
     let newBuffer = _copyToStringBuffer(
       capacity: newCapacity,
       byteWidth: newWidth)
-    self = _StringGuts(NativeString(newBuffer))
+    self = _StringGuts(newBuffer)
   }
 
   // Convert ourselves (if needed) to a NativeString for appending purposes.
@@ -1157,7 +1160,7 @@ extension _StringGuts {
     let newBuffer = _copyToStringBuffer(
       capacity: n,
       byteWidth: self.byteWidth)
-    self = _StringGuts(NativeString(newBuffer))
+    self = _StringGuts(newBuffer)
   }
 
   // @_inlineable // TODO: internal-inlineable, if that's possible
