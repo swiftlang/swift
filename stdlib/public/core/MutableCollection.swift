@@ -193,7 +193,26 @@ extension MutableCollection {
   ) rethrows -> R? {
     return nil
   }
+  
+  /// Exchanges the values at the specified indices of the collection.
+  ///
+  /// Both parameters must be valid indices of the collection that are not
+  /// equal to `endIndex`. Calling `swapAt(_:_:)` with the same index as both
+  /// `i` and `j` has no effect.
+  ///
+  /// - Parameters:
+  ///   - i: The index of the first value to swap.
+  ///   - j: The index of the second value to swap.
+  @_inlineable
+  public mutating func swapAt(_ i: Index, _ j: Index) {
+    guard i != j else { return }
+    let tmp = self[i]
+    self[i] = self[j]
+    self[j] = tmp
+  }
+}
 
+extension MutableCollection where SubSequence == MutableSlice<Self> {
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
@@ -226,26 +245,11 @@ extension MutableCollection {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
-
-  /// Exchanges the values at the specified indices of the collection.
-  ///
-  /// Both parameters must be valid indices of the collection that are not
-  /// equal to `endIndex`. Calling `swapAt(_:_:)` with the same index as both
-  /// `i` and `j` has no effect.
-  ///
-  /// - Parameters:
-  ///   - i: The index of the first value to swap.
-  ///   - j: The index of the second value to swap.
-  @_inlineable
-  public mutating func swapAt(_ i: Index, _ j: Index) {
-    guard i != j else { return }
-    let tmp = self[i]
-    self[i] = self[j]
-    self[j] = tmp
-  }
 }
 
-extension MutableCollection where Self: BidirectionalCollection {
+extension MutableCollection
+  where SubSequence == MutableBidirectionalSlice<Self>
+{
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> MutableBidirectionalSlice<Self> {
     get {
@@ -258,7 +262,9 @@ extension MutableCollection where Self: BidirectionalCollection {
   }
 }
 
-extension MutableCollection where Self: RandomAccessCollection {
+extension MutableCollection
+  where SubSequence == MutableRandomAccessSlice<Self>
+{
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Self> {
     get {
