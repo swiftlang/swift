@@ -165,9 +165,12 @@ ParserResult<Expr> Parser::parseExprArrow() {
 ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isExprBasic,
                                              bool isForConditionalDirective) {
+  SyntaxParsingContextChild ExprSequnceContext(SyntaxContext,
+                                               SyntaxContextKind::Expr);
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   bool HasCodeCompletion = false;
+  bool PendingTernary = false;
 
   while (true) {
     if (isForConditionalDirective && Tok.isAtStartOfLine())
@@ -188,6 +191,12 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       }
     }
     SequencedExprs.push_back(Primary.get());
+
+    // We know we can make a syntax node for ternary expression.
+    if (PendingTernary) {
+      SyntaxContext->makeNode(SyntaxKind::TernaryExpr, Tok.getLoc());
+      PendingTernary = false;
+    }
 
     if (isForConditionalDirective && Tok.isAtStartOfLine())
       break;
@@ -245,6 +254,10 @@ parse_operator:
                                colonLoc);
       SequencedExprs.push_back(unresolvedIf);
       Message = diag::expected_expr_after_if_colon;
+
+      // Wait for the next expression to make a syntax node for ternary
+      // expression.
+      PendingTernary = true;
       break;
     }
         
@@ -368,6 +381,8 @@ done:
 /// sequence, but this isn't enforced until sequence-folding.
 ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
+  SyntaxParsingContextChild ElementContext(SyntaxContext,
+                                           SyntaxContextKind::Expr);
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
   Optional<Token> trySuffix;
@@ -1390,7 +1405,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
-    SyntaxContext->makeNode(SyntaxKind::IntegerLiteralExpr, Loc);
+    SyntaxContext->makeNode(SyntaxKind::IntegerLiteralExpr, Tok.getLoc());
     Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;
@@ -1398,7 +1413,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
-    SyntaxContext->makeNode(SyntaxKind::FloatLiteralExpr, Loc);
+    SyntaxContext->makeNode(SyntaxKind::FloatLiteralExpr, Tok.getLoc());
     Result = makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;
@@ -1813,7 +1828,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   Token EntireTok = Tok;
 
   // Create a syntax node for string literal.
-  SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr, Tok.getLoc());
+  SyntaxContext->makeNode(SyntaxKind::StringLiteralExpr, peekToken().getLoc());
 
   // FIXME: Avoid creating syntax nodes for string interpolation.
   SyntaxParsingContextChild LocalContext(SyntaxContext, /*disabled*/true);

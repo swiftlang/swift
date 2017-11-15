@@ -35,4 +35,9 @@ class C {
   }
   func boolAnd() -> Bool { return true && false }
   func boolOr() -> Bool { return true || false }
+
+  func foo2() {
+    _ = true ? 1 : 0
+    _ = (true ? 1 : 0) ? (true ? 1 : 0) : (true ? 1 : 0)
+  }
 }
