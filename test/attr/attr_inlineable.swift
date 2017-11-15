@@ -24,10 +24,10 @@ public struct PublicStruct {
   public init() {}
 
   @_inlineable public var storedProperty: Int
-  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to stored properties}}
+  // expected-error@-1 {{@_inlineable cannot be applied to stored properties}}
 
   @_inlineable public lazy var lazyProperty: Int = 0
-  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to stored properties}}
+  // expected-error@-1 {{@_inlineable cannot be applied to stored properties}}
 }
 
 public struct Struct {

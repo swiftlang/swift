@@ -280,6 +280,32 @@ static bool verifySILSelfParameterType(SILDeclRef DeclRef,
           PInfo.isGuaranteed() || PInfo.isIndirectMutating();
 }
 
+static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
+                                  SILModule &M) {
+  for (auto *A : Attrs.getAttributes<SemanticsAttr>())
+    F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
+
+  // Propagate @_specialize.
+  for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
+    auto *SA = cast<SpecializeAttr>(A);
+    auto kind = SA->getSpecializationKind() ==
+                        SpecializeAttr::SpecializationKind::Full
+                    ? SILSpecializeAttr::SpecializationKind::Full
+                    : SILSpecializeAttr::SpecializationKind::Partial;
+    F->addSpecializeAttr(SILSpecializeAttr::create(
+        M, SA->getRequirements(), SA->isExported(), kind));
+  }
+
+  if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
+    F->setOptimizationMode(OA->getMode());
+  }
+
+  // @_silgen_name and @_cdecl functions may be called from C code somewhere.
+  if (Attrs.hasAttribute<SILGenNameAttr>() ||
+      Attrs.hasAttribute<CDeclAttr>())
+    F->setHasCReferences(true);
+}
+
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             SILDeclRef constant,
                                             ForDefinition_t forDefinition,
@@ -336,32 +362,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 
     if (auto *FDecl = dyn_cast<FuncDecl>(decl)) {
       if (auto *StorageDecl = FDecl->getAccessorStorageDecl())
-        decl = StorageDecl;
+        // Add attributes for e.g. computed properties.
+        addFunctionAttributes(F, StorageDecl->getAttrs(), *this);
     }
-    // Propagate @_semantics.
-    auto Attrs = decl->getAttrs();
-    for (auto *A : Attrs.getAttributes<SemanticsAttr>())
-      F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
-
-    // Propagate @_specialize.
-    for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
-      auto *SA = cast<SpecializeAttr>(A);
-      auto kind = SA->getSpecializationKind() ==
-                          SpecializeAttr::SpecializationKind::Full
-                      ? SILSpecializeAttr::SpecializationKind::Full
-                      : SILSpecializeAttr::SpecializationKind::Partial;
-      F->addSpecializeAttr(SILSpecializeAttr::create(
-          *this, SA->getRequirements(), SA->isExported(), kind));
-    }
-
-    if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
-      F->setOptimizationMode(OA->getMode());
-    }
-
-    // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-    if (Attrs.hasAttribute<SILGenNameAttr>() ||
-        Attrs.hasAttribute<CDeclAttr>())
-      F->setHasCReferences(true);
+    addFunctionAttributes(F, decl->getAttrs(), *this);
   }
 
   // If this function has a self parameter, make sure that it has a +0 calling
