@@ -1728,7 +1728,7 @@ CompilerInvocation::setUpInputForSILTool(
   } else {
     const StringRef Name = (alwaysSetModuleToMain || ModuleNameArg.empty())
                                ? "main"
-                               : StringRef(ModuleNameArg);
+                               : ModuleNameArg;
     setModuleName(Name);
     setInputKind(InputFileKind::IFK_SIL);
   }
