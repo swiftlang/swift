@@ -74,8 +74,8 @@ static RawSyntaxInfo createSyntaxAs(ArrayRef<RawSyntaxInfo> Parts,
 }
 } // End of anonymous namespace
 
-RawSyntaxInfo::RawSyntaxInfo(Token Tok, Trivia LeadingTrivia,
-                             Trivia TrailingTrivia) {
+RawSyntaxInfo::RawSyntaxInfo(Token Tok, Trivia &LeadingTrivia,
+                             Trivia &TrailingTrivia) {
   if (Tok.isEscapedIdentifier()) {
     LeadingTrivia.push_back(TriviaPiece::backtick());
     TrailingTrivia.push_front(TriviaPiece::backtick());

@@ -241,17 +241,21 @@ public:
 
   /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
   /// to trivias are populated.
-  void lex(Token &Result, syntax::Trivia *LeadingTriviaResult = nullptr,
-           syntax::Trivia *TrailingTriviaResult = nullptr) {
+  void lex(Token &Result, syntax::Trivia &LeadingTriviaResult,
+           syntax::Trivia &TrailingTriviaResult) {
     Result = NextToken;
-    if (LeadingTriviaResult && TrailingTriviaResult) {
-      *LeadingTriviaResult = syntax::Trivia {LeadingTrivia};
-      *TrailingTriviaResult = syntax::Trivia {TrailingTrivia};
+    LeadingTriviaResult = {LeadingTrivia};
+    TrailingTriviaResult = {TrailingTrivia};
+    if (Result.isNot(tok::eof)) {
       LeadingTrivia.clear();
       TrailingTrivia.clear();
-    }
-    if (Result.isNot(tok::eof))
       lexImpl();
+    }
+  }
+
+  void lex(Token &Result) {
+    syntax::Trivia LeadingTrivia, TrailingTrivia;
+    lex(Result, LeadingTrivia, TrailingTrivia);
   }
 
   bool isKeepingComments() const {

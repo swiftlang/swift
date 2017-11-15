@@ -283,7 +283,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
   Token Tok;
   Trivia LeadingTrivia, TrailingTrivia;
   do {
-    L.lex(Tok, &LeadingTrivia, &TrailingTrivia);
+    L.lex(Tok, LeadingTrivia, TrailingTrivia);
     auto ThisToken = RawSyntaxInfo(Tok, LeadingTrivia, TrailingTrivia)
                          .getRaw<RawTokenSyntax>();
     auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
@@ -305,7 +305,7 @@ void swift::populateTokenSyntaxMap(const LangOptions &LangOpts,
   Token ThisToken;
   Trivia LeadingTrivia, TrailingTrivia;
   do {
-    L.lex(ThisToken, &LeadingTrivia, &TrailingTrivia);
+    L.lex(ThisToken, LeadingTrivia, TrailingTrivia);
     Result.emplace_back(ThisToken, LeadingTrivia, TrailingTrivia);
     if (Result.back().getRaw<syntax::RawTokenSyntax>()->is(tok::eof))
       return;
@@ -318,14 +318,18 @@ void swift::populateTokenSyntaxMap(const LangOptions &LangOpts,
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState)
-  : Parser(std::unique_ptr<Lexer>(
-             new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-                   BufferID, &SF.getASTContext().Diags,
-                   /*InSILMode=*/SIL != nullptr,
-                   SF.getASTContext().LangOpts.AttachCommentsToDecls
-                   ? CommentRetentionMode::AttachToNextToken
-                   : CommentRetentionMode::None)), SF, SIL, PersistentState){
-}
+    : Parser(
+          std::unique_ptr<Lexer>(new Lexer(
+              SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
+              BufferID, &SF.getASTContext().Diags,
+              /*InSILMode=*/SIL != nullptr,
+              SF.getASTContext().LangOpts.AttachCommentsToDecls
+                  ? CommentRetentionMode::AttachToNextToken
+                  : CommentRetentionMode::None,
+              SF.shouldKeepSyntaxInfo()
+                  ? TriviaRetentionMode::WithTrivia
+                  : TriviaRetentionMode::WithoutTrivia)),
+          SF, SIL, PersistentState) {}
 
 namespace {
 

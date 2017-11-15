@@ -52,7 +52,7 @@ struct RawSyntaxInfo {
     SyntaxRange(SyntaxRange), RawNode(RawNode) {}
 
   /// Construct from legacy Token and trivia lists.
-  RawSyntaxInfo(Token Tok, Trivia LeadingTrivia, Trivia TrailingTrivia);
+  RawSyntaxInfo(Token Tok, Trivia &LeadingTrivia, Trivia &TrailingTrivia);
 
   bool isImplicit() const { return SyntaxRange.isInvalid(); }
   SourceLoc getStartLoc() const { return SyntaxRange.Start; }

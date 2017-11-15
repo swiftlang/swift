@@ -198,6 +198,12 @@ public:
   /// \brief This is the current token being considered by the parser.
   Token Tok;
 
+  /// \brief leading trivias for \c Tok. Always empty if !SF.shouldKeepSyntaxInfo().
+  syntax::Trivia LeadingTrivia;
+
+  /// \brief This is the current token being considered by the parser.
+  syntax::Trivia TrailingTrivia;
+
   /// \brief The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
 

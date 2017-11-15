@@ -2347,6 +2347,7 @@ Optional<syntax::TriviaPiece> Lexer::lexWhitespace(bool StopAtFirstNewline) {
   switch (Last) {
     case '\n':
     case '\r':
+      NextToken.setAtStartOfLine(true);
       return syntax::TriviaPiece {
         syntax::TriviaKind::Newline,
         Length,
@@ -2444,10 +2445,18 @@ void Lexer::lexTrivia(syntax::TriviaList &Pieces,
   while (CurPtr != BufferEnd) {
     if (auto Whitespace = lexWhitespace(StopAtFirstNewline)) {
       Pieces.push_back(Whitespace.getValue());
+    } else if (isKeepingComments()) {
+      // Don't try to lex comments as trivias.
+      return;
+    } else if (StopAtFirstNewline && *CurPtr == '/') {
+      // Don't lex comments as trailing trivias (for now).
+      return;
     } else if (auto DocComment = lexDocComment()) {
       Pieces.push_back(DocComment.getValue());
+      SeenComment = true;
     } else if (auto Comment = lexComment()) {
       Pieces.push_back(Comment.getValue());
+      SeenComment = true;
     } else {
       return;
     }
