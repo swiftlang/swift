@@ -313,7 +313,7 @@ static Address emitDefaultInitializeBufferWithCopyOfBuffer(
         emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
     Address srcObject =
         emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
-    type.initializeWithCopy(IGF, destObject, srcObject, T);
+    type.initializeWithCopy(IGF, destObject, srcObject, T, true);
     return destObject;
   } else {
     assert(packing == FixedPacking::Allocate);
@@ -353,7 +353,7 @@ emitDefaultInitializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
       emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
     Address srcObject =
       emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
-    type.initializeWithTake(IGF, destObject, srcObject, T);
+    type.initializeWithTake(IGF, destObject, srcObject, T, true);
     return destObject;
   }
 
@@ -484,7 +484,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   assert(isValueWitnessFunction(index));
 
   IRGenFunction IGF(IGM, fn);
-  IGF.setInOutlinedFunction();
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, fn);
 
@@ -494,7 +493,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.assignWithCopy(IGF, dest, src, concreteType);
+    type.assignWithCopy(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -504,7 +503,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.assignWithTake(IGF, dest, src, concreteType);
+    type.assignWithTake(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -549,7 +548,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    type.initializeWithCopy(IGF, dest, src, concreteType);
+    type.initializeWithCopy(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -560,7 +559,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    type.initializeWithTake(IGF, dest, src, concreteType);
+    type.initializeWithTake(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;

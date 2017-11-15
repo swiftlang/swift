@@ -1421,8 +1421,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
 
     Explosion argExplosion;
-    emitForeignParameter(IGF, params, foreignInfo, argTyIdx,
-                         arg->getType(), loadableArgTI, argExplosion);
+    emitForeignParameter(IGF, params, foreignInfo, argTyIdx, arg->getType(),
+                         loadableArgTI, argExplosion, false);
     IGF.setLoweredExplosion(arg, argExplosion);
   }
 
@@ -2188,12 +2188,12 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Add all those arguments.
-  emission.setArgs(llArgs, &witnessMetadata);
+  emission.setArgs(llArgs, false, &witnessMetadata);
 
   SILInstruction *i = site.getInstruction();
   
   Explosion result;
-  emission.emitToExplosion(result);
+  emission.emitToExplosion(result, false);
 
   if (auto apply = dyn_cast<ApplyInst>(i)) {
     setLoweredExplosion(apply, result);
@@ -2365,12 +2365,10 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 
   // Create the thunk and function value.
   Explosion function;
-  emitFunctionPartialApplication(*this, *CurSILFn,
-                                 calleeFn, innerContext, llArgs,
-                                 params, i->getSubstitutions(),
-                                 origCalleeTy, i->getSubstCalleeType(),
-                                 i->getType().castTo<SILFunctionType>(),
-                                 function);
+  emitFunctionPartialApplication(
+      *this, *CurSILFn, calleeFn, innerContext, llArgs, params,
+      i->getSubstitutions(), origCalleeTy, i->getSubstCalleeType(),
+      i->getType().castTo<SILFunctionType>(), function, false);
   setLoweredExplosion(v, function);
 }
 
@@ -2433,14 +2431,14 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   // require an indirect return.
   if (IGF.IndirectReturn.isValid()) {
     auto &retTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
-    retTI.initialize(IGF, result, IGF.IndirectReturn);
+    retTI.initialize(IGF, result, IGF.IndirectReturn, false);
     IGF.Builder.CreateRetVoid();
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
     assert(swiftCCReturn ||
            funcLang == SILFunctionLanguage::C && "Need to handle all cases");
-    IGF.emitScalarReturn(resultTy, result, swiftCCReturn);
+    IGF.emitScalarReturn(resultTy, result, swiftCCReturn, false);
   }
 }
 
@@ -3417,10 +3415,10 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   case StoreOwnershipQualifier::Unqualified:
   case StoreOwnershipQualifier::Init:
   case StoreOwnershipQualifier::Trivial:
-    typeInfo.initialize(*this, source, dest);
+    typeInfo.initialize(*this, source, dest, false);
     break;
   case StoreOwnershipQualifier::Assign:
-    typeInfo.assign(*this, source, dest);
+    typeInfo.assign(*this, source, dest, false);
     break;
   }
 }
@@ -4298,7 +4296,7 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
   IGF.Builder.CreateLifetimeStart(inStorage, maxSize);
   
   // Store the 'in' value.
-  inTI.initialize(IGF, in, inStorage);
+  inTI.initialize(IGF, in, inStorage, false);
   // Load the 'out' value as the destination type.
   auto outStorage = IGF.Builder.CreateBitCast(inStorage,
                                         outTI.getStorageType()->getPointerTo());
@@ -4723,10 +4721,10 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
         Builder.CreateBitCast(ptr, ti.getStorageType()->getPointerTo()));
       if (operand->getType().isAddress()) {
         ti.initializeWithTake(*this, addr, getLoweredAddress(operand),
-                              operand->getType());
+                              operand->getType(), false);
       } else {
         Explosion operandValue = getLoweredExplosion(operand);
-        cast<LoadableTypeInfo>(ti).initialize(*this, operandValue, addr);
+        cast<LoadableTypeInfo>(ti).initialize(*this, operandValue, addr, false);
       }
     }
     args = argsBufInst;
@@ -4844,8 +4842,9 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
 
   // Allocate a COW box for the value if necessary.
   auto *genericEnv = CurSILFn->getGenericEnvironment();
-  setLoweredAddress(i, emitAllocateBoxedOpaqueExistentialBuffer(
-                           *this, destType, srcType, container, genericEnv));
+  setLoweredAddress(
+      i, emitAllocateBoxedOpaqueExistentialBuffer(
+             *this, destType, srcType, container, genericEnv, false));
 }
 
 void IRGenSILFunction::visitInitExistentialValueInst(
@@ -5071,15 +5070,15 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   Address dest = loweredDest.getAnyAddress();
   if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {
-      addrTI.initializeWithTake(*this, dest, src, addrTy);
+      addrTI.initializeWithTake(*this, dest, src, addrTy, false);
     } else {
-      addrTI.initializeWithCopy(*this, dest, src, addrTy);
+      addrTI.initializeWithCopy(*this, dest, src, addrTy, false);
     }
   } else {
     if (i->isTakeOfSrc()) {
-      addrTI.assignWithTake(*this, dest, src, addrTy);
+      addrTI.assignWithTake(*this, dest, src, addrTy, false);
     } else {
-      addrTI.assignWithCopy(*this, dest, src, addrTy);
+      addrTI.assignWithCopy(*this, dest, src, addrTy, false);
     }
   }
 }

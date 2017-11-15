@@ -3506,7 +3506,6 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3530,7 +3529,6 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3584,7 +3582,6 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
   return getOrCreateHelperFunction(
       funcName, llvmType, argsTysVec,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address src(&*it++, objectTI.getBestKnownAlignment());
         Address dest(&*it++, objectTI.getBestKnownAlignment());
@@ -3611,7 +3608,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
       mangler.mangleOutlinedInitializeWithTakeFunction(canType, this);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
                     Address src, SILType T) {
-    objectTI.initializeWithTake(IGF, dest, src, T);
+    objectTI.initializeWithTake(IGF, dest, src, T, true);
   };
   return getOrCreateOutlinedCopyAddrHelperFunction(
       objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
@@ -3627,7 +3624,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
       mangler.mangleOutlinedInitializeWithCopyFunction(canType, this);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
                     Address src, SILType T) {
-    objectTI.initializeWithCopy(IGF, dest, src, T);
+    objectTI.initializeWithCopy(IGF, dest, src, T, true);
   };
   return getOrCreateOutlinedCopyAddrHelperFunction(
       objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
@@ -3642,8 +3639,9 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
   std::string funcName =
       mangler.mangleOutlinedAssignWithTakeFunction(canType, this);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
-                    Address src,
-                    SILType T) { objectTI.assignWithTake(IGF, dest, src, T); };
+                    Address src, SILType T) {
+    objectTI.assignWithTake(IGF, dest, src, T, true);
+  };
   return getOrCreateOutlinedCopyAddrHelperFunction(
       objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
@@ -3657,8 +3655,9 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
   std::string funcName =
       mangler.mangleOutlinedAssignWithCopyFunction(canType, this);
   auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
-                    Address src,
-                    SILType T) { objectTI.assignWithCopy(IGF, dest, src, T); };
+                    Address src, SILType T) {
+    objectTI.assignWithCopy(IGF, dest, src, T, true);
+  };
   return getOrCreateOutlinedCopyAddrHelperFunction(
       objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }

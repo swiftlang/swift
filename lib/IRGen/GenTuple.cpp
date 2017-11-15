@@ -158,7 +158,8 @@ namespace {
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address src, SILType T) const override {
+                              Address src, SILType T,
+                              bool isOutlined) const override {
       llvm_unreachable("unexploded tuple as argument?");
     }
 

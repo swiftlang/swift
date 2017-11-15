@@ -90,7 +90,7 @@ public:
 public:
   Explosion collectParameters();
   void emitScalarReturn(SILType resultTy, Explosion &scalars,
-                        bool isSwiftCCReturn);
+                        bool isSwiftCCReturn, bool isOutlined);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -570,13 +570,6 @@ public:
   llvm::Value *getLocalSelfMetadata();
   void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
 
-public:
-  //--- Outlined Function Support -------------------------------------------
-public:
-  bool isInOutlinedFunction();
-  void setInOutlinedFunction();
-  void setNotInOutlinedFunction();
-
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -593,10 +586,6 @@ private:
   llvm::Value *LocalSelf = nullptr;
   
   LocalSelfKind SelfKind;
-
-  /// Flag indiacting wherever we are in the middle of creating
-  /// an outlined address type function
-  bool inOutlinedFunction;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

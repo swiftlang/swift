@@ -135,9 +135,9 @@ public:
     }
   }
 
-  void assignWithCopy(IRGenFunction &IGF, Address dest,
-                      Address src, SILType T) const override {
-    if (IGF.isInOutlinedFunction() || T.hasOpenedExistential()) {
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
+    if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -145,8 +145,8 @@ public:
 
         Address destField = field.projectAddress(IGF, dest, offsets);
         Address srcField = field.projectAddress(IGF, src, offsets);
-        field.getTypeInfo().assignWithCopy(IGF, destField, srcField,
-                                           field.getType(IGF.IGM, T));
+        field.getTypeInfo().assignWithCopy(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
       llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
@@ -158,9 +158,9 @@ public:
     }
   }
 
-  void assignWithTake(IRGenFunction &IGF, Address dest,
-                      Address src, SILType T) const override {
-    if (IGF.isInOutlinedFunction() || T.hasOpenedExistential()) {
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
+    if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -168,8 +168,8 @@ public:
 
         Address destField = field.projectAddress(IGF, dest, offsets);
         Address srcField = field.projectAddress(IGF, src, offsets);
-        field.getTypeInfo().assignWithTake(IGF, destField, srcField,
-                                           field.getType(IGF.IGM, T));
+        field.getTypeInfo().assignWithTake(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
       llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
@@ -181,17 +181,16 @@ public:
     }
   }
 
-  void initializeWithCopy(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
     // If we're POD, use the generic routine.
     if (this->isPOD(ResilienceExpansion::Maximal) &&
         isa<LoadableTypeInfo>(this)) {
-      return cast<LoadableTypeInfo>(this)->
-               LoadableTypeInfo::initializeWithCopy(IGF, dest, src, T);
+      return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
+          IGF, dest, src, T, isOutlined);
     }
 
-    if (IGF.isInOutlinedFunction() || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -199,8 +198,8 @@ public:
 
         Address destField = field.projectAddress(IGF, dest, offsets);
         Address srcField = field.projectAddress(IGF, src, offsets);
-        field.getTypeInfo().initializeWithCopy(IGF, destField, srcField,
-                                               field.getType(IGF.IGM, T));
+        field.getTypeInfo().initializeWithCopy(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
       llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
@@ -211,10 +210,9 @@ public:
           &typeToMetadataVec);
     }
   }
-  
-  void initializeWithTake(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
+
+  void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
       IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
@@ -223,7 +221,7 @@ public:
       return;
     }
 
-    if (IGF.isInOutlinedFunction() || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -231,8 +229,8 @@ public:
 
         Address destField = field.projectAddress(IGF, dest, offsets);
         Address srcField = field.projectAddress(IGF, src, offsets);
-        field.getTypeInfo().initializeWithTake(IGF, destField, srcField,
-                                               field.getType(IGF.IGM, T));
+        field.getTypeInfo().initializeWithTake(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
       llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
@@ -422,17 +420,17 @@ private:
     }
   }
 
-
-  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
-                                         Explosion &in,
-                                         Address addr) const>
-  void forAllFields(IRGenFunction &IGF, Explosion &in, Address addr) const {
+  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF, Explosion &in,
+                                         Address addr, bool isOutlined) const>
+  void forAllFields(IRGenFunction &IGF, Explosion &in, Address addr,
+                    bool isOutlined) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
       Address fieldAddr = field.projectAddress(IGF, addr, offsets);
-      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr);
+      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr,
+                                                        isOutlined);
     }
   }
 
@@ -448,14 +446,15 @@ public:
                   Explosion &out) const override {
     forAllFields<&LoadableTypeInfo::loadAsTake>(IGF, addr, out);
   }
-  
-  void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
-    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr);
+
+  void assign(IRGenFunction &IGF, Explosion &e, Address addr,
+              bool isOutlined) const override {
+    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr, isOutlined);
   }
 
-  void initialize(IRGenFunction &IGF, Explosion &e,
-                  Address addr) const override {
-    forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr);
+  void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                  bool isOutlined) const override {
+    forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr, isOutlined);
   }
 
   unsigned getExplosionSize() const override {

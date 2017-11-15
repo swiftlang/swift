@@ -94,17 +94,16 @@ public:
 
   /// Assign a set of exploded values into an address.  The values are
   /// consumed out of the explosion.
-  virtual void assign(IRGenFunction &IGF, Explosion &explosion,
-                      Address addr) const = 0;
+  virtual void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
+                      bool isOutlined) const = 0;
 
   /// Initialize an address by consuming values out of an explosion.
   virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
-                          Address addr) const = 0;
-
+                          Address addr, bool isOutlined) const = 0;
 
   // We can give this a reasonable default implementation.
-  void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr, SILType T) const override;
+  void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.
