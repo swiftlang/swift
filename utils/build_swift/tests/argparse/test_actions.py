@@ -7,9 +7,9 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-from build_swift import argparse
-from build_swift.argparse import ArgumentParser, Nargs, actions
-from build_swift.tests.utils import TestCase, redirect_stderr
+from ..utils import TestCase, redirect_stderr
+from ...argparse import (ArgumentParser, BoolType, Nargs, PathType, SUPPRESS,
+                         actions)
 
 
 # -----------------------------------------------------------------------------
@@ -28,7 +28,7 @@ class TestAction(TestCase):
         self.assertEqual(action.required, False)
         self.assertEqual(action.help, None)
         self.assertEqual(action.metavar, None)
-        self.assertEqual(action.dest, argparse.SUPPRESS)
+        self.assertEqual(action.dest, SUPPRESS)
 
     def test_single_destination(self):
         action = actions.Action(['--foo'], 'foo')
@@ -44,7 +44,7 @@ class TestAction(TestCase):
         with self.assertNotRaises(Exception):
             action = actions.Action([], [], dest='foo')
 
-            self.assertEqual(action.dest, argparse.SUPPRESS)
+            self.assertEqual(action.dest, SUPPRESS)
 
     def test_call_not_implemented(self):
         action = actions.Action([], [])
@@ -250,7 +250,7 @@ class TestStorePathAction(TestCase):
         action = actions.StorePathAction(['--foo'], dests=['foo'])
 
         self.assertEqual(action.nargs, Nargs.SINGLE)
-        self.assertIsInstance(action.type, argparse.PathType)
+        self.assertIsInstance(action.type, PathType)
 
 
 class TestToggleTrueAction(TestCase):
@@ -283,7 +283,7 @@ class TestToggleTrueAction(TestCase):
         parser = ArgumentParser()
         parser.add_argument('--foo', action=actions.ToggleTrueAction)
 
-        for value in actions.ToggleTrueAction.TRUE_VALUES:
+        for value in BoolType.TRUE_VALUES:
             args = parser.parse_args(['--foo', str(value)])
             self.assertTrue(args.foo)
 
@@ -294,7 +294,7 @@ class TestToggleTrueAction(TestCase):
         parser = ArgumentParser()
         parser.add_argument('--foo', action=actions.ToggleTrueAction)
 
-        for value in actions.ToggleTrueAction.FALSE_VALUES:
+        for value in BoolType.FALSE_VALUES:
             args = parser.parse_args(['--foo', str(value)])
             self.assertFalse(args.foo)
 
@@ -345,7 +345,7 @@ class TestToggleFalseAction(TestCase):
         parser = ArgumentParser()
         parser.add_argument('--foo', action=actions.ToggleFalseAction)
 
-        for value in actions.ToggleFalseAction.TRUE_VALUES:
+        for value in BoolType.TRUE_VALUES:
             args = parser.parse_args(['--foo', str(value)])
             self.assertFalse(args.foo)
 
@@ -356,7 +356,7 @@ class TestToggleFalseAction(TestCase):
         parser = ArgumentParser()
         parser.add_argument('--foo', action=actions.ToggleFalseAction)
 
-        for value in actions.ToggleFalseAction.FALSE_VALUES:
+        for value in BoolType.FALSE_VALUES:
             args = parser.parse_args(['--foo', str(value)])
             self.assertTrue(args.foo)
 
@@ -384,7 +384,7 @@ class TestUnuspportedAction(TestCase):
 
         self.assertEqual(action.dests, [])
         self.assertEqual(action.nargs, Nargs.ZERO)
-        self.assertEqual(action.default, argparse.SUPPRESS)
+        self.assertEqual(action.default, SUPPRESS)
         self.assertEqual(action.message, None)
 
     def test_suppressed_default_value(self):

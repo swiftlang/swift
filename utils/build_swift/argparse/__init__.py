@@ -6,6 +6,7 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+
 """
 Wrapper module around the standard argparse that extends the default
 functionality with support for multi-destination actions, an expressive DSL for
@@ -22,7 +23,8 @@ from argparse import ONE_OR_MORE, OPTIONAL, SUPPRESS, ZERO_OR_MORE
 
 from .actions import Action, Nargs
 from .parser import ArgumentParser
-from .types import ClangVersionType, PathType, RegexType, SwiftVersionType
+from .types import (BoolType, ClangVersionType, PathType, RegexType,
+                    SwiftVersionType)
 
 
 __all__ = [
@@ -37,6 +39,7 @@ __all__ = [
     'RawDescriptionHelpFormatter',
     'RawTextHelpFormatter',
 
+    'BoolType',
     'FileType',
     'PathType',
     'RegexType',

@@ -9,11 +9,66 @@
 
 import os.path
 
-from build_swift.argparse import ArgumentTypeError, types
-from build_swift.tests.utils import TestCase
+from ..utils import TestCase
+from ...argparse import ArgumentTypeError, types
 
 
 # -----------------------------------------------------------------------------
+
+class TestBoolType(TestCase):
+
+    def test_true_values(self):
+        bool_type = types.BoolType()
+
+        self.assertTrue(bool_type(True))
+        self.assertTrue(bool_type(1))
+        self.assertTrue(bool_type('TRUE'))
+        self.assertTrue(bool_type('True'))
+        self.assertTrue(bool_type('true'))
+        self.assertTrue(bool_type('1'))
+
+    def test_false_values(self):
+        bool_type = types.BoolType()
+
+        self.assertFalse(bool_type(False))
+        self.assertFalse(bool_type(0))
+        self.assertFalse(bool_type('FALSE'))
+        self.assertFalse(bool_type('False'))
+        self.assertFalse(bool_type('false'))
+        self.assertFalse(bool_type('0'))
+
+    def test_custom_true_values(self):
+        bool_type = types.BoolType(true_values=['TRUE', 'ON', '1'])
+
+        self.assertTrue(bool_type('TRUE'))
+        self.assertTrue(bool_type('ON'))
+        self.assertTrue(bool_type('1'))
+
+        self.assertRaises(ArgumentTypeError, bool_type, True)
+        self.assertRaises(ArgumentTypeError, bool_type, 1)
+        self.assertRaises(ArgumentTypeError, bool_type, 'True')
+        self.assertRaises(ArgumentTypeError, bool_type, 'true')
+
+    def test_custom_false_values(self):
+        bool_type = types.BoolType(false_values=['FALSE', 'OFF', '0'])
+
+        self.assertFalse(bool_type('FALSE'))
+        self.assertFalse(bool_type('OFF'))
+        self.assertFalse(bool_type('0'))
+
+        self.assertRaises(ArgumentTypeError, bool_type, False)
+        self.assertRaises(ArgumentTypeError, bool_type, 0)
+        self.assertRaises(ArgumentTypeError, bool_type, 'False')
+        self.assertRaises(ArgumentTypeError, bool_type, 'false')
+
+    def test_invalid_values(self):
+        bool_type = types.BoolType()
+
+        self.assertRaises(ArgumentTypeError, bool_type, None)
+        self.assertRaises(ArgumentTypeError, bool_type, 2)
+        self.assertRaises(ArgumentTypeError, bool_type, 2.71828)
+        self.assertRaises(ArgumentTypeError, bool_type, 'Invalid')
+
 
 class TestPathType(TestCase):
 

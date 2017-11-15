@@ -21,6 +21,7 @@ from . import ArgumentTypeError
 
 
 __all__ = [
+    'BoolType',
     'PathType',
     'RegexType',
     'ClangVersionType',
@@ -29,6 +30,30 @@ __all__ = [
 
 
 # -----------------------------------------------------------------------------
+
+class BoolType(object):
+    """Argument type used to validate an input string as a bool-like type.
+    Callers are able to override valid true and false values.
+    """
+
+    TRUE_VALUES = [True, 1, 'TRUE', 'True', 'true', '1']
+    FALSE_VALUES = [False, 0, 'FALSE', 'False', 'false', '0']
+
+    def __init__(self, true_values=None, false_values=None):
+        true_values = true_values or BoolType.TRUE_VALUES
+        false_values = false_values or BoolType.FALSE_VALUES
+
+        self._true_values = set(true_values)
+        self._false_values = set(false_values)
+
+    def __call__(self, value):
+        if value in self._true_values:
+            return True
+        elif value in self._false_values:
+            return False
+        else:
+            raise ArgumentTypeError('{} is not a boolean value'.format(value))
+
 
 class PathType(object):
     """PathType denotes a valid path-like object. When called paths will be

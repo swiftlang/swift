@@ -16,7 +16,7 @@ default actions provided by the standard argparse.
 import argparse
 import copy
 
-from .types import PathType
+from .types import BoolType, PathType
 
 
 __all__ = [
@@ -255,11 +255,9 @@ class _ToggleAction(Action):
     explicitly when an optional boolean value is parsed.
     """
 
-    TRUE_VALUES = [True, 1, 'TRUE', 'True', 'true', '1']
-    FALSE_VALUES = [False, 0, 'FALSE', 'False', 'false', '0']
-
     def __init__(self, option_strings, on_value, off_value, **kwargs):
         kwargs['nargs'] = Nargs.OPTIONAL
+        kwargs['type'] = BoolType()
         kwargs.setdefault('default', off_value)
         kwargs.setdefault('metavar', 'BOOL')
 
@@ -273,9 +271,9 @@ class _ToggleAction(Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if values is None:
             values = self.on_value
-        elif values in _ToggleAction.TRUE_VALUES:
+        elif values is True:
             values = self.on_value
-        elif values in _ToggleAction.FALSE_VALUES:
+        elif values is False:
             values = self.off_value
         else:
             raise argparse.ArgumentTypeError(
