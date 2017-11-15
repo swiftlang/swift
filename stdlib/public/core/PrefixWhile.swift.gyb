@@ -103,7 +103,7 @@ extension LazySequenceProtocol {
 
 /// A position in the base collection of a `LazyPrefixWhileCollection` or the
 /// end of that collection.
-public enum _LazyPrefixWhileIndexRepresentation<Base : Collection> {
+public enum _LazyPrefixWhileIndexRepresentation<Base : Collection> : Hashable {
   case index(Base.Index)
   case pastEnd
 }
@@ -111,7 +111,7 @@ public enum _LazyPrefixWhileIndexRepresentation<Base : Collection> {
 /// A position in a `LazyPrefixWhileCollection` or
 /// `LazyPrefixWhileBidirectionalCollection` instance.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
+public struct LazyPrefixWhileIndex<Base : Collection> : Comparable, Hashable {
   /// The position corresponding to `self` in the underlying collection.
   @_versioned // FIXME(sil-serialize-all)
   internal let _value: _LazyPrefixWhileIndexRepresentation<Base>

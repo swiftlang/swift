@@ -188,7 +188,7 @@ public struct ${Index}<BaseElements>
   internal let _inner: BaseElements.Element.Index?
 }
 
-extension ${Index} : Comparable {
+extension ${Index} : Comparable, Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public static func == (
     lhs: ${Index}<BaseElements>,
@@ -217,6 +217,12 @@ extension ${Index} : Comparable {
     _precondition(lhs._inner == nil && rhs._inner == nil)
 
     return false
+  }
+
+  public var hashValue: Int {
+    var hash = _inner?.hashValue ?? 0
+    hash ^= _mixInt(_outer.hashValue)
+    return hash
   }
 }
 

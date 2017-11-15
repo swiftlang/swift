@@ -151,7 +151,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
   where
   // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
+  Bound : _Strideable & Comparable & Hashable,
   Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
@@ -310,7 +310,7 @@ extension CountableRange {
 
 extension CountableRange
   where
-  Bound._DisabledRangeIndex : Strideable,
+  Bound._DisabledRangeIndex : Strideable & Hashable,
   Bound._DisabledRangeIndex.Stride : SignedInteger {
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -479,7 +479,8 @@ extension ${Self}
 %   if ('Countable' in OtherSelf or 'Closed' in OtherSelf or 'Closed' in Self) \
 %   and not 'Countable' in Self:
   where
-  Bound : _Strideable, Bound.Stride : SignedInteger
+  Bound : _Strideable & Hashable, Bound.Stride : SignedInteger
+  // FIXME: It doesn't seem like the Hashable constraint should be necessary here.
 %   end
 {
   /// Creates an instance equivalent to the given range.
@@ -506,7 +507,7 @@ ${get_init_warning(Self, OtherSelf)}
 extension ${Self}
 %   if 'Countable' in OtherSelf and not 'Countable' in Self:
   where
-  Bound : _Strideable, Bound.Stride : SignedInteger
+  Bound : _Strideable & Hashable, Bound.Stride : SignedInteger
 %   end
 {
   /// Returns a Boolean value indicating whether this range and the given range

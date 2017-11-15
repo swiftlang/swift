@@ -897,17 +897,19 @@ extension Any${Kind} {
 internal protocol _AnyIndexBox : class {
   var _typeID: ObjectIdentifier { get }
 
-  func _unbox<T : Comparable>() -> T?
+  func _unbox<T : Comparable & Hashable>() -> T?
 
   func _isEqual(to rhs: _AnyIndexBox) -> Bool
 
   func _isLess(than rhs: _AnyIndexBox) -> Bool
+
+  var _hashValue: Int { get }
 }
 
 @_fixed_layout
 @_versioned
 internal final class _IndexBox<
-  BaseIndex : Comparable
+  BaseIndex : Comparable & Hashable
 > : _AnyIndexBox {
   @_versioned
   internal var _base: BaseIndex
@@ -932,7 +934,7 @@ internal final class _IndexBox<
 
   @_versioned
   @_inlineable
-  internal func _unbox<T : Comparable>() -> T? {
+  internal func _unbox<T : Comparable & Hashable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
@@ -947,6 +949,12 @@ internal final class _IndexBox<
   internal func _isLess(than rhs: _AnyIndexBox) -> Bool {
     return _base < _unsafeUnbox(rhs)
   }
+
+  @_versioned
+  @_inlineable
+  internal var _hashValue: Int {
+    return _base.hashValue
+  }
 }
 
 /// A wrapper over an underlying index that hides the specific underlying type.
@@ -954,7 +962,7 @@ internal final class _IndexBox<
 public struct AnyIndex {
   /// Creates a new index wrapping `base`.
   @_inlineable
-  public init<BaseIndex : Comparable>(_ base: BaseIndex) {
+  public init<BaseIndex : Comparable & Hashable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
   }
 
@@ -974,7 +982,7 @@ public struct AnyIndex {
   internal var _box: _AnyIndexBox
 }
 
-extension AnyIndex : Comparable {
+extension AnyIndex : Comparable, Hashable {
   /// Returns a Boolean value indicating whether two indices wrap equal
   /// underlying indices.
   ///
@@ -1001,6 +1009,11 @@ extension AnyIndex : Comparable {
   public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
     _precondition(lhs._typeID == rhs._typeID, "Base index types differ")
     return lhs._box._isLess(than: rhs._box)
+  }
+
+  @_inlineable
+  public var hashValue: Int {
+    return _box._hashValue
   }
 }
 

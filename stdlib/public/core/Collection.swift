@@ -355,7 +355,7 @@ public protocol Collection : Sequence
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
-  associatedtype Index : Comparable
+  associatedtype Index : Comparable, Hashable
  
   /// The position of the first element in a nonempty collection.
   ///

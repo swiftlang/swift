@@ -70,7 +70,7 @@ extension _ValidUTF8Buffer : Collection {
   public typealias IndexDistance = Int
   
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index : Comparable {
+  public struct Index : Comparable, Hashable {
     @_versioned
     internal var _biasedBits: Storage
     
@@ -78,10 +78,6 @@ extension _ValidUTF8Buffer : Collection {
     @_versioned
     internal init(_biasedBits: Storage) { self._biasedBits = _biasedBits }
     
-    @_inlineable // FIXME(sil-serialize-all)
-    public static func == (lhs: Index, rhs: Index) -> Bool {
-      return lhs._biasedBits == rhs._biasedBits
-    }
     @_inlineable // FIXME(sil-serialize-all)
     public static func < (lhs: Index, rhs: Index) -> Bool {
       return lhs._biasedBits > rhs._biasedBits
