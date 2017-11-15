@@ -74,6 +74,18 @@ static RawSyntaxInfo createSyntaxAs(ArrayRef<RawSyntaxInfo> Parts,
 }
 } // End of anonymous namespace
 
+RawSyntaxInfo::RawSyntaxInfo(Token Tok, Trivia LeadingTrivia,
+                             Trivia TrailingTrivia) {
+  if (Tok.isEscapedIdentifier()) {
+    LeadingTrivia.push_back(TriviaPiece::backtick());
+    TrailingTrivia.push_front(TriviaPiece::backtick());
+  }
+  SyntaxRange = Tok.getLoc();
+  RawNode = RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
+                                 SourcePresence::Present, LeadingTrivia,
+                                 TrailingTrivia);
+}
+
 struct SyntaxParsingContext::ContextInfo {
   bool Enabled;
 private:

@@ -738,25 +738,6 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-syntax::RawSyntaxInfo Lexer::fullLex() {
-  if (NextToken.isEscapedIdentifier()) {
-    LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
-    TrailingTrivia.insert(TrailingTrivia.begin(),
-                          syntax::TriviaPiece::backtick());
-  }
-  auto Loc = NextToken.getLoc();
-  auto Result = syntax::RawTokenSyntax::make(NextToken.getKind(),
-                                        OwnedString(NextToken.getText()),
-                                        syntax::SourcePresence::Present,
-                                        {LeadingTrivia}, {TrailingTrivia});
-  LeadingTrivia.clear();
-  TrailingTrivia.clear();
-  if (NextToken.isNot(tok::eof)) {
-    lexImpl();
-  }
-  return {Loc, Result};
-}
-
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;

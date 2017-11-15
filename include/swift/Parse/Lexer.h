@@ -239,14 +239,20 @@ public:
     return CodeCompletionPtr != nullptr;
   }
 
-  void lex(Token &Result) {
+  /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
+  /// to trivias are populated.
+  void lex(Token &Result, syntax::Trivia *LeadingTriviaResult = nullptr,
+           syntax::Trivia *TrailingTriviaResult = nullptr) {
     Result = NextToken;
+    if (LeadingTriviaResult && TrailingTriviaResult) {
+      *LeadingTriviaResult = syntax::Trivia {LeadingTrivia};
+      *TrailingTriviaResult = syntax::Trivia {TrailingTrivia};
+      LeadingTrivia.clear();
+      TrailingTrivia.clear();
+    }
     if (Result.isNot(tok::eof))
       lexImpl();
   }
-
-  /// Lex a full token including leading and trailing trivia.
-  syntax::RawSyntaxInfo fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;

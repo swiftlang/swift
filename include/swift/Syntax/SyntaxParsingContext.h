@@ -51,6 +51,9 @@ struct RawSyntaxInfo {
   RawSyntaxInfo(SourceRange SyntaxRange, RC<RawSyntax> RawNode):
     SyntaxRange(SyntaxRange), RawNode(RawNode) {}
 
+  /// Construct from legacy Token and trivia lists.
+  RawSyntaxInfo(Token Tok, Trivia LeadingTrivia, Trivia TrailingTrivia);
+
   bool isImplicit() const { return SyntaxRange.isInvalid(); }
   SourceLoc getStartLoc() const { return SyntaxRange.Start; }
   SourceLoc getEndLoc() const { return SyntaxRange.End; }

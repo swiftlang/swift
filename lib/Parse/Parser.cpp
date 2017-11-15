@@ -280,8 +280,12 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
   std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   syntax::AbsolutePosition RunningPos;
+  Token Tok;
+  Trivia LeadingTrivia, TrailingTrivia;
   do {
-    auto ThisToken = L.fullLex().getRaw<syntax::RawTokenSyntax>();
+    L.lex(Tok, &LeadingTrivia, &TrailingTrivia);
+    auto ThisToken = RawSyntaxInfo(Tok, LeadingTrivia, TrailingTrivia)
+                         .getRaw<RawTokenSyntax>();
     auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
     Tokens.push_back({ThisToken, ThisTokenPos});
   } while (Tokens.back().first->isNot(tok::eof));
@@ -298,8 +302,11 @@ void swift::populateTokenSyntaxMap(const LangOptions &LangOpts,
   Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
           CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia);
+  Token ThisToken;
+  Trivia LeadingTrivia, TrailingTrivia;
   do {
-    Result.emplace_back(L.fullLex());
+    L.lex(ThisToken, &LeadingTrivia, &TrailingTrivia);
+    Result.emplace_back(ThisToken, LeadingTrivia, TrailingTrivia);
     if (Result.back().getRaw<syntax::RawTokenSyntax>()->is(tok::eof))
       return;
   } while (true);
@@ -531,6 +538,7 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
 void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
+  TokReceiver->receive(SplitTokens.back());
 }
 
 SourceLoc Parser::consumeStartingLess() {
