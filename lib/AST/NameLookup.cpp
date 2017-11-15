@@ -1346,6 +1346,13 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
 
+  // FIXME: At present, lazy member loading conflicts with a bunch of other code
+  // that appears to special-case initializers (clang-imported initializer
+  // sorting, implicit initializer synthesis), so for the time being we have to
+  // turn it off for them entirely.
+  if (name.getBaseName() == ctx.Id_init)
+    useNamedLazyMemberLoading = false;
+
   // We check the LookupTable at most twice, possibly treating a miss in the
   // first try as a cache-miss that we then do a cache-fill on, and retry.
   for (int i = 0; i < 2; ++i) {
