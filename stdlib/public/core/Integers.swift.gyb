@@ -1473,7 +1473,7 @@ public protocol BinaryInteger :
   ///
   /// The `Words` type must conform to the `Collection` protocol with an
   /// `Element` type of `UInt`.
-  associatedtype Words : Sequence where Words.Element == UInt
+  associatedtype Words : Collection where Words.Element == UInt
 
   /// A collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
