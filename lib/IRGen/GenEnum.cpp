@@ -476,6 +476,17 @@ namespace {
                                          getSingletonType(IGF.IGM, T));
     }
 
+    void collectArchetypeMetadata(
+        IRGenFunction &IGF,
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            &typeToMetadataVec,
+        SILType T) const override {
+      if (!getSingleton())
+        return;
+      getSingleton()->collectArchetypeMetadata(IGF, typeToMetadataVec,
+                                               getSingletonType(IGF.IGM, T));
+    }
+
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
       if (getLoadableSingleton()) getLoadableSingleton()->reexplode(IGF, src, dest);
@@ -873,6 +884,16 @@ namespace {
       // primitive copy.
       llvm::Value *val = IGF.Builder.CreateLoad(src);
       IGF.Builder.CreateStore(val, dest);
+    }
+
+    void collectArchetypeMetadata(
+        IRGenFunction &IGF,
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            &typeToMetadataVec,
+        SILType T) const override {
+      auto canType = T.getSwiftRValueType();
+      assert(!canType->hasArchetype() &&
+             "collectArchetypeMetadata: no archetype expected here");
     }
 
     static constexpr IsPOD_t IsScalarPOD = IsPOD;
@@ -1300,6 +1321,14 @@ namespace {
       payload.store(IGF, projectPayload(IGF, addr));
       if (ExtraTagBitCount > 0)
         IGF.Builder.CreateStore(e.claimNext(), projectExtraTagBits(IGF, addr));
+    }
+
+    void collectArchetypeMetadata(
+        IRGenFunction &IGF,
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            &typeToMetadataVec,
+        SILType T) const override {
+      assert(TIK >= Loadable);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
@@ -2596,9 +2625,15 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedAssignWithCopyFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
@@ -2610,9 +2645,15 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedAssignWithTakeFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
@@ -2624,9 +2665,15 @@ namespace {
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedInitializeWithCopyFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
@@ -2638,14 +2685,38 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedInitializeWithTakeFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
             IGF, *TI, dest, src, T,
             &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      }
+    }
+
+    void collectArchetypeMetadata(
+        IRGenFunction &IGF,
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            &typeToMetadataVec,
+        SILType T) const override {
+      auto canType = T.getSwiftRValueType();
+      if (irgen::mightContainMetadata(IGF.IGM, canType)) {
+        auto *metadata = IGF.emitTypeMetadataRef(canType);
+        assert(metadata && "Expected Type Metadata Ref");
+        typeToMetadataVec.push_back(std::make_pair(canType, metadata));
+      }
+      if (CopyDestroyKind == Normal) {
+        auto payloadT = getPayloadType(IGF.IGM, T);
+        getPayloadTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
+                                                      payloadT);
       }
     }
 
@@ -4238,9 +4309,15 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedAssignWithCopyFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
@@ -4252,9 +4329,15 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedAssignWithTakeFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
@@ -4266,9 +4349,15 @@ namespace {
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedInitializeWithCopyFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
@@ -4280,14 +4369,42 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T)
     const override {
-      if (IGF.isInOutlinedFunction() || (TIK < Loadable) ||
-          (T.hasArchetype())) {
+      if (IGF.isInOutlinedFunction()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake);
+      } else if (T.hasArchetype()) {
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            typeToMetadataVec;
+        collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+            IGF, *TI, dest, src, typeToMetadataVec, T,
+            &IRGenModule::getOrCreateGenericOutlinedInitializeWithTakeFunction);
       } else {
         // Create an outlined function to avoid explosion
         IGF.IGM.generateCallToOutlinedCopyAddr(
             IGF, *TI, dest, src, T,
             &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      }
+    }
+
+    void collectArchetypeMetadata(
+        IRGenFunction &IGF,
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            &typeToMetadataVec,
+        SILType T) const override {
+      auto canType = T.getSwiftRValueType();
+      if (irgen::mightContainMetadata(IGF.IGM, canType)) {
+        auto *metadata = IGF.emitTypeMetadataRef(canType);
+        assert(metadata && "Expected Type Metadata Ref");
+        typeToMetadataVec.push_back(std::make_pair(canType, metadata));
+      }
+      if (CopyDestroyKind != Normal) {
+        return;
+      }
+      for (auto &payloadCasePair : ElementsWithPayload) {
+        SILType PayloadT =
+            T.getEnumElementType(payloadCasePair.decl, IGF.getSILModule());
+        auto &payloadTI = *payloadCasePair.ti;
+        payloadTI.collectArchetypeMetadata(IGF, typeToMetadataVec, PayloadT);
       }
     }
 
@@ -4814,6 +4931,20 @@ namespace {
                                  dest, src);
     }
 
+    void collectArchetypeMetadata(
+        IRGenFunction &IGF,
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            &typeToMetadataVec,
+        SILType T) const override {
+      auto canType = T.getSwiftRValueType();
+      if (!irgen::mightContainMetadata(IGF.IGM, canType)) {
+        return;
+      }
+      auto *metadata = IGF.emitTypeMetadataRef(canType);
+      assert(metadata && "Expected Type Metadata Ref");
+      typeToMetadataVec.push_back(std::make_pair(canType, metadata));
+    }
+
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       emitDestroyCall(IGF, T, addr);
     }
@@ -5191,6 +5322,13 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest,
                             Address src, SILType T) const override {
       return Strategy.initializeWithTake(IGF, dest, src, T);
+    }
+    void collectArchetypeMetadata(
+        IRGenFunction &IGF,
+        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+            &typeToMetadataVec,
+        SILType T) const override {
+      return Strategy.collectArchetypeMetadata(IGF, typeToMetadataVec, T);
     }
     void assignWithCopy(IRGenFunction &IGF, Address dest,
                         Address src, SILType T) const override {

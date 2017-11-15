@@ -438,3 +438,8 @@ void IRGenFunction::setInOutlinedFunction() {
   assert(!isInOutlinedFunction() && "Expected inOutlinedFunction to be false");
   inOutlinedFunction = true;
 }
+
+void IRGenFunction::setNotInOutlinedFunction() {
+  assert(isInOutlinedFunction() && "Expected inOutlinedFunction to be true");
+  inOutlinedFunction = false;
+}

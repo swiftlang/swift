@@ -137,27 +137,45 @@ public:
 
   void assignWithCopy(IRGenFunction &IGF, Address dest,
                       Address src, SILType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+    if (IGF.isInOutlinedFunction()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
 
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().assignWithCopy(IGF, destField, srcField,
-                                         field.getType(IGF.IGM, T));
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().assignWithCopy(IGF, destField, srcField,
+                                           field.getType(IGF.IGM, T));
+      }
+    } else {
+      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+          IGF, *this, dest, src, typeToMetadataVec, T,
+          &IRGenModule::getOrCreateGenericOutlinedAssignWithCopyFunction);
     }
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest,
                       Address src, SILType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+    if (IGF.isInOutlinedFunction()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
 
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().assignWithTake(IGF, destField, srcField,
-                                         field.getType(IGF.IGM, T));
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().assignWithTake(IGF, destField, srcField,
+                                           field.getType(IGF.IGM, T));
+      }
+    } else {
+      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+          IGF, *this, dest, src, typeToMetadataVec, T,
+          &IRGenModule::getOrCreateGenericOutlinedAssignWithTakeFunction);
     }
   }
 
@@ -171,15 +189,23 @@ public:
                LoadableTypeInfo::initializeWithCopy(IGF, dest, src, T);
     }
 
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty())
-        continue;
+    if (IGF.isInOutlinedFunction()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
 
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().initializeWithCopy(IGF, destField, srcField,
-                                             field.getType(IGF.IGM, T));
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().initializeWithCopy(IGF, destField, srcField,
+                                               field.getType(IGF.IGM, T));
+      }
+    } else {
+      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+          IGF, *this, dest, src, typeToMetadataVec, T,
+          &IRGenModule::getOrCreateGenericOutlinedInitializeWithCopyFunction);
     }
   }
   
@@ -193,15 +219,24 @@ public:
                  std::min(dest.getAlignment(), src.getAlignment()).getValue());
       return;
     }
-    
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
-      
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().initializeWithTake(IGF, destField, srcField,
-                                             field.getType(IGF.IGM, T));
+
+    if (IGF.isInOutlinedFunction()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
+
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().initializeWithTake(IGF, destField, srcField,
+                                               field.getType(IGF.IGM, T));
+      }
+    } else {
+      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToGenericOutlinedCopyAddr(
+          IGF, *this, dest, src, typeToMetadataVec, T,
+          &IRGenModule::getOrCreateGenericOutlinedInitializeWithTakeFunction);
     }
   }
 
@@ -212,6 +247,26 @@ public:
 
       field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr, offsets),
                                   field.getType(IGF.IGM, T));
+    }
+  }
+
+  void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
+          &typeToMetadataVec,
+      SILType T) const override {
+    auto canType = T.getSwiftRValueType();
+    if (irgen::mightContainMetadata(IGF.IGM, canType)) {
+      auto *metadata = IGF.emitTypeMetadataRef(canType);
+      assert(metadata && "Expected Type Metadata Ref");
+      typeToMetadataVec.push_back(std::make_pair(canType, metadata));
+    }
+    for (auto &field : getFields()) {
+      if (field.isEmpty())
+        continue;
+      auto fType = field.getType(IGF.IGM, T);
+      field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
+                                                   fType);
     }
   }
 };
