@@ -519,8 +519,10 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   // case.
   ArrayRef<SILInstruction *> InsertPts = Val.getInsertionPoints();
   if (InsertPts.size() == 1) {
-    SavedInsertionPointRAII SavedInsertPt(B, InsertPts[0]);
-    SILValue EltVal = nonDestructivelyExtractSubElement(Val, B, Loc);
+    // Use the scope and location of the store at the insertion point.
+    SILBuilderWithScope Builder(InsertPts[0]);
+    SILLocation Loc = InsertPts[0]->getLoc();
+    SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
     assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
     return EltVal;
   }
@@ -530,8 +532,10 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   SILSSAUpdater Updater;
   Updater.Initialize(LoadTy);
   for (auto *I : Val.getInsertionPoints()) {
-    SavedInsertionPointRAII SavedInsertPt(B, I);
-    SILValue EltVal = nonDestructivelyExtractSubElement(Val, B, Loc);
+    // Use the scope and location of the store at the insertion point.
+    SILBuilderWithScope Builder(I);
+    SILLocation Loc = I->getLoc();
+    SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
     Updater.AddAvailableValue(I->getParent(), EltVal);
   }
 
@@ -1113,7 +1117,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   }
   
   // Aggregate together all of the subelements into something that has the same
-  // type as the load did, and emit smaller) loads for any subelements that were
+  // type as the load did, and emit smaller loads for any subelements that were
   // not available.
   auto *Load = cast<LoadInst>(Inst);
   AvailableValueAggregator Agg(Load, AvailableValues, Uses);
