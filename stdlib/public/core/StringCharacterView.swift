@@ -213,7 +213,7 @@ extension String._CharacterView : BidirectionalCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal var unicodeScalars: UnicodeScalarView {
-    return UnicodeScalarView(_core, coreOffset: _coreOffset)
+    return UnicodeScalarView(_guts, coreOffset: _coreOffset)
   }
   
   public typealias Index = String.Index
@@ -794,9 +794,9 @@ extension String._CharacterView {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> String._CharacterView {
+  public subscript(bounds: Range<Index>) -> String.CharacterView {
     return String._CharacterView(
-      unicodeScalars[bounds]._core,
+      unicodeScalars[bounds]._guts,
       coreOffset: bounds.lowerBound.encodedOffset)
   }
 }

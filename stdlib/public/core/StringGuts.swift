@@ -1117,6 +1117,14 @@ extension _StringGuts {
 extension _StringGuts {
   @_versioned
   internal
+  var startIndex: Int { return 0 }
+
+  @_versioned
+  internal
+  var endIndex: Int { return count }
+
+  @_versioned
+  internal
   var count: Int {
     let contigOpt = self._unmanagedContiguous
     if _fastPath(contigOpt != nil) {
