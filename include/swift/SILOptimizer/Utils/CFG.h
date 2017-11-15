@@ -125,6 +125,16 @@ bool hasCriticalEdges(SILFunction &F, bool OnlyNonCondBr);
 bool splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
                            DominanceInfo *DT, SILLoopInfo *LI);
 
+/// \brief Split all cond_br critical edges with non-trivial arguments in the
+/// function updating the dominator tree and loop information (if they are not
+/// set to null).
+///
+/// A current invariant of Ownership SIL is that cond_br can only have critical
+/// edges with non-trivial arguments. This simplifies computation.
+bool splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &F,
+                                                   DominanceInfo *DT,
+                                                   SILLoopInfo *LI);
+
 /// \brief Merge a basic block ending in a branch with its successor
 /// if possible. If dominance information or loop info is non null update it.
 /// Return true if block was merged.
