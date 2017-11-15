@@ -154,10 +154,10 @@ extension String {
 //   }
 // }
 
-extension String : Comparable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func < (lhs: String, rhs: String) -> Bool {
-    return lhs._compareString(rhs) < 0
-  }
-}
+// extension String : Comparable {
+//   @_inlineable // FIXME(sil-serialize-all)
+//   public static func < (lhs: String, rhs: String) -> Bool {
+//     return lhs._compareString(rhs) < 0
+//   }
+// }
 
