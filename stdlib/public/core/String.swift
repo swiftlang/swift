@@ -789,8 +789,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
     self = String(_StringGuts(UnsafeString(
       baseAddress: UnsafeRawPointer(start),
       count: Int(utf16CodeUnitCount),
-      isSingleByte: false,
-      hasCocoaBuffer: false)))
+      isSingleByte: false)))
   }
 }
 
@@ -806,8 +805,7 @@ extension String : _ExpressibleByBuiltinStringLiteral {
         self = String(_StringGuts(UnsafeString(
           baseAddress: UnsafeRawPointer(start),
           count: Int(utf8CodeUnitCount),
-          isSingleByte: true,
-          hasCocoaBuffer: false)))
+          isSingleByte: true)))
     }
     else {
       self = String._fromWellFormedCodeUnitSequence(
@@ -915,7 +913,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _guts = _StringGuts(NativeString(_storage))
+    _guts = _StringGuts(_storage)
   }
 }
 

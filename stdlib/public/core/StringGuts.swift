@@ -68,17 +68,6 @@ struct _StringGuts {
 // one-byte code units.
 /*fileprivate*/ internal var _twoByteCodeUnitBit: UInt { return _smallBit >> 1 }
 
-// When managed, or an unsafe string, the bit used to discriminate Cocoa-buffer-
-// backed Strings.
-//
-// TODO: Remove when weaned off of _LegacyStringCore. Is should be effectively
-// redundant with BridgeObject's isObjC bit, and unsafe strings shouldn't care
-// where they came from.
-//
-/*fileprivate*/ internal var _hasCocoaBufferBit: UInt {
-  return _twoByteCodeUnitBit >> 1
-}
-
 //
 // Flags
 //
@@ -87,7 +76,7 @@ struct _StringGuts {
 //
 extension _StringGuts {
   /*private*/ internal var _flagsMask: UInt {
-    return _twoByteCodeUnitBit | _hasCocoaBufferBit
+    return _twoByteCodeUnitBit
   }
 
   @_versioned
@@ -113,18 +102,6 @@ extension _StringGuts {
     return isSingleByte
   }
 
-  // TODO: remove
-  var hasCocoaBuffer: Bool {
-    switch classification {
-    case .native, .unsafe:
-      return (_objectBitPattern & _hasCocoaBufferBit) != 0
-    case .nonTaggedCocoa:
-      return true
-    case .error, .smallCocoa:
-      return false
-    }
-  }
-
   var _unflaggedObject: _BuiltinBridgeObject {
     _sanityCheck(!_isSmallCocoa, "TODO: drop small cocoa")
     return Builtin.reinterpretCast(_objectBitPattern & ~_flagsMask)
@@ -140,15 +117,11 @@ extension _StringGuts {
   /*private*/ internal init(
     _unflagged object: _BuiltinBridgeObject,
     isSingleByte: Bool,
-    hasCocoaBuffer: Bool,
     otherBits: UInt
   ) {
     self.init(object, otherBits)
     if !isSingleByte {
       self._objectBitPattern |= _twoByteCodeUnitBit
-    }
-    if hasCocoaBuffer {
-      self._objectBitPattern |= _hasCocoaBufferBit
     }
 
     _sanityCheck(_bitPattern(self._unflaggedObject) == _bitPattern(object))
@@ -161,34 +134,29 @@ extension _StringGuts {
     self.init(UnsafeString(
         baseAddress: _emptyStringBase,
         count: 0,
-        isSingleByte: true,
-        hasCocoaBuffer: false))
+        isSingleByte: true))
   }
 
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     if let native = self._native {
       _sanityCheck(self.isSingleByte == native.isSingleByte)
-      _sanityCheck(!self.hasCocoaBuffer)
       _sanityCheck(self.count == native.count)
       _sanityCheck(self.capacity == native.capacity)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity >= self.count)
     } else if let unsafe = self._unsafeString {
       _sanityCheck(self.isSingleByte == unsafe.isSingleByte)
-      _sanityCheck(self.hasCocoaBuffer == unsafe.hasCocoaBuffer)
       _sanityCheck(self.count == unsafe.count)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
     } else if let cocoa = self._cocoa {
-      _sanityCheck(self.hasCocoaBuffer)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
       // Single-byte Cocoa strings must be contiguous
       _sanityCheck(!self.isSingleByte || cocoa.start != nil)
     } else if let _ = self._smallCocoa {
       _sanityCheck(!self.isSingleByte)
-      _sanityCheck(!self.hasCocoaBuffer) // FIXME: Is this right?
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
     } else {
@@ -288,11 +256,6 @@ internal struct UnsafeString {
   @_versioned
   internal var isSingleByte: Bool
 
-  // TODO: Is this actually important to track? Can we drop it when we're no
-  // longer using _LegacyStringCore?
-  @_versioned
-  internal var hasCocoaBuffer: Bool
-
   @_versioned
   internal var sizeInBytes: Int {
     return count * byteWidth
@@ -315,13 +278,11 @@ internal struct UnsafeString {
   init(
     baseAddress: UnsafeRawPointer,
     count: Int,
-    isSingleByte: Bool,
-    hasCocoaBuffer: Bool
+    isSingleByte: Bool
   ) {
     self.baseAddress = baseAddress
     self.count = count
     self.isSingleByte = isSingleByte
-    self.hasCocoaBuffer = hasCocoaBuffer
   }
 
   @_versioned
@@ -369,8 +330,7 @@ internal struct UnsafeString {
     return UnsafeString(
       baseAddress: _pointer(toElementAt: bounds.lowerBound),
       count: bounds.upperBound - bounds.lowerBound,
-      isSingleByte: self.isSingleByte,
-      hasCocoaBuffer: self.hasCocoaBuffer)
+      isSingleByte: self.isSingleByte)
   }
 
   /// Returns a pointer to the Nth element of contiguous
@@ -443,8 +403,7 @@ struct NativeString {
     return UnsafeString(
       baseAddress: self.baseAddress,
       count: self.count,
-      isSingleByte: self.isSingleByte,
-      hasCocoaBuffer: false)
+      isSingleByte: self.isSingleByte)
   }
 
   var baseAddress: UnsafeMutableRawPointer {
@@ -477,7 +436,7 @@ struct NativeString {
 
   @_versioned
   internal init(_ buffer: _StringBuffer) {
-    self.init(buffer._nativeObject)
+    self.stringBuffer = buffer
   }
 
   init(_ object: AnyObject) {
@@ -539,8 +498,7 @@ struct NativeString {
     return UnsafeString(
       baseAddress: UnsafeMutableRawPointer(mutating: start),
       count: count,
-      isSingleByte: isSingleByte,
-      hasCocoaBuffer: true)
+      isSingleByte: isSingleByte)
   }
 }
 
@@ -617,19 +575,29 @@ extension _StringGuts {
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
-  var _native: NativeString? {
-    guard _isNative else { return nil }
+  var _asNative: NativeString {
+    _sanityCheck(_isNative)
     let nativeObject = _nativeObject(fromBridge: _object)
     return NativeString(nativeObject)
+  }
+
+  /*fileprivate*/ internal // TODO: private in Swift 4
+  var _native: NativeString? {
+    guard _isNative else { return nil }
+    return _asNative
   }
 
   @_versioned
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NativeString) {
+    self.init(s.stringBuffer)
+  }
+
+  @_versioned
+  init(_ buffer: _StringBuffer) {
     self.init(
-      _unflagged: _bridgeObject(fromNative: s.nativeObject),
-      isSingleByte: s.isSingleByte,
-      hasCocoaBuffer: false,
+      _unflagged: _bridgeObject(fromNativeObject: buffer._nativeObject),
+      isSingleByte: buffer.elementWidth == 1,
       otherBits: 0)
   }
 
@@ -657,7 +625,6 @@ extension _StringGuts {
     self.init(
       _unflagged: _bridgeObject(fromNonTaggedObjC: s.owner),
       isSingleByte: s.isSingleByte,
-      hasCocoaBuffer: true,
       otherBits: UInt(bitPattern: s.start))
   }
 
@@ -682,8 +649,7 @@ extension _StringGuts {
     return UnsafeString(
       baseAddress: pointer,
       count: Int(self._otherBits),
-      isSingleByte: self.isSingleByte,
-      hasCocoaBuffer: self.hasCocoaBuffer)
+      isSingleByte: self.isSingleByte)
   }
 
   @_versioned
@@ -693,7 +659,6 @@ extension _StringGuts {
     self.init(
       _unflagged: object,
       isSingleByte: s.isSingleByte,
-      hasCocoaBuffer: s.hasCocoaBuffer,
       otherBits: UInt(s.count))
   }
 
@@ -770,16 +735,6 @@ extension _StringGuts {
 
 extension _LegacyStringCore {
   @_versioned // FIXME(sil-serialize-all)
-  internal var _isNativeSelfSlice: Bool {
-    @inline(__always) get {
-      guard let native = self.nativeBuffer else {
-        return false
-      }
-      return self._baseAddress != native.start || self.count != native.usedCount
-    }
-  }
-
-  @_versioned // FIXME(sil-serialize-all)
   internal func _copyToStringBuffer() -> _StringBuffer {
     var copy = self
     copy._copyInPlace(
@@ -799,7 +754,7 @@ extension _StringGuts {
           mutating: unsafeString.baseAddress),
         count: unsafeString.count,
         elementShift: unsafeString.isSingleByte ? 0 : 1,
-        hasCocoaBuffer: unsafeString.hasCocoaBuffer,
+        hasCocoaBuffer: false,
         owner: nil)
     }
     if let cocoa = self._cocoa {
@@ -820,42 +775,19 @@ extension _StringGuts {
 
   @_versioned
   init(_ legacyCore: _LegacyStringCore) {
-    guard !legacyCore.hasCocoaBuffer else {
+    if _slowPath(legacyCore._baseAddress == nil) {
+      // Opaque Cocoa string
+      _sanityCheck(legacyCore.hasCocoaBuffer,
+        "Non-cocoa, non-contiguous legacy String")
       _sanityCheck(legacyCore._owner != nil, "Cocoa string with no owner")
       let owner = legacyCore._owner._unsafelyUnwrappedUnchecked
-
       let guts = _makeCocoaStringGuts(owner)
-      if _fastPath(guts.count == legacyCore.count) {
-        self = guts
-        return
-      }
-      // NOTE: Sometimes a _LegacyStringCore is a self-slice of a Cocoa string
-      // without having properly sliced the backing Cocoa string itself. Detect
-      // that situation in retrospect and create a Cocoa substring.
-      Stats.numCocoaSelfSlice += 1
-
-      _sanityCheck(legacyCore._baseAddress != nil)
-      let sliceStart = UnsafeRawPointer(
-        legacyCore._baseAddress._unsafelyUnwrappedUnchecked)
-      let sliceEnd =  UnsafeRawPointer(
-        legacyCore._pointer(toElementAt: legacyCore.count))
-
-      let unsafeOpt = guts._unmanagedContiguous
-      defer { _fixLifetime(guts) }
-      _sanityCheck(unsafeOpt != nil)
-      let unsafe = unsafeOpt._unsafelyUnwrappedUnchecked
-
-      _sanityCheck(unsafe.baseAddress <= sliceStart)
-      _sanityCheck(unsafe._pointer(toElementAt: unsafe.count) >= sliceEnd)
-
-      let offset = sliceStart - unsafe.baseAddress
-      self = _makeCocoaStringGuts(
-        _cocoaStringSlice(owner, offset ..< offset + legacyCore.count))
+      _sanityCheck(guts.count == legacyCore.count,
+        "Self-slice of non-contiguous Cocoa string")
+      self = guts
       return
     }
 
-    _sanityCheck(legacyCore._baseAddress != nil,
-      "Non-cocoa, non-contiguous legacy String")
     let baseAddress = legacyCore._baseAddress._unsafelyUnwrappedUnchecked
 
     guard let owner = legacyCore._owner else {
@@ -864,16 +796,28 @@ extension _StringGuts {
       let immortal = UnsafeString(
         baseAddress: baseAddress,
         count: legacyCore.count,
-        isSingleByte: legacyCore.elementWidth == 1,
-        hasCocoaBuffer: legacyCore.hasCocoaBuffer)
+        isSingleByte: legacyCore.elementWidth == 1)
       self.init(immortal)
       return
     }
 
-    _sanityCheck(legacyCore.nativeBuffer != nil,
-      "Native string not native-buffer backed?")
+    if _slowPath(legacyCore.hasCocoaBuffer) {
+      let guts = _makeCocoaStringGuts(owner)
+      // NOTE: Sometimes a _LegacyStringCore is a self-slice of a Cocoa string
+      // without having properly sliced the backing Cocoa string itself. Detect
+      // that situation in retrospect and create a native copy.
+      if _slowPath(guts.count != legacyCore.count) {
+        Stats.numCocoaSelfSlice += 1
+        self.init(legacyCore._copyToStringBuffer())
+        return
+      }
+      self = guts
+      return
+    }
 
-    // Check for a self-slice, in which cast we'll work around that temporarily
+    let nativeBuffer = unsafeBitCast(owner, to: _StringBuffer.self)
+
+    // Check for a self-slice, in which case we'll work around that temporarily
     // by copying out the contents into a new native string.
     //
     // TODO: Forbid this. We need to audit all uses of ephemeralString and
@@ -881,14 +825,12 @@ extension _StringGuts {
     // many of the views still slice and dice _LegacyStringCore, need to audit
     // those too.
     //
-    guard !legacyCore._isNativeSelfSlice else {
+    if _slowPath(nativeBuffer.usedCount != legacyCore.count) {
       Stats.numNativeSelfSlice += 1
-      self.init(NativeString(legacyCore._copyToStringBuffer()))
+      self.init(legacyCore._copyToStringBuffer())
       return
     }
-
-    let nativeString = NativeString(owner)
-    self.init(nativeString)
+    self.init(nativeBuffer)
   }
 }
 
@@ -926,9 +868,6 @@ extension _StringGuts {
     else {
       print(" utf16", terminator: "")
     }
-    if hasCocoaBuffer {
-      print(" hasCocoaBuffer", terminator: "")
-    }
     print(">")
   }
 }
@@ -956,9 +895,8 @@ extension _StringGuts {
   @_versioned
   internal
   func _extractStringBuffer() -> _StringBuffer {
-    let native = self._native
-    if _fastPath(native != nil) {
-      return native._unsafelyUnwrappedUnchecked.stringBuffer
+    if _fastPath(_isNative) {
+      return _asNative.stringBuffer
     }
     return _copyToStringBuffer(capacity: self.count, byteWidth: self.byteWidth)
   }
@@ -1017,7 +955,7 @@ extension _StringGuts {
     let newBuffer = _copyToStringBuffer(
       capacity: newCapacity,
       byteWidth: newWidth)
-    self = _StringGuts(NativeString(newBuffer))
+    self = _StringGuts(newBuffer)
   }
 
   // Convert ourselves (if needed) to a NativeString for appending purposes.
@@ -1065,14 +1003,14 @@ extension _StringGuts {
   @_versioned
   internal
   var _unmanagedContiguous: UnsafeString? {
-    if let unsafe = self._unsafeString {
-      return unsafe
+    if _isUnsafe {
+      return _unsafeString
     }
-    if let native = self._native {
-      return native.unsafe
+    if _isNative {
+      return _asNative.unsafe
     }
-    if let cocoa = self._cocoa {
-      return cocoa.unsafe
+    if _isNonTaggedCocoa {
+      return _cocoa._unsafelyUnwrappedUnchecked.unsafe
     }
     return nil
   }
@@ -1157,7 +1095,7 @@ extension _StringGuts {
     let newBuffer = _copyToStringBuffer(
       capacity: n,
       byteWidth: self.byteWidth)
-    self = _StringGuts(NativeString(newBuffer))
+    self = _StringGuts(newBuffer)
   }
 
   // @_inlineable // TODO: internal-inlineable, if that's possible
@@ -1306,8 +1244,8 @@ extension UnsafeString {
   internal func _sanityCheckIdentical(to other: UnsafeString) {
     _sanityCheck(self.baseAddress == other.baseAddress)
     _sanityCheck(self.count == other.count)
-    _sanityCheck(self.isSingleByte == other.isSingleByte)
-    _sanityCheck(self.hasCocoaBuffer == other.hasCocoaBuffer)
+    // Empty string storage can be presented as any element width
+    _sanityCheck(self.count == 0 || self.isSingleByte == other.isSingleByte)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
