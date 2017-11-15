@@ -51,7 +51,7 @@ protocol Bindable: class { }
 
 extension Bindable {
   func test<Value>(to targetKeyPath: ReferenceWritableKeyPath<Self, Value>, change: Value?) {
-    if self[keyPath:targetKeyPath] != change {  // expected-error{{}}
+    if self[keyPath:targetKeyPath] != change { // expected-error{{cannot convert value of type 'Value' to expected argument type '_OptionalNilComparisonType'}}
       self[keyPath: targetKeyPath] = change!
     }
   }
