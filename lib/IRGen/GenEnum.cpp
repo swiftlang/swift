@@ -2743,8 +2743,8 @@ namespace {
             &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
-      if (irgen::mightContainMetadata(IGF.IGM, canType)) {
-        auto *metadata = IGF.emitTypeMetadataRef(canType);
+      if (shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
+        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
         assert(metadata && "Expected Type Metadata Ref");
         typeToMetadataVec.push_back(std::make_pair(canType, metadata));
       }
@@ -4415,8 +4415,8 @@ namespace {
             &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
-      if (irgen::mightContainMetadata(IGF.IGM, canType)) {
-        auto *metadata = IGF.emitTypeMetadataRef(canType);
+      if (shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
+        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
         assert(metadata && "Expected Type Metadata Ref");
         typeToMetadataVec.push_back(std::make_pair(canType, metadata));
       }
@@ -4956,10 +4956,10 @@ namespace {
             &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
-      if (!irgen::mightContainMetadata(IGF.IGM, canType)) {
+      if (!shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
         return;
       }
-      auto *metadata = IGF.emitTypeMetadataRef(canType);
+      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
       assert(metadata && "Expected Type Metadata Ref");
       typeToMetadataVec.push_back(std::make_pair(canType, metadata));
     }

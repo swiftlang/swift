@@ -500,7 +500,7 @@ public:
                       llvm::Value *typeMetadata,
                       SILType T) const;
 };
-bool mightContainMetadata(const IRGenModule &IGM, const CanType type);
+bool isTypeDependent(const IRGenModule &IGM, const CanType type);
 
 } // end namespace irgen
 } // end namespace swift

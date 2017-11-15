@@ -258,7 +258,7 @@ public:
           &typeToMetadataVec,
       SILType T) const override {
     auto canType = T.getSwiftRValueType();
-    if (irgen::mightContainMetadata(IGF.IGM, canType)) {
+    if (shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
       auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
       assert(metadata && "Expected Type Metadata Ref");
       typeToMetadataVec.push_back(std::make_pair(canType, metadata));
@@ -270,6 +270,24 @@ public:
       field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
                                                    fType);
     }
+  }
+
+private:
+  // For some types we might need the record's layout metadata
+  bool shouldEmitMetadataRefForLayout(IRGenModule &IGM,
+                                      const CanType canType) const {
+    if (!irgen::isTypeDependent(IGM, canType)) {
+      return false;
+    }
+    if (auto genTuple = dyn_cast<TupleType>(canType)) {
+      for (auto elt : genTuple->getElements()) {
+        if (isTypeDependent(IGM, elt.getType()->getCanonicalType())) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return true;
   }
 };
 

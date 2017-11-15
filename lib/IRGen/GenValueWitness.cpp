@@ -1392,12 +1392,20 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
   emitAssignArrayWithTakeCall(IGF, T, dest, src, count);
 }
 
+static bool shouldEmitTypeMetadata(const CanType canType) {
+  // Determine whether this type is an Archetype itself.
+  if (!canType->getWithoutSpecifierType()->is<ArchetypeType>()) {
+    return false;
+  }
+  return true;
+}
+
 void TypeInfo::collectArchetypeMetadata(
     IRGenFunction &IGF,
     llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> &typeToMetadataVec,
     SILType T) const {
   auto canType = T.getSwiftRValueType();
-  if (irgen::mightContainMetadata(IGF.IGM, canType)) {
+  if (shouldEmitTypeMetadata(canType)) {
     auto *metadata = IGF.emitTypeMetadataRef(canType);
     assert(metadata && "Expected Type Metadata Ref");
     typeToMetadataVec.push_back(std::make_pair(canType, metadata));

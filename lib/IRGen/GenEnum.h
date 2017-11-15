@@ -436,6 +436,24 @@ public:
           &typeToMetadataVec,
       SILType T) const = 0;
 
+  bool shouldEmitMetadataRefForLayout(IRGenModule &IGM,
+                                      const CanType canType) const {
+    if (!irgen::isTypeDependent(IGM, canType)) {
+      return false;
+    }
+    if (canType->is<EnumType>()) {
+      return true;
+    }
+    auto genEnum = cast<BoundGenericEnumType>(canType);
+    assert(genEnum && "Expected a BoundGenericEnumType");
+    for (auto arg : genEnum->getGenericArgs()) {
+      if (isTypeDependent(IGM, arg->getCanonicalType())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;
   EnumImplStrategy &operator=(const EnumImplStrategy &) = delete;
