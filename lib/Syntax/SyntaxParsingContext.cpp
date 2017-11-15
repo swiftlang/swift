@@ -358,6 +358,7 @@ void SyntaxParsingContextChild::makeNodeWhole(SyntaxKind Kind) {
   case SyntaxKind::DictionaryElement:
   case SyntaxKind::ArrayElement:
   case SyntaxKind::FunctionCallArgument:
+  case SyntaxKind::ReturnStmt:
   case SyntaxKind::CodeBlock: {
     ContextData.createWhole(Kind, AllNodes);
     break;
