@@ -936,22 +936,22 @@ extension _StringGuts {
     minimumByteWidth: Int
   ) {
     _sanityCheck(minimumByteWidth == 1 || minimumByteWidth == 2)
-    let oldCapacity: Int
+    var newCapacity = minimumCapacity
     let newWidth = Swift.max(self.byteWidth, minimumByteWidth)
-    if _fastPath(self.byteWidth == newWidth && isUniqueNative()) {
-      // TODO: width extension can be done in place if there's capacity
-      let nativeBuffer = self._native._unsafelyUnwrappedUnchecked.stringBuffer
-      oldCapacity = nativeBuffer.capacity
-      if _fastPath(oldCapacity >= minimumCapacity) {
+    if _fastPath(_isNative) {
+      let isUnique = isUniqueNative()
+      let nativeBuffer = self._asNative.stringBuffer
+      let oldCapacity = nativeBuffer.capacity
+      if oldCapacity < minimumCapacity {
+        newCapacity = Swift.max(
+          _growArrayCapacity(oldCapacity),
+          minimumCapacity)
+      } else if _fastPath(isUnique && self.byteWidth == newWidth) {
+        // TODO: width extension can be done in place if there's capacity
         return
       }
-    } else {
-      oldCapacity = 0
     }
 
-    let newCapacity = Swift.max(
-      _growArrayCapacity(oldCapacity),
-      minimumCapacity)
     let newBuffer = _copyToStringBuffer(
       capacity: newCapacity,
       byteWidth: newWidth)
@@ -1075,7 +1075,7 @@ extension _StringGuts {
   internal
   var capacity: Int {
     if _fastPath(_isNative) {
-      return self._native._unsafelyUnwrappedUnchecked.capacity
+      return self._asNative.capacity
     }
     return 0
   }
@@ -1109,7 +1109,7 @@ extension _StringGuts {
     // now for the tagged cocoa strings.
 
     self._formNative(forAppending: other)
-    self._native._unsafelyUnwrappedUnchecked._appendInPlace(other)
+    self._asNative._appendInPlace(other)
     _invariantCheck()
   }
 }
