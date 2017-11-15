@@ -477,7 +477,7 @@ struct NativeString {
 
   @_versioned
   internal init(_ buffer: _StringBuffer) {
-    self.init(buffer._nativeObject)
+    self.stringBuffer = buffer
   }
 
   init(_ object: AnyObject) {
@@ -617,10 +617,16 @@ extension _StringGuts {
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
-  var _native: NativeString? {
-    guard _isNative else { return nil }
+  var _asNative: NativeString {
+    _sanityCheck(_isNative)
     let nativeObject = _nativeObject(fromBridge: _object)
     return NativeString(nativeObject)
+  }
+
+  /*fileprivate*/ internal // TODO: private in Swift 4
+  var _native: NativeString? {
+    guard _isNative else { return nil }
+    return _asNative
   }
 
   @_versioned
@@ -939,9 +945,8 @@ extension _StringGuts {
   @_versioned
   internal
   func _extractStringBuffer() -> _StringBuffer {
-    let native = self._native
-    if _fastPath(native != nil) {
-      return native._unsafelyUnwrappedUnchecked.stringBuffer
+    if _fastPath(_isNative) {
+      return _asNative.stringBuffer
     }
     return _copyToStringBuffer(capacity: self.count, byteWidth: self.byteWidth)
   }
@@ -1048,14 +1053,14 @@ extension _StringGuts {
   @_versioned
   internal
   var _unmanagedContiguous: UnsafeString? {
-    if let unsafe = self._unsafeString {
-      return unsafe
+    if _isUnsafe {
+      return _unsafeString
     }
-    if let native = self._native {
-      return native.unsafe
+    if _isNative {
+      return _asNative.unsafe
     }
-    if let cocoa = self._cocoa {
-      return cocoa.unsafe
+    if _isNonTaggedCocoa {
+      return _cocoa._unsafelyUnwrappedUnchecked.unsafe
     }
     return nil
   }
