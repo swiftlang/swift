@@ -5,10 +5,10 @@
 
 class C {
   func bar(_ a: Int) <CodeBlock>{}</CodeBlock>
-  func bar1(_ a: Float) -> Float <CodeBlock>{ return <FloatLiteralExpr>-0.6 </FloatLiteralExpr>+ <FloatLiteralExpr>0.1 </FloatLiteralExpr>- <FloatLiteralExpr>0.3 </FloatLiteralExpr>}</CodeBlock>
-  func bar2(a: Int, b: Int, c:Int) -> Int <CodeBlock>{ return <IntegerLiteralExpr>1 </IntegerLiteralExpr>}</CodeBlock>
-  func bar3(a: Int) -> Int <CodeBlock>{ return <IntegerLiteralExpr>1 </IntegerLiteralExpr>}</CodeBlock>
-  func bar4(_ a: Int) -> Int <CodeBlock>{ return <IntegerLiteralExpr>1 </IntegerLiteralExpr>}</CodeBlock>
+  func bar1(_ a: Float) -> Float <CodeBlock>{ <ReturnStmt>return <FloatLiteralExpr>-0.6 </FloatLiteralExpr>+ <FloatLiteralExpr>0.1 </FloatLiteralExpr>- <FloatLiteralExpr>0.3 </FloatLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar2(a: Int, b: Int, c:Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar3(a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar4(_ a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
   func foo() <CodeBlock>{
     var a = /*comment*/<StringLiteralExpr>"abc"/*comment*/</StringLiteralExpr>
     var b = /*comment*/<IntegerLiteralExpr>+2/*comment*/</IntegerLiteralExpr><IdentifierExpr>
@@ -33,8 +33,8 @@ class C {
     _ </DiscardAssignmentExpr>= <DictionaryExpr>[<DictionaryElement><StringLiteralExpr>"a"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </DictionaryElement><DictionaryElement><StringLiteralExpr>"b"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </DictionaryElement><DictionaryElement><StringLiteralExpr>"c"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </DictionaryElement><DictionaryElement><StringLiteralExpr>"d"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</DictionaryElement>]</DictionaryExpr><IdentifierExpr>
     foo</IdentifierExpr>(<FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr></FunctionCallArgument>)
   }</CodeBlock>
-  func boolAnd() -> Bool <CodeBlock>{ return <BooleanLiteralExpr>true </BooleanLiteralExpr>&& <BooleanLiteralExpr>false </BooleanLiteralExpr>}</CodeBlock>
-  func boolOr() -> Bool <CodeBlock>{ return <BooleanLiteralExpr>true </BooleanLiteralExpr>|| <BooleanLiteralExpr>false </BooleanLiteralExpr>}</CodeBlock>
+  func boolAnd() -> Bool <CodeBlock>{ <ReturnStmt>return <BooleanLiteralExpr>true </BooleanLiteralExpr>&& <BooleanLiteralExpr>false </BooleanLiteralExpr></ReturnStmt>}</CodeBlock>
+  func boolOr() -> Bool <CodeBlock>{ <ReturnStmt>return <BooleanLiteralExpr>true </BooleanLiteralExpr>|| <BooleanLiteralExpr>false </BooleanLiteralExpr></ReturnStmt>}</CodeBlock>
 
   func foo2() <CodeBlock>{<DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr>= <TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr><DiscardAssignmentExpr>
