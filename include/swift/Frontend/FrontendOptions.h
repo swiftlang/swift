@@ -21,10 +21,6 @@
 
 namespace llvm {
   class MemoryBuffer;
-  namespace opt {
-  class ArgList;
-  class Arg;
-  } // namespace opt
 }
 
 namespace swift {
@@ -200,9 +196,6 @@ public:
 
 public:
   // Multi-facet readers
-  StringRef baseNameOfOutput(const llvm::opt::ArgList &Args,
-                             StringRef ModuleName) const;
-
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
@@ -260,6 +253,8 @@ public:
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
+  friend class FrontendArgsToOptionsConverter;
+
 public:
   FrontendInputs Inputs;
 
@@ -289,12 +284,9 @@ public:
     return getSingleOutputFilename() == "-";
   }
   bool isOutputFileDirectory() const;
-  bool isOutputFilePlainFile() const;
   bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
-  void setOutputFileList(DiagnosticEngine &Diags,
-                         const llvm::opt::ArgList &Args);
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -557,7 +549,22 @@ public:
            Inputs.hasUniqueInputFilename();
   }
 
-  void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
+private:
+  static const char *suffixForPrincipalOutputFileForAction(ActionType);
+
+  bool hasUnusedDependenciesFilePath() const;
+  static bool canActionEmitDependencies(ActionType);
+  bool hasUnusedObjCHeaderOutputPath() const;
+  static bool canActionEmitHeader(ActionType);
+  bool hasUnusedLoadedModuleTracePath() const;
+  static bool canActionEmitLoadedModuleTrace(ActionType);
+  bool hasUnusedModuleOutputPath() const;
+  static bool canActionEmitModule(ActionType);
+  bool hasUnusedModuleDocOutputPath() const;
+  static bool canActionEmitModuleDoc(ActionType);
+
+  static bool doesActionProduceOutput(ActionType);
+  static bool doesActionProduceTextualOutput(ActionType);
 };
 
 }
