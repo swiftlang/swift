@@ -930,3 +930,36 @@ void swift::completeJointPostDominanceSet(
   // list. These are the remaining parts of our joint post-dominance closure.
   copy(MustVisitSuccessorBlocks, std::back_inserter(Result));
 }
+
+bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
+                                                          DominanceInfo *DT,
+                                                          SILLoopInfo *LI) {
+  // Find our targets.
+  llvm::SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> Targets;
+  for (auto &Block : Fn) {
+    auto *CBI = dyn_cast<CondBranchInst>(Block.getTerminator());
+    if (!CBI)
+      continue;
+
+    // See if our true index is a critical edge. If so, add block to the list
+    // and continue. If the false edge is also critical, we will handle it at
+    // the same time.
+    if (isCriticalEdge(CBI, CondBranchInst::TrueIdx)) {
+      Targets.emplace_back(&Block, CondBranchInst::TrueIdx);
+    }
+
+    if (!isCriticalEdge(CBI, CondBranchInst::FalseIdx)) {
+      continue;
+    }
+
+    Targets.emplace_back(&Block, CondBranchInst::FalseIdx);
+  }
+
+  for (auto P : Targets) {
+    SILBasicBlock *Block = P.first;
+    unsigned Index = P.second;
+    auto *Result = splitCriticalEdge(Block->getTerminator(), Index, DT, LI);
+    (void)Result;
+    assert(Result);
+  }
+}
