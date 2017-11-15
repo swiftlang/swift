@@ -6,10 +6,11 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import argparse
+
 import multiprocessing
 
-from build_swift import defaults
+from .. import argparse
+from .. import defaults
 
 
 __all__ = [

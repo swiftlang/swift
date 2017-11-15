@@ -7,10 +7,10 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-import argparse as std_argparse
+from argparse import _ArgumentGroup, _MutuallyExclusiveGroup
 
-from build_swift.argparse import ArgumentParser, actions
-from build_swift.tests.utils import TestCase
+from ..utils import TestCase
+from ...argparse import ArgumentParser, actions
 
 
 # -----------------------------------------------------------------------------
@@ -115,7 +115,7 @@ class TestBuilder(TestCase):
 
         with builder.argument_group('First Group') as group:
             self.assertEqual(builder._current_group, group)
-            self.assertIsInstance(group, std_argparse._ArgumentGroup)
+            self.assertIsInstance(group, _ArgumentGroup)
 
         self.assertEqual(builder._current_group, builder._parser)
 
@@ -124,7 +124,7 @@ class TestBuilder(TestCase):
 
         with builder.mutually_exclusive_group() as group:
             self.assertEqual(builder._current_group, group)
-            self.assertIsInstance(group, std_argparse._MutuallyExclusiveGroup)
+            self.assertIsInstance(group, _MutuallyExclusiveGroup)
 
         self.assertEqual(builder._current_group, builder._parser)
 

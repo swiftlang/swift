@@ -17,7 +17,7 @@ constructing complex parsers.
 import argparse
 from contextlib import contextmanager
 
-from . import actions
+from . import Namespace, SUPPRESS, actions
 from .actions import Action
 
 
@@ -199,7 +199,7 @@ class ArgumentParser(argparse.ArgumentParser):
         """
 
         if namespace is None:
-            namespace = argparse.Namespace()
+            namespace = Namespace()
 
         # Add action defaults not present in namespace
         for action in self._actions:
@@ -209,7 +209,7 @@ class ArgumentParser(argparse.ArgumentParser):
             for dest in action.dests:
                 if hasattr(namespace, dest):
                     continue
-                if action.default is argparse.SUPPRESS:
+                if action.default is SUPPRESS:
                     continue
 
                 setattr(namespace, dest, action.default)
