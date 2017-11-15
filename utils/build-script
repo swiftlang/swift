@@ -227,7 +227,8 @@ class BuildScriptInvocation(object):
                 diagnostics.fatal(
                     "can't find distcc-pump (please install distcc-pump)")
 
-        if args.host_target is None or args.stdlib_deployment_targets is None:
+        if args.host_target is None \
+                or len(args.stdlib_deployment_targets) == 0:
             diagnostics.fatal("unknown operating system")
 
         if args.symbols_package:
@@ -263,7 +264,7 @@ class BuildScriptInvocation(object):
             args.build_ninja = True
 
         # Set the default stdlib-deployment-targets, if none were provided.
-        if args.stdlib_deployment_targets is None:
+        if len(args.stdlib_deployment_targets) == 0:
             stdlib_targets = \
                 StdlibDeploymentTarget.default_stdlib_deployment_targets()
             args.stdlib_deployment_targets = [
