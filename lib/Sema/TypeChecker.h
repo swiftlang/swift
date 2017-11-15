@@ -1511,10 +1511,6 @@ public:
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-  /// \brief Add an implicitly-defined destructor, if there is no
-  /// user-provided destructor.
-  void addImplicitDestructor(ClassDecl *CD);
-
   /// \brief Add the RawOptionSet (todo:, Equatable, and Hashable) methods to an
   /// imported NS_OPTIONS struct.
   void addImplicitStructConformances(StructDecl *ED);

@@ -2205,9 +2205,3 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   return ctor;
 }
-
-void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
-  auto *DD = CD->addImplicitDestructor();
-  if (DD)
-    typeCheckDecl(DD, /*isFirstPass=*/true);
-}

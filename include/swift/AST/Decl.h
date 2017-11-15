@@ -2225,6 +2225,10 @@ public:
   getFormalAccessScope(const DeclContext *useDC = nullptr,
                        bool respectVersionedAttr = false) const;
 
+
+  /// Copy the formal access level and @_versioned attribute from source.
+  void copyFormalAccessAndVersionedAttrFrom(ValueDecl *source);
+
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
   ///
@@ -3402,7 +3406,7 @@ public:
 
   /// Synthesize implicit, trivial destructor, add it to this ClassDecl
   /// and return it.
-  DestructorDecl *addImplicitDestructor();
+  void addImplicitDestructor();
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
