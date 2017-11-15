@@ -4638,7 +4638,7 @@ public:
     if (!IsFirstPass)
       TC.addImplicitConstructors(CD);
 
-    TC.addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
 
     if (!IsFirstPass && !CD->isInvalid())
       TC.checkConformancesInContext(CD, CD);
@@ -7213,13 +7213,7 @@ public:
            && "Decl parsing must prevent destructors outside of types!");
 
     TC.checkDeclAttributesEarly(DD);
-    if (!DD->hasAccess()) {
-      DD->setAccess(enclosingClass->getFormalAccess());
-    }
-
-    if (enclosingClass->getAttrs().hasAttribute<VersionedAttr>()) {
-      DD->getAttrs().add(new (TC.Context) VersionedAttr(/*implicit=*/true));
-    }
+    DD->copyFormalAccessAndVersionedAttrFrom(enclosingClass);
 
     configureImplicitSelf(TC, DD);
 
@@ -7963,7 +7957,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   // class, you shouldn't have to know what the vtable layout is.
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
     TC.addImplicitConstructors(CD);
-    TC.addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
   }
 
   // validateDeclForNameLookup will not trigger an immediate full

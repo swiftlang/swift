@@ -4254,7 +4254,7 @@ namespace {
         result->setCheckedInheritanceClause();
         result->setAddedImplicitInitializers(); // suppress all initializers
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
-        Impl.registerExternalDecl(result);
+        result->addImplicitDestructor();
         return result;
       };
 
@@ -4274,7 +4274,6 @@ namespace {
         auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
-        result->addImplicitDestructor();
         return result;
       }
 
@@ -4359,7 +4358,6 @@ namespace {
         markMissingSwiftDecl(result);
       if (decl->getAttr<clang::ObjCRuntimeVisibleAttr>()) {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
-        result->addImplicitDestructor();
       }
 
       // If this Objective-C class has a supertype, import it.
@@ -4392,7 +4390,6 @@ namespace {
       if (decl->getName() == "OS_object" ||
           decl->getName() == "OS_os_log") {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
-        result->addImplicitDestructor();
       }
 
       // If the superclass is runtime-only, our class is also. This only
@@ -4420,9 +4417,7 @@ namespace {
 #include "InferredAttributes.def"
 
       result->setMemberLoader(&Impl, 0);
-
-      // Pass the class to the type checker to create an implicit destructor.
-      Impl.registerExternalDecl(result);
+      result->addImplicitDestructor();
 
       return result;
     }

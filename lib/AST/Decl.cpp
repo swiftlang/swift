@@ -2184,6 +2184,19 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   llvm_unreachable("unknown access level");
 }
 
+void ValueDecl::copyFormalAccessAndVersionedAttrFrom(ValueDecl *source) {
+  if (!hasAccess()) {
+    setAccess(source->getFormalAccess());
+  }
+
+  // Inherit the @_versioned attribute.
+  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto &ctx = getASTContext();
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    getAttrs().add(clonedAttr);
+  }
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -2689,9 +2702,9 @@ DestructorDecl *ClassDecl::getDestructor() {
   return cast<DestructorDecl>(results.front());
 }
 
-DestructorDecl *ClassDecl::addImplicitDestructor() {
+void ClassDecl::addImplicitDestructor() {
   if (hasDestructor() || isInvalid())
-    return nullptr;
+    return;
 
   auto *selfDecl = ParamDecl::createSelf(getLoc(), this);
 
@@ -2699,12 +2712,36 @@ DestructorDecl *ClassDecl::addImplicitDestructor() {
   auto *DD = new (ctx) DestructorDecl(getLoc(), selfDecl, this);
 
   DD->setImplicit();
+  DD->setValidationStarted();
 
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
   addMember(DD);
   setHasDestructor();
-  return DD;
+
+  // Propagate access control and versioned-ness.
+  DD->copyFormalAccessAndVersionedAttrFrom(this);
+
+  // Wire up generic environment of DD.
+  DD->setGenericEnvironment(getGenericEnvironmentOfContext());
+
+  // Mark DD as ObjC, as all dtors are.
+  DD->setIsObjC(true);
+  recordObjCMethod(DD);
+
+  // Assign DD the interface type (Self) -> () -> ()
+  ArrayRef<AnyFunctionType::Param> noParams;
+  AnyFunctionType::ExtInfo info;
+  Type selfTy = selfDecl->getInterfaceType();
+  Type voidTy = TupleType::getEmpty(ctx);
+  Type funcTy = FunctionType::get(noParams, voidTy, info);
+  if (auto *sig = DD->getGenericSignature()) {
+    DD->setInterfaceType(
+      GenericFunctionType::get(sig, {selfTy}, funcTy, info));
+  } else {
+    DD->setInterfaceType(
+      FunctionType::get({selfTy}, funcTy, info));
+  }
 }
 
 

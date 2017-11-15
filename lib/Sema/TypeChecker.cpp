@@ -69,7 +69,7 @@ void TypeChecker::handleExternalDecl(Decl *decl) {
     addImplicitStructConformances(SD);
   }
   if (auto CD = dyn_cast<ClassDecl>(decl)) {
-    addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
   }
   if (auto ED = dyn_cast<EnumDecl>(decl)) {
     addImplicitEnumConformances(ED);
