@@ -926,7 +926,7 @@ extension _StringGuts {
   // TODO: internal
   public // TODO(StringGuts): for testing only
   mutating func isUniqueNative() -> Bool {
-    return _isNative && _isUnique(&_storage.0)
+    return _isUnique(&_storage.0) && _isNative
   }
 
   @_versioned
