@@ -135,7 +135,7 @@ extension String {
     /// If the string is empty, `startIndex` is equal to `endIndex`.
     @_inlineable // FIXME(sil-serialize-all)
     public var startIndex: Index {
-      return _fromCoreIndex(_core.startIndex)
+      return _fromCoreIndex(_guts.startIndex)
     }
 
     /// The "past the end" position---that is, the position one greater than
@@ -144,7 +144,7 @@ extension String {
     /// In an empty Unicode scalars view, `endIndex` is equal to `startIndex`.
     @_inlineable // FIXME(sil-serialize-all)
     public var endIndex: Index {
-      return _fromCoreIndex(_core.endIndex)
+      return _fromCoreIndex(_guts.endIndex)
     }
 
     /// Returns the next consecutive location after `i`.
@@ -293,7 +293,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     public var description: String {
-      return String(_core)
+      return String(_guts)
     }
 
     @_inlineable // FIXME(sil-serialize-all)
@@ -347,7 +347,7 @@ extension String {
 extension String.UnicodeScalarView : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var _persistentContent : String { return String(_core) }
+  internal var _persistentContent : String { return String(_guts) }
 }
 
 extension String {
@@ -355,10 +355,10 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public var unicodeScalars: UnicodeScalarView {
     get {
-      return UnicodeScalarView(_core)
+      return UnicodeScalarView(_guts)
     }
     set {
-      _core = newValue._core
+      _guts = newValue._guts
     }
   }
 }
@@ -518,7 +518,7 @@ extension String.UnicodeScalarView {
       return true
     }
     if !_isOnUnicodeScalarBoundary(i) { return false }
-    let str = String(_core)
+    let str = String(_guts)
     return i == str.index(before: str.index(after: i))
   }
 }
