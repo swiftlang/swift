@@ -162,6 +162,10 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
   // just does a retain.
   let cfImmutableValue
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
+
+  if _isObjCTaggedPointer(cfImmutableValue) {
+    return _StringGuts(SmallCocoaString(cfImmutableValue))
+  }
   
   let (start, isUTF16) = _getCocoaStringPointer(cfImmutableValue)
   return _StringGuts(NonTaggedCocoaString(
