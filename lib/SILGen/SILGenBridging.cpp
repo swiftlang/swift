@@ -356,6 +356,12 @@ expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
   return results;
 }
 
+static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
+                                              CanAnyFunctionType blockType) {
+  return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
+                                         blockType, blockType->getExtInfo());
+}
+
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
                                        SILLocation loc,
                                        CanAnyFunctionType formalFuncType,
@@ -369,10 +375,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   SILFunctionConventions funcConv(funcTy, SGF.SGM.M);
 
   // Make sure we lower the component types of the formal block type.
-  formalBlockType =
-    SGF.SGM.Types.getBridgedFunctionType(AbstractionPattern(formalBlockType),
-                                         formalBlockType,
-                                         formalBlockType->getExtInfo());
+  formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType);
 
   // Set up the indirect result.
   SILType blockResultTy = blockTy->getAllResultsType();
@@ -761,6 +764,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
                                       CanSILFunctionType funcTy) {
   // Collect the native arguments, which should all be +1.
   Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
+
+  // Make sure we lower the component types of the formal block type.
+  formalBlockTy = getBridgedBlockType(SGF.SGM, formalBlockTy);
 
   assert(blockTy->getNumParameters() == funcTy->getNumParameters()
          && "block and function types don't match");

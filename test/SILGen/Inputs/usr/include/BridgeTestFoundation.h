@@ -93,3 +93,5 @@ void escapeBlockAlias(dispatch_block_t block);
 @interface ObjectWithSplitProperty : NSObject
 @property (nonatomic, setter=private_setFlagForSomething:) BOOL flagForSomething;
 @end
+
+extern NSString * __nonnull (^ const __nonnull GlobalBlock)(NSString * __nonnull);
