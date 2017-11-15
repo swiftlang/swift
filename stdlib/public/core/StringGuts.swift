@@ -1221,8 +1221,6 @@ extension String : Equatable {
     let lhsContigOpt = lhs._unmanagedContiguous
     let rhsContigOpt = rhs._unmanagedContiguous
     if _slowPath(lhsContigOpt == nil || rhsContigOpt == nil) {
-      dump(lhsContigOpt)
-      dump(rhsContigOpt)
       return lhs._ephemeralString._compareString(rhs._ephemeralString) == 0
     }
     let result = lhsContigOpt._unsafelyUnwrappedUnchecked.equal(
