@@ -33,9 +33,8 @@ public struct SourceRange {
   /// The beginning location in the source range.
   public let start: SourceLocation
   
-  /// The number of UTF-8 bytes from the starting source location to the
-  /// ending source location.
-  public let utf8Length: Int
+  /// The beginning location in the source range.
+  public let end: SourceLocation
 }
 
 /// A FixIt represents a change to source code in order to "correct" a
@@ -56,7 +55,7 @@ public enum FixIt {
   var range: SourceRange {
     switch self {
     case .remove(let range), .replace(let range, _): return range
-    case .insert(let loc, _): return SourceRange(start: loc, utf8Length: 0)
+    case .insert(let loc, _): return SourceRange(start: loc, end: loc)
     }
   }
 
