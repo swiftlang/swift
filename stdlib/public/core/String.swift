@@ -915,7 +915,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _guts = _StringGuts(NativeString(_storage))
+    _guts = _StringGuts(_storage)
   }
 }
 
