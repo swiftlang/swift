@@ -1277,9 +1277,18 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     DeclBaseName name = getDeclBaseName(IID);
     pathTrace.addValue(name);
 
-    Type filterTy = getType(TID);
-    if (!isType)
+    Type filterTy;
+    if (!isType) {
+      auto maybeType = getTypeChecked(TID);
+      if (!maybeType) {
+        // FIXME: Don't throw away the inner error's information.
+        llvm::consumeError(maybeType.takeError());
+        return llvm::make_error<XRefError>("couldn't decode type",
+                                           pathTrace, name);
+      }
+      filterTy = maybeType.get();
       pathTrace.addType(filterTy);
+    }
 
     baseModule->lookupQualified(ModuleType::get(baseModule), name,
                                 NL_QualifiedDefault | NL_KnownNoDependency,
@@ -1482,9 +1491,18 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
 
       pathTrace.addValue(memberName);
 
-      Type filterTy = getType(TID);
-      if (!isType)
+      Type filterTy;
+      if (!isType) {
+        auto maybeType = getTypeChecked(TID);
+        if (!maybeType) {
+          // FIXME: Don't throw away the inner error's information.
+          llvm::consumeError(maybeType.takeError());
+          return llvm::make_error<XRefError>("couldn't decode type",
+                                             pathTrace, memberName);
+        }
+        filterTy = maybeType.get();
         pathTrace.addType(filterTy);
+      }
 
       if (values.size() != 1) {
         return llvm::make_error<XRefError>("multiple matching base values",
