@@ -65,7 +65,6 @@ TypeChecker::~TypeChecker() {
 
 void TypeChecker::handleExternalDecl(Decl *decl) {
   if (auto SD = dyn_cast<StructDecl>(decl)) {
-    addImplicitConstructors(SD);
     addImplicitStructConformances(SD);
   }
   if (auto CD = dyn_cast<ClassDecl>(decl)) {
