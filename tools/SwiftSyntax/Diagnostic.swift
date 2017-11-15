@@ -56,7 +56,7 @@ public enum FixIt {
   var range: SourceRange {
     switch self {
     case .remove(let range), .replace(let range, _): return range
-    case .insert(let loc, _): return SourceRange(start: loc, end: loc)
+    case .insert(let loc, _): return SourceRange(start: loc, utf8Length: 0)
     }
   }
 
@@ -86,7 +86,7 @@ public struct Note {
   public let fixIts: [FixIt]
 
   /// Constructs a new Note from the constituent parts.
-  internal init(message: Message, location: SourceLocation?,
+  internal init(message: Diagnostic.Message, location: SourceLocation?,
                 highlights: [SourceRange], fixIts: [FixIt]) {
     precondition(message.severity == .note,
                  "notes can only have the `note` severity")
@@ -193,7 +193,7 @@ public struct Diagnostic {
     /// Adds a FixIt to replace the contents of the source file corresponding
     /// to the provided SourceRange with the provided text.
     public mutating 
-    func fixItReplace(_ sourceRange: SourceLocation, with text: String) {
+    func fixItReplace(_ sourceRange: SourceRange, with text: String) {
       fixIts.append(.replace(sourceRange, text))
     }
   }
@@ -202,7 +202,7 @@ public struct Diagnostic {
   /// provided location (if any).
   /// This initializer also takes a closure that will be passed a Diagnostic
   /// Builder as an inout parameter. Use this closure to add notes, highlights,
-  /// and FixIts to the diagnotic through the Builder's API.
+  /// and FixIts to the diagnostic through the Builder's API.
   /// - parameters:
   ///   - message: The diagnostic's message.
   ///   - location: The location the diagnostic is attached to.
@@ -223,8 +223,8 @@ public struct Diagnostic {
   ///   - location: The location the diagnostic is attached to.
   ///   - highlights: An array of SourceRanges which will be highlighted when
   ///                 the diagnostic is presented.
-  init(message: Message, location: SourceLocation?,
-       highlights: [SourceRange], notes: [Note], fixIts: [FixIt]) {
+  init(message: Message, location: SourceLocation?, notes: [Note],
+       highlights: [SourceRange], fixIts: [FixIt]) {
     self.message = message
     self.location = location
     self.notes = notes

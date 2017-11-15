@@ -148,7 +148,7 @@ class SerializedDiagnosticConsumer: DiagnosticConsumer {
     record.append(0 as UInt) // Swift diagnostics have no category
     record.append(0 as UInt) // Swift diagnostics have no flags
 
-    record.append(UInt(diagnostic.message.utf8.count))
+    record.append(UInt(diagnostic.message.text.utf8.count))
     stream.writeRecord(abbreviations[.diagnostic]!, record,
                        blob: diagnostic.message.text)
 
@@ -283,8 +283,14 @@ class SerializedDiagnosticConsumer: DiagnosticConsumer {
       let diagEngine = DiagnosticEngine()
       let printingConsumer = PrintingDiagnosticConsumer()
       diagEngine.addConsumer(printingConsumer)
-      diagEngine.diagnose(.error("could not write file '\(outputURL.path)'",
-                                 location: nil))
+      diagEngine.diagnose(.couldNotWriteFile(outputURL.path))
     }
+  }
+}
+
+extension Diagnostic.Message {
+  /// There was an error writing to the provided path.
+  static func couldNotWriteFile(_ path: String) -> Diagnostic.Message {
+    return .init(.error, "could not write file '\(path)'")
   }
 }
