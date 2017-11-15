@@ -117,11 +117,8 @@ class ArgsToFrontendInputsConverter {
   struct FilesInfo {
     bool hadError;
     std::vector<std::pair<StringRef, FileKind>> files;
-    char const *const fileListPath;
+    char const *filelistPath;
 
-    static FilesInfo error() {
-      return {true, std::vector<std::pair<StringRef, FileKind>>(), nullptr};
-    }
     static FilesInfo
     fromFileList(char const *const path,
                  std::vector<std::pair<StringRef, FileKind>> &&files) {
@@ -131,7 +128,7 @@ class ArgsToFrontendInputsConverter {
     fromCommandLine(std::vector<std::pair<StringRef, FileKind>> &&files) {
       return {false, std::move(files), nullptr};
     }
-    bool mustAddPrimariesToAllFiles() const { return fileListPath == nullptr; }
+    bool mustAddPrimariesToAllFiles() const { return filelistPath == nullptr; }
   };
 
 public:
@@ -160,33 +157,12 @@ private:
   }
 
   FilesInfo getFiles() {
-    if (const llvm::opt::Arg *filelistPathArg =
-            Args.getLastArg(options::OPT_filelist)) {
-      char const *const filelistPath = filelistPathArg->getValue();
-      return getFilesFromFilelist(filelistPath);
-    }
-    return getFilesFromCommandLine();
-  }
-
-  FilesInfo getFilesFromFilelist(char const *const filelistPath) {
-
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
-        llvm::MemoryBuffer::getFile(filelistPath);
-
-    if (!filelistBufferOrError) {
-      Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
-                     filelistBufferOrError.getError().message());
-      return FilesInfo::error();
-    }
-    // Keep buffer alive because code passes around StringRefs.
-    FilelistBuffer = std::move(*filelistBufferOrError);
-    std::vector<StringRef> inputFilesFromFilelist(
-        llvm::line_iterator(*FilelistBuffer), {});
-    std::vector<std::pair<StringRef, FileKind>> files;
-    for (auto file : inputFilesFromFilelist) {
-      files.push_back(std::make_pair(file, FileKind::Secondary));
-    }
-    return FilesInfo::fromFileList(filelistPath, std::move(files));
+    // Even if filelist is present must do this to read primary file arguments.
+    FilesInfo info = getFilesFromCommandLine();
+    if (info.hadError)
+      return info;
+    addFilesFromFilelistTo(info);
+    return info;
   }
 
   FilesInfo getFilesFromCommandLine() {
@@ -204,6 +180,28 @@ private:
       files.push_back(std::make_pair(A->getValue(), fileType));
     }
     return FilesInfo::fromCommandLine(std::move(files));
+  }
+
+  void addFilesFromFilelistTo(FilesInfo &info) {
+    const llvm::opt::Arg *filelistArg = Args.getLastArg(options::OPT_filelist);
+    if (filelistArg == nullptr)
+      return;
+    info.filelistPath = filelistArg->getValue();
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
+        llvm::MemoryBuffer::getFile(info.filelistPath);
+    if (!filelistBufferOrError) {
+      Diags.diagnose(SourceLoc(), diag::cannot_open_file, info.filelistPath,
+                     filelistBufferOrError.getError().message());
+      info.hadError = true;
+      return;
+    }
+    // Keep buffer alive because code passes around StringRefs.
+    FilelistBuffer = std::move(*filelistBufferOrError);
+    std::vector<StringRef> inputFilesFromFilelist(
+        llvm::line_iterator(*FilelistBuffer), {});
+    for (auto file : inputFilesFromFilelist) {
+      info.files.push_back(std::make_pair(file, FileKind::Secondary));
+    }
   }
 
   void setInputFilesAndIndices(const FilesInfo &info) {
@@ -226,10 +224,10 @@ private:
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
       if (iterator == FileIndices.end()) {
-        assert(info.fileListPath != nullptr &&
+        assert(info.filelistPath != nullptr &&
                "Missing primary with no filelist");
         Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                       info.fileListPath);
+                       info.filelistPath);
         return true;
       }
       Inputs.addPrimaryInputFilename(file, iterator->second);
