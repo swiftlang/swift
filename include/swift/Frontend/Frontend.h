@@ -309,6 +309,17 @@ public:
     }
     return SourceFile::ImplicitModuleImportKind::Stdlib;
   }
+
+  /// Performs input setup common to these tools:
+  /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
+  /// Return value includes the buffer so caller can keep it alive.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  setUpInputForSILTool(StringRef InputFilename, StringRef ModuleNameArg,
+                       bool alwaysSetModuleToMain,
+                       serialization::ExtendedValidationInfo &extendedInfo);
+  bool hasSerializedAST() {
+    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
+  }
 };
 
 /// A class which manages the state and execution of the compiler.
