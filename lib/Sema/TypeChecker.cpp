@@ -512,13 +512,6 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   }
 }
 
-void swift::typeCheckExternalDefinitions(SourceFile &SF) {
-  assert(SF.ASTStage == SourceFile::TypeChecked);
-  auto &Ctx = SF.getASTContext();
-  TypeChecker TC(Ctx);
-  typeCheckFunctionsAndExternalDecls(TC);
-}
-
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
                                 unsigned StartElem,

@@ -197,9 +197,6 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
-  /// Incrementally type-check only added external definitions.
-  void typeCheckExternalDefinitions(SourceFile &SF);
-
   /// \brief Recursively validate the specified type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
