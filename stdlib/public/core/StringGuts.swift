@@ -775,16 +775,6 @@ extension _StringGuts {
 
 extension _LegacyStringCore {
   @_versioned // FIXME(sil-serialize-all)
-  internal var _isNativeSelfSlice: Bool {
-    @inline(__always) get {
-      guard let native = self.nativeBuffer else {
-        return false
-      }
-      return self._baseAddress != native.start || self.count != native.usedCount
-    }
-  }
-
-  @_versioned // FIXME(sil-serialize-all)
   internal func _copyToStringBuffer() -> _StringBuffer {
     var copy = self
     copy._copyInPlace(
@@ -825,42 +815,19 @@ extension _StringGuts {
 
   @_versioned
   init(_ legacyCore: _LegacyStringCore) {
-    guard !legacyCore.hasCocoaBuffer else {
+    if _slowPath(legacyCore._baseAddress == nil) {
+      // Opaque Cocoa string
+      _sanityCheck(legacyCore.hasCocoaBuffer,
+        "Non-cocoa, non-contiguous legacy String")
       _sanityCheck(legacyCore._owner != nil, "Cocoa string with no owner")
       let owner = legacyCore._owner._unsafelyUnwrappedUnchecked
-
       let guts = _makeCocoaStringGuts(owner)
-      if _fastPath(guts.count == legacyCore.count) {
-        self = guts
-        return
-      }
-      // NOTE: Sometimes a _LegacyStringCore is a self-slice of a Cocoa string
-      // without having properly sliced the backing Cocoa string itself. Detect
-      // that situation in retrospect and create a Cocoa substring.
-      Stats.numCocoaSelfSlice += 1
-
-      _sanityCheck(legacyCore._baseAddress != nil)
-      let sliceStart = UnsafeRawPointer(
-        legacyCore._baseAddress._unsafelyUnwrappedUnchecked)
-      let sliceEnd =  UnsafeRawPointer(
-        legacyCore._pointer(toElementAt: legacyCore.count))
-
-      let unsafeOpt = guts._unmanagedContiguous
-      defer { _fixLifetime(guts) }
-      _sanityCheck(unsafeOpt != nil)
-      let unsafe = unsafeOpt._unsafelyUnwrappedUnchecked
-
-      _sanityCheck(unsafe.baseAddress <= sliceStart)
-      _sanityCheck(unsafe._pointer(toElementAt: unsafe.count) >= sliceEnd)
-
-      let offset = sliceStart - unsafe.baseAddress
-      self = _makeCocoaStringGuts(
-        _cocoaStringSlice(owner, offset ..< offset + legacyCore.count))
+      _sanityCheck(guts.count == legacyCore.count,
+        "Self-slice of non-contiguous Cocoa string")
+      self = guts
       return
     }
 
-    _sanityCheck(legacyCore._baseAddress != nil,
-      "Non-cocoa, non-contiguous legacy String")
     let baseAddress = legacyCore._baseAddress._unsafelyUnwrappedUnchecked
 
     guard let owner = legacyCore._owner else {
@@ -875,10 +842,23 @@ extension _StringGuts {
       return
     }
 
-    _sanityCheck(legacyCore.nativeBuffer != nil,
-      "Native string not native-buffer backed?")
+    if _slowPath(legacyCore.hasCocoaBuffer) {
+      let guts = _makeCocoaStringGuts(owner)
+      // NOTE: Sometimes a _LegacyStringCore is a self-slice of a Cocoa string
+      // without having properly sliced the backing Cocoa string itself. Detect
+      // that situation in retrospect and create a native copy.
+      if _slowPath(guts.count != legacyCore.count) {
+        Stats.numCocoaSelfSlice += 1
+        self.init(legacyCore._copyToStringBuffer())
+        return
+      }
+      self = guts
+      return
+    }
 
-    // Check for a self-slice, in which cast we'll work around that temporarily
+    let nativeBuffer = unsafeBitCast(owner, to: _StringBuffer.self)
+
+    // Check for a self-slice, in which case we'll work around that temporarily
     // by copying out the contents into a new native string.
     //
     // TODO: Forbid this. We need to audit all uses of ephemeralString and
@@ -886,7 +866,7 @@ extension _StringGuts {
     // many of the views still slice and dice _LegacyStringCore, need to audit
     // those too.
     //
-    guard !legacyCore._isNativeSelfSlice else {
+    if _slowPath(nativeBuffer.usedCount != legacyCore.count) {
       Stats.numNativeSelfSlice += 1
       self.init(legacyCore._copyToStringBuffer())
       return
