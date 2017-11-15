@@ -34,12 +34,12 @@ public class PrintingDiagnosticConsumer: DiagnosticConsumer {
     } else {
       write("<unknown>:0:0: ")
     }
-    switch diagnostic.kind {
+    switch diagnostic.message.severity {
     case .note: write("note: ")
     case .warning: write("warning: ")
     case .error: write("error: ")
     }
-    write(diagnostic.message)
+    write(diagnostic.message.text)
     write("\n")
 
     // TODO: Write original file contents out and highlight them.

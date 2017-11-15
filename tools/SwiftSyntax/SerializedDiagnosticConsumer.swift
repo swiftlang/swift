@@ -142,7 +142,7 @@ class SerializedDiagnosticConsumer: DiagnosticConsumer {
   func emitDiagnostic(_ diagnostic: Diagnostic) {
     var record = BitstreamRecord()
     record.append(RecordID.diagnostic)
-    record.append(diagnostic.kind.rawValue)
+    record.append(diagnostic.message.severity.rawValue)
     addSourceLocation(diagnostic.location, to: &record)
 
     record.append(0 as UInt) // Swift diagnostics have no category
@@ -150,7 +150,7 @@ class SerializedDiagnosticConsumer: DiagnosticConsumer {
 
     record.append(UInt(diagnostic.message.utf8.count))
     stream.writeRecord(abbreviations[.diagnostic]!, record,
-                       blob: diagnostic.message)
+                       blob: diagnostic.message.text)
 
     // If there's no location, don't emit source ranges or fix-its.
     if diagnostic.location == nil { return }
@@ -220,7 +220,9 @@ class SerializedDiagnosticConsumer: DiagnosticConsumer {
           .blob                 // Category text
         ])
 
-      var sourceRangeAbbrev: BitCodeAbbrev = [.literalCode(RecordID.sourceRange)]
+      var sourceRangeAbbrev: BitCodeAbbrev = [
+        .literalCode(RecordID.sourceRange)
+      ]
       sourceRangeAbbrev.append(contentsOf: sourceLocationAbbrev)
       sourceRangeAbbrev.append(contentsOf: sourceLocationAbbrev)
       abbreviations[.sourceRange] =
@@ -261,10 +263,6 @@ class SerializedDiagnosticConsumer: DiagnosticConsumer {
       record.append(SerializedDiagnosticConsumer.clangDiagnosticVersion)
       stream.writeRecord(abbreviations[.version]!, record)
     }
-  }
-
-  func emitKind(_ kind: Diagnostic.Kind) {
-    stream.writeCode(kind)
   }
 
   func handle(_ diagnostic: Diagnostic) {

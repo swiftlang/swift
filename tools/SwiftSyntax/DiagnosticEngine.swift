@@ -25,8 +25,16 @@ public class DiagnosticEngine {
     consumers.append(consumer)
   }
 
-  /// Registers the diagnostic with the engine.
-  public func diagnose(_ diagnostic: Diagnostic) {
+  /// Registers a diagnostic with the diagnostic engine.
+  /// - parameters:
+  ///   - message: The message for the diagnostic. This message includes
+  ///              a severity and text that will be conveyed when the diagnostic
+  ///              is serialized.
+  public func diagnose(_ message: Diagnostic.Message,
+                       location: SourceLocation? = nil,
+                       actions: ((inout Diagnostic.Builder) -> Void)? = nil) {
+    let diagnostic = Diagnostic(message: message, location: location, 
+                                actions: actions)
     for consumer in consumers {
       consumer.handle(diagnostic)
     }

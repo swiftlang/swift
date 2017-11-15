@@ -32,9 +32,10 @@ public struct SourceLocation {
 public struct SourceRange {
   /// The beginning location in the source range.
   public let start: SourceLocation
-
-  /// The ending location in the source range.
-  public let end: SourceLocation
+  
+  /// The number of UTF-8 bytes from the starting source location to the
+  /// ending source location.
+  public let utf8Length: Int
 }
 
 /// A FixIt represents a change to source code in order to "correct" a
@@ -73,7 +74,7 @@ public enum FixIt {
 /// error, and optionally allows for FixIts.
 public struct Note {
   /// The note's message.
-  public let message: String
+  public let message: Diagnostic.Message
 
   /// The source location where the note should point.
   public let location: SourceLocation?
@@ -84,10 +85,11 @@ public struct Note {
   /// An array of FixIts that apply to this note.
   public let fixIts: [FixIt]
 
-  /// Creates a Note with the provided message, location, highlights, and
-  /// FixIts.
-  public init(_ message: String, location: SourceLocation?,
-              highlights: [SourceRange] = [], fixIts: [FixIt] = []) {
+  /// Constructs a new Note from the constituent parts.
+  internal init(message: Message, location: SourceLocation?,
+                highlights: [SourceRange], fixIts: [FixIt]) {
+    precondition(message.severity == .note,
+                 "notes can only have the `note` severity")
     self.message = message
     self.location = location
     self.highlights = highlights
@@ -96,28 +98,43 @@ public struct Note {
 
   /// Converts this Note to a Diagnostic for serialization.
   func asDiagnostic() -> Diagnostic {
-    return Diagnostic(kind: .note, message: message, location: location,
-                      highlights: highlights, fixIts: fixIts, notes: [])
+    return Diagnostic(message: message, location: location, notes: [],
+                      highlights: highlights, fixIts: fixIts)
   }
 }
 
 /// A Diagnostic message that can be emitted regarding some piece of code.
 public struct Diagnostic {
+  public struct Message {
+    /// The severity of diagnostic. This can be note, error, or warning.
+    public let severity: Severity
+
+    /// A string containing the contents of the diagnostic.
+    public let text: String
+
+    /// Creates a diagnostic message with the provided severity and text.
+    public init(_ severity: Severity, _ text: String) {
+      self.severity = severity
+      self.text = text
+    }
+  }
+
   // These values must match clang/Frontend/SerializedDiagnostics.h
   /// The severity of the diagnostic.
-  public enum Kind: UInt8 {
+  public enum Severity: UInt8 {
     case note = 1
     case warning = 2
     case error = 3
   }
-  /// The Kind of diagnostic. This can be note, error, or warning.
-  public let kind: Kind
 
   /// The diagnostic's message.
-  public let message: String
+  public let message: Message
 
   /// The location the diagnostic should point.
   public let location: SourceLocation?
+
+  /// An array of notes providing more context for this diagnostic.
+  public let notes: [Note]
 
   /// An array of source ranges to highlight.
   public let highlights: [SourceRange]
@@ -125,35 +142,93 @@ public struct Diagnostic {
   /// An array of possible FixIts to apply to this diagnostic.
   public let fixIts: [FixIt]
 
-  /// An array of notes providing more context for this diagnostic.
-  public let notes: [Note]
+  /// A diagnostic builder that 
+  public struct Builder {
+    /// An in-flight array of notes.
+    internal var notes = [Note]()
 
-  /// Creates an `error` diagnostic.
-  /// - Parameters:
-  ///   - message: The message for the diagnostic.
-  ///   - location: The location where the diagnostic should point, if any.
-  ///   - highlights: Ranges of code that should be highlighted in the resulting
-  ///                 diagnostic.
-  ///   - fixIts: Possible fixes for the error in the diagnostic.
-  public static func error(_ message: String, location: SourceLocation?,
-                           highlights: [SourceRange] = [], fixIts: [FixIt] = [],
-                           notes: [Note] = []) -> Diagnostic {
-    return Diagnostic(kind: .error, message: message, location: location,
-                      highlights: highlights, fixIts: fixIts, notes: notes)
+    /// An in-flight array of highlighted source ranges.
+    internal var highlights = [SourceRange]()
+
+    /// An in-flight array of FixIts.
+    internal var fixIts = [FixIt]()
+
+    internal init() {}
+
+    /// Adds a Note to the diagnostic builder.
+    /// - parameters:
+    ///   - message: The message associated with the note. This must have the
+    ///              `.note` severity.
+    ///   - location: The source location to which this note is attached.
+    ///   - highlights: Any source ranges that should be highlighted by this
+    ///                 note.
+    ///   - fixIts: Any FixIts that should be attached to this note.
+    public mutating func note(_ message: Message,
+                              location: SourceLocation? = nil,
+                              highlights: [SourceRange] = [], 
+                              fixIts: [FixIt] = []) {
+      self.notes.append(Note(message: message, location: location,
+                             highlights: highlights, fixIts: fixIts))
+    }
+
+    /// Adds the provided source ranges as highlights of this diagnostic.
+    public mutating func highlight(_ ranges: SourceRange...) {
+      self.highlights += ranges
+    }
+
+    /// Adds a FixIt to remove the contents of the provided SourceRange.
+    /// When applied, this FixIt will delete the characters corresponding to
+    /// this range in the original source file.
+    public mutating func fixItRemove(_ sourceRange: SourceRange) {
+      fixIts.append(.remove(sourceRange))
+    }
+
+    /// Adds a FixIt to insert the provided text at the provided SourceLocation
+    /// in the file where the location resides.
+    public mutating
+    func fixItInsert(_ text: String, at sourceLocation: SourceLocation) {
+      fixIts.append(.insert(sourceLocation, text))
+    }
+
+    /// Adds a FixIt to replace the contents of the source file corresponding
+    /// to the provided SourceRange with the provided text.
+    public mutating 
+    func fixItReplace(_ sourceRange: SourceLocation, with text: String) {
+      fixIts.append(.replace(sourceRange, text))
+    }
   }
 
-  /// Creates a `warning` diagnostic.
-  /// - Parameters:
-  ///   - message: The message for the diagnostic.
-  ///   - location: The location where the diagnostic should point, if any.
-  ///   - highlights: Ranges of code that should be highlighted in the resulting
-  ///                 diagnostic.
-  ///   - fixIts: Possible fixes for the warning in the diagnostic.
-  public static func warning(_ message: String, location: SourceLocation?,
-                             highlights: [SourceRange] = [],
-                             fixIts: [FixIt] = [],
-                             notes: [Note] = []) -> Diagnostic {
-    return Diagnostic(kind: .warning, message: message, location: location,
-                      highlights: highlights, fixIts: fixIts, notes: notes)
+  /// Creates a new Diagnostic with the provided message, pointing to the
+  /// provided location (if any).
+  /// This initializer also takes a closure that will be passed a Diagnostic
+  /// Builder as an inout parameter. Use this closure to add notes, highlights,
+  /// and FixIts to the diagnotic through the Builder's API.
+  /// - parameters:
+  ///   - message: The diagnostic's message.
+  ///   - location: The location the diagnostic is attached to.
+  ///   - actions: A closure that's used to attach notes and highlights to
+  ///              diagnostics.
+  init(message: Message, location: SourceLocation?,
+       actions: ((inout Builder) -> Void)?) {
+    var builder = Builder()
+    actions?(&builder)
+    self.init(message: message, location: location, notes: builder.notes,
+              highlights: builder.highlights, fixIts: builder.fixIts)
+  }
+
+  /// Creates a new Diagnostic with the provided message, pointing to the
+  /// provided location (if any).
+  /// - parameters:
+  ///   - message: The diagnostic's message.
+  ///   - location: The location the diagnostic is attached to.
+  ///   - highlights: An array of SourceRanges which will be highlighted when
+  ///                 the diagnostic is presented.
+  init(message: Message, location: SourceLocation?,
+       highlights: [SourceRange], notes: [Note], fixIts: [FixIt]) {
+    self.message = message
+    self.location = location
+    self.notes = notes
+    self.highlights = highlights
+    self.fixIts = fixIts
   }
 }
