@@ -261,8 +261,8 @@ def create_argument_parser():
         help='also build for iOS, and allow all iOS tests')
     parser.add_argument(
         '--skip-ios',
-        dest='ios',
         action='store_false',
+        dest='ios',
         help='set to skip everything iOS-related')
 
     parser.add_argument(
@@ -277,8 +277,8 @@ def create_argument_parser():
         help='also build for tvOS, and allow all tvOS tests')
     parser.add_argument(
         '--skip-tvos',
-        dest='tvos',
         action='store_false',
+        dest='tvos',
         help='set to skip everything tvOS-related')
 
     parser.add_argument(
@@ -293,8 +293,8 @@ def create_argument_parser():
         help='also build for Apple watchOS, and allow all Apple watchOS tests')
     parser.add_argument(
         '--skip-watchos',
-        dest='watchos',
         action='store_false',
+        dest='watchos',
         help='set to skip everything watchOS-related')
 
     parser.add_argument(
@@ -551,14 +551,16 @@ def create_argument_parser():
              'for the cross-compilation targets.')
     targets_group.add_argument(
         '--cross-compile-hosts',
-        action=arguments.action.concat, type=arguments.type.shell_split,
+        action=arguments.action.concat,
         default=[],
+        type=arguments.type.shell_split,
         help='A space separated list of targets to cross-compile host Swift '
              'tools for. Can be used multiple times.')
     targets_group.add_argument(
         '--stdlib-deployment-targets',
-        action=arguments.action.concat, type=arguments.type.shell_split,
+        action=arguments.action.concat,
         default=None,
+        type=arguments.type.shell_split,
         help='list of targets to compile or cross-compile the Swift standard '
              'library for. %(default)s by default.')
     targets_group.add_argument(
@@ -831,8 +833,8 @@ def create_argument_parser():
     run_tests_group.add_argument(
         '--test-paths',
         action=arguments.action.concat,
-        type=arguments.type.shell_split,
         default=[],
+        type=arguments.type.shell_split,
         help='run tests located in specific directories and/or files '
              '(implies --test and/or --validation-test)')
     run_tests_group.add_argument(
@@ -890,18 +892,18 @@ def create_argument_parser():
         help='skip testing Swift stdlibs for Mac OS X')
     run_tests_group.add_argument(
         '--skip-test-linux',
-        dest='test_linux',
         action=arguments.action.disable,
+        dest='test_linux',
         help='skip testing Swift stdlibs for Linux')
     run_tests_group.add_argument(
         '--skip-test-freebsd',
-        dest='test_freebsd',
         action=arguments.action.disable,
+        dest='test_freebsd',
         help='skip testing Swift stdlibs for FreeBSD')
     run_tests_group.add_argument(
         '--skip-test-cygwin',
-        dest='test_cygwin',
         action=arguments.action.disable,
+        dest='test_cygwin',
         help='skip testing Swift stdlibs for Cygwin')
 
     run_build_group = parser.add_argument_group(
@@ -934,159 +936,159 @@ def create_argument_parser():
         help='generate build directory only without building')
     run_build_group.add_argument(
         '--skip-build-linux',
-        dest='build_linux',
         action=arguments.action.disable,
+        dest='build_linux',
         help='skip building Swift stdlibs for Linux')
     run_build_group.add_argument(
         '--skip-build-freebsd',
-        dest='build_freebsd',
         action=arguments.action.disable,
+        dest='build_freebsd',
         help='skip building Swift stdlibs for FreeBSD')
     run_build_group.add_argument(
         '--skip-build-cygwin',
-        dest='build_cygwin',
         action=arguments.action.disable,
+        dest='build_cygwin',
         help='skip building Swift stdlibs for Cygwin')
     run_build_group.add_argument(
         '--skip-build-osx',
-        dest='build_osx',
         action=arguments.action.disable,
+        dest='build_osx',
         help='skip building Swift stdlibs for MacOSX')
 
     run_build_group.add_argument(
         '--skip-build-ios',
-        dest='build_ios',
         action=arguments.action.disable,
+        dest='build_ios',
         help='skip building Swift stdlibs for iOS')
     run_build_group.add_argument(
         '--skip-build-ios-device',
-        dest='build_ios_device',
         action=arguments.action.disable,
+        dest='build_ios_device',
         help='skip building Swift stdlibs for iOS devices '
              '(i.e. build simulators only)')
     run_build_group.add_argument(
         '--skip-build-ios-simulator',
-        dest='build_ios_simulator',
         action=arguments.action.disable,
+        dest='build_ios_simulator',
         help='skip building Swift stdlibs for iOS simulator '
              '(i.e. build devices only)')
 
     run_build_group.add_argument(
         '--skip-build-tvos',
-        dest='build_tvos',
         action=arguments.action.disable,
+        dest='build_tvos',
         help='skip building Swift stdlibs for tvOS')
     run_build_group.add_argument(
         '--skip-build-tvos-device',
-        dest='build_tvos_device',
         action=arguments.action.disable,
+        dest='build_tvos_device',
         help='skip building Swift stdlibs for tvOS devices '
              '(i.e. build simulators only)')
     run_build_group.add_argument(
         '--skip-build-tvos-simulator',
-        dest='build_tvos_simulator',
         action=arguments.action.disable,
+        dest='build_tvos_simulator',
         help='skip building Swift stdlibs for tvOS simulator '
              '(i.e. build devices only)')
 
     run_build_group.add_argument(
         '--skip-build-watchos',
-        dest='build_watchos',
         action=arguments.action.disable,
+        dest='build_watchos',
         help='skip building Swift stdlibs for watchOS')
     run_build_group.add_argument(
         '--skip-build-watchos-device',
-        dest='build_watchos_device',
         action=arguments.action.disable,
+        dest='build_watchos_device',
         help='skip building Swift stdlibs for watchOS devices '
              '(i.e. build simulators only)')
     run_build_group.add_argument(
         '--skip-build-watchos-simulator',
-        dest='build_watchos_simulator',
         action=arguments.action.disable,
+        dest='build_watchos_simulator',
         help='skip building Swift stdlibs for watchOS simulator '
              '(i.e. build devices only)')
 
     run_build_group.add_argument(
         '--skip-build-android',
-        dest='build_android',
         action=arguments.action.disable,
+        dest='build_android',
         help='skip building Swift stdlibs for Android')
 
     run_build_group.add_argument(
         '--skip-build-benchmarks',
-        dest='build_benchmarks',
         action=arguments.action.disable,
+        dest='build_benchmarks',
         help='skip building Swift Benchmark Suite')
 
     run_build_group.add_argument(
         '--build-external-benchmarks',
-        dest='build_external_benchmarks',
         action=arguments.action.enable,
+        dest='build_external_benchmarks',
         help='skip building Swift Benchmark Suite')
 
     skip_test_group = parser.add_argument_group(
         title='Skip testing specified targets')
     skip_test_group.add_argument(
         '--skip-test-ios',
-        dest='test_ios',
         action=arguments.action.disable,
+        dest='test_ios',
         help='skip testing all iOS targets. Equivalent to specifying both '
              '--skip-test-ios-simulator and --skip-test-ios-host')
     skip_test_group.add_argument(
         '--skip-test-ios-simulator',
-        dest='test_ios_simulator',
         action=arguments.action.disable,
+        dest='test_ios_simulator',
         help='skip testing iOS simulator targets')
     skip_test_group.add_argument(
         '--skip-test-ios-32bit-simulator',
-        dest='test_ios_32bit_simulator',
         action=arguments.action.disable,
+        dest='test_ios_32bit_simulator',
         help='skip testing iOS 32 bit simulator targets')
     skip_test_group.add_argument(
         '--skip-test-ios-host',
-        dest='test_ios_host',
         action=arguments.action.disable,
+        dest='test_ios_host',
         help='skip testing iOS device targets on the host machine (the phone '
              'itself)')
     skip_test_group.add_argument(
         '--skip-test-tvos',
-        dest='test_tvos',
         action=arguments.action.disable,
+        dest='test_tvos',
         help='skip testing all tvOS targets. Equivalent to specifying both '
              '--skip-test-tvos-simulator and --skip-test-tvos-host')
     skip_test_group.add_argument(
         '--skip-test-tvos-simulator',
-        dest='test_tvos_simulator',
         action=arguments.action.disable,
+        dest='test_tvos_simulator',
         help='skip testing tvOS simulator targets')
     skip_test_group.add_argument(
         '--skip-test-tvos-host',
-        dest='test_tvos_host',
         action=arguments.action.disable,
+        dest='test_tvos_host',
         help='skip testing tvOS device targets on the host machine (the TV '
              'itself)')
     skip_test_group.add_argument(
         '--skip-test-watchos',
-        dest='test_watchos',
         action=arguments.action.disable,
+        dest='test_watchos',
         help='skip testing all tvOS targets. Equivalent to specifying both '
              '--skip-test-watchos-simulator and --skip-test-watchos-host')
     skip_test_group.add_argument(
         '--skip-test-watchos-simulator',
-        dest='test_watchos_simulator',
         action=arguments.action.disable,
+        dest='test_watchos_simulator',
         help='skip testing watchOS simulator targets')
     skip_test_group.add_argument(
         '--skip-test-watchos-host',
-        dest='test_watchos_host',
         action=arguments.action.disable,
+        dest='test_watchos_host',
         help='skip testing watchOS device targets on the host machine (the '
              'watch itself)')
     skip_test_group.add_argument(
         '--skip-test-android-host',
-        dest='test_android_host',
         action=arguments.action.disable,
+        dest='test_android_host',
         help='skip testing Android device targets on the host machine (the '
              'phone itself)')
 
