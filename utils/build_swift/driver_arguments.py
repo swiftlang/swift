@@ -304,10 +304,10 @@ def create_argument_parser():
 
     parser.add_argument(
         '--swift-analyze-code-coverage',
+        dest='swift_analyze_code_coverage',
         choices=['false', 'not-merged', 'merged'],
         # so CMake can see the inert mode as a false value
         default=defaults.SWIFT_ANALYZE_CODE_COVERAGE,
-        dest='swift_analyze_code_coverage',
         help='enable code coverage analysis in Swift (false, not-merged, '
              'merged).')
 
@@ -318,8 +318,8 @@ def create_argument_parser():
              'products will be placed')
     parser.add_argument(
         '--install-prefix',
-        metavar='PATH',
         default=targets.install_prefix(),
+        metavar='PATH',
         help='The installation prefix. This is where built Swift products '
              '(like bin, lib, and include) will be installed.')
     parser.add_argument(
@@ -436,23 +436,23 @@ def create_argument_parser():
 
     parser.add_argument(
         '--darwin-deployment-version-osx',
-        metavar='MAJOR.MINOR',
         default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+        metavar='MAJOR.MINOR',
         help='minimum deployment target version for OS X')
     parser.add_argument(
         '--darwin-deployment-version-ios',
-        metavar='MAJOR.MINOR',
         default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+        metavar='MAJOR.MINOR',
         help='minimum deployment target version for iOS')
     parser.add_argument(
         '--darwin-deployment-version-tvos',
-        metavar='MAJOR.MINOR',
         default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+        metavar='MAJOR.MINOR',
         help='minimum deployment target version for tvOS')
     parser.add_argument(
         '--darwin-deployment-version-watchos',
-        metavar='MAJOR.MINOR',
         default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+        metavar='MAJOR.MINOR',
         help='minimum deployment target version for watchOS')
 
     parser.add_argument(
@@ -479,12 +479,12 @@ def create_argument_parser():
 
     parser.add_argument(
         '--lto',
-        metavar='LTO_TYPE',
+        dest='lto_type',
         nargs='?',
         choices=['thin', 'full'],
-        default=None,
         const='full',
-        dest='lto_type',
+        default=None,
+        metavar='LTO_TYPE',
         help='use lto optimization on llvm/swift tools. This does not '
              'imply using lto on the swift standard library or runtime. '
              'Options: thin, full. If no optional arg is provided, full is '
@@ -498,15 +498,15 @@ def create_argument_parser():
     default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     parser.add_argument(
         '--llvm-max-parallel-lto-link-jobs',
-        metavar='COUNT',
         default=default_max_lto_link_job_counts['llvm'],
+        metavar='COUNT',
         help='the maximum number of parallel link jobs to use when compiling '
              'llvm')
 
     parser.add_argument(
         '--swift-tools-max-parallel-lto-link-jobs',
-        metavar='COUNT',
         default=default_max_lto_link_job_counts['swift'],
+        metavar='COUNT',
         help='the maximum number of parallel link jobs to use when compiling '
              'swift tools.')
 
@@ -523,8 +523,8 @@ def create_argument_parser():
 
     parser.add_argument(
         '--lit-args',
-        metavar='LITARGS',
         default='-sv',
+        metavar='LITARGS',
         help='lit args to use when testing')
 
     parser.add_argument(
@@ -552,20 +552,21 @@ def create_argument_parser():
     targets_group.add_argument(
         '--cross-compile-hosts',
         action=arguments.action.concat,
-        default=[],
         type=arguments.type.shell_split,
+        default=[],
         help='A space separated list of targets to cross-compile host Swift '
              'tools for. Can be used multiple times.')
     targets_group.add_argument(
         '--stdlib-deployment-targets',
         action=arguments.action.concat,
-        default=None,
         type=arguments.type.shell_split,
+        default=None,
         help='list of targets to compile or cross-compile the Swift standard '
              'library for. %(default)s by default.')
     targets_group.add_argument(
         '--build-stdlib-deployment-targets',
-        type=arguments.type.shell_split, default=['all'],
+        type=arguments.type.shell_split,
+        default=['all'],
         help='A space-separated list that filters which of the configured '
              'targets to build the Swift standard library for, or "all".')
 
@@ -833,8 +834,8 @@ def create_argument_parser():
     run_tests_group.add_argument(
         '--test-paths',
         action=arguments.action.concat,
-        default=[],
         type=arguments.type.shell_split,
+        default=[],
         help='run tests located in specific directories and/or files '
              '(implies --test and/or --validation-test)')
     run_tests_group.add_argument(
@@ -873,22 +874,22 @@ def create_argument_parser():
         help='run the Swift Benchmark Suite after building')
     run_tests_group.add_argument(
         '--benchmark-num-o-iterations',
-        metavar='N',
         type=int,
         default=3,
+        metavar='N',
         help='if the Swift Benchmark Suite is run after building, run N '
              'iterations with -O')
     run_tests_group.add_argument(
         '--benchmark-num-onone-iterations',
-        metavar='N',
         type=int,
         default=3,
+        metavar='N',
         help='if the Swift Benchmark Suite is run after building, run N '
              'iterations with -Onone')
     run_tests_group.add_argument(
         '--skip-test-osx',
-        dest='test_osx',
         action=arguments.action.disable,
+        dest='test_osx',
         help='skip testing Swift stdlibs for Mac OS X')
     run_tests_group.add_argument(
         '--skip-test-linux',
