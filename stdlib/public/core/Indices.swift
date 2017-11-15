@@ -12,10 +12,13 @@
 
 /// A collection of indices for an arbitrary collection
 @_fixed_layout
-public struct DefaultIndices<Elements: Collection> : Collection {
-
-  public typealias Index = Elements.Index
-  public typealias Indices = DefaultIndices<Elements>
+public struct DefaultIndices<Elements: Collection> {
+  @_versioned
+  internal var _elements: Elements
+  @_versioned
+  internal var _startIndex: Elements.Index
+  @_versioned
+  internal var _endIndex: Elements.Index
 
   @_inlineable
   @_versioned
@@ -28,6 +31,16 @@ public struct DefaultIndices<Elements: Collection> : Collection {
     self._startIndex = startIndex
     self._endIndex = endIndex
   }
+}
+
+extension DefaultIndices: Collection {
+
+  public typealias Index = Elements.Index
+  public typealias Element = Elements.Index
+  public typealias Indices = DefaultIndices<Elements>
+  public typealias SubSequence = DefaultIndices<Elements>
+	public typealias IndexDistance = Elements.IndexDistance
+	public typealias Iterator = IndexingIterator<DefaultIndices<Elements>>
 
   @_inlineable
   public var startIndex: Index {
@@ -44,8 +57,6 @@ public struct DefaultIndices<Elements: Collection> : Collection {
     // FIXME: swift-3-indexing-model: range check.
     return i
   }
-
-  public typealias SubSequence = DefaultIndices<Elements>
 
   @_inlineable
   public subscript(bounds: Range<Index>) -> DefaultIndices<Elements> {
@@ -68,18 +79,10 @@ public struct DefaultIndices<Elements: Collection> : Collection {
     _elements.formIndex(after: &i)
   }
 
-
   @_inlineable
   public var indices: Indices {
     return self
   }
-
-  @_versioned
-  internal var _elements: Elements
-  @_versioned
-  internal var _startIndex: Elements.Index
-  @_versioned
-  internal var _endIndex: Elements.Index
 }
 
 extension DefaultIndices: BidirectionalCollection

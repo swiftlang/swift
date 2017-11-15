@@ -80,13 +80,72 @@
 ///   subsequence type that takes your index invalidation requirements into
 ///   account.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct Slice<Base: Collection>: Collection {
+public struct Slice<Base: Collection> {
+  /// Creates a view into the given collection that allows access to elements
+  /// within the specified range.
+  ///
+  /// It is unusual to need to call this method directly. Instead, create a
+  /// slice of a collection by using the collection's range-based subscript or
+  /// by using methods that return a subsequence.
+  ///
+  ///     let singleDigits = 0...9
+  ///     let subSequence = singleDigits.dropFirst(5)
+  ///     print(Array(subSequence))
+  ///     // Prints "[5, 6, 7, 8, 9]"
+  ///
+  /// In this example, the expression `singleDigits.dropFirst(5))` is
+  /// equivalent to calling this initializer with `singleDigits` and a
+  /// range covering the last five items of `singleDigits.indices`.
+  ///
+  /// - Parameters:
+  ///   - base: The collection to create a view into.
+  ///   - bounds: The range of indices to allow access to in the new slice.
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(base: Base, bounds: Range<Base.Index>) {
+    self._base = base
+    self._startIndex = bounds.lowerBound
+    self._endIndex = bounds.upperBound
+  }
 
+  @_versioned // FIXME(sil-serialize-all)
+  public var _startIndex: Base.Index
+  @_versioned // FIXME(sil-serialize-all)
+  public var _endIndex: Base.Index
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _base: Base
+
+  /// The underlying collection of the slice.
+  ///
+  /// You can use a slice's `base` property to access its base collection. The
+  /// following example declares `singleDigits`, a range of single digit
+  /// integers, and then drops the first element to create a slice of that
+  /// range, `singleNonZeroDigits`. The `base` property of the slice is equal
+  /// to `singleDigits`.
+  ///
+  ///     let singleDigits = 0..<10
+  ///     let singleNonZeroDigits = singleDigits.dropFirst()
+  ///     // singleNonZeroDigits is a Slice<CountableRange<Int>>
+  ///
+  ///     print(singleNonZeroDigits.count)
+  ///     // Prints "9"
+  ///     prints(singleNonZeroDigits.base.count)
+  ///     // Prints "10"
+  ///     print(singleDigits == singleNonZeroDigits.base)
+  ///     // Prints "true"
+  @_inlineable // FIXME(sil-serialize-all)
+  public var base: Base {
+    return _base
+  }
+}
+
+extension Slice: Collection {
   public typealias Index = Base.Index
+  public typealias Indices = Base.Indices
   public typealias IndexDistance = Base.IndexDistance  
-
-  public var _startIndex: Index
-  public var _endIndex: Index
+  public typealias Element = Base.Element
+  public typealias SubSequence = Slice<Base>
+	public typealias IndexDistance = Base.IndexDistance
+	public typealias Iterator = IndexingIterator<Slice<Base>>
 
   @_inlineable // FIXME(sil-serialize-all)
   public var startIndex: Index {
@@ -106,8 +165,6 @@ public struct Slice<Base: Collection>: Collection {
     }
   }
 
-  public typealias SubSequence = Slice<Base>
-
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
@@ -116,7 +173,6 @@ public struct Slice<Base: Collection>: Collection {
     }
   }
 
-  public typealias Indices = Base.Indices
   public var indices: Indices { 
     return _base.indices[_startIndex..<_endIndex]
   }
@@ -161,58 +217,6 @@ public struct Slice<Base: Collection>: Collection {
   @_inlineable // FIXME(sil-serialize-all)
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(range, bounds: bounds)
-  }
-
-  /// Creates a view into the given collection that allows access to elements
-  /// within the specified range.
-  ///
-  /// It is unusual to need to call this method directly. Instead, create a
-  /// slice of a collection by using the collection's range-based subscript or
-  /// by using methods that return a subsequence.
-  ///
-  ///     let singleDigits = 0...9
-  ///     let subSequence = singleDigits.dropFirst(5)
-  ///     print(Array(subSequence))
-  ///     // Prints "[5, 6, 7, 8, 9]"
-  ///
-  /// In this example, the expression `singleDigits.dropFirst(5))` is
-  /// equivalent to calling this initializer with `singleDigits` and a
-  /// range covering the last five items of `singleDigits.indices`.
-  ///
-  /// - Parameters:
-  ///   - base: The collection to create a view into.
-  ///   - bounds: The range of indices to allow access to in the new slice.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(base: Base, bounds: Range<Index>) {
-    self._base = base
-    self._startIndex = bounds.lowerBound
-    self._endIndex = bounds.upperBound
-  }
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _base: Base
-
-  /// The underlying collection of the slice.
-  ///
-  /// You can use a slice's `base` property to access its base collection. The
-  /// following example declares `singleDigits`, a range of single digit
-  /// integers, and then drops the first element to create a slice of that
-  /// range, `singleNonZeroDigits`. The `base` property of the slice is equal
-  /// to `singleDigits`.
-  ///
-  ///     let singleDigits = 0..<10
-  ///     let singleNonZeroDigits = singleDigits.dropFirst()
-  ///     // singleNonZeroDigits is a Slice<CountableRange<Int>>
-  ///
-  ///     print(singleNonZeroDigits.count)
-  ///     // Prints "9"
-  ///     prints(singleNonZeroDigits.base.count)
-  ///     // Prints "10"
-  ///     print(singleDigits == singleNonZeroDigits.base)
-  ///     // Prints "true"
-  @_inlineable // FIXME(sil-serialize-all)
-  public var base: Base {
-    return _base
   }
 }
 

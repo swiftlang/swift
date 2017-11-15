@@ -347,9 +347,6 @@ public struct IndexingIterator<
 /// O(*n*) operation.
 public protocol Collection : Sequence
 {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
   /// A type that represents a position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
