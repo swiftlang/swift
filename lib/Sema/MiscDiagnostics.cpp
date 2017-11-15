@@ -1418,15 +1418,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     ///       x == nil    // also !=
     ///
     void checkOptionalPromotions(ApplyExpr *call) {
-      // We only care about binary expressions.
-      if (!isa<BinaryExpr>(call)) return;
-
-      // Dig out the function we're calling.
-      auto fnExpr = call->getSemanticFn();
-      if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(fnExpr))
-        fnExpr = dotSyntax->getSemanticFn();
-
-      auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
+      auto DRE = dyn_cast<DeclRefExpr>(call->getSemanticFn());
       auto args = dyn_cast<TupleExpr>(call->getArg());
       if (!DRE || !DRE->getDecl()->isOperator() ||
           !args || args->getNumElements() != 2)

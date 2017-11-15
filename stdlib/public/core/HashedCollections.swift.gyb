@@ -2708,7 +2708,7 @@ extension Dictionary {
   }
 }
 
-extension Dictionary : Equatable where Value : Equatable {
+extension Dictionary where Value : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
   public static func == (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
     switch (lhs._variantBuffer, rhs._variantBuffer) {

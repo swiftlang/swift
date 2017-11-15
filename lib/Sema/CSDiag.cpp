@@ -4844,7 +4844,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     AFD = dyn_cast<AbstractFunctionDecl>(candidate);
   }
 
-  if (!AFD || !AFD->getGenericSignature() || !AFD->hasInterfaceType())
+  if (!AFD || !AFD->isGeneric() || !AFD->hasInterfaceType())
     return false;
 
   auto env = AFD->getGenericEnvironment();

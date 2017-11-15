@@ -1036,6 +1036,16 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       continue;
     }
 
+    // A concrete type is better than an archetype.
+    // FIXME: Total hack.
+    if (type1->is<ArchetypeType>() != type2->is<ArchetypeType>()) {
+      if (type1->is<ArchetypeType>())
+        ++score2;
+      else
+        ++score1;
+      continue;
+    }
+    
     // FIXME:
     // This terrible hack is in place to support equality comparisons of non-
     // equatable option types to 'nil'. Until we have a way to constrain a type

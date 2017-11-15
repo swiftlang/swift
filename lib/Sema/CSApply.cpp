@@ -474,6 +474,9 @@ namespace {
               tc.conformsToProtocol(baseTy, proto, cs.DC,
                                     (ConformanceCheckFlags::InExpression|
                                          ConformanceCheckFlags::Used));
+            assert((!conformance ||
+                    conformance->getConditionalRequirements().empty()) &&
+                   "unhandled conditional conformance");
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
                         conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
