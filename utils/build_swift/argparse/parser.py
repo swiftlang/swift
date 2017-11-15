@@ -7,6 +7,13 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+"""
+Extensions to the standard argparse ArgumentParer class to support multiple
+destination actions as well as a new builder DSL for declaratively
+constructing complex parsers.
+"""
+
+
 import argparse
 from contextlib import contextmanager
 

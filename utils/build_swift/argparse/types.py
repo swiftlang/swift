@@ -7,6 +7,12 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+"""
+Argument types useful for enforcing data-integrity and form when parsing
+arguments.
+"""
+
+
 import os.path
 import re
 import shlex

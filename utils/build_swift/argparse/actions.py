@@ -7,6 +7,12 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+"""
+Hierarchy of action classes which support multiple destinations, similar to the
+default actions provided by the standard argparse.
+"""
+
+
 import argparse
 import copy
 

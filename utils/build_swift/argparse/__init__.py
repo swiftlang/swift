@@ -6,6 +6,13 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+"""
+Wrapper module around the standard argparse that extends the default
+functionality with support for multi-destination actions, an expressive DSL for
+constructing parsers and more argument types. This module exposes a strict
+super-set of the argparse API and is meant to be used as a drop-in replacement.
+"""
+
 
 from argparse import (ArgumentDefaultsHelpFormatter, ArgumentError,
                       ArgumentTypeError, FileType, HelpFormatter,
