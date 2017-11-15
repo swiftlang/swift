@@ -1,4 +1,4 @@
-//===--- Random.swift ------------------------------------------------------===//
+//===--- Random.swift -----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,37 +15,83 @@ import SwiftShims
 /// A type that allows random number generators to be used throughout Swift to
 /// produce random aspects of Swift's types.
 ///
-/// The RandomGenerator protocol is used for random number generator types that
-/// implement their own pseudo-random or cryptographically-secure pseudo-random
-/// number generation. Using the RandomGenerator protocol allows these types
-/// to be used with types that conform to `Randomizable` or collections who
-/// conform to `RandomAccessCollection`.
+/// The RandomNumberGenerator protocol is used for random number generator types
+/// that implement their own pseudo-random or cryptographically secure
+/// pseudo-random number generation. Using the RandomNumberGenerator protocol
+/// allows these types to be used with types that conform to `Randomizable`,
+/// collections with .random, and collections/sequences with .shuffle() and
+/// .shuffled()
 ///
-/// Conforming to the RandomGenerator protocol
+/// Conforming to the RandomNumberGenerator protocol
 /// ==========================================
 ///
-/// In order to conform to RandomGenerator, types that implement this must be
-/// able to produce different types of integers that conform to
-/// `FixedWidthInteger`. They must also be able to constrict that number down
-/// to an upperBound.
+/// In order to conform to RandomNumberGenerator, types that implement this must be
+/// able to produce a specified unsigned integer.
 ///
-/// - Note: Types that implement RandomGenerator should have a decent amount of
-///   documentation that clearly conveys whether or not the generator produces
-///   cryptographically secure numbers or deterministically generated numbers.
-public protocol RandomGenerator {
+/// - Note: Types that implement RandomNumberGenerator should have a decent
+///   amount of documentation that clearly conveys whether or not the generator
+///   produces cryptographically secure numbers or deterministically generated
+///   numbers.
+public protocol RandomNumberGenerator {
+  /// The unsigned integer type that will be a result of this random number generator
+  associatedtype GeneratedNumber : FixedWidthInteger & UnsignedInteger
+
   /// Produces the next randomly generated number
   ///
-  /// - Parameter type: The `FixedWidthInteger` type to generate
   /// - Returns: A number that was randomly generated
-  func next<T : FixedWidthInteger>(_ type: T.Type) -> T
+  func next() -> GeneratedNumber
+}
+
+extension RandomNumberGenerator {
+  /// Produces the next randomly generated number
+  ///
+  /// - Parameter type: The type of unsigned integer to generate
+  /// - Returns: A number that was randomly generated
+  ///
+  /// This differs from next() as this function has the ability to transform the
+  /// generated number to any unsigned integer.
+  public func next<T: FixedWidthInteger & UnsignedInteger>(_ type: T.Type) -> T {
+    if T.bitWidth == GeneratedNumber.bitWidth {
+      return T(self.next())
+    }
+
+    let (quotient, remainder) = T.bitWidth.quotientAndRemainder(
+      dividingBy: GeneratedNumber.bitWidth
+    )
+    var tmp: T = 0
+
+    for i in 0 ..< quotient {
+      tmp += T(truncatingIfNeeded: self.next()) &<< (GeneratedNumber.bitWidth * i)
+    }
+
+    if remainder != 0 {
+      let random = self.next()
+      let mask = GeneratedNumber.max &>> (GeneratedNumber.bitWidth - remainder)
+      tmp +=
+        T(truncatingIfNeeded: random & mask) &<< (GeneratedNumber.bitWidth * quotient)
+    }
+
+    return tmp
+  }
 
   /// Produces the next randomly generated number that is constricted by an
   /// upperBound
   ///
-  /// - Parameter type: The `FixedWidthInteger` type to generate
   /// - Parameter upperBound: The max number this can generate up to.
   /// - Returns: A number that was randomly generated
-  func next<T : FixedWidthInteger>(_ type: T.Type, upperBound: T) -> T
+  ///
+  /// This uses the uniform distribution to form a random number within the
+  /// upperBound.
+  public func next<T: FixedWidthInteger & UnsignedInteger>(upperBound: T) -> T {
+    let range = T.max % upperBound
+    var random: T = 0
+
+    repeat {
+      random = self.next(T.self)
+    } while random < range
+
+    return random % upperBound
+  }
 }
 
 /// The provided default source of random numbers
@@ -68,37 +114,24 @@ public protocol RandomGenerator {
 ///   versions of these operating systems it uses /dev/urandom and SecRandomCopyBytes
 ///   on iOS. For Linux, it tries to use the getrandom(2) system call on newer
 ///   kernel versions. On older kernel versions, it uses /dev/urandom.
-public enum Random : RandomGenerator {
+public struct Random : RandomNumberGenerator {
+  /// This random number generator generates the machine's bit width unsigned integer
+  public typealias GeneratedNumber = UInt
+
   /// The default random implementation
-  case `default`
+  public static let `default` = Random()
+
+  private init() {}
 
   /// Produces the next randomly generated number
   ///
   /// - Parameter type: The `FixedWidthInteger` type to generate
   /// - Returns: A number that was randomly generated
   @_inlineable
-  public func next<T : FixedWidthInteger>(_ type: T.Type) -> T {
-    var random: T = 0
-    _swift_stdlib_random(&random, MemoryLayout<T>.size, _fatalErrorFlags())
+  public func next() -> UInt {
+    var random: UInt = 0
+    _swift_stdlib_random(&random, MemoryLayout<UInt>.size, _fatalErrorFlags())
     return random
-  }
-
-  /// Produces the next randomly generated number that is constricted by an
-  /// upperBound
-  ///
-  /// - Parameter type: The `FixedWidthInteger` type to generate
-  /// - Parameter upperBound: The max number this can generate up to.
-  /// - Returns: A number that was randomly generated
-  @_inlineable
-  public func next<T : FixedWidthInteger>(_ type: T.Type, upperBound: T) -> T {
-    let range = T.max % upperBound
-    var random: T = 0
-
-    repeat {
-      _swift_stdlib_random(&random, MemoryLayout<T>.size, _fatalErrorFlags())
-    } while random >= range
-
-    return random % upperBound
   }
 }
 
@@ -129,7 +162,7 @@ public enum Random : RandomGenerator {
 /// and implement the random(using:) function.
 ///
 ///     extension Date : Randomizable {
-///         static func random(using generator: RandomGenerator) -> Self {
+///         static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
 ///             let randomYear = (0 ... 3000).random(using: generator)
 ///             let randomMonth = (1 ... 12).random(using: generator)
 ///             let randomDay = (1 ... 31).random(using: generator)
@@ -154,7 +187,7 @@ public protocol Randomizable {
   /// - Parameter generator: The random number generator to use when getting
   ///   random values
   /// - Returns: A random representation of the type conforming to `Randomizable`
-  static func random(using generator: RandomGenerator) -> Self
+  static func random<T: RandomNumberGenerator>(using generator: T) -> Self
 }
 
 extension Randomizable {

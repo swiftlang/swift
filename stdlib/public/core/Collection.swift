@@ -781,14 +781,39 @@ public protocol Collection : Sequence
   ///   `endIndex`.
   func formIndex(after i: inout Index)
 
-  /// Returns a shuffled version of this collection.
+  /// Returns a random element from this collection.
   ///
-  /// - Parameter generator: The random number generator to use when shuffling
-  ///   the collection. This parameter is not needed as the default implementation
-  ///   of `Collection` uses the default random source in the standard library.
-  /// - Returns: A new array containing a shuffled version of this collection's
-  ///   elements.
-  func shuffled(using generator: RandomGenerator) -> [Element]
+  /// A good example of this is getting a random number from 1 to 10:
+  ///
+  ///     let randomToTen = (1 ... 10).random
+  ///
+  /// If the collection is empty, the value of this function is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let randomNumber = numbers.random {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "20"
+  var random: Element? { get }
+
+  /// Returns a random element from this collection.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random element.
+  /// - Returns: A random element from this collection.
+  ///
+  /// A good example of this is getting a random number from 1 to 10:
+  ///
+  ///     let randomToTen = (1 ... 10).random
+  ///
+  /// If the collection is empty, the value of this function is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let randomNumber = numbers.random {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "20"
+  func random<T: RandomNumberGenerator>(using generator: T) -> Element?
 }
 
 /// Default implementation for forward collections.
@@ -1000,20 +1025,52 @@ extension Collection {
     return count
   }
 
-  /// Returns a shuffled version of this collection.
+  /// Returns a random element from this collection.
   ///
-  /// - Parameter generator: The random number generator to use when shuffling
-  ///   the collection. This parameter is not needed as the default implementation
-  ///   of `Collection` uses the default random source in the standard library.
-  /// - Returns: A new array containing a shuffled version of this collection's
-  ///   elements.
+  /// This uses the default random number generator provided by the standard library.
+  /// A good example of this is getting a random number from 1 to 10:
+  ///
+  ///     let randomToTen = (1 ... 10).random
+  ///
+  /// If the collection is empty, the value of this function is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let randomNumber = numbers.random {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "20"
   @_inlineable
-  public func shuffled(
-    using generator: RandomGenerator = Random.default
-  ) -> [Element] {
-    var arr = Array(self)
-    arr.shuffle(using: generator)
-    return arr
+  public var random: Element? {
+    return self.random(using: Random.default)
+  }
+
+  /// Returns a random element from this collection.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random element.
+  /// - Returns: A random element this collection.
+  ///
+  /// A good example of this is getting a random number from 1 to 10:
+  ///
+  ///     let randomToTen = (1 ... 10).random
+  ///
+  /// If the collection is empty, the value of this function is `nil`.
+  ///
+  ///     let numbers = [10, 20, 30, 40, 50]
+  ///     if let randomNumber = numbers.random {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "20"
+  @_inlineable
+  public func random<T: RandomNumberGenerator>(using generator: T) -> Element? {
+    guard !isEmpty else { return nil }
+    var random = generator.next(upperBound: UInt(self.count))
+    let index = self.index(
+      self.startIndex,
+      offsetBy: IndexDistance(random),
+      limitedBy: self.endIndex
+    )
+    return self[index!]
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.

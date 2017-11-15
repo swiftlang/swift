@@ -88,9 +88,14 @@ public struct Bool : Randomizable {
     self = value
   }
 
+  /// Returns a random Boolean
+  ///
+  /// - Parameter generator: The random number generator to use when getting a
+  ///   random Boolean.
+  /// - Returns: A random Boolean.
   @_inlineable
-  public static func random(using generator: RandomGenerator) -> Bool {
-    let random = generator.next(Int8.self, upperBound: 2)
+  public static func random<T: RandomNumberGenerator>(using generator: T) -> Bool {
+    let random = Int8.random(using: generator)
     return self.init(Builtin.trunc_Int8_Int1(random._value))
   }
 }

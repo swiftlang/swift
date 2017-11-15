@@ -2606,7 +2606,33 @@ extension FixedWidthInteger {
   /// The range of this random integer is from the integer's min to the integer's
   /// max.
   @_inlineable
-  public static func random(using generator: RandomGenerator) -> Self {
+  public static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
+    switch bitWidth {
+    case 8:
+      return Self.init(truncatingIfNeeded: generator.next(UInt8.self))
+    case 16:
+      return Self.init(truncatingIfNeeded: generator.next(UInt16.self))
+    case 32:
+      return Self.init(truncatingIfNeeded: generator.next(UInt32.self))
+    case 64:
+      return Self.init(truncatingIfNeeded: generator.next(UInt64.self))
+    default:
+      return Self.init(truncatingIfNeeded: generator.next())
+    }
+  }
+}
+
+extension FixedWidthInteger where Self: UnsignedInteger {
+  /// Returns a random representation of this integer.
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   the random integer
+  /// - Returns: A random representation of this integer conforming to `Randomizable`
+  ///
+  /// The range of this random integer is from the integer's min to the integer's
+  /// max.
+  @_inlineable
+  public static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
     return generator.next(Self.self)
   }
 }

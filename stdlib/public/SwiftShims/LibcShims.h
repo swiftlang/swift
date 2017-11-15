@@ -96,7 +96,7 @@ _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_random(void *buf,
                           __swift_ssize_t nbytes,
-                          __swift_uint32_t debugFlags);
+                          __swift_uint32_t debug_flags);
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE

@@ -106,27 +106,6 @@ public protocol RandomAccessCollection : BidirectionalCollection
 
   // FIXME(ABI): Associated type inference requires this.
   var endIndex: Index { get }
-
-  /// Returns a random element from this collection.
-  ///
-  /// Shorthand for using the random(using:) function. This uses the default
-  /// random implementation defined in the standard library.
-  var random: Element { get }
-
-  /// Returns a random element from this collection.
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   a random element.
-  /// - Returns: A random element this collection.
-  ///
-  /// A good example of this is getting a random number from 1 to 10:
-  ///
-  ///     let randomToTen = (1 ... 10).random(using: Random.default)
-  ///     // Of course we can simplify this by using the shorthand property
-  ///     let randomToTen = (1 ... 10).random
-  ///
-  /// The `count` of this collection must exceed 0 elements.
-  func random(using generator: RandomGenerator) -> Element
 }
 
 /// Supply the default "slicing" `subscript` for `RandomAccessCollection`
@@ -219,44 +198,6 @@ extension RandomAccessCollection {
       return nil
     }
     return index(i, offsetBy: n)
-  }
-
-  /// Returns a random element from this collection.
-  ///
-  /// Shorthand for using the random(using:) function. This uses the default
-  /// random implementation defined in the standard library.
-  @_inlineable
-  public var random: Element {
-    return self.random(using: Random.default)
-  }
-
-  /// Returns a random element from this collection.
-  ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   a random element.
-  /// - Returns: A random element this collection.
-  ///
-  /// A good example of this is getting a random number from 1 to 10:
-  ///
-  ///     let randomToTen = (1 ... 10).random(using: Random.default)
-  ///     // Of course we can simplify this by using the shorthand property
-  ///     let randomToTen = (1 ... 10).random
-  ///
-  /// The `count` of this collection must exceed 0 elements.
-  @_inlineable
-  public func random(using generator: RandomGenerator) -> Element {
-    _precondition(
-      !self.isEmpty,
-      "Tried to get random element from empty collection"
-    )
-    var random = generator.next(Int.self, upperBound: Int(self.count))
-    if random < 0 { random *= -1 }
-    let index = self.index(
-      self.startIndex,
-      offsetBy: IndexDistance(random),
-      limitedBy: self.endIndex
-    )
-    return self[index!]
   }
 }
 

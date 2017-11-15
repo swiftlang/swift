@@ -733,6 +733,48 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 %   end
   }
 }
+
+extension ${Self} where Bound: BinaryFloatingPoint {
+  /// Returns a random value within this range's bounds
+  ///
+  /// This uses the default random number generator provided by the standard library.
+  /// If the range is empty, the value of this function is `nil`.
+  ///
+  ///     let range = 0.0 ..< 5.0
+  ///     if let randomNumber = numbers.random {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "3.1415926535"
+  public var random: Bound? {
+    return self.random(using: Random.default)
+  }
+
+  /// Returns a random value within this range's bounds
+  ///
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random value.
+  /// - Returns: A randomly generated value within this range's bounds.
+  ///
+  /// If the range is empty, the value of this function is `nil`.
+  ///
+  ///     let range = 0.0 ..< 5.0
+  ///     if let randomNumber = numbers.random {
+  ///         print(randomNumber)
+  ///     }
+  ///     // Could print "3.1415926535"
+  public func random<T: RandomNumberGenerator>(using generator: T) -> Bound? {
+    guard !isEmpty else { return nil }
+%   if 'Closed' not in Self:
+    var random: Bound? =
+      Bound.random(using: generator) * abs(lowerBound - upperBound) + lowerBound
+    if random == upperBound { random = self.random(using: generator) }
+%   else:
+    let random =
+      Bound.random(using: generator) * abs(lowerBound - upperBound) + lowerBound
+%   end
+    return random
+  }
+}
 % end
 
 /// Returns a half-open range that contains its lower bound but not its upper
@@ -900,15 +942,16 @@ public struct PartialRangeFrom<Bound: Comparable>: RangeExpression {
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
   
+
   public let lowerBound: Bound
-  
+
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return self.lowerBound..<collection.endIndex
   }
-  
+
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func contains(_ element: Bound) -> Bool {
@@ -1030,8 +1073,8 @@ extension CountablePartialRangeFrom: Sequence {
     internal var _current: Bound
   }
   @_inlineable
-  public func makeIterator() -> Iterator { 
-    return Iterator(_current: lowerBound) 
+  public func makeIterator() -> Iterator {
+    return Iterator(_current: lowerBound)
   }
 }
 
@@ -1220,7 +1263,7 @@ extension Collection {
   -> SubSequence where R.Bound == Index {
     return self[r.relative(to: self)]
   }
-  
+
   @_inlineable
   public subscript(x: UnboundedRange) -> SubSequence {
     return self[startIndex...]
