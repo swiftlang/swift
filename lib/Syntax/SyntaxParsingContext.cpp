@@ -330,13 +330,11 @@ void SyntaxParsingContextChild::makeNode(SyntaxKind Kind, SourceLoc EndLoc) {
       checkTokenFromBack(tok::oper_prefix, AllNodes, 1) ? 2 : 1);
     break;
   }
+  case SyntaxKind::TernaryExpr:
   case SyntaxKind::StringLiteralExpr: {
-    ContextData.createPartiallyFromBack(Kind, AllNodes, 1);
-    break;
-  }
-  case SyntaxKind::TernaryExpr: {
-    ContextData.createPartiallyFromBack(Kind, AllNodes,
-                                        5/*Five pieces: bool ? 0 : 1.*/);
+    auto Pair = SyntaxFactory::countChildren(Kind);
+    assert(Pair.first == Pair.second);
+    ContextData.createPartiallyFromBack(Kind, AllNodes, Pair.first);
     break;
   }
   default:
