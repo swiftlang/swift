@@ -181,5 +181,15 @@ EXPR_NODES = [
                        'TrueToken',
                        'FalseToken',
                    ])
-         ])
+         ]),
+
+    # a ? 1 : 0
+    Node('TernaryExpr', kind='Expr',
+         children=[
+             Child("ConditionExpression", kind='Expr'),
+             Child("QuestionMark", kind='InfixQuestionMarkToken'),
+             Child("FirstChoice", kind='Expr'),
+             Child("ColonMark", kind='ColonToken'),
+             Child("SecondChoice", kind='Expr')
+         ]),
 ]

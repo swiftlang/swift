@@ -23,6 +23,8 @@ using namespace swift::syntax;
 
 namespace {
 static bool isTrivialSyntaxKind(SyntaxKind Kind) {
+  if (isUnknownKind(Kind))
+    return true;
   if (isCollectionKind(Kind))
     return true;
   switch(Kind) {
