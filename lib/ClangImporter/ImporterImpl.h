@@ -1154,6 +1154,8 @@ public:
 
 private:
   void
+  loadAllMembersOfEnum(Decl *D, const clang::EnumDecl *enumDecl);
+  void
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
