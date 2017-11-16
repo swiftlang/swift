@@ -880,8 +880,7 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
                                 Type Replacement,
                                 const TypeDecl *TD) -> bool {
 
-    auto Subst = Conformance->getDeclContext()->mapTypeOutOfContext(
-        Replacement);
+    auto Subst = Replacement->mapTypeOutOfContext();
 
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),

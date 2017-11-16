@@ -1751,7 +1751,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      VarDecl *VD) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-      DC->mapTypeOutOfContext(VD->getParentPattern()->getType())
+    VD->getParentPattern()->getType()->mapTypeOutOfContext()
           ->getCanonicalType();
   auto sig = TC.getEffectiveGenericSignature(DC);
 
@@ -1871,7 +1871,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       // FIXME: Closures could have an interface type computed by Sema.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
-          ACE->mapTypeOutOfContext(funcTy)
+          funcTy->mapTypeOutOfContext()
               ->getCanonicalType());
       return getFunctionInterfaceTypeWithCaptures(funcTy, ACE);
     }

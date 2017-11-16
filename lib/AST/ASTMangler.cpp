@@ -1780,7 +1780,7 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
-  Ty = parentContext->mapTypeOutOfContext(Ty);
+  Ty = Ty->mapTypeOutOfContext();
   appendType(Ty->getCanonicalType());
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
@@ -1978,9 +1978,7 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendProtocolName(conformance->getProtocol());
     appendIdentifier(behaviorStorage->getBaseName().getIdentifier().str());
   } else {
-    auto conformanceDC = conformance->getDeclContext();
-    auto conformingType =
-      conformanceDC->mapTypeOutOfContext(conformance->getType());
+    auto conformingType = conformance->getType()->mapTypeOutOfContext();
     appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
     appendModule(conformance->getDeclContext()->getParentModule());

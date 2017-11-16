@@ -305,10 +305,6 @@ Type DeclContext::mapTypeIntoContext(Type type) const {
       getGenericEnvironmentOfContext(), type);
 }
 
-Type DeclContext::mapTypeOutOfContext(Type type) const {
-  return type->mapTypeOutOfContext();
-}
-
 DeclContext *DeclContext::getLocalContext() {
   if (isLocalContext())
     return this;
