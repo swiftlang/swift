@@ -214,14 +214,13 @@ void CapturePropagationCloner::cloneBlocks(
 }
 
 CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
-  SILFunction *OrigF = PAI->getReferencedFunction();
   // The new partial_apply will no longer take any arguments--they are all
   // expressed as literals. So its callee signature will be the same as its
   // return signature.
   auto FTy = PAI->getType().castTo<SILFunctionType>();
   assert(!PAI->hasSubstitutions() || !hasArchetypes(PAI->getSubstitutions()));
   FTy = cast<SILFunctionType>(
-    OrigF->mapTypeOutOfContext(FTy)->getCanonicalType());
+    FTy->mapTypeOutOfContext()->getCanonicalType());
   auto NewFTy = FTy;
   return NewFTy;
 }

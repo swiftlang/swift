@@ -2903,7 +2903,6 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                       genericEnv,
                                       interfaceSubs);
   auto thunk = SGF.SGM.getOrCreateReabstractionThunk(
-                                       genericEnv,
                                        thunkType,
                                        sourceType,
                                        toType,

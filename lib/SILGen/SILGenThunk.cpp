@@ -357,8 +357,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 }
 
 SILFunction *SILGenModule::
-getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
-                              CanSILFunctionType thunkType,
+getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
                               CanSILFunctionType fromType,
                               CanSILFunctionType toType,
                               IsSerialized_t Serialized) {
