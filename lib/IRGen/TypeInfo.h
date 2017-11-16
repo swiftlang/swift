@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace llvm {
   class Constant;
@@ -484,8 +485,7 @@ public:
   /// When encountering an Archetype - add it to a type-metadata vec.
   virtual void collectArchetypeMetadata(
       IRGenFunction &IGF,
-      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          &typeToMetadataVec,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
       SILType T) const;
 
   /// Get the native (abi) convention for a return value of this type.
@@ -500,7 +500,6 @@ public:
                       llvm::Value *typeMetadata,
                       SILType T) const;
 };
-bool isTypeDependent(const IRGenModule &IGM, const CanType type);
 
 } // end namespace irgen
 } // end namespace swift

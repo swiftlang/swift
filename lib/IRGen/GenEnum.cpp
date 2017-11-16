@@ -443,8 +443,7 @@ namespace {
         getSingleton()->assignWithCopy(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -464,8 +463,7 @@ namespace {
         getSingleton()->assignWithTake(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -492,8 +490,7 @@ namespace {
         getSingleton()->initializeWithCopy(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -513,8 +510,7 @@ namespace {
         getSingleton()->initializeWithTake(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -527,8 +523,7 @@ namespace {
 
     void collectArchetypeMetadata(
         IRGenFunction &IGF,
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            &typeToMetadataVec,
+        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       if (!getSingleton())
         return;
@@ -936,8 +931,7 @@ namespace {
 
     void collectArchetypeMetadata(
         IRGenFunction &IGF,
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            &typeToMetadataVec,
+        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
       assert(!canType->hasArchetype() &&
@@ -1374,8 +1368,7 @@ namespace {
 
     void collectArchetypeMetadata(
         IRGenFunction &IGF,
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            &typeToMetadataVec,
+        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       assert(TIK >= Loadable);
     }
@@ -2674,8 +2667,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -2691,8 +2683,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -2708,8 +2699,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -2725,8 +2715,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -2739,19 +2728,21 @@ namespace {
 
     void collectArchetypeMetadata(
         IRGenFunction &IGF,
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            &typeToMetadataVec,
+        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
-      if (shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
-        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-        assert(metadata && "Expected Type Metadata Ref");
-        typeToMetadataVec.push_back(std::make_pair(canType, metadata));
-      }
+      // get the size before insertions
+      auto SZ = typeToMetadataVec.size();
       if (CopyDestroyKind == Normal) {
         auto payloadT = getPayloadType(IGF.IGM, T);
         getPayloadTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
                                                       payloadT);
+      }
+      if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
+          SZ != typeToMetadataVec.size()) {
+        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+        assert(metadata && "Expected Type Metadata Ref");
+        typeToMetadataVec.insert(std::make_pair(canType, metadata));
       }
     }
 
@@ -4346,8 +4337,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -4363,8 +4353,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -4380,8 +4369,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -4397,8 +4385,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            typeToMetadataVec;
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
         if (T.hasArchetype()) {
           collectArchetypeMetadata(IGF, typeToMetadataVec, T);
         }
@@ -4411,15 +4398,11 @@ namespace {
 
     void collectArchetypeMetadata(
         IRGenFunction &IGF,
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            &typeToMetadataVec,
+        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
-      if (shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
-        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-        assert(metadata && "Expected Type Metadata Ref");
-        typeToMetadataVec.push_back(std::make_pair(canType, metadata));
-      }
+      // get the size before insertions
+      auto SZ = typeToMetadataVec.size();
       if (CopyDestroyKind != Normal) {
         return;
       }
@@ -4428,6 +4411,12 @@ namespace {
             T.getEnumElementType(payloadCasePair.decl, IGF.getSILModule());
         auto &payloadTI = *payloadCasePair.ti;
         payloadTI.collectArchetypeMetadata(IGF, typeToMetadataVec, PayloadT);
+      }
+      if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
+          typeToMetadataVec.size() != SZ) {
+        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+        assert(metadata && "Expected Type Metadata Ref");
+        typeToMetadataVec.insert(std::make_pair(canType, metadata));
       }
     }
 
@@ -4952,16 +4941,15 @@ namespace {
 
     void collectArchetypeMetadata(
         IRGenFunction &IGF,
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            &typeToMetadataVec,
+        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
-      if (!shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
+      if (typeToMetadataVec.find(canType) != typeToMetadataVec.end()) {
         return;
       }
       auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
       assert(metadata && "Expected Type Metadata Ref");
-      typeToMetadataVec.push_back(std::make_pair(canType, metadata));
+      typeToMetadataVec.insert(std::make_pair(canType, metadata));
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
@@ -5346,8 +5334,7 @@ namespace {
     }
     void collectArchetypeMetadata(
         IRGenFunction &IGF,
-        llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-            &typeToMetadataVec,
+        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       return Strategy.collectArchetypeMetadata(IGF, typeToMetadataVec, T);
     }

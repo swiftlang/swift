@@ -180,8 +180,9 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wb", Index(0));
+      appendOperator("Wb", Index(1));
     } else {
+      appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
       appendOperator("Wb", Index(mod->getCanTypeID(t)));
@@ -193,8 +194,9 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wc", Index(0));
+      appendOperator("Wc", Index(1));
     } else {
+      appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
       appendOperator("Wc", Index(mod->getCanTypeID(t)));
@@ -206,8 +208,9 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wd", Index(0));
+      appendOperator("Wd", Index(1));
     } else {
+      appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
       appendOperator("Wd", Index(mod->getCanTypeID(t)));
@@ -219,8 +222,9 @@ public:
     beginMangling();
     if (!t->hasArchetype()) {
       appendType(t);
-      appendOperator("Wf", Index(0));
+      appendOperator("Wf", Index(1));
     } else {
+      appendModule(mod->getSwiftModule());
       appendOperator("y");
       appendOperator("t");
       appendOperator("Wf", Index(mod->getCanTypeID(t)));

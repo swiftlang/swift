@@ -18,28 +18,29 @@
 #ifndef SWIFT_IRGEN_IRGENMODULE_H
 #define SWIFT_IRGEN_IRGENMODULE_H
 
+#include "IRGen.h"
+#include "SwiftTargetInfo.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
-#include "swift/Basic/SuccessorMap.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/Basic/SuccessorMap.h"
+#include "swift/IRGen/ValueWitness.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/ValueHandle.h"
-#include "llvm/IR/Attributes.h"
 #include "llvm/Target/TargetMachine.h"
-#include "IRGen.h"
-#include "SwiftTargetInfo.h"
-#include "swift/IRGen/ValueWitness.h"
 
 #include <atomic>
 
@@ -718,34 +719,33 @@ public:
 
   typedef llvm::Constant *(IRGenModule::*OutlinedCopyAddrFunction)(
       const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          *typeToMetadataVec);
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec);
 
   void generateCallToOutlinedCopyAddr(
       IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
       SILType T, const OutlinedCopyAddrFunction MethodToCall,
-      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          *typeToMetadataVec = nullptr);
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
       const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          *typeToMetadataVec = nullptr);
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
 
   llvm::Constant *getOrCreateOutlinedInitializeWithCopyFunction(
       const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          *typeToMetadataVec = nullptr);
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
 
   llvm::Constant *getOrCreateOutlinedAssignWithTakeFunction(
       const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          *typeToMetadataVec = nullptr);
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
 
   llvm::Constant *getOrCreateOutlinedAssignWithCopyFunction(
       const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          *typeToMetadataVec = nullptr);
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
 
   unsigned getCanTypeID(const CanType type);
 
@@ -759,8 +759,8 @@ private:
       llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
                               Address dest, Address src, SILType T)>
           Generate,
-      const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          *typeToMetadataVec = nullptr);
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
 
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
@@ -847,7 +847,7 @@ private:
 
   /// Mapping from archetype-containing CanType to UniqueID (for outline)
   llvm::DenseMap<const swift::TypeBase *, unsigned> typeToUniqueID;
-  unsigned currUniqueID = 0;
+  unsigned currUniqueID = 2;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
   void emitLazyObjCProtocolDefinitions();

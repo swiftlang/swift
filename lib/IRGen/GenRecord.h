@@ -149,7 +149,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
       collectArchetypeMetadata(IGF, typeToMetadataVec, T);
       IGF.IGM.generateCallToOutlinedCopyAddr(
           IGF, *this, dest, src, T,
@@ -172,7 +172,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
       collectArchetypeMetadata(IGF, typeToMetadataVec, T);
       IGF.IGM.generateCallToOutlinedCopyAddr(
           IGF, *this, dest, src, T,
@@ -202,7 +202,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
       collectArchetypeMetadata(IGF, typeToMetadataVec, T);
       IGF.IGM.generateCallToOutlinedCopyAddr(
           IGF, *this, dest, src, T,
@@ -233,7 +233,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4> typeToMetadataVec;
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
       collectArchetypeMetadata(IGF, typeToMetadataVec, T);
       IGF.IGM.generateCallToOutlinedCopyAddr(
           IGF, *this, dest, src, T,
@@ -254,15 +254,11 @@ public:
 
   void collectArchetypeMetadata(
       IRGenFunction &IGF,
-      llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-          &typeToMetadataVec,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
       SILType T) const override {
     auto canType = T.getSwiftRValueType();
-    if (shouldEmitMetadataRefForLayout(IGF.IGM, canType)) {
-      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-      assert(metadata && "Expected Type Metadata Ref");
-      typeToMetadataVec.push_back(std::make_pair(canType, metadata));
-    }
+    // get the size before insertions
+    auto SZ = typeToMetadataVec.size();
     for (auto &field : getFields()) {
       if (field.isEmpty())
         continue;
@@ -270,24 +266,12 @@ public:
       field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
                                                    fType);
     }
-  }
-
-private:
-  // For some types we might need the record's layout metadata
-  bool shouldEmitMetadataRefForLayout(IRGenModule &IGM,
-                                      const CanType canType) const {
-    if (!irgen::isTypeDependent(IGM, canType)) {
-      return false;
+    if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
+        typeToMetadataVec.size() != SZ) {
+      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+      assert(metadata && "Expected Type Metadata Ref");
+      typeToMetadataVec.insert(std::make_pair(canType, metadata));
     }
-    if (auto genTuple = dyn_cast<TupleType>(canType)) {
-      for (auto elt : genTuple->getElements()) {
-        if (isTypeDependent(IGM, elt.getType()->getCanonicalType())) {
-          return true;
-        }
-      }
-      return false;
-    }
-    return true;
   }
 };
 

@@ -3542,8 +3542,7 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
 void IRGenModule::generateCallToOutlinedCopyAddr(
     IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
     SILType T, const OutlinedCopyAddrFunction MethodToCall,
-    const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-        *typeToMetadataVec) {
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   llvm::SmallVector<llvm::Value *, 4> argsVec;
   argsVec.push_back(src.getAddress());
   argsVec.push_back(dest.getAddress());
@@ -3558,6 +3557,9 @@ void IRGenModule::generateCallToOutlinedCopyAddr(
   llvm::Type *llvmType = dest->getType();
   auto *outlinedF =
       (this->*MethodToCall)(objectTI, llvmType, T, typeToMetadataVec);
+  llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
+  assert(fn && "Expected llvm::Function");
+  fn->setLinkage(llvm::GlobalValue::InternalLinkage);
   llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
   call->setCallingConv(DefaultCC);
 }
@@ -3568,8 +3570,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
     llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
                             Address dest, Address src, SILType T)>
         Generate,
-    const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-        *typeToMetadataVec) {
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   llvm::SmallVector<llvm::Type *, 4> argsTysVec;
   argsTysVec.push_back(llvmType);
   argsTysVec.push_back(llvmType);
@@ -3600,8 +3601,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-        *typeToMetadataVec) {
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getSwiftRValueType();
   std::string funcName =
@@ -3616,8 +3616,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-        *typeToMetadataVec) {
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName =
@@ -3632,8 +3631,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-        *typeToMetadataVec) {
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName =
@@ -3648,8 +3646,7 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::SmallVector<std::pair<CanType, llvm::Value *>, 4>
-        *typeToMetadataVec) {
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName =
@@ -3662,7 +3659,13 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
       objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
 
+// IRGen is only multi-threaded during LLVM part
+// We don't need to be thread safe even
+// We are working on the primary module *before* LLVM
 unsigned IRGenModule::getCanTypeID(const CanType type) {
+  if (this != IRGen.getPrimaryIGM()) {
+    return IRGen.getPrimaryIGM()->getCanTypeID(type);
+  }
   auto it = typeToUniqueID.find(type.getPointer());
   if (it != typeToUniqueID.end()) {
     return it->second;

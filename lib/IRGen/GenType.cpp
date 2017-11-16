@@ -1778,7 +1778,6 @@ namespace {
     bool visitAnyFunctionType(CanAnyFunctionType type) {
       return false;
     }
-    bool visitSILFunctionType(CanSILFunctionType type) { return false; }
 
     // The safe default for a dependent type is to assume that it
     // needs its own implementation.
@@ -1798,12 +1797,6 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
     auto enumDecl = cast<EnumDecl>(decl);
     return IsIRTypeDependent(IGM).visitEnumDecl(enumDecl);
   }
-}
-
-bool irgen::isTypeDependent(const IRGenModule &IGM, const CanType type) {
-  IRGenModule &IGMCast = const_cast<IRGenModule &>(IGM);
-  auto runType = irgen::getRuntimeReifiedType(IGMCast, type);
-  return IsIRTypeDependent(IGMCast).visit(runType);
 }
 
 TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
