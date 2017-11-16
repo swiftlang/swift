@@ -121,7 +121,7 @@ func subject_genericFunc<T>(t: T) { // expected-error {{@objc can only be used w
 func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
 }
 
-@objc // expected-error {{@objc cannot be applied to this declaration}} {{1-7=}}
+@objc // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_struct {
   @objc
   var subject_instanceVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
@@ -133,7 +133,7 @@ struct subject_struct {
   func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
 }
 
-@objc   // expected-error {{@objc cannot be applied to this declaration}} {{1-7=}}
+@objc   // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_genericStruct<T> {
   @objc
   var subject_instanceVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
@@ -209,7 +209,7 @@ enum subject_enum: Int {
   @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
 
-  @nonobjc // expected-error {{@nonobjc cannot be applied to this declaration}}
+  @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
   case subject_enumElement7
 
   @objc   
