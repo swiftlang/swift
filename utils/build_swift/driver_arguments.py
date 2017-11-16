@@ -742,77 +742,55 @@ def create_argument_parser():
         help='build the Debug variant of libicu')
 
     # -------------------------------------------------------------------------
-    assertions_group = parser.add_mutually_exclusive_group(required=False)
-    assertions_group.add_argument(
-        '--assertions',
-        action='store_const',
-        const=True,
-        dest='assertions',
-        help='enable assertions in all projects')
-    assertions_group.add_argument(
-        '--no-assertions',
-        action='store_const',
-        const=False,
-        dest='assertions',
-        help='disable assertions in all projects')
+    # Assertions group
+
+    with mutually_exclusive_group():
+        set_defaults(assertions=True)
+
+        # TODO: Convert to store_true
+        option('--assertions', store,
+               const=True,
+               help='enable assertions in all projects')
+
+        # TODO: Convert to store_false
+        option('--no-assertions', store('assertions'),
+               const=False,
+               help='disable assertions in all projects')
 
     # -------------------------------------------------------------------------
-    assertions_override_group = parser.add_argument_group(
-        title='Control assertions in a specific project')
-    assertions_override_group.add_argument(
-        '--cmark-assertions',
-        action='store_const',
-        const=True,
-        dest='cmark_assertions',
-        help='enable assertions in CommonMark')
-    assertions_override_group.add_argument(
-        '--llvm-assertions',
-        action='store_const',
-        const=True,
-        dest='llvm_assertions',
-        help='enable assertions in LLVM')
-    assertions_override_group.add_argument(
-        '--no-llvm-assertions',
-        action='store_const',
-        const=False,
-        dest='llvm_assertions',
-        help='disable assertions in LLVM')
-    assertions_override_group.add_argument(
-        '--swift-assertions',
-        action='store_const',
-        const=True,
-        dest='swift_assertions',
-        help='enable assertions in Swift')
-    assertions_override_group.add_argument(
-        '--no-swift-assertions',
-        action='store_const',
-        const=False,
-        dest='swift_assertions',
-        help='disable assertions in Swift')
-    assertions_override_group.add_argument(
-        '--swift-stdlib-assertions',
-        action='store_const',
-        const=True,
-        dest='swift_stdlib_assertions',
-        help='enable assertions in the Swift standard library')
-    assertions_override_group.add_argument(
-        '--no-swift-stdlib-assertions',
-        action='store_const',
-        const=False,
-        dest='swift_stdlib_assertions',
-        help='disable assertions in the Swift standard library')
-    assertions_override_group.add_argument(
-        '--lldb-assertions',
-        action='store_const',
-        const=True,
-        dest='lldb_assertions',
-        help='enable assertions in LLDB')
-    assertions_override_group.add_argument(
-        '--no-lldb-assertions',
-        action='store_const',
-        const=False,
-        dest='lldb_assertions',
-        help='disable assertions in LLDB')
+    in_group('Control assertions in a specific project')
+
+    option('--cmark-assertions', store,
+           const=True,
+           help='enable assertions in CommonMark')
+
+    option('--llvm-assertions', store,
+           const=True,
+           help='enable assertions in LLVM')
+    option('--no-llvm-assertions', store('llvm_assertions'),
+           const=False,
+           help='disable assertions in LLVM')
+
+    option('--swift-assertions', store,
+           const=True,
+           help='enable assertions in Swift')
+    option('--no-swift-assertions', store('swift_assertions'),
+           const=False,
+           help='disable assertions in Swift')
+
+    option('--swift-stdlib-assertions', store,
+           const=True,
+           help='enable assertions in the Swift standard library')
+    option('--no-swift-stdlib-assertions', store('swift_stdlib_assertions'),
+           const=False,
+           help='disable assertions in the Swift standard library')
+
+    option('--lldb-assertions', store,
+           const=True,
+           help='enable assertions in LLDB')
+    option('--no-lldb-assertions', store('lldb_assertions'),
+           const=False,
+           help='disable assertions in LLDB')
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
