@@ -85,7 +85,7 @@ namespace swift {
 
     /// \brief Maximum number of typo corrections we are allowed to perform.
     unsigned TypoCorrectionLimit = 10;
-    
+
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
@@ -295,7 +295,7 @@ namespace swift {
     void clearAllPlatformConditionValues() {
       PlatformConditionValues.clear();
     }
-    
+
     /// Returns the value for the given platform condition or an empty string.
     StringRef getPlatformConditionValue(PlatformConditionKind Kind) const;
 

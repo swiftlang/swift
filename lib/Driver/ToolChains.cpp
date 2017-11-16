@@ -289,7 +289,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
-  
+
   Arguments.push_back(FrontendModeOption);
 
   // Add input arguments.
@@ -611,7 +611,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
 
   assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
-  
+
   Arguments.push_back(FrontendModeOption);
 
   // Add input arguments.
@@ -628,7 +628,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     assert(context.Inputs.size() == 1 && "The backend expects one input!");
     Arguments.push_back("-primary-file");
     const Job *Cmd = context.Inputs.front();
-    
+
     // In multi-threaded compilation, the backend job must select the correct
     // output file of the compilation job.
     auto OutNames = Cmd->getOutput().getPrimaryOutputFilenames();
@@ -760,7 +760,7 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
 
   Arguments.push_back("-target");
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
-    
+
   Arguments.push_back("-o");
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
@@ -1712,7 +1712,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
     Arguments.push_back("-lswiftCore");
   }
-  
+
   // Explicitly pass the target to the linker
   Arguments.push_back(context.Args.MakeArgString("--target=" + getTriple().str()));
 

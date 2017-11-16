@@ -116,7 +116,7 @@ public struct TypeIdentifier : Hashable, Comparable {
 
   public var hashValue: Int { return objectID.hashValue }
   public var value: Any.Type
-  
+
   internal var objectID : ObjectIdentifier { return ObjectIdentifier(value) }
 }
 

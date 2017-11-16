@@ -920,7 +920,7 @@ endif()
 ###############
 #
 # We have to include stdlib/ before tools/.
-# Do not move add_subdirectory(stdlib) after add_subdirectory(tools)!                                             
+# Do not move add_subdirectory(stdlib) after add_subdirectory(tools)!
 #
 # We must include stdlib/ before tools/ because stdlib/CMakeLists.txt
 # declares the swift-stdlib-* set of targets. These targets will then
@@ -939,7 +939,7 @@ add_subdirectory(stdlib)
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
-  
+
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975

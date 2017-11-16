@@ -235,7 +235,7 @@ reportOnCrash(uint32_t flags, const char *message)
   } else {
     newMessage = strdup(message);
   }
-  
+
   CRSetCrashLogMessage(newMessage);
 
   crashlogLock.unlock();
