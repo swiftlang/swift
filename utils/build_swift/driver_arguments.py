@@ -564,6 +564,11 @@ def create_argument_parser():
         '--skip-test-optimized',
         action=arguments.action.unavailable)
 
+    parser.add_argument(
+        "--use-lld-linker",
+        action=arguments.action.enable,
+        help="use lld linker instead of gold for Linux toolchains")
+
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
 

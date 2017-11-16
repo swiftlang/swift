@@ -542,6 +542,11 @@ class BuildScriptInvocation(object):
                 "--distcc-pump=%s" % toolchain.distcc_pump
             ]
 
+        if args.use_lld_linker:
+            impl_args += [
+                "--use-lld-linker",
+            ]
+
         # *NOTE* We use normal cmake to pass through tsan/ubsan options. We do
         # NOT pass them to build-script-impl.
         if args.enable_asan:
