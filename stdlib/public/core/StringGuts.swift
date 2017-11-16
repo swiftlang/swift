@@ -81,12 +81,11 @@ extension _StringGuts {
 
   @_versioned
   var isSingleByte: Bool {
-    switch classification {
-    case .native, .unsafe, .nonTaggedCocoa:
-      return (_objectBitPattern & _twoByteCodeUnitBit) == 0
-    case .smallCocoa, .error:
+    if _isSmallCocoa {
       return false
     }
+    _sanityCheck(_isNative || _isUnsafe || _isNonTaggedCocoa)
+    return (_objectBitPattern & _twoByteCodeUnitBit) == 0
   }
 
   var byteWidth: Int {
@@ -142,6 +141,7 @@ extension _StringGuts {
     if let native = self._native {
       _sanityCheck(self.isSingleByte == native.isSingleByte)
       _sanityCheck(self.count == native.count)
+      _sanityCheck(UInt(self.count) == self._otherBits)
       _sanityCheck(self.capacity == native.capacity)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity >= self.count)
@@ -234,8 +234,10 @@ extension _StringGuts {
 }
 
 @_fixed_layout
-@_versioned
-internal struct UnsafeString {
+// @_versioned
+public // For testing purposes only!
+// internal
+struct UnsafeString {
   // TODO: Use the extra 13 bits
   //
   // StringGuts when representing UnsafeStrings should have an extra 13 bits *at
@@ -395,8 +397,8 @@ struct NativeString {
 
   @_versioned
   @_inlineable
-  var nativeObject: AnyObject {
-    return stringBuffer._storage.buffer
+  var nativeObject: _BuiltinNativeObject {
+    return stringBuffer._nativeObject
   }
 
   var unsafe: UnsafeString {
@@ -410,9 +412,7 @@ struct NativeString {
     return stringBuffer.start
   }
 
-  var count: Int {
-    return stringBuffer.usedCount
-  }
+  var count: Int
 
   var capacity: Int {
     return stringBuffer.capacity
@@ -428,28 +428,17 @@ struct NativeString {
   }
 
   @_versioned
-  init(_ native: _BuiltinNativeObject) {
-    // TODO: Does this in practice incur overhead? Should we cast it?
-    let storage = _StringBuffer._Storage(_nativeObject: native)
-    self.stringBuffer = _StringBuffer(storage)
-  }
-
-  @_versioned
-  internal init(_ buffer: _StringBuffer) {
-    self.stringBuffer = buffer
-  }
-
-  init(_ object: AnyObject) {
-    self.init(
-      _StringBuffer(_StringBuffer._Storage(
-        _uncheckedUnsafeBufferObject: object
-      ))._nativeObject)
+  init(nativeObject: _BuiltinNativeObject, count: Int) {
+    self.stringBuffer = _StringBuffer(
+      _StringBuffer._Storage(_nativeObject: nativeObject))
+    self.count = count
+    _invariantCheck()
   }
 
   // Copy in `other` code units direclty.
   @_versioned
   internal
-  // FIXME: mutating
+  mutating
   func _appendInPlace(_ other: _StringGuts) {
     let otherCount = other.count
     _sanityCheck(self.capacity >= self.count + otherCount)
@@ -462,6 +451,13 @@ struct NativeString {
       capacityEnd: buffer.capacityEnd,
       accomodatingElementWidth: buffer.elementWidth)
     buffer.usedEnd += otherCount &<< buffer.elementShift
+    self.count = buffer.usedCount
+  }
+
+  internal func _invariantCheck() {
+#if INTERNAL_CHECKS_ENABLED
+    _sanityCheck(self.count == self.stringBuffer.usedCount)
+#endif
   }
 }
 
@@ -577,8 +573,11 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _asNative: NativeString {
     _sanityCheck(_isNative)
-    let nativeObject = _nativeObject(fromBridge: _object)
-    return NativeString(nativeObject)
+    let count = Int(truncatingIfNeeded: _otherBits)
+    _sanityCheck(count > 0)
+    return NativeString(
+      nativeObject: _nativeObject(fromBridge: _object),
+      count: count)
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
@@ -590,15 +589,21 @@ extension _StringGuts {
   @_versioned
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NativeString) {
-    self.init(s.stringBuffer)
+    s._invariantCheck()
+    self.init(
+      _unflagged: _bridgeObject(fromNativeObject: s.nativeObject),
+      isSingleByte: s.isSingleByte,
+      otherBits: UInt(truncatingIfNeeded: s.count))
   }
 
   @_versioned
   init(_ buffer: _StringBuffer) {
+    let count = buffer.usedCount
+    _sanityCheck(count > 0)
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: buffer._nativeObject),
       isSingleByte: buffer.elementWidth == 1,
-      otherBits: 0)
+      otherBits: UInt(truncatingIfNeeded: count))
   }
 
   //
@@ -641,7 +646,13 @@ extension _StringGuts {
   @_versioned
   var _unsafeString: UnsafeString? {
     guard _isUnsafe else { return nil }
+    return _asUnsafe
+  }
 
+  @_versioned
+  internal
+  var _asUnsafe: UnsafeString {
+    _sanityCheck(_isUnsafe)
     // Unflag it, untag it, and go
     let pointer = UnsafeMutableRawPointer(
       bitPattern: self._untaggedUnflaggedBitPattern
@@ -708,6 +719,9 @@ extension _StringGuts {
 // infinite recursion.
 internal func internalDumpHexImpl(_ x: UInt, newline: Bool) {
   _swift_stdlib_print_hex(x, newline ? 1 : 0)
+}
+internal func internalDumpHex(_ x: _BuiltinNativeObject, newline: Bool) {
+  internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
 internal func internalDumpHex(_ x: UInt, newline: Bool = true) {
   internalDumpHexImpl(x, newline: newline)
@@ -998,19 +1012,58 @@ extension _StringGuts {
       dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
   }
 
+  @inline(never)
+  @_versioned
+  internal
+  func produceUnsafeFromNative() -> UnsafeString {
+    _sanityCheck(_isNative)
+    let ptr = _StringBuffer(_StringBuffer._Storage(
+      _nativeObject: _nativeObject(fromBridge: _object))
+    ).start
+    let count = Int(truncatingIfNeeded: self._otherBits)
+    _sanityCheck(count > 0)
+    return UnsafeString(
+      baseAddress: ptr,
+      count: count,
+      isSingleByte: self.isSingleByte
+    )
+  }
+
+  @inline(never)
+  @_versioned
+  internal
+  func produceUnsafeFromCocoa() -> UnsafeString {
+    _sanityCheck(_isNonTaggedCocoa && self._otherBits != 0)
+    let count = _stdlib_binary_CFStringGetLength(
+      _bridgeObject(toNonTaggedObjC: _object))
+    let ptr = UnsafeMutableRawPointer(
+      bitPattern: _otherBits)._unsafelyUnwrappedUnchecked
+    return UnsafeString(
+      baseAddress: ptr,
+      count: count,
+      isSingleByte: self.isSingleByte
+    )
+
+  }
+
+
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
   // the return value.
   @_versioned
   internal
   var _unmanagedContiguous: UnsafeString? {
     if _isUnsafe {
-      return _unsafeString
+      return _asUnsafe
     }
     if _isNative {
-      return _asNative.unsafe
+      return produceUnsafeFromNative()
     }
     if _isNonTaggedCocoa {
-      return _cocoa._unsafelyUnwrappedUnchecked.unsafe
+      // Check for an opaque cocoa string
+      if self._otherBits == 0 {
+        return nil
+      }
+      return produceUnsafeFromCocoa()
     }
     return nil
   }
@@ -1109,7 +1162,9 @@ extension _StringGuts {
     // now for the tagged cocoa strings.
 
     self._formNative(forAppending: other)
-    self._asNative._appendInPlace(other)
+    var nativeSelf = self._asNative
+    nativeSelf._appendInPlace(other)
+    self = _StringGuts(nativeSelf)
     _invariantCheck()
   }
 }
@@ -1130,8 +1185,10 @@ extension String {
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
   // the return value.
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _unmanagedContiguous : UnsafeString? {
+  // @_versioned // FIXME(sil-serialize-all)
+  public // For testing purposes
+  // internal
+  var _unmanagedContiguous : UnsafeString? {
     return self._guts._unmanagedContiguous
   }
 }
@@ -1145,21 +1202,6 @@ extension Substring {
     return self._wholeString._unmanagedContiguous?[
       self.startIndex.encodedOffset..<self.endIndex.encodedOffset]
   }
-
-  // // A potentially-unmanaged ephemeral string for very temporary purposes.
-  // // Unlike _ephemeralString, caller must ensure lifetime.
-  // //
-  // // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
-  // // the return value.
-  // @_versioned
-  // internal
-  // var _unmanagedTransientString: String {
-  //   let contigOpt = self._unmanagedContiguous
-  //   if _slowPath(contigOpt == nil) {
-  //     return self._ephemeralString
-  //   }
-  //   return String(_StringGuts(contigOpt._unsafelyUnwrappedUnchecked))
-  // }
 }
 
 extension StringProtocol {
