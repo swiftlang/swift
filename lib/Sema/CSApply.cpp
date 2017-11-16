@@ -846,7 +846,9 @@ namespace {
       // Class members might be virtually dispatched, so we need to know
       // the full layout of the class.
       if (auto *classDecl = dyn_cast<ClassDecl>(member->getDeclContext()))
-        tc.requestClassLayout(classDecl);
+        tc.requestNominalLayout(classDecl);
+      if (auto *protocolDecl = dyn_cast<ProtocolDecl>(member->getDeclContext()))
+        tc.requestNominalLayout(protocolDecl);
 
       auto refTy = solution.simplifyType(openedFullType);
 

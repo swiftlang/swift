@@ -715,6 +715,11 @@ public:
   /// we can hand them off to SILGen etc.
   llvm::SetVector<ValueDecl *> DeclsToFinalize;
 
+  /// The list of protocols that need their requirement signatures computed,
+  /// because they were first validated by validateDeclForNameLookup(),
+  /// which skips this step.
+  llvm::SetVector<ProtocolDecl *> DelayedRequirementSignatures;
+
   /// The list of types whose circularity checks were delayed.
   SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
@@ -1068,7 +1073,7 @@ public:
 
   /// Request that the given class needs to have all members validated
   /// after everything in the translation unit has been processed.
-  void requestClassLayout(ClassDecl *classDecl);
+  void requestNominalLayout(NominalTypeDecl *nominalDecl);
 
   /// Request that the superclass of the given class, if any, needs to have
   /// all members validated after everything in the translation unit has

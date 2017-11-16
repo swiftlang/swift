@@ -6907,7 +6907,7 @@ public:
         if (auto nominal = extendedTy->getAnyNominal()) {
           TC.validateDecl(nominal);
           if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-            TC.requestClassLayout(classDecl);
+            TC.requestNominalLayout(classDecl);
 
           // Check the raw values of an enum, since we might synthesize
           // RawRepresentable while checking conformances on this extension.
@@ -7611,7 +7611,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       markAsObjC(*this, proto, isObjC);
     }
 
-    DeclsToFinalize.insert(proto);
+    // FIXME: IRGen likes to emit @objc protocol descriptors even if the
+    // protocol comes from a different module or translation unit.
+    //
+    // It would be nice if it didn't have to do that, then we could remove
+    // this case.
+    if (proto->isObjC())
+      requestNominalLayout(proto);
+
     break;
   }
 
@@ -7797,8 +7804,17 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       validateDeclForNameLookup(ATD);
     }
 
-    // Make sure the protocol is fully validated by the end of Sema.
-    DeclsToFinalize.insert(proto);
+    // Compute the requirement signature later to avoid circularity.
+    DelayedRequirementSignatures.insert(proto);
+
+    // FIXME: IRGen likes to emit @objc protocol descriptors even if the
+    // protocol comes from a different module or translation unit.
+    //
+    // It would be nice if it didn't have to do that, then we could remove
+    // this case.
+    if (proto->isObjC())
+      requestNominalLayout(proto);
+
     break;
   }
   case DeclKind::AssociatedType: {
@@ -7888,14 +7904,14 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
   return false;
 }
 
-void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
-  if (classDecl->hasValidatedLayout())
+void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
+  if (nominalDecl->hasValidatedLayout())
     return;
 
-  classDecl->setHasValidatedLayout();
+  nominalDecl->setHasValidatedLayout();
 
-  if (isa<SourceFile>(classDecl->getModuleScopeContext()))
-    DeclsToFinalize.insert(classDecl);
+  if (isa<SourceFile>(nominalDecl->getModuleScopeContext()))
+    DeclsToFinalize.insert(nominalDecl);
 }
 
 void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
@@ -7903,7 +7919,7 @@ void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
   if (superclassTy) {
     auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
     if (superclassDecl)
-      requestClassLayout(superclassDecl);
+      requestNominalLayout(superclassDecl);
   }
 }
 
