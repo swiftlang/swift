@@ -935,12 +935,7 @@ extension String {
   // String append
   @_inlineable // FIXME(sil-serialize-all)
   public static func += (lhs: inout String, rhs: String) {
-    if lhs.isEmpty {
-      lhs = rhs
-    }
-    else {
-      lhs._guts.append(rhs._guts)
-    }
+    lhs._guts.append(rhs._guts)
   }
 
   /// Constructs a `String` in `resultStorage` containing the given UTF-8.
