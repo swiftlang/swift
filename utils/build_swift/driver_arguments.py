@@ -1108,49 +1108,40 @@ def create_argument_parser():
            help='LLVM target generators to build')
 
     # -------------------------------------------------------------------------
-    android_group = parser.add_argument_group(
-        title='Build settings for Android')
-    android_group.add_argument(
-        '--android-ndk',
-        metavar='PATH',
-        help='An absolute path to the NDK that will be used as a libc '
-             'implementation for Android builds')
-    android_group.add_argument(
-        '--android-api-level',
-        default='21',
-        help='The Android API level to target when building for Android. '
-             'Currently only 21 or above is supported')
-    android_group.add_argument(
-        '--android-ndk-gcc-version',
-        choices=['4.8', '4.9'],
-        default='4.9',
-        help='The GCC version to use when building for Android. Currently '
-             'only 4.9 is supported. %(default)s is also the default value. '
-             'This option may be used when experimenting with versions '
-             'of the Android NDK not officially supported by Swift')
-    android_group.add_argument(
-        '--android-icu-uc',
-        metavar='PATH',
-        help='Path to a directory containing libicuuc.so')
-    android_group.add_argument(
-        '--android-icu-uc-include',
-        metavar='PATH',
-        help='Path to a directory containing headers for libicuuc')
-    android_group.add_argument(
-        '--android-icu-i18n',
-        metavar='PATH',
-        help='Path to a directory containing libicui18n.so')
-    android_group.add_argument(
-        '--android-icu-i18n-include',
-        metavar='PATH',
-        help='Path to a directory containing headers libicui18n')
-    android_group.add_argument(
-        '--android-deploy-device-path',
-        default=android.adb.commands.DEVICE_TEMP_DIR,
-        metavar='PATH',
-        help='Path on an Android device to which built Swift stdlib products '
-             'will be deployed. If running host tests, specify the "{}" '
-             'directory.'.format(android.adb.commands.DEVICE_TEMP_DIR))
+    in_group('Build settings for Android')
+
+    option('--android-ndk', store_path,
+           help='An absolute path to the NDK that will be used as a libc '
+                'implementation for Android builds')
+
+    option('--android-api-level', store,
+           default='21',
+           help='The Android API level to target when building for Android. '
+                'Currently only 21 or above is supported')
+
+    option('--android-ndk-gcc-version', store,
+           choices=['4.8', '4.9'],
+           default='4.9',
+           help='The GCC version to use when building for Android. Currently '
+                'only 4.9 is supported. %(default)s is also the default '
+                'value. This option may be used when experimenting with '
+                'versions of the Android NDK not officially supported by '
+                'Swift')
+
+    option('--android-icu-uc', store_path,
+           help='Path to a directory containing libicuuc.so')
+    option('--android-icu-uc-include', store_path,
+           help='Path to a directory containing headers for libicuuc')
+    option('--android-icu-i18n', store_path,
+           help='Path to a directory containing libicui18n.so')
+    option('--android-icu-i18n-include', store_path,
+           help='Path to a directory containing headers libicui18n')
+    option('--android-deploy-device-path', store_path,
+           default=android.adb.commands.DEVICE_TEMP_DIR,
+           help='Path on an Android device to which built Swift stdlib '
+                'products will be deployed. If running host tests, specify '
+                'the "{}" directory.'.format(
+                    android.adb.commands.DEVICE_TEMP_DIR))
 
     # -------------------------------------------------------------------------
     return builder.build()
