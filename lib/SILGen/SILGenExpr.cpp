@@ -3059,7 +3059,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   SmallVector<CanType, 2> interfaceSubs;
   for (auto &sub : subs) {
     interfaceSubs.push_back(
-      GenericEnvironment::mapTypeOutOfContext(genericEnv, sub.getReplacement())
+      sub.getReplacement()->mapTypeOutOfContext()
       ->getCanonicalType());
   }
   auto name = Mangle::ASTMangler()
@@ -3182,7 +3182,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   SmallVector<CanType, 2> interfaceSubs;
   for (auto &sub : subs) {
     interfaceSubs.push_back(
-      GenericEnvironment::mapTypeOutOfContext(genericEnv, sub.getReplacement())
+      sub.getReplacement()->mapTypeOutOfContext()
       ->getCanonicalType());
   }
   auto name = Mangle::ASTMangler().mangleKeyPathSetterThunkHelper(property,
@@ -3658,7 +3658,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   bool needsGenericContext = false;
   if (rootTy->hasArchetype()) {
     needsGenericContext = true;
-    rootTy = SGF.F.mapTypeOutOfContext(rootTy)->getCanonicalType();
+    rootTy = rootTy->mapTypeOutOfContext()->getCanonicalType();
   }
   
   auto baseTy = rootTy;
@@ -3766,7 +3766,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         baseSubscriptTy = genSubscriptTy
           ->substGenericArgs(component.getDeclRef().getSubstitutions());
       auto baseSubscriptInterfaceTy = cast<AnyFunctionType>(
-        SGF.F.mapTypeOutOfContext(baseSubscriptTy)->getCanonicalType());
+        baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
       
       baseTy = baseSubscriptInterfaceTy.getResult();
 
@@ -3793,10 +3793,10 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
           hashable.getConcrete()->getType()->isEqual(indexValues[i].getType()));
         auto &value = indexValues[i];
         
-        auto indexTy = SGF.F.mapTypeOutOfContext(value.getType())->getCanonicalType();
+        auto indexTy = value.getType()->mapTypeOutOfContext()->getCanonicalType();
         auto indexLoweredTy = SGF.getLoweredType(value.getType());
         indexLoweredTy = SILType::getPrimitiveType(
-          SGF.F.mapTypeOutOfContext(indexLoweredTy.getSwiftRValueType())
+          indexLoweredTy.getSwiftRValueType()->mapTypeOutOfContext()
              ->getCanonicalType(),
           indexLoweredTy.getCategory());
         indexPatterns.push_back({(unsigned)operands.size(),

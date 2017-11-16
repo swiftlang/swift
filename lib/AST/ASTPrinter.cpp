@@ -487,7 +487,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.
-        T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
+        T = T->mapTypeOutOfContext();
       }
 
       auto *M = Current->getDeclContext()->getParentModule();

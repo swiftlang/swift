@@ -124,7 +124,7 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   auto type = inherited->getType();
   if (!type.isNull() && !isa<ProtocolDecl>(dc))
-    inherited->setType(dc->mapTypeOutOfContext(type));
+    inherited->setType(type->mapTypeOutOfContext());
 }
 
 bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(

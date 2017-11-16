@@ -1358,7 +1358,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
 
   // Map the archetype out of its own generic environment and into the
   // canonical generic environment.
-  auto interfaceType = genericEnv->mapTypeOutOfContext(t);
+  auto interfaceType = t->getInterfaceType();
   auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
                     ->castTo<ArchetypeType>();
   assert(isExemplarArchetype(exemplar));

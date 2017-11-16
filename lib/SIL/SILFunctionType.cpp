@@ -881,9 +881,8 @@ static CanSILFunctionType getSILFunctionType(
     for (auto capture : loweredCaptures.getCaptures()) {
       if (capture.isDynamicSelfMetadata()) {
         ParameterConvention convention = ParameterConvention::Direct_Unowned;
-        auto dynamicSelfInterfaceType = GenericEnvironment::mapTypeOutOfContext(
-          function->getGenericEnvironment(),
-          loweredCaptures.getDynamicSelfType());
+        auto dynamicSelfInterfaceType =
+            loweredCaptures.getDynamicSelfType()->mapTypeOutOfContext();
         
         auto selfMetatype = MetatypeType::get(
             dynamicSelfInterfaceType,

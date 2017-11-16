@@ -842,7 +842,7 @@ void SILParser::convertRequirements(SILFunction *F,
     Ty.getTypeRepr()->walk(PerformLookup);
     performTypeLocChecking(Ty, /* IsSIL */ false);
     assert(Ty.getType());
-    return GenericEnv->mapTypeOutOfContext(Ty.getType()->getCanonicalType());
+    return Ty.getType()->mapTypeOutOfContext();
   };
 
   for (auto &Req : From) {
@@ -1049,9 +1049,12 @@ bool SILParser::parseASTType(CanType &result, GenericEnvironment *env) {
   TypeLoc loc = parsedType.get();
   if (performTypeLocChecking(loc, /*IsSILType=*/ false, env))
     return true;
-  result = loc.getType()->getCanonicalType();
+
   if (env)
-    result = env->mapTypeOutOfContext(result)->getCanonicalType();
+    result = loc.getType()->mapTypeOutOfContext()->getCanonicalType();
+  else
+    result = loc.getType()->getCanonicalType();
+
   // Invoke the callback on the parsed type.
   ParsedTypeCallback(loc.getType());
   return false;
@@ -2615,8 +2618,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                 
                 if (patternEnv)
                   loweredTy = SILType::getPrimitiveType(
-                    patternEnv
-                      ->mapTypeOutOfContext(loweredTy.getSwiftRValueType())
+                    loweredTy.getSwiftRValueType()->mapTypeOutOfContext()
                       ->getCanonicalType(),
                     loweredTy.getCategory());
 

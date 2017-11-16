@@ -5861,7 +5861,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
       !T->castTo<ArchetypeType>()->requiresClass() &&
       T->castTo<ArchetypeType>()->getGenericEnvironment()
         == DC->getGenericEnvironmentOfContext()) {
-    auto interfaceType = DC->mapTypeOutOfContext(T);
+    auto interfaceType = T->mapTypeOutOfContext();
     if (interfaceType->isTypeParameter()) {
       auto genericSig = DC->getGenericSignatureOfContext();
       auto path = genericSig->getConformanceAccessPath(interfaceType, Proto);

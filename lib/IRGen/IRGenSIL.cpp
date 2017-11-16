@@ -3148,8 +3148,7 @@ void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   auto *outlinedF = IGM.getOrCreateRetainFunction(
-      addrTI, i->getFunction()
-                  ->mapTypeOutOfContext(objectT.getSwiftRValueType())
+      addrTI, objectT.getSwiftRValueType()->mapTypeOutOfContext()
                   ->getCanonicalType(),
       llvmType);
   llvm::Value *args[] = {addr.getAddress()};
@@ -3227,8 +3226,7 @@ void IRGenSILFunction::visitReleaseValueAddrInst(
   llvm::Type *llvmType = addr.getAddress()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   auto *outlinedF = IGM.getOrCreateReleaseFunction(
-      addrTI, i->getFunction()
-                  ->mapTypeOutOfContext(objectT.getSwiftRValueType())
+      addrTI, objectT.getSwiftRValueType()->mapTypeOutOfContext()
                   ->getCanonicalType(),
       llvmType);
   llvm::Value *args[] = {addr.getAddress()};

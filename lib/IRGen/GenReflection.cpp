@@ -555,7 +555,6 @@ public:
 /// captures are generic.
 class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   swift::reflection::MetadataSourceBuilder SourceBuilder;
-  SILFunction &Caller;
   CanSILFunctionType OrigCalleeType;
   CanSILFunctionType SubstCalleeType;
   SubstitutionList Subs;
@@ -563,13 +562,12 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
 
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
-                           SILFunction &Caller,
                            CanSILFunctionType OrigCalleeType,
                            CanSILFunctionType SubstCalleeType,
                            SubstitutionList Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
-      Caller(Caller), OrigCalleeType(OrigCalleeType),
+      OrigCalleeType(OrigCalleeType),
       SubstCalleeType(SubstCalleeType), Subs(Subs),
       Layout(Layout) {}
 
@@ -650,7 +648,7 @@ public:
 
       auto Source = SourceBuilder.createClosureBinding(i);
       auto BindingType = Bindings[i].TypeParameter;
-      auto InterfaceType = Caller.mapTypeOutOfContext(BindingType);
+      auto InterfaceType = BindingType->mapTypeOutOfContext();
       SourceMap.push_back({InterfaceType->getCanonicalType(), Source});
     }
 
@@ -692,7 +690,7 @@ public:
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
       auto SubstType = GenericParam.subst(SubstMap);
-      auto InterfaceType = Caller.mapTypeOutOfContext(SubstType);
+      auto InterfaceType = SubstType->mapTypeOutOfContext();
       SourceMap.push_back({InterfaceType->getCanonicalType(), Src});
     });
 
@@ -718,7 +716,7 @@ public:
         })->getCanonicalType();
       }
 
-      auto InterfaceType = Caller.mapTypeOutOfContext(SwiftType);
+      auto InterfaceType = SwiftType->mapTypeOutOfContext();
       CaptureTypes.push_back(InterfaceType->getCanonicalType());
     }
 
@@ -864,7 +862,7 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
   if (CaptureDescriptorBuilder::hasOpenedExistential(OrigCalleeType, Layout))
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  CaptureDescriptorBuilder builder(*this, Caller,
+  CaptureDescriptorBuilder builder(*this,
                                    OrigCalleeType, SubstCalleeType, Subs,
                                    Layout);
   auto var = builder.emit();
@@ -882,8 +880,7 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
                                 Type Replacement,
                                 const TypeDecl *TD) -> bool {
 
-    auto Subst = Conformance->getDeclContext()->mapTypeOutOfContext(
-        Replacement);
+    auto Subst = Replacement->mapTypeOutOfContext();
 
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),

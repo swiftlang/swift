@@ -507,9 +507,9 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(loweredFuncTy)->getCanonicalType());
+    loweredFuncTy->mapTypeOutOfContext()->getCanonicalType());
   auto blockInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(loweredBlockTy)->getCanonicalType());
+    loweredBlockTy->mapTypeOutOfContext()->getCanonicalType());
 
   assert(!blockInterfaceTy->isCoroutine());
 
@@ -557,8 +557,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   // Create the invoke function. Borrow the mangling scheme from reabstraction
   // thunks, which is what we are in spirit.
-  auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
-                                                 invokeTy,
+  auto thunk = SGM.getOrCreateReabstractionThunk(invokeTy,
                                                  loweredFuncTy,
                                                  loweredBlockTy,
                                                  F.isSerialized());
@@ -873,8 +872,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
                                 inputSubstType, outputSubstType,
                                 genericEnv, interfaceSubs);
 
-  auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
-                                                 thunkTy,
+  auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
                                                  loweredFuncTy,
                                                  F.isSerialized());

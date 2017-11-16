@@ -449,7 +449,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // the only time we get an interface type here is with invalid
     // circular cases. That should be diagnosed elsewhere.
     if (inheritedTy->hasArchetype() && !isa<GenericTypeParamDecl>(decl))
-      inheritedTy = DC->mapTypeOutOfContext(inheritedTy);
+      inheritedTy = inheritedTy->mapTypeOutOfContext();
 
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
@@ -3200,8 +3200,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   auto dc = decl->getDeclContext();
   auto behaviorSelf = conformance->getType();
-  auto behaviorInterfaceSelf =
-    conformance->getDeclContext()->mapTypeOutOfContext(behaviorSelf);
+  auto behaviorInterfaceSelf = behaviorSelf->mapTypeOutOfContext();
   auto behaviorProto = conformance->getProtocol();
   auto behaviorProtoTy = behaviorProto->getDeclaredType();
   
