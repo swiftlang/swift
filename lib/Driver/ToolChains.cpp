@@ -121,8 +121,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   }
 
   // Handle the CPU and its preferences.
-  if (auto arg = inputArgs.getLastArg(options::OPT_target_cpu))
-    arg->render(inputArgs, arguments);
+  inputArgs.AddLastArg(arguments, options::OPT_target_cpu);
 
   if (!OI.SDKPath.empty()) {
     arguments.push_back("-sdk");
@@ -650,8 +649,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
 
   // Handle the CPU and its preferences.
-  if (auto arg = context.Args.getLastArg(options::OPT_target_cpu))
-    arg->render(context.Args, Arguments);
+  context.Args.AddLastArg(Arguments, options::OPT_target_cpu);
 
   // Enable optimizations, but disable all LLVM-IR-level transformations.
   context.Args.AddLastArg(Arguments, options::OPT_O_Group);

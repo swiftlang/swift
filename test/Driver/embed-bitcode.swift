@@ -69,6 +69,16 @@
 // CHECK-SINGLE-OPT-SIZE-SAME: -Osize
 // CHECK-SINGLE-OPT-SIZE-SAME: -disable-llvm-optzns
 
+// RUN: %target-swiftc_driver -embed-bitcode -target-cpu abc -force-single-frontend-invocation %s 2>&1 -### | %FileCheck %s -check-prefix=CHECK-SINGLE-MISC
+// CHECK-SINGLE-MISC: -frontend
+// CHECK-SINGLE-MISC-SAME: -emit-bc
+// CHECK-SINGLE-MISC-SAME: -target-cpu abc
+// CHECK-SINGLE-MISC: -frontend
+// CHECK-SINGLE-MISC-SAME: -c
+// CHECK-SINGLE-MISC-SAME: -embed-bitcode
+// CHECK-SINGLE-MISC-SAME: -target-cpu abc
+// CHECK-SINGLE-MISC-SAME: -disable-llvm-optzns
+
 // RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module -force-single-frontend-invocation %s -parse-stdlib -module-name Swift 2>&1 -### | %FileCheck %s -check-prefix=CHECK-LIB-WMO
 // CHECK-LIB-WMO: -frontend
 // CHECK-LIB-WMO: -emit-bc
