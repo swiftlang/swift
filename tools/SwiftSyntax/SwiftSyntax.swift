@@ -62,10 +62,9 @@ public typealias ToolHandler = (SourceFileSyntax, DiagnosticEngine) -> Int
 /// - Parameter body: The main body of your tool. Its return value must be
 ///                   the exit status code you intend your tool to finish with.
 /// - Note: This function calls exit(_:) on your behalf.
-public func runSwiftTool(_ body: ToolHandler) throws -> Never {
-  let fileURL = URL(fileURLWithPath: "/tmp/foo.swift")
-  let outputURL = fileURL.deletingPathExtension()
-                         .appendingPathExtension("dia")
+public func runSwiftTool(file: URL, _ body: ToolHandler) throws -> Never {
+  let outputURL = file.deletingPathExtension()
+                      .appendingPathExtension("dia")
   let consumer = SerializedDiagnosticConsumer(outputURL: outputURL)
   let printingConsumer = PrintingDiagnosticConsumer()
 
@@ -73,7 +72,7 @@ public func runSwiftTool(_ body: ToolHandler) throws -> Never {
   engine.addConsumer(consumer)
   engine.addConsumer(printingConsumer)
 
-  let sourceFile = try Syntax.parse(fileURL)
+  let sourceFile = try Syntax.parse(file)
   let exitCode = body(sourceFile, engine)
 
   engine.finalize()

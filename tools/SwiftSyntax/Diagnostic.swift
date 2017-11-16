@@ -26,15 +26,27 @@ public struct SourceLocation {
 
   /// The file in which this location resides.
   public let file: String
+
+  public init(line: Int, column: Int, offset: Int, file: String) {
+    self.line = line
+    self.column = column
+    self.offset = offset
+    self.file = file
+  }
 }
 
 /// Represents a start and end location in a Swift file.
 public struct SourceRange {
   /// The beginning location in the source range.
   public let start: SourceLocation
-  
+
   /// The beginning location in the source range.
   public let end: SourceLocation
+
+  public init(start: SourceLocation, end: SourceLocation) {
+    self.start = start
+    self.end = end
+  }
 }
 
 /// A FixIt represents a change to source code in order to "correct" a

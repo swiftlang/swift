@@ -1,10 +1,12 @@
-// RUN: %target-swift 2>&1 | %FileCheck %s
+// RUN: %target-run-simple-swift 2>&1 | %FileCheck %s
 
+import Foundation
 import StdlibUnittest
+import SwiftSyntax
 
 func loc(_ file: String = #file, line: Int = #line, 
          column: Int = #line) -> SourceLocation {
-  return SourceLocation(file: file, line: line, column: column, offset: 0)
+  return SourceLocation(line: line, column: column, offset: 0, file: file)
 }
 
 /// Adds static constants to Diagnostic.Message.
@@ -21,7 +23,7 @@ extension Diagnostic.Message {
     Diagnostic.Message(.note, "check for explicit equality to '0'")
 }
 
-try runTool { engine in
+try runSwiftTool(file: URL(fileURLWithPath: #file)) { file, engine in
   let startLoc = loc()
   let fixLoc = loc()
 
