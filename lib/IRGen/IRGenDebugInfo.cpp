@@ -1994,19 +1994,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     return;
   }
 
-  // If the storage is an instruction, insert the dbg.value directly after it.
-  if (auto *I = dyn_cast<llvm::Instruction>(Storage)) {
-    auto InsPt = std::next(I->getIterator());
-    auto E = I->getParent()->end();
-    while (InsPt != E && isa<llvm::PHINode>(&*InsPt))
-      ++InsPt;
-    if (InsPt != E) {
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, &*InsPt);
-      return;
-    }
-  }
-
-  // Otherwise just insert it at the current insertion point.
+  // Insert a dbg.value at the current insertion point.
   DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
