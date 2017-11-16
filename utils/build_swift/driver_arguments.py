@@ -7,7 +7,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-import argparse
 import multiprocessing
 
 import android.adb.commands
@@ -18,6 +17,7 @@ from swift_build_support.swift_build_support import targets
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 
+from . import argparse
 from . import defaults
 
 
@@ -224,12 +224,34 @@ def _apply_default_arguments(args):
 def create_argument_parser():
     """Return a configured argument parser."""
 
+    # NOTE: USAGE, DESCRIPTION and EPILOG are defined at the bottom of the file
     parser = _ApplyDefaultsArgumentParser(
         apply_defaults=_apply_default_arguments,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=USAGE,
         description=DESCRIPTION,
         epilog=EPILOG)
+
+    builder = parser.to_builder()
+
+    # Prepare DSL functions
+    option = builder.add_option
+    set_defaults = builder.set_defaults
+    in_group = builder.in_group
+    mutually_exclusive_group = builder.mutually_exclusive_group
+
+    append = builder.actions.append
+    store = builder.actions.store
+    store_int = builder.actions.store_int
+    store_path = builder.actions.store_path
+    store_true = builder.actions.store_true
+    store_false = builder.actions.store_false
+    toggle_true = builder.actions.toggle_true
+    toggle_false = builder.actions.toggle_false
+    unsupported = builder.actions.unsupported
+
+    # -------------------------------------------------------------------------
+    # Top-level options
 
     parser.add_argument(
         '-n', '--dry-run',
@@ -238,8 +260,9 @@ def create_argument_parser():
         help='print the commands that would be executed, but do not execute '
              'them')
     parser.add_argument(
-        '--no-legacy-impl', dest='legacy_impl',
+        '--no-legacy-impl',
         action='store_false',
+        dest='legacy_impl',
         default=True,
         help='avoid legacy implementation')
 
@@ -541,6 +564,7 @@ def create_argument_parser():
         '--skip-test-optimized',
         action=arguments.action.unavailable)
 
+    # -------------------------------------------------------------------------
     targets_group = parser.add_argument_group(
         title='Host and cross-compilation targets')
     targets_group.add_argument(
@@ -570,6 +594,7 @@ def create_argument_parser():
         help='A space-separated list that filters which of the configured '
              'targets to build the Swift standard library for, or "all".')
 
+    # -------------------------------------------------------------------------
     projects_group = parser.add_argument_group(
         title='Options to select projects')
     projects_group.add_argument(
@@ -622,6 +647,7 @@ def create_argument_parser():
         action=arguments.action.enable,
         help='build the Ninja tool')
 
+    # -------------------------------------------------------------------------
     extra_actions_group = parser.add_argument_group(
         title='Extra actions to perform before or in addition to building')
     extra_actions_group.add_argument(
@@ -638,6 +664,7 @@ def create_argument_parser():
         help='if provided, an archive of the symbols directory will be '
              'generated at this path')
 
+    # -------------------------------------------------------------------------
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
     build_variant_group.add_argument(
         '-d', '--debug',
@@ -661,6 +688,7 @@ def create_argument_parser():
         dest='build_variant',
         help='build the Release variant of everything (default is Debug)')
 
+    # -------------------------------------------------------------------------
     build_variant_override_group = parser.add_argument_group(
         title='Override build variant for a specific project')
     build_variant_override_group.add_argument(
@@ -713,6 +741,7 @@ def create_argument_parser():
         dest='libicu_build_variant',
         help='build the Debug variant of libicu')
 
+    # -------------------------------------------------------------------------
     assertions_group = parser.add_mutually_exclusive_group(required=False)
     assertions_group.add_argument(
         '--assertions',
@@ -727,6 +756,7 @@ def create_argument_parser():
         dest='assertions',
         help='disable assertions in all projects')
 
+    # -------------------------------------------------------------------------
     assertions_override_group = parser.add_argument_group(
         title='Control assertions in a specific project')
     assertions_override_group.add_argument(
@@ -907,6 +937,7 @@ def create_argument_parser():
         dest='test_cygwin',
         help='skip testing Swift stdlibs for Cygwin')
 
+    # -------------------------------------------------------------------------
     run_build_group = parser.add_argument_group(
         title='Run build')
     run_build_group.add_argument(
@@ -1028,6 +1059,7 @@ def create_argument_parser():
         dest='build_external_benchmarks',
         help='skip building Swift Benchmark Suite')
 
+    # -------------------------------------------------------------------------
     skip_test_group = parser.add_argument_group(
         title='Skip testing specified targets')
     skip_test_group.add_argument(
@@ -1093,6 +1125,7 @@ def create_argument_parser():
         help='skip testing Android device targets on the host machine (the '
              'phone itself)')
 
+    # -------------------------------------------------------------------------
     llvm_group = parser.add_argument_group(
         title='Build settings specific for LLVM')
     llvm_group.add_argument(
@@ -1100,6 +1133,7 @@ def create_argument_parser():
         default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
         help='LLVM target generators to build')
 
+    # -------------------------------------------------------------------------
     android_group = parser.add_argument_group(
         title='Build settings for Android')
     android_group.add_argument(
@@ -1144,7 +1178,8 @@ def create_argument_parser():
              'will be deployed. If running host tests, specify the "{}" '
              'directory.'.format(android.adb.commands.DEVICE_TEMP_DIR))
 
-    return parser
+    # -------------------------------------------------------------------------
+    return builder.build()
 
 
 # ----------------------------------------------------------------------------
