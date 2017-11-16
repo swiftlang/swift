@@ -931,7 +931,7 @@ void swift::completeJointPostDominanceSet(
   copy(MustVisitSuccessorBlocks, std::back_inserter(Result));
 }
 
-bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
+void swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
                                                           DominanceInfo *DT,
                                                           SILLoopInfo *LI) {
   // Find our targets.
