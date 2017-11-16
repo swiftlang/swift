@@ -43,8 +43,10 @@ public func foo(_ x: Double) {
   // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF_META]])
   // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[A]]
   // CHECK: [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
+  // CHECK: [[BORROWED_A2:%.*]] = begin_borrow [[A_COPY]]
   let a: (Double) -> Struct1 = Struct1.init(value:)
-  // CHECK: apply [[A_COPY]]([[X]])
+  // CHECK: apply [[BORROWED_A2]]([[X]])
+  // CHECK: destroy_value [[A_COPY]]
   // CHECK: end_borrow [[BORROWED_A]] from [[A]]
   z = a(x)
 
@@ -70,8 +72,10 @@ public func foo(_ x: Double) {
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
   // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
+  // CHECK: [[BORROWED_C2:%.*]] = begin_borrow [[C_COPY]]
   let c: (Double) -> Struct1 = z.translate(radians:)
-  // CHECK: apply [[C_COPY]]([[X]])
+  // CHECK: apply [[BORROWED_C2]]([[X]])
+  // CHECK: destroy_value [[C_COPY]]
   // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME]]
@@ -81,7 +85,9 @@ public func foo(_ x: Double) {
   let d: (Struct1) -> (Double) -> Struct1 = Struct1.translate(radians:)
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: apply [[COPY]]([[ZVAL]])
+  // CHECK: [[BORROW_COPY:%.*]] = begin_borrow [[COPY]]
+  // CHECK: apply [[BORROW_COPY]]([[ZVAL]])
+  // CHECK: destroy_value [[COPY]]
   z = d(z)(x)
 
   // TODO: If we implement SE-0042, this should thunk the value Struct1 param
@@ -103,8 +109,10 @@ public func foo(_ x: Double) {
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
   // CHECK: [[F_COPY:%.*]] = copy_value [[BORROWED_F]]
+  // CHECK: [[BORROWED_F2:%.*]] = begin_borrow [[F_COPY]]
   let f = z.scale
-  // CHECK: apply [[F_COPY]]([[X]])
+  // CHECK: apply [[BORROWED_F2]]([[X]])
+  // CHECK: destroy_value [[F_COPY]]
   // CHECK: end_borrow [[BORROWED_F]] from [[F]]
   z = f(x)
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
@@ -157,8 +165,10 @@ public func foo(_ x: Double) {
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
   // CHECK: [[BORROWED_I:%.*]] = begin_borrow [[I]]
   // CHECK: [[I_COPY:%.*]] = copy_value [[BORROWED_I]]
+  // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[I_COPY]]
   let i = Struct1.staticMethod
-  // CHECK: apply [[I_COPY]]()
+  // CHECK: apply [[BORROWED_I2]]()
+  // CHECK: destroy_value [[I_COPY]]
   // CHECK: end_borrow [[BORROWED_I]] from [[I]]
   y = i()
 

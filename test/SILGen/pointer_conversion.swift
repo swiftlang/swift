@@ -264,10 +264,10 @@ func classInoutToPointer() {
 // rdar://problem/21505805
 // CHECK-LABEL: sil hidden @_T018pointer_conversion22functionInoutToPointeryyF
 func functionInoutToPointer() {
-  // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_owned () -> () }
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
   var f: () -> () = {}
 
-  // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_owned (@in ()) -> @out ()
+  // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_guaranteed (@in ()) -> @out ()
   // CHECK: address_to_pointer [[REABSTRACT_BUF]]
   takesMutableVoidPointer(&f)
 }

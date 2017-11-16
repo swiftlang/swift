@@ -107,9 +107,9 @@ struct HasVarInit {
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
 
-// CHECK-LABEL: sil hidden @_T08mangling19autoClosureOverloadySiyXK1f_tF : $@convention(thin) (@owned @noescape @callee_owned () -> Int) -> () {
+// CHECK-LABEL: sil hidden @_T08mangling19autoClosureOverloadySiyXK1f_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> () {
 func autoClosureOverload(f: @autoclosure () -> Int) {}
-// CHECK-LABEL: sil hidden @_T08mangling19autoClosureOverloadySiyc1f_tF : $@convention(thin) (@owned @noescape @callee_owned () -> Int) -> () {
+// CHECK-LABEL: sil hidden @_T08mangling19autoClosureOverloadySiyc1f_tF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Int) -> () {
 func autoClosureOverload(f: () -> Int) {}
 
 // CHECK-LABEL: sil hidden @_T08mangling24autoClosureOverloadCallsyyF : $@convention(thin) () -> () {
@@ -165,17 +165,17 @@ func curry1Throws() throws {
 
 }
 
-// CHECK-LABEL: sil hidden @_T08mangling12curry2ThrowsyycyKF : $@convention(thin) () -> (@owned @callee_owned () -> (), @error Error)
+// CHECK-LABEL: sil hidden @_T08mangling12curry2ThrowsyycyKF : $@convention(thin) () -> (@owned @callee_guaranteed () -> (), @error Error)
 func curry2Throws() throws -> () -> () {
   return curry1
 }
 
-// CHECK-LABEL: sil hidden @_T08mangling6curry3yyKcyF : $@convention(thin) () -> @owned @callee_owned () -> @error Error
+// CHECK-LABEL: sil hidden @_T08mangling6curry3yyKcyF : $@convention(thin) () -> @owned @callee_guaranteed () -> @error Error
 func curry3() -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @_T08mangling12curry3ThrowsyyKcyKF : $@convention(thin) () -> (@owned @callee_owned () -> @error Error, @error Error)
+// CHECK-LABEL: sil hidden @_T08mangling12curry3ThrowsyyKcyKF : $@convention(thin) () -> (@owned @callee_guaranteed () -> @error Error, @error Error)
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }

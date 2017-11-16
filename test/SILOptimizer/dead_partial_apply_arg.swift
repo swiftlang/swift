@@ -14,7 +14,7 @@ extension Int32 {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T04test6callitSbs5Int32V_ADtcyF : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool
+// CHECK-LABEL: sil hidden @_T04test6callitSbs5Int32V_ADtcyF : $@convention(thin) () -> @owned @callee_guaranteed (Int32, Int32) -> Bool
 // CHECK: [[F:%[0-9]+]] = function_ref @_T0s5Int32V4testE8lessthanSbAB3lhs_AB3rhstFZTf4nnd_n
 // CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
 // CHECK: return [[R]]

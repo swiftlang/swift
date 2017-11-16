@@ -216,33 +216,37 @@ class Noot : Aap {
   override func map() -> (S?) -> () -> Noot {}
 }
 
-// CHECK-LABEL: sil private @_T013vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}FTV : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<@callee_owned (Int) -> Int>
+// CHECK-LABEL: sil private @_T013vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}FTV : $@convention(method) (@owned @callee_guaranteed (Int) -> Int, @guaranteed Bar) -> @owned Optional<@callee_guaranteed (Int) -> Int>
 // CHECK:         [[IMPL:%.*]] = function_ref @_T013vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[IMPL]]
 
 // CHECK-LABEL: sil private @_T013vtable_thunks4NootC4flip{{[_0-9a-zA-Z]*}}FTV
 // CHECK:         [[IMPL:%.*]] = function_ref @_T013vtable_thunks4NootC4flip{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
-// CHECK:         [[THUNK:%.*]] = function_ref @_T013vtable_thunks1SVIexd_ACSgIexd_TR
-// CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
+// CHECK:         [[THUNK:%.*]] = function_ref @_T013vtable_thunks1SVIegd_ACSgIegd_TR
+// CHECK:         [[OUTER:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVIexd_ACSgIexd_TR
-// CHECK:         [[INNER:%.*]] = apply %0()
-// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %1 : $S
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVIegd_ACSgIegd_TR
+// CHECK:         [[COPY:%.*]] = copy_value %0
+// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPY]]
+// CHECK:         [[INNER:%.*]] = apply [[BORROW]]()
+// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, [[INNER]] : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
 
 // CHECK-LABEL: sil private @_T013vtable_thunks4NootC3map{{[_0-9a-zA-Z]*}}FTV
 // CHECK:         [[IMPL:%.*]] = function_ref @_T013vtable_thunks4NootC3map{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
-// CHECK:         [[THUNK:%.*]] = function_ref @_T013vtable_thunks1SVSgAA4NootCIexo_Iexyo_AcA3AapCSgIexo_Iexyo_TR
-// CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
+// CHECK:         [[THUNK:%.*]] = function_ref @_T013vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
+// CHECK:         [[OUTER:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIexo_Iexyo_AcA3AapCSgIexo_Iexyo_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
+// CHECK:         [[COPY:%.*]] = copy_value %1
 // CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
-// CHECK:         [[INNER:%.*]] = apply %1(%2)
-// CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>
+// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPY]]
+// CHECK:         [[INNER:%.*]] = apply [[BORROW]]([[ARG]])
+// CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_guaranteed () -> @owned Noot to $@callee_guaranteed () -> @owned Optional<Aap>
 // CHECK:         return [[OUTER]]
 // CHECK-LABEL: sil_vtable D {
 // CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV

@@ -438,8 +438,8 @@ struct GenericParameterNameCollision<T: HasAssoc> :
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func foo<U>(_ x: U) {}
 
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3bary6Assoc2Qzqd__clFTW : $@convention(witness_method: GenericParameterNameCollisionProtocol) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@owned @noescape @callee_owned (@in τ_1_0) -> @out τ_0_0.Assoc, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
-  // CHECK:       bb0(%0 : @owned $@noescape @callee_owned (@in τ_1_0) -> @out τ_0_0.Assoc, %1 : @trivial $*GenericParameterNameCollision<τ_0_0>):
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3bary6Assoc2Qzqd__clFTW : $@convention(witness_method: GenericParameterNameCollisionProtocol) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@owned @noescape @callee_guaranteed (@in τ_1_0) -> @out τ_0_0.Assoc, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
+  // CHECK:       bb0(%0 : @owned $@noescape @callee_guaranteed (@in τ_1_0) -> @out τ_0_0.Assoc, %1 : @trivial $*GenericParameterNameCollision<τ_0_0>):
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func bar<V>(_ x: (V) -> T.Assoc) {}
 }

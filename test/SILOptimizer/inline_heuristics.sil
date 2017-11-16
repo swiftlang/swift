@@ -39,22 +39,22 @@ enum E {
 
 sil @testDirectClosure : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = function_ref @takeDirectClosure : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32
+  %0 = function_ref @takeDirectClosure : $@convention(thin) (@owned @callee_guaranteed (Int32) -> Int32) -> Int32
   %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
-  %3 = apply %0(%2) : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_guaranteed (Int32) -> Int32
+  %3 = apply %0(%2) : $@convention(thin) (@owned @callee_guaranteed (Int32) -> Int32) -> Int32
   return %3 : $Int32
 }
 
-sil @takeDirectClosure : $@convention(thin) (@owned @callee_owned (Int32) -> Int32) -> Int32 {
-bb0(%0 : $@callee_owned (Int32) -> Int32):
+sil @takeDirectClosure : $@convention(thin) (@owned @callee_guaranteed (Int32) -> Int32) -> Int32 {
+bb0(%0 : $@callee_guaranteed (Int32) -> Int32):
   // increase the scope length
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct $Int32 (%1 : $Builtin.Int32)
-  %3 = apply %0(%2) : $@callee_owned (Int32) -> Int32
+  %3 = apply %0(%2) : $@callee_guaranteed (Int32) -> Int32
   return %3 : $Int32
 }
 
@@ -71,8 +71,8 @@ sil @testStructClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeStructClosure : $@convention(thin) (@owned Cont) -> Int32
   %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
-  %3 = struct $Cont (%2 : $@callee_owned (Int32) -> Int32)
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_guaranteed (Int32) -> Int32
+  %3 = struct $Cont (%2 : $@callee_guaranteed (Int32) -> Int32)
   %4 = apply %0(%3) : $@convention(thin) (@owned Cont) -> Int32
   return %4 : $Int32
 }
@@ -86,7 +86,7 @@ bb0(%0 : $Cont):
   %1 = struct_extract %0 : $Cont, #Cont.cl
   %2 = integer_literal $Builtin.Int32, 27
   %3 = struct $Int32 (%2 : $Builtin.Int32)
-  %4 = apply %1(%3) : $@callee_owned (Int32) -> Int32
+  %4 = apply %1(%3) : $@callee_guaranteed (Int32) -> Int32
   return %4 : $Int32
 }
 
@@ -103,14 +103,14 @@ sil @testStructAddrClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Cont
   %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
-  %3 = struct $Cont (%2 : $@callee_owned (Int32) -> Int32)
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_guaranteed (Int32) -> Int32
+  %3 = struct $Cont (%2 : $@callee_guaranteed (Int32) -> Int32)
   store %3 to %0 : $*Cont
   %5 = function_ref @takeStructAddrClosure : $@convention(thin) (@inout Cont) -> Int32
   %6 = apply %5(%0) : $@convention(thin) (@inout Cont) -> Int32
   %7 = struct_element_addr %0 : $*Cont, #Cont.cl
-  %8 = load %7 : $*@callee_owned (Int32) -> Int32
-  strong_release %8 : $@callee_owned (Int32) -> Int32
+  %8 = load %7 : $*@callee_guaranteed (Int32) -> Int32
+  strong_release %8 : $@callee_guaranteed (Int32) -> Int32
   dealloc_stack %0 : $*Cont
   return %6 : $Int32
 }
@@ -122,11 +122,11 @@ bb0(%0 : $*Cont):
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_element_addr %0 : $*Cont, #Cont.cl
-  %2 = load %1 : $*@callee_owned (Int32) -> Int32
+  %2 = load %1 : $*@callee_guaranteed (Int32) -> Int32
   %3 = integer_literal $Builtin.Int32, 27
   %4 = struct $Int32 (%3 : $Builtin.Int32)
-  strong_retain %2 : $@callee_owned (Int32) -> Int32
-  %6 = apply %2(%4) : $@callee_owned (Int32) -> Int32
+  strong_retain %2 : $@callee_guaranteed (Int32) -> Int32
+  %6 = apply %2(%4) : $@callee_guaranteed (Int32) -> Int32
   return %6 : $Int32
 }
 
@@ -145,9 +145,9 @@ bb0:
   %1 = integer_literal $Builtin.Int32, 27
   %2 = struct $Int32 (%1 : $Builtin.Int32)
   %3 = function_ref @closure : $@convention(thin) (Int32) -> Int32
-  %4 = thin_to_thick_function %3 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
-  %5 = tuple (%2 : $Int32, %4 : $@callee_owned (Int32) -> Int32)
-  %6 = struct $Cont2 (%5 : $(Int32, @callee_owned (Int32) -> Int32))
+  %4 = thin_to_thick_function %3 : $@convention(thin) (Int32) -> Int32 to $@callee_guaranteed (Int32) -> Int32
+  %5 = tuple (%2 : $Int32, %4 : $@callee_guaranteed (Int32) -> Int32)
+  %6 = struct $Cont2 (%5 : $(Int32, @callee_guaranteed (Int32) -> Int32))
   %7 = apply %0(%6) : $@convention(thin) (@owned Cont2) -> Int32
   return %7 : $Int32
 }
@@ -160,10 +160,10 @@ bb0(%0 : $Cont2):
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
 
   %1 = struct_extract %0 : $Cont2, #Cont2.tp
-  %2 = tuple_extract %1 : $(Int32, @callee_owned (Int32) -> Int32), 1
+  %2 = tuple_extract %1 : $(Int32, @callee_guaranteed (Int32) -> Int32), 1
   %3 = integer_literal $Builtin.Int32, 27
   %4 = struct $Int32 (%3 : $Builtin.Int32)
-  %5 = apply %2(%4) : $@callee_owned (Int32) -> Int32
+  %5 = apply %2(%4) : $@callee_guaranteed (Int32) -> Int32
   return %5 : $Int32
 }
 
@@ -179,8 +179,8 @@ sil @testEnumClosure : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @takeEnumClosure : $@convention(thin) (@owned E) -> Int32
   %1 = function_ref @closure : $@convention(thin) (Int32) -> Int32
-  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_owned (Int32) -> Int32
-  %3 = enum $E, #E.B!enumelt.1, %2 : $@callee_owned (Int32) -> Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int32) -> Int32 to $@callee_guaranteed (Int32) -> Int32
+  %3 = enum $E, #E.B!enumelt.1, %2 : $@callee_guaranteed (Int32) -> Int32
   %4 = apply %0(%3) : $@convention(thin) (@owned E) -> Int32
   return %4 : $Int32
 }
@@ -195,7 +195,7 @@ bb0(%0 : $E):
   %1 = unchecked_enum_data %0 : $E, #E.B!enumelt.1
   %2 = integer_literal $Builtin.Int32, 27
   %3 = struct $Int32 (%2 : $Builtin.Int32)
-  %4 = apply %1(%3) : $@callee_owned (Int32) -> Int32
+  %4 = apply %1(%3) : $@callee_guaranteed (Int32) -> Int32
   return %4 : $Int32
 }
 

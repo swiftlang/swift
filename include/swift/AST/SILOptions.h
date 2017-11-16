@@ -115,7 +115,7 @@ public:
   
   /// Emit captures and function contexts using +0 caller-guaranteed ARC
   /// conventions.
-  bool EnableGuaranteedClosureContexts = false;
+  bool EnableGuaranteedClosureContexts = true;
 
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;

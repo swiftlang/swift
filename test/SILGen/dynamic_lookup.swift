@@ -85,21 +85,21 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[PBOBJ]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
+  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
   // CHECK:   [[PBOPT:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJ_SELF:%[0-9]*]] = open_existential_ref [[EXISTVAL]]
-  // CHECK:   [[OPT_TMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
+  // CHECK:   [[OPT_TMP:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>
   // CHECK:   dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
 
   // Has method BB:
   // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()):
   // CHECK:   [[OBJ_SELF_COPY:%.*]] = copy_value [[OBJ_SELF]]
-  // CHECK:   [[PARTIAL:%[0-9]+]] = partial_apply [[UNCURRIED]]([[OBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
+  // CHECK:   [[PARTIAL:%[0-9]+]] = partial_apply [callee_guaranteed] [[UNCURRIED]]([[OBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPT_TMP]]
   // CHECK:   store [[PARTIAL]] to [init] [[THUNK_PAYLOAD]]
-  // CHECK:   inject_enum_addr [[OPT_TMP]] : $*Optional<@callee_owned () -> ()>, #Optional.some!enumelt.1
+  // CHECK:   inject_enum_addr [[OPT_TMP]] : $*Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1
   // CHECK:   br [[CONTBB:[a-zA-Z0-9]+]]
 
   // No method BB:
@@ -110,13 +110,13 @@ func opt_to_class(_ obj: AnyObject) {
   // Continuation block
   // CHECK: [[CONTBB]]:
   // CHECK:   [[OPT:%.*]] = load [take] [[OPT_TMP]]
-  // CHECK:   store [[OPT]] to [init] [[PBOPT]] : $*Optional<@callee_owned () -> ()>
+  // CHECK:   store [[OPT]] to [init] [[PBOPT]] : $*Optional<@callee_guaranteed () -> ()>
   // CHECK:   dealloc_stack [[OPT_TMP]]
   var of: (() -> ())! = obj.f
 
   // Exit
   // CHECK:   destroy_value [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
-  // CHECK:   destroy_value [[OPTBOX]] : ${ var Optional<@callee_owned () -> ()> }
+  // CHECK:   destroy_value [[OPTBOX]] : ${ var Optional<@callee_guaranteed () -> ()> }
   // CHECK:   destroy_value [[EXISTBOX]] : ${ var AnyObject }
   // CHECK:   destroy_value %0
   // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
@@ -139,14 +139,14 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
-  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
+  // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
   // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[OBJMETA:%[0-9]+]] = existential_metatype $@thick AnyObject.Type, [[OBJCOPY]] : $AnyObject
   // CHECK:   [[OPENMETA:%[0-9]+]] = open_existential_metatype [[OBJMETA]] : $@thick AnyObject.Type to $@thick (@opened
   // CHECK:   [[OBJCMETA:%[0-9]+]] = thick_to_objc_metatype [[OPENMETA]]
-  // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_owned () -> ()>
+  // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>
   // CHECK:   dynamic_method_br [[OBJCMETA]] : $@objc_metatype (@opened({{".*"}}) AnyObject).Type, #X.staticF!1.foreign, [[HASMETHOD:[A-Za-z0-9_]+]], [[NOMETHOD:[A-Za-z0-9_]+]]
   var optF: (() -> ())! = type(of: obj).staticF
 }
@@ -171,11 +171,14 @@ func opt_to_property(_ obj: AnyObject) {
 
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
-  // CHECK:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [[METHOD]]([[RAWOBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int
-  // CHECK:   [[VALUE:%[0-9]+]] = apply [[BOUND_METHOD]]() : $@callee_owned () -> Int
+  // CHECK:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[RAWOBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int
+  // CHECK:   [[B:%.*]] = begin_borrow [[BOUND_METHOD]]
+  // CHECK:   [[VALUE:%[0-9]+]] = apply [[B]]() : $@callee_guaranteed () -> Int
+  // CHECK:   end_borrow [[B]]
   // CHECK:   [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK:   store [[VALUE]] to [trivial] [[VALUETEMP]]
   // CHECK:   inject_enum_addr [[OPTTEMP]]{{.*}}some
+  // CHECK:   destroy_value [[BOUND_METHOD]]
   // CHECK:   br bb3
   var i: Int = obj.value!
 }
@@ -235,11 +238,14 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
-  // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
+  // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
+  // CHECK:   [[B:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[B]]([[I]]) : $@callee_guaranteed (Int) -> Int
+  // CHECK:   end_borrow [[B]]
   // CHECK:   [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK:   store [[RESULT]] to [trivial] [[RESULTTEMP]]
   // CHECK:   inject_enum_addr [[OPTTEMP]]{{.*}}some
+  // CHECK:   destroy_value [[GETTER_WITH_SELF]]
   // CHECK:   br bb3
   var x: Int = obj[i]!
 }
@@ -302,11 +308,14 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
 
   // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
-  // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[GETTER_WITH_SELF]]([[I]]) : $@callee_owned (Int) -> Int
+  // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
+  // CHECK:   [[B:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[B]]([[I]]) : $@callee_guaranteed (Int) -> Int
+  // CHECK:   end_borrow [[B]]
   // CHECK:   [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // CHECK:   store [[RESULT]] to [trivial] [[RESULTTEMP]]
   // CHECK:   inject_enum_addr [[OPTTEMP]]
+  // CHECK:   destroy_value [[GETTER_WITH_SELF]]
   // CHECK:   br bb3
   obj[i]
 }
@@ -343,11 +352,14 @@ func downcast(_ obj: AnyObject) -> X {
 
 // CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]([[SELF_COPY]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
-// CHECK:   [[RESULT:%.*]] = apply [[METHOD]]() : $@callee_owned () -> @owned Juice
+// CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]([[SELF_COPY]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
+// CHECK:   [[B:%.*]] = begin_borrow [[METHOD]]
+// CHECK:   [[RESULT:%.*]] = apply [[B]]() : $@callee_guaranteed () -> @owned Juice
+// CHECK:   end_borrow [[B]]
 // CHECK:   [[PAYLOAD:%.*]] = init_enum_data_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
 // CHECK:   store [[RESULT]] to [init] [[PAYLOAD]]
 // CHECK:   inject_enum_addr [[BOX]] : $*Optional<Juice>, #Optional.some!enumelt.1
+// CHECK:   destroy_value [[METHOD]]
 // CHECK:   br bb3
 
 // CHECK: bb2:

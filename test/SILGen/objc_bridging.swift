@@ -643,13 +643,13 @@ func takeTwoAnys(_ lhs: Any, _ rhs: Any) -> Any { return lhs }
 // CHECK-LABEL: sil hidden @_T013objc_bridging22defineNonStandardBlockyyp1x_tF
 func defineNonStandardBlock(x: Any) {
   // CHECK: function_ref @_T013objc_bridging22defineNonStandardBlockyyp1x_tFypypcfU_
-  // CHECK: function_ref @_T0ypypIexir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+  // CHECK: function_ref @_T0ypypIegir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
 
   let fn : @convention(block) (Any) -> Any = { y in takeTwoAnys(x, y) }
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIexir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
-// CHECK: bb0(%0 : @trivial $*@block_storage @callee_owned (@in Any) -> @out Any, %1 : @unowned $AnyObject):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIegir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+// CHECK: bb0(%0 : @trivial $*@block_storage @callee_guaranteed (@in Any) -> @out Any, %1 : @unowned $AnyObject):
 // CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
 // CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject
 // CHECK:   [[ARG:%.*]] = alloc_stack $Any
