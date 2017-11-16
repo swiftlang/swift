@@ -1050,13 +1050,10 @@ extension _StringGuts {
     return nil
   }
 
-  // TODO(perf): guarantee this is a simple bitmask operation, and probably
-  // make inlineable or inline allways
   @_versioned
   internal
   var _isOpaque: Bool {
-      @inline(never) // TODO(perf): to inspect code quality
-      get { return _unmanagedContiguous == nil }
+    return _unmanagedContiguous == nil
   }
 
   @_versioned
