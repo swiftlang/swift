@@ -2831,6 +2831,18 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
 
+    SmallVector<TypeID, 2> dependencies;
+    for (Type dep : collectDependenciesFromType(underlying->getCanonicalType()))
+      dependencies.push_back(addTypeRef(dep));
+
+    for (Requirement req : typeAlias->getGenericRequirements()) {
+      for (Type dep : collectDependenciesFromType(req.getFirstType()))
+        dependencies.push_back(addTypeRef(dep));
+      if (req.getKind() != RequirementKind::Layout)
+        for (Type dep : collectDependenciesFromType(req.getSecondType()))
+          dependencies.push_back(addTypeRef(dep));
+    }
+
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(typeAlias->getFormalAccess());
 
@@ -2843,7 +2855,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit(),
                                 addGenericEnvironmentRef(
                                              typeAlias->getGenericEnvironment()),
-                                rawAccessLevel);
+                                rawAccessLevel,
+                                dependencies);
     writeGenericParams(typeAlias->getGenericParams());
     break;
   }
