@@ -160,7 +160,7 @@ public:
   range getValues() const;
 
   using type_range = llvm::iterator_range<
-      llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>>>;
+    llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>, SILType>>;
   type_range getTypes() const;
 
   bool operator==(const SILInstructionResultArray &rhs);
