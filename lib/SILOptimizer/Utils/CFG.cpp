@@ -931,7 +931,7 @@ void swift::completeJointPostDominanceSet(
   copy(MustVisitSuccessorBlocks, std::back_inserter(Result));
 }
 
-void swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
+bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
                                                           DominanceInfo *DT,
                                                           SILLoopInfo *LI) {
   // Find our targets.
@@ -955,6 +955,9 @@ void swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
     Targets.emplace_back(&Block, CondBranchInst::FalseIdx);
   }
 
+  if (Targets.empty())
+    return false;
+
   for (auto P : Targets) {
     SILBasicBlock *Block = P.first;
     unsigned Index = P.second;
@@ -962,4 +965,6 @@ void swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
     (void)Result;
     assert(Result);
   }
+
+  return true;
 }

@@ -131,7 +131,7 @@ bool splitAllCriticalEdges(SILFunction &F, bool OnlyNonCondBr,
 ///
 /// A current invariant of Ownership SIL is that cond_br can only have critical
 /// edges with non-trivial arguments. This simplifies computation.
-void splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &F,
+bool splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
                                                    DominanceInfo *DT,
                                                    SILLoopInfo *LI);
 
