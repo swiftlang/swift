@@ -528,6 +528,10 @@ def main():
                         default="sum",
                         type=str,
                         help="Merge identical metrics by (sum|min|max)")
+    parser.add_argument("--merge-timers",
+                        default=False,
+                        action="store_true",
+                        help="Merge timers across modules/targets/etc.")
     parser.add_argument("--markdown",
                         default=False,
                         action="store_true",
