@@ -1979,11 +1979,13 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendIdentifier(behaviorStorage->getBaseName().getIdentifier().str());
   } else {
     auto conformanceDC = conformance->getDeclContext();
-    auto conformingType =
-      conformanceDC->mapTypeOutOfContext(conformance->getType());
+    auto conformingType = conformance->getType();
+    if (!isa<NormalProtocolConformance>(conformance)) {
+      conformingType = conformanceDC->mapTypeOutOfContext(conformingType);
+    }
     appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
-    appendModule(conformance->getDeclContext()->getParentModule());
+    appendModule(conformanceDC->getParentModule());
 
     contextSig =
       conformingType->getAnyNominal()->getGenericSignatureOfContext();

@@ -6527,7 +6527,7 @@ void SwiftDeclConverter::addObjCProtocolConformances(
   for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
     // FIXME: Build a superclass conformance if the superclass
     // conforms.
-    auto conformance = ctx.getConformance(dc->getDeclaredTypeInContext(),
+    auto conformance = ctx.getConformance(dc->getDeclaredInterfaceType(),
                                           protocols[i], SourceLoc(), dc,
                                           ProtocolConformanceState::Incomplete);
     conformance->setLazyLoader(&Impl, /*context*/0);

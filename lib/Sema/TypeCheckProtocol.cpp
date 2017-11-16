@@ -3622,9 +3622,10 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
+    auto archetype = candidate.second->hasArchetype() ? candidate.second : DC->mapTypeIntoContext(candidate.second);
     // Check this type against the protocol requirements.
     if (auto checkResult = checkTypeWitness(TC, DC, Proto, assocType,
-                                            candidate.second)) {
+                                            archetype)) {
       nonViable.push_back({candidate.first, checkResult});
     } else {
       viable.push_back(candidate);
@@ -3633,7 +3634,10 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
-    recordTypeWitness(assocType, viable.front().second, viable.front().first, true);
+    auto interfaceType = viable.front().second;
+    if (interfaceType->hasArchetype())
+      interfaceType = DC->mapTypeOutOfContext(interfaceType);
+    recordTypeWitness(assocType, interfaceType, viable.front().first, true);
     return ResolveWitnessResult::Success;
   }
 
@@ -3873,6 +3877,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
           Conformance->getTypeWitness(result.first, nullptr);
+        existingWitness = Conformance->getDeclContext()->mapTypeIntoContext(existingWitness);
 
         // If the deduced type contains an irreducible
         // DependentMemberType, that indicates a dependency
@@ -4005,7 +4010,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   // Retrieve the set of substitutions to be applied to the witness.
-  Type model = conformance->getType();
+  Type model = conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
   Type type = witness->getInterfaceType()->getReferenceStorageReferent();
   
@@ -4115,6 +4120,9 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
                   TypeBase *secondType, Type sugaredFirstType) {
+      //assert(!(firstDepMember->hasTypeParameter() && secondType->hasArchetype())
+      //       && !(firstDepMember->hasArchetype() && secondType->hasTypeParameter()));
+      //assert(!secondType->hasTypeParameter());
       // If the second type is an error, don't look at it further.
       if (secondType->hasError())
         return true;
@@ -4538,7 +4546,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
         continue;
       if (Conformance->hasTypeWitness(assocType)) {
         substitutions[archetype] =
-          Conformance->getTypeWitness(assocType, nullptr);
+          DC->mapTypeIntoContext(Conformance->getTypeWitness(assocType, nullptr));
       } else {
         auto known = typeWitnesses.begin(assocType);
         if (known != typeWitnesses.end())
@@ -4561,6 +4569,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
     if (!defaultType)
       return Type();
+    if (defaultType->hasTypeParameter())
+      defaultType = DC->mapTypeIntoContext(defaultType);
 
     if (auto failed = checkTypeWitness(TC, DC, Proto, assocType, defaultType)) {
       // Record the failure, if we haven't seen one already.
@@ -4596,6 +4606,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
     Type derivedType = TC.deriveTypeWitness(DC, derivingTypeDecl, assocType);
     if (!derivedType)
       return Type();
+
+    if (derivedType->hasTypeParameter())
+      derivedType = DC->mapTypeIntoContext(derivedType);
 
     // Make sure that the derived type is sane.
     if (checkTypeWitness(TC, DC, Proto, assocType, derivedType)) {
@@ -4699,12 +4712,14 @@ void ConformanceChecker::resolveTypeWitnesses() {
             AssociatedTypeDecl *assocType) -> TypeBase * {
           if (conformance != Conformance) return nullptr;
 
-          return typeWitnesses.begin(assocType)->first.getPointer();
+          auto type = typeWitnesses.begin(assocType)->first;
+          return conformance->getDeclContext()->mapTypeOutOfContext(type).getPointer();
         };
 
+      auto typeInContext = Conformance->getDeclContext()->mapTypeIntoContext(Conformance->getType());
       auto substitutions =
-        SubstitutionMap::getProtocolSubstitutions(
-                                          Proto, Conformance->getType(),
+      SubstitutionMap::getProtocolSubstitutions(
+        Proto, typeInContext,
                                           ProtocolConformanceRef(Conformance));
 
       SmallVector<Requirement, 4> sanitizedRequirements;
@@ -4715,7 +4730,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
                                sanitizedRequirements);
       auto result =
         TC.checkGenericArguments(DC, SourceLoc(), SourceLoc(),
-                                 Conformance->getType(), requirementSig,
+                                 typeInContext, requirementSig,
                                  QuerySubstitutionMap{substitutions},
                                  TypeChecker::LookUpConformance(
                                    TC, Conformance->getDeclContext()),
@@ -5045,6 +5060,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
       // away for some reason.
       if (replacement->hasDependentMember())
         replacement = ErrorType::get(TC.Context);
+      else if (replacement->hasArchetype())
+        replacement = DC->mapTypeOutOfContext(replacement);
       recordTypeWitness(assocType, replacement, nullptr, true);
     }
 
@@ -5401,8 +5418,10 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   auto reqSig = GenericSignature::get({proto->getProtocolSelfType()},
                                       proto->getRequirementSignature());
 
+  auto DC = Conformance->getDeclContext();
+  auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
-      proto, Conformance->getType(), ProtocolConformanceRef(Conformance));
+      proto, substitutingType, ProtocolConformanceRef(Conformance));
 
   // Create a writer to populate the signature conformances.
   std::function<void(ProtocolConformanceRef)> writer
@@ -5422,11 +5441,11 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   } listener(writer);
 
   auto result = TC.checkGenericArguments(
-      Conformance->getDeclContext(), Loc, Loc,
+      DC, Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(), reqSig,
       QuerySubstitutionMap{substitutions},
-      TypeChecker::LookUpConformance(TC, Conformance->getDeclContext()),
+      TypeChecker::LookUpConformance(TC, DC),
       nullptr,
       ConformanceCheckFlags::Used, &listener);
 

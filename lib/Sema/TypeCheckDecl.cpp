@@ -3297,6 +3297,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     {
       auto conformancesCopy = TC.Context.AllocateCopy(valueConformances);
       valueSub = Substitution(propTy, conformancesCopy);
+      //propTy = conformance->getDeclContext()->mapTypeIntoContext(propTy);
       // FIXME: Maybe we should synthesize an implicit TypeAliasDecl? We
       // really don't want the behavior conformances to show up in the
       // enclosing namespace though.
