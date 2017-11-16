@@ -1187,10 +1187,8 @@ void Serializer::writePattern(const Pattern *pattern, DeclContext *owningDC) {
 
     // If we have an owning context and a contextual type, map out to an
     // interface type.
-    if (owningDC && type->hasArchetype()) {
-      type = owningDC->getGenericEnvironmentOfContext()
-                     ->mapTypeOutOfContext(type);
-    }
+    if (owningDC && type->hasArchetype())
+      type = type->mapTypeOutOfContext();
 
     return type;
   };
@@ -1621,7 +1619,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
-      type = genericEnv->mapTypeOutOfContext(type);
+      type = type->mapTypeOutOfContext();
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
                                                      addTypeRef(type),
@@ -1639,7 +1637,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
-      type = genericEnv->mapTypeOutOfContext(type);
+      type = type->mapTypeOutOfContext();
 
     InheritedProtocolConformanceLayout::emitRecord(
       Out, ScratchRecord, abbrCode, addTypeRef(type));
@@ -1678,8 +1676,7 @@ Serializer::writeSubstitutions(SubstitutionList substitutions,
   for (auto &sub : substitutions) {
     auto replacementType = sub.getReplacement();
     if (genericEnv && replacementType->hasArchetype()) {
-      replacementType =
-        genericEnv->mapTypeOutOfContext(replacementType);
+      replacementType = replacementType->mapTypeOutOfContext();
     }
 
     BoundGenericSubstitutionLayout::emitRecord(

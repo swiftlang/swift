@@ -2502,7 +2502,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
     auto homeSig = captured->getDeclContext()
         ->getGenericSignatureOfContext();
     loweredInterfaceType =
-      env->mapTypeOutOfContext(loweredInterfaceType)
+      loweredInterfaceType->mapTypeOutOfContext()
         ->getCanonicalType(homeSig);
   }
   

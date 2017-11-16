@@ -524,6 +524,9 @@ public:
   /// underlying type.
   Type eraseDynamicSelfType();
 
+  /// Map a contextual type to an interface type.
+  Type mapTypeOutOfContext();
+
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
   ///

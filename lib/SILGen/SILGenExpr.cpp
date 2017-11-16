@@ -3059,7 +3059,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   SmallVector<CanType, 2> interfaceSubs;
   for (auto &sub : subs) {
     interfaceSubs.push_back(
-      GenericEnvironment::mapTypeOutOfContext(genericEnv, sub.getReplacement())
+      sub.getReplacement()->mapTypeOutOfContext()
       ->getCanonicalType());
   }
   auto name = Mangle::ASTMangler()
@@ -3182,7 +3182,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   SmallVector<CanType, 2> interfaceSubs;
   for (auto &sub : subs) {
     interfaceSubs.push_back(
-      GenericEnvironment::mapTypeOutOfContext(genericEnv, sub.getReplacement())
+      sub.getReplacement()->mapTypeOutOfContext()
       ->getCanonicalType());
   }
   auto name = Mangle::ASTMangler().mangleKeyPathSetterThunkHelper(property,
