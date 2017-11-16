@@ -149,14 +149,14 @@ class _Builder(object):
 
         return self._add_argument(option_strings, *actions, **kwargs)
 
-    def set_defaults(self, dests=None, value=None, **kwargs):
-        if dests is None:
-            dests = []
-        elif isinstance(dests, str):
-            dests = [dests]
+    def set_defaults(self, *args, **kwargs):
+        if len(args) == 1:
+            raise TypeError('set_defaults takes at least 2 arguments')
 
-        for dest in dests:
-            kwargs[dest] = value
+        if len(args) >= 2:
+            dests, value = args[:-1], args[-1]
+            for dest in dests:
+                kwargs[dest] = value
 
         self._defaults.update(**kwargs)
 
@@ -192,9 +192,15 @@ class ArgumentParser(argparse.ArgumentParser):
 
     @classmethod
     def builder(cls, **kwargs):
+        """Create a new builder instance using this parser class.
+        """
+
         return _Builder(parser=cls(**kwargs))
 
     def to_builder(self):
+        """Construct and return a builder instance with this parser.
+        """
+
         return _Builder(parser=self)
 
     def parse_known_args(self, args=None, namespace=None):
