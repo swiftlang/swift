@@ -1552,9 +1552,7 @@ void Serializer::writeNormalConformance(
    // Bail out early for simple witnesses.
    if (!witness.getDecl()) return;
 
-   if (auto genericEnv = witness.requiresSubstitution() 
-                           ? witness.getSyntheticEnvironment()
-                           : nullptr) {
+   if (witness.requiresSubstitution()) {
      // Write requirement-to-synthetic substitutions.
      writeSubstitutions(witness.getRequirementToSyntheticSubs(),
                         DeclTypeAbbrCodes,
