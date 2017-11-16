@@ -107,7 +107,7 @@ class _Builder(object):
         self._parser.set_defaults(**self._defaults)
         return self._parser
 
-    def _add_argument(self, option_strings, *actions, **kwargs):
+    def _add_argument(self, names, *actions, **kwargs):
         # Unwrap partial actions
         _actions = []
         for action in actions:
@@ -126,22 +126,25 @@ class _Builder(object):
             action = thunk
 
         return self._current_group.add_argument(
-            *option_strings, action=action, **kwargs)
+            *names, action=action, **kwargs)
 
-    def add_positional(self, option_strings, *actions, **kwargs):
-        if isinstance(option_strings, str):
-            option_strings = [option_strings]
+    def add_positional(self, dests, action=None, **kwargs):
+        if isinstance(dests, str):
+            dests = [dests]
 
-        if any(o.startswith('-') for o in option_strings):
-            raise ValueError("add_option can't add optional arguments")
+        if any(dest.startswith('-') for dest in dests):
+            raise ValueError("add_positional can't add optional arguments")
 
-        return self._add_argument(option_strings, *actions, **kwargs)
+        if action is None:
+            action = actions.StoreAction
+
+        return self._add_argument(dests, action, **kwargs)
 
     def add_option(self, option_strings, *actions, **kwargs):
         if isinstance(option_strings, str):
             option_strings = [option_strings]
 
-        if not all(o.startswith('-') for o in option_strings):
+        if not all(opt.startswith('-') for opt in option_strings):
             raise ValueError("add_option can't add positional arguments")
 
         return self._add_argument(option_strings, *actions, **kwargs)
@@ -172,9 +175,10 @@ class _Builder(object):
         self._current_group = previous_group
 
     @contextmanager
-    def mutually_exclusive_group(self):
+    def mutually_exclusive_group(self, **kwargs):
         previous_group = self._current_group
-        self._current_group = previous_group.add_mutually_exclusive_group()
+        self._current_group = previous_group \
+            .add_mutually_exclusive_group(**kwargs)
         yield self._current_group
         self._current_group = previous_group
 
@@ -186,9 +190,9 @@ class ArgumentParser(argparse.ArgumentParser):
     methods to interact with a builder instance.
     """
 
-    @staticmethod
-    def builder(**kwargs):
-        return _Builder(parser=ArgumentParser(**kwargs))
+    @classmethod
+    def builder(cls, **kwargs):
+        return _Builder(parser=cls(**kwargs))
 
     def to_builder(self):
         return _Builder(parser=self)

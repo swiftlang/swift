@@ -122,14 +122,29 @@ class TestBuilder(TestCase):
     def test_mutually_exclusive_group(self):
         builder = ArgumentParser.builder()
 
-        with builder.mutually_exclusive_group() as group:
+        with builder.mutually_exclusive_group(required=True) as group:
             self.assertEqual(builder._current_group, group)
             self.assertIsInstance(group, _MutuallyExclusiveGroup)
+            self.assertTrue(group.required)
 
         self.assertEqual(builder._current_group, builder._parser)
 
 
 class TestArgumentParser(TestCase):
+
+    def test_builder(self):
+        builder = ArgumentParser.builder(usage='Totally useless help message')
+
+        self.assertIsInstance(builder._parser, ArgumentParser)
+        self.assertEqual(builder._parser.usage, 'Totally useless help message')
+
+    def test_builder_uses_subclass(self):
+        class _ArgumentParserSubclass(ArgumentParser):
+            pass
+
+        builder = _ArgumentParserSubclass.builder()
+
+        self.assertIsInstance(builder._parser, _ArgumentParserSubclass)
 
     def test_to_builder(self):
         parser = ArgumentParser()
