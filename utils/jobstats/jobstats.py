@@ -98,6 +98,13 @@ class JobStats(object):
                         self.module, self.start_usec, self.dur_usec,
                         self.jobargs, prefixed_stats)
 
+    def divided_by(self, n):
+        divided_stats = dict([(k, v / n)
+                              for (k, v) in self.stats.items()])
+        return JobStats(self.jobkind, random.randint(0, 1000000000),
+                        self.module, self.start_usec, self.dur_usec,
+                        self.jobargs, divided_stats)
+
     def incrementality_percentage(self):
         """Assuming the job is a driver job, return the amount of
         jobs that actually ran, as a percentage of the total number."""
@@ -257,7 +264,7 @@ def load_stats_dir(path, select_module=[], select_stat=[],
 
 
 def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
-                       merge_by="sum", **kwargs):
+                       merge_by="sum", divide_by=1, **kwargs):
     """Does a pairwise merge of the elements of list of jobs"""
     m = None
     if len(select_module) > 0:
@@ -269,7 +276,8 @@ def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
         jobstats.sort(key=keyfunc)
         prefixed = []
         for mod, group in itertools.groupby(jobstats, keyfunc):
-            groupmerge = merge_all_jobstats(group, merge_by=merge_by)
+            groupmerge = merge_all_jobstats(group, merge_by=merge_by,
+                                            divide_by=divide_by)
             prefixed.append(groupmerge.prefixed_by(mod))
         jobstats = prefixed
     for j in jobstats:
@@ -277,4 +285,6 @@ def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
             m = j
         else:
             m = m.merged_with(j, merge_by=merge_by)
-    return m
+    if m is None:
+        return m
+    return m.divided_by(divide_by)

@@ -532,6 +532,11 @@ def main():
                         default=False,
                         action="store_true",
                         help="Merge timers across modules/targets/etc.")
+    parser.add_argument("--divide-by",
+                        default=1,
+                        metavar="D",
+                        type=int,
+                        help="Divide stats by D (to take an average)")
     parser.add_argument("--markdown",
                         default=False,
                         action="store_true",
