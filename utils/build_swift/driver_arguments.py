@@ -1101,12 +1101,11 @@ def create_argument_parser():
              'phone itself)')
 
     # -------------------------------------------------------------------------
-    llvm_group = parser.add_argument_group(
-        title='Build settings specific for LLVM')
-    llvm_group.add_argument(
-        '--llvm-targets-to-build',
-        default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
-        help='LLVM target generators to build')
+    in_group('Build settings specific for LLVM')
+
+    option('--llvm-targets-to-build', store,
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
+           help='LLVM target generators to build')
 
     # -------------------------------------------------------------------------
     android_group = parser.add_argument_group(
