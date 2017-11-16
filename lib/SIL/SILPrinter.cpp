@@ -2687,6 +2687,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "[serialized] ";
 
   getConformance()->printName(OS, Options);
+  Options.GenericEnv =
+    getConformance()->getDeclContext()->getGenericEnvironmentOfContext();
 
   if (isDeclaration()) {
     OS << "\n\n";
@@ -2727,7 +2729,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       auto &assocWitness = witness.getAssociatedTypeWitness();
       OS << "associated_type ";
       OS << assocWitness.Requirement->getName() << ": ";
-      assocWitness.Witness->print(OS, PrintOptions::printSIL());
+      assocWitness.Witness->print(OS, Options);
       break;
     }
     case AssociatedTypeProtocol: {

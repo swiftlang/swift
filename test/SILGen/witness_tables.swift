@@ -296,7 +296,7 @@ struct ConformingGeneric<R: AssocReqt> : AnyProtocol {
 func <~> <R: AssocReqt>(x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
 // TABLE-LABEL: sil_witness_table hidden <R where R : AssocReqt> ConformingGeneric<R>: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
-// TABLE-NEXT:    associated_type AssocWithReqt: τ_0_0
+// TABLE-NEXT:    associated_type AssocWithReqt: R
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
 // TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolA2aEP7generic{{[_0-9a-zA-Z]*}}FTW
@@ -323,7 +323,7 @@ struct ConformingGenericWithMoreGenericWitnesses<S: AssocReqt>
 func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(x: AA, y: BB) {}
 // TABLE-LABEL: sil_witness_table hidden <S where S : AssocReqt> ConformingGenericWithMoreGenericWitnesses<S>: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
-// TABLE-NEXT:    associated_type AssocWithReqt: τ_0_0
+// TABLE-NEXT:    associated_type AssocWithReqt: S
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
 // TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP6method{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolA2aEP7{{[_0-9a-zA-Z]*}}FTW
@@ -482,7 +482,7 @@ struct ConformsWithDependentAssocType1<CC: AssocReqt> : AssocTypeWithReqt {
   typealias AssocType = CC
 }
 // TABLE-LABEL: sil_witness_table hidden <CC where CC : AssocReqt> ConformsWithDependentAssocType1<CC>: AssocTypeWithReqt module witness_tables {
-// TABLE-NEXT:    associated_type AssocType: τ_0_0
+// TABLE-NEXT:    associated_type AssocType: CC
 // TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): dependent
 // TABLE-NEXT:  }
 
@@ -490,7 +490,7 @@ struct ConformsWithDependentAssocType2<DD> : AssocTypeWithReqt {
   typealias AssocType = GenericAssocType<DD>
 }
 // TABLE-LABEL: sil_witness_table hidden <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module witness_tables {
-// TABLE-NEXT:    associated_type AssocType: GenericAssocType<τ_0_0>
+// TABLE-NEXT:    associated_type AssocType: GenericAssocType<DD>
 // TABLE-NEXT:    associated_type_protocol (AssocType: AssocReqt): <T> GenericAssocType<T>: AssocReqt module witness_tables
 // TABLE-NEXT:  }
 
