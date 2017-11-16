@@ -458,6 +458,14 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
     }  
   }
 
+  // Cannot extend a bound generic type.
+  if (options.contains(TR_ExtensionBinding)) {
+    diagnose(loc, diag::extension_specialization,
+             genericDecl->getName())
+      .highlight(generic->getSourceRange());
+    return ErrorType::get(Context);
+  }
+
   // FIXME: More principled handling of circularity.
   if (!genericDecl->hasValidSignature()) {
     diagnose(loc, diag::recursive_type_reference,
@@ -676,22 +684,26 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             UnsatisfiedDependency *unsatisfiedDependency) {
   assert(fromDC && "No declaration context for type resolution?");
 
-  // If we have a callback to report dependencies, do so.
-  if (unsatisfiedDependency) {
-    if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
-      return nullptr;
-  } else {
-    // Validate the declaration.
-    TC.validateDeclForNameLookup(typeDecl);
-  }
+  // Don't validate nominal type declarations during extension binding.
+  if (!options.contains(TR_ExtensionBinding) ||
+      !isa<NominalTypeDecl>(typeDecl)) {
+    // If we have a callback to report dependencies, do so.
+    if (unsatisfiedDependency) {
+      if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
+        return nullptr;
+    } else {
+      // Validate the declaration.
+      TC.validateDeclForNameLookup(typeDecl);
+    }
 
-  // If we didn't bail out with an unsatisfiedDependency,
-  // and were not able to validate recursively, bail out.
-  if (!typeDecl->hasInterfaceType()) {
-    TC.diagnose(loc, diag::recursive_type_reference,
-                typeDecl->getDescriptiveKind(), typeDecl->getName());
-    TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
-    return ErrorType::get(TC.Context);
+    // If we didn't bail out with an unsatisfiedDependency,
+    // and were not able to validate recursively, bail out.
+    if (!typeDecl->hasInterfaceType()) {
+      TC.diagnose(loc, diag::recursive_type_reference,
+                  typeDecl->getDescriptiveKind(), typeDecl->getName());
+      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
+      return ErrorType::get(TC.Context);
+    }
   }
 
   // Resolve the type declaration to a specific type. How this occurs

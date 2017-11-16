@@ -8084,6 +8084,8 @@ static Type formExtensionInterfaceType(Type type,
     parentType = unbound->getParent();
     nominal = cast<NominalTypeDecl>(unbound->getDecl());
   } else {
+    if (type->is<ProtocolCompositionType>())
+      type = type->getCanonicalType();
     auto nominalType = type->castTo<NominalType>();
     parentType = nominalType->getParent();
     nominal = nominalType->getDecl();
@@ -8100,11 +8102,8 @@ static Type formExtensionInterfaceType(Type type,
 
   // If we don't have generic parameters at this level, just build the result.
   if (!nominal->getGenericParams() || isa<ProtocolDecl>(nominal)) {
-    Type resultType = NominalType::get(nominal, parentType,
-                                       nominal->getASTContext());
-
-    // If the parent was unchanged, return the original pointer.
-    return resultType->isEqual(type) ? type : resultType;
+    return NominalType::get(nominal, parentType,
+                            nominal->getASTContext());
   }
 
   // Form the bound generic type with the type parameters provided.
@@ -8113,8 +8112,7 @@ static Type formExtensionInterfaceType(Type type,
     genericArgs.push_back(gp->getDeclaredInterfaceType());
   }
 
-  Type resultType = BoundGenericType::get(nominal, parentType, genericArgs);
-  return resultType->isEqual(type) ? type : resultType;
+  return BoundGenericType::get(nominal, parentType, genericArgs);
 }
 
 /// Visit the given generic parameter lists from the outermost to the innermost,
@@ -8207,7 +8205,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     // Check generic parameters.
     GenericEnvironment *env;
     std::tie(env, extendedType) = checkExtensionGenericParams(
-        *this, ext, ext->getExtendedType()->getCanonicalType(),
+        *this, ext, ext->getExtendedType(),
         genericParams);
 
     ext->getExtendedTypeLoc().setType(extendedType);
