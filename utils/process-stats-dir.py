@@ -311,9 +311,20 @@ def write_comparison(args, old_stats, new_stats):
 
     if args.markdown:
 
+        def format_time(v):
+            if abs(v) > 1000000:
+                return "{:.1f}s".format(v / 1000000.0)
+            elif abs(v) > 1000:
+                return "{:.1f}ms".format(v / 1000.0)
+            else:
+                return "{:.1f}us".format(v)
+
         def format_field(field, row):
-            if field == 'name' and args.group_by_module:
-                return stat_name_minus_module(row.name)
+            if field == 'name':
+                if args.group_by_module:
+                    return stat_name_minus_module(row.name)
+                else:
+                    return row.name
             elif field == 'delta_pct':
                 s = str(row.delta_pct) + "%"
                 if args.github_emoji:
@@ -323,7 +334,11 @@ def write_comparison(args, old_stats, new_stats):
                         s += " :white_check_mark:"
                 return s
             else:
-                return str(vars(row)[field])
+                v = int(vars(row)[field])
+                if row.name.startswith('time.'):
+                    return format_time(v)
+                else:
+                    return "{:,d}".format(v)
 
         def format_table(elts):
             out = args.output
@@ -360,10 +375,12 @@ def write_comparison(args, old_stats, new_stats):
                 format_table(elts)
             out.write('</details>\n')
 
-        format_details('Regressed', regressed, args.close_regressions)
+        closed_regressions = (args.close_regressions or len(regressed) == 0)
+        format_details('Regressed', regressed, closed_regressions)
         format_details('Improved', improved, True)
-        format_details('Unchanged (abs(delta) < %s%% or %susec)' %
-                       (args.delta_pct_thresh, args.delta_usec_thresh),
+        format_details('Unchanged (delta < %s%% or delta < %s)' %
+                       (args.delta_pct_thresh,
+                        format_time(args.delta_usec_thresh)),
                        unchanged, True)
 
     else:
