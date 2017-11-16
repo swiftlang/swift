@@ -1203,9 +1203,7 @@ extension StringProtocol {
           self as? String
         )._unsafelyUnwrappedUnchecked._unmanagedContiguous
       }
-      return (
-        self as? Substring
-      )._unsafelyUnwrappedUnchecked._unmanagedContiguous
+      return (self as? Substring)?._unmanagedContiguous
     }
   }
 }
