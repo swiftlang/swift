@@ -126,6 +126,8 @@ class StdlibDeploymentTarget(object):
 
     Android = Platform("android", archs=["armv7"])
 
+    Fuchsia = Platform("fuchsia", archs=["x86_64", "aarch64"])
+
     Windows = Platform("windows", archs=["x86_64"])
 
     Haiku = Platform("haiku", archs=["x86_64"])
@@ -140,6 +142,7 @@ class StdlibDeploymentTarget(object):
         FreeBSD,
         Cygwin,
         Android,
+        Fuchsia,
         Windows,
         Haiku]
 

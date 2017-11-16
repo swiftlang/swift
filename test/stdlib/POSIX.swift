@@ -1,9 +1,11 @@
 // RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
 
-// Android Bionic does not provide a working implementation of
+// Android Bionic and Fuchsia does not provide a working implementation of
 // <semaphore.h>.
 // XFAIL: OS=linux-androideabi
+// XFAIL: OS=fuchsia-x86_64
+// XFAIL: OS=fuchsia-aarch64
 
 import StdlibUnittest
 #if os(Linux)

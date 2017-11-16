@@ -106,12 +106,36 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   0 // int entries; (zero'd bits)
 };
 
+#if defined(__Fuchsia__)
+#include <zircon/syscalls.h>
+static __swift_uint64_t randomUInt64() {
+  __swift_uint64_t returnval;
+  size_t remaining = sizeof(__swift_uint64_t);
+  unsigned char* offset = reinterpret_cast<unsigned char*>(&returnval);
+  size_t actual;
+  size_t read_len;
+  do {
+    // We can only read a limited number of bytes via the syscall at a time.
+    read_len =
+        remaining > ZX_CPRNG_DRAW_MAX_LEN ? ZX_CPRNG_DRAW_MAX_LEN : remaining;
+
+    zx_status_t status = zx_cprng_draw(offset, read_len, &actual);
+
+    // Decrement the remainder and update the pointer offset in the buffer.
+    remaining -= actual;
+    offset += actual;
+
+  } while (remaining > 0);
+  return returnval;
+}
+#else
 static __swift_uint64_t randomUInt64() {
   std::random_device randomDevice;
   std::mt19937_64 twisterEngine(randomDevice());
   std::uniform_int_distribution<__swift_uint64_t> distribution;
   return distribution(twisterEngine);
 }
+#endif
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 swift::_SwiftHashingSecretKey swift::_swift_stdlib_Hashing_secretKey = {

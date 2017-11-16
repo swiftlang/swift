@@ -119,6 +119,11 @@ function(_add_variant_c_compile_link_flags)
       "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "FUCHSIA")
+    list(APPEND result
+      "-I${SWIFT_FUCHSIA_TOOLCHAIN_PATH}/lib/${CFLAGS_ARCH}-fuchsia/include/c++/v1/")
+  endif()
+
   if(IS_DARWIN)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
@@ -270,6 +275,18 @@ function(_add_variant_c_compile_flags)
         "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "FUCHSIA")
+    if ("${CFLAGS_ARCH}" STREQUAL "x86_64")
+      # LLVM may assume that CMPXCHG16B instruction doesn't exist on some x64 cpus
+      # and will attempt to replace it with a libcall to a libgcc function that
+      # doesn't exist in compiler-rt
+      list(APPEND result "-mcx16")
+    endif()
+    list(APPEND result
+      "-I${SWIFT_FUCHSIA_ICU_CU_INCLUDE}"
+      "-I${SWIFT_FUCHSIA_ICU_I18N_INCLUDE}")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -369,6 +386,13 @@ function(_add_variant_link_flags)
     list(APPEND library_search_directories
         "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/lib/armv7-a"
         "${SWIFT_ANDROID_PREBUILT_PATH}/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x")
+  elseif("${LFLAGS_SDK}" STREQUAL "FUCHSIA")
+    list(APPEND result "-lc" "-ldl" "-lzircon" "-lfdio")
+    if (LFLAGS_ARCH STREQUAL "aarch64")
+      list(APPEND library_search_directories "${SWIFT_FUCHSIA_AARCH64_LIBS}")
+    elseif (LFLAGS_ARCH STREQUAL "x86_64")
+      list(APPEND library_search_directories "${SWIFT_FUCHSIA_X86_64_LIBS}")
+    endif()
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
@@ -1294,6 +1318,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_CYGWIN
 #   Swift modules this library depends on when built for Cygwin.
 #
+# SWIFT_MODULE_DEPENDS_FUCHSIA
+#   Swift modules this library depends on when built for Fuchsia.
+#
 # SWIFT_MODULE_DEPENDS_HAIKU
 #   Swift modules this library depends on when built for Haiku.
 #
@@ -1370,7 +1397,7 @@ function(add_swift_library name)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
     "INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS"
-    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;SWIFT_MODULE_DEPENDS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;SWIFT_MODULE_DEPENDS_FREEBSD;SWIFT_MODULE_DEPENDS_LINUX;SWIFT_MODULE_DEPENDS_CYGWIN;SWIFT_MODULE_DEPENDS_HAIKU;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;LLVM_COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS_OSX;SWIFT_COMPILE_FLAGS_IOS;SWIFT_COMPILE_FLAGS_TVOS;SWIFT_COMPILE_FLAGS_WATCHOS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY"
+    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;SWIFT_MODULE_DEPENDS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;SWIFT_MODULE_DEPENDS_FREEBSD;SWIFT_MODULE_DEPENDS_LINUX;SWIFT_MODULE_DEPENDS_CYGWIN;SWIFT_MODULE_DEPENDS_FUCHSIA;SWIFT_MODULE_DEPENDS_HAIKU;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;LLVM_COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS_OSX;SWIFT_COMPILE_FLAGS_IOS;SWIFT_COMPILE_FLAGS_TVOS;SWIFT_COMPILE_FLAGS_WATCHOS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_UNPARSED_ARGUMENTS})
 
@@ -1401,7 +1428,7 @@ function(add_swift_library name)
   if("${SWIFTLIB_TARGET_SDKS}" STREQUAL "")
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
   endif()
-  list_replace(SWIFTLIB_TARGET_SDKS ALL_POSIX_PLATFORMS "ALL_APPLE_PLATFORMS;ANDROID;CYGWIN;FREEBSD;LINUX;HAIKU")
+  list_replace(SWIFTLIB_TARGET_SDKS ALL_POSIX_PLATFORMS "ALL_APPLE_PLATFORMS;ANDROID;CYGWIN;FREEBSD;LINUX;FUCHSIA;HAIKU")
   list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_APPLE_PLATFORMS}")
 
   # All Swift code depends on the standard library, except for the standard
@@ -1513,6 +1540,9 @@ function(add_swift_library name)
         elseif("${sdk}" STREQUAL "CYGWIN")
           list(APPEND swiftlib_module_depends_flattened
                ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
+        elseif("${sdk}" STREQUAL "FUCHSIA")
+          list(APPEND swiftlib_module_depends_flattened
+               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FUCHSIA})
         elseif("${sdk}" STREQUAL "HAIKU")
           list(APPEND swiftlib_module_depends_flattened
                ${SWIFTLIB_SWIFT_MODULE_DEPENDS_HAIKU})
@@ -2030,8 +2060,7 @@ function(_add_swift_executable_single name)
 
   add_dependencies_multiple_targets(
       TARGETS "${name}"
-      DEPENDS
-        ${dependency_target}
+      DEPENDS ${dependency_target}
         ${LLVM_COMMON_DEPENDS}
         ${SWIFTEXE_SINGLE_DEPENDS}
         ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS})

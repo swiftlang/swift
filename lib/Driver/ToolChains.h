@@ -87,6 +87,16 @@ public:
   ~Android() = default;
 };
 
+class LLVM_LIBRARY_VISIBILITY Fuchsia : public GenericUnix {
+protected:
+  std::string getDefaultLinker() const override;
+
+  bool shouldProvideRPathToLinker() const override;
+public:
+  Fuchsia(const Driver &D, const llvm::Triple &Triple) : GenericUnix(D, Triple) {}
+  ~Fuchsia() = default;
+};
+
 class LLVM_LIBRARY_VISIBILITY Cygwin : public GenericUnix {
 protected:
   std::string getDefaultLinker() const override;

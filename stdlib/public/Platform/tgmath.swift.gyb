@@ -216,15 +216,15 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 @available(*, deprecated, message: "use the floatingPointClass property.")
 public func fpclassify(_ value: ${T}) -> Int {
 %if T == 'Double':
-#if os(Linux) || os(Haiku)
+#if os(Linux) || os(Fuchsia) || os(Haiku)
   return Int(__fpclassify(CDouble(value)))
-#elseif os(Windows) 
+#elseif os(Windows)
   return Int(_dclass(CDouble(value)))
 #else
   return Int(__fpclassifyd(CDouble(value)))
 #endif
 %else:
-#if os(Windows) 
+#if os(Windows)
   return Int(_${f}dclass(${CT}(value)))
 #else
   return Int(__fpclassify${f}(${CT}(value)))
@@ -300,7 +300,7 @@ public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Fuchsia) || os(Haiku)
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
   var sign = Int32(0)

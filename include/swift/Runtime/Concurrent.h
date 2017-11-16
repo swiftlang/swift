@@ -15,6 +15,7 @@
 #include <atomic>
 #include <functional>
 #include <stdint.h>
+#include <cstdio>
 #include "llvm/Support/Allocator.h"
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)

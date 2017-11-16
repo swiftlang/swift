@@ -6,6 +6,7 @@
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=linux-androideabi
+// UNSUPPORTED: OS=fuchsia
 
 // REQUIRES: OS=linux-gnu
 

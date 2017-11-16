@@ -20,7 +20,7 @@
 
 #include <type_traits>
 
-#if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__) || defined(__HAIKU__))
+#if (defined(__APPLE__) || defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__) || defined(__Fuchsia__) || defined(__HAIKU__))
 #include "swift/Runtime/MutexPThread.h"
 #elif defined(_WIN32)
 #include "swift/Runtime/MutexWin32.h"

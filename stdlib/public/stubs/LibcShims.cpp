@@ -138,6 +138,7 @@ int swift::_stdlib_openat(int fd, const char *path, int oflag,
   return openat(fd, path, oflag, mode);
 }
 
+#if !defined(__Fuchsia__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void *swift::_stdlib_sem_open2(const char *name, int oflag) {
   return sem_open(name, oflag);
@@ -148,6 +149,7 @@ void *swift::_stdlib_sem_open4(const char *name, int oflag,
                                __swift_mode_t mode, unsigned int value) {
   return sem_open(name, oflag, mode, value);
 }
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int swift::_stdlib_fcntl(int fd, int cmd, int value) {
@@ -285,7 +287,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_size(ptr);
 }
-#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
+#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) || defined(__Fuchsia__) || defined(__HAIKU__)
 #if defined(__HAIKU__)
 #define _GNU_SOURCE
 #endif

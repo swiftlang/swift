@@ -63,6 +63,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
+     ("${SDK}" STREQUAL "FUCHSIA") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU"))
     # No extra dependencies.

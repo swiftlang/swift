@@ -10,7 +10,7 @@
 
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Fuchsia)
 import Glibc
 #endif
 

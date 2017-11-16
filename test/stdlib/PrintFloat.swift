@@ -6,7 +6,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Fuchsia)
   import Glibc
 #else
   import Darwin

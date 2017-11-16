@@ -181,7 +181,32 @@ set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
 #
-# User-configurable ICU specific options for Android, FreeBSD, Linux and Haiku.
+# User-configurable Fuchsia specific options
+#
+
+set(SWIFT_FUCHSIA_AARCH64_SYSROOT "" CACHE STRING
+  "Path to a Fuchsia zircon aarch64 sysroot directory")
+
+set(SWIFT_FUCHSIA_X86_64_SYSROOT "" CACHE STRING
+  "Path to a Fuchsia zircon x86_64 sysroot directory")
+
+set(SWIFT_FUCHSIA_AARCH64_LIBS "" CACHE STRING
+  "Path to a Fuchsia aarch64 shared libs directory")
+
+set(SWIFT_FUCHSIA_X86_64_LIBS "" CACHE STRING
+  "Path to a Fuchsia x86_64 shared libs directory")
+
+set(SWIFT_FUCHSIA_ICU_UC_INCLUDE "" CACHE STRING
+  "Path to a directory containing Fuchsia's ICU common headers")
+
+set(SWIFT_FUCHSIA_ICU_I18N_INCLUDE "" CACHE STRING
+  "Path to a directory containing Fuchsia's ICU i18n headers")
+
+set(SWIFT_FUCHSIA_TOOLCHAIN_PATH "" CACHE STRING
+  "Path to a directory containing a Fuchsia clang toolchain")
+
+#
+# User-configurable ICU specific options for non-Darwin SDKs.
 #
 
 foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU)
@@ -736,10 +761,10 @@ if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
 
   set(SWIFT_ANDROID_PREBUILT_PATH
       "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}")
-  
+
   # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
   get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
-  set(SWIFT_SDK_ANDROID_ARCH_armv7_LINKER 
+  set(SWIFT_SDK_ANDROID_ARCH_armv7_LINKER
       "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}/bin/arm-linux-androideabi-${SWIFT_ANDROID_LINKER_NAME}")
 
   configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
@@ -750,6 +775,34 @@ if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
          ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND NOT swift_build_linux))
     set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
+  endif()
+endif()
+
+# Should we cross-compile the standard library for Fuchsia
+is_sdk_requested(FUCHSIA swift_build_fuchsia)
+if(swift_build_fuchsia)
+  set(fuchsia_archs)
+
+  if (NOT SWIFT_FUCHSIA_AARCH64_SYSROOT STREQUAL "")
+    set(SWIFT_SDK_FUCHSIA_ARCH_aarch64_PATH "${SWIFT_FUCHSIA_AARCH64_SYSROOT}")
+    list(APPEND fuchsia_archs "aarch64")
+  endif()
+  if (NOT SWIFT_FUCHSIA_X86_64_SYSROOT STREQUAL "")
+    set(SWIFT_SDK_FUCHSIA_ARCH_x86_64_PATH "${SWIFT_FUCHSIA_X86_64_SYSROOT}")
+    list(APPEND fuchsia_archs "x86_64")
+  endif()
+
+  set(SWIFT_FUCHSIA_ICU_UC "-licuuc")
+  set(SWIFT_FUCHSIA_ICU_I18N "-licui18n")
+
+  configure_sdk_fuchsia(FUCHSIA "Fuchsia" "fuchsia" "fuchsia" "${fuchsia_archs}")
+
+  if (NOT ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux"))
+    message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Fuchsia")
+  elseif(("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT swift_build_osx) OR
+         ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND NOT swift_build_linux))
+    set(SWIFT_PRIMARY_VARIANT_SDK_default "FUCHSIA")
+    set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
   endif()
 endif()
 

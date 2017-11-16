@@ -11,7 +11,7 @@
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Fuchsia)
   import Glibc
 #endif
 
@@ -35,18 +35,18 @@ bytes[11] = CChar(0)
 print("the magic word is //\(String(cString: bytes))//")
 
 // CHECK: O_CREAT|O_EXCL returned errno *17*
-let errFile = 
+let errFile =
   open(sourcePath, O_RDONLY | O_CREAT | O_EXCL)
-if errFile != -1 { 
-  print("O_CREAT|O_EXCL failed to return an error") 
+if errFile != -1 {
+  print("O_CREAT|O_EXCL failed to return an error")
 } else {
   let e = errno
-  print("O_CREAT|O_EXCL returned errno *\(e)*") 
+  print("O_CREAT|O_EXCL returned errno *\(e)*")
 }
 
 // CHECK-NOT: error
 // CHECK: created mode *33216* *33216*
-let tempFile = 
+let tempFile =
   open(tempPath, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IXUSR)
 if tempFile == -1 {
   let e = errno
@@ -82,4 +82,5 @@ print("created mode *\(statbuf1.st_mode)* *\(statbuf2.st_mode)*")
 
 assert(statbuf1.st_mode == S_IFREG | S_IRUSR | S_IWUSR | S_IXUSR)
 assert(statbuf1.st_mode == statbuf2.st_mode)
+
 

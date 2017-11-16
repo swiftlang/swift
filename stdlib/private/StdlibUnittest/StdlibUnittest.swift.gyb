@@ -20,7 +20,7 @@ import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Fuchsia) || os(Haiku)
 import Glibc
 #endif
 
@@ -1432,6 +1432,7 @@ public enum OSVersion : CustomStringConvertible {
   case ps4
   case windowsCygnus
   case windows
+  case fuchsia
   case haiku
 
   public var description: String {
@@ -1462,6 +1463,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Cygwin"
     case .windows:
       return "Windows"
+    case .fuchsia:
+      return "Fuchsia"
     case .haiku:
       return "Haiku"
     }
@@ -1506,6 +1509,8 @@ func _getOSVersion() -> OSVersion {
   return .windowsCygnus
 #elseif os(Windows)
   return .windows
+#elseif os(Fuchsia)
+  return .fuchsia
 #elseif os(Haiku)
   return .haiku
 #else
@@ -1589,7 +1594,9 @@ public enum TestRunPredicate : CustomStringConvertible {
   case windowsAny(reason: String)
 
   case windowsCygnusAny(reason: String)
-  
+
+  case fuchsiaAny(reason: String)
+
   case haikuAny(reason: String)
 
   case objCRuntime(/*reason:*/ String)
@@ -1683,7 +1690,10 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .windowsCygnusAny(reason: let reason):
       return "windowsCygnusAny(*, reason: \(reason))"
-      
+
+    case .fuchsiaAny(reason: let reason):
+      return "fuchsiaAny(*, reason: \(reason))"
+
     case .haikuAny(reason: let reason):
       return "haikuAny(*, reason: \(reason))"
 
@@ -1969,7 +1979,15 @@ public enum TestRunPredicate : CustomStringConvertible {
       default:
         return false
       }
-  
+
+    case .fuchsiaAny:
+      switch _getRunningOSVersion() {
+      case .fuchsia:
+        return true
+      default:
+        return false
+      }
+
     case .haikuAny:
       switch _getRunningOSVersion() {
       case .haiku:

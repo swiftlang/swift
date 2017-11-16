@@ -117,6 +117,7 @@ KNOWN_SETTINGS=(
     skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
     skip-build-android          ""               "set to skip building Swift stdlibs for Android"
+    skip-build-fuchsia          ""               "set to skip building Swift stdlibs for Fuchsia"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
@@ -152,6 +153,7 @@ KNOWN_SETTINGS=(
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
     skip-test-watchos-host      ""               "set to skip testing the host parts of the watchOS toolchain"
     skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
+    skip-test-fuchsia-host      ""               "set to skip testing the host parts of the Fuchsia toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
     test-paths                  ""               "run tests located in specific directories and/or files"
@@ -232,6 +234,13 @@ KNOWN_SETTINGS=(
     android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
     android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
+    fuchsia-aarch64-sysroot            ""        "Path to a directory containing a Fuchsia zircon aarch64 sysroot"
+    fuchsia-aarch64-libs               ""        "Path to a directory the Fuchsia aarch64 shared lib directory"
+    fuchsia-x86-64-sysroot             ""        "Path to a directory containing a Fuchsia zircon x86_64 sysroot"
+    fuchsia-x86-64-libs                ""        "Path to a directory the Fuchsia x86_64 shared lib directory"
+    fuchsia-icu-uc-include             ""        "Path to a directory containing Fuchsia ICU common headers"
+    fuchsia-icu-i18n-include           ""        "Path to a directory containing Fuchsia ICU i18n headers"
+    fuchsia-toolchain-path             ""        "Path to a directory containing a Fuchsia clang toolchain"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     cmark-cmake-options                ""        "CMake options used for all cmark targets"
@@ -1430,6 +1439,11 @@ function calculate_targets_for_host() {
                 build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
                 test_this_target=$(not ${SKIP_TEST_ANDROID_HOST})
                 ;;
+            fuchsia-*)
+                swift_sdk="FUCHSIA"
+                build_for_this_target=$(not ${SKIP_BUILD_FUCHSIA})
+                test_this_target=$(not ${SKIP_TEST_FUCHSIA_HOST})
+                ;;
             *)
                 echo "Unknown compiler deployment target: ${stdlib_deployment_target}"
                 exit 1
@@ -2121,6 +2135,19 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
                         -DSWIFT_ANDROID_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
+                    )
+                fi
+
+                if [[ ! "${SKIP_BUILD_FUCHSIA}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_FUCHSIA_X86_64_SYSROOT:STRING="${FUCHSIA_X86_64_SYSROOT}"
+                        -DSWIFT_FUCHSIA_X86_64_LIBS:STRING="${FUCHSIA_X86_64_LIBS}"
+                        -DSWIFT_FUCHSIA_AARCH64_SYSROOT:STRING="${FUCHSIA_AARCH64_SYSROOT}"
+                        -DSWIFT_FUCHSIA_AARCH64_LIBS:STRING="${FUCHSIA_AARCH64_LIBS}"
+                        -DSWIFT_FUCHSIA_ICU_UC_INCLUDE:STRING="${FUCHSIA_ICU_UC_INCLUDE}"
+                        -DSWIFT_FUCHSIA_ICU_I18N_INCLUDE:STRING="${FUCHSIA_ICU_I18N_INCLUDE}"
+                        -DSWIFT_FUCHSIA_TOOLCHAIN_PATH:STRING="${FUCHSIA_TOOLCHAIN_PATH}"
                     )
                 fi
 

@@ -82,10 +82,11 @@ list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   set(static_binary_lnk_file_list)
-  foreach(sdk ${SWIFT_SDKS}) 
+  foreach(sdk ${SWIFT_SDKS})
     if(NOT "${sdk}" STREQUAL "LINUX" AND
        NOT "${sdk}" STREQUAL "FREEBSD" AND
-       NOT "${sdk}" STREQUAL "ANDROID")
+       NOT "${sdk}" STREQUAL "ANDROID" AND
+       NOT "${sdk}" STREQUAL "FUCHSIA"))
       continue()
     endif()
 

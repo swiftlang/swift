@@ -254,6 +254,39 @@ class BuildScriptInvocation(object):
                     "--android-icu-uc-include, --android-icu-i18n, "
                     "and --android-icu-i18n-include must be specified")
 
+
+        fuchsia_tgts = [tgt for tgt in args.stdlib_deployment_targets
+                    if StdlibDeploymentTarget.Fuchsia.contains(tgt)]
+        if len(fuchsia_tgts) > 0:
+            if args.fuchsia_toolchain_path is None:
+                diagnostics.fatal(
+                    "when building for Fuchsia --fuchsia-toolchain-path must "
+                    "be specified")
+
+            if args.fuchsia_icu_uc_include is None:
+                diagnostics.fatal(
+                    "when building for Fuchsia --fuchsia-icu-uc-include must "
+                    "be specified")
+
+            if args.fuchsia_icu_i18n_include is None:
+                diagnostics.fatal(
+                    "when building for Fuchsia --fuchsia-icu-i18n-include must "
+                    "be specified")
+
+            if StdlibDeploymentTarget.Fuchsia.aarch64.name in fuchsia_tgts and \
+                    (args.fuchsia_aarch64_libs is None or \
+                    args.fuchsia_aarch64_sysroot is None):
+                diagnostics.fatal(
+                    "when building for Fuchsia aarch64 --fuchsia-aarch64-libs "
+                    "and --fuchsia-aarch64-sysroot must be specified")
+
+            if StdlibDeploymentTarget.Fuchsia.x86_64.name in fuchsia_tgts and \
+                    (args.fuchsia_x86_64_libs is None or \
+                    args.fuchsia_x86_64_sysroot is None):
+                diagnostics.fatal(
+                    "when building for Fuchsia x86_64 --fuchsia-x86_64-libs "
+                    "and --fuchsia-x86_64-sysroot must be specified")
+
     @staticmethod
     def apply_default_arguments(toolchain, args):
         # Infer if ninja is required
@@ -360,6 +393,8 @@ class BuildScriptInvocation(object):
                 StdlibDeploymentTarget.AppleWatchSimulator)
         if not args.build_android:
             self.platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
+        if not args.build_fuchsia:
+            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Fuchsia)
 
         self.platforms_to_skip_test = set()
         self.platforms_archs_to_skip_test = set()
@@ -401,6 +436,9 @@ class BuildScriptInvocation(object):
 
         if not args.test_android_host:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
+
+        if not args.test_fuchsia_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Fuchsia)
 
         self.platforms_to_skip_test_host = set()
         if not args.test_ios_host:
@@ -637,6 +675,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-watchos-simulator"]
         if not args.build_android:
             impl_args += ["--skip-build-android"]
+        if not args.build_fuchsia:
+            impl_args += ["--skip-build-fuchsia"]
 
         if not args.test and not args.long_test:
             impl_args += ["--skip-test-swift"]
@@ -675,6 +715,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-watchos-simulator"]
         if not args.test_android_host:
             impl_args += ["--skip-test-android-host"]
+        if not args.test_fuchsia_host:
+            impl_args += ["--skip-test-fuchsia-host"]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]
         if args.validation_test:
@@ -704,6 +746,24 @@ class BuildScriptInvocation(object):
                 "--android-deploy-device-path",
                 args.android_deploy_device_path,
             ]
+
+        if args.fuchsia_toolchain_path is not None:
+            impl_args += [
+                "--fuchsia-icu-uc-include", args.fuchsia_icu_uc_include,
+                "--fuchsia-icu-i18n-include", args.fuchsia_icu_i18n_include,
+                "--fuchsia-toolchain-path", args.fuchsia_toolchain_path,
+            ]
+
+            if args.fuchsia_x86_64_libs is not None:
+                impl_args += [
+                    "--fuchsia-x86-64-libs", args.fuchsia_x86_64_libs,
+                    "--fuchsia-x86-64-sysroot", args.fuchsia_x86_64_sysroot,
+                ]
+            if args.fuchsia_aarch64_libs is not None:
+                impl_args += [
+                    "--fuchsia-aarch64-libs", args.fuchsia_aarch64_libs,
+                    "--fuchsia-aarch64-sysroot", args.fuchsia_aarch64_sysroot,
+                ]
 
         if platform.system() == 'Darwin':
             impl_args += [

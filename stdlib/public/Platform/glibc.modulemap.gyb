@@ -19,8 +19,11 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "FUCHSIA"]:
   link "pthread"
+% end
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
   // FIXME: util contains rarely used functions and not usually needed. Unfortunately
   // link directive doesn't work in the submodule yet.
   link "util"
@@ -38,7 +41,7 @@ module SwiftGlibc [system] {
 
   // C standard library
   module C {
-% if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN", "FUCHSIA"]:
     module features {
 % if CMAKE_SDK == "LINUX":
       header "${GLIBC_INCLUDE_PATH}/stdc-predef.h"
@@ -47,17 +50,19 @@ module SwiftGlibc [system] {
       export *
     }
 % end
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "FUCHSIA", "HAIKU"]:
     module complex {
       header "${GLIBC_INCLUDE_PATH}/complex.h"
       export *
     }
 % end
-% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "CYGWIN", "FUCHSIA"]:
     module pty {
       header "${GLIBC_INCLUDE_PATH}/pty.h"
       export *
     }
+% end
+% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
     module utmp {
       header "${GLIBC_INCLUDE_PATH}/utmp.h"
       export *
@@ -178,7 +183,7 @@ module SwiftGlibc [system] {
 
   // POSIX
   module POSIX {
-% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "CYGWIN", "FUCHSIA"]:
     module wait {
       header "${GLIBC_INCLUDE_PATH}/wait.h"
       export *
@@ -190,6 +195,9 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/aio.h"
       export *
     }
+% end
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "FUCHSIA"]:
     module cpio {
       header "${GLIBC_INCLUDE_PATH}/cpio.h"
       export *
@@ -208,7 +216,7 @@ module SwiftGlibc [system] {
     }
 % end
 
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "FUCHSIA"]:
     module ftw {
       header "${GLIBC_INCLUDE_PATH}/ftw.h"
       export *
@@ -253,10 +261,14 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/tar.h"
       export *
     }
+% end
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
     module utmpx {
       header "${GLIBC_INCLUDE_PATH}/utmpx.h"
       export *
     }
+% end
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "FUCHSIA"]:
     module wordexp {
       header "${GLIBC_INCLUDE_PATH}/wordexp.h"
       export *
@@ -390,7 +402,7 @@ module SwiftGlibc [system] {
     module sys {
       export *
 
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "FUCHSIA", "HAIKU"]:
       module file {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/file.h"
         export *
