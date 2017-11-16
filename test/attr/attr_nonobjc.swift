@@ -39,10 +39,10 @@ class BlueLightSaber : LightSaber {
   init(x: String) {} // expected-error {{conflicts with previous declaration with the same Objective-C selector}}
 }
 
-@nonobjc class NonObjCClassNotAllowed { } // expected-error {{@nonobjc cannot be applied to this declaration}} {{1-10=}}
+@nonobjc class NonObjCClassNotAllowed { } // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}} {{1-10=}}
 
 class NonObjCDeallocNotAllowed {
-  @nonobjc deinit { // expected-error {{@nonobjc cannot be applied to this declaration}} {{3-12=}}
+  @nonobjc deinit { // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}} {{3-12=}}
 
   }
 }
