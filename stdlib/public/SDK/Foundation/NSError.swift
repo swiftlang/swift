@@ -27,7 +27,6 @@ public typealias ErrorPointer = NSErrorPointer
 public // COMPILER_INTRINSIC
 let _nilObjCError: Error = _GenericObjCError.nilError
 
-@_silgen_name("swift_convertNSErrorToError")
 public // COMPILER_INTRINSIC
 func _convertNSErrorToError(_ error: NSError?) -> Error {
   if let error = error {
@@ -36,7 +35,6 @@ func _convertNSErrorToError(_ error: NSError?) -> Error {
   return _nilObjCError
 }
 
-@_silgen_name("swift_convertErrorToNSError")
 public // COMPILER_INTRINSIC
 func _convertErrorToNSError(_ error: Error) -> NSError {
   return unsafeDowncast(_bridgeErrorToNSError(error), to: NSError.self)
@@ -147,7 +145,7 @@ public extension CustomNSError {
 
   /// The error code within the given domain.
   var errorCode: Int {
-    return _swift_getDefaultErrorCode(self)
+    return _getDefaultErrorCode(self)
   }
 
   /// The default user-info dictionary.
@@ -201,8 +199,7 @@ internal let _errorDomainUserInfoProviderQueue = DispatchQueue(
   label: "SwiftFoundation._errorDomainUserInfoProviderQueue")
 
 /// Retrieve the default userInfo dictionary for a given error.
-@_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
-public func _swift_Foundation_getErrorDefaultUserInfo<T: Error>(_ error: T)
+public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
   -> AnyObject? {
   let hasUserInfoValueProvider: Bool
 
@@ -358,8 +355,7 @@ public protocol _ObjectiveCBridgeableError : Error {
 /// If the bridge succeeds, the bridged value is written to the uninitialized
 /// memory pointed to by 'out', and true is returned. Otherwise, 'out' is
 /// left uninitialized, and false is returned.
-@_silgen_name("swift_stdlib_bridgeNSErrorToError")
-public func _stdlib_bridgeNSErrorToError<
+public func _bridgeNSErrorToError<
   T : _ObjectiveCBridgeableError
 >(_ error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
   if let bridged = T(_bridgedNSError: error) {

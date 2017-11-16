@@ -95,24 +95,20 @@ public protocol Hashable : Equatable {
   var hashValue: Int { get }
 }
 
-public enum _RuntimeHelpers {}
+// Called by the SwiftValue implementation.
+@_silgen_name("_swift_stdlib_Hashable_isEqual_indirect")
+internal func Hashable_isEqual_indirect<T : Hashable>(
+  _ lhs: UnsafePointer<T>,
+  _ rhs: UnsafePointer<T>
+) -> Bool {
+  return lhs.pointee == rhs.pointee
+}
 
-extension _RuntimeHelpers {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_silgen_name("swift_stdlib_Hashable_isEqual_indirect")
-  public static func Hashable_isEqual_indirect<T : Hashable>(
-    _ lhs: UnsafePointer<T>,
-    _ rhs: UnsafePointer<T>
-  ) -> Bool {
-    return lhs.pointee == rhs.pointee
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_silgen_name("swift_stdlib_Hashable_hashValue_indirect")
-  public static func Hashable_hashValue_indirect<T : Hashable>(
-    _ value: UnsafePointer<T>
-  ) -> Int {
-    return value.pointee.hashValue
-  }
+// Called by the SwiftValue implementation.
+@_silgen_name("_swift_stdlib_Hashable_hashValue_indirect")
+internal func Hashable_hashValue_indirect<T : Hashable>(
+  _ value: UnsafePointer<T>
+) -> Int {
+  return value.pointee.hashValue
 }
 

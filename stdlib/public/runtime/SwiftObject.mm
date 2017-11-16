@@ -148,24 +148,17 @@ static SwiftObject *_allocHelper(Class cls) {
 }
 
 NSString *swift::convertStringToNSString(String *swiftString) {
+  // public func _convertStringToNSString(_ string: String) -> NSString
   typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
+  auto convertStringToNSString = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<ConversionFn*>(dlsym(RTLD_DEFAULT,
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_convertStringToNSStringSo0E0CSSF)))));
 
-  // Cached lookup of swift_convertStringToNSString, which is in Foundation.
-  static std::atomic<ConversionFn *> TheConvertStringToNSString(nullptr);
-  auto convertStringToNSString =
-    TheConvertStringToNSString.load(std::memory_order_relaxed);
-  if (!convertStringToNSString) {
-    convertStringToNSString = (ConversionFn *)(uintptr_t)
-      dlsym(RTLD_DEFAULT, "swift_convertStringToNSString");
-    // If Foundation hasn't loaded yet, fall back to returning the static string
-    // "SwiftObject". The likelihood of someone invoking -description without
-    // ObjC interop is low.
-    if (!convertStringToNSString)
-      return @"SwiftObject";
-
-    TheConvertStringToNSString.store(convertStringToNSString,
-                                     std::memory_order_relaxed);
-  }
+  // If Foundation hasn't loaded yet, fall back to returning the static string
+  // "SwiftObject". The likelihood of someone invoking -description without
+  // ObjC interop is low.
+  if (!convertStringToNSString)
+    return @"SwiftObject";
 
   return convertStringToNSString(swiftString->x,
                                  swiftString->y,

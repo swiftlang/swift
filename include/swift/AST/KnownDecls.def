@@ -49,8 +49,6 @@ FUNC_DECL(ForceBridgeFromObjectiveC,
           "_forceBridgeFromObjectiveC")
 FUNC_DECL(ConditionallyBridgeFromObjectiveC,
           "_conditionallyBridgeFromObjectiveC")
-FUNC_DECL(BridgeErrorToNSError,
-          "_bridgeErrorToNSError")
 
 FUNC_DECL(ForceBridgeFromObjectiveCBridgeable,
           "_forceBridgeFromObjectiveC_bridgeable")
@@ -66,7 +64,7 @@ FUNC_DECL(ConvertToAnyHashable, "_convertToAnyHashable")
 
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
-FUNC_DECL(GetErrorEmbeddedNSError, "_stdlib_getErrorEmbeddedNSError")
+FUNC_DECL(GetErrorEmbeddedNSError, "_getErrorEmbeddedNSError")
 
 FUNC_DECL(UnsafeBitCast, "unsafeBitCast")
 

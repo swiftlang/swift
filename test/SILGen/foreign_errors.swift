@@ -48,7 +48,7 @@ func test0() throws {
   //   Error path: fall out and rethrow.
   // CHECK: [[ERROR_BB]]:
   // CHECK: [[T0:%.*]] = load [take] [[ERR_TEMP0]]
-  // CHECK: [[T1:%.*]] = function_ref @swift_convertNSErrorToError : $@convention(thin) (@owned Optional<NSError>) -> @owned Error
+  // CHECK: [[T1:%.*]] = function_ref @_T010Foundation22_convertNSErrorToErrors0E0_pSo0C0CSgF : $@convention(thin) (@owned Optional<NSError>) -> @owned Error
   // CHECK: [[T2:%.*]] = apply [[T1]]([[T0]])
   // CHECK: throw [[T2]] : $Error
 }
@@ -68,7 +68,7 @@ extension NSObject {
 // CHECK: bb2([[ERR:%.*]] : $Error):
 // CHECK:   switch_enum %0 : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb4
 // CHECK: bb3([[UNWRAPPED_OUT:%.+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
-// CHECK:   [[T0:%.*]] = function_ref @swift_convertErrorToNSError : $@convention(thin) (@owned Error) -> @owned NSError
+// CHECK:   [[T0:%.*]] = function_ref @_T010Foundation22_convertErrorToNSErrorSo0E0Cs0C0_pF : $@convention(thin) (@owned Error) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
@@ -111,7 +111,7 @@ extension NSObject {
 // CHECK:   switch_enum [[UNOWNED_ARG0]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9][0-9]*]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9][0-9]*]]
 //
 // CHECK: [[SOME_BB]]([[UNWRAPPED_OUT:%.+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
-// CHECK:   [[T0:%.*]] = function_ref @swift_convertErrorToNSError : $@convention(thin) (@owned Error) -> @owned NSError
+// CHECK:   [[T0:%.*]] = function_ref @_T010Foundation22_convertErrorToNSErrorSo0E0Cs0C0_pF : $@convention(thin) (@owned Error) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>

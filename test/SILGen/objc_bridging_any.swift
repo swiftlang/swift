@@ -731,7 +731,7 @@ extension GenericClass {
 // Make sure AnyHashable erasure marks Hashable conformance as used
 class AnyHashableClass : NSObject {
   // CHECK-LABEL: sil hidden @_T017objc_bridging_any16AnyHashableClassC07returnsdE0s0dE0VyF
-  // CHECK: [[FN:%.*]] = function_ref @_swift_convertToAnyHashable
+  // CHECK: [[FN:%.*]] = function_ref @_T0s21_convertToAnyHashables0cD0Vxs0D0RzlF
   // CHECK: apply [[FN]]<GenericOption>({{.*}})
   func returnsAnyHashable() -> AnyHashable {
     return GenericOption.multithreaded
