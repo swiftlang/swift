@@ -128,8 +128,6 @@ public:
   void clearLoc(IRBuilder &Builder);
   void pushLoc();
   void popLoc();
-  void setArtificialTrapLocation(IRBuilder &Builder,
-                                 const SILDebugScope *Scope);
   void setEntryPointLoc(IRBuilder &Builder);
   llvm::DIScope *getEntryPointFn();
   llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
@@ -1628,14 +1626,6 @@ void IRGenDebugInfoImpl::popLoc() {
   std::tie(LastDebugLoc, LastScope) = LocationStack.pop_back_val();
 }
 
-/// Emit the final line 0 location for the unified trap block at the
-/// end of the function.
-void IRGenDebugInfoImpl::setArtificialTrapLocation(IRBuilder &Builder,
-                                                   const SILDebugScope *Scope) {
-  auto DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope));
-  Builder.SetCurrentDebugLocation(DL);
-}
-
 void IRGenDebugInfoImpl::setEntryPointLoc(IRBuilder &Builder) {
   auto DL = llvm::DebugLoc::get(0, 0, getEntryPointFn(), nullptr);
   Builder.SetCurrentDebugLocation(DL);
@@ -2082,12 +2072,6 @@ void IRGenDebugInfo::pushLoc() {
 
 void IRGenDebugInfo::popLoc() {
   static_cast<IRGenDebugInfoImpl *>(this)->popLoc();
-}
-
-void IRGenDebugInfo::setArtificialTrapLocation(IRBuilder &Builder,
-                                               const SILDebugScope *Scope) {
-  static_cast<IRGenDebugInfoImpl *>(this)->setArtificialTrapLocation(Builder,
-                                                                     Scope);
 }
 
 void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
