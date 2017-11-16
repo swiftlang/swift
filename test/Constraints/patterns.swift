@@ -163,8 +163,9 @@ case nil?: break // expected-warning {{case is already handled by previous patte
 default: break
 }
 
+// <rdar://problem/21995744> QoI: Binary operator '~=' cannot be applied to operands of type 'String' and 'String?'
 switch ("foo" as String?) {
-case "what": break
+case "what": break // expected-error{{expression pattern of type 'String' cannot match values of type 'String?'}} {{12-12=?}}
 default: break
 }
 

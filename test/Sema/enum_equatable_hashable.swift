@@ -226,18 +226,6 @@ indirect enum TotallyIndirect: Hashable {
   case end(Int)
 }
 
-// Check the use of conditional conformances.
-enum ArrayOfEquatables : Equatable {
-case only([Int])
-}
-
-struct NotEquatable { }
-
-// FIXME: rdar://problem/35518088 this should fail.
-enum ArrayOfNotEquatables : Equatable {
-case only([NotEquatable])
-}
-
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
