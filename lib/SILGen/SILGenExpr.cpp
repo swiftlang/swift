@@ -834,9 +834,21 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   }
 
   // If we hit this point, we must have DidExclusiveBorrowSelf. We should have
-  // gone through the formal evaluation variant.
-  llvm_unreachable("Accessed self via non-formal evaluation API after "
-                   "exclusively borrowing self?!");
+  // gone through the formal evaluation variant but did not. The only way that
+  // this can happen is if during argument evaluation, we are accessing self in
+  // a way that is illegal before we call super. Return a copy of self in this
+  // case so that DI will flag on this issue. We do not care where the destroy
+  // occurs, so we can use a normal scoped copy.
+  ManagedValue Result;
+  if (!SuperInitDelegationSelf) {
+    Result = InitDelegationSelf.copy(*this, loc);
+  } else {
+    Result =
+        B.createUncheckedRefCast(loc, SuperInitDelegationSelf.copy(*this, loc),
+                                 InitDelegationSelf.getType());
+  }
+
+  return RValue(*this, loc, refType, Result);
 }
 
 RValue SILGenFunction::emitFormalEvaluationRValueForSelfInDelegationInit(
