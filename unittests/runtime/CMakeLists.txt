@@ -29,6 +29,11 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${EXECINFO_LIBRARY}
       )
+    # FIXME: This won't work on anything but x86-64. It's not a big issue
+    # for now, as Swift only works on x86-64 for FreeBSD, but we need
+    # to generalize to work on other architectures.
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+      "${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-x86_64.a")
   endif()
 
   add_swift_unittest(SwiftRuntimeTests
