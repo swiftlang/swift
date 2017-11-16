@@ -1139,6 +1139,10 @@ extension _StringGuts {
   public // TODO(StringGuts): for testing only
   mutating func append(_ other: _StringGuts) {
     guard !other._isEmpty else { return }
+    if _isEmpty && capacity == 0 { // Don't discard reserved capacity, if any
+      self = other
+      return
+    }
 
     // TODO: Eventual small form check on self and other. We could even do this
     // now for the tagged cocoa strings.
