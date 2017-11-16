@@ -1029,7 +1029,7 @@ recur:
     if (type->hasTypeParameter())
       var->setInterfaceType(type);
     else
-      var->setInterfaceType(var->getDeclContext()->mapTypeOutOfContext(type));
+      var->setInterfaceType(type->mapTypeOutOfContext());
 
     checkTypeModifyingDeclAttributes(var);
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
@@ -1548,7 +1548,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
         assert(!param->isLet() || !ty->is<InOutType>());
         param->setType(ty->getInOutObjectType());
-        param->setInterfaceType(CE->mapTypeOutOfContext(ty)->getInOutObjectType());
+        param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
       }
     }
     
@@ -1568,7 +1568,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (isValidType(ty) || shouldOverwriteParam(param)) {
       assert(!param->isLet() || !ty->is<InOutType>());
       param->setType(ty->getInOutObjectType());
-      param->setInterfaceType(CE->mapTypeOutOfContext(ty)->getInOutObjectType());
+      param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
     }
     
     checkTypeModifyingDeclAttributes(param);

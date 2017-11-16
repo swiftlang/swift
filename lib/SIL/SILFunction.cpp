@@ -204,11 +204,6 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                     genericSig);
 }
 
-Type SILFunction::mapTypeOutOfContext(Type type) const {
-  return GenericEnvironment::mapTypeOutOfContext(
-      getGenericEnvironment(), type);
-}
-
 bool SILFunction::isNoReturnFunction() const {
   return SILType::getPrimitiveObjectType(getLoweredFunctionType())
       .isNoReturnFunction();

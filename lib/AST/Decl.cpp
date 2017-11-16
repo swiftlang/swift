@@ -2503,7 +2503,7 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
   if (underlying->hasArchetype() && isGenericContext())
-    underlying = mapTypeOutOfContext(underlying);
+    underlying = underlying->mapTypeOutOfContext();
   UnderlyingTy.setType(underlying);
 
   // FIXME -- if we already have an interface type, we're changing the
@@ -5185,7 +5185,7 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto inputTy = getArgumentTypeLoc().getType()) {
-    resultTy = FunctionType::get(ED->mapTypeOutOfContext(inputTy), resultTy);
+    resultTy = FunctionType::get(inputTy->mapTypeOutOfContext(), resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())

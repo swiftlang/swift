@@ -2114,7 +2114,7 @@ Type ClangImporter::Implementation::importMethodType(
                                            bodyName,
                                            swiftParamTy,
                                            ImportedHeaderUnit);
-    paramInfo->setInterfaceType(dc->mapTypeOutOfContext(swiftParamTy));
+    paramInfo->setInterfaceType(swiftParamTy->mapTypeOutOfContext());
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||
@@ -2178,7 +2178,7 @@ Type ClangImporter::Implementation::importMethodType(
 
   // Form the function type.
   return FunctionType::get((*bodyParams)->getInterfaceType(SwiftContext),
-                           dc->mapTypeOutOfContext(swiftResultTy), extInfo);
+                           swiftResultTy->mapTypeOutOfContext(), extInfo);
 }
 
 Type ClangImporter::Implementation::importAccessorMethodType(
@@ -2218,7 +2218,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
   Type resultTy;
   if (isGetter) {
     *params = ParameterList::createEmpty(SwiftContext);
-    resultTy = dc->mapTypeOutOfContext(propertyTy);
+    resultTy = propertyTy->mapTypeOutOfContext();
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
     ImportedName fullBodyName = importFullName(param, CurrentVersion);
@@ -2233,7 +2233,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
                                            argLabel, nameLoc, bodyName,
                                            propertyTy,
                                            /*dummy DC*/ImportedHeaderUnit);
-    paramInfo->setInterfaceType(dc->mapTypeOutOfContext(propertyTy));
+    paramInfo->setInterfaceType(propertyTy->mapTypeOutOfContext());
 
     *params = ParameterList::create(SwiftContext, paramInfo);
     resultTy = SwiftContext.getVoidDecl()->getDeclaredInterfaceType();

@@ -907,7 +907,7 @@ public:
 
     // Enum case constructor references are open-coded.
     if (auto *eed = dyn_cast<EnumElementDecl>(e->getDecl())) {
-      setCallee(Callee::forEnumElement(SGF, SILDeclRef(e->getDecl()), subs, e));
+      setCallee(Callee::forEnumElement(SGF, SILDeclRef(eed), subs, e));
       return;
     }
 

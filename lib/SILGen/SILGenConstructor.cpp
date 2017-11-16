@@ -892,7 +892,7 @@ static SILValue getBehaviorSetterFn(SILGenFunction &SGF, VarDecl *behaviorVar) {
 static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Pattern *pattern) {
-  auto interfaceType = fromDC->mapTypeOutOfContext(pattern->getType());
+  auto interfaceType = pattern->getType()->mapTypeOutOfContext();
   auto resultType = toDC->mapTypeIntoContext(interfaceType);
 
   return resultType;

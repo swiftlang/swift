@@ -1669,7 +1669,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   DeclContext *DC = D->getDeclContext();
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto *genericSig = FD->getGenericSignature();
-  auto *genericEnv = FD->getGenericEnvironment();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
   if (!trailingWhereClause) {
@@ -1721,9 +1720,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
       // Map types to their interface types.
       if (firstType)
-        interfaceFirstType = genericEnv->mapTypeOutOfContext(firstType);
+        interfaceFirstType = firstType->mapTypeOutOfContext();
       if (secondType)
-        interfaceSecondType = genericEnv->mapTypeOutOfContext(secondType);
+        interfaceSecondType = secondType->mapTypeOutOfContext();
 
       collectUsedGenericParameters(interfaceFirstType,
                                    constrainedGenericParams);
@@ -1770,7 +1769,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
       // Map types to their interface types.
       if (subjectType)
-        interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+        interfaceSubjectType = subjectType->mapTypeOutOfContext();
 
       collectUsedGenericParameters(interfaceSubjectType,
                                    constrainedGenericParams);
@@ -1809,7 +1808,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
       // Map types to their interface types.
       if (subjectType)
-        interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+        interfaceSubjectType = subjectType->mapTypeOutOfContext();
 
       collectUsedGenericParameters(interfaceSubjectType,
                                    constrainedGenericParams);
@@ -1820,8 +1819,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         continue;
 
 
-      auto interfaceLayoutConstraint =
-          genericEnv->mapTypeOutOfContext(constraint);
+      auto interfaceLayoutConstraint = constraint->mapTypeOutOfContext();
 
       // Re-create a requirement using the resolved interface types.
       auto resolvedReq = RequirementRepr::getTypeConstraint(

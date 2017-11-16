@@ -639,7 +639,7 @@ public:
       generator = new (TC.Context)
         VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
                 S->getInLoc(), TC.Context.getIdentifier(name), generatorTy, DC);
-      generator->setInterfaceType(DC->mapTypeOutOfContext(generatorTy));
+      generator->setInterfaceType(generatorTy->mapTypeOutOfContext());
       generator->setImplicit();
 
       // Create a pattern binding to initialize the generator.

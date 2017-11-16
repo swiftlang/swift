@@ -2085,7 +2085,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
       // Map it to an interface type in terms of the derived class
       // generic signature.
-      decl->setInterfaceType(classDecl->mapTypeOutOfContext(paramSubstTy));
+      decl->setInterfaceType(paramSubstTy->mapTypeOutOfContext());
     }
   } else {
     for (auto *decl : *bodyParams) {

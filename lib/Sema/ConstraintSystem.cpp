@@ -717,7 +717,7 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
   if (!wantInterfaceType && requestedType->hasArchetype()) {
     auto valueDC = value->getDeclContext();
     if (valueDC != UseDC) {
-      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
+      Type mapped = requestedType->mapTypeOutOfContext();
       requestedType = UseDC->mapTypeIntoContext(mapped);
     }
   }

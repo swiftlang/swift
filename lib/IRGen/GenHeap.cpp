@@ -1530,7 +1530,7 @@ public:
     auto boxedInterfaceType = boxedType;
     if (env) {
       boxedInterfaceType = SILType::getPrimitiveType(
-        env->mapTypeOutOfContext(boxedType.getSwiftRValueType())
+        boxedType.getSwiftRValueType()->mapTypeOutOfContext()
            ->getCanonicalType(),
          boxedType.getCategory());
     }
