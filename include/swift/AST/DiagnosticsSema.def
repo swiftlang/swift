@@ -1028,9 +1028,9 @@ ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
 ERROR(transparent_in_protocols_not_supported,none,
-      "@_transparent is not supported on declarations within protocols", ())
+      "'@_transparent' attribute is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,none,
-      "@_transparent is not supported on declarations within classes", ())
+      "'@_transparent' attribute is not supported on declarations within classes", ())
 
 ERROR(invalid_iboutlet,none,
       "only instance properties can be declared @IBOutlet", ())
@@ -1124,7 +1124,7 @@ ERROR(access_control_open_bad_decl,none,
 ERROR(invalid_decl_attribute_simple,none,
       "attribute cannot be applied to declaration", ())
 ERROR(invalid_decl_attribute,none,
-      "%0 cannot be applied to this declaration", (DeclAttribute))
+      "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,none,
@@ -3707,7 +3707,7 @@ ERROR(class_designated_init_inlineable_resilient,none,
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
-      none, "@%0 cannot be applied to stored properties", (StringRef))
+      none, "'@%0' attribute cannot be applied to stored properties", (StringRef))
 
 ERROR(inlineable_dynamic_not_supported,
       none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())
