@@ -2198,6 +2198,8 @@ namespace {
     conformance->setState(ProtocolConformanceState::Checking);
     SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
+    TC.validateDecl(Proto);
+
     // If the protocol itself is invalid, there's nothing we can do.
     if (Proto->isInvalid()) {
       conformance->setInvalid();
