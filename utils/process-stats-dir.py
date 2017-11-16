@@ -48,7 +48,10 @@ def vars_of_args(args):
     vargs = vars(args)
     if args.select_stats_from_csv_baseline is not None:
         b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
-        if args.group_by_module:
+        # Sniff baseline stat-names to figure out if they're module-qualified
+        # even when the user isn't asking us to _output_ module-grouped data.
+        all_triples = all(len(k.split('.')) == 3 for k in b.keys())
+        if args.group_by_module or all_triples:
             vargs['select_stat'] = set(stat_name_minus_module(k)
                                        for k in b.keys())
         else:
