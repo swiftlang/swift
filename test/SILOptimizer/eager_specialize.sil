@@ -49,7 +49,7 @@ enum ArithmeticError : Error {
 @_specialize(where T == Int)
 public func divideNum<T : SignedInteger & _ExpressibleByBuiltinIntegerLiteral>(num: T, den: T) throws -> T
 
-@inline(never) @_semantics("optimize.sil.never") func foo<T>(t: T) -> Int64
+@inline(never) @_optimize(none) func foo<T>(t: T) -> Int64
 
 // CHECK: @_specialize(exported: false, kind: full, where T == Int64)
 // CHECK: @_specialize(exported: false, kind: full, where T == Float)
@@ -240,7 +240,7 @@ bb2:
 // --- test: multiple void and non-void return values
 
 // foo<A> (A) -> Int64
-sil hidden [noinline] [_semantics "optimize.sil.never"] @_T016eager_specialize3foos5Int64VxlF : $@convention(thin) <T> (@in T) -> Int64 {
+sil hidden [noinline] [Onone] @_T016eager_specialize3foos5Int64VxlF : $@convention(thin) <T> (@in T) -> Int64 {
 // %0                                             // users: %1, %4
 bb0(%0 : $*T):
   %2 = integer_literal $Builtin.Int64, 3

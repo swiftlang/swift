@@ -13,7 +13,7 @@ protocol RRR : QQQ {
 struct S : RRR {}
 
 extension QQQ {
-    @_semantics("optimize.sil.never")
+    @_optimize(none)
     func f() {}
 }
 

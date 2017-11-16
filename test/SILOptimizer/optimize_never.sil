@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -generic-specializer -inline %s > %t.sil
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-full-demangle -enable-sil-verify-all -specdevirt %t.sil | %FileCheck %s
 
-// Check that the  @_semantics("optimize.sil.never") annotation prevents
+// Check that the  @_optimize(none) annotation prevents
 // any optimizations of the annotated function:
 // - No functions are inlined into the annotated function.
 // - No calls are devirtualized in the body of the annotated function.
@@ -27,7 +27,7 @@ public class D : C {
 }
 
 public class Base {
-  @_semantics("optimize.sil.never") func foo() -> Int32
+  @_optimize(none) func foo() -> Int32
   func boo() -> Int32
   deinit
   init()
@@ -35,7 +35,7 @@ public class Base {
 
 public class Derived1 : Base {
   override func foo() -> Int32
-  @_semantics("optimize.sil.never") override func boo() -> Int32
+  @_optimize(none) override func boo() -> Int32
   deinit
   override init()
 }
@@ -49,13 +49,13 @@ public class Derived2 : Base {
 
 public func transform1<T>(x: T) -> Int32
 
-@_semantics("optimize.sil.never") public func foo1<T>(x: T, _ c: C) -> Int32
+@_optimize(none) public func foo1<T>(x: T, _ c: C) -> Int32
 
 public func boo1(c: C) -> Int32
 
 public func transform2(x: Int32) -> Int32
 
-@_semantics("optimize.sil.never") public func foo2(x: Int32, _ c: C) -> Int32
+@_optimize(none) public func foo2(x: Int32, _ c: C) -> Int32
 
 public func boo2(c: C) -> Int32
 
@@ -171,7 +171,7 @@ bb0(%0 : $*T):
 
 
 // Check that both calls are not inlined or devirtualized.
-// CHECK-LABEL: sil [_semantics "optimize.sil.never"] @_T014optimize_never4foo1s5Int32Vx_AA1CCtlF
+// CHECK-LABEL: sil [Onone] @_T014optimize_never4foo1s5Int32Vx_AA1CCtlF
 // CHECK-NOT: checked_cast_br
 // CHECK: function_ref @_T014optimize_never10transform1s5Int32VxlF
 // CHECK: apply
@@ -179,7 +179,7 @@ bb0(%0 : $*T):
 // CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
-sil [_semantics "optimize.sil.never"] @_T014optimize_never4foo1s5Int32Vx_AA1CCtlF : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
+sil [Onone] @_T014optimize_never4foo1s5Int32Vx_AA1CCtlF : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
 bb0(%0 : $*T, %1 : $C):
   %4 = function_ref @_T014optimize_never10transform1s5Int32VxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %5 = alloc_stack $T
@@ -207,7 +207,7 @@ sil [transparent] [serialized] @_T0s1pois5Int32VAC_ACtFZ : $@convention(thin) (I
 
 // CHECK-LABEL: sil @_T014optimize_never4boo1s5Int32VAA1CCF
 // CHECK-NOT: return
-// This call should not be inlined, because the callee is annotated with @_semantics("optimize.sil.never")
+// This call should not be inlined, because the callee is annotated with @_optimize(none)
 // CHECK: function_ref @_T014optimize_never4foo1s5Int32Vx_AA1CCtlF
 // CHECK: apply
 // CHECK: return
@@ -236,7 +236,7 @@ bb0(%0 : $Int32):
 
 
 // Check that both calls are not inlined or devirtualized.
-// CHECK-LABEL: sil [_semantics "optimize.sil.never"] @_T014optimize_never4foo2s5Int32VAD_AA1CCtF
+// CHECK-LABEL: sil [Onone] @_T014optimize_never4foo2s5Int32VAD_AA1CCtF
 // CHECK-NOT: checked_cast_br
 // CHECK: function_ref @_T014optimize_never10transform2s5Int32VADF
 // CHECK: apply
@@ -244,7 +244,7 @@ bb0(%0 : $Int32):
 // CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
-sil [_semantics "optimize.sil.never"] @_T014optimize_never4foo2s5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32 {
+sil [Onone] @_T014optimize_never4foo2s5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32 {
 bb0(%0 : $Int32, %1 : $C):
   %4 = function_ref @_T014optimize_never10transform2s5Int32VADF : $@convention(thin) (Int32) -> Int32
   %5 = apply %4(%0) : $@convention(thin) (Int32) -> Int32
@@ -265,7 +265,7 @@ bb0(%0 : $Int32, %1 : $C):
 
 // CHECK-LABEL: sil @_T014optimize_never4boo2s5Int32VAA1CCF
 // CHECK-NOT: return
-// This call should not be inlined, because the callee is annotated with @_semantics("optimize.sil.never")
+// This call should not be inlined, because the callee is annotated with @_optimize(none)
 // CHECK: function_ref @_T014optimize_never4foo2s5Int32VAD_AA1CCtF
 // CHECK: apply
 // CHECK: return
@@ -282,7 +282,7 @@ bb0(%0 : $C):
 
 // Check that no generic specialization was produced for foo1 because it is excluded from optimizations.
 // CHECK-NOT: generic specialization <Swift.Int> of {{.*}}.foo1
-// But foo3 was specialized, because it is not annotated with @_semantics("optimize.sil.never")
+// But foo3 was specialized, because it is not annotated with @_optimize(none)
 // CHECK: generic specialization <Swift.Int32> of {{.*}}.foo3
 
 
@@ -389,7 +389,7 @@ bb0(%0 : $C):
   return %6 : $Int32
 }
 
-sil hidden [_semantics "optimize.sil.never"] @_T014optimize_never4BaseC3foos5Int32VyF : $@convention(method) (@guaranteed Base) -> Int32 {
+sil hidden [Onone] @_T014optimize_never4BaseC3foos5Int32VyF : $@convention(method) (@guaranteed Base) -> Int32 {
 bb0(%0 : $Base):
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -409,7 +409,7 @@ bb0(%0 : $Derived1):
   return %3 : $Int32
 }
 
-sil hidden [_semantics "optimize.sil.never"] @_T014optimize_never8Derived1C3boos5Int32VyF : $@convention(method) (@guaranteed Derived1) -> Int32 {
+sil hidden [Onone] @_T014optimize_never8Derived1C3boos5Int32VyF : $@convention(method) (@guaranteed Derived1) -> Int32 {
 bb0(%0 : $Derived1):
   %2 = integer_literal $Builtin.Int32, 4
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -432,7 +432,7 @@ bb0(%0 : $Derived2):
 
 // Check that class_method is not speculatively devirtualized, because the
 // method foo in the class Base, which mentioned in the class_method
-// instruction is marked with @_semantics("optimize.sil.never").
+// instruction is marked with @_optimize(none).
 //
 // CHECK-LABEL: sil @_T014optimize_never19testDoNotDevirtBases5Int32VAA0G0C1o_tF
 // CHECK: bb0
@@ -449,7 +449,7 @@ bb0(%0 : $Base):
 }
 
 // Check that Derived1.boo is not devirtualized, because this method
-// is marked with @_semantics("optimize.sil.never") and thus should not
+// is marked with @_optimize(none) and thus should not
 // participate in speculative devirtualization.
 //
 // CHECK-LABEL: sil @_T014optimize_never23testDoNotDevirtDerived1s5Int32VAA4BaseC1o_tF
