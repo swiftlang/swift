@@ -2011,9 +2011,9 @@ extension _JSONDecoder {
         switch self.options.dateDecodingStrategy {
         case .deferredToDate:
             self.storage.push(container: value)
-            let date = try Date(from: self)
-            self.storage.popContainer()
-            return date
+            defer { self.storage.popContainer() }
+
+            return try Date(from: self)
 
         case .secondsSince1970:
             let double = try self.unbox(value, as: Double.self)!
@@ -2045,9 +2045,9 @@ extension _JSONDecoder {
 
         case .custom(let closure):
             self.storage.push(container: value)
-            let date = try closure(self)
-            self.storage.popContainer()
-            return date
+            defer { self.storage.popContainer() }
+
+            return try closure(self)
         }
     }
 
@@ -2057,9 +2057,9 @@ extension _JSONDecoder {
         switch self.options.dataDecodingStrategy {
         case .deferredToData:
             self.storage.push(container: value)
-            let data = try Data(from: self)
-            self.storage.popContainer()
-            return data
+            defer { self.storage.popContainer() }
+
+            return try Data(from: self)
 
         case .base64:
             guard let string = value as? String else {
@@ -2074,9 +2074,9 @@ extension _JSONDecoder {
 
         case .custom(let closure):
             self.storage.push(container: value)
-            let data = try closure(self)
-            self.storage.popContainer()
-            return data
+            defer { self.storage.popContainer() }
+
+            return try closure(self)
         }
     }
 
@@ -2116,8 +2116,9 @@ extension _JSONDecoder {
             decoded = decimal as! T
         } else {
             self.storage.push(container: value)
+            defer { self.storage.popContainer() }
+
             decoded = try type.init(from: self)
-            self.storage.popContainer()
         }
 
         return decoded
