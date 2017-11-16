@@ -211,6 +211,7 @@ KNOWN_SETTINGS=(
     swift-enable-ast-verifier   "1"              "If enabled, and the assertions are enabled, the built Swift compiler will run the AST verifier every time it is invoked"
     swift-runtime-enable-leak-checker   "0"              "Enable leaks checking routines in the runtime"
     use-gold-linker             ""               "Enable using the gold linker"
+    use-lld-linker              ""               "Enable using the lld linker"
     darwin-toolchain-bundle-identifier ""        "CFBundleIdentifier for xctoolchain info plist"
     darwin-toolchain-display-name      ""        "Display Name for xctoolcain info plist"
     darwin-toolchain-display-name-short ""       "Display Name with out date for xctoolchain info plist"
@@ -440,7 +441,10 @@ function set_build_options_for_host() {
         linux-*)
             SWIFT_HOST_VARIANT="linux"
             SWIFT_HOST_VARIANT_SDK="LINUX"
-            USE_GOLD_LINKER=1
+            if [[ -z "${USE_LLD_LINKER}" ]] ; then
+                USE_GOLD_LINKER=1
+            fi
+
             case ${host} in
                 linux-x86_64)
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
@@ -1972,6 +1976,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_SHARED_LINKER_FLAGS:STRING="-fuse-ld=gold"
                 )
             fi
+        elif [[ "${USE_LLD_LINKER}" ]]; then
+            echo "${product}: using lld linker"
+            if [[ "${product}" != "swift" ]]; then
+                # All other projects override the linker flags to add in
+                # lld linker support.
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    -DCMAKE_EXE_LINKER_FLAGS:STRING="-fuse-ld=lld"
+                    -DCMAKE_SHARED_LINKER_FLAGS:STRING="-fuse-ld=lld"
+                )
+            fi
         else
             echo "${product}: using standard linker"
         fi
@@ -2032,6 +2047,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llvm_cmake_options[@]}"
                 )
 
+                if [[ "${USE_LLD_LINKER}" ]]; then
+                    cmake_options+=(
+                    -DLLVM_ENABLE_LLD:BOOL=YES
+                    )
+                fi
+
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
                     -DLLVM_BUILD_TOOLS=NO
@@ -2073,14 +2094,19 @@ for host in "${ALL_HOSTS[@]}"; do
 
             swift)
 
+                # Swift will selectively use the gold or lld linker on all
+                # parts except building the standard library.  We
+                # let the Swift cmake setup figure out how to apply
+                # that.
                 if [[ "${USE_GOLD_LINKER}" ]]; then
-                    # Swift will selectively use the gold linker on all
-                    # parts except building the standard library.  We
-                    # let the Swift cmake setup figure out how to apply
-                    # that.
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ENABLE_GOLD_LINKER=TRUE
+                    )
+                elif [[ "${USE_LLD_LINKER}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ENABLE_LLD_LINKER=TRUE
                     )
                 fi
 
@@ -2465,6 +2491,8 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "${USE_GOLD_LINKER}" ]]; then
                     SWIFT_USE_LINKER="-fuse-ld=gold"
+                elif [[ "${USE_LLD_LINKER}" ]]; then
+                    SWIFT_USE_LINKER="-fuse-ld=lld"
                 fi
 
                 # FIXME CROSSCOMPILING:
