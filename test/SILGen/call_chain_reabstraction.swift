@@ -7,9 +7,11 @@ struct A {
         // CHECK-LABEL: sil hidden @_T024call_chain_reabstraction1AV1f{{[_0-9a-zA-Z]*}}F
         // CHECK:         [[G:%.*]] = function_ref @_T024call_chain_reabstraction1AV1g{{[_0-9a-zA-Z]*}}F
         // CHECK:         [[G2:%.*]] = apply [[G]]<A>
-        // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_T024call_chain_reabstraction1AVA2CIexyir_A3CIexyyd_TR
-        // CHECK:         [[REABSTRACT:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[G2]])
-        // CHECK:         apply [[REABSTRACT]]([[SELF:%.*]], [[SELF]])
+        // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_T024call_chain_reabstraction1AVA2CIegyir_A3CIegyyd_TR
+        // CHECK:         [[REABSTRACT:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[G2]])
+        // CHECK:         [[BORROW:%.*]] = begin_borrow [[REABSTRACT]]
+        // CHECK:         apply [[BORROW]]([[SELF:%.*]], [[SELF]])
+        // CHECK:         destroy_value [[REABSTRACT]]
         func f() {
                 let recur: (A, A) -> A = { c, x in x }
                 let b = g(recur)(self, self)

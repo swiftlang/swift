@@ -4,7 +4,7 @@ func testCall(_ f: (() -> ())?) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
-// CHECK:    bb0([[T0:%.*]] : @owned $Optional<@callee_owned () -> ()>):
+// CHECK:    bb0([[T0:%.*]] : @owned $Optional<@callee_guaranteed () -> ()>):
 // CHECK:      [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK:      [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK:      [[T1:%.*]] = select_enum [[T0_COPY]]
@@ -18,9 +18,11 @@ func testCall(_ f: (() -> ())?) {
 //   optional...
 
 // CHECK: [[SOME]]:
-// CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data [[T0_COPY]] : $Optional<@callee_owned () -> ()>, #Optional.some!enumelt.1
+// CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data [[T0_COPY]] : $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1
 //   .... then call it
-// CHECK-NEXT: apply [[FN0]]()
+// CHECK-NEXT: [[B:%.*]] = begin_borrow [[FN0]]
+// CHECK-NEXT: apply [[B]]()
+// CHECK:      destroy_value [[FN0]]
 // CHECK:      end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK:      br [[EXIT:bb[0-9]+]](
 
@@ -34,9 +36,9 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
   var x = f?()
 }
-// CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<@callee_owned () -> @out T>) -> ()
-// CHECK:    bb0([[T0:%.*]] : @owned $Optional<@callee_owned () -> @out T>):
-// CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_owned () -> @out τ_0_0> } <T>, var, name "f"
+// CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<@callee_guaranteed () -> @out T>) -> ()
+// CHECK:    bb0([[T0:%.*]] : @owned $Optional<@callee_guaranteed () -> @out T>):
+// CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_guaranteed () -> @out τ_0_0> } <T>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
 // CHECK: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
@@ -55,9 +57,11 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: [[T0:%.*]] = load [copy] [[T1]]
 // CHECK-NEXT: end_access [[READ]]
 //   ...evaluate the rest of the suffix...
-// CHECK-NEXT: apply [[T0]]([[TEMP]])
+// CHECK:     [[B:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: apply [[B]]([[TEMP]])
 //   ...and coerce to T?
-// CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}some
+// CHECK: inject_enum_addr [[PBX]] {{.*}}some
+// CHECK:     destroy_value [[T0]]
 // CHECK-NEXT: br bb3
 //   Continuation block.
 // CHECK:    bb3

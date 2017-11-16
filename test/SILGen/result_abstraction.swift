@@ -25,8 +25,8 @@ protocol ReturnsFunction {
 }
 
 struct ConformsToReturnsFunction : ReturnsFunction {
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T018result_abstraction25ConformsToReturnsFunctionVAA0eF0A2aDP7getFunc{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: ReturnsFunction) (@in_guaranteed ConformsToReturnsFunction) -> @owned @callee_owned (@in S) -> @out R
-  // CHECK:         function_ref @_T018result_abstraction1SVAA1RVIexyd_AcEIexir_TR : $@convention(thin) (@in S, @owned @callee_owned (S) -> R) -> @out R
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T018result_abstraction25ConformsToReturnsFunctionVAA0eF0A2aDP7getFunc{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: ReturnsFunction) (@in_guaranteed ConformsToReturnsFunction) -> @owned @callee_guaranteed (@in S) -> @out R
+  // CHECK:         function_ref @_T018result_abstraction1SVAA1RVIegyd_AcEIegir_TR : $@convention(thin) (@in S, @guaranteed @callee_guaranteed (S) -> R) -> @out R
   func getFunc() -> (S) -> R {
     return {s in R()}
   }
@@ -50,8 +50,8 @@ struct ConformsToReturnsAssocWithMetatype : ReturnsAssoc {
 
 struct ConformsToReturnsAssocWithFunction : ReturnsAssoc {
   typealias Assoc = (S) -> R
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T018result_abstraction34ConformsToReturnsAssocWithFunctionVAA0eF0A2aDP03getF0{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: ReturnsAssoc) (@inout ConformsToReturnsAssocWithFunction) -> @out @callee_owned (@in S) -> @out R
-  // CHECK:         function_ref @_T018result_abstraction34ConformsToReturnsAssocWithFunctionV03getF0{{[_0-9a-zA-Z]*}}F : $@convention(method) (@inout ConformsToReturnsAssocWithFunction) -> @owned @callee_owned (S) -> R
+  // CHECK-LABEL: sil private [transparent] [thunk] @_T018result_abstraction34ConformsToReturnsAssocWithFunctionVAA0eF0A2aDP03getF0{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: ReturnsAssoc) (@inout ConformsToReturnsAssocWithFunction) -> @out @callee_guaranteed (@in S) -> @out R
+  // CHECK:         function_ref @_T018result_abstraction34ConformsToReturnsAssocWithFunctionV03getF0{{[_0-9a-zA-Z]*}}F : $@convention(method) (@inout ConformsToReturnsAssocWithFunction) -> @owned @callee_guaranteed (S) -> R
   mutating
   func getAssoc() -> (S) -> R {
     return {s in R()}

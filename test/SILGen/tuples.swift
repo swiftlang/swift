@@ -123,13 +123,15 @@ func testTupleUnsplat() {
   // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
   _ = GenericEnum<(Int, Int)>.one(x, y)
 
-  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIexi_S2iIexyy_TR
-  // CHECK: [[REABSTRACTED:%.+]] = partial_apply [[THUNK]]({{%.+}})
-  // CHECK: apply [[REABSTRACTED]]([[X]], [[Y]])
+  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIegi_S2iIegyy_TR
+  // CHECK: [[REABSTRACTED:%.+]] = partial_apply [callee_guaranteed] [[THUNK]]({{%.+}})
+  // CHECK: [[BORROW:%.*]] = begin_borrow [[REABSTRACTED]]
+  // CHECK: apply [[BORROW]]([[X]], [[Y]])
   _ = GenericEnum<(Int, Int)>.callback((x, y))
-  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIexi_S2iIexyy_TR
-  // CHECK: [[REABSTRACTED:%.+]] = partial_apply [[THUNK]]({{%.+}})
-  // CHECK: apply [[REABSTRACTED]]([[X]], [[Y]])
+  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIegi_S2iIegyy_TR
+  // CHECK: [[REABSTRACTED:%.+]] = partial_apply [callee_guaranteed] [[THUNK]]({{%.+}})
+  // CHECK: [[BORROW:%.*]] = begin_borrow [[REABSTRACTED]]
+  // CHECK: apply [[BORROW]]([[X]], [[Y]])
   _ = GenericEnum<(Int, Int)>.callback(x, y)
 } // CHECK: end sil function '_T06tuples16testTupleUnsplatyyF'
 

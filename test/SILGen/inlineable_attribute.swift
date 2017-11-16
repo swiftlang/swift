@@ -43,7 +43,7 @@ public class MyCls {
   case c(MySt)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T020inlineable_attribute6MyEnumO1cAcA0C2StVcACmFTc : $@convention(thin) (@thin MyEnum.Type) -> @owned @callee_owned (MySt) -> MyEnum
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T020inlineable_attribute6MyEnumO1cAcA0C2StVcACmFTc : $@convention(thin) (@thin MyEnum.Type) -> @owned @callee_guaranteed (MySt) -> MyEnum
 
 @_inlineable public func referencesMyEnum() {
   _ = MyEnum.c
@@ -66,7 +66,7 @@ public class Horse {
 // CHECK: return
 // CHECK: }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T020inlineable_attribute5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_owned () -> () {
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T020inlineable_attribute5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_guaranteed () -> () {
 // CHECK: class_method
 // CHECK: return
 // CHECK: }
