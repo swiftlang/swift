@@ -26,11 +26,14 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   // First, get a mangled name for the declaration.
   std::string mangledName;
 
-  if (auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>()) {
-    mangledName = SILGenName->Name;
-  } else {
-    Mangle::ASTMangler NewMangler;
-    mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
+  {
+    auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>();
+    if (SILGenName && !SILGenName->Name.empty()) {
+      mangledName = SILGenName->Name;
+    } else {
+      Mangle::ASTMangler NewMangler;
+      mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
+    }
   }
 
   // Check if it is already created, and update linkage if necessary.

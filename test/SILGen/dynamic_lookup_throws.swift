@@ -24,7 +24,7 @@ func testBlub(a: AnyObject) throws {
   // CHECK:   return
 
   // CHECK: bb2
-  // CHECK:   function_ref @swift_convertNSErrorToError
+  // CHECK:   function_ref @_T010Foundation22_convertNSErrorToErrors0E0_pSo0C0CSgF
   // CHECK:   throw {{%.*}} : $Error
   try a.blub()
 }

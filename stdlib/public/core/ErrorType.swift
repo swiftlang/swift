@@ -134,49 +134,45 @@ extension Error {
 #if _runtime(_ObjC)
 // Helper functions for the C++ runtime to have easy access to embedded error,
 // domain, code, and userInfo as Objective-C values.
-@_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_getErrorDomainNSString")
-public func _stdlib_getErrorDomainNSString<T : Error>(_ x: UnsafePointer<T>)
+@_silgen_name("")
+internal func _getErrorDomainNSString<T : Error>(_ x: UnsafePointer<T>)
 -> AnyObject {
   return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_getErrorCode")
-public func _stdlib_getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
+@_silgen_name("")
+internal func _getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
 }
 
-// Helper functions for the C++ runtime to have easy access to domain and
-// code as Objective-C values.
-@_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
-public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
+@_silgen_name("")
+internal func _getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
   return x.pointee._userInfo.map { $0 as AnyObject }
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorIndirect")
-public func _stdlib_getErrorEmbeddedNSErrorIndirect<T : Error>(
+// Called by the casting machinery to extract an NSError from an Error value.
+@_silgen_name("")
+internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
     _ x: UnsafePointer<T>) -> AnyObject? {
   return x.pointee._getEmbeddedNSError()
 }
 
-/// FIXME: Quite unfortunate to have both of these.
+/// Called by compiler-generated code to extract an NSError from an Error value.
 @_inlineable // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_getErrorEmbeddedNSError")
-public func _stdlib_getErrorEmbeddedNSError<T : Error>(_ x: T)
+public // COMPILER_INTRINSIC
+func _getErrorEmbeddedNSError<T : Error>(_ x: T)
 -> AnyObject? {
   return x._getEmbeddedNSError()
 }
 
-@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
-public func _stdlib_getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject?
+/// Provided by the ErrorObject implementation.
+@_silgen_name("_swift_stdlib_getErrorDefaultUserInfo")
+internal func _getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject?
 
-// Known function for the compiler to use to coerce `Error` instances
-// to `NSError`.
-@_silgen_name("swift_bridgeErrorToNSError")
+/// Provided by the ErrorObject implementation.
+/// Called by the casting machinery and by the Foundation overlay.
+@_silgen_name("_swift_stdlib_bridgeErrorToNSError")
 public func _bridgeErrorToNSError(_ error: Error) -> AnyObject
 #endif
 
@@ -196,13 +192,14 @@ public func _errorInMain(_ error: Error) {
 }
 
 /// Runtime function to determine the default code for an Error-conforming type.
-@_silgen_name("swift_getDefaultErrorCode")
-public func _swift_getDefaultErrorCode<T : Error>(_ x: T) -> Int
+/// Called by the Foundation overlay.
+@_silgen_name("_swift_stdlib_getDefaultErrorCode")
+public func _getDefaultErrorCode<T : Error>(_ error: T) -> Int
 
 extension Error {
   @_inlineable // FIXME(sil-serialize-all)
   public var _code: Int {
-    return _swift_getDefaultErrorCode(self)
+    return _getDefaultErrorCode(self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -210,10 +207,9 @@ extension Error {
     return String(reflecting: type(of: self))
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
   public var _userInfo: AnyObject? {
 #if _runtime(_ObjC)
-    return _stdlib_getErrorDefaultUserInfo(self)
+    return _getErrorDefaultUserInfo(self)
 #else
     return nil
 #endif

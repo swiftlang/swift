@@ -16,9 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_arrayDownCastIndirect")
-public func _arrayDownCastIndirect<SourceValue, TargetValue>(
+internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>) {
   target.initialize(to: _arrayForceCast(source.pointee))
@@ -69,9 +69,9 @@ extension Optional {
   }
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_arrayDownCastConditionalIndirect")
-public func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
+internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>
 ) -> Bool {
