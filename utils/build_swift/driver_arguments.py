@@ -814,28 +814,25 @@ def create_argument_parser():
         dest='lldb_assertions',
         help='disable assertions in LLDB')
 
-    # FIXME: This should be one option using choices=[...]
-    cmake_generator_group = parser.add_argument_group(
-        title='Select the CMake generator')
-    cmake_generator_group.add_argument(
-        '-x', '--xcode',
-        action='store_const',
-        const='Xcode',
-        dest='cmake_generator',
-        help="use CMake's Xcode generator (default is Ninja)")
-    cmake_generator_group.add_argument(
-        '-m', '--make',
-        action='store_const',
-        const='Unix Makefiles',
-        dest='cmake_generator',
-        help="use CMake's Makefile generator (default is Ninja)")
-    cmake_generator_group.add_argument(
-        '-e', '--eclipse',
-        action='store_const',
-        const='Eclipse CDT4 - Ninja',
-        dest='cmake_generator',
-        help="use CMake's Eclipse generator (default is Ninja)")
+    # -------------------------------------------------------------------------
+    in_group('Select the CMake generator')
 
+    set_defaults(cmake_generator=defaults.CMAKE_GENERATOR)
+
+    option(['-e', '--eclipse'], store('cmake_generator'),
+           const='Eclipse CDT4 - Ninja',
+           default=defaults.CMAKE_GENERATOR,
+           help="use CMake's Xcode generator (%(default)s by default)")
+    option(['-m', '--make'], store('cmake_generator'),
+           const='Unix Makefiles',
+           default=defaults.CMAKE_GENERATOR,
+           help="use CMake's Makefile generator (%(default)s by default)")
+    option(['-x', '--xcode'], store('cmake_generator'),
+           const='Xcode',
+           default=defaults.CMAKE_GENERATOR,
+           help="use CMake's Xcode generator (%(default)s by default)")
+
+    # -------------------------------------------------------------------------
     run_tests_group = parser.add_argument_group(
         title='Run tests')
 
