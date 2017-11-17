@@ -49,7 +49,7 @@ Currently, a generic type cannot be nested within another generic type, e.g.
 
 ```Swift
 struct X<T> {
-  struct Y<U> { }  // currently ill-formed, but should be possible
+  struct Y<U> { }
 }
 ```
 
