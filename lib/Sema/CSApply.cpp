@@ -7874,7 +7874,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   cs.cacheExprTypes(call);
 
   // If the system failed to produce a solution, post any available diagnostics.
-  if (cs.solve(solutions) || solutions.size() != 1) {
+  if (cs.solve(call, solutions) || solutions.size() != 1) {
     cs.salvage(solutions, base);
     return nullptr;
   }
