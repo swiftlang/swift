@@ -677,12 +677,12 @@ public:
       return true;
 
     case SyntaxNodeKind::Keyword:
+    case SyntaxNodeKind::Identifier:
       if (Node.Range.getStart() == LastArgLoc ||
           Node.Range.getStart() == LastParamLoc)
         return true;
       break;
 
-    case SyntaxNodeKind::Identifier:
     case SyntaxNodeKind::DollarIdent:
     case SyntaxNodeKind::Integer:
     case SyntaxNodeKind::Floating:
