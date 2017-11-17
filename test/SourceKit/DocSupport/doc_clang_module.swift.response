@@ -420,11 +420,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 96,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
     key.usr: "s:s6UInt32V",
@@ -443,16 +438,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 133,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 124,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 133,
     key.length: 8
   },
@@ -501,11 +486,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 200,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooEnum1",
     key.usr: "c:@E@FooEnum1",
@@ -519,11 +499,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 217,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 217,
     key.length: 3
   },
@@ -603,11 +578,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 334,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
     key.usr: "s:s6UInt32V",
@@ -626,16 +596,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 371,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 362,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 371,
     key.length: 8
   },
@@ -684,11 +644,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 438,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooEnum2",
     key.usr: "c:@E@FooEnum2",
@@ -702,11 +657,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 455,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 455,
     key.length: 3
   },
@@ -808,11 +758,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 604,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
     key.usr: "s:s6UInt32V",
@@ -831,16 +776,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 641,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 632,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 641,
     key.length: 8
   },
@@ -889,11 +824,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 708,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooEnum3",
     key.usr: "c:@E@FooEnum3",
@@ -907,11 +837,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 725,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 725,
     key.length: 3
   },
@@ -1041,11 +966,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 947,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.enum,
     key.name: "FooComparisonResult",
     key.usr: "c:@E@FooComparisonResult",
@@ -1059,11 +979,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 975,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 975,
     key.length: 3
   },
@@ -1110,16 +1025,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1069,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1060,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1069,
     key.length: 8
   },
@@ -1205,11 +1110,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1218,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1223,11 +1123,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1244,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1244,
     key.length: 3
   },
@@ -1262,16 +1157,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1311,
-    key.length: 12
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1298,
-    key.length: 12
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1311,
     key.length: 12
   },
@@ -1316,11 +1201,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1407,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1407,
     key.length: 8
   },
@@ -1396,11 +1276,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1509,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1424,16 +1299,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1557,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1554,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1557,
     key.length: 5
   },
@@ -1472,16 +1337,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1612,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1615,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1516,16 +1371,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1670,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1675,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1556,11 +1401,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1733,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1733,
     key.length: 5
   },
@@ -1621,16 +1461,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1838,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1841,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1661,16 +1491,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1903,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1900,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1903,
     key.length: 5
   },
@@ -1721,11 +1541,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1988,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1760,11 +1575,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2060,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1795,11 +1605,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2139,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 2139,
     key.length: 5
   },
@@ -1850,11 +1655,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2240,
-    key.length: 6
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1890,11 +1690,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2303,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 2303,
     key.length: 9
   },
@@ -1955,11 +1750,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2419,
-    key.length: 6
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -1995,16 +1785,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2499,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2494,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 2499,
     key.length: 9
   },
@@ -2070,11 +1850,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2639,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -2107,11 +1882,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2703,
-    key.length: 5
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooRuncingOptions",
     key.usr: "c:@E@FooRuncingOptions",
@@ -2140,11 +1910,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2774,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 2774,
     key.length: 5
   },
@@ -2220,16 +1985,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2881,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2883,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -2243,16 +1998,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 2895,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 2893,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 2895,
     key.length: 1
   },
@@ -2352,16 +2097,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3050,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3052,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -2375,16 +2110,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3064,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3062,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3064,
     key.length: 1
   },
@@ -2477,16 +2202,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3204,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3206,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -2500,16 +2215,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3218,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3216,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3218,
     key.length: 1
   },
@@ -2571,11 +2276,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3298,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3298,
     key.length: 1
   },
@@ -2648,11 +2348,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3382,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -2666,11 +2361,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3394,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3394,
     key.length: 1
   },
@@ -2692,11 +2382,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3406,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Double",
     key.usr: "s:Sd",
@@ -2710,11 +2395,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3419,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3419,
     key.length: 1
   },
@@ -2760,11 +2440,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 3485,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Float",
     key.usr: "s:Sf",
@@ -2795,11 +2470,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3545,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3545,
     key.length: 4
   },
@@ -2918,11 +2588,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 3813,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 3813,
     key.length: 1
   },
@@ -3129,11 +2794,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 4271,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 4281,
     key.length: 3
@@ -3167,16 +2827,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 4346,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 4340,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 4346,
     key.length: 1
   },
@@ -3383,11 +3033,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 4789,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -3415,11 +3060,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 4828,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -3433,16 +3073,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 4844,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 4838,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 4844,
     key.length: 1
   },
@@ -3997,16 +3627,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 5794,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 5796,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -4383,16 +4003,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6615,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6619,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:s5Int32V",
@@ -4664,11 +4274,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7302,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.enum,
     key.name: "ABAuthorizationStatus",
     key.usr: "c:@E@ABAuthorizationStatus",
@@ -4682,11 +4287,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7332,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 7332,
     key.length: 3
   },
@@ -4721,11 +4321,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7389,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 7389,
     key.length: 1
   },
@@ -4783,11 +4378,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7471,
-    key.length: 8
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
     key.usr: "s:s6UInt32V",
@@ -4806,16 +4396,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7508,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7499,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 7508,
     key.length: 8
   },
@@ -4864,11 +4444,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7575,
-    key.length: 3
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
@@ -4882,11 +4457,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7595,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 7595,
     key.length: 3
   },

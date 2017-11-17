@@ -121,16 +121,6 @@ protocol P3 {
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 102,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 104,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -144,16 +134,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 114,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 112,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 114,
     key.length: 1
   },
@@ -176,11 +156,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 139,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 139,
     key.length: 1
   },
@@ -315,16 +290,6 @@ protocol P3 {
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 316,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 318,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -338,16 +303,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 328,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 326,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 328,
     key.length: 1
   },
@@ -370,11 +325,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 353,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 353,
     key.length: 1
   },
