@@ -257,7 +257,7 @@ extension Character
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
     if _fastPath(s._guts.count <= 4) {
-      let b = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(s._core)
+      let b = _SmallUTF16(s._core)
       if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
         _representation = .smallUTF16(
           Builtin.trunc_Int64_Int63(b._storage._value))
@@ -286,14 +286,16 @@ extension Character : CustomDebugStringConvertible {
 }
 
 extension Character {
+  internal typealias _SmallUTF16 = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>
+
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _smallUTF16 : _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>? {
+  internal var _smallUTF16 : _SmallUTF16? {
     guard case .smallUTF16(let _63bits) = _representation else { return nil }
     _onFastPath()
     let bits = UInt64(Builtin.zext_Int63_Int64(_63bits))
     let minBitWidth = type(of: bits).bitWidth - bits.leadingZeroBitCount
-    return _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(
+    return _SmallUTF16(
       _storage: bits,
       _bitCount: UInt8(
         truncatingIfNeeded: 16 * Swift.max(1, (minBitWidth + 15) / 16))
