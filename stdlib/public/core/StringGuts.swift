@@ -431,6 +431,16 @@ struct NativeString {
   }
 
   @_versioned
+  init(capacity: Int, byteWidth: Int) {
+    _sanityCheck(byteWidth == 1 || byteWidth == 2)
+    self.stringBuffer = _StringBuffer(
+      capacity: capacity,
+      initialSize: 0,
+      elementWidth: byteWidth)
+    self.count = 0
+  }
+
+  @_versioned
   init(nativeObject: _BuiltinNativeObject, count: Int) {
     self.stringBuffer = _StringBuffer(
       _StringBuffer._Storage(_nativeObject: nativeObject))
@@ -455,6 +465,30 @@ struct NativeString {
       accomodatingElementWidth: buffer.elementWidth)
     buffer.usedEnd += otherCount &<< buffer.elementShift
     self.count = buffer.usedCount
+  // Append directly to the end of this string, whose buffer must be
+  // uniquely referenced. Grow buffer if there isn't enough capacity.
+  @_versioned
+  internal mutating func append(_ other: _StringGuts, range: Range<Int>) {
+    let count = self.count
+    if _slowPath(self.capacity < count + range.count) {
+      let width = max(self.byteWidth, other.byteWidth)
+      let buffer = _StringBuffer(
+        capacity: max(_growArrayCapacity(self.capacity), range.count),
+        initialSize: count,
+        elementWidth: width)
+      self.unsafe._copy(
+        into: buffer.start,
+        capacityEnd: buffer.capacityEnd,
+        accomodatingElementWidth: width)
+    }
+    _appendInPlace(other, range: range)
+  }
+
+  // Append directly to the end of this string, whose buffer must be
+  // uniquely referenced. Grow buffer if there isn't enough capacity.
+  @_versioned
+  internal mutating func append<S: StringProtocol>(_ other: S) {
+    self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
 
   internal func _invariantCheck() {
