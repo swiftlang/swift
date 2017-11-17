@@ -6000,9 +6000,40 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  toTuple->getElementForScalarInit(), locator);
     }
 
-    case ConversionRestrictionKind::DeepEquality:
-      assert(toType->hasUnresolvedType() && "Should have handled this above");
-      break;
+    case ConversionRestrictionKind::DeepEquality: {
+      if (toType->hasUnresolvedType())
+        break;
+
+      // HACK: Fix problem related to Swift 3 mode (with assertions),
+      // since Swift 3 mode allows passing arguments with extra parens
+      // to parameters which don't expect them, it should be supported
+      // by "deep equality" type - Optional<T> e.g.
+      // ```swift
+      // func foo(_: (() -> Void)?) {}
+      // func bar() -> ((()) -> Void)? { return nil }
+      // foo(bar) // This expression should compile in Swift 3 mode
+      // ```
+      if (tc.getLangOpts().isSwiftVersion3()) {
+        auto obj1 = fromType->getAnyOptionalObjectType();
+        auto obj2 = toType->getAnyOptionalObjectType();
+
+        if (obj1 && obj2) {
+          auto *fn1 = obj1->getAs<AnyFunctionType>();
+          auto *fn2 = obj2->getAs<AnyFunctionType>();
+
+          if (fn1 && fn2) {
+            auto *params1 = fn1->getInput()->getAs<TupleType>();
+            auto *params2 = fn2->getInput()->getAs<TupleType>();
+
+            // This handles situations like argument: (()), parameter: ().
+            if (params1 && params2 && params1->isEqual(params2))
+              break;
+          }
+        }
+      }
+
+      llvm_unreachable("Should be handled above");
+    }
 
     case ConversionRestrictionKind::Superclass:
       return coerceSuperclass(expr, toType, locator);
