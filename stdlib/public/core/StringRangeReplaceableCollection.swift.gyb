@@ -257,8 +257,10 @@ extension String {
   /// - Parameter c: The character to append to the string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
-    withMutableCharacters {
-      (v: inout _CharacterView) in v.append(c)
+    if let small = c._smallUTF16 {
+      _guts.append(contentsOf: small)
+    } else {
+      _guts.append(c._largeUTF16!)
     }
   }
 
@@ -268,9 +270,18 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Character {
-    withMutableCharacters {
-      (v: inout _CharacterView) in v.append(contentsOf: newElements)
+    if _fastPath(newElements is _SwiftStringView) {
+      let v = newElements as! _SwiftStringView
+      _guts.append(v._wholeString._guts, range: v._encodedOffsetRange)
+      return
     }
+    if _fastPath(newElements is Character._SmallUTF16) {
+      let v = newElements as! Character._SmallUTF16
+      
+      return
+    }
+    reserveCapacity(_guts.count + newElements.underestimatedCount)
+    for c in newElements { self.append(c) }
   }
 
   /// Replaces the text within the specified bounds with the given characters.

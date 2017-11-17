@@ -449,6 +449,37 @@ struct NativeString {
     _invariantCheck()
   }
 
+  @_versioned
+  internal
+  mutating
+  func _appendInPlace(_ u: UTF16.CodeUnit) {
+    _sanityCheck(self.capacity >= self.count + 1)
+    _sanityCheck(u <= 0x7f || byteWidth == 2)
+    if _fastPath(byteWidth == 1) {
+      stringBuffer.usedEnd
+        .assumingMemoryBound(to: UInt8.self).pointee = UInt8(u)
+      stringBuffer.usedEnd += 1
+    } else {
+      stringBuffer.usedEnd
+        .assumingMemoryBound(to: UTF16.CodeUnit.self).pointee = u
+      stringBuffer.usedEnd += 2
+    }
+    self.count += 1
+  }
+
+  @_versioned
+  internal
+  mutating
+  func _appendInPlace(_ u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit) {
+    _sanityCheck(self.capacity >= self.count + 2)
+    _sanityCheck(byteWidth == 2)
+    let d = stringBuffer.usedEnd.assumingMemoryBound(to: UTF16.CodeUnit.self)
+    d[0] = u0
+    d[1] = u1
+    stringBuffer.usedEnd += 4
+    self.count += 2
+  }
+  
   // Append a range of code units from `other` directly to the end of
   // this string, which must have uniquely referenced storage with
   // large enough capacity.
@@ -1191,6 +1222,56 @@ extension _StringGuts {
     self = _StringGuts(nativeSelf)
     _invariantCheck()
   }
+
+  @_versioned
+  internal mutating func append<C : Collection>(contentsOf other: C)
+    where C.Element == UTF16.CodeUnit {
+    var byteWidth = 1
+    if byteWidth == 1 &&
+      // Don't widen string when appending CR+LF
+      (other.count > 2 || other.contains { $0 > 0x7f }) {
+      byteWidth = 2
+    }
+    self._ensureUniqueNative(
+      minimumCapacity: self.count + numericCast(other.count),
+      minimumByteWidth: byteWidth)
+    var nativeSelf = self._asNative
+    for codeunit in other {
+      nativeSelf._appendInPlace(codeunit)
+    }
+    _invariantCheck()    
+  }
+
+  @_versioned
+  internal mutating func append(_ c: Unicode.Scalar) {
+    let width = UTF16.width(c)
+    if _fastPath(width == 1) {
+      append(UTF16.CodeUnit(c.value))
+    } else {
+      append(UTF16.leadSurrogate(c), UTF16.trailSurrogate(c))
+    }
+  }
+
+  @_versioned
+  internal mutating func append(_ u: UTF16.CodeUnit) {
+    _ensureUniqueNative(
+      minimumCapacity: count + 1,
+      minimumByteWidth: (u <= 0x7f ? 1 : 2))
+    var nativeSelf = self._asNative
+    nativeSelf._appendInPlace(u)
+    _invariantCheck()
+  }
+
+  @_versioned
+  internal mutating func append(_ u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit) {
+    _ensureUniqueNative(
+      minimumCapacity: count + 2,
+      minimumByteWidth: 2)
+    var nativeSelf = self._asNative
+    nativeSelf._appendInPlace(u0, u1)
+    _invariantCheck()
+  }
+
 }
 
 @_versioned // FIXME(sil-serialize-all)
