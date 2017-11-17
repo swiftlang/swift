@@ -267,6 +267,18 @@ extension String {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func append(contentsOf newElements: String) {
+    _guts.append(newElements._guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func append(contentsOf newElements: Substring) {
+    _guts.append(
+      newElements._wholeString._guts,
+      range: newElements._encodedOffsetRange)
+  }
+
   /// Appends the characters in the given sequence to the string.
   ///
   /// - Parameter newElements: A sequence of characters.
