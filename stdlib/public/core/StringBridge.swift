@@ -315,6 +315,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
+    _precondition(aRange.location >= 0 && aRange.length >= 0)
     _precondition(aRange.location + aRange.length <= Int(_guts.count))
     let slice = _unmanagedContiguous[
       aRange.location ..< aRange.location + aRange.length]
