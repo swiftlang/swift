@@ -617,8 +617,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned : NumDeclBits;
 
     unsigned NumberOfVTableEntries : 2;
+    unsigned NumberOfFieldOffsetVectorEntries : 1;
   };
-  enum { NumMissingMemberDeclBits = NumDeclBits + 2 };
+  enum { NumMissingMemberDeclBits = NumDeclBits + 3 };
   static_assert(NumMissingMemberDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -2985,6 +2986,26 @@ public:
   StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const {
     return StoredPropertyRange(getMembers(),
                                ToStoredProperty(skipInaccessible));
+  }
+
+private:
+  /// Predicate used to filter StoredPropertyRange.
+  struct ToStoredPropertyOrMissingMemberPlaceholder {
+    Optional<Decl *> operator()(Decl *decl) const;
+  };
+
+public:
+  /// A range for iterating the stored member variables of a structure.
+  using StoredPropertyOrMissingMemberPlaceholderRange
+    = OptionalTransformRange<DeclRange,
+                             ToStoredPropertyOrMissingMemberPlaceholder>;
+  
+  /// Return a collection of the stored member variables of this type, along
+  /// with placeholders for unimportable stored properties.
+  StoredPropertyOrMissingMemberPlaceholderRange
+  getStoredPropertiesAndMissingMemberPlaceholders() const {
+    return StoredPropertyOrMissingMemberPlaceholderRange(getMembers(),
+                             ToStoredPropertyOrMissingMemberPlaceholder());
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -6305,10 +6326,16 @@ public:
 class MissingMemberDecl : public Decl {
   DeclName Name;
 
-  MissingMemberDecl(DeclContext *DC, DeclName name, unsigned vtableEntries)
+  MissingMemberDecl(DeclContext *DC, DeclName name,
+                    unsigned vtableEntries,
+                    unsigned fieldOffsetVectorEntries)
       : Decl(DeclKind::MissingMember, DC), Name(name) {
     MissingMemberDeclBits.NumberOfVTableEntries = vtableEntries;
     assert(getNumberOfVTableEntries() == vtableEntries && "not enough bits");
+    MissingMemberDeclBits.NumberOfFieldOffsetVectorEntries =
+      fieldOffsetVectorEntries;
+    assert(getNumberOfFieldOffsetVectorEntries() == fieldOffsetVectorEntries
+           && "not enough bits");
     setImplicit();
   }
 public:
@@ -6316,7 +6343,7 @@ public:
   forMethod(ASTContext &ctx, DeclContext *DC, DeclName name,
             bool hasNormalVTableEntry) {
     assert(!name || name.isCompoundName());
-    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry);
+    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry, 0);
   }
 
   static MissingMemberDecl *
@@ -6324,7 +6351,12 @@ public:
                  bool hasNormalVTableEntry,
                  bool hasAllocatingVTableEntry) {
     unsigned entries = hasNormalVTableEntry + hasAllocatingVTableEntry;
-    return new (ctx) MissingMemberDecl(DC, name, entries);
+    return new (ctx) MissingMemberDecl(DC, name, entries, 0);
+  }
+  
+  static MissingMemberDecl *
+  forStoredProperty(ASTContext &ctx, DeclContext *DC, DeclName name) {
+    return new (ctx) MissingMemberDecl(DC, name, 0, 1);
   }
 
   DeclName getFullName() const {
@@ -6333,6 +6365,10 @@ public:
 
   unsigned getNumberOfVTableEntries() const {
     return MissingMemberDeclBits.NumberOfVTableEntries;
+  }
+
+  unsigned getNumberOfFieldOffsetVectorEntries() const {
+    return MissingMemberDeclBits.NumberOfFieldOffsetVectorEntries;
   }
 
   SourceLoc getLoc() const {
@@ -6364,6 +6400,21 @@ NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
     if (!var->isStatic() && var->hasStorage() &&
         (!skipUserInaccessible || var->isUserAccessible()))
       return var;
+  }
+
+  return None;
+}
+
+inline Optional<Decl *>
+NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
+::operator()(Decl *decl) const {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    if (!var->isStatic() && var->hasStorage())
+      return var;
+  }
+  if (auto missing = dyn_cast<MissingMemberDecl>(decl)) {
+    if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+      return missing;
   }
 
   return None;

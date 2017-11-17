@@ -194,19 +194,19 @@ namespace {
     {
       // Start by adding a heap header.
       switch (refcounting) {
-      case swift::irgen::ReferenceCounting::Native:
+      case ReferenceCounting::Native:
         // For native classes, place a full object header.
         addHeapHeader();
         break;
-      case swift::irgen::ReferenceCounting::ObjC:
+      case ReferenceCounting::ObjC:
         // For ObjC-inheriting classes, we don't reliably know the size of the
         // base class, but NSObject only has an `isa` pointer at most.
         addNSObjectHeader();
         break;
-      case swift::irgen::ReferenceCounting::Block:
-      case swift::irgen::ReferenceCounting::Unknown:
-      case swift::irgen::ReferenceCounting::Bridge:
-      case swift::irgen::ReferenceCounting::Error:
+      case ReferenceCounting::Block:
+      case ReferenceCounting::Unknown:
+      case ReferenceCounting::Bridge:
+      case ReferenceCounting::Error:
         llvm_unreachable("not a class refcounting kind");
       }
       
@@ -316,6 +316,12 @@ namespace {
           // Count the fields we got from the superclass.
           NumInherited = Elements.size();
         }
+      }
+      
+      // If this class was imported from another module, assume that we may
+      // not know its exact layout.
+      if (theClass->getModuleContext() != IGM.getSwiftModule()) {
+        ClassHasFixedSize = false;
       }
 
       // Access strategies should be set by the abstract class layout,
