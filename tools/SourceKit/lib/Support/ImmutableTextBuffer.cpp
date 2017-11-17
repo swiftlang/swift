@@ -126,6 +126,7 @@ EditableTextBuffer::EditableTextBuffer(StringRef Filename, StringRef Text) {
 }
 
 ImmutableTextSnapshotRef EditableTextBuffer::getSnapshot() const {
+  llvm::sys::ScopedLock L(EditMtx);
   return new ImmutableTextSnapshot(const_cast<EditableTextBuffer*>(this), Root,
                                    CurrUpd);
 }
