@@ -5447,15 +5447,42 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
                               ProtocolConformanceRef conformance) override {
       // The conformance will use contextual types, but we want the
       // interface type equivalent.
+
+      // If we have an inherited conformance for an archetype, dig out the
+      // superclass conformance to translate.
+      Type inheritedInterfaceType;
       if (conformance.isConcrete() &&
           conformance.getConcrete()->getType()->hasArchetype()) {
+        auto concreteConformance = conformance.getConcrete();
+        if (concreteConformance->getKind()
+              == ProtocolConformanceKind::Inherited &&
+            conformance.getConcrete()->getType()->is<ArchetypeType>()) {
+          inheritedInterfaceType =
+            concreteConformance->getType()->mapTypeOutOfContext();
+          concreteConformance =
+            cast<InheritedProtocolConformance>(concreteConformance)
+              ->getInheritedConformance();
+        }
+
+        // Map the conformance.
+        // FIXME: It would be so much easier and efficient if we had
+        // ProtocolConformance::mapTypesOutOfContext().
         auto interfaceType =
-          conformance.getConcrete()->getType()->mapTypeOutOfContext();
+          concreteConformance->getType()->mapTypeOutOfContext();
+
         conformance = *tc.conformsToProtocol(
-                            interfaceType,
-                            conformance.getRequirement(),
-                            dc,
-                            ConformanceCheckFlags::SuppressDependencyTracking);
+                           interfaceType,
+                           conformance.getRequirement(),
+                           dc,
+                           ConformanceCheckFlags::SuppressDependencyTracking);
+
+        // Reinstate inherited conformance.
+        if (inheritedInterfaceType) {
+          conformance =
+            ProtocolConformanceRef(
+              tc.Context.getInheritedConformance(inheritedInterfaceType,
+                                                 conformance.getConcrete()));
+        }
       }
 
       writer(conformance);
