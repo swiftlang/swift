@@ -3213,7 +3213,7 @@ bool _swift_isClassOrObjCExistentialType(const Metadata *value,
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift)
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject())
     if (classHasSuperclass(classType))
