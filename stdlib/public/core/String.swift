@@ -113,6 +113,11 @@ public protocol StringProtocol
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
+
+  /// The entire String onto whose slice this view is a projection.
+  var _wholeString : String { get }
+  /// The range of storage offsets of this view in `_wholeString`.
+  var _encodedOffsetRange : Range<Int> { get }
 }
 
 extension StringProtocol {
@@ -142,6 +147,11 @@ internal protocol _SwiftStringView {
   //
   // FIXME: Remove once _StringGuts has append(contentsOf:).
   var _persistentContent : String { get }
+
+  /// The entire String onto whose slice this view is a projection.
+  var _wholeString : String { get }
+  /// The range of storage offsets of this view in `_wholeString`.
+  var _encodedOffsetRange : Range<Int> { get }
 }
 
 extension _SwiftStringView {
@@ -166,6 +176,16 @@ extension String : _SwiftStringView {
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
     return self
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _wholeString : String {
+    return self
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _encodedOffsetRange : Range<Int> {
+    return 0..<_guts.count
   }
 }
 

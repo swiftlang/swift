@@ -1182,8 +1182,7 @@ extension Substring {
   @_versioned
   internal
   var _unmanagedContiguous: UnsafeString? {
-    return self._wholeString._unmanagedContiguous?[
-      self.startIndex.encodedOffset..<self.endIndex.encodedOffset]
+    return self._wholeString._unmanagedContiguous?[self._encodedOffsetRange]
   }
 }
 
