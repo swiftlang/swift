@@ -122,3 +122,6 @@
 // REMOVE_RUNTIME_ASSERTS: swift
 // REMOVE_RUNTIME_ASSERTS: -frontend {{.*}} -remove-runtime-asserts
 
+// RUN: %swiftc_driver -driver-print-jobs -assume-single-threaded %s | %FileCheck -check-prefix=ASSUME_SINGLE_THREADED %s
+// ASSUME_SINGLE_THREADED: swift
+// ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded
