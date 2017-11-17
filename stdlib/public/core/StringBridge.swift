@@ -71,7 +71,7 @@ internal func _cocoaStringToContiguous(
   return buffer
 }
 
-/// Reads the entire contents of a _CocoaString into contiguous
+/// Copies the entire contents of a _CocoaString into contiguous
 /// storage of sufficient capacity.
 @_versioned // FIXME(sil-serialize-all)
 @inline(never) // Hide the CF dependency
@@ -81,6 +81,21 @@ internal func _cocoaStringReadAll(
   _swift_stdlib_CFStringGetCharacters(
     source, _swift_shims_CFRange(
       location: 0, length: _swift_stdlib_CFStringGetLength(source)), destination)
+}
+
+/// Copies a slice of a _CocoaString into contiguous storage of
+/// sufficient capacity.
+@_versioned // FIXME(sil-serialize-all)
+@inline(never) // Hide the CF dependency
+internal func _cocoaStringCopyCharacters(
+  from source: _CocoaString,
+  range: Range<Int>,
+  into destination: UnsafeMutablePointer<UTF16.CodeUnit>
+) {
+  _swift_stdlib_CFStringGetCharacters(
+    source,
+    _swift_shims_CFRange(location: range.lowerBound, length: range.count),
+    destination)
 }
 
 @_versioned // FIXME(sil-serialize-all)
