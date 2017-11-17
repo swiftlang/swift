@@ -1838,8 +1838,9 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
-        // Treat this as a cache-miss to the caller and let them attempt
-        // to refill through the normal loadAllMembers() path.
+        // Eat the error and treat this as a cache-miss to the caller; let
+        // them attempt to refill through the normal loadAllMembers() path.
+        llvm::consumeError(mem.takeError());
         return None;
       }
     }
