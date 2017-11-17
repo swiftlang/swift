@@ -193,18 +193,20 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
 
 void finalizeSourceFile(SourceFile *SF, ArrayRef<RC<RawSyntax>> Parts) {
   std::vector<DeclSyntax> AllTopLevel;
+  llvm::Optional<TokenSyntax> EOFToken;
+
   if (SF->hasSyntaxRoot()) {
+    EOFToken.emplace(SF->getSyntaxRoot().getEOFToken());
     for (auto It : SF->getSyntaxRoot().getTopLevelDecls()) {
       AllTopLevel.push_back(It);
     }
   }
 
-  TokenSyntax EOFToken = Parts.back()->isToken()
-                             // TODO: Ensure tok::eof.
-                             ? make<TokenSyntax>(Parts.back())
-                             : TokenSyntax::missingToken(tok::eof, "");
-  if (Parts.back()->isToken())
+  if (Parts.back()->isToken() &&
+      cast<RawTokenSyntax>(Parts.back())->is(tok::eof)) {
+    EOFToken.emplace(make<TokenSyntax>(Parts.back()));
     Parts = Parts.drop_back();
+  }
 
   for (auto RawNode : Parts) {
     if (RawNode->Kind != SyntaxKind::StmtList)
@@ -214,7 +216,9 @@ void finalizeSourceFile(SourceFile *SF, ArrayRef<RC<RawSyntax>> Parts) {
         SyntaxFactory::makeTopLevelCodeDecl(make<StmtListSyntax>(RawNode)));
   }
   SF->setSyntaxRoot(SyntaxFactory::makeSourceFile(
-      SyntaxFactory::makeDeclList(AllTopLevel), EOFToken));
+      SyntaxFactory::makeDeclList(AllTopLevel),
+      EOFToken.hasValue() ? *EOFToken
+                          : TokenSyntax::missingToken(tok::eof, "")));
 }
 
 } // End of anonymous namespace
