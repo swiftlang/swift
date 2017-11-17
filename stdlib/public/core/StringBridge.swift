@@ -289,6 +289,14 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @_inlineable // FIXME(sil-serialize-all)
   deinit {}
 
+  @_versioned
+  internal var _unmanagedContiguous: UnsafeString {
+    @inline(__always)
+    get {
+      return _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
+    }
+  }
+  
   @_versioned // FIXME(sil-serialize-all)
 	@objc
   func length() -> Int {
@@ -298,9 +306,8 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @_versioned // FIXME(sil-serialize-all)
 	@objc
   func characterAtIndex(_ index: Int) -> UInt16 {
-    let unmanaged = _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
-    defer { _fixLifetime(_guts) }
-    return unmanaged[index]
+    defer { _fixLifetime(self) }
+    return _unmanagedContiguous[index]
   }
 
   @_versioned // FIXME(sil-serialize-all)
@@ -309,20 +316,20 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
     _precondition(aRange.location + aRange.length <= Int(_guts.count))
-    let unmanaged = _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
-    let slice = unmanaged[aRange.location ..< aRange.location + aRange.length]
+    let slice = _unmanagedContiguous[
+      aRange.location ..< aRange.location + aRange.length]
     slice._copy(
       into: UnsafeMutableRawPointer(buffer),
       capacityEnd: UnsafeMutableRawPointer(buffer + aRange.length),
       accomodatingElementWidth: 2)
-    _fixLifetime(_guts)
+    _fixLifetime(self)
   }
 
   @_versioned // FIXME(sil-serialize-all)
   @objc
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
-    let unmanaged = _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
-    defer { _fixLifetime(_guts) }
+    let unmanaged = _unmanagedContiguous
+    defer { _fixLifetime(self) }
     guard !unmanaged.isSingleByte else { return nil }
     return UnsafeMutablePointer(mutating: unmanaged.utf16Buffer.baseAddress)
   }
@@ -333,7 +340,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   func _fastCStringContents(
     _ nullTerminationRequired: Bool
   ) -> UnsafePointer<UInt8>? {
-    let unmanaged = _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
+    let unmanaged = _unmanagedContiguous
     defer { _fixLifetime(_guts) }
     guard !nullTerminationRequired, unmanaged.isSingleByte else { return nil }
     return unmanaged.asciiBuffer.baseAddress
