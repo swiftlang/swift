@@ -91,6 +91,7 @@ extension _StringGuts {
     return (_objectBitPattern & _twoByteCodeUnitBit) == 0
   }
 
+  @_versioned
   var byteWidth: Int {
     return isSingleByte ? 1 : 2
   }
@@ -448,23 +449,24 @@ struct NativeString {
     _invariantCheck()
   }
 
-  // Copy in `other` code units direclty.
+  // Append a range of code units from `other` directly to the end of
+  // this string, which must have uniquely referenced storage with
+  // large enough capacity.
   @_versioned
   internal
   mutating
-  func _appendInPlace(_ other: _StringGuts) {
-    let otherCount = other.count
-    _sanityCheck(self.capacity >= self.count + otherCount)
-
-    // TODO: Does this incur ref counting?
-    var buffer = self.stringBuffer
+  func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
+    _sanityCheck(self.capacity >= self.count + range.count)
 
     other._copy(
-      into: buffer.usedEnd,
-      capacityEnd: buffer.capacityEnd,
-      accomodatingElementWidth: buffer.elementWidth)
-    buffer.usedEnd += otherCount &<< buffer.elementShift
-    self.count = buffer.usedCount
+      range: range,
+      into: stringBuffer.usedEnd,
+      capacityEnd: stringBuffer.capacityEnd,
+      accomodatingElementWidth: stringBuffer.elementWidth)
+    stringBuffer.usedEnd += range.count &<< stringBuffer.elementShift
+    self.count = stringBuffer.usedCount
+  }
+
   // Append directly to the end of this string, whose buffer must be
   // uniquely referenced. Grow buffer if there isn't enough capacity.
   @_versioned
@@ -947,6 +949,7 @@ extension _StringGuts {
 
     // Copy ourselves in
     self._copy(
+      range: 0..<self.count,
       into: buffer.start,
       capacityEnd: buffer.capacityEnd,
       accomodatingElementWidth: byteWidth)
@@ -954,13 +957,15 @@ extension _StringGuts {
   }
 
   @_inlineable
-  // TODO: @_versioned
-  // TODO: internal
+  @_transparent
   public // TODO(StringGuts): for testing only
   mutating func isUniqueNative() -> Bool {
     return _isUnique(&_storage.0) && _isNative
   }
 
+  // Convert ourselves (if needed) to a native string with the specified
+  // storage parameters. After this call, self is ready to be memcpy-ed into.
+  // Does not affect count.
   @_versioned
   internal
   mutating func _ensureUniqueNative(
@@ -990,44 +995,35 @@ extension _StringGuts {
     self = _StringGuts(newBuffer)
   }
 
-  // Convert ourselves (if needed) to a NativeString for appending purposes.
-  // After this call, self is ready to be memcpy-ed into. Does not adjust the
-  // referenced StringBuffer's usedCount.
-  @_versioned
-  internal
-  mutating func _formNative(forAppending other: _StringGuts) {
-    _ensureUniqueNative(
-      minimumCapacity: self.count + other.count,
-      minimumByteWidth: other.byteWidth)
-  }
-
-  // Copy in our elements to the new storage
-  //
+  // Copy code units from a slice of this string into a buffer.
   @_versioned
   internal
   func _copy(
+    range: Range<Int>,
     into dest: UnsafeMutableRawPointer,
     capacityEnd: UnsafeMutableRawPointer,
     accomodatingElementWidth width: Int
   ) {
     _sanityCheck(byteWidth == 1 || byteWidth == 2)
-    _sanityCheck(capacityEnd >= dest + (self.count &<< (byteWidth &- 1)))
+    _sanityCheck(capacityEnd >= dest + (range.count &<< (byteWidth &- 1)))
 
     // TODO: Eventual small form check on other. We could even do this now for
     // the tagged cocoa strings.
     let unmanagedSelfOpt = self._unmanagedContiguous
     if _fastPath(unmanagedSelfOpt != nil) {
-      unmanagedSelfOpt._unsafelyUnwrappedUnchecked._copy(
+      let unsafe = unmanagedSelfOpt._unsafelyUnwrappedUnchecked
+      unsafe[range]._copy(
         into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
       _fixLifetime(self)
       return
     }
 
-    _sanityCheck(width == 2)
+    _sanityCheck(width == 2) // TODO: CFStringGetBytes
     let opaque = getOpaque()
-    _cocoaStringReadAll(
-      opaque.object,
-      dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
+    _cocoaStringCopyCharacters(
+      from: opaque.object,
+      range: range,
+      into: dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
   }
 
   @inline(__always)
@@ -1164,13 +1160,22 @@ extension _StringGuts {
     self = _StringGuts(newBuffer)
   }
 
+  @_inlineable
+  public // TODO(StringGuts): for testing only
+  mutating func append(_ other: _StringGuts) {
+    self.append(other, range: 0..<other.count)
+  }
+
   // @_inlineable // TODO: internal-inlineable, if that's possible
   // TODO: @_versioned
   // TODO: internal
   public // TODO(StringGuts): for testing only
-  mutating func append(_ other: _StringGuts) {
-    guard !other._isEmpty else { return }
-    if _isEmpty && capacity == 0 { // Don't discard reserved capacity, if any
+  mutating func append(_ other: _StringGuts, range: Range<Int>) {
+    _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
+    guard range.count > 0 else { return }
+    if _isEmpty &&
+      capacity == 0 && // Don't discard reserved capacity, if any
+      range.count == other.count {
       self = other
       return
     }
@@ -1178,9 +1183,11 @@ extension _StringGuts {
     // TODO: Eventual small form check on self and other. We could even do this
     // now for the tagged cocoa strings.
 
-    self._formNative(forAppending: other)
+    self._ensureUniqueNative(
+      minimumCapacity: self.count + range.count,
+      minimumByteWidth: other.byteWidth)
     var nativeSelf = self._asNative
-    nativeSelf._appendInPlace(other)
+    nativeSelf._appendInPlace(other, range: range)
     self = _StringGuts(nativeSelf)
     _invariantCheck()
   }
