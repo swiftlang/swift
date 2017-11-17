@@ -352,14 +352,6 @@ The optimize attribute adds function-specific directives to the optimizer.
 
 The optimize attribute supports the following tags:
 
-sil.never
-
-   The sil optimizer should not optimize this function.
-
-  Example:
-  @_semantics("optimize.sil.never")
-  func miscompile() { ... }
-
 sil.specialize.generic.never
 
    The sil optimizer should never create generic specializations of this function. 

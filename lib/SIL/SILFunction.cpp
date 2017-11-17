@@ -178,8 +178,7 @@ OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
 }
 
 bool SILFunction::shouldOptimize() const {
-  return !hasSemanticsAttr("optimize.sil.never") &&
-         getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
+  return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
