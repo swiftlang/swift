@@ -758,7 +758,7 @@ extension String._CharacterView : RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     if let c0 = c._smallUTF16 {
-      _core.append(contentsOf: c0)
+      _guts.append(contentsOf: c0)
       return
     }
     _guts.append(c._largeUTF16!)
