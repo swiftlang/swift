@@ -1133,6 +1133,9 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   // Mark the constructor transparent so that we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
 
+  if (Impl.hasFinishedTypeChecking())
+    return constructor;
+
   // Use a builtin to produce a zero initializer, and assign it to self.
 
   // Construct the left-hand reference to self.
