@@ -2630,6 +2630,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
   }, [&] { // Parameters
+    if (decl->isGeneric())
+      if (auto *genericSig = decl->getGenericSignature())
+        printGenericSignature(genericSig, PrintParams | InnermostOnly);
+
     printParameterList(decl->getIndices(),
                        decl->hasInterfaceType()
                          ? decl->getIndicesInterfaceType()
@@ -2645,7 +2649,9 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
   printTypeLoc(elementTy);
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
-
+  if (decl->isGeneric())
+    if (auto *genericSig = decl->getGenericSignature())
+      printGenericSignature(genericSig, PrintRequirements | InnermostOnly);
   printAccessors(decl);
 }
 
