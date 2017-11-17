@@ -5661,8 +5661,25 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
           EntryKeyword.str() == "conditional_conformance") {
         if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
           return true;
-        CanType assoc = parseAssociatedTypePath(P, WitnessState, proto);
-        if (!assoc)
+        CanType assocOrSubject;
+        if (EntryKeyword.str() == "associated_type_protocol") {
+          assocOrSubject = parseAssociatedTypePath(P, WitnessState, proto);
+        } else {
+          // Parse AST type.
+          ParserResult<TypeRepr> TyR = P.parseType();
+          if (TyR.isNull())
+            return true;
+          TypeLoc Ty = TyR.get();
+          if (swift::performTypeLocChecking(P.Context, Ty,
+                                            /*isSILMode=*/false,
+                                            /*isSILType=*/false,
+                                            witnessEnv,
+                                            &P.SF))
+            return true;
+
+          assocOrSubject = Ty.getType()->getCanonicalType();
+        }
+        if (!assocOrSubject)
           return true;
         if (P.parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
@@ -5685,11 +5702,13 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
 
         if (EntryKeyword.str() == "associated_type_protocol")
           witnessEntries.push_back(
-              SILWitnessTable::AssociatedTypeProtocolWitness{assoc, proto,
+              SILWitnessTable::AssociatedTypeProtocolWitness{assocOrSubject,
+                                                             proto,
                                                              conformance});
         else
           conditionalConformances.push_back(
-              SILWitnessTable::ConditionalConformance{assoc, conformance});
+              SILWitnessTable::ConditionalConformance{assocOrSubject,
+                                                      conformance});
 
         continue;
       }
