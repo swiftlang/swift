@@ -167,6 +167,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
+  inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
+  inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
