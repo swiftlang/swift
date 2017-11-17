@@ -3431,7 +3431,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   }
 
   SmallVector<Solution, 3> solutions;
-  if (CS.solve(solutions, FreeTypeVariableBinding::Allow)) {
+  if (CS.solve(Parent, solutions, FreeTypeVariableBinding::Allow)) {
     return false;
   }
 
