@@ -148,7 +148,7 @@ StringTests.test("unicodeScalars") {
   checkUnicodeScalarViewIteration([ 0x10ffff ], "\u{0010ffff}")
 }
 
-StringTests.test("indexComparability") {
+StringTests.test("Index/Comparable") {
   let empty = ""
   expectTrue(empty.startIndex == empty.endIndex)
   expectFalse(empty.startIndex != empty.endIndex)
@@ -164,6 +164,13 @@ StringTests.test("indexComparability") {
   expectFalse(nonEmpty.startIndex >= nonEmpty.endIndex)
   expectFalse(nonEmpty.startIndex > nonEmpty.endIndex)
   expectTrue(nonEmpty.startIndex < nonEmpty.endIndex)
+}
+
+StringTests.test("Index/Hashable") {
+  let s = "abcdef"
+  let t = Set(s.indices)
+  expectEqual(s.count, t.count)
+  expectTrue(t.contains(s.startIndex))
 }
 
 StringTests.test("ForeignIndexes/Valid") {

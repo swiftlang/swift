@@ -33,6 +33,10 @@ extension IndexSet.Index {
     public static func >=(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
         return lhs.value >= rhs.value
     }
+  
+    public var hashValue: Int {
+        return value.hashValue
+    }
 }
 
 extension IndexSet.RangeView {
@@ -94,7 +98,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     }
     
     /// The mechanism for accessing the integers stored in an IndexSet.
-    public struct Index : CustomStringConvertible, Comparable {
+    public struct Index : CustomStringConvertible, Comparable, Hashable {
         fileprivate var value: IndexSet.Element
         fileprivate var extent: Range<IndexSet.Element>
         fileprivate var rangeIndex: Int

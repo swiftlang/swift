@@ -17,7 +17,7 @@
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal struct _CollectionOf<
-  IndexType : Strideable, Element
+  IndexType : Strideable & Hashable, Element
 > : Collection {
 
   @_inlineable // FIXME(sil-serialize-all)

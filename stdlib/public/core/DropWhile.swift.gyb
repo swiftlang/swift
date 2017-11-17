@@ -115,7 +115,7 @@ extension LazySequenceProtocol {
 /// A position in a `LazyDropWhileCollection` or
 /// `LazyDropWhileBidirectionalCollection` instance.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct LazyDropWhileIndex<Base : Collection> : Comparable {
+public struct LazyDropWhileIndex<Base : Collection> : Comparable, Hashable {
   /// The position corresponding to `self` in the underlying collection.
   public let base: Base.Index
 

@@ -34,8 +34,8 @@ public struct ClosedRangeIndex<Bound>
   // swift-3-indexing-model: should conform to _Strideable, otherwise
   // CountableClosedRange is not interchangeable with CountableRange in all
   // contexts.
-  Bound : _Strideable & Comparable,
-  Bound.Stride : SignedNumeric {
+  Bound : _Strideable & Comparable & Hashable,
+  Bound.Stride : SignedInteger {
   /// Creates the "past the end" position.
   @_inlineable
   @_versioned
@@ -90,6 +90,17 @@ extension ClosedRangeIndex : Comparable {
   }
 }
 
+extension ClosedRangeIndex : Hashable {
+  public var hashValue: Int {
+    switch self._value {
+    case .inRange(let value):
+      return value.hashValue
+    case .pastEnd:
+      return .max
+    }
+  }
+}
+
 // FIXME(ABI)#175 (Type checker)
 // WORKAROUND: needed because of rdar://25584401
 /// An iterator over the elements of a `CountableClosedRange` instance.
@@ -98,7 +109,7 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
   where
   // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
+  Bound : _Strideable & Comparable & Hashable,
   Bound.Stride : SignedInteger {
 
   @_inlineable
@@ -178,7 +189,7 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   where
   // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
+  Bound : _Strideable & Comparable & Hashable,
   Bound.Stride : SignedInteger {
 
   /// The range's lower bound.

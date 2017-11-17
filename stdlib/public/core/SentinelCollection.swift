@@ -74,7 +74,7 @@ where IsSentinel.Input == Base.Iterator.Element {
   
   @_fixed_layout // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal struct Index : Comparable {
+  internal struct Index : Comparable, Hashable {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal init(
@@ -98,6 +98,10 @@ where IsSentinel.Input == Base.Iterator.Element {
     internal static func < (lhs: Index, rhs: Index) -> Bool {
       if rhs._impl == nil { return lhs._impl != nil }
       return lhs._impl != nil && rhs._impl!.position < lhs._impl!.position
+    }
+    
+    internal var hashValue: Int {
+      return _impl?.position.hashValue ?? 0
     }
   }
 

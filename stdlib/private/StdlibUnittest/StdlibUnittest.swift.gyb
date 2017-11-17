@@ -323,7 +323,7 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
 extension Range
 %   if 'Countable' in OtherRange:
   where
-  Bound : _Strideable, Bound.Stride : SignedInteger
+  Bound : _Strideable & Hashable, Bound.Stride : SignedInteger
 %   end
 {
   internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {
@@ -2430,7 +2430,7 @@ public func expectEqualsUnordered<T : Comparable>(
 }
 
 public func expectEqualsUnordered<
-  T : Strideable
+  T : Strideable & Hashable
 >(
   _ expected: Range<T>, _ actual: [T], ${TRACE}
 ) where T.Stride : SignedInteger {

@@ -69,7 +69,7 @@ extension _UIntBuffer : Sequence {
 
 extension _UIntBuffer : Collection {  
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index : Comparable {
+  public struct Index : Comparable, Hashable {
     @_versioned
     internal var bitOffset: UInt8
     

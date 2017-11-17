@@ -96,6 +96,13 @@ extension Character.UnicodeScalarView.Index : Comparable {
   }
 }
 
+extension Character.UnicodeScalarView.Index : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _encodedOffset.hashValue
+  }
+}
+
 extension Character.UnicodeScalarView : Collection {
   @_inlineable // FIXME(sil-serialize-all)
   public var startIndex: Index {

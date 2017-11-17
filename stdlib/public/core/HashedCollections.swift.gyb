@@ -5893,7 +5893,7 @@ elif Self == 'Dictionary':
 
 ${SubscriptingWithIndexDoc}
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct Index : Comparable {
+public struct Index : Comparable, Hashable {
   // Index for native buffer is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -6012,6 +6012,22 @@ extension ${Self}.Index {
       return lhsCocoa < rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different sets")
+  #endif
+    }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    if _fastPath(_guaranteedNative) {
+      return _nativeIndex.offset
+    }
+
+    switch _value {
+    case ._native(let nativeIndex):
+      return nativeIndex.offset
+  #if _runtime(_ObjC)
+    case ._cocoa(let cocoaIndex):
+      return cocoaIndex.currentKeyIndex
   #endif
     }
   }

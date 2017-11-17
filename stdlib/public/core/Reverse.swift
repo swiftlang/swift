@@ -76,7 +76,7 @@ public struct _ReverseIndexingIterator<
 /// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
 @_fixed_layout
-public struct ReversedIndex<Base : Collection> : Comparable {
+public struct ReversedIndex<Base : Collection> : Comparable, Hashable {
   /// Creates a new index into a reversed collection for the position before
   /// the specified index.
   ///
@@ -274,7 +274,7 @@ public struct ReversedCollection<
 @_fixed_layout
 public struct ReversedRandomAccessIndex<
   Base : RandomAccessCollection
-> : Comparable {
+> : Comparable, Hashable {
   /// Creates a new index into a reversed collection for the position before
   /// the specified index.
   ///

@@ -183,7 +183,7 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
     }
     
     @_fixed_layout // FIXME(sil-serialize-all)
-    public struct Index : Comparable {
+    public struct Index : Comparable, Hashable {
       public var _value: _IndexValue
 
       @_inlineable // FIXME(sil-serialize-all)
@@ -205,6 +205,13 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
         case (.low(_), .high(_)): return true
         case (.high(_), .low(_)): return false
         case let (.high(l), .high(r)): return l < r
+        }
+      }
+
+      public var hashValue: Int {
+        switch _value {
+        case .low(let v): return v.hashValue
+        case .high(let v): return v.hashValue
         }
       }
     }
