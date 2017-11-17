@@ -116,11 +116,6 @@ namespace swift {
   LLVM_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
 
-  static inline
-  const ClassMetadata *_swift_getSuperclass(const ClassMetadata *theClass) {
-    return theClass->SuperClass;
-  }
-
   LLVM_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
