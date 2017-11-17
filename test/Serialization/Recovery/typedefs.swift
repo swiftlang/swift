@@ -52,6 +52,12 @@ let _ = unwrapped // okay
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
 _ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
 
+let _: WrappedAlias = nil // expected-error {{use of undeclared type 'WrappedAlias'}}
+let _: UnwrappedAlias = nil // expected-error {{nil cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
+
+let _: ConstrainedWrapped<Int> = nil // expected-error {{use of undeclared type 'ConstrainedWrapped'}}
+let _: ConstrainedUnwrapped<Int> = nil // expected-error {{type 'Int' does not conform to protocol 'HasAssoc'}}
+
 func testExtensions(wrapped: WrappedInt, unwrapped: UnwrappedInt) {
   wrapped.wrappedMethod() // expected-error {{value of type 'WrappedInt' (aka 'Int32') has no member 'wrappedMethod'}}
   unwrapped.unwrappedMethod() // expected-error {{value of type 'UnwrappedInt' has no member 'unwrappedMethod'}}
@@ -343,5 +349,11 @@ public func returnsWrappedGeneric<T>(_: T.Type) -> WrappedInt { fatalError() }
 
 public protocol WrappedProto {}
 public protocol UnwrappedProto {}
+
+public typealias WrappedAlias = WrappedInt
+public typealias UnwrappedAlias = UnwrappedInt
+
+public typealias ConstrainedWrapped<T: HasAssoc> = T where T.Assoc == WrappedInt
+public typealias ConstrainedUnwrapped<T: HasAssoc> = T where T.Assoc == UnwrappedInt
 
 #endif // TEST
