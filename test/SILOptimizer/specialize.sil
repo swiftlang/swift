@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer -save-optimization-record-path=%t.yaml %s | %FileCheck %s
+// RUN: %FileCheck -check-prefix=YAML %s < %t.yaml
 
 sil_stage canonical
 
@@ -17,6 +18,43 @@ import Swift
 // CHECK: apply [[ACCEPTS_INT]]
 // CHECK: return
 // CHEcK: sil @exp2 : $@convention(thin) () -> () {
+
+// YAML:      --- !Passed
+// YAML-NEXT: Pass:            sil-generic-specializer
+// YAML-NEXT: Name:            Specialized
+// YAML-NEXT: DebugLoc:
+// YAML-NEXT:   File:            {{.*}}/specialize.sil
+// YAML-NEXT:   Line:            132
+// YAML-NEXT:   Column:          8
+// YAML-NEXT: Function:        exp1
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Specialized function '
+// YAML-NEXT:   - Function:        '"XXX_init"'
+// YAML-NEXT:     DebugLoc:
+// YAML-NEXT:       File:            {{.*}}/specialize.sil
+// YAML-NEXT:       Line:            73
+// YAML-NEXT:       Column:          17
+// YAML-NEXT:   - String:          ' with type '
+// YAML-NEXT:   - FuncType:        '(Int32, @thin XXX<Int32>.Type) -> XXX<Int32>'
+// YAML-NEXT: ...
+// YAML-NEXT: --- !Passed
+// YAML-NEXT: Pass:            sil-generic-specializer
+// YAML-NEXT: Name:            Specialized
+// YAML-NEXT: DebugLoc:
+// YAML-NEXT:   File:            {{.*}}/specialize.sil
+// YAML-NEXT:   Line:            142
+// YAML-NEXT:   Column:          9
+// YAML-NEXT: Function:        exp1
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Specialized function '
+// YAML-NEXT:   - Function:        '"XXX_foo"'
+// YAML-NEXT:     DebugLoc:
+// YAML-NEXT:       File:            {{.*}}/specialize.sil
+// YAML-NEXT:       Line:            90
+// YAML-NEXT:       Column:          17
+// YAML-NEXT:   - String:          ' with type '
+// YAML-NEXT:   - FuncType:        '(Int32, @inout XXX<Int32>) -> Int32'
+// YAML-NEXT: ...
 
 struct XXX<T> {
   init(t: T)
@@ -243,6 +281,20 @@ bb0(%0 : $Base):
 // CHECK-LABEL: sil shared @{{.*}}generic_upcast{{.*}}Tg5 : $@convention(thin) (@owned Base) -> @owned Base {
 // CHECK: bb0(%0 : $Base):
 // CHECK:  return %0 : $Base
+
+// YAML:      Line:            277
+// YAML-NEXT:   Column:          8
+// YAML-NEXT: Function:        specialize_generic_upcast
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Specialized function '
+// YAML-NEXT:   - Function:        '"generic_upcast"'
+// YAML-NEXT:     DebugLoc:
+// YAML-NEXT:       File:            {{.*}}/specialize.sil
+// YAML-NEXT:       Line:            268
+// YAML-NEXT:       Column:          6
+// YAML-NEXT:   - String:          ' with type '
+// YAML-NEXT:   - FuncType:        '(@owned Base) -> @owned Base'
+// YAML-NEXT: ...
 
 
 // Check generic specialization of partial_apply

@@ -29,6 +29,10 @@ namespace swift {
 
 class FunctionSignaturePartialSpecializer;
 
+namespace OptRemark {
+class Emitter;
+} // namespace OptRemark
+
 /// Tries to specialize an \p Apply of a generic function. It can be a full
 /// apply site or a partial apply.
 /// Replaced and now dead instructions are returned in \p DeadApplies.
@@ -38,7 +42,8 @@ class FunctionSignaturePartialSpecializer;
 /// This is the top-level entry point for specializing an existing call site.
 void trySpecializeApplyOfGeneric(
     ApplySite Apply, DeadInstructionSet &DeadApplies,
-    llvm::SmallVectorImpl<SILFunction *> &NewFunctions);
+    llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
+    OptRemark::Emitter &ORE);
 
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
@@ -117,7 +122,8 @@ class ReabstractionInfo {
 
   void createSubstitutedAndSpecializedTypes();
   bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
-                       SubstitutionList ParamSubs);
+                       SubstitutionList ParamSubs,
+                       OptRemark::Emitter *ORE = nullptr);
   void performFullSpecializationPreparation(SILFunction *Callee,
                                             SubstitutionList ParamSubs);
   void performPartialSpecializationPreparation(SILFunction *Caller,
@@ -134,7 +140,8 @@ public:
   /// invalid type.
   ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
                     SubstitutionList ParamSubs,
-                    bool ConvertIndirectToDirect = true);
+                    bool ConvertIndirectToDirect = true,
+                    OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// additional requirements. Requirements may contain new layout,
