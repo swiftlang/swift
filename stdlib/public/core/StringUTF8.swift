@@ -127,7 +127,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _LegacyStringCore,
+    internal init(_fixmeLegacyCore _core: _LegacyStringCore,
       legacyOffsets: (Int, Int) = (0, 0)
     ) {
       self.init(_StringGuts(_core), legacyOffsets: legacyOffsets)
@@ -141,7 +141,7 @@ extension String {
     /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
     @_inlineable // FIXME(sil-serialize-all)
     public var startIndex: Index {
-      let r = _index(atEncodedOffset: _core.startIndex)
+      let r = _index(atEncodedOffset: _guts.startIndex)
       if _legacyOffsets.start == 0 { return r }
       return index(r, offsetBy: numericCast(_legacyOffsets.start))
     }
@@ -155,7 +155,7 @@ extension String {
       _sanityCheck(_legacyOffsets.end >= -3 && _legacyOffsets.end <= 0,
         "out of bounds legacy end")
 
-      var r = Index(encodedOffset: _core.endIndex)
+      var r = Index(encodedOffset: _guts.endIndex)
       if _fastPath(_legacyOffsets.end == 0) {
         return r
       }
@@ -171,7 +171,7 @@ extension String {
     @_versioned
     internal func _index(atEncodedOffset n: Int) -> Index {
       if _fastPath(_guts.isASCII) { return Index(encodedOffset: n) }
-      if n == _core.endIndex { return endIndex }
+      if n == _guts.endIndex { return endIndex }
       
       var p = UTF16.ForwardParser()
       var i = _core[n...].makeIterator()
@@ -341,7 +341,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     public var description: String {
-      return String(_core)
+      return String(_guts)
     }
 
     @_inlineable // FIXME(sil-serialize-all)
@@ -354,7 +354,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public var utf8: UTF8View {
     get {
-      return UTF8View(self._core)
+      return UTF8View(self._guts)
     }
     set {
       self = String(describing: newValue)
@@ -437,7 +437,7 @@ extension String {
     // since we no longer have access to the length of the original string when
     // there is no owner and elements have been dropped from the end.
     if let nativeBuffer = utf8._core.nativeBuffer {
-      let wholeString = String(_LegacyStringCore(nativeBuffer))
+      let wholeString = String(_fixmeLegacyCore: _LegacyStringCore(nativeBuffer))
       let offset = (utf8._core._baseAddress! - nativeBuffer.start)
         &>> utf8._core.elementShift
 
@@ -450,7 +450,7 @@ extension String {
         return nil
       }
     }
-    self = String(utf8._core)
+    self = String(utf8._guts)
   }
 
   /// Creates a string corresponding to the given sequence of UTF-8 code units.
@@ -458,7 +458,7 @@ extension String {
   @available(swift, introduced: 4.0, message:
     "Please use failable String.init?(_:UTF8View) when in Swift 3.2 mode")
   public init(_ utf8: UTF8View) {
-    self = String(utf8._core)
+    self = String(utf8._guts)
   }
 
   /// The index type for subscripting a string.
@@ -468,7 +468,7 @@ extension String {
 extension String.UTF8View : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var _persistentContent : String { return String(self._core) }
+  internal var _persistentContent : String { return String(self._guts) }
 }
 
 extension String.UTF8View {
@@ -655,7 +655,7 @@ extension String.UTF8View.Index {
         transcodedOffset:sourcePosition._transcodedOffset, sourcePosition._cache)
 
     default:
-      guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
+      guard String.UnicodeScalarView(target._guts)._isOnUnicodeScalarBoundary(
         sourcePosition) else { return nil }
       self.init(encodedOffset: sourcePosition.encodedOffset)
     }
@@ -732,7 +732,7 @@ extension String.UTF8View {
   @available(swift, obsoleted: 4)
   public subscript(r: Range<Index>) -> String.UTF8View {
     if r.upperBound._transcodedOffset == 0 {
-      return String.UTF8View(
+      return String.UTF8View(_fixmeLegacyCore:
         _core[r.lowerBound.encodedOffset..<r.upperBound.encodedOffset],
         legacyOffsets: (r.lowerBound._transcodedOffset, 0))
     }
@@ -741,7 +741,7 @@ extension String.UTF8View {
     let scalarLength8 = (~b0).leadingZeroBitCount
     let scalarLength16 = scalarLength8 == 4 ? 2 : 1
     let coreEnd = r.upperBound.encodedOffset + scalarLength16
-    return String.UTF8View(
+    return String.UTF8View(_fixmeLegacyCore:
       _core[r.lowerBound.encodedOffset..<coreEnd],
       legacyOffsets: (
         r.lowerBound._transcodedOffset,

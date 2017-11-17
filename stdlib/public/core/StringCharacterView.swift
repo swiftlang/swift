@@ -96,12 +96,6 @@ extension String {
       self._guts = _guts
       self._coreOffset = coreOffset
     }
-
-    @_inlineable // FIXME(sil-serialize-all)
-    public // @testable
-    init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
-      self.init(_StringGuts(_core), coreOffset: coreOffset)
-    }
   }
   
   /// A view of the string's contents as a collection of characters.
@@ -755,7 +749,7 @@ extension String._CharacterView : RangeReplaceableCollection {
       _core.append(contentsOf: c0)
       return
     }
-    _core.append(c._largeUTF16!)
+    _guts.append(c._largeUTF16!)
   }
 
   /// Appends the characters in the given sequence to the character view.
@@ -767,10 +761,10 @@ extension String._CharacterView : RangeReplaceableCollection {
     if _fastPath(newElements is _SwiftStringView) {
       let v = newElements as! _SwiftStringView
       if _fastPath(_guts.count == 0) {
-        _core = v._persistentContent._core
+        _guts = v._persistentContent._guts
         return
       }
-      _core.append(v._ephemeralContent._core)
+      _guts.append(v._ephemeralContent._guts)
       return
     }
     reserveCapacity(_guts.count + newElements.underestimatedCount)

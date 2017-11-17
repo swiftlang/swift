@@ -25,14 +25,17 @@ struct _StringGuts {
   public // FIXME for testing only
   var _storage: (_BuiltinBridgeObject, UInt)
 
+  @_versioned
   var _object: _BuiltinBridgeObject {
     get { return _storage.0 }
     set { _storage.0 = newValue }
   }
+  @_versioned
   var _otherBits: UInt {
     get { return _storage.1 }
     set { _storage.1 = newValue }
   }
+  @_versioned
   var _objectBitPattern: UInt {
     get { return _bitPattern(_object) }
     set { _object = Builtin.reinterpretCast(newValue) }
@@ -538,28 +541,6 @@ internal struct OpaqueCocoaString {
 }
 
 extension _StringGuts {
-  enum Form {
-    case native
-    case nonTaggedCocoa
-    case unsafe
-    case smallCocoa
-    case error
-  }
-
-  // TODO(performance): Make sure this generates sensible code
-  /*fileprivate*/ internal // TODO: private in Swift 4
-  var classification: Form {
-    @inline(__always) get {
-      if _isNative { return .native }
-      if _isNonTaggedCocoa { return .nonTaggedCocoa }
-      if _isUnsafe { return .unsafe }
-      _sanityCheck(_isSmallCocoa)
-      return .smallCocoa
-    }
-  }
-}
-
-extension _StringGuts {
   //
   // Native Swift Strings
   //
@@ -574,7 +555,7 @@ extension _StringGuts {
   var _asNative: NativeString {
     _sanityCheck(_isNative)
     let count = Int(truncatingIfNeeded: _otherBits)
-    _sanityCheck(count > 0)
+    _sanityCheck(count >= 0)
     return NativeString(
       nativeObject: _nativeObject(fromBridge: _object),
       count: count)
@@ -599,7 +580,7 @@ extension _StringGuts {
   @_versioned
   init(_ buffer: _StringBuffer) {
     let count = buffer.usedCount
-    _sanityCheck(count > 0)
+    _sanityCheck(count >= 0)
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: buffer._nativeObject),
       isSingleByte: buffer.elementWidth == 1,
@@ -657,9 +638,11 @@ extension _StringGuts {
     let pointer = UnsafeMutableRawPointer(
       bitPattern: self._untaggedUnflaggedBitPattern
     )._unsafelyUnwrappedUnchecked
+    let count = Int(truncatingIfNeeded: self._otherBits)
+    _sanityCheck(count >= 0)
     return UnsafeString(
       baseAddress: pointer,
-      count: Int(self._otherBits),
+      count: count,
       isSingleByte: self.isSingleByte)
   }
 
@@ -761,6 +744,7 @@ extension _LegacyStringCore {
 
 // Conversions two/from legacy core
 extension _StringGuts {
+  @_versioned
   var _legacyCore: _LegacyStringCore {
     if let unsafeString = self._unsafeString {
       return _LegacyStringCore(
@@ -1012,7 +996,7 @@ extension _StringGuts {
       dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
   }
 
-  @inline(never)
+  @inline(__always)
   @_versioned
   internal
   func produceUnsafeFromNative() -> UnsafeString {
@@ -1021,7 +1005,7 @@ extension _StringGuts {
       _nativeObject: _nativeObject(fromBridge: _object))
     ).start
     let count = Int(truncatingIfNeeded: self._otherBits)
-    _sanityCheck(count > 0)
+    _sanityCheck(count >= 0)
     return UnsafeString(
       baseAddress: ptr,
       count: count,
@@ -1043,9 +1027,7 @@ extension _StringGuts {
       count: count,
       isSingleByte: self.isSingleByte
     )
-
   }
-
 
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
   // the return value.

@@ -129,7 +129,7 @@ extension Character.UnicodeScalarView : Collection {
       r = parser.parseScalar(from: &i)
     }
     else {
-      var i = _base._largeUTF16![startOfNextScalar...].makeIterator()
+      var i = _base._largeUTF16!._legacyCore[startOfNextScalar...].makeIterator()
       r = parser.parseScalar(from: &i)
     }
     
@@ -168,7 +168,7 @@ extension Character.UnicodeScalarView : BidirectionalCollection {
       r = parser.parseScalar(from: &i)
     }
     else {
-      var i = _base._largeUTF16![..<i._encodedOffset].reversed().makeIterator()
+      var i = _base._largeUTF16!._legacyCore[..<i._encodedOffset].reversed().makeIterator()
       r = parser.parseScalar(from: &i)
     }
     

@@ -55,7 +55,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
-    self._guts = _StringGuts(_CharacterView(other)._core)
+    self._guts = _CharacterView(other)._guts
   }
   
   // The defaulted argument prevents this initializer from satisfies the
@@ -66,7 +66,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
   public init?(_ other: String, obsoletedInSwift4: () = ()) {
-    self.init(other._core)
+    self.init(other._guts)
   }
 
   /// The position of the first character in a nonempty string.
@@ -225,7 +225,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
     where S.Iterator.Element == Character {
-    self._guts = _StringGuts(_CharacterView(characters)._core)
+    self._guts = _CharacterView(characters)._guts
   }
 
   /// Reserves enough space in the string's underlying storage to store the

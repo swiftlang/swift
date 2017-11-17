@@ -139,6 +139,8 @@ internal protocol _SwiftStringView {
   
   /// A `String`, having the same contents as `self`, that is suitable for
   /// long-term storage.
+  //
+  // FIXME: Remove once _StringGuts has append(contentsOf:).
   var _persistentContent : String { get }
 }
 
@@ -163,7 +165,7 @@ extension String : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
-    return _characters._persistentContent
+    return self
   }
 }
 
@@ -290,7 +292,7 @@ extension String {
   ) where C.Iterator.Element == Encoding.CodeUnit {
     let (b,_) = _StringBuffer.fromCodeUnits(
       codeUnits, encoding: sourceEncoding, repairIllFormedSequences: true)
-    self = String(_LegacyStringCore(b!))
+    self = String(_StringGuts(b!))
   }
   
   /// Creates a string from the null-terminated sequence of bytes at the given
@@ -694,7 +696,7 @@ public struct String {
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
-  init(_ _core: _LegacyStringCore) {
+  init(_fixmeLegacyCore _core: _LegacyStringCore) {
     self.init(_StringGuts(_core))
   }
 

@@ -213,14 +213,11 @@ extension Character
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
     default:
       _representation = Character(
-        _largeRepresentationString: String(
-          _LegacyStringCore(
-            baseAddress: UnsafeMutableRawPointer(start), 
-            count: utf16.count,
-            elementShift: 1,
-            hasCocoaBuffer: false,
-            owner: nil)
-        ))._representation
+        _largeRepresentationString: String(_StringGuts(UnsafeString(
+          baseAddress: UnsafeMutableRawPointer(start),
+          count: utf16.count,
+          isSingleByte: false
+        ))))._representation
     }
   }
   
@@ -305,9 +302,9 @@ extension Character {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _largeUTF16 : _LegacyStringCore? {
+  internal var _largeUTF16 : _StringGuts? {
     guard case .large(let storage) = _representation else { return nil }
-    return _LegacyStringCore(_StringBuffer(storage))
+    return _StringGuts(_StringBuffer(storage))
   }
 }
 
