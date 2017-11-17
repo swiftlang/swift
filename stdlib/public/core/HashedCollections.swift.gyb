@@ -4880,51 +4880,88 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   }
 #endif
 
+  /// Return true if self is native.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _isNative : Bool {
+#if _runtime(_ObjC)
+    switch self {
+    case .native:
+      return true
+    case .cocoa:
+      return false
+    }
+#else
+    return true
+#endif
+  }
+
+  @inline(__always)
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func ensureUniqueNativeBufferNative(_ minimumCapacity: Int)
+  -> (reallocated: Bool, capacityChanged: Bool) {
+    let oldCapacity = asNative.capacity
+    if oldCapacity >= minimumCapacity && isUniquelyReferenced() {
+      return (reallocated: false, capacityChanged: false)
+    }
+
+    let oldNativeBuffer = asNative
+    var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
+    let newCapacity = newNativeBuffer.capacity
+    for i in 0..<oldCapacity {
+      if oldNativeBuffer.isInitializedEntry(at: i) {
+        if oldCapacity == newCapacity {
+          let key = oldNativeBuffer.key(at: i)
+%if Self == 'Set':
+          newNativeBuffer.initializeKey(key, at: i)
+%elif Self == 'Dictionary':
+          let value = oldNativeBuffer.value(at: i)
+          newNativeBuffer.initializeKey(key, value: value , at: i)
+%end
+        } else {
+          let key = oldNativeBuffer.key(at: i)
+%if Self == 'Set':
+          newNativeBuffer.unsafeAddNew(key: key)
+%elif Self == 'Dictionary':
+          newNativeBuffer.unsafeAddNew(
+            key: key,
+            value: oldNativeBuffer.value(at: i))
+%end
+        }
+      }
+    }
+    newNativeBuffer.count = oldNativeBuffer.count
+
+    self = .native(newNativeBuffer)
+    return (reallocated: true,
+            capacityChanged: oldCapacity != newNativeBuffer.capacity)
+  }
+
   /// Ensure this we hold a unique reference to a native buffer
   /// having at least `minimumCapacity` elements.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func ensureUniqueNativeBuffer(_ minimumCapacity: Int)
-    -> (reallocated: Bool, capacityChanged: Bool) {
+  -> (reallocated: Bool, capacityChanged: Bool) {
+#if _runtime(_ObjC)
+    // This is a performance optimization that was put in to ensure that we did
+    // not make a copy of self to call _isNative over the entire if region
+    // causing at -Onone the uniqueness check to fail. This code used to be:
+    //
+    //  if _isNative {
+    //    return ensureUniqueNativeBufferNative(minimumCapacity)
+    //  }
+    //
+    // SR-6437
+    let n = _isNative
+    if n {
+      return ensureUniqueNativeBufferNative(minimumCapacity)
+    }
+
     switch self {
     case .native:
-      let oldCapacity = asNative.capacity
-      if isUniquelyReferenced() && oldCapacity >= minimumCapacity {
-        return (reallocated: false, capacityChanged: false)
-      }
-
-      let oldNativeBuffer = asNative
-      var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
-      let newCapacity = newNativeBuffer.capacity
-      for i in 0..<oldCapacity {
-        if oldNativeBuffer.isInitializedEntry(at: i) {
-          if oldCapacity == newCapacity {
-            let key = oldNativeBuffer.key(at: i)
-%if Self == 'Set':
-            newNativeBuffer.initializeKey(key, at: i)
-%elif Self == 'Dictionary':
-            let value = oldNativeBuffer.value(at: i)
-            newNativeBuffer.initializeKey(key, value: value , at: i)
-%end
-          } else {
-            let key = oldNativeBuffer.key(at: i)
-%if Self == 'Set':
-            newNativeBuffer.unsafeAddNew(key: key)
-%elif Self == 'Dictionary':
-            newNativeBuffer.unsafeAddNew(
-              key: key,
-              value: oldNativeBuffer.value(at: i))
-%end
-          }
-        }
-      }
-      newNativeBuffer.count = oldNativeBuffer.count
-
-      self = .native(newNativeBuffer)
-      return (reallocated: true,
-              capacityChanged: oldCapacity != newNativeBuffer.capacity)
-
-#if _runtime(_ObjC)
+      fatalError("This should have been handled earlier")
     case .cocoa(let cocoaBuffer):
       let cocoa${Self} = cocoaBuffer.cocoa${Self}
       var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
@@ -4948,8 +4985,10 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
       self = .native(newNativeBuffer)
       return (reallocated: true, capacityChanged: true)
-#endif
     }
+#else
+    return ensureUniqueNativeBufferNative(minimumCapacity)
+#endif
   }
 
 #if _runtime(_ObjC)
@@ -5236,8 +5275,17 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func nativePointerToValue(at i: Index)
-    -> UnsafeMutablePointer<Value> {
-    _ = ensureUniqueNativeBuffer(asNative.capacity)
+  -> UnsafeMutablePointer<Value> {
+    // This is a performance optimization that was put in to ensure that we did
+    // not make a copy of self to call asNative.capacity over
+    // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
+    // fail. This code used to be:
+    //
+    // _ = ensureUniqueNativeBuffer(capacity)
+    //
+    // SR-6437
+    let capacity = asNative.capacity
+    _ = ensureUniqueNativeBuffer(capacity)
     return asNative.values + i._nativeIndex.offset
   }
 
@@ -5391,7 +5439,16 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
       if found {
-        _ = ensureUniqueNativeBuffer(asNative.capacity)
+        // This is a performance optimization that was put in to ensure that we
+        // did not make a copy of self to call asNative.capacity over
+        // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
+        // fail. This code used to be:
+        //
+        // _ = ensureUniqueNativeBuffer(asNative.capacity)
+        //
+        // SR-6437
+        let capacity = asNative.capacity
+        _ = ensureUniqueNativeBuffer(capacity)
         do {
           let newValue = try combine(asNative.value(at: i.offset), value)
           asNative.setKey(key, value: newValue, at: i.offset)
@@ -5545,8 +5602,17 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       return nil
     }
 
+    // This is a performance optimization that was put in to ensure that we
+    // did not make a copy of self to call asNative.capacity over
+    // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
+    // fail. This code used to be:
+    //
+    // _ = ensureUniqueNativeBuffer(asNative.capacity)
+    //
+    // SR-6437
+    let capacity = asNative.capacity
     let (_, capacityChanged) =
-      ensureUniqueNativeBuffer(asNative.capacity)
+      ensureUniqueNativeBuffer(capacity)
     let nativeBuffer = asNative
     if capacityChanged {
       idealBucket = nativeBuffer._bucket(key)
@@ -5568,10 +5634,18 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func nativeRemove(
     at nativeIndex: NativeIndex
   ) -> SequenceElement {
-
+    // This is a performance optimization that was put in to ensure that we did
+    // not make a copy of self to call asNative.capacity over
+    // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
+    // fail. This code used to be:
+    //
+    // _ = ensureUniqueNativeBuffer(asNative.capacity)
+    //
+    // SR-6437
+    let capacity = asNative.capacity
     // The provided index should be valid, so we will always mutating the
     // set buffer.  Request unique buffer.
-    _ = ensureUniqueNativeBuffer(asNative.capacity)
+    _ = ensureUniqueNativeBuffer(capacity)
     let nativeBuffer = asNative
 
     let result = nativeBuffer.assertingGet(nativeIndex)
