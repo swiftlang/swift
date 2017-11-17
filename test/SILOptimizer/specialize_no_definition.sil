@@ -28,13 +28,13 @@ sil_stage canonical
 sil hidden @foo : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int64, 2          // user: %1
-  %1 = struct $Int (%0 : $Builtin.Int64)          // user: %3
-  %2 = alloc_stack $Int                           // users: %3, %6, %5
-  store %1 to %2 : $*Int                          // id: %3
+  %1 = struct $Int64 (%0 : $Builtin.Int64)          // user: %3
+  %2 = alloc_stack $Int64                           // users: %3, %6, %5
+  store %1 to %2 : $*Int64                          // id: %3
   // function_ref bar<A>(_:)
   %4 = function_ref @bar : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
-  %5 = apply %4<Int>(%2) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
-  dealloc_stack %2 : $*Int                        // id: %6
+  %5 = apply %4<Int64>(%2) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %2 : $*Int64                        // id: %6
   %7 = tuple ()                                   // user: %8
   return %7 : $()                                 // id: %8
 } // end sil function 'foo'
