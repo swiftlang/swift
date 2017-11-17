@@ -753,10 +753,10 @@ extension String.CharacterView : RangeReplaceableCollection {
     if _fastPath(newElements is _SwiftStringView) {
       let v = newElements as! _SwiftStringView
       if _fastPath(_guts.count == 0) {
-        _core = v._persistentContent._core
+        _guts = v._persistentContent._guts
         return
       }
-      _core.append(v._ephemeralContent._core)
+      _guts.append(v._ephemeralContent._guts)
       return
     }
     reserveCapacity(_guts.count + newElements.underestimatedCount)
