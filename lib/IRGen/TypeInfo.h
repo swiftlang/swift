@@ -270,8 +270,8 @@ public:
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.
-  virtual void destroyStack(IRGenFunction &IGF, StackAddress addr,
-                            SILType T) const = 0;
+  virtual void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                            bool isOutlined) const = 0;
 
   /// Copy or take a value out of one address and into another, destroying
   /// old value in the destination.  Equivalent to either assignWithCopy
@@ -345,7 +345,8 @@ public:
                                     bool isOutlined) const = 0;
 
   /// Destroy an object of this type in memory.
-  virtual void destroy(IRGenFunction &IGF, Address address, SILType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
+                       bool isOutlined) const = 0;
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single object pointer?

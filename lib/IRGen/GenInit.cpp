@@ -73,8 +73,8 @@ StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
 }
 
 void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,
-                                 SILType T) const {
-  destroy(IGF, addr.getAddress(), T);
+                                 SILType T, bool isOutlined) const {
+  destroy(IGF, addr.getAddress(), T, isOutlined);
   FixedTypeInfo::deallocateStack(IGF, addr, T);
 }
 

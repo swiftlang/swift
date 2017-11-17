@@ -804,7 +804,8 @@ namespace {
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity) const override {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {}
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {}
     void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
                              Explosion &src, unsigned offset) const override {}
     void unpackFromEnumPayload(IRGenFunction &IGF,
@@ -937,7 +938,8 @@ namespace {
       explosion.claimNext();
     }
 
-    void destroy(IRGenFunction &IGF, Address address, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
       /* nop */
     }
     
@@ -999,8 +1001,8 @@ namespace {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
-    void destroy(IRGenFunction &IGF, Address address,
-                 SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
   };

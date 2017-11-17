@@ -354,7 +354,8 @@ public:
   virtual void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                                 Size offset) const = 0;
   virtual void getSchema(ExplosionSchema &schema) const = 0;
-  virtual void destroy(IRGenFunction &IGF, Address addr, SILType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                       bool isOutlined) const = 0;
 
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address dest, SILType T,

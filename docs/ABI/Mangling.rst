@@ -87,6 +87,7 @@ Globals
   global ::= type 'Wc' INDEX // Outlined InitializeWithCopy Function Type
   global ::= type 'Wd' INDEX // Outlined AssignWithTake Function Type
   global ::= type 'Wf' INDEX // Outlined AssignWithCopy Function Type
+  global ::= type 'Wh' INDEX // Outlined Destroy Function Type
 
   assoc_type_path ::= identifier '_' identifier*
 

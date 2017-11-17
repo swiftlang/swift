@@ -79,7 +79,8 @@ public:
   StackAddress allocateStack(IRGenFunction &IGF, SILType T, bool isEntryBlock,
                              const llvm::Twine &name) const override;
   void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
-  void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
+  void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                    bool isOutlined) const override;
 
   // We can give these reasonable default implementations.
 

@@ -242,13 +242,23 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isPOD()) continue;
+  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+               bool isOutlined) const override {
+    if (isOutlined || T.hasOpenedExistential()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isPOD())
+          continue;
 
-      field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr, offsets),
-                                  field.getType(IGF.IGM, T));
+        field.getTypeInfo().destroy(IGF,
+                                    field.projectAddress(IGF, addr, offsets),
+                                    field.getType(IGF.IGM, T), isOutlined);
+      }
+    } else {
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, addr, T,
+                                            &typeToMetadataVec);
     }
   }
 

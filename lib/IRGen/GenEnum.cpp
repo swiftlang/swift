@@ -552,11 +552,22 @@ namespace {
       if (getLoadableSingleton()) getLoadableSingleton()->fixLifetime(IGF, src);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       if (getSingleton() &&
-          !getSingleton()->isPOD(ResilienceExpansion::Maximal))
-        getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
-                                getSingletonType(IGF.IGM, T));
+          !getSingleton()->isPOD(ResilienceExpansion::Maximal)) {
+        if (isOutlined || T.hasOpenedExistential()) {
+          getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
+                                  getSingletonType(IGF.IGM, T), isOutlined);
+        } else {
+          llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+          if (T.hasArchetype()) {
+            collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+          }
+          IGF.IGM.generateCallToOutlinedDestroy(IGF, *TI, addr, T,
+                                                &typeToMetadataVec);
+        }
+      }
     }
 
     void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
@@ -2420,35 +2431,49 @@ namespace {
 
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      switch (CopyDestroyKind) {
-      case POD:
-        return;
-
-      case Normal: {
-        // Check that there is a payload at the address.
-        llvm::BasicBlock *endBB = testEnumContainsPayload(IGF, addr, T);
-
-        ConditionalDominanceScope condition(IGF);
-
-        // If there is, project and destroy it.
-        Address payloadAddr = projectPayloadData(IGF, addr);
-        getPayloadTypeInfo().destroy(IGF, payloadAddr,
-                                     getPayloadType(IGF.IGM, T));
-
-        IGF.Builder.CreateBr(endBB);
-        IGF.Builder.emitBlock(endBB);
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
+      if (CopyDestroyKind == POD) {
         return;
       }
+      if (isOutlined || T.hasOpenedExistential()) {
+        switch (CopyDestroyKind) {
+        case POD:
+          return;
 
-      case NullableRefcounted: {
-        // Load the value as swift.refcounted, then hand to swift_release.
-        addr = IGF.Builder.CreateBitCast(addr,
-                                 getRefcountedPtrType(IGF.IGM)->getPointerTo());
-        llvm::Value *ptr = IGF.Builder.CreateLoad(addr);
-        releaseRefcountedPayload(IGF, ptr);
-        return;
-      }
+        case Normal: {
+          // Check that there is a payload at the address.
+          llvm::BasicBlock *endBB = testEnumContainsPayload(IGF, addr, T);
+
+          ConditionalDominanceScope condition(IGF);
+
+          // If there is, project and destroy it.
+          Address payloadAddr = projectPayloadData(IGF, addr);
+          getPayloadTypeInfo().destroy(IGF, payloadAddr,
+                                       getPayloadType(IGF.IGM, T),
+                                       true /*isOutlined*/);
+
+          IGF.Builder.CreateBr(endBB);
+          IGF.Builder.emitBlock(endBB);
+          return;
+        }
+
+        case NullableRefcounted: {
+          // Load the value as swift.refcounted, then hand to swift_release.
+          addr = IGF.Builder.CreateBitCast(
+              addr, getRefcountedPtrType(IGF.IGM)->getPointerTo());
+          llvm::Value *ptr = IGF.Builder.CreateLoad(addr);
+          releaseRefcountedPayload(IGF, ptr);
+          return;
+        }
+        }
+      } else {
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+        if (T.hasArchetype()) {
+          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        }
+        IGF.IGM.generateCallToOutlinedDestroy(IGF, *TI, addr, T,
+                                              &typeToMetadataVec);
       }
     }
 
@@ -2535,7 +2560,8 @@ namespace {
           IGF.Builder.emitBlock(destNoSrcPayloadBB);
           {
             ConditionalDominanceScope destNoSrcCondition(IGF);
-            getPayloadTypeInfo().destroy(IGF, destData, PayloadT);
+            getPayloadTypeInfo().destroy(IGF, destData, PayloadT,
+                                         false /*outline calling outline*/);
             emitPrimitiveCopy(IGF, dest, src, T);
             IGF.Builder.CreateBr(endBB);
           }
@@ -4189,7 +4215,7 @@ namespace {
         ConditionalDominanceScope condition(IGF);
 
         // Destroy the old value.
-        destroy(IGF, dest, T);
+        destroy(IGF, dest, T, false /*outline calling outline*/);
 
         // Reinitialize with the new value.
         emitIndirectInitialize(IGF, dest, src, T, isTake, isOutlined);
@@ -4420,38 +4446,51 @@ namespace {
       }
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      switch (CopyDestroyKind) {
-      case POD:
-        return;
-
-      case BitwiseTakable:
-      case Normal:
-      case TaggedRefcounted: {
-        // If loadable, it's better to do this directly to the value than
-        // in place, so we don't need to RMW out the tag bits in memory.
-        if (TI->isLoadable()) {
-          Explosion tmp;
-          loadAsTake(IGF, addr, tmp);
-          consume(IGF, tmp, IGF.getDefaultAtomicity());
-          return;
-        }
-
-        auto tag = loadPayloadTag(IGF, addr, T);
-
-        forNontrivialPayloads(IGF, tag,
-          [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
-            // Clear tag bits out of the payload area, if any.
-            destructiveProjectDataForLoad(IGF, T, addr);
-            // Destroy the data.
-            Address dataAddr = IGF.Builder.CreateBitCast(addr,
-                                      elt.ti->getStorageType()->getPointerTo());
-            SILType payloadT =
-              T.getEnumElementType(elt.decl, IGF.getSILModule());
-            elt.ti->destroy(IGF, dataAddr, payloadT);
-          });
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
+      if (CopyDestroyKind == POD) {
         return;
       }
+      if (isOutlined || T.hasOpenedExistential()) {
+        switch (CopyDestroyKind) {
+        case POD:
+          return;
+
+        case BitwiseTakable:
+        case Normal:
+        case TaggedRefcounted: {
+          // If loadable, it's better to do this directly to the value than
+          // in place, so we don't need to RMW out the tag bits in memory.
+          if (TI->isLoadable()) {
+            Explosion tmp;
+            loadAsTake(IGF, addr, tmp);
+            consume(IGF, tmp, IGF.getDefaultAtomicity());
+            return;
+          }
+
+          auto tag = loadPayloadTag(IGF, addr, T);
+
+          forNontrivialPayloads(
+              IGF, tag, [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+                // Clear tag bits out of the payload area, if any.
+                destructiveProjectDataForLoad(IGF, T, addr);
+                // Destroy the data.
+                Address dataAddr = IGF.Builder.CreateBitCast(
+                    addr, elt.ti->getStorageType()->getPointerTo());
+                SILType payloadT =
+                    T.getEnumElementType(elt.decl, IGF.getSILModule());
+                elt.ti->destroy(IGF, dataAddr, payloadT, true /*isOutlined*/);
+              });
+          return;
+        }
+        }
+      } else {
+        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+        if (T.hasArchetype()) {
+          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+        }
+        IGF.IGM.generateCallToOutlinedDestroy(IGF, *TI, addr, T,
+                                              &typeToMetadataVec);
       }
     }
 
@@ -4952,7 +4991,8 @@ namespace {
       typeToMetadataVec.insert(std::make_pair(canType, metadata));
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       emitDestroyCall(IGF, T, addr);
     }
 
@@ -5316,8 +5356,9 @@ namespace {
     void getSchema(ExplosionSchema &s) const override {
       return Strategy.getSchema(s);
     }
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-      return Strategy.destroy(IGF, addr, T);
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
+      return Strategy.destroy(IGF, addr, T, isOutlined);
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address dest, SILType T,

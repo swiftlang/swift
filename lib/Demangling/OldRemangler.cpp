@@ -1724,6 +1724,11 @@ void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
   mangleSingleChildNode(node);
 }
 
+void Remangler::mangleOutlinedDestroy(Node *node) {
+  Out << "Wh";
+  mangleSingleChildNode(node);
+}
+
 void Remangler::mangleOutlinedVariable(Node *node) {
   Out << "Tv" << node->getIndex();
   mangleSingleChildNode(node);

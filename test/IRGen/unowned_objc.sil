@@ -103,8 +103,7 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call void @swift_unknownRelease([[UNKNOWN]]* [[TV]])
   strong_release %t1 : $P
 
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], [[UREF]]* [[X]], i32 0, i32 0
-  // CHECK-NEXT: call void @swift_unknownUnownedDestroy(%swift.unowned* [[T0]])
+  // CHECK-NEXT: call { %swift.unowned, i8** }* @_T012unowned_objc1P_pXoWh0_({ %swift.unowned, i8** }*
   destroy_addr %x : $*@sil_unowned P
 
   // CHECK-NEXT: bitcast

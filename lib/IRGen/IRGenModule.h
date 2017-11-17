@@ -747,6 +747,11 @@ public:
       const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
           nullptr);
 
+  void generateCallToOutlinedDestroy(
+      IRGenFunction &IGF, const TypeInfo &objectTI, Address addr, SILType T,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
+
   unsigned getCanTypeID(const CanType type);
 
 private:

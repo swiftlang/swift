@@ -235,7 +235,8 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
       continue;
 
     field.getType().destroy(IGF, field.project(IGF, structAddr, offsets),
-                            fieldTy);
+                            fieldTy,
+                            false /*not outlined in heap's code paths*/);
   }
 
   emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
@@ -515,7 +516,8 @@ namespace {
       IGF.emitNativeWeakTakeAssign(destAddr, srcAddr);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       IGF.emitNativeWeakDestroy(addr);
     }
 
@@ -671,8 +673,8 @@ namespace {
       IGF.emitUnknownUnownedTakeInit(dest, src);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr,
-                 SILType type) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType type,
+                 bool isOutlined) const override {
       IGF.emitUnknownUnownedDestroy(addr);
     }
 
@@ -745,7 +747,8 @@ namespace {
       IGF.emitUnknownWeakTakeAssign(destAddr, srcAddr);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       IGF.emitUnknownWeakDestroy(addr);
     }
                                 
