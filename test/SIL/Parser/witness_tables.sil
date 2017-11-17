@@ -96,3 +96,22 @@ sil_witness_table DeadMethodClass: Proto module witness_tables {
   method #Proto.abc!1: nil
 }
 
+protocol P {
+}
+
+struct ConditionalStruct<T> {
+  init()
+}
+
+extension ConditionalStruct : P where T : P {
+}
+
+// CHECK-LABEL: sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module witness_tables {
+// CHECK-NEXT:    conditional_conformance (T: P): dependent
+// CHECL-NEXT:   }
+sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module t4 {
+  conditional_conformance (T: P): dependent
+}
+
+sil_default_witness_table hidden P {
+}
