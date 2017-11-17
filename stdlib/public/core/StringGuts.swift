@@ -744,6 +744,7 @@ extension _LegacyStringCore {
 
 // Conversions two/from legacy core
 extension _StringGuts {
+  @_versioned
   var _legacyCore: _LegacyStringCore {
     if let unsafeString = self._unsafeString {
       return _LegacyStringCore(

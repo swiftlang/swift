@@ -192,7 +192,7 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal func _internalIndex(at i: Int) -> Int {
-      return _core.startIndex + i
+      return _guts.startIndex + i
     }
 
     /// Accesses the code unit at the given position.
@@ -213,7 +213,7 @@ extension String {
           "out-of-range access on a UTF16View")
 
       let index = _internalIndex(at: i.encodedOffset)
-      let u = _core[index]
+      let u = _guts[index]
       if _fastPath((u &>> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence
         // of 1 code unit.
@@ -225,7 +225,7 @@ extension String {
         // is followed by a low-surrogate.
         if _fastPath(
                index + 1 < _guts.count &&
-               (_core[index + 1] &>> 10) == 0b1101_11) {
+               (_guts[index + 1] &>> 10) == 0b1101_11) {
           return u
         }
         return 0xfffd
@@ -233,7 +233,7 @@ extension String {
 
       // `u` is a low-surrogate.  Sequence is well-formed if
       // previous code unit is a high-surrogate.
-      if _fastPath(index != 0 && (_core[index - 1] &>> 10) == 0b1101_10) {
+      if _fastPath(index != 0 && (_guts[index - 1] &>> 10) == 0b1101_10) {
         return u
       }
       return 0xfffd
@@ -265,12 +265,6 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _LegacyStringCore) {
-      self.init(_core, offset: 0, length: _core.count)
-    }
-
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
@@ -278,16 +272,10 @@ extension String {
     }
 
     @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _LegacyStringCore, offset: Int, length: Int) {
-      self.init(_StringGuts(_core), offset: offset, length: length)
-    }
-
-    @_inlineable // FIXME(sil-serialize-all)
     public var description: String {
       let start = _internalIndex(at: _offset)
       let end = _internalIndex(at: _offset + _length)
-      return String(_core[start..<end])
+      return String(_fixmeLegacyCore: _core[start..<end])
     }
 
     @_inlineable // FIXME(sil-serialize-all)
@@ -347,8 +335,9 @@ extension String {
     // semantics may be impossible to preserve in the case of string literals,
     // since we no longer have access to the length of the original string when
     // there is no owner and elements are dropped from the end.
-    let wholeString = utf16._core.nativeBuffer.map { String(_LegacyStringCore($0)) }
-       ?? String(utf16._core)
+    let wholeString = utf16._core.nativeBuffer.map {
+      String(_fixmeLegacyCore: _LegacyStringCore($0))
+    } ?? String(utf16._guts)
 
     guard
       let start = UTF16Index(_offset: utf16._offset)
@@ -360,14 +349,13 @@ extension String {
         return nil
     }
     self = wholeString[start..<end]
-
   }
 
   /// Creates a string corresponding to the given sequence of UTF-16 code units.
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4.0)
   public init(_ utf16: UTF16View) {
-    self = String(utf16._core)
+    self = String(utf16._guts)
   }
 
   /// The index type for subscripting a string.
@@ -380,7 +368,7 @@ extension String.UTF16View : _SwiftStringView {
   internal var _ephemeralContent : String { return _persistentContent }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var _persistentContent : String { return String(self._core) }
+  internal var _persistentContent : String { return String(self._guts) }
 }
 
 // Index conversions
@@ -613,7 +601,7 @@ extension String.UTF16View {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String.UTF16View {
     return String.UTF16View(
-      _core,
+      _guts,
       offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
       length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
   }

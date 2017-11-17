@@ -84,8 +84,8 @@ extension String {
     // Character.
 #if _runtime(_ObjC)
     if self._core.hasContiguousStorage && rhs._core.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(self._core)
-      let rhsStr = _NSContiguousString(rhs._core)
+      let lhsStr = _NSContiguousString(self._guts)
+      let rhsStr = _NSContiguousString(rhs._guts)
       let res = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
         return Int(
             _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))

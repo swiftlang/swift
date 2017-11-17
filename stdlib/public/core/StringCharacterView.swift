@@ -94,12 +94,6 @@ extension String {
       self._guts = _guts
       self._coreOffset = coreOffset
     }
-
-    @_inlineable // FIXME(sil-serialize-all)
-    public // @testable
-    init(_ _core: _LegacyStringCore, coreOffset: Int = 0) {
-      self.init(_StringGuts(_core), coreOffset: coreOffset)
-    }
   }
 
   /// A view of the string's contents as a collection of characters.
@@ -741,7 +735,7 @@ extension String.CharacterView : RangeReplaceableCollection {
       _core.append(contentsOf: c0)
       return
     }
-    _core.append(c._largeUTF16!)
+    _guts.append(c._largeUTF16!)
   }
 
   /// Appends the characters in the given sequence to the character view.

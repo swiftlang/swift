@@ -261,7 +261,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   }
   
   @_inlineable // FIXME(sil-serialize-all)
-  public convenience init(_ _core: _LegacyStringCore) {
+  public convenience init(_fixmeLegacyCore _core: _LegacyStringCore) {
     self.init(_StringGuts(_core))
   }
 
@@ -330,17 +330,17 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   //
   @_versioned // FIXME(sil-serialize-all)
   @objc func substringFromIndex(_ start: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[Int(start)..<Int(_guts.count)])
+    return _NSContiguousString(_fixmeLegacyCore: _core[Int(start)..<Int(_guts.count)])
   }
 
   @_versioned // FIXME(sil-serialize-all)
   @objc func substringToIndex(_ end: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[0..<Int(end)])
+    return _NSContiguousString(_fixmeLegacyCore: _core[0..<Int(end)])
   }
 
   @_versioned // FIXME(sil-serialize-all)
   @objc func substringWithRange(_ aRange: _SwiftNSRange) -> _NSContiguousString {
-    return _NSContiguousString(
+    return _NSContiguousString(_fixmeLegacyCore:
       _core[Int(aRange.location)..<Int(aRange.location + aRange.length)])
   }
 
