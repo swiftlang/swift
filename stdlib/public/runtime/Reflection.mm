@@ -761,14 +761,14 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 intptr_t swift_ObjCMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
-  auto isa = (Class)type;
+  auto isa = (const ClassMetadata *)type;
 
   unsigned count = 0;
   // ObjC makes no guarantees about the state of ivars, so we can't safely
   // introspect them in the general case.
 
   // The superobject counts as a child.
-  if (_swift_getSuperclass((const ClassMetadata*) isa))
+  if (isa->SuperClass)
     count += 1;
 
   swift_release(owner);
@@ -790,7 +790,7 @@ void swift_ObjCMirror_subscript(String *outString,
   auto isa = (Class)type;
 
   // If there's a superclass, it becomes the first child.
-  if (auto sup = (Class) _swift_getSuperclass((const ClassMetadata*) isa)) {
+  if (auto sup = class_getSuperclass(isa)) {
     if (i == 0) {
       const char *supName = class_getName(sup);
       new (outString) String(supName, strlen(supName));

@@ -259,7 +259,7 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
     if (sourceType == targetType) {
       return sourceType;
     }
-    sourceType = _swift_getSuperclass(sourceType);
+    sourceType = sourceType->SuperClass;
   } while (sourceType);
   
   return nullptr;

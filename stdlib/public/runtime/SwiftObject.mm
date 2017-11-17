@@ -198,15 +198,14 @@ static NSString *_getClassDescription(Class cls) {
   return _swift_getObjCClassOfAllocated(self);
 }
 + (Class)superclass {
-  return class_const_cast(_swift_getSuperclass((const ClassMetadata*) self));
+  return (Class)((const ClassMetadata*) self)->SuperClass;
 }
 - (Class)superclass {
-  return
-    class_const_cast(_swift_getSuperclass(_swift_getClassOfAllocated(self)));
+  return (Class)_swift_getClassOfAllocated(self)->SuperClass;
 }
 
 + (BOOL)isMemberOfClass:(Class)cls {
-  return cls ==  _swift_getObjCClassOfAllocated(self);
+  return cls == _swift_getObjCClassOfAllocated(self);
 }
 
 - (BOOL)isMemberOfClass:(Class)cls {
@@ -293,7 +292,7 @@ static NSString *_getClassDescription(Class cls) {
 
 - (BOOL)isKindOfClass:(Class)someClass {
   for (auto cls = _swift_getClassOfAllocated(self); cls != nullptr;
-       cls = _swift_getSuperclass(cls))
+       cls = cls->SuperClass)
     if (cls == (const ClassMetadata*) someClass)
       return YES;
 
@@ -302,7 +301,7 @@ static NSString *_getClassDescription(Class cls) {
 
 + (BOOL)isSubclassOfClass:(Class)someClass {
   for (auto cls = (const ClassMetadata*) self; cls != nullptr;
-       cls = _swift_getSuperclass(cls))
+       cls = cls->SuperClass)
     if (cls == (const ClassMetadata*) someClass)
       return YES;
 
