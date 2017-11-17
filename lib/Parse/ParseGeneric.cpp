@@ -354,10 +354,6 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
       addToScope(pd);
   
   SmallVector<RequirementRepr, 4> Requirements;
-  if (genericParams)
-    Requirements.append(genericParams->getRequirements().begin(),
-                        genericParams->getRequirements().end());
-  
   SourceLoc WhereLoc;
   bool FirstTypeInComplete;
   auto result = parseGenericWhereClause(WhereLoc, Requirements,
@@ -368,11 +364,7 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
   if (!genericParams)
     diagnose(WhereLoc, diag::where_without_generic_params, unsigned(kind));
   else
-    genericParams = GenericParamList::create(Context,
-                                             genericParams->getLAngleLoc(),
-                                             genericParams->getParams(),
-                                             WhereLoc, Requirements,
-                                             genericParams->getRAngleLoc());
+    genericParams->addTrailingWhereClause(Context, WhereLoc, Requirements);
   return ParserStatus();
 }
 
