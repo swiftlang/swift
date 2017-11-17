@@ -254,7 +254,9 @@ extension String {
       
       // Parse a single scalar
       var p =  Unicode.UTF16.ReverseParser()
-      var s = _core[..<i.encodedOffset].reversed().makeIterator()
+      // FIXME: Work around ambiguity in chained reversed().makeIterator() by splitting the expression up.
+      let reversed = _core[..<i.encodedOffset].reversed()
+      var s = reversed.makeIterator()
       let u8: Unicode.UTF8.EncodedScalar
       switch p.parseScalar(from: &s) {
       case .valid(let u16):

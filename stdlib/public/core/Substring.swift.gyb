@@ -610,7 +610,9 @@ extension Substring {
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> String {
-    return try String(self.lazy.filter(isIncluded))
+    // FIXME: Work around ambiguity in lazy.filter by splitting the expression up.
+    let lazy = self.lazy
+    return try String(lazy.filter(isIncluded))
   }
 }
 

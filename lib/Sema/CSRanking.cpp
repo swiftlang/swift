@@ -1325,7 +1325,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
             overloadChoice.first,
             overloadChoice.second
           });
-        
+        break;
       }
     }
   }
