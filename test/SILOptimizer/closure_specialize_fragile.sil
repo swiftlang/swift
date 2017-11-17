@@ -8,14 +8,14 @@ import Builtin
 import Swift
 import SwiftShims
 
-@_semantics("optimize.sil.never") public func action()
+@_optimize(none) public func action()
 
 @inline(__always) public func fragileCaller()
 
 public func resilientCallee(fn: () -> ())
 
 // action()
-sil [_semantics "optimize.sil.never"] @_T026closure_specialize_fragile6actionyyF : $@convention(thin) () -> () {
+sil [Onone] @_T026closure_specialize_fragile6actionyyF : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()

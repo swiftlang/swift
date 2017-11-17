@@ -88,7 +88,7 @@ func overlapping_sub_bad<U: P1>(_: U) {
 
 struct SameType<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=SameType<Int>
-// CHECK-NEXT: (normal_conformance type=SameType<Int> protocol=P2
+// CHECK-NEXT: (normal_conformance type=SameType<T> protocol=P2
 // CHECK-NEXT:   same_type: τ_0_0 Int)
 extension SameType: P2 where T == Int {}
 func same_type_good() {
@@ -102,7 +102,7 @@ func same_type_bad<U>(_: U) {
 
 struct SameTypeGeneric<T, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=SameTypeGeneric<T, T>
-// CHECK-NEXT: (normal_conformance type=SameTypeGeneric<T, T> protocol=P2
+// CHECK-NEXT: (normal_conformance type=SameTypeGeneric<T, U> protocol=P2
 // CHECK-NEXT:   same_type: τ_0_0 τ_0_1)
 extension SameTypeGeneric: P2 where T == U {}
 func same_type_generic_good<U, V>(_: U, _: V)
@@ -124,7 +124,7 @@ func same_type_bad<U, V>(_: U, _: V) {
 
 struct Infer<T, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Infer<Constrained<U>, U>
-// CHECK-NEXT: (normal_conformance type=Infer<Constrained<U>, U> protocol=P2
+// CHECK-NEXT: (normal_conformance type=Infer<T, U> protocol=P2
 // CHECK-NEXT:   same_type: τ_0_0 Constrained<τ_0_1>
 // CHECK-NEXT:   conforms_to:  τ_0_1 P1)
 extension Infer: P2 where T == Constrained<U> {}
@@ -142,7 +142,7 @@ func infer_bad<U: P1, V>(_: U, _: V) {
 
 struct InferRedundant<T, U: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InferRedundant<Constrained<U>, U>
-// CHECK-NEXT: (normal_conformance type=InferRedundant<Constrained<U>, U> protocol=P2
+// CHECK-NEXT: (normal_conformance type=InferRedundant<T, U> protocol=P2
 // CHECK-NEXT:   same_type: τ_0_0 Constrained<τ_0_1>)
 extension InferRedundant: P2 where T == Constrained<U> {}
 func infer_redundant_good<U: P1>(_: U) {
@@ -310,12 +310,12 @@ extension TwoDisjointConformances: P2 where T == String {}
 // true in the original type's generic signature.
 struct RedundancyOrderDependenceGood<T: P1, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceGood<T, T>
-// CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, T> protocol=P2
+// CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, U> protocol=P2
 // CHECK-NEXT:   same_type: τ_0_0 τ_0_1)
 extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
 struct RedundancyOrderDependenceBad<T, U: P1> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad<T, T>
-// CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceBad<T, T> protocol=P2
+// CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceBad<T, U> protocol=P2
 // CHECK-NEXT:   conforms_to: τ_0_0 P1
 // CHECK-NEXT:   same_type: τ_0_0 τ_0_1)
 extension RedundancyOrderDependenceBad: P2 where T: P1, T == U {}
