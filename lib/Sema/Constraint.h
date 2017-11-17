@@ -505,6 +505,11 @@ public:
     IsDisabled = true;
   }
 
+  void setEnabled() {
+    assert(isDisabled() && "Can't re-enable already active constraint!");
+    IsDisabled = false;
+  }
+
   /// Mark or retrieve whether this constraint should be favored in the system.
   void setFavored() { IsFavored = true; }
   bool isFavored() const { return IsFavored; }
