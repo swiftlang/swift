@@ -1748,8 +1748,13 @@
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 1919,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 1921,
     key.length: 1
   },
   {
@@ -1758,7 +1763,9 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "T",
+    key.usr: "s:8__main__6genfooyxAA5Prot2RzSi7ElementRtzlF1TL_xmfp",
     key.offset: 1924,
     key.length: 1
   },
@@ -1782,28 +1789,11 @@
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1919,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1921,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
     key.offset: 1946,
     key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.generic_type_param,
-    key.name: "T",
-    key.usr: "s:8__main__6genfooyxAA5Prot2RzSi7ElementRtzlF1TL_xmfp",
-    key.offset: 1924,
-    key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,

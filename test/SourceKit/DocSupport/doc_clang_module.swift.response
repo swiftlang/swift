@@ -1310,9 +1310,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 1405,
     key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 1407,
+    key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
@@ -1320,7 +1325,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 1417,
     key.length: 1
   },
@@ -1364,16 +1369,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 1471,
     key.length: 7
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1405,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1407,
-    key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,

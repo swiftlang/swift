@@ -1295,8 +1295,7 @@ public:
     return Requirements.slice(0, FirstTrailingWhereArg);
   }
 
-  /// Retrieve only those requirements that are written within the brackets,
-  /// which does not include any requirements written in a trailing where
+  /// Retrieve only those requirements written in a trailing where
   /// clause.
   ArrayRef<RequirementRepr> getTrailingRequirements() const {
     return Requirements.slice(FirstTrailingWhereArg);

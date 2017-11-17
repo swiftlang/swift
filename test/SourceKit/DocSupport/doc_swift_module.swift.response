@@ -1294,6 +1294,16 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.length: 2
   },
   {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 1532,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 1534,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1532,
     key.length: 1
@@ -1304,8 +1314,18 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.length: 2
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 1538,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 1542,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 1544,
     key.length: 2
   },
   {
@@ -1319,7 +1339,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.length: 2
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 1548,
     key.length: 2
   },
@@ -1377,26 +1397,6 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.name: "C1",
     key.usr: "s:4cake2C1C",
     key.offset: 1602,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1532,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1534,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1542,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1544,
     key.length: 2
   },
   {
