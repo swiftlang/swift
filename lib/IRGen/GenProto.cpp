@@ -981,8 +981,9 @@ static bool isDependentConformance(IRGenModule &IGM,
       return true;
   }
 
+  auto DC = conformance->getDeclContext();
   // If the conforming type isn't dependent, the below check is never true.
-  if (!conformance->getDeclContext()->isGenericContext())
+  if (!DC->isGenericContext())
     return false;
 
   // Check whether any of the associated types are dependent.
@@ -990,7 +991,7 @@ static bool isDependentConformance(IRGenModule &IGM,
         [&](AssociatedTypeDecl *requirement, Type type,
             TypeDecl *explicitDecl) -> bool {
           // RESILIENCE: this could be an opaque conformance
-          return type->hasArchetype();
+          return type->hasTypeParameter();
        })) {
     return true;
   }
@@ -1208,7 +1209,10 @@ public:
     WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
                         SILWitnessTable *SILWT)
         : IGM(IGM), Table(table),
-          ConcreteType(SILWT->getConformance()->getType()->getCanonicalType()),
+          ConcreteType(SILWT->getConformance()->getDeclContext()
+                         ->mapTypeIntoContext(
+                           SILWT->getConformance()->getType()
+                             ->getCanonicalType())),
           Conformance(*SILWT->getConformance()),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
@@ -1316,13 +1320,15 @@ public:
 
       SILEntries = SILEntries.slice(1);
 
-      CanType associate =
-        Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
-          ->getCanonicalType();
+      auto interfaceAssociate =
+        Conformance.getTypeWitness(requirement.getAssociation(), nullptr);
 
       // This type will be expressed in terms of the archetypes
       // of the conforming context.
-      assert(!associate->hasTypeParameter());
+      assert(!interfaceAssociate->hasArchetype());
+      auto associate = Conformance.getDeclContext()->mapTypeIntoContext(interfaceAssociate)
+        ->getCanonicalType();
+
 
       llvm::Constant *metadataAccessFunction =
         getAssociatedTypeMetadataAccessFunction(requirement, associate);
@@ -1332,10 +1338,13 @@ public:
     void addAssociatedConformance(AssociatedConformance requirement) {
       // FIXME: Add static witness tables for type conformances.
 
-      CanType associate =
-        Conformance.getAssociatedType(requirement.getAssociation())
+      auto interfaceAssociate =
+        Conformance.getAssociatedType(requirement.getAssociation());
+      assert(!interfaceAssociate->hasArchetype());
+
+      auto associate =
+        Conformance.getDeclContext()->mapTypeIntoContext(interfaceAssociate)
           ->getCanonicalType();
-      assert(!associate->hasTypeParameter());
 
       ProtocolConformanceRef associatedConformance =
         Conformance.getAssociatedConformance(requirement.getAssociation(),
@@ -2347,7 +2356,14 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
     CanType associatedType =
       sourceConformance.getAssociatedType(sourceType, association)
-        ->getCanonicalType();
+      ->getCanonicalType();
+    if (sourceConformance.isConcrete() &&
+        isa<NormalProtocolConformance>(sourceConformance.getConcrete())) {
+      associatedType =
+        sourceConformance.getConcrete()->getDeclContext()
+          ->mapTypeIntoContext(associatedType)
+          ->getCanonicalType();
+    }
     sourceKey.Type = associatedType;
 
     auto associatedConformance =

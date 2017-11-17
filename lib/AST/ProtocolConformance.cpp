@@ -394,6 +394,9 @@ void NormalProtocolConformance::setSignatureConformances(
   unsigned idx = 0;
   for (const auto &req : getProtocol()->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
+      assert(!conformances[idx].isConcrete() ||
+             !conformances[idx].getConcrete()->getType()->hasArchetype() &&
+             "Should have interface types here");
       assert(idx < conformances.size());
       assert(conformances[idx].getRequirement() ==
                req.getSecondType()->castTo<ProtocolType>()->getDecl());
@@ -467,7 +470,9 @@ NormalProtocolConformance::populateSignatureConformances() {
       assert(!requirementSignature.empty() && "Too many conformances?");
       assert(conformance.getRequirement() ==
                requirementSignature.front().getSecondType()->castTo<ProtocolType>()->getDecl());
-
+      assert((!conformance.isConcrete() ||
+              !conformance.getConcrete()->getType()->hasArchetype()) &&
+             "signature conformances must use interface types");
       // Add this conformance to the known signature conformances.
       requirementSignature = requirementSignature.drop_front();
       new (&buffer[self->SignatureConformances.size()])
@@ -538,7 +543,8 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   return false;
 }
 
-std::pair<Type, TypeDecl *>
+using TypeWitnessAndDecl = std::pair<Type, TypeDecl *>;
+TypeWitnessAndDecl
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                  LazyResolver *resolver,
                                                  SubstOptions options) const {
@@ -557,7 +563,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
     if (options.getTentativeTypeWitness) {
      if (Type witnessType =
            Type(options.getTentativeTypeWitness(this, assocType)))
-        return { witnessType, nullptr };
+       return { witnessType, nullptr };
     }
 
     // Otherwise, we fail; this is the only case in which we can return a
@@ -582,6 +588,7 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
          "associated type in wrong protocol");
   assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
+  assert(!type->hasArchetype() && "type witnesses must be interface types");
   TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
 }
 
@@ -800,7 +807,7 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
     return {Type(), nullptr};
 
   // Apply the substitution we computed above
-  auto specializedType = genericWitness.subst(getSubstitutionMap(), options);
+  auto specializedType = genericWitness.subst(substitutionMap, options);
   if (!specializedType) {
     if (isTentativeWitness())
       return { Type(), nullptr };
