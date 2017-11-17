@@ -85,10 +85,9 @@ namespace irgen {
 
   void emitForeignParameter(IRGenFunction &IGF, Explosion &params,
                             ForeignFunctionInfo foreignInfo,
-                            unsigned foreignParamIndex,
-                            SILType paramTy, const LoadableTypeInfo &paramTI,
-                            Explosion &paramExplosion);
-
+                            unsigned foreignParamIndex, SILType paramTy,
+                            const LoadableTypeInfo &paramTI,
+                            Explosion &paramExplosion, bool isOutlined);
 
   void emitClangExpandedParameter(IRGenFunction &IGF,
                                   Explosion &in, Explosion &out,
@@ -97,8 +96,9 @@ namespace irgen {
                                   const LoadableTypeInfo &swiftTI);
 
   bool addNativeArgument(IRGenFunction &IGF, Explosion &in,
-                         SILParameterInfo origParamInfo, Explosion &args);
-  
+                         SILParameterInfo origParamInfo, Explosion &args,
+                         bool isOutlined);
+
   /// Allocate a stack buffer of the appropriate size to bitwise-coerce a value
   /// between two LLVM types.
   std::pair<Address, Size>

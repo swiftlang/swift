@@ -3506,7 +3506,6 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3530,7 +3529,6 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3543,11 +3541,26 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
 
 void IRGenModule::generateCallToOutlinedCopyAddr(
     IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
-    SILType T, const OutlinedCopyAddrFunction MethodToCall) {
+    SILType T, const OutlinedCopyAddrFunction MethodToCall,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
+  llvm::SmallVector<llvm::Value *, 4> argsVec;
+  argsVec.push_back(src.getAddress());
+  argsVec.push_back(dest.getAddress());
+  if (typeToMetadataVec) {
+    for (auto &typeDataPair : *typeToMetadataVec) {
+      auto *metadata = typeDataPair.second;
+      assert(metadata && metadata->getType() == IGF.IGM.TypeMetadataPtrTy &&
+             "Expeceted TypeMetadataPtrTy");
+      argsVec.push_back(metadata);
+    }
+  }
   llvm::Type *llvmType = dest->getType();
-  auto *outlinedF = (this->*MethodToCall)(objectTI, llvmType, T);
-  llvm::Value *args[] = {src.getAddress(), dest.getAddress()};
-  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, args);
+  auto *outlinedF =
+      (this->*MethodToCall)(objectTI, llvmType, T, typeToMetadataVec);
+  llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
+  assert(fn && "Expected llvm::Function");
+  fn->setLinkage(llvm::GlobalValue::InternalLinkage);
+  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
   call->setCallingConv(DefaultCC);
 }
 
@@ -3556,15 +3569,30 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
     std::string funcName,
     llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
                             Address dest, Address src, SILType T)>
-        Generate) {
-  llvm::Type *argTys[] = {llvmType, llvmType};
+        Generate,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
+  llvm::SmallVector<llvm::Type *, 4> argsTysVec;
+  argsTysVec.push_back(llvmType);
+  argsTysVec.push_back(llvmType);
+  if (typeToMetadataVec) {
+    for (auto &typeDataPair : *typeToMetadataVec) {
+      auto *metadata = typeDataPair.second;
+      argsTysVec.push_back(metadata->getType());
+    }
+  }
   return getOrCreateHelperFunction(
-      funcName, llvmType, argTys,
+      funcName, llvmType, argsTysVec,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address src(&*it++, objectTI.getBestKnownAlignment());
         Address dest(&*it++, objectTI.getBestKnownAlignment());
+        if (typeToMetadataVec) {
+          for (auto &typeDataPair : *typeToMetadataVec) {
+            llvm::Value *arg = &*it++;
+            CanType abstractType = typeDataPair.first;
+            getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
+          }
+        }
         Generate(objectTI, IGF, dest, src, addrTy);
         IGF.Builder.CreateRet(dest.getAddress());
       },
@@ -3572,55 +3600,77 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
-  CanType canType = addrTy.getObjectType().getSwiftRValueType();
+  CanType canType = addrTy.getSwiftRValueType();
   std::string funcName =
-      mangler.mangleOutlinedInitializeWithTakeFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.initializeWithTake(IGF, dest, src, T);
+      mangler.mangleOutlinedInitializeWithTakeFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.initializeWithTake(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName =
-      mangler.mangleOutlinedInitializeWithCopyFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.initializeWithCopy(IGF, dest, src, T);
+      mangler.mangleOutlinedInitializeWithCopyFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.initializeWithCopy(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
-  std::string funcName = mangler.mangleOutlinedAssignWithTakeFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.assignWithTake(IGF, dest, src, T);
+  std::string funcName =
+      mangler.mangleOutlinedAssignWithTakeFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.assignWithTake(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
-  std::string funcName = mangler.mangleOutlinedAssignWithCopyFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.assignWithCopy(IGF, dest, src, T);
+  std::string funcName =
+      mangler.mangleOutlinedAssignWithCopyFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.assignWithCopy(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
+}
+
+// IRGen is only multi-threaded during LLVM part
+// We don't need to be thread safe even
+// We are working on the primary module *before* LLVM
+unsigned IRGenModule::getCanTypeID(const CanType type) {
+  if (this != IRGen.getPrimaryIGM()) {
+    return IRGen.getPrimaryIGM()->getCanTypeID(type);
+  }
+  auto it = typeToUniqueID.find(type.getPointer());
+  if (it != typeToUniqueID.end()) {
+    return it->second;
+  }
+  ++currUniqueID;
+  typeToUniqueID[type.getPointer()] = currUniqueID;
+  return currUniqueID;
 }

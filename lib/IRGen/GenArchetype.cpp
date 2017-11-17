@@ -91,6 +91,19 @@ public:
   static const OpaqueArchetypeTypeInfo *create(llvm::Type *type) {
     return new OpaqueArchetypeTypeInfo(type);
   }
+
+  void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
+      SILType T) const override {
+    auto canType = T.getSwiftRValueType();
+    if (typeToMetadataVec.find(canType) != typeToMetadataVec.end()) {
+      return;
+    }
+    auto *metadata = IGF.emitTypeMetadataRef(canType);
+    assert(metadata && "Expected Type Metadata Ref");
+    typeToMetadataVec.insert(std::make_pair(canType, metadata));
+  }
 };
 
 /// A type implementation for a class archetype, that is, an archetype
