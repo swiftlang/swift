@@ -26,7 +26,7 @@ extension String {
     let u16 = x._core[start.encodedOffset..<end.encodedOffset]
     if start.samePosition(in: x.unicodeScalars) != nil
     && end.samePosition(in: x.unicodeScalars) != nil {
-      self = String(_LegacyStringCore(u16))
+      self = String(_fixmeLegacyCore: _LegacyStringCore(u16))
     }
     else {
       self = String(decoding: u16, as: UTF16.self)
@@ -317,7 +317,7 @@ extension Substring : _SwiftStringView {
     let wholeCore = _wholeString._core
     let native = wholeCore.nativeBuffer
     if _fastPath(native != nil) {
-      let wholeString = String(wholeCore)
+      let wholeString = String(_fixmeLegacyCore: wholeCore)
       let n = native._unsafelyUnwrappedUnchecked
       if _fastPath(
         n.start == wholeCore._baseAddress
@@ -329,7 +329,7 @@ extension Substring : _SwiftStringView {
       }
     }
     var r = String()
-    r._core.append(_ephemeralContent._core)
+    r._guts.append(_ephemeralContent._guts)
     _sanityCheck(r._core._owner !== _ephemeralContent._core._owner)
     return r
   }
@@ -345,7 +345,7 @@ extension Substring : _SwiftStringView {
     _sanityCheck(
       subCore._owner === wholeCore._owner || !wholeCore.hasContiguousStorage)
 
-    return String(subCore)
+    return String(_fixmeLegacyCore: subCore)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -461,7 +461,7 @@ extension Substring.${View} : BidirectionalCollection {
   @_versioned // FIXME(sil-serialize-all)
   internal init(_ base: String.${View}, _bounds: Range<Index>) {
     _slice = Slice(
-      base: String(base._core).${property},
+      base: String(base._guts).${property},
       bounds: _bounds)
   }
 
@@ -469,7 +469,7 @@ extension Substring.${View} : BidirectionalCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _wholeString: String {
-    return String(_slice._base._core)
+    return String(_slice._base._guts)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -599,10 +599,10 @@ extension Substring : RangeReplaceableCollection {
     let e0 = elements as? _SwiftStringView
     if _fastPath(e0 != nil), let e1 = e0 {
       c.append(contentsOf: e1._ephemeralContent.utf16)
-      self = String(c)[...]
+      self = String(_fixmeLegacyCore: c)[...]
     }
     else {
-      var s = String(c)
+      var s = String(_fixmeLegacyCore: c)
       s.append(contentsOf: elements)
       self = s[...]
     }
