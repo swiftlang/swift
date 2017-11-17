@@ -98,12 +98,15 @@ struct StructWithTwoStoredProp {
 
 // Take an unsafe pointer to a stored property while accessing another stored property.
 func violationWithUnsafePointer(_ s: inout StructWithTwoStoredProp) {
-  // FIXME: This needs to be statically enforced.
   withUnsafePointer(to: &s.f1) { (ptr) in
+    // expected-warning@-1 {{overlapping accesses to 's.f1', but modification requires exclusive access; consider copying to a local variable}}
     _ = s.f1
+    // expected-note@-1 {{conflicting access is here}}
   }
-  // FIXME: We may want to allow this case for known-layout stored properties.
-  withUnsafePointer(to: &s.f1) { (ptr) in
+
+  // Statically treat accesses to separate stored properties in structs as
+  // accessing separate storage.
+  withUnsafePointer(to: &s.f1) { (ptr) in // no-error
     _ = s.f2
   }
 }
@@ -227,6 +230,28 @@ func callsTakesInoutAndEscapingClosure() {
   }
 }
 
+func callsClosureLiteralImmediately() {
+  var i = 7;
+  // Closure literals that are called immediately are considered nonescaping
+  _ = ({ (p: inout Int) in
+         i
+         // expected-note@-1 {{conflicting access is here}}
+       }
+      )(&i)
+  // expected-error@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+}
+
+func callsStoredClosureLiteral() {
+  var i = 7;
+  let c = { (p: inout Int) in i}
+
+  // Closure literals that are stored and later called are treated as escaping
+  // We don't expect a static exclusivity diagnostic here, but the issue
+  // will be caught at run time
+  _ = c(&i) // no-error
+}
+
+
 func takesUnsafePointerAndNoEscapeClosure<T>(_ p: UnsafePointer<T>, _ c: () -> ()) { }
 
 func callsTakesUnsafePointerAndNoEscapeClosure() {
@@ -266,6 +291,49 @@ func conflictOnWholeInNoEscapeAutoclosure() {
     // expected-note@-1 {{conflicting access is here}}
   }
 }
+
+struct ParameterizedStruct<T> {
+  mutating func takesFunctionWithGenericReturnType(_ f: (Int) -> T) {}
+}
+
+func testReabstractionThunk(p1: inout ParameterizedStruct<Int>,
+                            p2: inout ParameterizedStruct<Int>) {
+  // Since takesFunctionWithGenericReturnType() takes a closure with a generic
+  // return type it expects the value to be returned @out. But the closure
+  // here has an 'Int' return type, so the compiler uses a reabstraction thunk
+  // to pass the closure to the method.
+  // This tests that we still detect access violations for closures passed
+  // using a reabstraction thunk.
+  p1.takesFunctionWithGenericReturnType { _ in
+    // expected-warning@-1 {{overlapping accesses to 'p1', but modification requires exclusive access; consider copying to a local variable}}
+    p2 = p1
+    // expected-note@-1 {{conflicting access is here}}
+    return 3
+  }
+}
+
+func takesInoutAndClosureWithGenericArg<T>(_ p: inout Int, _ c: (T) -> Int) { }
+
+func callsTakesInoutAndClosureWithGenericArg() {
+  var i = 7
+  takesInoutAndClosureWithGenericArg(&i) { (p: Int) in
+    // expected-warning@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    return i + p
+    // expected-note@-1 {{conflicting access is here}}
+  }
+}
+
+func takesInoutAndClosureTakingNonOptional(_ p: inout Int, _ c: (Int) -> ()) { }
+func callsTakesInoutAndClosureTakingNonOptionalWithClosureTakingOptional() {
+  var i = 7
+  // Test for the thunk converting an (Int?) -> () to an (Int) -> ()
+  takesInoutAndClosureTakingNonOptional(&i) { (p: Int?) in
+    // expected-warning@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    i = 8
+    // expected-note@-1 {{conflicting access is here}}
+  }
+}
+
 
 func inoutSeparateStructStoredProperties() {
   var s = StructWithTwoStoredProp()

@@ -227,6 +227,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         if (doIt(GP))
           return true;
       }
+      for (auto Req: NTD->getGenericParams()->getNonTrailingRequirements()) {
+        if (doIt(Req))
+          return true;
+      }
     }
 
     for (auto &Inherit : NTD->getInherited()) {
@@ -244,7 +248,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
     if (WalkGenerics) {
-      for (auto &Req: NTD->getGenericParams()->getRequirements()) {
+      for (auto Req: NTD->getGenericParams()->getTrailingRequirements()) {
         if (doIt(Req))
           return true;
       }
@@ -266,8 +270,31 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitSubscriptDecl(SubscriptDecl *SD) {
+    bool WalkGenerics = SD->getGenericParams() &&
+      Walker.shouldWalkIntoGenericParams();
+    if (WalkGenerics) {
+      // Visit generic params
+      for (auto &P : SD->getGenericParams()->getParams()) {
+        if (doIt(P))
+          return true;
+      }
+      for (auto Req : SD->getGenericParams()->getNonTrailingRequirements()) {
+        if (doIt(Req))
+          return true;
+      }
+    }
     visit(SD->getIndices());
-    return doIt(SD->getElementTypeLoc());
+    if (doIt(SD->getElementTypeLoc()))
+      return true;
+
+    if (WalkGenerics) {
+      // Visit generic requirements
+      for (auto Req : SD->getGenericParams()->getTrailingRequirements()) {
+        if (doIt(Req))
+          return true;
+      }
+    }
+    return false;
   }
 
   bool visitMissingMemberDecl(MissingMemberDecl *MMD) {
@@ -278,17 +305,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
-    if (AFD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams()) {
 
+    bool WalkGenerics = AFD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams() &&
+        // accessor generics are visited from the storage decl
+        (!isa<FuncDecl>(AFD) || !cast<FuncDecl>(AFD)->isAccessor());
+
+    if (WalkGenerics) {
       // Visit generic params
       for (auto &P : AFD->getGenericParams()->getParams()) {
         if (doIt(P))
           return true;
       }
-
       // Visit param conformance
-      for (auto &Req : AFD->getGenericParams()->getRequirements()) {
+      for (auto Req : AFD->getGenericParams()->getNonTrailingRequirements()) {
         if (doIt(Req))
           return true;
       }
@@ -302,6 +332,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (!FD->isAccessor())
         if (doIt(FD->getBodyResultTypeLoc()))
           return true;
+
+    if (WalkGenerics) {
+      // Visit trailing requirments
+      for (auto Req : AFD->getGenericParams()->getTrailingRequirements()) {
+        if (doIt(Req))
+          return true;
+      }
+    }
 
     if (AFD->getBody(/*canSynthesize=*/false)) {
       AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
