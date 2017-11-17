@@ -198,6 +198,18 @@ extension String._CharacterView : _SwiftStringView {
     // _StringGuts can never be a slice.
     return String(self._guts)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _wholeString : String {
+    return String(_guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _encodedOffsetRange : Range<Int> {
+    return 0..<_guts.count
+  }
 }
 
 
