@@ -1002,44 +1002,40 @@ extension Sequence where Element: StringProtocol {
   @_versioned // FIXME(sil-serialize-all)
   @inline(__always)
   internal func _joined(separator: String = "") -> String {
-    var result = ""
-
-    // FIXME(performance): this code assumes UTF-16 in-memory representation.
-    // It should be switched to low-level APIs.
-    let separatorSize = separator.utf16.count
+    let separatorSize = separator._guts.count
+    var byteWidth = separator._guts.byteWidth
 
     let reservation = self._preprocessingPass {
       () -> Int in
       var r = 0
       for chunk in self {
-        // FIXME(performance): this code assumes UTF-16 in-memory representation.
-        // It should be switched to low-level APIs.
-        r += separatorSize + chunk._ephemeralString.utf16.count
+        r += separatorSize + chunk._encodedOffsetRange.count
+        byteWidth = Swift.max(byteWidth, chunk._wholeString._guts.byteWidth)
       }
       return r - separatorSize
     }
 
-    if let n = reservation {
-      result.reserveCapacity(n)
-    }
+    var result = NativeString(
+      capacity: reservation ?? 0,
+      byteWidth: byteWidth)
 
     if separatorSize == 0 {
       for x in self {
-        result.append(x._ephemeralString)
+        result.append(x)
       }
-      return result
+      return String(_StringGuts(result))
     }
 
     var iter = makeIterator()
     if let first = iter.next() {
-      result.append(first._ephemeralString)
+      result.append(first)
       while let next = iter.next() {
         result.append(separator)
-        result.append(next._ephemeralString)
+        result.append(next)
       }
     }
 
-    return result
+    return String(_StringGuts(result))
   }
 }
 
