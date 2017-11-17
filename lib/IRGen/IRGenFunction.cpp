@@ -37,8 +37,7 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              Optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
-      OptMode(OptMode),
-      CurFn(Fn), DbgScope(DbgScope), inOutlinedFunction(false) {
+      OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {
 
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
@@ -430,11 +429,4 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   auto offsetValue = offset.getAsValue(*this);
   auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
   return Address(slotPtr, objectAlignment);
-}
-
-bool IRGenFunction::isInOutlinedFunction() { return inOutlinedFunction; }
-
-void IRGenFunction::setInOutlinedFunction() {
-  assert(!isInOutlinedFunction() && "Expected inOutlinedFunction to be false");
-  inOutlinedFunction = true;
 }

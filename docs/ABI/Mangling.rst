@@ -83,10 +83,10 @@ Globals
   global ::= type 'We' // Outlined Consume Function Type
   global ::= type 'Wr' // Outlined Retain Function Type
   global ::= type 'Ws' // Outlined Release Function Type
-  global ::= type 'Wb' // Outlined InitializeWithTake Function Type
-  global ::= type 'Wc' // Outlined InitializeWithCopy Function Type
-  global ::= type 'Wd' // Outlined AssignWithTake Function Type
-  global ::= type 'Wf' // Outlined AssignWithCopy Function Type
+  global ::= type 'Wb' INDEX // Outlined InitializeWithTake Function Type
+  global ::= type 'Wc' INDEX // Outlined InitializeWithCopy Function Type
+  global ::= type 'Wd' INDEX // Outlined AssignWithTake Function Type
+  global ::= type 'Wf' INDEX // Outlined AssignWithCopy Function Type
 
   assoc_type_path ::= identifier '_' identifier*
 

@@ -447,8 +447,8 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto destEltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(destElt,
                                     ti.getStorageType()->getPointerTo()));
-        
-        ti.initializeWithCopy(IGF, destEltAddr, sourceEltAddr, ty);
+
+        ti.initializeWithCopy(IGF, destEltAddr, sourceEltAddr, ty, false);
         auto size = ti.getSize(IGF, ty);
         offset = IGF.Builder.CreateAdd(offset, size);
       }
@@ -590,9 +590,11 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       // The last component using an operand can move the value out of the
       // buffer.
       if (&component == operands[index.Operand].LastUser) {
-        ti.initializeWithTake(IGF, destAddr, srcAddresses[index.Operand], ty);
+        ti.initializeWithTake(IGF, destAddr, srcAddresses[index.Operand], ty,
+                              false);
       } else {
-        ti.initializeWithCopy(IGF, destAddr, srcAddresses[index.Operand], ty);
+        ti.initializeWithCopy(IGF, destAddr, srcAddresses[index.Operand], ty,
+                              false);
       }
       auto size = ti.getSize(IGF, ty);
       offset = IGF.Builder.CreateAdd(offset, size);

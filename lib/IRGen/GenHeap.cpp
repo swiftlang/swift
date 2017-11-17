@@ -494,22 +494,24 @@ namespace {
         ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitNativeWeakCopyInit(destAddr, srcAddr);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitNativeWeakTakeInit(destAddr, srcAddr);
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitNativeWeakCopyAssign(destAddr, srcAddr);
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitNativeWeakTakeAssign(destAddr, srcAddr);
     }
 
@@ -649,23 +651,23 @@ namespace {
                          IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, SILType type) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedCopyAssign(dest, src);
     }
 
-    void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                            Address src, SILType type) const override {
+    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                            SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedCopyInit(dest, src);
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address dest,
-                        Address src, SILType type) const override {
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedTakeAssign(dest, src);
     }
 
-    void initializeWithTake(IRGenFunction &IGF, Address dest,
-                            Address src, SILType type) const override {
+    void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                            SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedTakeInit(dest, src);
     }
 
@@ -722,22 +724,24 @@ namespace {
         ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitUnknownWeakCopyInit(destAddr, srcAddr);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitUnknownWeakTakeInit(destAddr, srcAddr);
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitUnknownWeakCopyAssign(destAddr, srcAddr);
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitUnknownWeakTakeAssign(destAddr, srcAddr);
     }
 
@@ -1687,11 +1691,9 @@ Address irgen::emitProjectBox(IRGenFunction &IGF,
                        boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
-Address irgen::emitAllocateExistentialBoxInBuffer(IRGenFunction &IGF,
-                                                  SILType boxedType,
-                                                  Address destBuffer,
-                                                  GenericEnvironment *env,
-                                                  const llvm::Twine &name) {
+Address irgen::emitAllocateExistentialBoxInBuffer(
+    IRGenFunction &IGF, SILType boxedType, Address destBuffer,
+    GenericEnvironment *env, const llvm::Twine &name, bool isOutlined) {
   // Get a box for the boxed value.
   auto boxType = SILBoxType::get(boxedType.getSwiftRValueType());
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
@@ -1702,7 +1704,8 @@ Address irgen::emitAllocateExistentialBoxInBuffer(IRGenFunction &IGF,
                    Address(IGF.Builder.CreateBitCast(
                                destBuffer.getAddress(),
                                owned.getOwner()->getType()->getPointerTo()),
-                           destBuffer.getAlignment()));
+                           destBuffer.getAlignment()),
+                   isOutlined);
   return owned.getAddress();
 }
 
