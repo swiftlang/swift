@@ -3763,6 +3763,9 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
     return true;
   };
 
+  auto typeInContext =
+    Conformance->getDeclContext()->mapTypeIntoContext(Conformance->getType());
+
   for (auto witness : lookupValueWitnesses(req, /*ignoringNames=*/nullptr)) {
     DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
           witness->dump(llvm::dbgs()));
@@ -3816,7 +3819,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
           if (!associatedTypesAreSameEquivalenceClass(dmt->getAssocType(),
                                                       result.first))
             return false;
-          if (!dmt->getBase()->isEqual(DC->mapTypeIntoContext(Conformance->getType())))
+          if (!dmt->getBase()->isEqual(typeInContext))
             return false;
           
           // If this associated type is same-typed to another associated type
@@ -3883,7 +3886,8 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
           Conformance->getTypeWitness(result.first, nullptr);
-        existingWitness = Conformance->getDeclContext()->mapTypeIntoContext(existingWitness);
+        existingWitness =
+          Conformance->getDeclContext()->mapTypeIntoContext(existingWitness);
 
         // If the deduced type contains an irreducible
         // DependentMemberType, that indicates a dependency
@@ -4016,7 +4020,8 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   // Retrieve the set of substitutions to be applied to the witness.
-  Type model = conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
+  Type model =
+    conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
   Type type = witness->getInterfaceType()->getReferenceStorageReferent();
   
@@ -4549,7 +4554,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
         continue;
       if (Conformance->hasTypeWitness(assocType)) {
         substitutions[archetype] =
-          DC->mapTypeIntoContext(Conformance->getTypeWitness(assocType, nullptr));
+          DC->mapTypeIntoContext(
+            Conformance->getTypeWitness(assocType, nullptr));
       } else {
         auto known = typeWitnesses.begin(assocType);
         if (known != typeWitnesses.end())
@@ -4678,6 +4684,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
   };
 
+  auto typeInContext =
+    Conformance->getDeclContext()->mapTypeIntoContext(Conformance->getType());
+
   // Local function that checks the current (complete) set of type witnesses
   // to determine whether they meet all of the requirements and to deal with
   // substitution of type witness bindings into other type witness bindings.
@@ -4714,7 +4723,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
           return type->mapTypeOutOfContext().getPointer();
         };
 
-      auto typeInContext = Conformance->getDeclContext()->mapTypeIntoContext(Conformance->getType());
       auto substitutions =
       SubstitutionMap::getProtocolSubstitutions(
         Proto, typeInContext,

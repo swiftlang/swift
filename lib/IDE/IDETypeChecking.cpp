@@ -81,6 +81,25 @@ PrintOptions PrintOptions::printDocInterface() {
   return result;
 }
 
+/// Erase any associated types within dependent member types, so we'll resolve
+/// them again.
+static Type eraseAssociatedTypes(Type type) {
+  if (!type->hasTypeParameter()) return type;
+
+  return type.transformRec([](TypeBase *type) -> Optional<Type> {
+    if (auto depMemType = dyn_cast<DependentMemberType>(type)) {
+      auto newBase = eraseAssociatedTypes(depMemType->getBase());
+      if (newBase.getPointer() == depMemType->getBase().getPointer() &&
+          !depMemType->getAssocType())
+        return None;
+
+      return Type(DependentMemberType::get(newBase, depMemType->getName()));
+    }
+
+    return None;
+  });
+}
+
 struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
     DeclContext* DC = Target->getInnermostDeclContext();
@@ -157,9 +176,11 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     std::set<Requirement> Requirements;
     void addRequirement(GenericSignature *GenericSig,
                         Type First, Type Second, RequirementKind Kind) {
-      CanType CanFirst = GenericSig->getCanonicalTypeInContext(First);
+      CanType CanFirst =
+        GenericSig->getCanonicalTypeInContext(eraseAssociatedTypes(First));
       CanType CanSecond;
-      if (Second) CanSecond = GenericSig->getCanonicalTypeInContext(Second);
+      if (Second) CanSecond =
+        GenericSig->getCanonicalTypeInContext(eraseAssociatedTypes(Second));
 
       Requirements.insert({First, Second, Kind, CanFirst, CanSecond});
     }

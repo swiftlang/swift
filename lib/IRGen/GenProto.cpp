@@ -991,7 +991,7 @@ static bool isDependentConformance(IRGenModule &IGM,
         [&](AssociatedTypeDecl *requirement, Type type,
             TypeDecl *explicitDecl) -> bool {
           // RESILIENCE: this could be an opaque conformance
-          return DC->mapTypeIntoContext(type)->hasArchetype();
+          return type->hasTypeParameter();
        })) {
     return true;
   }
@@ -1209,7 +1209,10 @@ public:
     WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
                         SILWitnessTable *SILWT)
         : IGM(IGM), Table(table),
-          ConcreteType(SILWT->getConformance()->getDeclContext()->mapTypeIntoContext(SILWT->getConformance()->getType()->getCanonicalType())),
+          ConcreteType(SILWT->getConformance()->getDeclContext()
+                         ->mapTypeIntoContext(
+                           SILWT->getConformance()->getType()
+                             ->getCanonicalType())),
           Conformance(*SILWT->getConformance()),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
@@ -2357,8 +2360,9 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     if (sourceConformance.isConcrete() &&
         isa<NormalProtocolConformance>(sourceConformance.getConcrete())) {
       associatedType =
-        sourceConformance.getConcrete()->getDeclContext()->mapTypeIntoContext(associatedType)
-        ->getCanonicalType();
+        sourceConformance.getConcrete()->getDeclContext()
+          ->mapTypeIntoContext(associatedType)
+          ->getCanonicalType();
     }
     sourceKey.Type = associatedType;
 
