@@ -161,6 +161,15 @@ public:
     return make<TokenSyntax>(popBack());
   }
 
+  /// Create a syntax node using the tail \c N elements of collected parts and
+  /// replace those parts with the single result.
+  void createNodeInPlace(SyntaxKind Kind, size_t N);
+
+  /// Create a node using the tail of the collected parts. The number of parts
+  /// is automatically determined from \c Kind. Node: limited number of \c Kind
+  /// are supported. See the implementation.
+  void createNodeInPlace(SyntaxKind Kind);
+
   /// On destruction, construct a specified kind of RawSyntax node consuming the
   /// collected parts, then append it to the parent context.
   void setCreateSyntax(SyntaxKind Kind) {

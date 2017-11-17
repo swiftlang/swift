@@ -193,7 +193,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
 
     // We know we can make a syntax node for ternary expression.
     if (PendingTernary) {
-      //SyntaxContext->makeNode(SyntaxKind::TernaryExpr, Tok.getLoc());
+      SyntaxContext->createNodeInPlace(SyntaxKind::TernaryExpr);
       PendingTernary = false;
     }
 
@@ -510,15 +510,6 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     return makeParserCodeCompletionResult<Expr>();
   if (SubExpr.isNull())
     return nullptr;
-
-  if (SyntaxContext->isEnabled() && Operator->hasName() &&
-      (Operator->getName().getBaseName() == "-" ||
-       Operator->getName().getBaseName() == "+")) {
-    if (auto Node = SyntaxContext->popIf<IntegerLiteralExprSyntax>())
-      SyntaxContext->addSyntax(Node->withSign(SyntaxContext->popToken()));
-    else if (auto Node = SyntaxContext->popIf<FloatLiteralExprSyntax>())
-      SyntaxContext->addSyntax(Node->withSign(SyntaxContext->popToken()));
-  }
 
   // Check if we have a unary '-' with number literal sub-expression, for
   // example, "-42" or "-1.25".
@@ -1411,19 +1402,17 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   ParserResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::integer_literal: {
-    SyntaxParsingContext IntegerContext(SyntaxContext,
-                                        SyntaxKind::IntegerLiteralExpr);
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
+    SyntaxContext->createNodeInPlace(SyntaxKind::IntegerLiteralExpr);
     Result = makeParserResult(new (Context) IntegerLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;
   }
   case tok::floating_literal: {
-    SyntaxParsingContext IntegerContext(SyntaxContext,
-                                        SyntaxKind::FloatLiteralExpr);
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
+    SyntaxContext->createNodeInPlace(SyntaxKind::FloatLiteralExpr);
     Result = makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
                                                            /*Implicit=*/false));
     break;

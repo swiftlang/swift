@@ -49,6 +49,7 @@ static RC<RawSyntax> createSyntaxAs(SyntaxKind Kind,
   // Fallback to unknown syntax for the category.
   return makeUnknownSyntax(SyntaxFactory::getUnknownKind(Kind), Parts);
 }
+
 } // End of anonymous namespace
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
@@ -90,6 +91,47 @@ void SyntaxParsingContext::addSyntax(Syntax Node) {
   if (!Enabled)
     return;
   addRawSyntax(Node.getRaw());
+}
+
+void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N) {
+  assert(N >= 1);
+
+  auto I = Parts.end() - N;
+  *I = createSyntaxAs(Kind, llvm::makeArrayRef(Parts).take_back(N));
+
+  // Remove used parts.
+  if (N != 1)
+    Parts.erase(I + 1, Parts.end());
+}
+
+void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
+  assert(isTopOfContextStack());
+  if (!Enabled)
+    return;
+
+  switch (Kind) {
+  case SyntaxKind::IntegerLiteralExpr:
+  case SyntaxKind::FloatLiteralExpr: {
+    assert(!Parts.empty());
+    bool HasSign = false;
+    if (Parts.size() >= 2) {
+      auto Sign = make<Syntax>(Parts[Parts.size() - 2]).getAs<TokenSyntax>();
+      HasSign = Sign && (Sign->getText() == "-" || Sign->getText() == "+");
+    }
+    createNodeInPlace(Kind, HasSign ? 2 : 1);
+    break;
+  }
+
+  case SyntaxKind::TernaryExpr: {
+    auto Pair = SyntaxFactory::countChildren(Kind);
+    assert(Pair.first == Pair.second);
+    createNodeInPlace(Kind, Pair.first);
+    break;
+  }
+
+  default:
+    llvm_unreachable("Unrecognized node kind.");
+  }
 }
 
 namespace {
@@ -224,5 +266,4 @@ SyntaxParsingContext::~SyntaxParsingContext() {
     assert(!Enabled && "Cleanup mode must be spefcified before destruction");
     break;
   }
-
 }

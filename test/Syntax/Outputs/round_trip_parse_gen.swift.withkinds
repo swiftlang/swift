@@ -37,7 +37,7 @@ class C {
   func boolOr() -> Bool <CodeBlock>{ <ReturnStmt>return <BooleanLiteralExpr>true </BooleanLiteralExpr>|| <BooleanLiteralExpr>false </BooleanLiteralExpr></ReturnStmt>}</CodeBlock>
 
   func foo2() <CodeBlock>{<DiscardAssignmentExpr>
-    _ </DiscardAssignmentExpr>= <BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr><DiscardAssignmentExpr>
-    _ </DiscardAssignmentExpr>= (<FunctionCallArgument><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></FunctionCallArgument>) ? (<FunctionCallArgument><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></FunctionCallArgument>) : (<FunctionCallArgument><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></FunctionCallArgument>)
+    _ </DiscardAssignmentExpr>= <TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <TernaryExpr>(<FunctionCallArgument><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr></FunctionCallArgument>) ? (<FunctionCallArgument><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr></FunctionCallArgument>) : (<FunctionCallArgument><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr></FunctionCallArgument>)</TernaryExpr>
   }</CodeBlock>
 }
