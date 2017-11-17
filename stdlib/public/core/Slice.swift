@@ -52,7 +52,7 @@
 /// ------------------------
 ///
 /// A slice inherits the value or reference semantics of its base collection.
-/// That is, if a Slice's instance is wrapped around a mutable
+/// That is, if a `Slice` instance is wrapped around a mutable
 /// collection that has value semantics, such as an array, mutating the
 /// original collection would trigger a copy of that collection, and not
 /// affect the base collection stored inside of the slice.
@@ -73,12 +73,12 @@
 ///   prolong the lifetime of elements that are no longer otherwise
 ///   accessible, which can erroneously appear to be memory leakage.
 ///
-/// - Note: `Collection where Base: MutableCollection requires that the base collection's
-///   `subscript(_: Index)` setter does not invalidate indices. If you are
-///   writing a collection and  mutations need to invalidate indices, don't use Self
-///   as its subsequence type. Instead, use the nonmutable `Slice` or define your own
-///   subsequence type that takes your index invalidation requirements into
-///   account.
+/// - Note: Using a `Slice` instance with a mutable collection requires that
+///   the base collection's `subscript(_: Index)` setter does not invalidate
+///   indices. If mutations need to invalidate indices in your custom
+///   collection type, don't use `Slice` as its subsequence type. Instead,
+///   define your own subsequence type that takes your index invalidation
+///   requirements into account.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct Slice<Base: Collection> {
   /// Creates a view into the given collection that allows access to elements
@@ -144,8 +144,8 @@ extension Slice: Collection {
   public typealias IndexDistance = Base.IndexDistance  
   public typealias Element = Base.Element
   public typealias SubSequence = Slice<Base>
-	public typealias IndexDistance = Base.IndexDistance
-	public typealias Iterator = IndexingIterator<Slice<Base>>
+  public typealias IndexDistance = Base.IndexDistance
+  public typealias Iterator = IndexingIterator<Slice<Base>>
 
   @_inlineable // FIXME(sil-serialize-all)
   public var startIndex: Index {
