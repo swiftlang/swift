@@ -170,10 +170,10 @@ public:
     bool EmitRemark =
         ORE && (ORE->isEnabled<RemarkT>() || ORE->Module.getOptRecordStream());
     // Same for DEBUG.
-    bool EmitDebug = false
-#ifndef _NDEBUG
-                     || (llvm::DebugFlag && llvm::isCurrentDebugType(PassName));
-#endif // _NDEBUG
+    bool EmitDebug = false;
+#ifndef NDEBUG
+    EmitDebug |= llvm::DebugFlag && llvm::isCurrentDebugType(PassName);
+#endif // NDEBUG
 
     if (EmitRemark || EmitDebug) {
       auto R = RemarkBuilder();
