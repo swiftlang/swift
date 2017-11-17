@@ -664,31 +664,38 @@ extension _JSONEncoder {
 
     // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
     fileprivate func box_<T : Encodable>(_ value: T) throws -> NSObject? {
-        if T.self == Date.self || T.self == NSDate.self {
-            // Respect Date encoding strategy
-            return try self.box((value as! Date))
-        } else if T.self == Data.self || T.self == NSData.self {
-            // Respect Data encoding strategy
-            return try self.box((value as! Data))
-        } else if T.self == URL.self || T.self == NSURL.self {
-            // Encode URLs as single strings.
-            return self.box((value as! URL).absoluteString)
-        } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
-            // JSONSerialization can natively handle NSDecimalNumber.
-            return (value as! NSDecimalNumber)
-        }
-
-        // The value should request a container from the _JSONEncoder.
         let depth = self.storage.count
-        try value.encode(to: self)
+        do {
+            if T.self == Date.self || T.self == NSDate.self {
+                // Respect Date encoding strategy
+                return try self.box((value as! Date))
+            } else if T.self == Data.self || T.self == NSData.self {
+                // Respect Data encoding strategy
+                return try self.box((value as! Data))
+            } else if T.self == URL.self || T.self == NSURL.self {
+                // Encode URLs as single strings.
+                return self.box((value as! URL).absoluteString)
+            } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
+                // JSONSerialization can natively handle NSDecimalNumber.
+                return (value as! NSDecimalNumber)
+            }
 
-        // The top container should be a new container.
-        guard self.storage.count > depth else {
-            return nil
+            // The value should request a container from the _JSONEncoder.
+            try value.encode(to: self)
+
+            // The top container should be a new container.
+            guard self.storage.count > depth else {
+                return nil
+            }
+
+            return self.storage.popContainer()
+        } catch let error {
+            if self.storage.count > depth {
+                assert(self.storage.count == depth + 1, "Internal inconsistency: more than one container on encoder stack during error unwinding")
+                self.storage.popContainer()
+            }
+            throw error
         }
-
-        return self.storage.popContainer()
-    }
 }
 
 // MARK: - _JSONReferencingEncoder

@@ -490,7 +490,15 @@ extension _PlistEncoder {
 
         // The value should request a container from the _PlistEncoder.
         let depth = self.storage.count
-        try value.encode(to: self)
+        do {
+            try value.encode(to: self)
+        } catch let error {
+            if self.storage.count > depth {
+                assert(self.storage.count == depth + 1, "Internal inconsistency: more than one container on encoder stack during error unwinding")
+                self.storage.popContainer()
+            }
+            throw error
+        }
 
         // The top container should be a new container.
         guard self.storage.count > depth else {
@@ -1764,8 +1772,9 @@ extension _PlistDecoder {
             decoded = data as! T
         } else {
             self.storage.push(container: value)
+            defer { self.storage.popContainer() }
+
             decoded = try type.init(from: self)
-            self.storage.popContainer()
         }
 
         return decoded
