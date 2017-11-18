@@ -564,35 +564,21 @@ void NameMatcher::skipLocsBefore(SourceLoc Start) {
 }
 
 bool NameMatcher::shouldSkip(Expr *E) {
-  if (!isa<StringLiteralExpr>(E) || !Parent.getAsExpr() ||
-      !isa<InterpolatedStringLiteralExpr>(Parent.getAsExpr()))
-    return shouldSkip(E->getSourceRange());
+  if (isa<StringLiteralExpr>(E) && Parent.getAsExpr()) {
+    // Attempting to get the CharSourceRange from the SourceRange of a
+    // StringLiteralExpr that is a segment of an interpolated string gives
+    // incorrect ranges. Use the CharSourceRange of the corresponding token
+    // instead.
 
-  // The lexer treats interpolated strings as a single token when computing the
-  // CharSourceRange, so when we try to get the CharSourceRange of its first
-  // child StringLiteralExpr (at the same SourceLoc) it goes beyond any
-  // interpolated values. Use the StartLoc of the next sibling to bound it.
+    auto ExprStart = E->getStartLoc();
+    auto RemaingTokens = TokensToCheck.drop_while([&](const Token &tok) -> bool {
+      return getSourceMgr().isBeforeInBuffer(tok.getRange().getStart(), ExprStart);
+    });
 
-  StringLiteralExpr *SL = cast<StringLiteralExpr>(E);
-  InterpolatedStringLiteralExpr *ISL =
-    cast<InterpolatedStringLiteralExpr>(Parent.getAsExpr());
-
-  SourceLoc Start = SL->getStartLoc();
-  ArrayRef<Expr*> Segments = ISL->getSegments();
-  Segments = Segments.drop_until([&](Expr *Item){ return Item == SL; })
-    .drop_front();
-
-  CharSourceRange Range;
-  if (Segments.empty()) {
-    Range = Lexer::getCharSourceRangeFromSourceRange(getSourceMgr(),
-                                                     SourceRange(Start));
-  } else {
-    SourceLoc NextSiblingLoc = Segments.front()->getStartLoc();
-    unsigned Length = getSourceMgr().getByteDistance(Start, NextSiblingLoc);
-    Range = CharSourceRange(Start, Length);
+    if (!RemaingTokens.empty() && RemaingTokens.front().getLoc() == ExprStart)
+      return shouldSkip(RemaingTokens.front().getRange());
   }
-
-  return shouldSkip(Range);
+  return shouldSkip(E->getSourceRange());
 }
 
 bool NameMatcher::shouldSkip(SourceRange Range) {
