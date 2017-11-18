@@ -1545,3 +1545,99 @@ extension _StringGuts {
   }
 }
 
+// Some CharacterView operations
+extension String {
+  /// Accesses the character at the given position.
+  ///
+  /// You can use the same indices for subscripting a string and its substring.
+  /// For example, this code finds the first letter after the first space:
+  ///
+  ///     let str = "Greetings, friend! How are you?"
+  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  ///     let substr = str[firstSpace...]
+  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///         print("Capital after a space: \(str[nextCapital])")
+  ///     }
+  ///     // Prints "Capital after a space: H"
+  ///
+  /// - Parameter i: A valid index of the string. `i` must be less than the
+  ///   string's end index.
+  @_inlineable // FIXME(sil-serialize-all)
+  public subscript(i: Index) -> Character { 
+    return _guts.character(at: i)
+  }
+}
+
+extension _StringGuts {
+  @_inlineable
+  @_versioned
+  internal 
+  func character(at i: String.Index) -> Character {
+    let contigOpt = self._unmanagedContiguous
+    if _slowPath(contigOpt == nil) {
+      return String.CharacterView(self)[i] // TODO: opaque string
+    }
+    return contigOpt._unsafelyUnwrappedUnchecked.character(at: i)
+  }
+}
+
+extension UnsafeString {
+  @_inlineable
+  @_versioned
+  internal 
+  func character(at i: String.Index) -> Character {
+    let offset = i.encodedOffset
+    let stride: Int
+    if case .character(let _stride) = i._cache {
+      stride = Int(truncatingIfNeeded: _stride)
+    } else {
+      stride = self._measureExtendedGraphemeClusterForward(from: offset)
+    }
+    // TODO: better bounds checks?
+    _precondition(offset + stride <= self.count, "String index is out of range")
+    _precondition(offset >= 0, "String index cannot be negative")
+
+    if _fastPath(stride == 1) {
+      return Character(_singleCodeUnit: self[offset])
+    }
+    return Character(self[offset..<offset+stride])
+  }
+
+  // TODO: Implement directly
+  @inline(never) // FIXME: remove
+  @_versioned
+  internal
+  func _measureExtendedGraphemeClusterForward(from idx: Int) -> Int {
+    return String.CharacterView(
+      _StringGuts(self)
+    )._measureExtendedGraphemeClusterForward(
+      from: String.Index(encodedOffset: idx))
+  }
+}
+
+extension Character {
+  @_inlineable
+  @_versioned
+  internal
+  init(_singleCodeUnit cu: UInt16) {
+    _representation = .smallUTF16(
+      Builtin.zext_Int16_Int63(Builtin.reinterpretCast(cu)))
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  init(_ unsafeStr: UnsafeString) {
+    if _fastPath(unsafeStr.count <= 4) {
+      let b = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(unsafeStr)
+      if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
+        _representation = .smallUTF16(
+          Builtin.trunc_Int64_Int63(b._storage._value))
+        return
+      }
+    }
+    self = Character(_largeRepresentationString: String(_StringGuts(unsafeStr)))
+  }
+}
+
+

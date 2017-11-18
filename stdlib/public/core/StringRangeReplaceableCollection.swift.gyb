@@ -187,23 +187,23 @@ extension String : StringProtocol, RangeReplaceableCollection {
     return _characters.distance(from: start, to: end)
   }
 
-  /// Accesses the character at the given position.
-  ///
-  /// You can use the same indices for subscripting a string and its substring.
-  /// For example, this code finds the first letter after the first space:
-  ///
-  ///     let str = "Greetings, friend! How are you?"
-  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
-  ///     let substr = str[firstSpace...]
-  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
-  ///         print("Capital after a space: \(str[nextCapital])")
-  ///     }
-  ///     // Prints "Capital after a space: H"
-  ///
-  /// - Parameter i: A valid index of the string. `i` must be less than the
-  ///   string's end index.
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(i: Index) -> Character { return _characters[i] }
+  // /// Accesses the character at the given position.
+  // ///
+  // /// You can use the same indices for subscripting a string and its substring.
+  // /// For example, this code finds the first letter after the first space:
+  // ///
+  // ///     let str = "Greetings, friend! How are you?"
+  // ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  // ///     let substr = str[firstSpace...]
+  // ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  // ///         print("Capital after a space: \(str[nextCapital])")
+  // ///     }
+  // ///     // Prints "Capital after a space: H"
+  // ///
+  // /// - Parameter i: A valid index of the string. `i` must be less than the
+  // ///   string's end index.
+  // @_inlineable // FIXME(sil-serialize-all)
+  // public subscript(i: Index) -> Character { return characters[i] }
 }
 
 extension String {
