@@ -188,12 +188,20 @@ StrideTestSuite.test("FloatingPointStride") {
   expectEqual([ 1.4, 2.4, 3.4 ], result)
 }
 
-StrideTestSuite.test("ErrorAccumulation") {
-  let a = Array(stride(from: Float(1.0), through: Float(2.0), by: Float(0.1)))
+StrideTestSuite.test("FloatingPointStride/rounding error") {
+  // Ensure that there is no error accumulation
+  let a = Array(stride(from: 1 as Float, through: 2, by: 0.1))
   expectEqual(11, a.count)
-  expectEqual(Float(2.0), a.last)
-  let b = Array(stride(from: Float(1.0), to: Float(10.0), by: Float(0.9)))
+  expectEqual(2 as Float, a.last)
+  let b = Array(stride(from: 1 as Float, to: 10, by: 0.9))
   expectEqual(10, b.count)
+
+  // Ensure that there is no intermediate rounding error on supported platforms
+  if (-0.2).addingProduct(0.2, 6) == 1 {
+    let c = Array(stride(from: -0.2, through: 1, by: 0.2))
+    expectEqual(7, c.count)
+    expectEqual(1 as Double, c.last)
+  }
 }
 
 func strideIteratorTest<
@@ -226,5 +234,57 @@ StrideTestSuite.test("StrideToIterator/past end/backward") {
   strideIteratorTest(stride(from: 3, to: 0, by: -1), nonNilResults: 3)
 }
 
-runAllTests()
+StrideTestSuite.test("RandomAccessCollection") {
+  func check<T : RandomAccessCollection>(_ c: T) where T.Element : Numeric {
+    let a = Array(c)
+    expectEqual(a.count, Int(c.count))
+    for (i, j) in zip(0..., c.indices) {
+      // Ensure that the subscript always returns the same value as the iterator
+      expectEqual(a[i], c[j])
+    }
+  }
 
+  let x = [
+    stride(from: 0, to: 0, by: 2),
+    stride(from: 0, to: 0, by: -2),
+    stride(from: 0, to: 20, by: 2),
+    stride(from: 0, to: -20, by: 2),
+    stride(from: 20, to: 0, by: 2),
+    stride(from: -20, to: 0, by: 2),
+    stride(from: 0, to: 20, by: -2),
+    stride(from: 0, to: -20, by: -2),
+    stride(from: 20, to: 0, by: -2),
+    stride(from: -20, to: 0, by: -2),
+  ]
+  x.forEach(check)
+
+  let y = [
+    stride(from: 0, through: 0, by: 2),
+    stride(from: 0, through: 0, by: -2),
+    stride(from: 0, through: 20, by: 2),
+    stride(from: 0, through: -20, by: 2),
+    stride(from: 20, through: 0, by: 2),
+    stride(from: -20, through: 0, by: 2),
+    stride(from: 0, through: 20, by: -2),
+    stride(from: 0, through: -20, by: -2),
+    stride(from: 20, through: 0, by: -2),
+    stride(from: -20, through: 0, by: -2),
+  ]
+  y.forEach(check)
+
+  let z = [
+    stride(from: -0.2, to: -0.2, by: 0.2),
+    stride(from: -0.2, to: -0.2, by: -0.2),
+    stride(from: -0.2, to: 1.2, by: 0.2),
+    stride(from: -0.2, to: -1.2, by: 0.2),
+    stride(from: 1.2, to: -0.2, by: 0.2),
+    stride(from: -1.2, to: -0.2, by: 0.2),
+    stride(from: -0.2, to: 1.2, by: -0.2),
+    stride(from: -0.2, to: -1.2, by: -0.2),
+    stride(from: 1.2, to: -0.2, by: -0.2),
+    stride(from: -1.2, to: -0.2, by: -0.2),
+  ]
+  z.forEach(check)
+}
+
+runAllTests()
