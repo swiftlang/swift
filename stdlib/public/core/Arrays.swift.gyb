@@ -2177,61 +2177,56 @@ extension _ArrayBufferProtocol {
 }
 
 % for (Self, a_Self) in arrayTypes:
-// NOTE: The '==' and '!=' below only handles array types
-// that are the same, e.g. Array<Int> and Array<Int>, not
-// ArraySlice<Int> and Array<Int>.
 
-/// Returns `true` if these arrays contain the same elements.
-@_inlineable
-public func == <Element : Equatable>(
-  lhs: ${Self}<Element>, rhs: ${Self}<Element>
-) -> Bool {
-  let lhsCount = lhs.count
-  if lhsCount != rhs.count {
-    return false
-  }
+extension ${Self} where Element : Equatable {
+  /// Returns `true` if these arrays contain the same elements.
+  @_inlineable
+  public static func ==(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
+    let lhsCount = lhs.count
+    if lhsCount != rhs.count {
+      return false
+    }
 
-  // Test referential equality.
-  if lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
+    // Test referential equality.
+    if lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
+      return true
+    }
+
+  %if Self == 'ArraySlice':
+
+    var streamLHS = lhs.makeIterator()
+    var streamRHS = rhs.makeIterator()
+
+    var nextLHS = streamLHS.next()
+    while nextLHS != nil {
+      let nextRHS = streamRHS.next()
+      if nextLHS != nextRHS {
+        return false
+      }
+      nextLHS = streamLHS.next()
+    }
+
+  %else:
+
+    _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
+    _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+
+    // We know that lhs.count == rhs.count, compare element wise.
+    for idx in 0..<lhsCount {
+      if lhs[idx] != rhs[idx] {
+        return false
+      }
+    }
+  %end
+
     return true
   }
 
-%if Self == 'ArraySlice':
-
-  var streamLHS = lhs.makeIterator()
-  var streamRHS = rhs.makeIterator()
-
-  var nextLHS = streamLHS.next()
-  while nextLHS != nil {
-    let nextRHS = streamRHS.next()
-    if nextLHS != nextRHS {
-      return false
-    }
-    nextLHS = streamLHS.next()
+  /// Returns `true` if the arrays do not contain the same elements.
+  @_inlineable
+  public static func !=(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
+    return !(lhs == rhs)
   }
-
-%else:
-
-  _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
-  _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
-
-  // We know that lhs.count == rhs.count, compare element wise.
-  for idx in 0..<lhsCount {
-    if lhs[idx] != rhs[idx] {
-      return false
-    }
-  }
-%end
-
-  return true
-}
-
-/// Returns `true` if the arrays do not contain the same elements.
-@_inlineable
-public func != <Element : Equatable>(
-  lhs: ${Self}<Element>, rhs: ${Self}<Element>
-) -> Bool {
-  return !(lhs == rhs)
 }
 
 extension ${Self} {

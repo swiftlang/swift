@@ -224,9 +224,9 @@ extension NSDictionary {
 
     // Allocate a buffer containing both the keys and values.
     let buffer = UnsafeMutableRawPointer.allocate(
-      bytes: totalSize, alignedTo: alignment)
+      byteCount: totalSize, alignment: alignment)
     defer {
-      buffer.deallocate(bytes: totalSize, alignedTo: alignment)
+      buffer.deallocate()
       _fixLifetime(otherDictionary)
     }
 

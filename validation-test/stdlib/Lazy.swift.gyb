@@ -677,7 +677,7 @@ Base.Iterator.Element == S.Iterator.Element {
     expectTrue(writtenUpTo == buf.endIndex, 
       "_copyContents failed to use entire buffer")
     ptr.deinitialize(count: count)
-    ptr.deallocate(capacity: count)
+    ptr.deallocate()
   }
 }
 

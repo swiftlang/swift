@@ -106,7 +106,7 @@ import SwiftShims
 
 func allocBytes(count: Int, alignment: Int)
   -> UnsafeMutableRawPointer {
-  return UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: alignment)
+  return UnsafeMutableRawPointer.allocate(byteCount: count, alignment: alignment)
 }
 
 func deallocBytes(
@@ -114,7 +114,7 @@ func deallocBytes(
   byteCount: Int,
   alignment: Int
 ) {
-  pointer.deallocate(bytes: byteCount, alignedTo: alignment)
+  pointer.deallocate()
 }
 
 func _swift_stdlib_atomicStoreInt(
@@ -1054,12 +1054,12 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
       for i in keyPopulationBitmap.setBitIndices {
         (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
           .assumingMemoryBound(to: Key.self)
-          .deinitialize()
+          .deinitialize(count: 1)
       }
     }
     if !_isPOD(Value.self) {
       for i in keyPopulationBitmap.setBitIndices {
-        (_valueArray + i).deinitialize()
+        (_valueArray + i).deinitialize(count: 1)
       }
     }
     deallocBytes(self._nodePointer,
@@ -1135,7 +1135,7 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
     precondition(!keyPopulationBitmap[i]) // sanity check
 
     (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
-      .initializeMemory(as: Key.self, to: key)
+      .initializeMemory(as: Key.self, repeating: key, count: 1)
     (_valueArray + i).initialize(to: value)
 
     keyPopulationBitmap[i] = true
@@ -2214,4 +2214,3 @@ PersistentVectorTests.test("removeValue(forKey:)/NoCollisionsInRootNode/1") {
 }
 
 runAllTests()
-

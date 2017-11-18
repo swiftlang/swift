@@ -36,7 +36,7 @@
 ///
 /// - `load(fromByteOffset:as:)`
 /// - `storeBytes(of:toByteOffset:as:)`
-/// - `copyBytes(from:count:)`
+/// - `copyMemory(from:)`
 %  else:
 /// An `${Self}` instance is a view of the raw bytes in a region of memory.
 /// Each byte in memory is viewed as a `UInt8` value independent of the type
@@ -134,32 +134,44 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 
 %  if mutable:
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "allocate(byteCount:alignment:)")
+  public static func allocate(count: Int) -> UnsafeMutableRawBufferPointer { 
+    return UnsafeMutableRawBufferPointer.allocate(
+      byteCount: count, alignment: MemoryLayout<UInt>.alignment)
+  }
+
   /// Returns a newly allocated buffer with the given size, in bytes.
   ///
   /// The memory referenced by the new buffer is allocated, but not
   /// initialized.
   ///
-  /// - Parameter size: The number of bytes to allocate.
-  /// - Returns: A word-aligned buffer pointer covering a region of memory.
+  /// - Parameters:
+  ///   - byteCount: The number of bytes to allocate.
+  ///   - alignment: The alignment of the new region of allocated memory, in
+  ///     bytes.
+  /// - Returns: A buffer pointer to a newly allocated region of memory aligned 
+  ///     to `alignment`.
   @_inlineable
-  public static func allocate(count size: Int
+  public static func allocate(
+    byteCount: Int, alignment: Int
   ) -> UnsafeMutableRawBufferPointer {
-    return UnsafeMutableRawBufferPointer(
-      start: UnsafeMutableRawPointer.allocate(
-        bytes: size, alignedTo: MemoryLayout<UInt>.alignment),
-      count: size)
+    let base = UnsafeMutableRawPointer.allocate(
+      byteCount: byteCount, alignment: alignment)
+    return UnsafeMutableRawBufferPointer(start: base, count: byteCount)
   }
 %  end # mutable
 
-  /// Deallocates the memory viewed by this buffer pointer.
+  /// Deallocates the memory block previously allocated at this buffer pointer’s 
+  /// base address. 
   ///
-  /// The memory to be deallocated must not be initialized or must be
-  /// initialized to a trivial type. For a buffer pointer `p`, all `p.count`
-  /// bytes referenced by `p` are deallocated.
+  /// This buffer pointer's `baseAddress` must be `nil` or a pointer to a memory 
+  /// block previously returned by a Swift allocation method. If `baseAddress` is 
+  /// `nil`, this function does nothing. Otherwise, the memory must not be initialized 
+  /// or `Pointee` must be a trivial type. This buffer pointer's byte `count` must 
+  /// be equal to the originally allocated size of the memory block.
   @_inlineable
   public func deallocate() {
-    _position?.deallocate(
-      bytes: count, alignedTo: MemoryLayout<UInt>.alignment)
+    _position?.deallocate()
   }
 
   /// Returns a new instance of the given type, read from the buffer pointer's
@@ -233,6 +245,10 @@ public struct Unsafe${Mutable}RawBufferPointer
     baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
 
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "copyMemory(from:)")
+  public func copyBytes(from source: UnsafeRawBufferPointer) {
+    copyMemory(from: source)
+  }
   /// Copies the bytes from the given buffer to this buffer's memory.
   ///
   /// If the `source.count` bytes of memory referenced by this buffer are bound
@@ -240,17 +256,17 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// must be properly aligned for accessing `T`, and `source.count` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// After calling `copyBytes(from:)`, the first `source.count` bytes of
+  /// After calling `copyMemory(from:)`, the first `source.count` bytes of
   /// memory referenced by this buffer are initialized to raw bytes. If the
   /// memory is bound to type `T`, then it contains values of type `T`.
   ///
   /// - Parameter source: A buffer of raw bytes from which to copy.
   ///   `source.count` must be less than or equal to this buffer's `count`.
   @_inlineable
-  public func copyBytes(from source: UnsafeRawBufferPointer) {
+  public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
-      "${Self}.copyBytes source has too many elements")
-    baseAddress?.copyBytes(from: source.baseAddress!, count: source.count)
+      "${Self}.copyMemory source has too many elements")
+    baseAddress?.copyMemory(from: source.baseAddress!, byteCount: source.count)
   }
 
   /// Copies from a collection of `UInt8` into this buffer's memory.
@@ -468,9 +484,9 @@ public struct Unsafe${Mutable}RawBufferPointer
       _debugPrecondition(bounds.count == newValue.count)
 
       if !newValue.isEmpty {
-        (baseAddress! + bounds.lowerBound).copyBytes(
+        (baseAddress! + bounds.lowerBound).copyMemory(
           from: newValue.base.baseAddress! + newValue.startIndex,
-          count: newValue.count)
+          byteCount: newValue.count)
       }
     }
 %  end # mutable
@@ -504,6 +520,42 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 
   %  if mutable:
+  
+  /// Initializes the memory referenced by this buffer with the given value,
+  /// binds the memory to the value's type, and returns a typed buffer of the
+  /// initialized memory.
+  ///
+  /// The memory referenced by this buffer must be uninitialized or
+  /// initialized to a trivial type, and must be properly aligned for
+  /// accessing `T`.
+  ///
+  /// After calling this method on a raw buffer with non-nil `baseAddress` `b`, 
+  /// the region starting at `b` and continuing up to
+  /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound to type `T` and
+  /// initialized. If `T` is a nontrivial type, you must eventually deinitialize
+  /// or move the values in this region to avoid leaks. If `baseAddress` is 
+  /// `nil`, this function does nothing and returns an empty buffer pointer.
+  ///
+  /// - Parameters:
+  ///   - type: The type to bind this buffer’s memory to.
+  ///   - repeatedValue: The instance to copy into memory.
+  /// - Returns: A typed buffer of the memory referenced by this raw buffer. 
+  ///     The typed buffer contains `self.count / MemoryLayout<T>.stride` 
+  ///     instances of `T`.
+  @_inlineable
+  @discardableResult
+  public func initializeMemory<T>(as type: T.Type, repeating repeatedValue: T)
+    -> UnsafeMutableBufferPointer<T> {
+    guard let base = _position else {
+      return UnsafeMutableBufferPointer<T>(start: nil, count: 0)
+    }
+    
+    let count = (_end! - base) / MemoryLayout<T>.stride
+    let typed = base.initializeMemory(
+      as: type, repeating: repeatedValue, count: count)
+    return UnsafeMutableBufferPointer<T>(start: typed, count: count)
+  }
+
   /// Initializes the buffer's memory with the given elements, binding the
   /// initialized memory to the elements' type.
   ///
@@ -555,7 +607,7 @@ public struct Unsafe${Mutable}RawBufferPointer
       // underflow is permitted -- e.g. a sequence into
       // the spare capacity of an Array buffer
       guard let x = it.next() else { break }
-      p.initializeMemory(as: S.Element.self, to: x)
+      p.initializeMemory(as: S.Element.self, repeating: x, count: 1)
       formIndex(&idx, offsetBy: elementStride)
     }
 
@@ -565,6 +617,39 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
   %  end # mutable
 
+  /// Binds this buffer’s memory to the specified type and returns a typed buffer 
+  /// of the bound memory.
+  ///
+  /// Use the `bindMemory(to:)` method to bind the memory referenced
+  /// by this buffer to the type `T`. The memory must be uninitialized or
+  /// initialized to a type that is layout compatible with `T`. If the memory
+  /// is uninitialized, it is still uninitialized after being bound to `T`.
+  ///
+  /// - Warning: A memory location may only be bound to one type at a time. The
+  ///   behavior of accessing memory as a type unrelated to its bound type is
+  ///   undefined.
+  ///
+  /// - Parameters:
+  ///   - type: The type `T` to bind the memory to.
+  /// - Returns: A typed buffer of the newly bound memory. The memory in this
+  ///   region is bound to `T`, but has not been modified in any other way.
+  ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  @discardableResult
+  public func bindMemory<T>(
+    to type: T.Type
+  ) -> Unsafe${Mutable}BufferPointer<T> {
+    guard let base = _position else {
+      return Unsafe${Mutable}BufferPointer<T>(start: nil, count: 0)
+    }
+
+    let capacity = count / MemoryLayout<T>.stride
+    Builtin.bindMemory(base._rawValue, capacity._builtinWordValue, type)
+    return Unsafe${Mutable}BufferPointer<T>(
+      start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: capacity)
+  }
+  
   @_versioned
   internal let _position, _end: Unsafe${Mutable}RawPointer?
 }
