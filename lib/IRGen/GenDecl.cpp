@@ -3564,6 +3564,55 @@ void IRGenModule::generateCallToOutlinedCopyAddr(
   call->setCallingConv(DefaultCC);
 }
 
+void IRGenModule::generateCallToOutlinedDestroy(
+    IRGenFunction &IGF, const TypeInfo &objectTI, Address addr, SILType T,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
+  IRGenMangler mangler;
+  CanType canType = T.getSwiftRValueType();
+  std::string funcName = mangler.mangleOutlinedDestroyFunction(canType, this);
+
+  llvm::SmallVector<llvm::Type *, 4> argsTysVec;
+  llvm::SmallVector<llvm::Value *, 4> argsVec;
+  llvm::Type *llvmType = addr.getType();
+  argsTysVec.push_back(llvmType);
+  argsVec.push_back(addr.getAddress());
+  if (typeToMetadataVec) {
+    for (auto &typeDataPair : *typeToMetadataVec) {
+      auto *metadata = typeDataPair.second;
+      assert(metadata && metadata->getType() == IGF.IGM.TypeMetadataPtrTy &&
+             "Expeceted TypeMetadataPtrTy");
+      argsTysVec.push_back(metadata->getType());
+      argsVec.push_back(metadata);
+    }
+  }
+
+  auto *outlinedF = getOrCreateHelperFunction(
+      funcName, llvmType, argsTysVec,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address addr(&*it++, objectTI.getBestKnownAlignment());
+        if (typeToMetadataVec) {
+          for (auto &typeDataPair : *typeToMetadataVec) {
+            llvm::Value *arg = &*it++;
+            CanType abstractType = typeDataPair.first;
+            getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
+          }
+        }
+        objectTI.destroy(IGF, addr, T, true);
+        IGF.Builder.CreateRet(addr.getAddress());
+      },
+      true /*setIsNoInline*/);
+
+  if (T.hasArchetype()) {
+    llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
+    assert(fn && "Expected llvm::Function");
+    fn->setLinkage(llvm::GlobalValue::InternalLinkage);
+  }
+
+  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
+  call->setCallingConv(DefaultCC);
+}
+
 llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
     const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
     std::string funcName,

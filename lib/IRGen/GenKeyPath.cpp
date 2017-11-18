@@ -394,7 +394,8 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto elt = IGF.Builder.CreateInBoundsGEP(componentArgsBuf, offset);
         auto eltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(elt, ti.getStorageType()->getPointerTo()));
-        ti.destroy(IGF, eltAddr, ty);
+        ti.destroy(IGF, eltAddr, ty,
+                   true /*witness table: need it to be fast*/);
         auto size = ti.getSize(IGF, ty);
         offset = IGF.Builder.CreateAdd(offset, size);
       }

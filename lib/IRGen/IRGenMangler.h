@@ -231,6 +231,19 @@ public:
     }
     return finalize();
   }
+  std::string mangleOutlinedDestroyFunction(const CanType t, IRGenModule *mod) {
+    beginMangling();
+    if (!t->hasArchetype()) {
+      appendType(t);
+      appendOperator("Wh", Index(1));
+    } else {
+      appendModule(mod->getSwiftModule());
+      appendOperator("y");
+      appendOperator("t");
+      appendOperator("Wh", Index(mod->getCanTypeID(t)));
+    }
+    return finalize();
+  }
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
 
