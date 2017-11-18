@@ -23,7 +23,7 @@ let s = "a foo is here"
 #selector(AStruct.foo(a:))
 #selector(AStruct.foo())
 #selector(AStruct.foo)
-let y = "before foo \(foo(a:1)) foo after"
+let y = "before foo \(foo(a:1)) foo after foo"
 
 func bar(a/* a comment */: Int, b c: Int, _: Int, _ d: Int) {}
 bar(a: 1, b: 2, 3, 4)
