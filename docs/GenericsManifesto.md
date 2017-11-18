@@ -88,6 +88,30 @@ var d1 = StringDictionary<Int>()
 var d2: Dictionary<String, Int> = d1 // okay: d1 and d2 have the same type, Dictionary<String, Int>
 ```
 
+### Generic associatedtypes
+
+Associatedtypes could be allowed to carry generic parameters. 
+
+```Swift
+    protocol Wrapper {
+      associatedtype Wrapped<T>
+      
+      static func wrap<T>(_ t: T) -> Wrapped<T>
+    }
+```
+
+Generic associatedtypes would support all constraints supported by the language including where clauses.  As with non-generic associatedtypes conforming types would be required to provide a nested type or typealias matching the name of the associatedtype.  However, in this case the nested type or typealias would be generic.  
+
+```Swift
+    enum OptionalWrapper {
+      typealias Wrapped<T> = Optional<T>
+      
+      static func wrap<T>(_ t: T) -> Optional<T>
+    }
+```
+
+Note: generic associatedtypes address many use cases also addressed by higher-kinded types but with lower implementation complexity.
+
 ### Generic subscripts
 
 *This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md), was tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and was released with Swift 4.*
@@ -248,6 +272,21 @@ typealias AnyObject = protocol<class>
 ```
 
 See the "Existentials" section, particularly "Generalized existentials", for more information.
+
+### Generalized supertype constraints
+
+Currently, supertype constraints may only be specified using a concrete class or protocol type.  This prevents us from abstracting over the supertype.
+
+```Swift
+protocol P {
+  associatedtype Base
+  associatedtype Derived: Base
+}
+```
+
+In the above example `Base` may be any type.  `Derived` may be the same as `Base` or may be _any_ subtype of `Base`.  All subtype relationships supported by Swift should be supported in this context including (but not limited to) classes and subclasses, existentials and conforming concrete types or refining existentials, `T?` and  `T`, `((Base) -> Void)` and `((Derived) -> Void)`, etc.
+
+Generalized supertype constraints would be accepted in all syntactic locations where generic constraints are accepted.
 
 ### Allowing subclasses to override requirements satisfied by defaults (*)
 
