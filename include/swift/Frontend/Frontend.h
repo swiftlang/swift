@@ -478,7 +478,8 @@ public: // for static functions in Frontend.cpp
 
 private:
   void createREPLFile(const ImplicitImports &implicitImports) const;
-  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
+  std::unique_ptr<DelayedParsingCallbacks>
+  computeDelayedParsingCallback(bool isPrimary);
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
@@ -487,13 +488,15 @@ private:
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
                         PersistentParserState &PersistentState,
-                        DelayedParsingCallbacks *DelayedParseCB);
+                        DelayedParsingCallbacks *PrimaryDelayedCB,
+                        DelayedParsingCallbacks *SecondaryDelayedCB);
 
   /// Return true if had load error
   bool
   parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
                                      PersistentParserState &PersistentState,
-                                     DelayedParsingCallbacks *DelayedParseCB);
+                                     DelayedParsingCallbacks *PrimaryDelayedCB,
+                                     DelayedParsingCallbacks *SecondaryDelayedCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
@@ -502,7 +505,6 @@ private:
   void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
                                  DelayedParsingCallbacks *DelayedParseCB,
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
-  void performTypeCheckingAndDelayedParsing();
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };
