@@ -326,7 +326,8 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
 static void
-deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
+deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
+                                               void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -381,7 +382,8 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
 /// Derive the body for an '==' operator for an enum where at least one of the
 /// cases has associated values.
 static void
-deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
+deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
+                                                void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -497,7 +499,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
 }
 
 /// Derive the body for an '==' operator for a struct.
-static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
+static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -549,7 +551,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
 static ValueDecl *
 deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
                    Identifier generatedIdentifier,
-                   void (*bodySynthesizer)(AbstractFunctionDecl *)) {
+                   void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
   //
@@ -645,7 +647,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
     return nullptr;
   }
 
-  eqDecl->setBodySynthesizer(bodySynthesizer);
+  eqDecl->setBodySynthesizer(bodySynthesizer, nullptr);
 
   // Compute the type.
   Type paramsTy = params[1]->getType(tc.Context);
@@ -800,7 +802,7 @@ static Expr* mixIntAssignmentExpr(ASTContext &C, VarDecl* resultVar) {
 }
 
 static void
-deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
+deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -911,7 +913,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
 
 /// Derive the body for the 'hashValue' getter for a struct.
 static void
-deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
+deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -988,7 +990,7 @@ deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
 static ValueDecl *
 deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
                          NominalTypeDecl *typeDecl,
-                         void (*bodySynthesizer)(AbstractFunctionDecl *)) {
+                         void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
   // enum SomeEnum {
   //   case A, B, C
   //   @derived var hashValue: Int {
@@ -1073,7 +1075,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
                        /*GenericParams=*/nullptr, params,
                        TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
-  getterDecl->setBodySynthesizer(bodySynthesizer);
+  getterDecl->setBodySynthesizer(bodySynthesizer, nullptr);
 
   // Compute the type of hashValue().
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);

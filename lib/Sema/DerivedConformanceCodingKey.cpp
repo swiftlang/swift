@@ -30,7 +30,7 @@ using namespace DerivedConformance;
 /// Sets the body of the given function to `return nil`.
 ///
 /// \param funcDecl The function whose body to set.
-static void deriveNilReturn(AbstractFunctionDecl *funcDecl) {
+static void deriveNilReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -44,7 +44,7 @@ static void deriveNilReturn(AbstractFunctionDecl *funcDecl) {
 /// Sets the body of the given function to `return self.rawValue`.
 ///
 /// \param funcDecl The function whose body to set.
-static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl) {
+static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -63,7 +63,7 @@ static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl) {
 /// the parameter of the given constructor.
 ///
 /// \param initDecl The constructor whose body to set.
-static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
+static void deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   auto *parentDC = initDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -239,7 +239,7 @@ static ValueDecl *deriveProperty(TypeChecker &tc, Decl *parentDecl,
 ///
 /// \param strValDecl The function whose body to set.
 static void
-deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
+deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   // enum SomeEnum {
   //   case A, B, C
   //   @derived var stringValue: String {
@@ -305,7 +305,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
 ///
 /// \param initDecl The function whose body to set.
 static void
-deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
+deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum {
   //   case A, B, C
   //   @derived init?(stringValue: String) {
@@ -329,7 +329,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
 
   auto elements = enumDecl->getAllElements();
   if (elements.empty() /* empty enum */) {
-    deriveNilReturn(initDecl);
+    deriveNilReturn(initDecl, nullptr);
     return;
   }
 
@@ -443,7 +443,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
         //   @derived var stringValue: String {
         //     return self.rawValue
         //   }
-        getterDecl->setBodySynthesizer(&deriveRawValueReturn);
+        getterDecl->setBodySynthesizer(&deriveRawValueReturn, nullptr);
       } else {
         // enum SomeEnum {
         //   case A, B, C
@@ -458,7 +458,8 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
         //     }
         //   }
         // }
-        getterDecl->setBodySynthesizer(&deriveBodyCodingKey_enum_stringValue);
+        getterDecl->setBodySynthesizer(&deriveBodyCodingKey_enum_stringValue,
+                                       nullptr);
       }
     };
 
@@ -478,7 +479,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
         //     return self.rawValue
         //   }
         // }
-        getterDecl->setBodySynthesizer(&deriveRawValueReturn);
+        getterDecl->setBodySynthesizer(&deriveRawValueReturn, nullptr);
       } else {
         // enum SomeEnum {
         //   case A, B, C
@@ -486,7 +487,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
         //     return nil
         //   }
         // }
-        getterDecl->setBodySynthesizer(&deriveNilReturn);
+        getterDecl->setBodySynthesizer(&deriveNilReturn, nullptr);
       }
     };
 
@@ -506,7 +507,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
             //     self.init(rawValue: stringValue)
             //   }
             // }
-            initDecl->setBodySynthesizer(&deriveRawValueInit);
+            initDecl->setBodySynthesizer(&deriveRawValueInit, nullptr);
           } else {
             // enum SomeEnum {
             //   case A, B, C
@@ -523,7 +524,8 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
             //     }
             //   }
             // }
-            initDecl->setBodySynthesizer(&deriveBodyCodingKey_init_stringValue);
+            initDecl->setBodySynthesizer(&deriveBodyCodingKey_init_stringValue,
+                                         nullptr);
           }
         };
 
@@ -540,7 +542,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
             //     self.init(rawValue: intValue)
             //   }
             // }
-            initDecl->setBodySynthesizer(&deriveRawValueInit);
+            initDecl->setBodySynthesizer(&deriveRawValueInit, nullptr);
           } else {
             // enum SomeEnum {
             //   case A, B, C
@@ -548,7 +550,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
             //     return nil
             //   }
             // }
-            initDecl->setBodySynthesizer(&deriveNilReturn);
+            initDecl->setBodySynthesizer(&deriveNilReturn, nullptr);
           }
         };
 

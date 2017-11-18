@@ -27,7 +27,8 @@ using namespace swift;
 using namespace DerivedConformance;
 
 static void deriveBodyBridgedNSError_enum_nsErrorDomain(
-              AbstractFunctionDecl *domainDecl) {
+      AbstractFunctionDecl *domainDecl,
+      void *) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
@@ -75,7 +76,8 @@ static ValueDecl *deriveBridgedNSError_enum_nsErrorDomain(TypeChecker &tc,
                                                  stringTy, stringTy,
                                                  /*isStatic=*/true,
                                                  /*isFinal=*/true);
-  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
+  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain,
+                                 nullptr);
   
   // Define the property.
   VarDecl *propDecl;

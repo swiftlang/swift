@@ -61,7 +61,8 @@ static Type deriveRawRepresentable_Raw(TypeChecker &tc, Decl *parentDecl,
   return cast<DeclContext>(parentDecl)->mapTypeIntoContext(rawInterfaceType);
 }
 
-static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
+static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
+                                           void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
   //   @derived
@@ -138,7 +139,7 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
                                                  rawType,
                                                  /*isStatic=*/false,
                                                  /*isFinal=*/false);
-  getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
+  getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw, nullptr);
 
   // Define the property.
   VarDecl *propDecl;
@@ -161,7 +162,7 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
 }
 
 static void
-deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
+deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
   //   @derived
@@ -316,7 +317,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
                             /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();
-  initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
+  initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init, nullptr);
 
   // Compute the type of the initializer.
   TupleTypeElt element(rawType, C.Id_rawValue);

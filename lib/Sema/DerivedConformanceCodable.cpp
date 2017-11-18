@@ -542,7 +542,7 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
 /// Synthesizes the body for `func encode(to encoder: Encoder) throws`.
 ///
 /// \param encodeDecl The function decl whose body to synthesize.
-static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
+static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   // struct Foo : Codable {
   //   var x: Int
   //   var y: String
@@ -771,7 +771,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
                                       TypeLoc::withoutLoc(returnType),
                                       target);
   encodeDecl->setImplicit();
-  encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
+  encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode, nullptr);
 
   // This method should be marked as 'override' for classes inheriting Encodable
   // conformance from a parent class.
@@ -810,7 +810,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 /// Synthesizes the body for `init(from decoder: Decoder) throws`.
 ///
 /// \param initDecl The function decl whose body to synthesize.
-static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
+static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   // struct Foo : Codable {
   //   var x: Int
   //   var y: String
@@ -1112,7 +1112,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
                                            SourceLoc(), selfDecl, paramList,
                                            /*GenericParams=*/nullptr, target);
   initDecl->setImplicit();
-  initDecl->setBodySynthesizer(deriveBodyDecodable_init);
+  initDecl->setBodySynthesizer(deriveBodyDecodable_init, nullptr);
 
   // This constructor should be marked as `required` for non-final classes.
   if (isa<ClassDecl>(target) && !target->getAttrs().hasAttribute<FinalAttr>()) {
