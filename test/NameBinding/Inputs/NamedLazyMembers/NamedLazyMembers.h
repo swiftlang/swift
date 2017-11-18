@@ -50,3 +50,28 @@
 
 @end
 
+
+@protocol MirroredBase
++ (void)mirroredBaseClassMethod;
+- (void)mirroredBaseInstanceMethod;
+@end
+
+@protocol MirroredDoer <MirroredBase>
++ (void)mirroredDerivedClassMethod;
+- (void)mirroredDerivedInstanceMethod;
+@end
+
+@interface MirroringDoer : NSObject<MirroredDoer>
+- (void)unobtrusivelyGoForWalk;
+- (void)unobtrusivelyTakeNap;
+- (void)unobtrusivelyEatMeal;
+- (void)unobtrusivelyTidyHome;
+- (void)unobtrusivelyCallFamily;
+- (void)unobtrusivelySingSong;
+- (void)unobtrusivelyReadBook;
+- (void)unobtrusivelyAttendLecture;
+- (void)unobtrusivelyWriteLetter;
+@end
+
+@interface DerivedFromMirroringDoer : MirroringDoer
+@end
