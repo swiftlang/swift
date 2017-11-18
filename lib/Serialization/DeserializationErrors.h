@@ -216,6 +216,7 @@ public:
     DesignatedInitializer = 1 << 0,
     NeedsVTableEntry = 1 << 1,
     NeedsAllocatingVTableEntry = 1 << 2,
+    NeedsFieldOffsetVectorEntry = 1 << 3,
   };
   using Flags = OptionSet<Flag>;
 
@@ -236,6 +237,9 @@ public:
   }
   bool needsAllocatingVTableEntry() const {
     return flags.contains(Flag::NeedsAllocatingVTableEntry);
+  }
+  bool needsFieldOffsetVectorEntry() const {
+    return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
   }
 
   bool isA(const void *const ClassID) const override {

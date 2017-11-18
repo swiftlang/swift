@@ -127,15 +127,23 @@ private:
     // But we currently always give classes field-offset vectors,
     // whether they need them or not.
     asImpl().noteStartOfFieldOffsets(theClass);
-    for (auto field : theClass->getStoredProperties()) {
+    for (auto field :
+           theClass->getStoredPropertiesAndMissingMemberPlaceholders()) {
       addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);
   }
   
 private:
-  void addFieldEntries(VarDecl *field) {
-    asImpl().addFieldOffset(field);
+  void addFieldEntries(Decl *field) {
+    if (auto var = dyn_cast<VarDecl>(field)) {
+      asImpl().addFieldOffset(var);
+      return;
+    }
+    if (auto placeholder = dyn_cast<MissingMemberDecl>(field)) {
+      asImpl().addFieldOffsetPlaceholders(placeholder);
+      return;
+    }
   }
 };
 
@@ -171,6 +179,12 @@ public:
   }
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
   void addFieldOffset(VarDecl *var) { addPointer(); }
+  void addFieldOffsetPlaceholders(MissingMemberDecl *mmd) {
+    for (unsigned i = 0, e = mmd->getNumberOfFieldOffsetVectorEntries();
+         i < e; ++i) {
+      addPointer();
+    }
+  }
   void addGenericArgument(CanType argument, ClassDecl *forClass) {
     addPointer();
   }

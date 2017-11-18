@@ -3355,6 +3355,16 @@ namespace {
         }
       }
     }
+    
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      for (unsigned i = 0,
+                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
+           i < e; ++i) {
+        // Emit placeholder values for some number of stored properties we
+        // know exist but aren't able to reference directly.
+        B.addInt(IGM.SizeTy, 0);
+      }
+    }
 
     void addMethod(SILDeclRef fn) {
       // Find the vtable entry.
@@ -3386,8 +3396,9 @@ namespace {
       B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
     }
 
-    void addPlaceholder(MissingMemberDecl *) {
-      llvm_unreachable("cannot generate metadata with placeholders in it");
+    void addPlaceholder(MissingMemberDecl *m) {
+      assert(m->getNumberOfVTableEntries() == 0
+             && "cannot generate metadata with placeholders in it");
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
@@ -4044,7 +4055,7 @@ irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
   // FIXME: The below checks should capture this property already, but
   // resilient class metadata layout is not fully implemented yet.
   auto expansion = IGF.IGM.getResilienceExpansionForLayout(theClass);
-  if (IGF.IGM.isResilient(theClass, expansion)) {
+  if (theClass->getParentModule() != IGF.IGM.getSwiftModule()) {
     return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
   }
 
