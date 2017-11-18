@@ -137,7 +137,29 @@ extension Strideable where Stride : FloatingPoint {
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self) {
     if let i = current.index {
+      // When Stride is a floating-point type, we should avoid accumulating
+      // rounding error from repeated addition.
       return (i + 1, start.advanced(by: Stride(i + 1) * distance))
+    }
+    // If current.index == nil, either we're just starting out (in which case
+    // the next index is 1), or we should proceed without an index just as
+    // though this floating point specialization doesn't exist.
+    return (current.value == start ? 1 : nil,
+            current.value.advanced(by: distance))
+  }
+}
+
+extension Strideable where Self : FloatingPoint, Self == Stride {
+  @_inlineable
+  public static func _step(
+    after current: (index: Int?, value: Self),
+    from start: Self, by distance: Self.Stride
+  ) -> (index: Int?, value: Self) {
+    if let i = current.index {
+      // When both Self and Stride are the same floating-point type, we should
+      // take advantage of fused multiply-add (where supported) to eliminate
+      // intermediate rounding error.
+      return (i + 1, start.addingProduct(Stride(i + 1), distance))
     }
     // If current.index == nil, either we're just starting out (in which case
     // the next index is 1), or we should proceed without an index just as
@@ -259,7 +281,6 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 // conditional extensions to StrideTo type
 % for Self, ElementConstraint, Where in [
 %   ('IntegerStrideToCollection', 'BinaryInteger', 'Element.Stride : BinaryInteger'),
-%   ('FloatingPointStrideToCollection', 'BinaryFloatingPoint', 'Element.Stride == Element'),
 % ]:
 %   ElementIsInteger = ElementConstraint == 'BinaryInteger'
 
@@ -327,9 +348,6 @@ where ${Where} {
       (_stride > 0) ? (_start, _end, _stride) : (_end, _start, -_stride)
 %   if ElementIsInteger:
     return Int((start.distance(to: end) - 1) / stride) + 1
-%   else:
-    let nonExactCount = (start.distance(to: end)) / stride
-    return Int(nonExactCount.rounded(.toNearestOrAwayFromZero))
 %   end
   }
 
@@ -491,7 +509,6 @@ public struct StrideThrough<
 // conditional extensions to StrideThrough type
 % for Self, ElementConstraint, Where in [
 %   ('IntegerStrideThroughCollection', 'BinaryInteger', 'Element.Stride : BinaryInteger'),
-%   ('FloatingPointStrideThroughCollection', 'BinaryFloatingPoint', 'Element.Stride == Element'),
 % ]:
 %   ElementIsInteger = ElementConstraint == 'BinaryInteger'
 
@@ -562,9 +579,6 @@ where ${Where} {
       (_stride > 0) ? (_start, _end, _stride) : (_end, _start, -_stride)
 %   if ElementIsInteger:
     return Int(start.distance(to: end) / stride) + 1
-%   else:
-    let nonExactCount = start.distance(to: end) / stride
-    return Int(nonExactCount.rounded(.toNearestOrAwayFromZero)) + 1
 %   end
   }
 
@@ -626,4 +640,3 @@ public func stride<T>(
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)
 }
-
