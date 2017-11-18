@@ -107,130 +107,116 @@ class ArgsToFrontendInputsConverter {
   const ArgList &Args;
   FrontendInputs &Inputs;
 
-  /// A primary file is one that the compiler will generate code for,
-  /// a secondary file supplies definitions used by the primaries.
-  enum class FileKind { Primary, Secondary };
+  Arg const *const FilelistPathArg;
 
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
+
   llvm::StringMap<unsigned> FileIndices;
+  std::vector<StringRef> Files;
+  std::vector<StringRef> PrimaryFiles;
 
-  struct FilesInfo {
-    bool hadError;
-    std::vector<std::pair<StringRef, FileKind>> files;
-    char const *filelistPath;
+  StringRef filelistPath() { return FilelistPathArg->getValue(); }
 
-    static FilesInfo
-    fromFileList(char const *const path,
-                 std::vector<std::pair<StringRef, FileKind>> &&files) {
-      return {false, std::move(files), path};
-    }
-    static FilesInfo
-    fromCommandLine(std::vector<std::pair<StringRef, FileKind>> &&files) {
-      return {false, std::move(files), nullptr};
-    }
-    bool mustAddPrimariesToAllFiles() const { return filelistPath == nullptr; }
+  void addPrimary(StringRef file) { PrimaryFiles.push_back(file); }
+
+  void addInput(StringRef file) {
+    FileIndices.insert({file, Files.size()});
+    Files.push_back(file);
+  }
+
+  bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
+    return FilelistPathArg != nullptr;
+  }
+
+  enum class Whence {
+    PrimaryFromCommandLine,
+    SecondaryFromCommandLine,
+    SecondaryFromFileList
   };
+
+  void addFile(StringRef file, Whence whence) {
+    switch (whence) {
+    case Whence::PrimaryFromCommandLine:
+      addPrimary(file);
+      if (!arePrimariesOnCommandLineAlsoAppearingInFilelist())
+        addInput(file);
+      break;
+    case Whence::SecondaryFromCommandLine:
+    case Whence::SecondaryFromFileList:
+      addInput(file);
+      break;
+    }
+  }
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
                                 FrontendInputs &Inputs)
-      : Diags(Diags), Args(Args), Inputs(Inputs) {}
+      : Diags(Diags), Args(Args), Inputs(Inputs),
+        FilelistPathArg(Args.getLastArg(options::OPT_filelist)) {}
 
   bool convert() {
     if (enforceFilelistExclusion())
       return true;
-    const FilesInfo info = getFiles();
-    if (info.hadError)
+    getFilesFromCommandLine();
+    if (getFilesFromFilelist())
       return true;
-    setInputFilesAndIndices(info);
-    return setPrimaryFiles(info);
+    return setPrimaryFiles();
   }
 
 private:
   bool enforceFilelistExclusion() {
-    if (Args.hasArg(options::OPT_INPUT) && Args.hasArg(options::OPT_filelist)) {
+    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg != nullptr) {
       Diags.diagnose(SourceLoc(),
                      diag::error_cannot_have_input_files_with_file_list);
       return true;
     }
     return false;
   }
-
-  FilesInfo getFiles() {
-    // Even if filelist is present must do this to read primary file arguments.
-    FilesInfo info = getFilesFromCommandLine();
-    if (info.hadError)
-      return info;
-    addFilesFromFilelistTo(info);
-    return info;
-  }
-
-  FilesInfo getFilesFromCommandLine() {
-    std::vector<std::pair<StringRef, FileKind>> files;
+  void getFilesFromCommandLine() {
     for (const Arg *A :
          Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-      FileKind fileType;
-      if (A->getOption().matches(options::OPT_INPUT)) {
-        fileType = FileKind::Secondary;
-      } else if (A->getOption().matches(options::OPT_primary_file)) {
-        fileType = FileKind::Primary;
-      } else {
+      StringRef file = A->getValue();
+      if (A->getOption().matches(options::OPT_INPUT))
+        addFile(file, Whence::SecondaryFromCommandLine);
+      else if (A->getOption().matches(options::OPT_primary_file))
+        addFile(file, Whence::PrimaryFromCommandLine);
+      else
         llvm_unreachable("Unknown input-related argument!");
-      }
-      files.push_back(std::make_pair(A->getValue(), fileType));
     }
-    return FilesInfo::fromCommandLine(std::move(files));
   }
 
-  void addFilesFromFilelistTo(FilesInfo &info) {
-    const llvm::opt::Arg *filelistArg = Args.getLastArg(options::OPT_filelist);
-    if (filelistArg == nullptr)
-      return;
-    info.filelistPath = filelistArg->getValue();
+  bool getFilesFromFilelist() {
+    if (FilelistPathArg == nullptr)
+      return false;
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
-        llvm::MemoryBuffer::getFile(info.filelistPath);
+        llvm::MemoryBuffer::getFile(filelistPath());
     if (!filelistBufferOrError) {
-      Diags.diagnose(SourceLoc(), diag::cannot_open_file, info.filelistPath,
+      Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath(),
                      filelistBufferOrError.getError().message());
-      info.hadError = true;
-      return;
+      return true;
     }
     // Keep buffer alive because code passes around StringRefs.
     FilelistBuffer = std::move(*filelistBufferOrError);
-    std::vector<StringRef> inputFilesFromFilelist(
-        llvm::line_iterator(*FilelistBuffer), {});
-    for (auto file : inputFilesFromFilelist) {
-      info.files.push_back(std::make_pair(file, FileKind::Secondary));
+    for (auto file : llvm::make_range(llvm::line_iterator(*FilelistBuffer),
+                                      llvm::line_iterator())) {
+      addFile(file, Whence::SecondaryFromFileList);
     }
+    return false;
   }
 
-  void setInputFilesAndIndices(const FilesInfo &info) {
-    for (std::pair<StringRef, FileKind> p : info.files) {
-      if (p.second == FileKind::Secondary ||
-          info.mustAddPrimariesToAllFiles()) {
-        unsigned index = Inputs.inputFilenameCount();
-        auto file = p.first;
-        Inputs.addInputFilename(file);
-        FileIndices.insert({file, index});
-      }
-    }
-  }
-  bool setPrimaryFiles(const FilesInfo &info) {
-    for (std::pair<StringRef, FileKind> p : info.files) {
-      if (p.second != FileKind::Primary)
-        continue;
-      auto file = p.first;
-      const auto iterator = FileIndices.find(file);
+  bool setPrimaryFiles() {
+    for (StringRef primaryFile : PrimaryFiles) {
+      const auto iterator = FileIndices.find(primaryFile);
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
       if (iterator == FileIndices.end()) {
-        assert(info.filelistPath != nullptr &&
+        assert(FilelistPathArg != nullptr &&
                "Missing primary with no filelist");
-        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                       info.filelistPath);
+        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
+                       primaryFile, filelistPath());
         return true;
       }
-      Inputs.addPrimaryInputFilename(file, iterator->second);
+      Inputs.addPrimaryInputFilename(primaryFile, iterator->second);
     }
     return false;
   }
