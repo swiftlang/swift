@@ -1502,19 +1502,20 @@ extension UnsafeString {
   internal
   func character(at i: String.Index) -> Character {
     let offset = i.encodedOffset
+    _precondition(offset < self.count, "String index is out of range")
+    _precondition(offset >= 0, "String index cannot be negative")
+
     let stride: Int
     if case .character(let _stride) = i._cache {
       stride = Int(truncatingIfNeeded: _stride)
     } else {
       stride = self._measureExtendedGraphemeClusterForward(from: offset)
     }
-    // TODO: better bounds checks?
-    _precondition(offset + stride <= self.count, "String index is out of range")
-    _precondition(offset >= 0, "String index cannot be negative")
 
     if _fastPath(stride == 1) {
       return Character(_singleCodeUnit: self[offset])
     }
+    _precondition(offset + stride <= self.count, "String index is out of range")
     return Character(self[offset..<offset+stride])
   }
 
