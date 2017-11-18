@@ -28,7 +28,7 @@ using namespace swift;
 using namespace llvm::opt;
 
 bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (hasUniqueInputFilename()) {
+  if (haveUniqueInputFilename()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
            llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
@@ -43,14 +43,14 @@ StringRef FrontendInputs::baseNameOfOutput(const llvm::opt::ArgList &Args,
     return llvm::sys::path::stem(pifn);
   }
   bool UserSpecifiedModuleName = Args.getLastArg(options::OPT_module_name);
-  if (!UserSpecifiedModuleName && hasUniqueInputFilename()) {
+  if (!UserSpecifiedModuleName && haveUniqueInputFilename()) {
     return llvm::sys::path::stem(getFilenameOfFirstInput());
   }
   return ModuleName;
 }
 
 bool FrontendInputs::shouldTreatAsSIL() const {
-  if (hasUniqueInputFilename()) {
+  if (haveUniqueInputFilename()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
     StringRef Input(getFilenameOfFirstInput());
@@ -58,7 +58,8 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   }
   // If we have one primary input and it's a filename with extension "sil",
   // treat the input as SIL.
-  if (const llvm::Optional<StringRef> filename = uniquePrimaryInputFilename()) {
+  if (const Optional<StringRef> filename =
+          getOptionalUniquePrimaryInputFilename()) {
     return llvm::sys::path::extension(filename.getValue())
         .endswith(SIL_EXTENSION);
   }
@@ -69,7 +70,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
-    if (hasInputFilenames()) {
+    if (haveInputFilenames()) {
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
@@ -77,7 +78,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
     for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
-      if (i == getOptionalPrimaryInput()->Index)
+      if (i == getOptionalUniquePrimaryInput()->Index)
         continue;
 
       StringRef File(getInputFilenames()[i]);
@@ -88,12 +89,12 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
       }
     }
   } else if (TreatAsSIL) {
-    if (!hasUniqueInputFilename()) {
+    if (!haveUniqueInputFilename()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
     }
   } else if (!isNoneRequested) {
-    if (!hasInputFilenames()) {
+    if (!haveInputFilenames()) {
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
     }
@@ -224,7 +225,7 @@ void FrontendOptions::setModuleName(DiagnosticEngine &Diags,
 }
 
 StringRef FrontendOptions::originalPath() const {
-  if (hasNamedOutputFile())
+  if (haveNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
 
@@ -244,7 +245,7 @@ StringRef FrontendOptions::determineFallbackModuleName() const {
     return "REPL";
   }
   // In order to pass Driver/options.swift test must leave ModuleName empty
-  if (!Inputs.hasInputFilenames()) {
+  if (!Inputs.haveInputFilenames()) {
     return StringRef();
   }
   StringRef OutputFilename = getSingleOutputFilename();
@@ -281,11 +282,11 @@ void FrontendOptions::setOutputFileList(swift::DiagnosticEngine &Diags,
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {
-  return hasNamedOutputFile() &&
+  return haveNamedOutputFile() &&
          llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
 bool FrontendOptions::isOutputFilePlainFile() const {
-  return hasNamedOutputFile() &&
+  return haveNamedOutputFile() &&
          !llvm::sys::fs::is_directory(getSingleOutputFilename());
 }

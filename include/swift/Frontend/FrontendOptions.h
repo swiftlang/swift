@@ -88,17 +88,17 @@ public:
 
   // Input filename readers
   ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
-  bool hasInputFilenames() const { return !getInputFilenames().empty(); }
+  bool haveInputFilenames() const { return !getInputFilenames().empty(); }
   unsigned inputFilenameCount() const { return getInputFilenames().size(); }
 
-  bool hasUniqueInputFilename() const { return inputFilenameCount() == 1; }
+  bool haveUniqueInputFilename() const { return inputFilenameCount() == 1; }
   const std::string &getFilenameOfFirstInput() const {
-    assert(hasInputFilenames());
+    assert(haveInputFilenames());
     return getInputFilenames()[0];
   }
 
-  bool isReadingFromStdin() {
-    return hasUniqueInputFilename() && getFilenameOfFirstInput() == "-";
+  bool isReadingFromStdin() const {
+    return haveUniqueInputFilename() && getFilenameOfFirstInput() == "-";
   }
 
   // If we have exactly one input filename, and its extension is "bc" or "ll",
@@ -115,74 +115,58 @@ public:
   // Primary input readers
 
 private:
-  void mustNotBeMoreThanOnePrimaryInput() const {
+  void assertMustNotBeMoreThanOnePrimaryInput() const {
     assert(PrimaryInputs.size() < 2 &&
            "have not implemented >1 primary input yet");
   }
 
 public:
-  bool havePrimaryInputsFilenames() const {
-    for (const SelectedInput &SI : getPrimaryInputs())
-      if (SI.isFilename())
-        return true;
-    return false;
-  }
-  unsigned primaryInputFilenameCount() const {
-    unsigned r = 0;
-    for (const SelectedInput &SI : getPrimaryInputs())
-      r += SI.isFilename() ? 1 : 0;
-    return r;
-  }
-  std::vector<std::string> primaryFilenames() const {
-    std::vector<std::string> r;
-    for (const SelectedInput &SI : getPrimaryInputs()) {
-      if (!SI.isFilename())
-        continue;
-      r.push_back(getInputFilenames()[SI.Index]);
-    }
-    return r;
-  }
+  ArrayRef<SelectedInput> getPrimaryInputs() const { return PrimaryInputs; }
 
-  const ArrayRef<SelectedInput> getPrimaryInputs() const {
-    return PrimaryInputs;
-  }
-
-private:
-  std::vector<SelectedInput> &getMutablePrimaryInputs() {
-    mustNotBeMoreThanOnePrimaryInput();
-    return PrimaryInputs;
-  }
-
-public:
   unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+
+  // Primary count readers:
+
+  bool haveUniquePrimaryInput() const { return primaryInputCount() == 1; }
 
   bool havePrimaryInputs() const { return primaryInputCount() > 0; }
 
-  bool isWholeModule() { return !havePrimaryInputs(); }
+  bool isWholeModule() const { return !havePrimaryInputs(); }
+
+  // Count-dependend readers:
 
   Optional<SelectedInput> getOptionalPrimaryInput() const {
     return havePrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
                                : Optional<SelectedInput>();
   }
 
-  bool isPrimaryInputAFileAt(unsigned i) {
-    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename() &&
-           getOptionalPrimaryInput()->Index == i;
+  SelectedInput getRequiredUniquePrimaryInput() const {
+    assert(haveUniquePrimaryInput());
+    return getPrimaryInputs()[0];
+  }
+
+  Optional<SelectedInput> getOptionalUniquePrimaryInput() const {
+    return haveUniquePrimaryInput()
+               ? Optional<SelectedInput>(getPrimaryInputs()[0])
+               : Optional<SelectedInput>();
   }
 
   bool haveAPrimaryInputFile() const {
     return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename();
   }
 
-  bool hasUniquePrimaryInputFilename() const {
-    return primaryInputCount() == 1 && getPrimaryInputs()[0].isFilename();
+  Optional<StringRef> getOptionalUniquePrimaryInputFilename() const {
+    Optional<SelectedInput> primaryInput = getOptionalUniquePrimaryInput();
+    return (primaryInput && primaryInput->isFilename())
+               ? Optional<StringRef>(getInputFilenames()[primaryInput->Index])
+               : Optional<StringRef>();
   }
 
-  llvm::Optional<StringRef> uniquePrimaryInputFilename() const {
-    return hasUniquePrimaryInputFilename()
-               ? llvm::Optional<StringRef>(
-                     getInputFilenames()[getPrimaryInputs()[0].Index])
-               : llvm::Optional<StringRef>();
+  bool isPrimaryInputAFileAt(unsigned i) const {
+    assertMustNotBeMoreThanOnePrimaryInput();
+    if (Optional<SelectedInput> primaryInput = getOptionalPrimaryInput())
+      return primaryInput->isFilename() && primaryInput->Index == i;
+    return false;
   }
 
   Optional<unsigned> primaryInputFileIndex() const {
@@ -223,6 +207,13 @@ public:
 
   // Primary input writers
 
+private:
+  std::vector<SelectedInput> &getMutablePrimaryInputs() {
+    assertMustNotBeMoreThanOnePrimaryInput();
+    return PrimaryInputs;
+  }
+
+public:
   void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
 
   void setPrimaryInputToFirstFile() {
@@ -237,8 +228,7 @@ public:
     getMutablePrimaryInputs().push_back(si);
   }
 
-  void addPrimaryInputFilename(const std::string &inputFilename,
-                               unsigned index) {
+  void addPrimaryInputFilename(unsigned index) {
     addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
   }
 
@@ -290,7 +280,7 @@ public:
   }
   bool isOutputFileDirectory() const;
   bool isOutputFilePlainFile() const;
-  bool hasNamedOutputFile() const {
+  bool haveNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
   void setOutputFileList(DiagnosticEngine &Diags,
@@ -554,7 +544,7 @@ public:
 
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift &&
-           Inputs.hasUniqueInputFilename();
+           Inputs.haveUniqueInputFilename();
   }
 
   void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);

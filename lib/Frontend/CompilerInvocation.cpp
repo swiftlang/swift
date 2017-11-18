@@ -89,13 +89,16 @@ namespace swift {
 /// Implement argument semantics in a way that will make it easier to have
 /// >1 primary file (or even a primary file list) in the future without
 /// breaking anything today.
+///
 /// Semantics today:
 /// If input files are on command line, primary files on command line are also
 /// input files; they are not repeated without -primary-file. If input files are
 /// in a file list, the primary files on the command line are repeated in the
 /// file list. Thus, if there are any primary files, it is illegal to have both
 /// (non-primary) input files and a file list. Finally, the order of input files
-/// must match the order given on the command line or the file list. Side note:
+/// must match the order given on the command line or the file list.
+///
+/// Side note:
 /// since each input file will cause a lot of work for the compiler, this code
 /// is biased towards clarity and not optimized.
 /// In the near future, it will be possible to put primary files in the
@@ -112,7 +115,6 @@ class ArgsToFrontendInputsConverter {
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
 
   llvm::StringMap<unsigned> FileIndices;
-  std::vector<StringRef> Files;
   std::vector<StringRef> PrimaryFiles;
 
   StringRef filelistPath() { return FilelistPathArg->getValue(); }
@@ -120,8 +122,8 @@ class ArgsToFrontendInputsConverter {
   void addPrimary(StringRef file) { PrimaryFiles.push_back(file); }
 
   void addInput(StringRef file) {
-    FileIndices.insert({file, Files.size()});
-    Files.push_back(file);
+    FileIndices.insert({file, Inputs.inputFilenameCount()});
+    Inputs.addInputFilename(file);
   }
 
   bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
@@ -216,7 +218,7 @@ private:
                        primaryFile, filelistPath());
         return true;
       }
-      Inputs.addPrimaryInputFilename(primaryFile, iterator->second);
+      Inputs.addPrimaryInputFilename(iterator->second);
     }
     return false;
   }
@@ -1606,10 +1608,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const llvm::Optional<StringRef> filename =
-                 FrontendOpts.Inputs.uniquePrimaryInputFilename()) {
+  } else if (const Optional<StringRef> filename =
+                 FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename()) {
     Opts.MainInputFilename = filename.getValue();
-  } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
+  } else if (FrontendOpts.Inputs.haveUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
   Opts.OutputFilenames = FrontendOpts.OutputFilenames;
