@@ -1563,7 +1563,7 @@ extension String {
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(i: Index) -> Character { 
+  public subscript(i: Index) -> Character {
     return _guts.character(at: i)
   }
 }
@@ -1571,7 +1571,7 @@ extension String {
 extension _StringGuts {
   @_inlineable
   @_versioned
-  internal 
+  internal
   func character(at i: String.Index) -> Character {
     let contigOpt = self._unmanagedContiguous
     if _slowPath(contigOpt == nil) {
@@ -1579,28 +1579,88 @@ extension _StringGuts {
     }
     return contigOpt._unsafelyUnwrappedUnchecked.character(at: i)
   }
+
+  @_inlineable
+  @_versioned
+  internal
+  func characterIndex(after i: String.Index) -> String.Index {
+    let contigOpt = self._unmanagedContiguous
+    if _slowPath(contigOpt == nil) {
+      return String.CharacterView(self).index(after: i) // TODO: opaque string
+    }
+    return contigOpt._unsafelyUnwrappedUnchecked.characterIndex(after: i)
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  func characterIndex(before i: String.Index) -> String.Index {
+    let contigOpt = self._unmanagedContiguous
+    if _slowPath(contigOpt == nil) {
+      return String.CharacterView(self).index(before: i) // TODO: opaque string
+    }
+    return contigOpt._unsafelyUnwrappedUnchecked.characterIndex(before: i)
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  func characterIndex(
+    _ i: String.Index, offsetBy n: String.IndexDistance
+  ) -> String.Index {
+    let contigOpt = self._unmanagedContiguous
+    if _slowPath(contigOpt == nil) {
+      return String.CharacterView(self).index(i, offsetBy: n) // TODO: opaque string
+    }
+    return contigOpt._unsafelyUnwrappedUnchecked.characterIndex(i, offsetBy: n)
+  }
 }
 
 extension UnsafeString {
   @_inlineable
   @_versioned
-  internal 
+  internal
   func character(at i: String.Index) -> Character {
     let offset = i.encodedOffset
+    _precondition(offset < self.count, "String index is out of range")
+    _precondition(offset >= 0, "String index cannot be negative")
+
     let stride: Int
     if case .character(let _stride) = i._cache {
       stride = Int(truncatingIfNeeded: _stride)
     } else {
       stride = self._measureExtendedGraphemeClusterForward(from: offset)
     }
-    // TODO: better bounds checks?
-    _precondition(offset + stride <= self.count, "String index is out of range")
-    _precondition(offset >= 0, "String index cannot be negative")
 
     if _fastPath(stride == 1) {
       return Character(_singleCodeUnit: self[offset])
     }
+    _precondition(offset + stride <= self.count, "String index is out of range")
     return Character(self[offset..<offset+stride])
+  }
+
+  @inline(never) // @_inlineable
+  @_versioned
+  internal
+  func characterIndex(after i: String.Index) -> String.Index {
+    // TODO: implement directly
+    return String.CharacterView(_StringGuts(self)).index(after: i)
+  }
+
+  @inline(never) // @_inlineable
+  @_versioned
+  internal
+  func characterIndex(before i: String.Index) -> String.Index {
+    // TODO: implement directly
+    return String.CharacterView(_StringGuts(self)).index(before: i)
+  }
+
+  @inline(never) // @_inlineable
+  @_versioned
+  internal
+  func characterIndex(_ i: String.Index, offsetBy n: String.IndexDistance) -> String.Index {
+    // TODO: implement directly
+    return String.CharacterView(_StringGuts(self)).index(i, offsetBy: n)
   }
 
   // TODO: Implement directly
