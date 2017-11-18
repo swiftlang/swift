@@ -201,7 +201,7 @@ func curry_bridged_AnyObject(_ x: AnyObject) -> (String?) -> String? {
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : @trivial $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased Optional<AnyObject>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[METHOD]]([[OPENED_ANY_COPY_2]])
-// CHECK: } // end sil function '_T013objc_currying27curry_returnsSelf_AnyObjectSQyyXlGycyXlF'
+// CHECK: } // end sil function '_T013objc_currying27curry_returnsSelf_AnyObjectyXlSgycyXlF'
 func curry_returnsSelf_AnyObject(_ x: AnyObject) -> () -> AnyObject? {
   return x.returnsSelf!
 }
