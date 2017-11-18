@@ -469,10 +469,10 @@ void CompilerInstance::parseAndCheckTypes(
   if (auto *stdlib = Context->getStdlibModule())
     Context->recordKnownProtocols(stdlib);
 
-  if (DelayedCB.get()) {
+  /*if (DelayedCB.get()) {
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
-  }
+                          }*/
   finishTypeChecking(TypeCheckOptions);
 }
 
@@ -488,8 +488,10 @@ void CompilerInstance::parseLibraryFile(
   MainModule->addFile(*NextInput);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  if (BufferID == PrimaryBufferID)
+  if (BufferID == PrimaryBufferID) {
     setPrimarySourceFile(NextInput);
+    DelayedParseCB = nullptr;
+  }
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();

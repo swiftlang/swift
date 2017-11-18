@@ -3623,7 +3623,7 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB->shouldDelayFunctionBodyParsing(
+  if (false && DelayedParseCB->shouldDelayFunctionBodyParsing(
           *this, AFD, AFD->getAttrs(), BodyRange)) {
     State->delayAccessorBodyParsing(AFD, BodyRange, SavedPreviousLoc, LBLoc);
     AFD->setBodyDelayed(BodyRange);
@@ -4758,7 +4758,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
+  if (false && DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
                                                      BodyRange)) {
     State->delayFunctionBodyParsing(AFD, BodyRange,
                                     BeginParserPosition.PreviousLoc);
