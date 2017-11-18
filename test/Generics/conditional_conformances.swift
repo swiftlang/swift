@@ -15,7 +15,7 @@ protocol P6: P2 {}
 protocol Assoc { associatedtype AT }
 
 func takes_P2<X: P2>(_: X) {}
-
+// FIXME: "requirement specified as..." isn't accurate below
 // expected-note@-2{{candidate requires that the types 'U' and 'V' be equivalent (requirement specified as 'U' == 'V')}}
 // expected-note@-3{{requirement from conditional conformance of 'SameTypeGeneric<U, V>' to 'P2'}}
 // expected-note@-4{{candidate requires that the types 'U' and 'Int' be equivalent (requirement specified as 'U' == 'Int')}}
@@ -28,6 +28,12 @@ func takes_P2<X: P2>(_: X) {}
 // expected-note@-11{{requirement from conditional conformance of 'ClassMoreSpecific<U>' to 'P2'}}
 // expected-note@-12{{candidate requires that 'C1' inherit from 'Int' (requirement specified as 'Int' : 'C1')}}
 // expected-note@-13{{requirement from conditional conformance of 'SubclassBad' to 'P2'}}
+// expected-note@-14{{candidate requires that the types 'Float' and 'Int' be equivalent (requirement specified as 'Float' == 'Int')}}
+// expected-note@-15{{requirement from conditional conformance of 'Infer<Constrained<U>, V>' to 'P2'}}
+// expected-note@-16{{candidate requires that the types 'Constrained<U>' and 'Constrained<V>' be equivalent (requirement specified as 'Constrained<U>' == 'Constrained<V>')}}
+// expected-note@-17{{candidate requires that the types 'U' and 'Int' be equivalent (requirement specified as 'U' == 'Int')}}
+// expected-note@-18{{requirement from conditional conformance of 'SameType<Float>' to 'P2'}}
+// expected-note@-19{{requirement from conditional conformance of 'SameType<U>' to 'P2'}}
 func takes_P5<X: P5>(_: X) {}
 
 struct Free<T> {}
@@ -39,7 +45,7 @@ func free_good<U: P1>(_: U) {
     takes_P2(Free<U>())
 }
 func free_bad<U>(_: U) {
-    takes_P2(Free<U>())
+    takes_P2(Free<U>()) // expected-error{{type 'U' does not conform to protocol 'P1'}}}}
     // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P1'}}
     // expected-note@-2{{requirement specified as 'U' : 'P1'}}
     // expected-note@-3{{requirement from conditional conformance of 'Free<U>' to 'P2'}}
@@ -54,7 +60,7 @@ func constrained_good<U: P1 & P3>(_: U) {
     takes_P2(Constrained<U>())
 }
 func constrained_bad<U: P1>(_: U) {
-    takes_P2(Constrained<U>())
+    takes_P2(Constrained<U>()) // expected-error{{type 'U' does not conform to protocol 'P3'}}
     // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P3'}}
     // expected-note@-2{{requirement specified as 'U' : 'P3'}}
     // expected-note@-3{{requirement from conditional conformance of 'Constrained<U>' to 'P2'}}
@@ -79,7 +85,7 @@ func overlapping_sub_good<U: P4>(_: U) {
     takes_P2(OverlappingSub<U>())
 }
 func overlapping_sub_bad<U: P1>(_: U) {
-    takes_P2(OverlappingSub<U>())
+    takes_P2(OverlappingSub<U>()) // expected-error{{type 'U' does not conform to protocol 'P4'}}
     // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P4'}}
     // expected-note@-2{{requirement specified as 'U' : 'P4'}}
     // expected-note@-3{{requirement from conditional conformance of 'OverlappingSub<U>' to 'P2'}}
@@ -95,8 +101,8 @@ func same_type_good() {
     takes_P2(SameType<Int>())
 }
 func same_type_bad<U>(_: U) {
-    takes_P2(SameType<U>())
-    takes_P2(SameType<Float>())
+    takes_P2(SameType<U>()) // expected-error{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SameType<U>)'}}
+    takes_P2(SameType<Float>()) // expected-error{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SameType<Float>)'}}
 }
 
 
@@ -133,9 +139,7 @@ func infer_good<U: P1>(_: U) {
 }
 func infer_bad<U: P1, V>(_: U, _: V) {
     takes_P2(Infer<Constrained<U>, V>())
-    // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'V' conform to 'P1'}}
-    // expected-note@-2{{requirement specified as 'V' : 'P1'}}
-    // expected-note@-3{{requirement from conditional conformance of 'Infer<Constrained<U>, V>' to 'P2'}}
+    // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(Infer<Constrained<U>, V>)'}}
     takes_P2(Infer<Constrained<V>, V>())
     // expected-error@-1{{type 'V' does not conform to protocol 'P1'}}
 }
@@ -223,11 +227,11 @@ func inheritequal_good<U: P1>(_: U) {
   takes_P5(InheritEqual<U>())
 }
 func inheritequal_bad<U>(_: U) {
-  takes_P2(InheritEqual<U>())
+  takes_P2(InheritEqual<U>()) // expected-error{{type 'U' does not conform to protocol 'P1'}}
   // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P1'}}
   // expected-note@-2{{requirement specified as 'U' : 'P1'}}
   // expected-note@-3{{requirement from conditional conformance of 'InheritEqual<U>' to 'P2'}}
-  takes_P5(InheritEqual<U>())
+  takes_P5(InheritEqual<U>()) // expected-error{{type 'U' does not conform to protocol 'P1'}}
   // expected-error@-1{{'<X where X : P5> (X) -> ()' requires that 'U' conform to 'P1'}}
   // expected-note@-2{{requirement specified as 'U' : 'P1'}}
   // expected-note@-3{{requirement from conditional conformance of 'InheritEqual<U>' to 'P5'}}
@@ -235,7 +239,7 @@ func inheritequal_bad<U>(_: U) {
 
 struct InheritLess<T> {}
 extension InheritLess: P2 where T: P1 {}
-extension InheritLess: P5 {}
+extension InheritLess: P5 {} // expected-error{{type 'T' does not conform to protocol 'P1'}}
 // expected-error@-1{{'P5' requires that 'T' conform to 'P1'}}
 // expected-note@-2{{requirement specified as 'T' : 'P1'}}
 // expected-note@-3{{requirement from conditional conformance of 'InheritLess<T>' to 'P2'}}
@@ -256,17 +260,17 @@ func inheritequal_good_good<U: P4>(_: U) {
 }
 func inheritequal_good_bad<U: P1>(_: U) {
   takes_P2(InheritMore<U>())
-  takes_P5(InheritMore<U>())
+  takes_P5(InheritMore<U>()) // expected-error{{type 'U' does not conform to protocol 'P4'}}
   // expected-error@-1{{'<X where X : P5> (X) -> ()' requires that 'U' conform to 'P4'}}
   // expected-note@-2{{requirement specified as 'U' : 'P4'}}
   // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}
 }
 func inheritequal_bad_bad<U>(_: U) {
-  takes_P2(InheritMore<U>())
+  takes_P2(InheritMore<U>()) // expected-error{{type 'U' does not conform to protocol 'P1'}}
   // expected-error@-1{{'<X where X : P2> (X) -> ()' requires that 'U' conform to 'P1'}}
   // expected-note@-2{{requirement specified as 'U' : 'P1'}}
   // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P2'}}
-  takes_P5(InheritMore<U>())
+  takes_P5(InheritMore<U>()) // expected-error{{type 'U' does not conform to protocol 'P4'}}
   // expected-error@-1{{'<X where X : P5> (X) -> ()' requires that 'U' conform to 'P4'}}
   // expected-note@-2{{requirement specified as 'U' : 'P4'}}
   // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}

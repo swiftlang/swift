@@ -743,15 +743,23 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
 {
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
 
-  // Substitute the conditional requirements so that they're phrased in terms of
-  // the specialized types, not the conformance-declaring decl's types.
-  auto subMap = getSubstitutionMap();
-  SmallVector<Requirement, 4> newReqs;
-  for (auto oldReq : GenericConformance->getConditionalRequirements()) {
-    newReqs.push_back(*oldReq.subst(subMap));
+  if (!GenericConformance->getConditionalRequirements().empty()) {
+    // Substitute the conditional requirements so that they're phrased in
+    // terms of the specialized types, not the conformance-declaring decl's
+    // types.
+    auto nominal = GenericConformance->getType()->getAnyNominal();
+    auto subMap =
+      getType()->getContextSubstitutionMap(nominal->getModuleContext(),
+                                           nominal);
+
+    SmallVector<Requirement, 4> newReqs;
+    for (auto oldReq : GenericConformance->getConditionalRequirements()) {
+      if (auto newReq = oldReq.subst(subMap))
+        newReqs.push_back(*newReq);
+    }
+    auto &ctxt = getProtocol()->getASTContext();
+    ConditionalRequirements = ctxt.AllocateCopy(newReqs);
   }
-  auto &ctxt = getProtocol()->getASTContext();
-  ConditionalRequirements = ctxt.AllocateCopy(newReqs);
 }
 
 SubstitutionMap SpecializedProtocolConformance::getSubstitutionMap() const {
