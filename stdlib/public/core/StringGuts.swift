@@ -1097,7 +1097,12 @@ extension _StringGuts {
   @_transparent
   public // TODO(StringGuts): for testing only
   mutating func isUniqueNative() -> Bool {
-    return _isUnique(&_storage.0) && _isNative
+    guard _isNative else { return false }
+    // Note that the isUnique test must be in a separate statement;
+    // `_isNative && _isUnique` always evaluates to false in debug builds,
+    // because SILGen keeps the self reference in `_isNative` alive for the
+    // duration of the expression.
+    return _isUnique(&_storage.0)
   }
 
   // Convert ourselves (if needed) to a native string with the specified storage
