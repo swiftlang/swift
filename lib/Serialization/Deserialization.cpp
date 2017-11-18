@@ -2872,8 +2872,30 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     for (TypeID dependencyID : dependencyIDs) {
       auto dependency = getTypeChecked(dependencyID);
       if (!dependency) {
+        // Stored properties in classes still impact class object layout because
+        // their offset is computed and stored in the field offset vector.
+        DeclDeserializationError::Flags flags;
+        
+        if (!isStatic) {
+          switch ((StorageKind)storageKind) {
+          case StorageKind::Stored:
+          case StorageKind::StoredWithObservers:
+          case StorageKind::StoredWithTrivialAccessors:
+            flags |= DeclDeserializationError::Flag::NeedsFieldOffsetVectorEntry;
+            break;
+            
+          case StorageKind::Addressed:
+          case StorageKind::AddressedWithObservers:
+          case StorageKind::AddressedWithTrivialAccessors:
+          case StorageKind::Computed:
+          case StorageKind::ComputedWithMutableAddress:
+          case StorageKind::InheritedWithObservers:
+            break;
+          }
+        }
+        
         return llvm::make_error<TypeError>(
-            name, takeErrorInfo(dependency.takeError()));
+            name, takeErrorInfo(dependency.takeError()), flags);
       }
     }
 
@@ -4690,6 +4712,9 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
     } else if (error.needsVTableEntry()) {
       suppliedMissingMember = MissingMemberDecl::forMethod(
           context, containingClass, error.getName(), error.needsVTableEntry());
+    } else if (error.needsFieldOffsetVectorEntry()) {
+      suppliedMissingMember = MissingMemberDecl::forStoredProperty(
+          context, containingClass, error.getName());
     }
     // FIXME: Handle other kinds of missing members: properties,
     // subscripts, and methods that don't need vtable entries.

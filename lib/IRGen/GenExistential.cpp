@@ -359,8 +359,8 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-
+  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+               bool isOutlined) const override {
     // Use copy-on-write existentials?
     auto fn = getDestroyBoxedOpaqueExistentialBufferFunction(
         IGF.IGM, getLayout(), addr.getAddress()->getType());
@@ -462,10 +462,14 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address existential,
-               SILType T) const override {
-    Address valueAddr = projectValue(IGF, existential);
-    asDerived().emitValueDestroy(IGF, valueAddr);
+  void destroy(IRGenFunction &IGF, Address existential, SILType T,
+               bool isOutlined) const override {
+    if (isOutlined) {
+      Address valueAddr = projectValue(IGF, existential);
+      asDerived().emitValueDestroy(IGF, valueAddr);
+    } else {
+      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, existential, T);
+    }
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them
@@ -859,7 +863,9 @@ public:
     (void)src.claim(getNumStoredProtocols());
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+               bool isOutlined) const override {
+    // Small type (scalar) do not create outlined function
     llvm::Value *value = asDerived().loadValue(IGF, addr);
     asDerived().emitValueRelease(IGF, value, IGF.getDefaultAtomicity());
   }

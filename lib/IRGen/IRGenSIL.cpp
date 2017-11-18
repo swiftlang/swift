@@ -5099,7 +5099,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 
   // Otherwise, do the normal thing.
   Address base = getLoweredAddress(i->getOperand());
-  addrTI.destroy(*this, base, addrTy);
+  addrTI.destroy(*this, base, addrTy, false /*isOutlined*/);
 }
 
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {

@@ -1711,6 +1711,11 @@ NodePointer Demangler::demangleWitness() {
       return createWithChildren(Node::Kind::OutlinedAssignWithCopy,
                                 popNode(Node::Kind::Type), IndexChild);
     }
+    case 'h': {
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedDestroy,
+                                popNode(Node::Kind::Type), IndexChild);
+    }
 
     default:
       return nullptr;

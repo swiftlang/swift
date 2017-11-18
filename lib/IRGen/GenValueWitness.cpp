@@ -512,7 +512,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   case ValueWitness::Destroy: {
     Address object = getArgAs(IGF, argv, type, "object");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.destroy(IGF, object, concreteType);
+    type.destroy(IGF, object, concreteType, true);
     IGF.Builder.CreateRetVoid();
     return;
   }
