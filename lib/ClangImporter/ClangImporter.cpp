@@ -3280,6 +3280,20 @@ ClangImporter::Implementation::loadNamedMembers(
   auto *CD = D->getClangDecl();
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 
+
+  // FIXME: The legacy of mirroring protocol members rears its ugly head,
+  // and as a result we have to bail on any @interface or @category that
+  // has a declared protocol conformance.
+  if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(CD)) {
+    if (ID->protocol_begin() != ID->protocol_end())
+      return None;
+  }
+  if (auto *CCD = dyn_cast<clang::ObjCCategoryDecl>(CD)) {
+    if (CCD->protocol_begin() != CCD->protocol_end())
+      return None;
+  }
+
+
   // There are 3 cases:
   //
   //  - The decl is from a bridging header, CMO is Some(nullptr)
