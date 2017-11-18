@@ -4912,7 +4912,7 @@ public:
     return BodyKind(AbstractFunctionDeclBits.BodyKind);
   }
 
-  using BodySynthesizer = void (*)(AbstractFunctionDecl *);
+  using BodySynthesizer = void (*)(AbstractFunctionDecl *, void *);
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -4922,8 +4922,11 @@ protected:
     /// BodyKind::TypeChecked.
     BraceStmt *Body;
 
-    /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
-    BodySynthesizer Synthesizer;
+    /// This enum member is active if getBodyKind() is BodyKind::Synthesize.
+    struct {
+      BodySynthesizer Synthesizer;
+      void *SynthesizerContext;
+    };
 
     /// The location of the function body when the body is delayed or skipped.
     ///
@@ -5012,7 +5015,8 @@ public:
   BraceStmt *getBody(bool canSynthesize = true) const {
     if (canSynthesize && getBodyKind() == BodyKind::Synthesize) {
       const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
-      (*Synthesizer)(const_cast<AbstractFunctionDecl *>(this));
+      (*Synthesizer)(const_cast<AbstractFunctionDecl *>(this),
+                     SynthesizerContext);
     }
     if (getBodyKind() == BodyKind::Parsed ||
         getBodyKind() == BodyKind::TypeChecked) {
@@ -5044,9 +5048,10 @@ public:
   }
 
   /// Note that parsing for the body was delayed.
-  void setBodySynthesizer(BodySynthesizer synthesizer) {
+  void setBodySynthesizer(BodySynthesizer synthesizer, void *context) {
     assert(getBodyKind() == BodyKind::None);
     Synthesizer = synthesizer;
+    SynthesizerContext = context;
     setBodyKind(BodyKind::Synthesize);
   }
 
