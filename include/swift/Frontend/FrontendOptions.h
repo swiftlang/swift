@@ -366,10 +366,6 @@ public:
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
 
-  /// Indicates whether function body parsing should be delayed
-  /// until the end of all files.
-  bool DelayedFunctionBodyParsing = false;
-
   /// If true, serialization encodes an extra lookup table for use in module-
   /// merging when emitting partial modules (the per-file modules in a non-WMO
   /// build).

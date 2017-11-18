@@ -401,7 +401,7 @@ CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
   if (Invocation.isCodeCompletion())
     return llvm::make_unique<CodeCompleteDelayedCallbacks>(
         SourceMgr.getCodeCompletionLoc());
-  if (Invocation.isDelayedFunctionBodyParsing())
+  if (!isPrimary)
     return llvm::make_unique<AlwaysDelayedCallbacks>();
   return nullptr;
 }
