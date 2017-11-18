@@ -238,9 +238,8 @@ extension _StringGuts {
 }
 
 @_fixed_layout
-// @_versioned
-public // For testing purposes only!
-// internal
+@_versioned
+internal
 struct UnsafeString {
   // TODO: Use the extra 13 bits
   //
@@ -257,7 +256,8 @@ struct UnsafeString {
   internal var baseAddress: UnsafeRawPointer
 
   @_versioned
-  internal var count: Int
+  internal
+  var count: Int
 
   @_versioned
   internal var isSingleByte: Bool
@@ -380,6 +380,37 @@ struct UnsafeString {
         dest += 1
       }
     }
+  }
+}
+
+extension UnsafeString: RandomAccessCollection {
+  typealias Index = Int
+  typealias Element = UInt16
+  typealias SubSequence = UnsafeString
+  typealias Indices = CountableRange<Int>
+
+  @_inlineable
+  @_versioned
+  internal
+  var startIndex: Int { return 0 }
+
+  @_inlineable
+  @_versioned
+  internal
+  var endIndex: Int { return count }
+
+  @_inlineable
+  @_versioned
+  internal
+  func index(after i: Int) -> Int {
+    return i+1
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  func index(before i: Int) -> Int {
+    return i-1
   }
 }
 
@@ -1290,9 +1321,8 @@ extension String {
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
   // the return value.
   @_inlineable // FIXME(sil-serialize-all)
-  // @_versioned // FIXME(sil-serialize-all)
-  public // For testing purposes
-  // internal
+  @_versioned // FIXME(sil-serialize-all)
+  internal
   var _unmanagedContiguous : UnsafeString? {
     return self._guts._unmanagedContiguous
   }
