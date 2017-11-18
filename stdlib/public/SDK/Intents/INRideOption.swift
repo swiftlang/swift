@@ -26,7 +26,7 @@ public protocol _INRideOptionMeteredFare {
 extension _INRideOptionMeteredFare {
   @available(swift, obsoleted: 4)
   @nonobjc
-  public final var usesMeteredFare: NSNumber? {
+  public var usesMeteredFare: NSNumber? {
     get {
       return __usesMeteredFare
     }

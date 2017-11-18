@@ -136,7 +136,7 @@ struct Empty { }
 
 // CHECK-LABEL: sil {{.*}}arrayWithEmptyElements{{.*}} : $@convention(thin) () -> @owned Array<Empty> {
 func arrayWithEmptyElements() -> [Empty] {
-  // CHECK:    alloc_ref
+  // CHECK:    global_value @{{.*}}arrayWithEmptyElements{{.*}}
   // CHECK:    return
   return [Empty()]
 }

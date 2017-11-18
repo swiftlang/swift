@@ -1980,6 +1980,108 @@ public:
         abort();
       }
     }
+  
+    void verifyChecked(KeyPathApplicationExpr *E) {
+      PrettyStackTraceExpr debugStack(
+        Ctx, "verifying KeyPathApplicationExpr", E);
+      
+      auto baseTy = E->getBase()->getType();
+      auto keyPathTy = E->getKeyPath()->getType();
+      auto resultTy = E->getType();
+      
+      if (auto nom = keyPathTy->getAs<NominalType>()) {
+        if (nom->getDecl() == Ctx.getAnyKeyPathDecl()) {
+          // AnyKeyPath application is <T> rvalue T -> rvalue Any?
+          if (baseTy->is<LValueType>()) {
+            Out << "AnyKeyPath application base is not an rvalue\n";
+            abort();
+          }
+          auto resultObjTy = resultTy->getOptionalObjectType();
+          if (!resultObjTy || !resultObjTy->isAny()) {
+            Out << "AnyKeyPath application result must be Any?\n";
+            abort();
+          }
+          return;
+        }
+      } else if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
+        if (bgt->getDecl() == Ctx.getPartialKeyPathDecl()) {
+          // PartialKeyPath<T> application is rvalue T -> rvalue Any
+          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+            Out << "PartialKeyPath application base doesn't match type\n";
+            abort();
+          }
+          if (!resultTy->isAny()) {
+            Out << "PartialKeyPath application result must be Any?\n";
+            abort();
+          }
+          return;
+        } else if (bgt->getDecl() == Ctx.getKeyPathDecl()) {
+          // KeyPath<T, U> application is rvalue T -> rvalue U
+          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+            Out << "KeyPath application base doesn't match type\n";
+            abort();
+          }
+          if (!resultTy->isEqual(bgt->getGenericArgs()[1])) {
+            Out << "KeyPath application result doesn't match type\n";
+            abort();
+          }
+          return;
+        } else if (bgt->getDecl() == Ctx.getWritableKeyPathDecl()) {
+          // WritableKeyPath<T, U> application is
+          //    lvalue T -> lvalue U
+          // or rvalue T -> rvalue U
+          if (baseTy->is<LValueType>()) {
+            if (!resultTy->is<LValueType>()) {
+              Out << "WritableKeyPath base and result don't match lvalue-ness\n";
+              abort();
+            }
+            baseTy = baseTy->getRValueType();
+            resultTy = resultTy->getRValueType();
+          }
+          
+          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+            Out << "WritableKeyPath application base doesn't match type\n";
+            abort();
+          }
+          if (!resultTy->isEqual(bgt->getGenericArgs()[1])) {
+            Out << "WritableKeyPath application result doesn't match type\n";
+            abort();
+          }
+          return;
+        } else if (bgt->getDecl() == Ctx.getReferenceWritableKeyPathDecl()) {
+          // ReferenceWritableKeyPath<T, U> application is
+          //    rvalue T -> lvalue U
+          // or lvalue T -> lvalue U
+          // or rvalue T -> rvalue U
+          if (baseTy->is<LValueType>()) {
+            if (!resultTy->is<LValueType>()) {
+              Out << "ReferenceWritableKeyPath base and result don't "
+                     "match lvalue-ness\n";
+              abort();
+            }
+            baseTy = baseTy->getRValueType();
+            resultTy = resultTy->getRValueType();
+          } else {
+            resultTy = resultTy->getRValueType();
+          }
+
+          if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
+            Out << "ReferenceWritableKeyPath application base doesn't "
+                   "match type\n";
+            abort();
+          }
+          if (!resultTy->isEqual(bgt->getGenericArgs()[1])) {
+            Out << "ReferenceWritableKeyPath application result doesn't "
+                   "match type\n";
+            abort();
+          }
+          return;
+        }
+      }
+      
+      Out << "invalid key path type\n";
+      abort();
+    }
 
     static bool hasEnclosingFunctionContext(DeclContext *dc) {
       switch (dc->getContextKind()) {
@@ -2097,10 +2199,17 @@ public:
                  "Storage overrides but setter does not");
         if (ASD->getMaterializeForSetFunc() &&
             baseASD->getMaterializeForSetFunc() &&
-            baseASD->isSetterAccessibleFrom(ASD->getDeclContext()))
-          assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() ==
-                 baseASD->getMaterializeForSetFunc() &&
-                 "Storage override but materializeForSet does not");
+            baseASD->isSetterAccessibleFrom(ASD->getDeclContext())) {
+          if (baseASD->getMaterializeForSetFunc()->hasForcedStaticDispatch()) {
+            assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() == nullptr
+                   && "Forced static dispatch materializeForSet should not be "
+                   "overridden");
+          } else {
+            assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() ==
+                   baseASD->getMaterializeForSetFunc() &&
+                   "Storage override but materializeForSet does not");
+          }
+        }
       } else {
         if (ASD->getGetter())
           assert(!ASD->getGetter()->getOverriddenDecl() &&
@@ -2201,6 +2310,18 @@ public:
             paramType.dump(Out, 2);
             abort();
           }
+        }
+      }
+
+      if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        auto varTy = var->getInterfaceType()->getReferenceStorageReferent();
+
+        // FIXME: Update to look for plain Optional once
+        // ImplicitlyUnwrappedOptional is removed
+        if (!varTy->getAnyOptionalObjectType()) {
+          Out << "implicitly unwrapped optional attribute should only be set on VarDecl "
+                 "with optional type\n";
+          abort();
         }
       }
 
@@ -2779,6 +2900,24 @@ public:
         }
       }
 
+      if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+        if (!FD->getInterfaceType() ||
+            !FD->getInterfaceType()->is<AnyFunctionType>()) {
+          Out << "Expected FuncDecl to have a function type!\n";
+          abort();
+        }
+
+        auto resultTy = FD->getResultInterfaceType();
+
+        // FIXME: Update to look for plain Optional once
+        // ImplicitlyUnwrappedOptional is removed
+        if (!resultTy->getAnyOptionalObjectType()) {
+          Out << "implicitly unwrapped optional attribute should only be set "
+                 "on functions with optional return types\n";
+          abort();
+        }
+      }
+
       verifyCheckedBase(FD);
     }
 
@@ -3287,13 +3426,6 @@ void swift::verify(SourceFile &SF) {
 
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
 #if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
-  unsigned ProcessCount = Context.LangOpts.ASTVerifierProcessCount;
-  unsigned ProcessId = Context.LangOpts.ASTVerifierProcessId;
-  if (ProcessCount == 1) {
-    // No parallelism, verify all declarations.
-    return true;
-  }
-
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return shouldVerify(ED->getExtendedType()->getAnyNominal(), Context);
   }
@@ -3304,8 +3436,7 @@ bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
     return true;
   }
 
-  size_t Hash = llvm::hash_value(VD->getBaseName().userFacingName());
-  return Hash % ProcessCount == ProcessId;
+  return true;
 #else
   return false;
 #endif

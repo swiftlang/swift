@@ -100,6 +100,10 @@ private:
   /// A map from local DeclContexts to their serialized IDs.
   llvm::DenseMap<const DeclContext*, DeclContextID> LocalDeclContextIDs;
 
+  /// A map from generic signatures to their serialized IDs.
+  llvm::DenseMap<const GenericSignature *, GenericSignatureID>
+    GenericSignatureIDs;
+
   /// A map from generic environments to their serialized IDs.
   llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
     GenericEnvironmentIDs;
@@ -129,6 +133,17 @@ public:
   // hash table of all defined Objective-C methods.
   using NestedTypeDeclsTable = llvm::MapVector<Identifier, NestedTypeDeclsData>;
 
+  using DeclMembersData = SmallVector<DeclID, 2>;
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of all ValueDecl-members of a paticular DeclBaseName.
+  using DeclMembersTable = llvm::MapVector<uint32_t, DeclMembersData>;
+
+  using DeclMemberNamesData = std::pair<serialization::BitOffset,
+                                        std::unique_ptr<DeclMembersTable>>;
+  // In-memory representation of what will eventually be an on-disk
+  // hash table mapping DeclBaseNames to DeclMembersData tables.
+  using DeclMemberNamesTable = llvm::MapVector<DeclBaseName, DeclMemberNamesData>;
+
   using ExtensionTableData =
       SmallVector<std::pair<const NominalTypeDecl *, DeclID>, 4>;
   using ExtensionTable = llvm::MapVector<Identifier, ExtensionTableData>;
@@ -137,7 +152,12 @@ private:
   /// A map from identifiers to methods and properties with the given name.
   ///
   /// This is used for id-style lookup.
-  DeclTable ClassMembersByName;
+  DeclTable ClassMembersForDynamicLookup;
+
+  /// A map from DeclBaseNames of members to Decl->members sub-tables.
+  ///
+  /// This is for Named Lazy Member Loading.
+  DeclMemberNamesTable DeclMemberNames;
 
   /// The queue of types and decls that need to be serialized.
   ///
@@ -150,6 +170,9 @@ private:
 
   /// Local DeclContexts that need to be serialized.
   std::queue<const DeclContext*> LocalDeclContextsToWrite;
+
+  /// Generic signatures that need to be serialized.
+  std::queue<const GenericSignature *> GenericSignaturesToWrite;
 
   /// Generic environments that need to be serialized.
   std::queue<const GenericEnvironment*> GenericEnvironmentsToWrite;
@@ -185,6 +208,10 @@ private:
   /// The offset of each Identifier in the identifier data block, indexed by
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
+
+  /// The offset of each GenericSignature in the bitstream, indexed by
+  /// GenericSignatureID.
+  std::vector<BitOffset> GenericSignatureOffsets;
 
   /// The offset of each GenericEnvironment in the bitstream, indexed by
   /// GenericEnvironmentID.
@@ -226,6 +253,10 @@ private:
   uint32_t /*IdentifierID*/ LastIdentifierID =
       serialization::NUM_SPECIAL_IDS - 1;
 
+  /// The last assigned GenericSignatureID for generic signature from this
+  /// module.
+  uint32_t /*GenericSignatureID*/ LastGenericSignatureID = 0;
+
   /// The last assigned GenericEnvironmentID for generic environments from this
   /// module.
   uint32_t /*GenericEnvironmentID*/ LastGenericEnvironmentID = 0;
@@ -245,6 +276,8 @@ private:
       return index_block::DECL_CONTEXT_OFFSETS;
     if (&values == &LocalDeclContextOffsets)
       return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
+    if (&values == &GenericSignatureOffsets)
+      return index_block::GENERIC_SIGNATURE_OFFSETS;
     if (&values == &GenericEnvironmentOffsets)
       return index_block::GENERIC_ENVIRONMENT_OFFSETS;
     if (&values == &NormalConformanceOffsets)
@@ -289,10 +322,11 @@ private:
 
   /// Writes an array of members for a decl context.
   ///
-  /// \param members The decls within the context
+  /// \param parentID The DeclID of the context.
+  /// \param members The decls within the context.
   /// \param isClass True if the context could be a class context (class,
   ///        class extension, or protocol).
-  void writeMembers(DeclRange members, bool isClass);
+  void writeMembers(DeclID parentID, DeclRange members, bool isClass);
 
   /// Write a default witness table for a protocol.
   ///
@@ -337,6 +371,9 @@ private:
   /// Writes the given type.
   void writeType(Type ty);
 
+  /// Writes a generic signature.
+  void writeGenericSignature(const GenericSignature *sig);
+
   /// Writes a generic environment.
   void writeGenericEnvironment(const GenericEnvironment *env);
 
@@ -369,7 +406,8 @@ private:
   void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeAST(ModuleOrSourceFile DC, bool enableNestedTypeLookupTable);
+  void writeAST(ModuleOrSourceFile DC,
+                bool enableNestedTypeLookupTable);
 
   void writeToStream(raw_ostream &os);
 
@@ -417,6 +455,11 @@ public:
   ///
   /// The DeclContext will be scheduled for serialization if necessary.
   DeclContextID addLocalDeclContextRef(const DeclContext *DC);
+
+  /// Records the use of the given generic signature.
+  ///
+  /// The GenericSignature will be scheduled for serialization if necessary.
+  GenericSignatureID addGenericSignatureRef(const GenericSignature *sig);
 
   /// Records the use of the given generic environment.
   ///

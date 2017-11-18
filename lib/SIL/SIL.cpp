@@ -65,23 +65,6 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
-FormalLinkage swift::getTypeLinkage(CanType type) {
-  FormalLinkage result = FormalLinkage::Top;
-
-  // Merge all nominal types from the structural type.
-  (void) type.findIf([&](Type _type) {
-    CanType type = CanType(_type);
-
-    // For any nominal type reference, look at the type declaration.
-    if (auto nominal = type->getAnyNominal())
-      result ^= getDeclLinkage(nominal);
-
-    return false; // continue searching
-  });
-
-  return result;
-}
-
 SILLinkage swift::getSILLinkage(FormalLinkage linkage,
                                 ForDefinition_t forDefinition) {
   switch (linkage) {

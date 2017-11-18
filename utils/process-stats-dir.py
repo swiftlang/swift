@@ -48,7 +48,10 @@ def vars_of_args(args):
     vargs = vars(args)
     if args.select_stats_from_csv_baseline is not None:
         b = read_stats_dict_from_csv(args.select_stats_from_csv_baseline)
-        if args.group_by_module:
+        # Sniff baseline stat-names to figure out if they're module-qualified
+        # even when the user isn't asking us to _output_ module-grouped data.
+        all_triples = all(len(k.split('.')) == 3 for k in b.keys())
+        if args.group_by_module or all_triples:
             vargs['select_stat'] = set(stat_name_minus_module(k)
                                        for k in b.keys())
         else:
@@ -308,9 +311,20 @@ def write_comparison(args, old_stats, new_stats):
 
     if args.markdown:
 
+        def format_time(v):
+            if abs(v) > 1000000:
+                return "{:.1f}s".format(v / 1000000.0)
+            elif abs(v) > 1000:
+                return "{:.1f}ms".format(v / 1000.0)
+            else:
+                return "{:.1f}us".format(v)
+
         def format_field(field, row):
-            if field == 'name' and args.group_by_module:
-                return stat_name_minus_module(row.name)
+            if field == 'name':
+                if args.group_by_module:
+                    return stat_name_minus_module(row.name)
+                else:
+                    return row.name
             elif field == 'delta_pct':
                 s = str(row.delta_pct) + "%"
                 if args.github_emoji:
@@ -320,7 +334,11 @@ def write_comparison(args, old_stats, new_stats):
                         s += " :white_check_mark:"
                 return s
             else:
-                return str(vars(row)[field])
+                v = int(vars(row)[field])
+                if row.name.startswith('time.'):
+                    return format_time(v)
+                else:
+                    return "{:,d}".format(v)
 
         def format_table(elts):
             out = args.output
@@ -357,10 +375,12 @@ def write_comparison(args, old_stats, new_stats):
                 format_table(elts)
             out.write('</details>\n')
 
-        format_details('Regressed', regressed, args.close_regressions)
+        closed_regressions = (args.close_regressions or len(regressed) == 0)
+        format_details('Regressed', regressed, closed_regressions)
         format_details('Improved', improved, True)
-        format_details('Unchanged (abs(delta) < %s%% or %susec)' %
-                       (args.delta_pct_thresh, args.delta_usec_thresh),
+        format_details('Unchanged (delta < %s%% or delta < %s)' %
+                       (args.delta_pct_thresh,
+                        format_time(args.delta_usec_thresh)),
                        unchanged, True)
 
     else:
@@ -435,6 +455,40 @@ def evaluate(args):
         return 1
 
 
+# Evaluate a boolean expression in terms of deltas between the provided two
+# stats-dirs; works like evaluate() above but on absolute differences
+def evaluate_delta(args):
+    if len(args.remainder) != 2:
+        raise ValueError("Expected exactly 2 stats-dirs to evaluate-delta")
+
+    (old, new) = args.remainder
+    vargs = vars_of_args(args)
+    old_stats = merge_all_jobstats(load_stats_dir(old, **vargs), **vargs)
+    new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
+
+    env = {}
+    ident = re.compile('(\w+)$')
+    for r in compare_stats(args, old_stats.stats, new_stats.stats):
+        if r.name.startswith("time.") or '.time.' in r.name:
+            continue
+        m = re.search(ident, r.name)
+        if m:
+            i = m.groups()[0]
+            if args.verbose:
+                print("%s => %s" % (i, r.delta))
+            env[i] = r.delta
+    try:
+        if eval(args.evaluate_delta, env):
+            return 0
+        else:
+            print("evaluate-delta condition failed: '%s'" %
+                  args.evaluate_delta)
+            return 1
+    except Exception as e:
+        print(e)
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true",
@@ -494,6 +548,15 @@ def main():
                         default="sum",
                         type=str,
                         help="Merge identical metrics by (sum|min|max)")
+    parser.add_argument("--merge-timers",
+                        default=False,
+                        action="store_true",
+                        help="Merge timers across modules/targets/etc.")
+    parser.add_argument("--divide-by",
+                        default=1,
+                        metavar="D",
+                        type=int,
+                        help="Divide stats by D (to take an average)")
     parser.add_argument("--markdown",
                         default=False,
                         action="store_true",
@@ -528,6 +591,8 @@ def main():
                        help="Emit an LNT-compatible test summary")
     modes.add_argument("--evaluate", type=str, default=None,
                        help="evaluate an expression of stat-names")
+    modes.add_argument("--evaluate-delta", type=str, default=None,
+                       help="evaluate an expression of stat-deltas")
     parser.add_argument('remainder', nargs=argparse.REMAINDER,
                         help="stats-dirs to process")
 
@@ -552,6 +617,8 @@ def main():
         write_lnt_values(args)
     elif args.evaluate:
         return evaluate(args)
+    elif args.evaluate_delta:
+        return evaluate_delta(args)
     return None
 
 

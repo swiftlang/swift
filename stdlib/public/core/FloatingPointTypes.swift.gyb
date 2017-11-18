@@ -559,11 +559,11 @@ extension ${Self}: BinaryFloatingPoint {
     // in angles in the wrong quadrant if users aren't careful.  This is
     // not a problem for Double or Float80, as pi rounds down in both of
     // those formats.
-    return Float(0x1.921fb4p1)
+    return 0x1.921fb4p1
 %elif bits == 64:
-    return Double(0x1.921fb54442d18p1)
+    return 0x1.921fb54442d18p1
 %elif bits == 80:
-    return Float80(0x1.921fb54442d1846ap1)
+    return 0x1.921fb54442d1846ap1
 %end
   }
 
@@ -1503,8 +1503,9 @@ extension ${Self} {
   public init?(exactly value: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
 
-%   if srcBits < SignificandBitCount:
-    if ${That}(self) != value {
+%   if srcBits >= SignificandBitCount:
+    guard let roundTrip = ${That}(exactly: self),
+      roundTrip == value else {
       return nil
     }
 %   end

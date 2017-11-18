@@ -1339,6 +1339,10 @@ ERROR(convention_attribute_expected_name,none,
       "expected convention name identifier in 'convention' attribute", ())
 ERROR(convention_attribute_expected_rparen,none,
       "expected ')' after convention name for 'convention' attribute", ())
+ERROR(convention_attribute_witness_method_expected_colon,none,
+      "expected ':' after 'witness_method' for 'convention' attribute", ())
+ERROR(convention_attribute_witness_method_expected_protocol,none,
+      "expected protocol name in 'witness_method' 'convention' attribute", ())
 
 // objc
 ERROR(attr_objc_missing_colon,none,
@@ -1361,10 +1365,10 @@ ERROR(opened_attribute_id_value,none,
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
-// inline
-ERROR(inline_attribute_expect_option,none,
-      "expected '%0' option such as 'never'", (StringRef))
-ERROR(inline_attribute_unknown_option,none,
+// inline, optimize
+ERROR(optimization_attribute_expect_option,none,
+      "expected '%0' option such as '%1'", (StringRef, StringRef))
+ERROR(optimization_attribute_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 // effects

@@ -819,7 +819,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
 
   // We cannot extract expressions of l-value type.
   if (auto Ty = RangeInfo.getType()) {
-    if (Ty->hasLValueType() || Ty->getKind() == TypeKind::InOut)
+    if (Ty->hasLValueType() || Ty->is<InOutType>())
       return ExtractCheckResult();
 
     // Disallow extracting error type expressions/statements
@@ -886,6 +886,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
   case RangeKind::PartOfExpression:
   case RangeKind::SingleDecl:
+  case RangeKind::MultiTypeMemberDecl:
   case RangeKind::Invalid:
     return false;
   case RangeKind::SingleExpression:
@@ -940,7 +941,7 @@ static StringRef correctNewDeclName(DeclContext *DC, StringRef Name) {
 static Type sanitizeType(Type Ty) {
   // Transform lvalue type to inout type so that we can print it properly.
   return Ty.transform([](Type Ty) {
-    if (Ty->getKind() == TypeKind::LValue) {
+    if (Ty->is<LValueType>()) {
       return Type(InOutType::get(Ty->getRValueType()->getCanonicalType()));
     }
     return Ty;
@@ -1162,7 +1163,7 @@ bool RefactoringActionExtractFunction::performChange() {
     for (auto &RD : Parameters) {
 
       // Inout argument needs "&".
-      if (RD.Ty->getKind() == TypeKind::InOut)
+      if (RD.Ty->is<InOutType>())
         OS << "&";
       OS << RD.VD->getBaseName().userFacingName();
       if (&RD != &Parameters.back())
@@ -1420,6 +1421,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
       return checkExtractConditions(Info, Diag).success();
     case RangeKind::PartOfExpression:
     case RangeKind::SingleDecl:
+    case RangeKind::MultiTypeMemberDecl:
     case RangeKind::SingleStatement:
     case RangeKind::MultiStatement:
     case RangeKind::Invalid:
@@ -1441,6 +1443,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
         success({CannotExtractReason::Literal});
     case RangeKind::PartOfExpression:
     case RangeKind::SingleDecl:
+    case RangeKind::MultiTypeMemberDecl:
     case RangeKind::SingleStatement:
     case RangeKind::MultiStatement:
     case RangeKind::Invalid:
@@ -1451,6 +1454,82 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
   return RefactoringActionExtractExprBase(TheFile, RangeInfo,
                                           DiagEngine, true, PreferredName,
                                           EditConsumer).performChange();
+}
+
+// Compute a decl context that is the parent context for all decls in
+// \c DeclaredDecls. Return \c nullptr if no such context exists.
+DeclContext *getCommonDeclContext(ArrayRef<DeclaredDecl> DeclaredDecls) {
+  if (DeclaredDecls.empty())
+    return nullptr;
+
+  DeclContext *CommonDC = DeclaredDecls.front().VD->getDeclContext();
+  for (auto DD : DeclaredDecls) {
+    auto OtherDC = DD.VD->getDeclContext();
+    CommonDC = DeclContext::getCommonParentContext(CommonDC, OtherDC);
+  }
+  return CommonDC;
+}
+
+bool RefactoringActionMoveMembersToExtension::isApplicable(
+    ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  switch (Info.Kind) {
+  case RangeKind::SingleDecl:
+  case RangeKind::MultiTypeMemberDecl: {
+    DeclContext *CommonDC = getCommonDeclContext(Info.DeclaredDecls);
+
+    // The the common decl context is not a nomial type, we cannot create an
+    // extension for it
+    if (!CommonDC || !CommonDC->getInnermostDeclarationDeclContext() ||
+        !isa<NominalTypeDecl>(CommonDC->getInnermostDeclarationDeclContext()))
+      return false;
+
+    // Members of types not declared at top file level cannot be extracted
+    // to an extension at top file level
+    if (CommonDC->getParent()->getContextKind() != DeclContextKind::FileUnit)
+      return false;
+
+    // We should not move instance variables with storage into the extension
+    // because they are not allowed to be declared there
+    for (auto DD : Info.DeclaredDecls) {
+      if (auto ASD = dyn_cast<AbstractStorageDecl>(DD.VD)) {
+        // Only disallow storages in the common decl context, allow them in
+        // any subtypes
+        if (ASD->hasStorage() && ASD->getDeclContext() == CommonDC) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+  case RangeKind::SingleExpression:
+  case RangeKind::PartOfExpression:
+  case RangeKind::SingleStatement:
+  case RangeKind::MultiStatement:
+  case RangeKind::Invalid:
+    return false;
+  }
+}
+
+bool RefactoringActionMoveMembersToExtension::performChange() {
+  DeclContext *CommonDC = getCommonDeclContext(RangeInfo.DeclaredDecls);
+
+  auto CommonTypeDecl =
+      dyn_cast<NominalTypeDecl>(CommonDC->getInnermostDeclarationDeclContext());
+  assert(CommonTypeDecl && "Not applicable if common parent is no nomial type");
+
+  SmallString<64> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  OS << "\n\n";
+  OS << "extension " << CommonTypeDecl->getName() << " {\n";
+  OS << RangeInfo.ContentRange.str().trim();
+  OS << "\n}";
+
+  // Insert extension after the type declaration
+  EditConsumer.insertAfter(SM, CommonTypeDecl->getEndLoc(), Buffer);
+  EditConsumer.remove(SM, RangeInfo.ContentRange);
+
+  return false;
 }
 
 struct CollapsibleNestedIfInfo {
@@ -2268,6 +2347,7 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
       return false;
     }
     case RangeKind::SingleDecl:
+    case RangeKind::MultiTypeMemberDecl:
     case RangeKind::SingleStatement:
     case RangeKind::MultiStatement:
     case RangeKind::Invalid:

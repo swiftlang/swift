@@ -205,7 +205,7 @@ public struct Substring : StringProtocol {
   /// encoding.
   ///
   /// - Parameters:
-  ///   - codeUnits: A collection of code units encoded in the ecoding
+  ///   - codeUnits: A collection of code units encoded in the encoding
   ///     specified in `sourceEncoding`.
   ///   - sourceEncoding: The encoding in which `codeUnits` should be
   ///     interpreted.

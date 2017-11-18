@@ -133,7 +133,13 @@ private:
     case TermKind::ReturnInst:
     case TermKind::SwitchValueInst:
     case TermKind::ThrowInst:
+    case TermKind::UnwindInst:
       llvm_unreachable("Did not expect terminator that does not have args!");
+
+    case TermKind::YieldInst:
+      for (auto &O : cast<YieldInst>(Term)->getAllOperands())
+        Operands.push_back(O.get());
+      return;
 
     case TermKind::TryApplyInst:
       for (auto &O : cast<TryApplyInst>(Term)->getAllOperands())

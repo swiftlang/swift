@@ -83,7 +83,7 @@ namespace syntax {
   class SourceFileSyntax;
   class SyntaxParsingContext;
   class SyntaxParsingContextRoot;
-  struct RawTokenInfo;
+  struct RawSyntaxInfo;
 }
 
 /// Discriminator for file-units.
@@ -891,7 +891,7 @@ public:
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ImplicitModuleImportKind ModImpKind, bool KeepTokens);
+             ImplicitModuleImportKind ModImpKind, bool KeepSyntaxInfo);
 
   void
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
@@ -1080,7 +1080,7 @@ public:
 
   ArrayRef<Token> getAllTokens() const;
 
-  bool shouldKeepTokens() const;
+  bool shouldKeepSyntaxInfo() const;
 
   syntax::SourceFileSyntax getSyntaxRoot() const;
 
@@ -1092,7 +1092,7 @@ private:
   Optional<std::vector<Token>> AllCorrectedTokens;
 
   /// All of the raw token syntax nodes in the underlying source.
-  std::vector<syntax::RawTokenInfo> AllRawTokenSyntax;
+  std::vector<syntax::RawSyntaxInfo> AllRawTokenSyntax;
 
   SourceFileSyntaxInfo &SyntaxInfo;
 
@@ -1172,6 +1172,15 @@ public:
   }
 
   virtual bool isSystemModule() const { return false; }
+
+  /// Retrieve the set of generic signatures stored within this module.
+  ///
+  /// \returns \c true if this module file supports retrieving all of the
+  /// generic signatures, \c false otherwise.
+  virtual bool getAllGenericSignatures(
+                 SmallVectorImpl<GenericSignature*> &genericSignatures) {
+    return false;
+  }
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||

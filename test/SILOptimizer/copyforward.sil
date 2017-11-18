@@ -29,18 +29,18 @@ bb0(%0 : $*T, %1 : $Bool):
 
 bb1:                                              // Preds: bb0
   %5 = metatype $@thick T.Type                    // user: %9
-  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
+  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
   %7 = integer_literal $Builtin.Int32, 10          // user: %8
   %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
-  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
+  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
   br bb3                                          // id: %10
 
 bb2:                                              // Preds: bb0
   %11 = metatype $@thick T.Type                   // user: %15
-  %12 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %15
+  %12 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %15
   %13 = integer_literal $Builtin.Int32, 1          // user: %14
   %14 = struct $Int32 (%13 : $Builtin.Int32)         // user: %15
-  %15 = apply %12<T>(%2, %14, %11) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
+  %15 = apply %12<T>(%2, %14, %11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
   br bb3                                          // id: %16
 
 bb3:                                              // Preds: bb1 bb2
@@ -63,10 +63,10 @@ bb0(%0 : $*T, %1 : $Bool):
   debug_value_addr %2 : $*T
   %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
   %5 = metatype $@thick T.Type                    // user: %9
-  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
+  %6 = witness_method $T, #P.init!allocator.1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0 // user: %9
   %7 = integer_literal $Builtin.Int32, 10          // user: %8
   %8 = struct $Int32 (%7 : $Builtin.Int32)           // user: %9
-  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
+  %9 = apply %6<T>(%2, %8, %5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (Int32, @thick τ_0_0.Type) -> @out τ_0_0
   br bb3(%0 : $*T)
 
 bb3(%10 : $*T):                                              // Preds: bb1 bb2
@@ -591,8 +591,8 @@ sil @backward_propagate_exi_init : $@convention(thin) <T where T : P>(@inout T) 
 bb0(%0 : $*P, %1 : $*T):
   %2 = alloc_stack $T
   copy_addr %1 to [initialization] %2 : $*T
-  %3 = witness_method $T, #P.poke!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
-  %4 = apply %3<T>(%1) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
+  %3 = witness_method $T, #P.poke!1 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
+  %4 = apply %3<T>(%1) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> ()
   %5 = init_existential_addr %0 : $*P, $T
   copy_addr [take] %2 to [initialization] %5 : $*T
   dealloc_stack %2 : $*T

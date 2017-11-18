@@ -368,7 +368,7 @@ bb0(%0 : $@thick CP1.Type):
 }
 
 
-sil [transparent] [thunk] @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_FzT_Vs5Int32 : $@convention(witness_method) (@in_guaranteed CP1) -> (Int32, @error Error) {
+sil [transparent] [thunk] @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_FzT_Vs5Int32 : $@convention(witness_method: P) (@in_guaranteed CP1) -> (Int32, @error Error) {
 bb0(%0 : $*CP1):
   %1 = load %0 : $*CP1
   strong_retain %1 : $CP1
@@ -670,8 +670,8 @@ bb0:
   %8 = struct $Int32 (%7 : $Builtin.Int32)
   store %8 to %0 : $*Int32
   %10 = open_existential_addr immutable_access %1 : $*P to $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P
-  %11 = witness_method $@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P, #P.foo!1, %10 : $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error)
-  try_apply %11<@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error), normal bb1, error bb4
+  %11 = witness_method $@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P, #P.foo!1, %10 : $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error)
+  try_apply %11<@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error), normal bb1, error bb4
 
 bb1(%13 : $Int32):
   store %13 to %0 : $*Int32

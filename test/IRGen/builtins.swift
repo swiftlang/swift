@@ -11,6 +11,8 @@ import Swift
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1
 
+// CHECK: call swiftcc void @swift_errorInMain(
+
 infix operator * {
   associativity left
   precedence 200
@@ -221,12 +223,12 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden {{.*}}void @_T08builtins27generic_sizeof_alignof_testyxlF(
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 7
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
+  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
@@ -237,7 +239,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @_T08builtins21generic_strideof_testyxlF(
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 11
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
@@ -761,7 +763,7 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536
@@ -837,6 +839,23 @@ func atomicload(_ p: Builtin.RawPointer) {
   // CHECK: store atomic volatile i32 [[D1]], i32* {{.*}} seq_cst, align 4
   Builtin.atomicstore_seqcst_volatile_FPIEEE32(p, d)
 }
+
+func createInt(_ fn: () -> ()) throws {}
+// CHECK-LABEL: define {{.*}}testForceTry
+// CHECK: call swiftcc void @swift_unexpectedError(%swift.error*
+func testForceTry(_ fn: () -> ()) {
+  try! createInt(fn)
+}
+
+// CHECK-LABEL: declare swiftcc void @swift_unexpectedError(%swift.error*
+
+enum MyError : Error {
+  case A, B
+}
+
+throw MyError.A
+
+
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
 

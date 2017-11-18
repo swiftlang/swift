@@ -19,15 +19,15 @@
 
 import SwiftReflectionTest
 
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func concrete(x: Int, y: Any) {
   reflect(function: {print(x)})
 // CHECK:         Type reference:
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=16 alignment=4 stride=16
-// CHECK-32-NEXT:   (field offset=12
+// CHECK-32-NEXT: (closure_context size=12 alignment=4 stride=12
+// CHECK-32-NEXT:   (field offset=8
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
@@ -45,8 +45,8 @@ func concrete(x: Int, y: Any) {
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=28 alignment=4 stride=28
-// CHECK-32-NEXT:   (field offset=12
+// CHECK-32-NEXT: (closure_context size=24 alignment=4 stride=24
+// CHECK-32-NEXT:   (field offset=8
 // CHECK-32-NEXT:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=metadata offset=12
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096)))))
@@ -78,15 +78,15 @@ class C {
   }
 }
 
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
   reflect(function: {print(i)})
 // CHECK:         Type reference:
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=16 alignment=4 stride=16
-// CHECK-32-NEXT:   (field offset=12
+// CHECK-32-NEXT: (closure_context size=12 alignment=4 stride=12
+// CHECK-32-NEXT:   (field offset=8
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
@@ -103,12 +103,12 @@ func generic<T : P, U, V : C>(x: T, y: U, z: V, i: Int) {
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=40 alignment=4 stride=40
+// CHECK-32-NEXT: (closure_context size=36 alignment=4 stride=36
+// CHECK-32-NEXT:   (field offset=24
+// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-32-NEXT:   (field offset=28
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-32-NEXT:   (field offset=32
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=36
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
@@ -125,21 +125,21 @@ generic(x: 10, y: "", z: C(), i: 101)
 
 class GC<A, B, C> {}
 
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func genericWithSources<A, B, C>(a: A, b: B, c: C, gc: GC<A, B, C>) {
   reflect(function: {print(a); print(b); print(c); print(gc)})
 // CHECK:         Type reference:
 // CHECK-NEXT:    (builtin Builtin.NativeObject)
 
 // CHECK-32:      Type info:
-// CHECK-32-NEXT: (closure_context size=28 alignment=4 stride=28
+// CHECK-32-NEXT: (closure_context size=24 alignment=4 stride=24
+// CHECK-32-NEXT:   (field offset=8
+// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-32-NEXT:   (field offset=12
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-32-NEXT:   (field offset=16
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-32-NEXT:   (field offset=20
-// CHECK-32-NEXT:     (reference kind=strong refcounting=native))
-// CHECK-32-NEXT:   (field offset=24
 // CHECK-32-NEXT:     (reference kind=strong refcounting=native)))
 
 // CHECK-64:      Type info:
@@ -171,8 +171,8 @@ class CapturingClass {
   // CHECK-32: (class functions.CapturingClass)
   
   // CHECK-32: Type info:
-  // CHECK-32: (class_instance size=12 alignment=1 stride=12
-  @_semantics("optimize.sil.never")
+  // CHECK-32: (class_instance size=8 alignment=1 stride=8
+  @_optimize(none)
   func arity0Capture1() -> () -> () {
     let closure = {
       // Captures a single retainable reference.
@@ -204,8 +204,8 @@ class CapturingClass {
   // CHECK-32: (builtin Builtin.NativeObject)
 
   // CHECK-32:        Type info:
-  // CHECK-32:        (closure_context size=32 alignment=8 stride=32
-  // CHECK-32-NEXT:   (field offset=16
+  // CHECK-32:        (closure_context size=24 alignment=8 stride=24
+  // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0
   // CHECK-32-NEXT:       (field offset=0
   // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
@@ -215,7 +215,7 @@ class CapturingClass {
   // CHECK-32-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
   // CHECK-32-NEXT:           (field name=_value offset=0
   // CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))))))
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func arity1Capture1() -> (Int) -> () {
     let pair = (2, 333.0)
     let closure = { (i: Int) in
@@ -245,8 +245,8 @@ class CapturingClass {
   // CHECK-32: (builtin Builtin.NativeObject)
   
   // CHECK-32:        Type info:
-  // CHECK-32:        (closure_context size=20 alignment=4 stride=20
-  // CHECK-32-NEXT:   (field offset=12
+  // CHECK-32:        (closure_context size=16 alignment=4 stride=16
+  // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (tuple size=8 alignment=4 stride=8 num_extra_inhabitants=0
   // CHECK-32-NEXT:       (field offset=0
   // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
@@ -254,7 +254,7 @@ class CapturingClass {
   // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0))))
   // CHECK-32-NEXT:       (field offset=4
   // CHECK-32-NEXT:         (reference kind=strong refcounting=native)))))
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func arity2Capture1() -> (Int, String) -> () {
    let pair = (999, C())
    let closure = { (i: Int, s: String) in
@@ -283,14 +283,14 @@ class CapturingClass {
   // CHECK-32: (builtin Builtin.NativeObject)
   
   // CHECK-32:        Type info:
-  // CHECK-32:        (closure_context size=16 alignment=4 stride=16
-  // CHECK-32-NEXT:   (field offset=12
+  // CHECK-32:        (closure_context size=12 alignment=4 stride=12
+  // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095
   // CHECK-32-NEXT:       (field name=some offset=0
   // CHECK-32-NEXT:         (class_existential size=4 alignment=4 stride=4 num_extra_inhabitants=4096
   // CHECK-32-NEXT:           (field name=object offset=0
   // CHECK-32-NEXT:             (reference kind=strong refcounting=unknown)))))
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func arity3Capture1() -> (Int, String, AnyObject?) -> () {
     let c: AnyObject? = C()
     let closure = { (i: Int, s: String, a: AnyObject?) in
@@ -326,7 +326,7 @@ class CapturingClass {
 
   // CHECK-32:        Type info:
   // CHECK-32:        (closure_context size=32 alignment=8 stride=32
-  // CHECK-32-NEXT:   (field offset=12
+  // CHECK-32-NEXT:   (field offset=8
   // CHECK-32-NEXT:     (reference kind=strong refcounting=native))
   // CHECK-32-NEXT:   (field offset=16
   // CHECK-32-NEXT:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0
@@ -338,7 +338,7 @@ class CapturingClass {
   // CHECK-32-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
   // CHECK-32-NEXT:           (field name=_value offset=0
   // CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))))))
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func arity0Capture2() -> () -> () {
    let pair = (999, 1010.2)
     let closure = {
@@ -367,12 +367,12 @@ class CapturingClass {
   // CHECK-32: (builtin Builtin.NativeObject)
   
   // CHECK-32: Type info:
-  // CHECK-32: (closure_context size=20 alignment=4 stride=20
-  // CHECK-32:   (field offset=12
+  // CHECK-32: (closure_context size=16 alignment=4 stride=16
+  // CHECK-32:   (field offset=8
   // CHECK-32:     (reference kind=strong refcounting=native))
-  // CHECK-32:   (field offset=16
+  // CHECK-32:   (field offset=12
   // CHECK-32:     (reference kind=strong refcounting=native)))
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func arity1Capture2() -> (Int) -> () {
    let x: C? = C()
    let closure = { (i: Int) in 
@@ -408,7 +408,7 @@ class CapturingClass {
   
   // CHECK-32: Type info:
   // CHECK-32: (closure_context size=32 alignment=8 stride=32
-  // CHECK-32:   (field offset=12
+  // CHECK-32:   (field offset=8
   // CHECK-32:     (reference kind=strong refcounting=native))
   // CHECK-32:   (field offset=16
   // CHECK-32:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0
@@ -420,7 +420,7 @@ class CapturingClass {
   // CHECK-32:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
   // CHECK-32:           (field name=_value offset=0
   // CHECK-32:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))))))
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func arity2Capture2() -> (Int, String) -> () {
    let pair = (999, 1010.2)
    let closure = { (i: Int, s: String) in
@@ -457,7 +457,7 @@ class CapturingClass {
   
   // CHECK-32: Type info:
   // CHECK-32: (closure_context size=32 alignment=8 stride=32
-  // CHECK-32:   (field offset=12
+  // CHECK-32:   (field offset=8
   // CHECK-32:     (reference kind=strong refcounting=native))
   // CHECK-32:   (field offset=16
   // CHECK-32:     (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0
@@ -469,7 +469,7 @@ class CapturingClass {
   // CHECK-32:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
   // CHECK-32:           (field name=_value offset=0
   // CHECK-32:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))))))
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func arity3Capture2() -> (Int, String, AnyObject?) -> () {
    let pair = (999, 1010.2)
    let closure = { (i: Int, s: String, a: AnyObject?) in
@@ -510,8 +510,8 @@ reflect(function: C().captureWeakSelf())
 // CHECK-32: (builtin Builtin.NativeObject)
 
 // CHECK-32:        Type info:
-// CHECK-32:        (closure_context size=16 alignment=4 stride=16
-// CHECK-32-NEXT:   (field offset=12
+// CHECK-32:        (closure_context size=12 alignment=4 stride=12
+// CHECK-32-NEXT:   (field offset=8
 // CHECK-32-NEXT:     (reference kind=weak refcounting=native)))
 
 reflect(function: C().captureUnownedSelf())
@@ -531,8 +531,8 @@ reflect(function: C().captureUnownedSelf())
 // CHECK-32: (builtin Builtin.NativeObject)
 
 // CHECK-32:        Type info:
-// CHECK-32:        (closure_context size=16 alignment=4 stride=16
-// CHECK-32-NEXT:   (field offset=12
+// CHECK-32:        (closure_context size=12 alignment=4 stride=12
+// CHECK-32-NEXT:   (field offset=8
 // CHECK-32-NEXT:     (reference kind=unowned refcounting=native)))
 
 doneReflecting()

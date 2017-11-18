@@ -120,25 +120,13 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
   return env->mapTypeIntoContext(type);
 }
 
-Type
-GenericEnvironment::mapTypeOutOfContext(GenericEnvironment *env,
-                                        Type type) {
-  assert(!type->hasTypeParameter() && "already have an interface type");
-
-  if (!env)
-    return type.substDependentTypesWithErrorTypes();
-
-  return env->mapTypeOutOfContext(type);
-}
-
-Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
-  type = type.subst([&](SubstitutableType *t) -> Type {
-                      return cast<ArchetypeType>(t)->getInterfaceType();
-                    },
-                    MakeAbstractConformanceForGenericType(),
-                    SubstFlags::AllowLoweredTypes);
-  assert(!type->hasArchetype() && "not fully substituted");
-  return type;
+Type TypeBase::mapTypeOutOfContext() {
+  assert(!hasTypeParameter() && "already have an interface type");
+  return Type(this).subst([&](SubstitutableType *t) -> Type {
+      return cast<ArchetypeType>(t)->getInterfaceType();
+    },
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::AllowLoweredTypes);
 }
 
 Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(

@@ -1668,6 +1668,10 @@ void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {
   Out << "<curry-thunk>";
 }
 
+void Remangler::mangleDispatchThunk(Node *node, EntityContext &ctx) {
+  Out << "<dispatch-thunk>";
+}
+
 void Remangler::mangleEmptyList(Node *node) {
   Out << "<empty>";
 }
@@ -1697,6 +1701,26 @@ void Remangler::mangleOutlinedRetain(Node *node) {
 
 void Remangler::mangleOutlinedRelease(Node *node) {
   Out << "Ws";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedInitializeWithTake(Node *node) {
+  Out << "Wb";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedInitializeWithCopy(Node *node) {
+  Out << "Wc";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedAssignWithTake(Node *node) {
+  Out << "Wd";
+  mangleSingleChildNode(node);
+}
+
+void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
+  Out << "Wf";
   mangleSingleChildNode(node);
 }
 

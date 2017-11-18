@@ -5,6 +5,56 @@ if exists("b:current_syntax")
     finish
 endif
 
+syn keyword silStage skipwhite nextgroup=silStages
+      \ sil_stage
+syn keyword silStages
+      \ canonical
+      \ raw
+
+syn match silIdentifier skipwhite
+      \ /@\<[A-Za-z_0-9]\+\>/
+
+syn match silConvention skipwhite
+      \ /$\?@convention/
+syn region silConvention contained contains=silConventions
+      \ start="@convention(" end=")"
+syn keyword silConventions
+      \ block
+      \ c
+      \ method
+      \ objc_method
+      \ thick
+      \ thin
+      \ witness_method
+
+syn match silFunctionType skipwhite
+      \ /@\(\<autoreleased\>\|\<callee_guaranteed\>\|\<callee_owned\>\|\<error\>\|\<guaranteed\>\|\<in\>\|\<in_constant\>\|\<in_guaranteed\>\|\<inout\>\|\<inout_aliasable\>\|\<noescape\>\|\<out\>\|\<owned\>\)/
+syn match silMetatypeType skipwhite
+      \ /@\(\<thick\>\|\<thin\>\|\<objc\>\)/
+
+" TODO: handle [tail_elems sil-type * sil-operand]
+syn region silAttribute contains=silAttributes
+      \ start="\[" end="\]"
+syn keyword silAttributes contained containedin=silAttribute
+      \ abort
+      \ deinit
+      \ delegatingself
+      \ derivedself
+      \ derivedselfonly
+      \ dynamic
+      \ exact
+      \ init
+      \ modify
+      \ objc
+      \ read
+      \ rootself
+      \ stack
+      \ static
+      \ strict
+      \ unknown
+      \ unsafe
+      \ var
+
 syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
@@ -67,7 +117,7 @@ syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
-hi def link swiftApplyKeyword ModeMsg
+hi def link swiftApplyKeyword Statement
 hi def link swiftKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftTypeName Type
@@ -96,5 +146,15 @@ hi def link swiftOperator Function
 hi def link swiftChar Character
 hi def link swiftLabel Label
 hi def link swiftNew Operator
+
+hi def link silStage Special
+hi def link silStages Type
+hi def link silConvention Special
+hi def link silConventionParameter Special
+hi def link silConventions Type
+hi def link silIdentifier Identifier
+hi def link silFunctionType Special
+hi def link silMetatypeType Special
+hi def link silAttribute PreProc
 
 let b:current_syntax = "sil"

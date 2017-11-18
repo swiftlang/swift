@@ -42,17 +42,19 @@ public typealias CShort = Int16
 /// The C 'int' type.
 public typealias CInt = Int32
 
-/// The C 'long' type.
 #if os(Windows) && arch(x86_64)
+/// The C 'long' type.
 public typealias CLong = Int32
 #else
+/// The C 'long' type.
 public typealias CLong = Int
 #endif
 
-/// The C 'long long' type.
 #if os(Windows) && arch(x86_64)
+/// The C 'long long' type.
 public typealias CLongLong = Int
 #else
+/// The C 'long long' type.
 public typealias CLongLong = Int64
 #endif
 
@@ -200,7 +202,7 @@ extension OpaquePointer : Equatable {
   }
 }
 
-/// The corresponding Swift type to `va_list` in imported C APIs.
+/// A wrapper around a C `va_list` pointer.
 @_fixed_layout
 public struct CVaListPointer {
   @_versioned // FIXME(sil-serialize-all)

@@ -1621,3 +1621,10 @@ func rdar33239714() {
   Generic<(Int, Int)>().optAliasF { x, y in }
   Generic<(Int, Int)>().optAliasF { (x, y) in }
 }
+
+// rdar://problem/35198459 - source-compat-suite failure: Moya (toType->hasUnresolvedType() && "Should have handled this above"
+do {
+  func foo(_: (() -> Void)?) {}
+  func bar() -> ((()) -> Void)? { return nil }
+  foo(bar()) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+}

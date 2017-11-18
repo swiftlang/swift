@@ -37,12 +37,10 @@ extension Syntax {
       throw ParserError.swiftcFailed(result.exitCode, result.stderr)
     }
     let decoder = JSONDecoder()
-    let raw = try decoder.decode([RawSyntax].self, from: result.stdoutData)
-    let topLevelNodes = raw.map { Syntax.fromRaw($0) }
-    let eof = topLevelNodes.last! as! TokenSyntax
-    let decls = Array(topLevelNodes.dropLast()) as! [DeclSyntax]
-    let declList = SyntaxFactory.makeDeclList(decls)
-    return SyntaxFactory.makeSourceFile(topLevelDecls: declList,
-                                        eofToken: eof)
+    let raw = try decoder.decode(RawSyntax.self, from: result.stdoutData)
+    guard let file = Syntax.fromRaw(raw) as? SourceFileSyntax else {
+      throw ParserError.invalidFile
+    }
+    return file
   }
 }

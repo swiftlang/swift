@@ -18,6 +18,7 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -96,7 +97,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      KeepAsPublic(false), EffectsKindAttr(E), EntryCount(entryCount) {
+      HasCReferences(false), KeepAsPublic(false),
+      OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
+      EntryCount(entryCount) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -167,10 +170,15 @@ ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();
 }
 
+OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
+  if (OptMode != OptimizationMode::NotSet)
+    return OptMode;
+
+  return getModule().getOptions().OptMode;
+}
+
 bool SILFunction::shouldOptimize() const {
-  if (Module.getStage() == SILStage::Raw)
-    return true;
-  return !hasSemanticsAttr("optimize.sil.never");
+  return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
@@ -193,11 +201,6 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                     QueryInterfaceTypeSubstitutions(this),
                     LookUpConformanceInSignature(*genericSig),
                     genericSig);
-}
-
-Type SILFunction::mapTypeOutOfContext(Type type) const {
-  return GenericEnvironment::mapTypeOutOfContext(
-      getGenericEnvironment(), type);
 }
 
 bool SILFunction::isNoReturnFunction() const {
@@ -445,13 +448,15 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   return hasPublicVisibility(getLinkage());
 }
 
-/// Helper method which returns true if the linkage of the SILFunction
-/// indicates that the objects definition might be required outside the
-/// current SILModule.
 bool
 SILFunction::isPossiblyUsedExternally() const {
-  return swift::isPossiblyUsedExternally(getLinkage(),
-                                         getModule().isWholeModule());
+  auto linkage = getLinkage();
+
+  // Hidden functions may be referenced by other C code in the linkage unit.
+  if (linkage == SILLinkage::Hidden && hasCReferences())
+    return true;
+
+  return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
 bool SILFunction::isExternallyUsedSymbol() const {

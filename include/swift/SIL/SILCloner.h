@@ -616,6 +616,39 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitBeginApplyInst(BeginApplyInst *Inst) {
+  auto Args = getOpValueArray<8>(Inst->getArguments());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createBeginApply(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getCallee()),
+                                  getOpSubstitutions(Inst->getSubstitutions()),
+                                  Args,
+                                  Inst->isNonThrowing(),
+                                  GenericSpecializationInformation::create(
+                                    Inst, getBuilder())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitAbortApplyInst(AbortApplyInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createAbortApply(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createEndApply(getOpLocation(Inst->getLoc()),
+                                getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
   SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2114,6 +2147,27 @@ SILCloner<ImplClass>::visitThrowInst(ThrowInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createThrow(getOpLocation(Inst->getLoc()),
                              getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitUnwindInst(UnwindInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createUnwind(getOpLocation(Inst->getLoc())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitYieldInst(YieldInst *Inst) {
+  auto Values = getOpValueArray<8>(Inst->getYieldedValues());
+  auto ResumeBB = getOpBasicBlock(Inst->getResumeBB());
+  auto UnwindBB = getOpBasicBlock(Inst->getUnwindBB());
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createYield(getOpLocation(Inst->getLoc()), Values,
+                             ResumeBB, UnwindBB));
 }
 
 template<typename ImplClass>

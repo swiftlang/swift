@@ -361,6 +361,15 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
   llvm_unreachable("Unknown decl kind");
 }
 
+SourceRange Decl::getSourceRangeIncludingAttrs() const {
+  auto Range = getSourceRange();
+  for (auto Attr : getAttrs()) {
+    if (Attr->getRange().isValid())
+      Range.widen(Attr->getRange());
+  }
+  return Range;
+}
+
 SourceLoc Decl::getLoc() const {
   switch (getKind()) {
 #define DECL(ID, X) \
@@ -1187,10 +1196,10 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr) {
 
 // @NSManaged properties never get default initialized, nor do debugger
 // variables and immutable properties.
-bool isNeverDefaultInitializable(const Pattern *p) {
+bool Pattern::isNeverDefaultInitializable() const {
   bool result = false;
 
-  p->forEachVariable([&](const VarDecl *var) {
+  forEachVariable([&](const VarDecl *var) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>())
       return;
 
@@ -1209,7 +1218,7 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   if (entry.getInit())
     return true;
 
-  if (isNeverDefaultInitializable(entry.getPattern()))
+  if (entry.getPattern()->isNeverDefaultInitializable())
     return false;
 
   // If the pattern is typed as optional (or tuples thereof), it is
@@ -2175,6 +2184,19 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   llvm_unreachable("unknown access level");
 }
 
+void ValueDecl::copyFormalAccessAndVersionedAttrFrom(ValueDecl *source) {
+  if (!hasAccess()) {
+    setAccess(source->getFormalAccess());
+  }
+
+  // Inherit the @_versioned attribute.
+  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto &ctx = getASTContext();
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    getAttrs().add(clonedAttr);
+  }
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -2481,7 +2503,7 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
   if (underlying->hasArchetype() && isGenericContext())
-    underlying = mapTypeOutOfContext(underlying);
+    underlying = underlying->mapTypeOutOfContext();
   UnderlyingTy.setType(underlying);
 
   // FIXME -- if we already have an interface type, we're changing the
@@ -2679,6 +2701,49 @@ DestructorDecl *ClassDecl::getDestructor() {
   assert(results.size() == 1 && "More than one destructor?");
   return cast<DestructorDecl>(results.front());
 }
+
+void ClassDecl::addImplicitDestructor() {
+  if (hasDestructor() || isInvalid())
+    return;
+
+  auto *selfDecl = ParamDecl::createSelf(getLoc(), this);
+
+  auto &ctx = getASTContext();
+  auto *DD = new (ctx) DestructorDecl(getLoc(), selfDecl, this);
+
+  DD->setImplicit();
+  DD->setValidationStarted();
+
+  // Create an empty body for the destructor.
+  DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
+  addMember(DD);
+  setHasDestructor();
+
+  // Propagate access control and versioned-ness.
+  DD->copyFormalAccessAndVersionedAttrFrom(this);
+
+  // Wire up generic environment of DD.
+  DD->setGenericEnvironment(getGenericEnvironmentOfContext());
+
+  // Mark DD as ObjC, as all dtors are.
+  DD->setIsObjC(true);
+  recordObjCMethod(DD);
+
+  // Assign DD the interface type (Self) -> () -> ()
+  ArrayRef<AnyFunctionType::Param> noParams;
+  AnyFunctionType::ExtInfo info;
+  Type selfTy = selfDecl->getInterfaceType();
+  Type voidTy = TupleType::getEmpty(ctx);
+  Type funcTy = FunctionType::get(noParams, voidTy, info);
+  if (auto *sig = DD->getGenericSignature()) {
+    DD->setInterfaceType(
+      GenericFunctionType::get(sig, {selfTy}, funcTy, info));
+  } else {
+    DD->setInterfaceType(
+      FunctionType::get({selfTy}, funcTy, info));
+  }
+}
+
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
@@ -3401,7 +3466,7 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 }
 
 GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
-  auto *outerGenericParams = dc->getParent()->getGenericParamsOfContext();
+  auto *outerGenericParams = getParent()->getGenericParamsOfContext();
 
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();
@@ -5120,7 +5185,7 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto inputTy = getArgumentTypeLoc().getType()) {
-    resultTy = FunctionType::get(ED->mapTypeOutOfContext(inputTy), resultTy);
+    resultTy = FunctionType::get(inputTy->mapTypeOutOfContext(), resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())

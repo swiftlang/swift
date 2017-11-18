@@ -406,9 +406,15 @@ internal func _heapSort<C>(
 % end
 // for p in preds
 
-/// Exchange the values of `a` and `b`.
+/// Exchanges the values of the two arguments.
 ///
-/// - Precondition: `a` and `b` do not alias each other.
+/// The two arguments must not alias each other. To swap two elements of a
+/// mutable collection, use the `swapAt(_:_:)` method of that collection
+/// instead of this function.
+///
+/// - Parameters:
+///   - a: The first value to swap.
+///   - b: The second value to swap.
 @_inlineable
 public func swap<T>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).

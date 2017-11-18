@@ -2302,6 +2302,8 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::ThrowInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
+    case TermKind::UnwindInst:
+    case TermKind::YieldInst:
       break;
     }
     // If the block has a cond_fail, try to move it to the predecessors.

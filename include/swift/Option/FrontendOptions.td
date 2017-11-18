@@ -76,6 +76,9 @@ def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
 def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,
   HelpText<"Allow diagnostics for '<unknown>' location in verify mode">;
+def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
+  MetaVarName<"<module-name>">,
+  HelpText<"Verify the generic signatures in the given module">;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
@@ -193,9 +196,6 @@ def enable_guaranteed_closure_contexts : Flag<["-"], "enable-guaranteed-closure-
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
-
-def remove_runtime_asserts : Flag<["-"], "remove-runtime-asserts">,
-  HelpText<"Remove runtime asserts.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -368,6 +368,16 @@ def use_jit : Flag<["-"], "use-jit">,
 def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
   MetaVarName<"<50>">,
   HelpText<"Controls the aggressiveness of performance inlining">;
+
+def sil_inline_caller_benefit_reduction_factor : Separate<["-"], "sil-inline-caller-benefit-reduction-factor">,
+  MetaVarName<"<2>">,
+  HelpText<"Controls the aggressiveness of performance inlining in -Osize "
+          "mode by reducing the base benefits of a caller (lower value "
+          "permits more inlining!)">;
+
+def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
+  MetaVarName<"<250>">,
+  HelpText<"Controls the aggressiveness of loop unrolling">;
 
 def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
   HelpText<"Merge SIL from all partial swiftmodules into the final module">;

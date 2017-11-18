@@ -673,8 +673,29 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
 
   if (hadError)
     TP->setType(ErrorType::get(TC.Context));
-  else
+  else {
     TP->setType(TL.getType());
+
+    // Track whether the decl in this typed pattern should be
+    // implicitly unwrapped as needed during expression type checking.
+    if (TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
+        TypeReprKind::ImplicitlyUnwrappedOptional) {
+      auto *subPattern = TP->getSubPattern();
+
+      while (auto *parenPattern = dyn_cast<ParenPattern>(subPattern))
+        subPattern = parenPattern->getSubPattern();
+
+      if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
+        auto &C = DC->getASTContext();
+        namedPattern->getDecl()->getAttrs().add(
+            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      } else {
+        assert(isa<AnyPattern>(subPattern) &&
+               "Unexpected pattern nested in typed pattern!");
+      }
+    }
+  }
+
   return hadError;
 }
 
@@ -691,6 +712,9 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   auto elementOptions = (options |
                          (decl->isVariadic() ? TR_VariadicFunctionInput
                                              : TR_FunctionInput));
+  if (!decl->isVariadic())
+    elementOptions |= TR_AllowIUO;
+
   bool hadError = false;
 
   // We might have a null typeLoc if this is a closure parameter list,
@@ -1005,7 +1029,7 @@ recur:
     if (type->hasTypeParameter())
       var->setInterfaceType(type);
     else
-      var->setInterfaceType(var->getDeclContext()->mapTypeOutOfContext(type));
+      var->setInterfaceType(type->mapTypeOutOfContext());
 
     checkTypeModifyingDeclAttributes(var);
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
@@ -1524,7 +1548,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
         assert(!param->isLet() || !ty->is<InOutType>());
         param->setType(ty->getInOutObjectType());
-        param->setInterfaceType(CE->mapTypeOutOfContext(ty)->getInOutObjectType());
+        param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
       }
     }
     
@@ -1544,7 +1568,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (isValidType(ty) || shouldOverwriteParam(param)) {
       assert(!param->isLet() || !ty->is<InOutType>());
       param->setType(ty->getInOutObjectType());
-      param->setInterfaceType(CE->mapTypeOutOfContext(ty)->getInOutObjectType());
+      param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
     }
     
     checkTypeModifyingDeclAttributes(param);

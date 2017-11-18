@@ -94,8 +94,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $() -> (), 
   // CHECK-SAME:   id ##C.reabstracted,
-  // CHECK-SAME:   getter @_T08keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in C<τ_0_0>) -> @out @callee_owned (@in ()) -> @out (),
-  // CHECK-SAME:   setter @_T08keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in @callee_owned (@in ()) -> @out (), @in C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @_T08keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in C<τ_0_0>) -> @out @callee_guaranteed (@in ()) -> @out (),
+  // CHECK-SAME:   setter @_T08keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in @callee_guaranteed (@in ()) -> @out (), @in C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.reabstracted
 
@@ -123,8 +123,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME:  root $S<τ_0_0>;
   // CHECK-SAME:  settable_property $() -> (),
   // CHECK-SAME:    id ##S.reabstracted,
-  // CHECK-SAME:    getter @_T08keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in S<τ_0_0>) -> @out @callee_owned (@in ()) -> @out (),
-  // CHECK-SAME:    setter @_T08keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in @callee_owned (@in ()) -> @out (), @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:    getter @_T08keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in S<τ_0_0>) -> @out @callee_guaranteed (@in ()) -> @out (),
+  // CHECK-SAME:    setter @_T08keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in @callee_guaranteed (@in ()) -> @out (), @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.reabstracted
 

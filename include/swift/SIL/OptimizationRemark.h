@@ -20,12 +20,13 @@
 #define SWIFT_SIL_OPTIMIZATIONREMARKEMITTER_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
-class ASTContext;
 class SILFunction;
 
 namespace OptRemark {
@@ -39,6 +40,7 @@ struct Argument {
   SourceLoc Loc;
 
   explicit Argument(StringRef Str = "") : Key("String"), Val(Str) {}
+  Argument(StringRef Key, StringRef Val) : Key(Key), Val(Val) {}
 
   Argument(StringRef Key, int N);
   Argument(StringRef Key, long N);
@@ -53,12 +55,22 @@ struct Argument {
 /// Shorthand to insert named-value pairs.
 using NV = Argument;
 
+/// Inserting this into a Remark indents the text when printed as a debug
+/// message.
+struct IndentDebug {
+  explicit IndentDebug(unsigned Width) : Width(Width) {}
+  unsigned Width;
+};
+
 /// The base class for remarks.  This can be created by optimization passed to
 /// report successful and unsuccessful optimizations. CRTP is used to preserve
 /// the underlying type encoding the remark kind in the insertion operator.
 template <typename DerivedT> class Remark {
   /// Arguments collected via the streaming interface.
   SmallVector<Argument, 4> Args;
+
+  /// The name of the pass generating the remark.
+  StringRef PassName;
 
   /// Textual identifier for the remark (single-word, camel-case). Can be used
   /// by external tools reading the YAML output file for optimization remarks to
@@ -68,9 +80,16 @@ template <typename DerivedT> class Remark {
   /// Source location for the diagnostics.
   SourceLoc Location;
 
+  /// The function for the diagnostics.
+  SILFunction *Function;
+
+  /// Indentation used if this remarks is printed as a debug message.
+  unsigned IndentDebugWidth = 0;
+
 protected:
   Remark(StringRef Identifier, SILInstruction &I)
-      : Identifier(Identifier), Location(I.getLoc().getSourceLoc()) {}
+      : Identifier(Identifier), Location(I.getLoc().getSourceLoc()),
+        Function(I.getParent()->getParent()) {}
 
 public:
   DerivedT &operator<<(StringRef S) {
@@ -83,8 +102,21 @@ public:
     return *static_cast<DerivedT *>(this);
   }
 
+  DerivedT &operator<<(IndentDebug ID) {
+    IndentDebugWidth = ID.Width;
+    return *static_cast<DerivedT *>(this);
+  }
+
+  StringRef getPassName() const { return PassName; }
+  StringRef getIdentifier() const { return Identifier; }
+  SILFunction *getFunction() const { return Function; }
   SourceLoc getLocation() const { return Location; }
   std::string getMsg() const;
+  std::string getDebugMsg() const;
+  Remark<DerivedT> &getRemark() { return *this; }
+  SmallVector<Argument, 4> &getArgs() { return Args; }
+
+  void setPassName(StringRef PN) { PassName = PN; }
 };
 
 /// Remark to report a successful optimization.
@@ -99,18 +131,21 @@ struct RemarkMissed : public Remark<RemarkMissed> {
 /// Used to emit the remarks.  Passes reporting remarks should create an
 /// instance of this.
 class Emitter {
-  ASTContext &Ctx;
+  SILModule &Module;
   std::string PassName;
   bool PassedEnabled;
   bool MissedEnabled;
 
+  // Making these non-generic allows out-of-line definition.
   void emit(const RemarkPassed &R);
   void emit(const RemarkMissed &R);
+  static void emitDebug(const RemarkPassed &R);
+  static void emitDebug(const RemarkMissed &R);
 
   template <typename RemarkT> bool isEnabled();
 
 public:
-  Emitter(StringRef PassName, ASTContext &Ctx);
+  Emitter(StringRef PassName, SILModule &M);
 
   /// \brief Take a lambda that returns a remark which will be emitted.  The
   /// lambda is not evaluated unless remarks are enabled.  Second argument is
@@ -119,12 +154,43 @@ public:
   void emit(T RemarkBuilder, decltype(RemarkBuilder()) * = nullptr) {
     using RemarkT = decltype(RemarkBuilder());
     // Avoid building the remark unless remarks are enabled.
-    if (isEnabled<RemarkT>()) {
+    if (isEnabled<RemarkT>() || Module.getOptRecordStream()) {
       auto R = RemarkBuilder();
+      R.setPassName(PassName);
       emit(R);
     }
   }
+
+  /// Emit an optimization remark or debug message.
+  template <typename T>
+  static void emitOrDebug(const char *PassName, Emitter *ORE, T RemarkBuilder,
+                          decltype(RemarkBuilder()) * = nullptr) {
+    using RemarkT = decltype(RemarkBuilder());
+    // Avoid building the remark unless remarks are enabled.
+    bool EmitRemark =
+        ORE && (ORE->isEnabled<RemarkT>() || ORE->Module.getOptRecordStream());
+    // Same for DEBUG.
+    bool EmitDebug = false;
+#ifndef NDEBUG
+    EmitDebug |= llvm::DebugFlag && llvm::isCurrentDebugType(PassName);
+#endif // NDEBUG
+
+    if (EmitRemark || EmitDebug) {
+      auto R = RemarkBuilder();
+      if (EmitDebug)
+        emitDebug(R);
+      if (EmitRemark) {
+        // If we have ORE use the PassName that was set up with ORE. DEBUG_TYPE
+        // may be different if a pass is calling other modules.
+        R.setPassName(ORE->PassName);
+        ORE->emit(R);
+      }
+    }
+  }
 };
+
+#define REMARK_OR_DEBUG(...)                                                   \
+  OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, __VA_ARGS__)
 
 template <> inline bool Emitter::isEnabled<RemarkMissed>() {
   return MissedEnabled;

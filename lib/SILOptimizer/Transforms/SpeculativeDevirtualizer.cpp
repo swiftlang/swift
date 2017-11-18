@@ -555,8 +555,11 @@ namespace {
 
       auto &CurFn = *getFunction();
       // Don't perform speculative devirtualization at -Os.
-      if (CurFn.getModule().getOptions().Optimization ==
-          SILOptions::SILOptMode::OptimizeForSize)
+      if (CurFn.optimizeForSize())
+        return;
+
+      // Don't speculatively devirtualize calls inside thunks.
+      if (CurFn.isThunk())
         return;
 
       ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();

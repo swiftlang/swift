@@ -17,7 +17,7 @@ struct String { var ptr: Builtin.NativeObject }
 // CHECK-LABEL: sil hidden @_T0s21s010______PAndS_casesyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[MTYPE:%.*]] = metatype $@thin PAndSEnum.Type
-// CHECK:   [[EAPPLY:%.*]] = apply {{.*}}([[MTYPE]]) : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum
+// CHECK:   [[EAPPLY:%.*]] = apply {{.*}}([[MTYPE]]) : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_guaranteed (@in EmptyP, @owned String) -> @out PAndSEnum
 // CHECK:   destroy_value [[EAPPLY]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T0s21s010______PAndS_casesyyF'
@@ -67,10 +67,10 @@ func s030__________refCast<T, U>(_ x: T, to: U.Type) -> U {
 // CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt.1, [[RTUPLE]] : $(EmptyP, String)
 // CHECK:   return [[RETVAL]] : $PAndSEnum
 // CHECK-LABEL: } // end sil function '_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmF'
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmFTc : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum {
+// CHECK-LABEL: sil shared [transparent] [thunk] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmFTc : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_guaranteed (@in EmptyP, @owned String) -> @out PAndSEnum {
 // CHECK: bb0([[ARG:%.*]] : @trivial $@thin PAndSEnum.Type):
-// CHECK:   [[RETVAL:%.*]] = partial_apply {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum
-// CHECK:   return [[RETVAL]] : $@callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum
+// CHECK:   [[RETVAL:%.*]] = partial_apply [callee_guaranteed] {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum
+// CHECK:   return [[RETVAL]] : $@callee_guaranteed (@in EmptyP, @owned String) -> @out PAndSEnum
 // CHECK-LABEL: } // end sil function '_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmFTc'
 enum PAndSEnum { case A(EmptyP, String) }
 

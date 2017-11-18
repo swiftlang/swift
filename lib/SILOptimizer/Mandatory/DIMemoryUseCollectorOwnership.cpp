@@ -446,14 +446,12 @@ getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B, SILLocation Loc,
 }
 
 /// Given an RValue of aggregate type, compute the values of the elements by
-/// emitting a series of tuple_element instructions.
+/// emitting a destructure.
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V->getType().castTo<TupleType>();
-  for (auto Index : indices(TT->getElements())) {
-    ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
-  }
+  auto *DTI = B.createDestructureTuple(Loc, V);
+  copy(DTI->getResults(), std::back_inserter(ElementVals));
 }
 
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
@@ -562,6 +560,8 @@ private:
   void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
                       DIUseKind Kind);
   void collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo);
+  void collectDestructureTupleResultUses(DestructureTupleResult *DTR,
+                                         unsigned BaseEltNo);
   void collectStructElementUses(StructElementAddrInst *SEAI,
                                 unsigned BaseEltNo);
 };
@@ -609,6 +609,33 @@ void ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
   }
 
   collectUses(TEAI, BaseEltNo);
+}
+
+/// Given a destructure_tuple, compute the new BaseEltNo implicit in the
+/// selected member, and recursively add uses of the instruction.
+void ElementUseCollector::collectDestructureTupleResultUses(
+    DestructureTupleResult *DTR, unsigned BaseEltNo) {
+
+  // If we're walking into a tuple within a struct or enum, don't adjust the
+  // BaseElt.  The uses hanging off the tuple_element_addr are going to be
+  // counted as uses of the struct or enum itself.
+  if (InStructSubElement || InEnumSubElement)
+    return collectUses(DTR, BaseEltNo);
+
+  assert(!IsSelfOfNonDelegatingInitializer && "self doesn't have tuple type");
+
+  // tuple_element_addr P, 42 indexes into the current tuple element.
+  // Recursively process its uses with the adjusted element number.
+  unsigned FieldNo = DTR->getIndex();
+  auto T = DTR->getParent()->getOperand()->getType();
+  if (T.is<TupleType>()) {
+    for (unsigned i = 0; i != FieldNo; ++i) {
+      SILType EltTy = T.getTupleElementType(i);
+      BaseEltNo += getElementCountRec(Module, EltTy, false);
+    }
+  }
+
+  collectUses(DTR, BaseEltNo);
 }
 
 void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
@@ -1024,8 +1051,15 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Now that we've scalarized some stuff, recurse down into the newly created
     // element address computations to recursively process it.  This can cause
     // further scalarization.
-    for (auto EltPtr : ElementAddrs)
-      collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseEltNo);
+    for (SILValue EltPtr : ElementAddrs) {
+      if (auto *TEAI = dyn_cast<TupleElementAddrInst>(EltPtr)) {
+        collectTupleElementUses(TEAI, BaseEltNo);
+        continue;
+      }
+
+      auto *DTRI = cast<DestructureTupleResult>(EltPtr);
+      collectDestructureTupleResultUses(DTRI, BaseEltNo);
+    }
   }
 }
 

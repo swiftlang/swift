@@ -18,9 +18,9 @@ var gClass = MyClass()
 
 // CHECK-LABEL: sil hidden @_T020tsan_instrumentation17inoutGlobalStructyyF : $@convention(thin) () -> () {
 // CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation7gStructAA02MyC0Vvp : $*MyStruct
-// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutyAA8MyStructVzF : $@convention(thin) (@inout MyStruct) -> ()
 // CHECK:  [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]] : $*MyStruct
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[WRITE]] : $*MyStruct) : $()
+// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutyAA8MyStructVzF : $@convention(thin) (@inout MyStruct) -> ()
 // CHECK:  {{%.*}} = apply [[TAKES_INOUT_FUNC]]([[WRITE]]) : $@convention(thin) (@inout MyStruct) -> ()
 func inoutGlobalStruct() {
   takesInout(&gStruct)
@@ -29,11 +29,11 @@ func inoutGlobalStruct() {
 
 // CHECK-LABEL: sil hidden @_T020tsan_instrumentation31inoutGlobalStructStoredPropertyyyF : $@convention(thin) () -> () {
 // CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation7gStructAA02MyC0Vvp : $*MyStruct
-// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  [[WRITE:%.*]] = begin_access [modify] [dynamic] [[GLOBAL_ADDR]] : $*MyStruct
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[WRITE]] : $*MyStruct) : $()
 // CHECK:  [[ELEMENT_ADDR:%.*]] = struct_element_addr [[WRITE]] : $*MyStruct, #MyStruct.storedProperty
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[ELEMENT_ADDR]] : $*Int) : $()
+// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  {{%.*}} = apply [[TAKES_INOUT_FUNC]]([[ELEMENT_ADDR]]) : $@convention(thin) (@inout Int) -> ()
 func inoutGlobalStructStoredProperty() {
   // This should generate two TSan inout instrumentations; one for the address
@@ -43,15 +43,14 @@ func inoutGlobalStructStoredProperty() {
 
 // CHECK-LABEL: sil hidden @_T020tsan_instrumentation30inoutGlobalClassStoredPropertyyyF : $@convention(thin) () -> () {
 // CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @_T020tsan_instrumentation6gClassAA02MyC0Cvp : $*MyClass
-// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*MyClass
 // CHECK:  [[LOADED_CLASS:%.*]] = load [copy] [[READ]] : $*MyClass
 // CHECK:  [[VALUE_BUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK:  [[TEMPORARY:%.*]] = alloc_stack $Int
 // CHECK:  [[BORROWED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]] : $MyClass
 // CHECK:  [[TEMPORARY_RAW:%.*]] = address_to_pointer [[TEMPORARY]] : $*Int to $Builtin.RawPointer
-// CHECK:  [[MATERIALIZE_FOR_SET:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!materializeForSet.1 : (MyClass) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?), $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed MyClass) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[VALUE_BUFFER]] : $*Builtin.UnsafeValueBuffer) : $()
+// CHECK:  [[MATERIALIZE_FOR_SET:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!materializeForSet.1 : (MyClass) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?), $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed MyClass) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:  [[MATERIALIZE_FOR_SET_TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]([[TEMPORARY_RAW]], [[VALUE_BUFFER]], [[BORROWED_CLASS]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed MyClass) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:  [[TEMPORARY_BUFFER:%.*]] = tuple_extract [[MATERIALIZE_FOR_SET_TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
 // CHECK:  [[OPTIONAL_CALLBACK:%.*]] = tuple_extract [[MATERIALIZE_FOR_SET_TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1
@@ -59,6 +58,7 @@ func inoutGlobalStructStoredProperty() {
 // CHECK:  [[BUFFER_ADDRESS_DEPENDENCE:%.*]] = mark_dependence [[BUFFER_ADDRESS]] : $*Int on [[LOADED_CLASS]] : $MyClass
 // CHECK:  end_borrow [[BORROWED_CLASS]] from [[LOADED_CLASS]] : $MyClass, $MyClass
 // CHECK:  {{%.*}} builtin "tsanInoutAccess"([[BUFFER_ADDRESS_DEPENDENCE]] : $*Int) : $()
+// CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @_T020tsan_instrumentation10takesInoutySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS_DEPENDENCE]]) : $@convention(thin) (@inout Int) -> ()
 func inoutGlobalClassStoredProperty() {
   // This generates two TSan inout instrumentations. One for the value

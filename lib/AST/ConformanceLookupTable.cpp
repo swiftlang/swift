@@ -804,7 +804,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     conformingDC->getAsNominalTypeOrNominalTypeExtensionContext();
 
   // Form the conformance.
-  Type type = entry->getDeclContext()->getDeclaredTypeInContext();
+  Type type = entry->getDeclContext()->getDeclaredInterfaceType();
   ProtocolConformance *conformance;
     ASTContext &ctx = nominal->getASTContext();
   if (entry->getKind() == ConformanceEntryKind::Inherited) {
@@ -828,7 +828,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
                     inheritedConformance->getConcrete());
   } else {
     // Create or find the normal conformance.
-    Type conformingType = conformingDC->getDeclaredTypeInContext();
+    Type conformingType = conformingDC->getDeclaredInterfaceType();
     SourceLoc conformanceLoc
       = conformingNominal == conformingDC
           ? conformingNominal->getLoc()

@@ -23,7 +23,6 @@
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Trivia.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -31,6 +30,7 @@ namespace swift {
 
 namespace syntax {
   struct RawTokenSyntax;
+  struct RawSyntaxInfo;
 }
 
   /// Given a pointer to the starting byte of a UTF8 character, validate it and
@@ -246,7 +246,7 @@ public:
   }
 
   /// Lex a full token including leading and trailing trivia.
-  syntax::RawTokenInfo fullLex();
+  syntax::RawSyntaxInfo fullLex();
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;

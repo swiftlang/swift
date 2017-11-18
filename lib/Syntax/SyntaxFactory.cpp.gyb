@@ -57,6 +57,32 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
   return make<UnknownSyntax>(Raw);
 }
 
+Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+%   if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}: return makeBlank${node.syntax_kind}();
+%   end
+% end
+  default: break;
+  }
+  llvm_unreachable("not collection kind.");
+}
+
+std::pair<unsigned, unsigned>
+SyntaxFactory::countChildren(SyntaxKind Kind){
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+  case SyntaxKind::${node.syntax_kind}:
+% child_count = len(node.children)
+% non_optional_child_count = sum(0 if child.is_optional else 1 for child in node.children)
+    return {${non_optional_child_count}, ${child_count}};
+% end
+  default:
+  llvm_unreachable("bad syntax kind.");
+  }
+}
+
 Optional<Syntax>
 SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
   switch(Kind) {

@@ -181,11 +181,19 @@ public:
   /// Get the function for a SILDeclRef, creating it if necessary.
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
-  
+
+  /// Get the function for a dispatch thunk, creating it if necessary.
+  SILFunction *getDispatchThunk(SILDeclRef constant,
+                                ForDefinition_t forDefinition);
+
+  /// Emit a native Swift class or protocol method dispatch thunk, used for
+  /// resilient method dispatch.
+  SILFunction *emitDispatchThunk(SILDeclRef constant);
+
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
                                CanSILFunctionType constantTy);
-  
+
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
@@ -209,7 +217,6 @@ public:
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(
-                                           GenericEnvironment *genericEnv,
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
@@ -332,13 +339,11 @@ public:
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
   
   /// Emit a protocol witness entry point.
-  SILFunction *emitProtocolWitness(ProtocolConformance *conformance,
-                                   SILLinkage linkage,
-                                   IsSerialized_t isSerialized,
-                                   SILDeclRef requirement,
-                                   SILDeclRef witnessRef,
-                                   IsFreeFunctionWitness_t isFree,
-                                   Witness witness);
+  SILFunction *
+  emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
+                      IsSerialized_t isSerialized, SILDeclRef requirement,
+                      SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree,
+                      Witness witness);
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);

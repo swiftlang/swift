@@ -37,6 +37,12 @@ class SILType;
 
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
+///
+/// The most frequently used method here is mapTypeIntoContext(), which
+/// maps an interface type to a type written in terms of the generic
+/// environment's archetypes; to go in the other direction, use
+/// TypeBase::mapTypeOutOfContext().
+///
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
         : private llvm::TrailingObjects<GenericEnvironment, Type> {
   GenericSignature *Signature = nullptr;
@@ -125,13 +131,6 @@ public:
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(GenericEnvironment *genericEnv,
                                  Type type);
-
-  /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(GenericEnvironment *genericEnv,
-                                  Type type);
-
-  /// Map a contextual type to an interface type.
-  Type mapTypeOutOfContext(Type type) const;
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(Type type) const;

@@ -5,7 +5,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
-// CHECK: [[B:%TSo1BC]] = type
+// CHECK: %TSo1BC = type
 
 import ObjectiveC
 import Foundation
@@ -18,7 +18,7 @@ import ObjCIRExtras
 // CHECK: @"\01L_selector_data(method:separateExtMethod:)" = private global [26 x i8] c"method:separateExtMethod:\00", section "__TEXT,__objc_methname,cstring_literals"
 
 // Instance method invocation
-// CHECK: define hidden swiftcc void @_T07objc_ir15instanceMethodsySo1BCF([[B]]*
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir15instanceMethodsySo1BCF(%TSo1BC*
 func instanceMethods(_ b: B) {
   // CHECK: load i8*, i8** @"\01L_selector(method:withFloat:)"
   // CHECK: call i32 bitcast (void ()* @objc_msgSend to i32
@@ -28,7 +28,7 @@ func instanceMethods(_ b: B) {
   i = i + b.method(1, with: 2.5 as Double)
 }
 
-// CHECK: define hidden swiftcc void @_T07objc_ir16extensionMethodsySo1BC1b_tF
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir16extensionMethodsySo1BC1b_tF
 func extensionMethods(b b: B) {
   // CHECK:      load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
   // CHECK:      [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
@@ -38,18 +38,18 @@ func extensionMethods(b b: B) {
   b.method(1, separateExtMethod:1.5)
 }
 
-// CHECK: define hidden swiftcc void @_T07objc_ir19initCallToAllocInitys5Int32V1i_tF
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir19initCallToAllocInitys5Int32V1i_tF
 func initCallToAllocInit(i i: CInt) {
   // CHECK: call {{.*}} @_T0So1BCSQyABGs5Int32V3int_tcfC
  
   B(int: i)
 }
 
-// CHECK: linkonce_odr hidden {{.*}} @_T0So1BCSQyABGs5Int32V3int_tcfC
+// CHECK-LABEL: linkonce_odr hidden {{.*}} @_T0So1BCSQyABGs5Int32V3int_tcfC
 // CHECK: call [[OPAQUE:%.*]]* @objc_allocWithZone
 
 // Indexed subscripting
-// CHECK: define hidden swiftcc void @_T07objc_ir19indexedSubscriptingySo1BC1b_Si3idxSo1AC1atF
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir19indexedSubscriptingySo1BC1b_Si3idxSo1AC1atF
 func indexedSubscripting(b b: B, idx: Int, a: A) {
   // CHECK: load i8*, i8** @"\01L_selector(setObject:atIndexedSubscript:)", align 8
   b[idx] = a
@@ -58,7 +58,7 @@ func indexedSubscripting(b b: B, idx: Int, a: A) {
   var a2 = b[idx] as! A
 }
 
-// CHECK: define hidden swiftcc void @_T07objc_ir17keyedSubscriptingySo1BC1b_So1AC3idxAG1atF
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir17keyedSubscriptingySo1BC1b_So1AC3idxAG1atF
 func keyedSubscripting(b b: B, idx: A, a: A) {
   // CHECK: load i8*, i8** @"\01L_selector(setObject:forKeyedSubscript:)"
   b[a] = a
@@ -66,20 +66,19 @@ func keyedSubscripting(b b: B, idx: A, a: A) {
   var a2 = b[a] as! A
 }
 
-// CHECK: define hidden swiftcc void @_T07objc_ir14propertyAccessySo1BC1b_tF
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir14propertyAccessySo1BC1b_tF
 func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(counter)"
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
 
-   // CHECK: call %swift.type* @_T0So1BCMa()
-   // CHECK: bitcast %swift.type* {{%.+}} to %objc_class*
+   // CHECK: load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
    // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
    // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
    B.sharedCounter = B.sharedCounter + 1
 }
 
-// CHECK: define hidden swiftcc [[B]]* @_T07objc_ir8downcastSo1BCSo1AC1a_tF(
+// CHECK-LABEL: define hidden swiftcc %TSo1BC* @_T07objc_ir8downcastSo1BCSo1AC1a_tF(
 func downcast(a a: A) -> B {
   // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
   // CHECK: [[T0:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[CLASS]])
@@ -88,12 +87,12 @@ func downcast(a a: A) -> B {
   return a as! B
 }
 
-// CHECK: define hidden swiftcc void @_T07objc_ir19almostSubscriptableySo06AlmostD0C3as1_So1AC1atF
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir19almostSubscriptableySo06AlmostD0C3as1_So1AC1atF
 func almostSubscriptable(as1 as1: AlmostSubscriptable, a: A) {
   as1.objectForKeyedSubscript(a)
 }
 
-// CHECK: define hidden swiftcc void @_T07objc_ir13protocolTypesySo7NSMinceC1a_So9NSRuncing_p1btF(%TSo7NSMinceC*, %objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @_T07objc_ir13protocolTypesySo7NSMinceC1a_So9NSRuncing_p1btF(%TSo7NSMinceC*, %objc_object*) {{.*}} {
 func protocolTypes(a a: NSMince, b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
   a.eat(with: b)

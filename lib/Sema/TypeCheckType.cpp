@@ -458,6 +458,14 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
     }  
   }
 
+  // Cannot extend a bound generic type.
+  if (options.contains(TR_ExtensionBinding)) {
+    diagnose(loc, diag::extension_specialization,
+             genericDecl->getName())
+      .highlight(generic->getSourceRange());
+    return ErrorType::get(Context);
+  }
+
   // FIXME: More principled handling of circularity.
   if (!genericDecl->hasValidSignature()) {
     diagnose(loc, diag::recursive_type_reference,
@@ -501,6 +509,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   options -= TR_FunctionInput;
   options -= TR_TypeAliasUnderlyingType;
   options -= TR_AllowUnavailableProtocol;
+  options -= TR_AllowIUO;
 
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
@@ -675,22 +684,26 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             UnsatisfiedDependency *unsatisfiedDependency) {
   assert(fromDC && "No declaration context for type resolution?");
 
-  // If we have a callback to report dependencies, do so.
-  if (unsatisfiedDependency) {
-    if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
-      return nullptr;
-  } else {
-    // Validate the declaration.
-    TC.validateDeclForNameLookup(typeDecl);
-  }
+  // Don't validate nominal type declarations during extension binding.
+  if (!options.contains(TR_ExtensionBinding) ||
+      !isa<NominalTypeDecl>(typeDecl)) {
+    // If we have a callback to report dependencies, do so.
+    if (unsatisfiedDependency) {
+      if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
+        return nullptr;
+    } else {
+      // Validate the declaration.
+      TC.validateDeclForNameLookup(typeDecl);
+    }
 
-  // If we didn't bail out with an unsatisfiedDependency,
-  // and were not able to validate recursively, bail out.
-  if (!typeDecl->hasInterfaceType()) {
-    TC.diagnose(loc, diag::recursive_type_reference,
-                typeDecl->getDescriptiveKind(), typeDecl->getName());
-    TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
-    return ErrorType::get(TC.Context);
+    // If we didn't bail out with an unsatisfiedDependency,
+    // and were not able to validate recursively, bail out.
+    if (!typeDecl->hasInterfaceType()) {
+      TC.diagnose(loc, diag::recursive_type_reference,
+                  typeDecl->getDescriptiveKind(), typeDecl->getName());
+      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
+      return ErrorType::get(TC.Context);
+    }
   }
 
   // Resolve the type declaration to a specific type. How this occurs
@@ -1180,6 +1193,63 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return ErrorType::get(TC.Context);
   }
 
+  // Emit a warning about directly spelling
+  // ImplicitlyUnwrappedOptional rather than using a trailing '!'.
+  auto *IUODecl = TC.Context.getImplicitlyUnwrappedOptionalDecl();
+  if (currentDecl == IUODecl) {
+    if (options.contains(TR_AllowIUO)) {
+      if (isa<GenericIdentTypeRepr>(comp)) {
+        auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
+        assert(genericTyR->getGenericArgs().size() == 1);
+        auto *genericArgTyR = genericTyR->getGenericArgs()[0];
+
+        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated_with_fixit;
+
+        // For Swift 5 and later, spelling the full name is an error.
+        if (TC.Context.isSwiftVersionAtLeast(5))
+          diag = diag::implicitly_unwrapped_optional_spelling_error_with_fixit;
+
+        TC.diagnose(comp->getStartLoc(), diag)
+          .fixItRemoveChars(
+              genericTyR->getStartLoc(),
+              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
+          .fixItInsertAfter(genericArgTyR->getEndLoc(), "!")
+          .fixItRemoveChars(
+              genericTyR->getAngleBrackets().End,
+              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
+      } else {
+        Diagnostic diag = diag::implicitly_unwrapped_optional_spelling_deprecated;
+
+        // For Swift 5 and later, spelling the full name is an error.
+        if (TC.Context.isSwiftVersionAtLeast(5))
+          diag = diag::implicitly_unwrapped_optional_spelling_error;
+
+        TC.diagnose(comp->getStartLoc(), diag);
+      }
+    } else if (TC.Context.isSwiftVersionAtLeast(5)) {
+      if (isa<GenericIdentTypeRepr>(comp)) {
+        auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
+        assert(genericTyR->getGenericArgs().size() == 1);
+        auto *genericArgTyR = genericTyR->getGenericArgs()[0];
+
+        TC.diagnose(comp->getStartLoc(), diag::iuo_in_illegal_position)
+          .fixItRemoveChars(
+              genericTyR->getStartLoc(),
+              genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
+          .fixItInsertAfter(genericArgTyR->getEndLoc(), "?")
+          .fixItRemoveChars(
+              genericTyR->getAngleBrackets().End,
+              genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
+      } else {
+        TC.diagnose(comp->getStartLoc(), diag::iuo_in_illegal_position);
+      }
+    } else {
+      // Pre-Swift-5 warning for spelling ImplicitlyUnwrappedOptional
+      // in places we shouldn't even allow it.
+      TC.diagnose(comp->getStartLoc(), diag::implicitly_unwrapped_optional_spelling_deprecated);
+    }
+  }
+
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
@@ -1582,8 +1652,12 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
   if (Loc.getType().isNull()) {
-    // Raise error if we parse an IUO type in an illegal position.
-    checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
+    // Swift version < 5? Use the old "illegal IUO" check for
+    // backwards compatibiliy.
+    if (!Context.isSwiftVersionAtLeast(5)) {
+      // Raise error if we parse an IUO type in an illegal position.
+      checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
+    }
 
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
@@ -1642,16 +1716,23 @@ namespace {
                                   = FunctionType::ExtInfo());
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
+                                SILCoroutineKind coroutineKind
+                                  = SILCoroutineKind::None,
                                 SILFunctionType::ExtInfo extInfo
                                   = SILFunctionType::ExtInfo(),
                                 ParameterConvention calleeConvention
-                                  = DefaultParameterConvention);
+                                  = DefaultParameterConvention,
+                                TypeRepr *witnessmethodProtocol = nullptr);
     SILParameterInfo resolveSILParameter(TypeRepr *repr,
                                          TypeResolutionOptions options);
+    SILYieldInfo resolveSILYield(TypeAttributes &remainingAttrs,
+                                 TypeRepr *repr, TypeResolutionOptions options);
     bool resolveSILResults(TypeRepr *repr, TypeResolutionOptions options,
+                           SmallVectorImpl<SILYieldInfo> &yields,
                            SmallVectorImpl<SILResultInfo> &results,
                            Optional<SILResultInfo> &errorResult);
     bool resolveSingleSILResult(TypeRepr *repr, TypeResolutionOptions options,
+                                SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &results,
                                 Optional<SILResultInfo> &errorResult);
     Type resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
@@ -1909,7 +1990,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_noreturn, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_escaping
+    TAK_escaping, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -1955,6 +2036,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     // Fall through to diagnose below.
   } else if (hasFunctionAttr && (options & TR_SILType)) {
     SILFunctionType::Representation rep;
+    TypeRepr *witnessMethodProtocol = nullptr;
+
+    auto coroutineKind = SILCoroutineKind::None;
+    if (attrs.has(TAK_yield_once)) {
+      coroutineKind = SILCoroutineKind::YieldOnce;
+    } else if (attrs.has(TAK_yield_many)) {
+      coroutineKind = SILCoroutineKind::YieldMany;
+    }
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
@@ -1970,18 +2059,20 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (!attrs.hasConvention()) {
       rep = SILFunctionType::Representation::Thick;
     } else {
+      auto convention = attrs.getConvention();
       // SIL exposes a greater number of conventions than Swift source.
       auto parsedRep =
-      llvm::StringSwitch<Optional<SILFunctionType::Representation>>
-      (attrs.getConvention())
-      .Case("thick", SILFunctionType::Representation::Thick)
-      .Case("block", SILFunctionType::Representation::Block)
-      .Case("thin", SILFunctionType::Representation::Thin)
-      .Case("c", SILFunctionType::Representation::CFunctionPointer)
-      .Case("method", SILFunctionType::Representation::Method)
-      .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
-      .Case("witness_method", SILFunctionType::Representation::WitnessMethod)
-      .Default(None);
+          llvm::StringSwitch<Optional<SILFunctionType::Representation>>(
+              convention)
+              .Case("thick", SILFunctionType::Representation::Thick)
+              .Case("block", SILFunctionType::Representation::Block)
+              .Case("thin", SILFunctionType::Representation::Thin)
+              .Case("c", SILFunctionType::Representation::CFunctionPointer)
+              .Case("method", SILFunctionType::Representation::Method)
+              .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
+              .Case("witness_method",
+                    SILFunctionType::Representation::WitnessMethod)
+              .Default(None);
       if (!parsedRep) {
         TC.diagnose(attrs.getLoc(TAK_convention),
                     diag::unsupported_sil_convention, attrs.getConvention());
@@ -1989,13 +2080,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       } else {
         rep = *parsedRep;
       }
+
+      if (rep == SILFunctionType::Representation::WitnessMethod) {
+        auto protocolName = *attrs.conventionWitnessMethodProtocol;
+        witnessMethodProtocol = new (TC.Context) SimpleIdentTypeRepr(
+            SourceLoc(), TC.Context.getIdentifier(protocolName));
+      }
     }
 
     // Resolve the function type directly with these attributes.
     SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                      attrs.has(TAK_noescape));
 
-    ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
+    ty = resolveSILFunctionType(fnRepr, options, coroutineKind,
+                                extInfo, calleeConvention,
+                                witnessMethodProtocol);
     if (!ty || ty->hasError()) return ty;
   } else if (hasFunctionAttr) {
     FunctionType::Representation rep = FunctionType::Representation::Swift;
@@ -2186,6 +2285,11 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_TypeAliasUnderlyingType;
+  // FIXME: Until we remove the IUO type from the type system, we
+  // need to continue to parse IUOs in SIL tests so that we can
+  // match the types we generate from the importer.
+  if (!options.contains(TR_SILMode))
+    options -= TR_AllowIUO;
 
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
@@ -2242,8 +2346,8 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
-    inputTy = genericEnv->mapTypeOutOfContext(inputTy);
-    outputTy = genericEnv->mapTypeOutOfContext(outputTy);
+    inputTy = inputTy->mapTypeOutOfContext();
+    outputTy = outputTy->mapTypeOutOfContext();
     return GenericFunctionType::get(genericEnv->getGenericSignature(),
                                     inputTy, outputTy, extInfo);
   }
@@ -2302,7 +2406,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
     
     for (auto &field : fields) {
-      auto transTy = genericEnv->mapTypeOutOfContext(field.getLoweredType());
+      auto transTy = field.getLoweredType()->mapTypeOutOfContext();
       field = {transTy->getCanonicalType(), field.isMutable()};
     }
   }
@@ -2353,8 +2457,10 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
+                                          SILCoroutineKind coroutineKind,
                                           SILFunctionType::ExtInfo extInfo,
-                                          ParameterConvention callee) {
+                                          ParameterConvention callee,
+                                          TypeRepr *witnessMethodProtocol) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_TypeAliasUnderlyingType;
@@ -2364,6 +2470,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // Resolve parameter and result types using the function's generic
   // environment.
   SmallVector<SILParameterInfo, 4> params;
+  SmallVector<SILYieldInfo, 4> yields;
   SmallVector<SILResultInfo, 4> results;
   Optional<SILResultInfo> errorResult;
   {
@@ -2412,8 +2519,15 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     {
       // FIXME: Deal with unsatisfied dependencies.
-      if (resolveSILResults(repr->getResultTypeRepr(), options,
+      if (resolveSILResults(repr->getResultTypeRepr(), options, yields,
                             results, errorResult)) {
+        hasError = true;
+      }
+
+      // Diagnose non-coroutines that declare yields.
+      if (coroutineKind == SILCoroutineKind::None && !yields.empty()) {
+        TC.diagnose(repr->getResultTypeRepr()->getLoc(),
+                    diag::sil_non_coro_yields);
         hasError = true;
       }
     }
@@ -2426,38 +2540,81 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   // FIXME: Remap the parsed context types to interface types.
   CanGenericSignature genericSig;
   SmallVector<SILParameterInfo, 4> interfaceParams;
+  SmallVector<SILYieldInfo, 4> interfaceYields;
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
-      auto transParamType = genericEnv->mapTypeOutOfContext(
-          param.getType())->getCanonicalType();
+      auto transParamType = param.getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
+    for (auto &yield : yields) {
+      auto transYieldType = yield.getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
+      interfaceYields.push_back(yield.getWithType(transYieldType));
+    }
     for (auto &result : results) {
-      auto transResultType = genericEnv->mapTypeOutOfContext(
-          result.getType())->getCanonicalType();
+      auto transResultType = result.getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
       interfaceResults.push_back(result.getWithType(transResultType));
     }
 
     if (errorResult) {
-      auto transErrorResultType = genericEnv->mapTypeOutOfContext(
-          errorResult->getType())->getCanonicalType();
+      auto transErrorResultType = errorResult->getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }
   } else {
     interfaceParams = params;
+    interfaceYields = yields;
     interfaceResults = results;
     interfaceErrorResult = errorResult;
   }
-  return SILFunctionType::get(genericSig, extInfo,
+  Optional<ProtocolConformanceRef> witnessMethodConformance;
+  if (witnessMethodProtocol) {
+    auto resolved = resolveType(witnessMethodProtocol, options);
+    if (resolved->hasError())
+      return resolved;
+
+    auto protocolType = resolved->getAs<ProtocolType>();
+    if (!protocolType)
+      return ErrorType::get(Context);
+
+    Type selfType = params.back().getType();
+    // The Self type can be nested in a few layers of metatypes (etc.), e.g. for
+    // a mutable static variable the materializeForSet currently has its last
+    // argument as a Self.Type.Type metatype.
+    while (1) {
+      auto next = selfType->getRValueInstanceType();
+      if (next->isEqual(selfType))
+        break;
+      selfType = next;
+    }
+
+    witnessMethodConformance = TC.conformsToProtocol(
+        selfType, protocolType->getDecl(), DC, ConformanceCheckOptions());
+    assert(witnessMethodConformance &&
+           "found witness_method without matching conformance");
+  }
+
+  return SILFunctionType::get(genericSig, extInfo, coroutineKind,
                               callee,
-                              interfaceParams, interfaceResults,
-                              interfaceErrorResult,
-                              Context);
+                              interfaceParams, interfaceYields,
+                              interfaceResults, interfaceErrorResult,
+                              Context, witnessMethodConformance);
+}
+
+SILYieldInfo TypeResolver::resolveSILYield(TypeAttributes &attrs,
+                                           TypeRepr *repr,
+                                           TypeResolutionOptions options) {
+  AttributedTypeRepr attrRepr(attrs, repr);
+  SILParameterInfo paramInfo =
+    resolveSILParameter(&attrRepr, options | TR_ImmediateFunctionInput);
+  return SILYieldInfo(paramInfo.getType(), paramInfo.getConvention());
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(
@@ -2471,6 +2628,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
+
     auto checkFor = [&](TypeAttrKind tak, ParameterConvention attrConv) {
       if (!attrs.has(tak)) return;
       if (convention != DefaultParameterConvention) {
@@ -2513,6 +2671,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
 bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
                                           TypeResolutionOptions options,
+                                          SmallVectorImpl<SILYieldInfo> &yields,
                               SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                        Optional<SILResultInfo> &errorResult) {
   Type type;
@@ -2522,6 +2681,19 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     // Copy the attributes out; we're going to destructively modify them.
     auto attrs = attrRepr->getAttrs();
+
+    // Recognize @yields.
+    if (attrs.has(TypeAttrKind::TAK_yields)) {
+      attrs.clearAttribute(TypeAttrKind::TAK_yields);
+
+      // The treatment from this point on is basically completely different.
+      auto yield = resolveSILYield(attrs, attrRepr->getTypeRepr(), options);
+      if (yield.getType()->hasError())
+        return true;
+
+      yields.push_back(yield);
+      return false;
+    }
 
     // Recognize @error.
     if (attrs.has(TypeAttrKind::TAK_error)) {
@@ -2590,6 +2762,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
 
 bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                      TypeResolutionOptions options,
+                                SmallVectorImpl<SILYieldInfo> &yields,
                                 SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                 Optional<SILResultInfo> &errorResult) {
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
@@ -2599,13 +2772,15 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
         TC.diagnose(element.UnderscoreLoc, diag::sil_function_output_label);
     }
     for (auto elt : tuple->getElements()) {
-      if (resolveSingleSILResult(elt.Type, options, ordinaryResults, errorResult))
+      if (resolveSingleSILResult(elt.Type, options,
+                                 yields, ordinaryResults, errorResult))
         hadError = true;
     }
     return hadError;
   }
 
-  return resolveSingleSILResult(repr, options, ordinaryResults, errorResult);
+  return resolveSingleSILResult(repr, options,
+                                yields, ordinaryResults, errorResult);
 }
 
 Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
@@ -2713,6 +2888,15 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
+
+  // Swift version >= 5? Use the newer check for IUOs appearing in
+  // illegal positions.
+  if (TC.Context.isSwiftVersionAtLeast(5) && !options.contains(TR_AllowIUO)) {
+    TC.diagnose(repr->getStartLoc(), diag::iuo_in_illegal_position)
+      .fixItReplace(repr->getExclamationLoc(), "?");
+    return ErrorType::get(Context);
+  }
+
   auto elementOptions = withoutContext(options, true);
   elementOptions |= TR_ImmediateOptionalTypeArgument;
 
@@ -2739,6 +2923,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   // ImmediateFunctionInput marker and install a FunctionInput one instead.
   auto elementOptions = options;
   if (repr->isParenType()) {
+    // We also want to disallow IUO within even a paren.
+    elementOptions -= TR_AllowIUO;
+
     // If we have a single ParenType, don't clear the context bits; we
     // still want to parse the type contained therein as if it were in
     // parameter position, meaning function types are not @escaping by

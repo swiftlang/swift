@@ -528,7 +528,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     return false;
   }
 
-  if (!F->shouldOptimize()) {
+  // Mandatory inlining does class method devirtualization. I'm not sure if this
+  // is really needed, but some test rely on this.
+  // So even for Onone functions we have to do it if the SILStage is raw.
+  if (F->getModule().getStage() != SILStage::Raw && !F->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
     DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
                        << " because it is marked no-opt: " << F->getName()
@@ -712,48 +715,6 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //                        Witness Method Optimization
 //===----------------------------------------------------------------------===//
 
-static SubstitutionMap
-getSubstitutionsForProtocolConformance(ModuleDecl *M,
-                                       ProtocolConformanceRef CRef) {
-  auto C = CRef.getConcrete();
-
-  // Walk down to the base NormalProtocolConformance.
-  SubstitutionList Subs;
-  const ProtocolConformance *ParentC = C;
-  while (!isa<NormalProtocolConformance>(ParentC)) {
-    switch (ParentC->getKind()) {
-    case ProtocolConformanceKind::Normal:
-      llvm_unreachable("should have exited the loop?!");
-    case ProtocolConformanceKind::Inherited:
-      ParentC = cast<InheritedProtocolConformance>(ParentC)
-        ->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized: {
-      auto SC = cast<SpecializedProtocolConformance>(ParentC);
-      ParentC = SC->getGenericConformance();
-      assert(Subs.empty() && "multiple conformance specializations?!");
-      Subs = SC->getGenericSubstitutions();
-      break;
-    }
-    }
-  }
-  const NormalProtocolConformance *NormalC
-    = cast<NormalProtocolConformance>(ParentC);
-
-  // If the normal conformance is for a generic type, and we didn't hit a
-  // specialized conformance, collect the substitutions from the generic type.
-  // FIXME: The AST should do this for us.
-  if (!NormalC->getType()->isSpecialized())
-    return SubstitutionMap();
-
-  if (Subs.empty()) {
-    auto *DC = NormalC->getDeclContext();
-    return NormalC->getType()->getContextSubstitutionMap(M, DC);
-  }
-
-  return NormalC->getGenericSignature()->getSubstitutionMap(Subs);
-}
-
 /// Compute substitutions for making a direct call to a SIL function with
 /// @convention(witness_method) convention.
 ///
@@ -823,7 +784,7 @@ getWitnessMethodSubstitutions(
 
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
-  auto baseSubMap = getSubstitutionsForProtocolConformance(mod, conformanceRef);
+  auto baseSubMap = conformance->getSubstitutions(mod);
 
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootNormalConformance();

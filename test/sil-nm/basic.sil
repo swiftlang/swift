@@ -29,7 +29,7 @@ bb0(%0 : $C):
 }
 
 // CHECK: F defaultA
-sil [serialized] @defaultA : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+sil [serialized] @defaultA : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
   return %result : $()

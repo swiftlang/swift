@@ -328,20 +328,24 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
+    if (!PAI->hasCalleeGuaranteedContext())
+      Builder.createStrongRelease(AI.getLoc(), PAI,
+                                  Builder.getDefaultAtomicity());
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
+    if (!PAI->hasCalleeGuaranteedContext())
+      Builder.emitDestroyValueOperation(PAI->getLoc(), PAI);
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
+    if (!PAI->hasCalleeGuaranteedContext())
+      Builder.emitDestroyValueOperation(PAI->getLoc(), PAI);
   }
 
   if (auto apply = dyn_cast<ApplyInst>(AI))
@@ -384,7 +388,7 @@ SILInstruction *PartialApplyCombiner::combine() {
       auto ConvertCalleeTy = CFI->getType().castTo<SILFunctionType>();
       auto EscapingCalleeTy = Lowering::adjustFunctionType(
           ConvertCalleeTy, ConvertCalleeTy->getExtInfo().withNoEscape(false),
-          ConvertCalleeTy->getCalleeConvention());
+          ConvertCalleeTy->getWitnessMethodConformanceOrNone());
       if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
         Uses.append(CFI->getUses().begin(), CFI->getUses().end());
 
@@ -485,13 +489,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
-    } else if (SILType::canRefCast(OldOpType, NewOpType, AI.getModule())) {
-      auto URC = Builder.createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
+    } else if (OldOpType.getSwiftRValueType() != NewOpType.getSwiftRValueType()) {
+      auto URC = Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
-      assert((!OldOpType.isHeapObjectReferenceType()
-              && !NewOpType.isHeapObjectReferenceType()) &&
-             "ref argument types should map to refs.");
       Args.push_back(Op);
     }
   }

@@ -1,7 +1,7 @@
 @import Foundation;
 @import CoreFoundation;
 
-typedef NSString *__nonnull SNTErrorDomain __attribute((swift_newtype(struct)))
+typedef NSString *_Nonnull SNTErrorDomain __attribute((swift_newtype(struct)))
 __attribute((swift_name("ErrorDomain")));
 
 extern void SNTErrorDomainProcess(SNTErrorDomain d)
@@ -19,7 +19,7 @@ extern const SNTErrorDomain SNTFive
 extern const SNTErrorDomain SNTElsewhere
     __attribute((swift_name("Food.err")));
 
-typedef NSString *__nullable SNTClosedEnum __attribute((swift_newtype(enum)))
+typedef NSString *_Nullable SNTClosedEnum __attribute((swift_newtype(enum)))
 __attribute((swift_name("ClosedEnum")));
 
 extern const SNTClosedEnum SNTFirstClosedEntryEnum;
@@ -83,16 +83,16 @@ extern MyABIOldType getMyABIOldType(void);
 extern void takeMyABINewType(MyABINewType);
 extern void takeMyABIOldType(MyABIOldType);
 
-extern void takeMyABINewTypeNonNull(__nonnull MyABINewType);
-extern void takeMyABIOldTypeNonNull(__nonnull MyABIOldType);
+extern void takeMyABINewTypeNonNull(_Nonnull MyABINewType);
+extern void takeMyABIOldTypeNonNull(_Nonnull MyABIOldType);
 _Pragma("clang arc_cf_code_audited end")
 
 typedef NSString *MyABINewTypeNS __attribute((swift_newtype(struct)));
 typedef NSString *MyABIOldTypeNS;
 extern MyABINewTypeNS getMyABINewTypeNS(void);
 extern MyABIOldTypeNS getMyABIOldTypeNS(void);
-extern void takeMyABINewTypeNonNullNS(__nonnull MyABINewTypeNS);
-extern void takeMyABIOldTypeNonNullNS(__nonnull MyABIOldTypeNS);
+extern void takeMyABINewTypeNonNullNS(_Nonnull MyABINewTypeNS);
+extern void takeMyABIOldTypeNonNullNS(_Nonnull MyABIOldTypeNS);
 
 // Nested types
 typedef struct {int i;} NSSomeContext;

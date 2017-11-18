@@ -1414,8 +1414,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
-        if (OI.ShouldGenerateModule) {
-          // When generating a .swiftmodule, treat .swiftmodule files as
+        if (OI.ShouldGenerateModule && !OI.shouldLink()) {
+          // When generating a .swiftmodule as a top-level output (as opposed
+          // to, for example, linking an image), treat .swiftmodule files as
           // inputs to a MergeModule action.
           AllModuleInputs.push_back(Current);
           break;
@@ -1453,6 +1454,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case types::TY_ImportedModules:
       case types::TY_TBD:
       case types::TY_ModuleTrace:
+      case types::TY_OptRecord:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -1738,6 +1740,7 @@ static StringRef getOutputFilename(Compilation &C,
                                    const JobAction *JA,
                                    const OutputInfo &OI,
                                    const TypeToPathMap *OutputMap,
+                                   const llvm::Triple &Triple,
                                    const llvm::opt::DerivedArgList &Args,
                                    bool AtTopLevel,
                                    StringRef BaseInput,
@@ -1826,10 +1829,17 @@ static StringRef getOutputFilename(Compilation &C,
       BaseName = llvm::sys::path::stem(BaseInput);
     if (auto link = dyn_cast<LinkJobAction>(JA)) {
       if (link->getKind() == LinkKind::DynamicLibrary) {
-        // FIXME: This should be target-specific.
-        Buffer = "lib";
+        if (Triple.isOSWindows())
+          Buffer = "";
+        else
+          Buffer = "lib";
         Buffer.append(BaseName);
-        Buffer.append(LTDL_SHLIB_EXT);
+        if (Triple.isOSDarwin())
+          Buffer.append(".dylib");
+        else if (Triple.isOSWindows())
+          Buffer.append(".dll");
+        else
+          Buffer.append(".so");
         return Buffer.str();
       }
     }
@@ -2042,9 +2052,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
         OMForInput = OFM->getOutputMapForInput(Input);
-      
-      OutputFile = getOutputFilename(C, JA, OI, OMForInput, C.getArgs(),
-                                     AtTopLevel, Input, InputJobs,
+
+      OutputFile = getOutputFilename(C, JA, OI, OMForInput, TC.getTriple(),
+                                     C.getArgs(), AtTopLevel, Input, InputJobs,
                                      Diags, Buf);
       Output->addPrimaryOutput(OutputFile, Input);
     };
@@ -2060,9 +2070,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     }
   } else {
     // The common case: there is a single output file.
-    OutputFile = getOutputFilename(C, JA, OI, OutputMap, C.getArgs(),
-                                   AtTopLevel, BaseInput, InputJobs,
-                                   Diags, Buf);
+    OutputFile = getOutputFilename(C, JA, OI, OutputMap, TC.getTriple(),
+                                   C.getArgs(), AtTopLevel, BaseInput,
+                                   InputJobs, Diags, Buf);
     Output->addPrimaryOutput(OutputFile, BaseInput);
   }
 
@@ -2234,6 +2244,19 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
         Output->setAdditionalOutputForType(types::TY_TBD, filename);
       }
     }
+  }
+
+  if (C.getArgs().hasArg(options::OPT_save_optimization_record,
+                         options::OPT_save_optimization_record_path)) {
+    if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+      auto filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+          OI, C.getArgs(), options::OPT_save_optimization_record_path,
+          types::TY_OptRecord, /*TreatAsTopLevelOutput=*/true, "opt.yaml", Buf);
+
+      Output->setAdditionalOutputForType(types::TY_OptRecord, filename);
+    } else
+      // FIXME: We should use the OutputMap in this case.
+      Diags.diagnose({}, diag::warn_opt_remark_disabled);
   }
 
   // Choose the Objective-C header output path.

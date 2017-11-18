@@ -22,21 +22,21 @@ func call_me(_ code: @escaping () -> Void)
 }
 
 func main(_ x: Int64) -> Void
-// CHECK: define hidden {{.*}} void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: define hidden {{.*}} void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
 {
     var my_class = MyClass(input: 10)
 // Linetable continuity. Don't go into the closure expression.
 // ASM-CHECK: .loc [[FILEID:[0-9]]] [[@LINE+1]] 5
     call_me (
 // ASM-CHECK-NOT: .loc [[FILEID]] [[@LINE+1]] 5
-// CHECK: define {{.*}} @_T09linetable4mainys5Int64VFyycfU_Tf2in_n({{.*}})
+// CHECK-LABEL: define {{.*}} @_T09linetable4mainys5Int64VFyycfU_Tf2in_n({{.*}})
         {
             var result = my_class.do_something(x)
             markUsed(result)
 // CHECK: call {{.*}} @swift_rt_swift_release {{.*}}
 // CHECK: bitcast
 // CHECK: llvm.lifetime.end
-// CHECK: call {{.*}} @swift_rt_swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
+// CHECK: call {{.*}}llvm.lifetime.end{{.*}}, !dbg ![[CLOSURE_END:.*]]
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
 // CHECK: ![[CLOSURE_END]] = !DILocation(line: [[@LINE+1]],
         }

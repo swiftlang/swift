@@ -1166,8 +1166,8 @@ public protocol KeyedDecodingContainerProtocol {
 
 // An implementation of _KeyedDecodingContainerBase and _KeyedDecodingContainerBox are given at the bottom of this file.
 
-/// A concrete container that provides a view into an decoder's storage, making
-/// the encoded properties of an decodable type accessible by keys.
+/// A concrete container that provides a view into a decoder's storage, making
+/// the encoded properties of a decodable type accessible by keys.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct KeyedDecodingContainer<K : CodingKey> : KeyedDecodingContainerProtocol {
     public typealias Key = K
@@ -2307,7 +2307,8 @@ public protocol SingleValueEncodingContainer {
     mutating func encode<T : Encodable>(_ value: T) throws
 }
 
-/// A `SingleValueDecodingContainer` is a container which can support the storage and direct decoding of a single non-keyed value.
+/// A container that can support the storage and direct decoding of a single
+/// nonkeyed value.
 public protocol SingleValueDecodingContainer {
     /// The path of coding keys taken to get to this point in encoding.
     var codingPath: [CodingKey] { get }

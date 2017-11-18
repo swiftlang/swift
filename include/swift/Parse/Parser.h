@@ -25,8 +25,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Syntax/RawTokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
@@ -55,6 +53,14 @@ namespace swift {
   
   struct EnumElementInfo;
   
+  namespace syntax {
+    class AbsolutePosition;
+    class SyntaxParsingContext;
+    struct RawSyntaxInfo;
+    struct RawTokenSyntax;
+    enum class SyntaxKind;
+  }// end of syntax namespace
+
   /// Different contexts in which BraceItemList are parsed.
   enum class BraceItemListKind {
     /// A statement list terminated by a closing brace. The default.
@@ -411,12 +417,7 @@ public:
     BacktrackingScope(Parser &P)
       : P(P), PP(P.getParserPosition()), DT(P.Diags) {}
 
-    ~BacktrackingScope() {
-      if (Backtrack) {
-        P.backtrackToPosition(PP);
-        DT.abort();
-      }
-    }
+    ~BacktrackingScope();
 
     void cancelBacktrack() {
       Backtrack = false;
@@ -669,6 +670,7 @@ public:
   /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
+                         syntax::SyntaxKind Kind,
                          std::function<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
@@ -1242,7 +1244,8 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
+                                   syntax::SyntaxKind Kind);
 
   /// Parse an expression list, keeping all of the pieces separated.
   ParserStatus parseExprList(tok leftTok, tok rightTok,
@@ -1253,7 +1256,8 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             Expr *&trailingClosure);
+                             Expr *&trailingClosure,
+                             syntax::SyntaxKind Kind);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 
@@ -1271,10 +1275,8 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc,
-                                    ParserResult<Expr> FirstExpr);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc,
-                                         ParserResult<Expr> FirstKey);
+  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
@@ -1429,7 +1431,7 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
 void populateTokenSyntaxMap(const LangOptions &LangOpts,
                             const SourceManager &SM,
                             unsigned BufferID,
-                            std::vector<syntax::RawTokenInfo> &Result);
+                            std::vector<syntax::RawSyntaxInfo> &Result);
 } // end namespace swift
 
 #endif

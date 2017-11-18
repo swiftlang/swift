@@ -296,15 +296,18 @@ public:
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
 
-  enum ActionType {
-    NoneAction, ///< No specific action
-    Parse, ///< Parse only
-    Typecheck, ///< Parse and type-check only
-    DumpParse, ///< Parse only and dump AST
+  /// The module for which we should verify all of the generic signatures.
+  std::string VerifyGenericSignaturesInModule;
+
+  enum class ActionType {
+    NoneAction,        ///< No specific action
+    Parse,             ///< Parse only
+    Typecheck,         ///< Parse and type-check only
+    DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
-    EmitSyntax, ///< Parse and dump Syntax tree as JSON
-    DumpAST, ///< Parse, type-check, and dump AST
-    PrintAST, ///< Parse, type-check, and pretty-print AST
+    EmitSyntax,        ///< Parse and dump Syntax tree as JSON
+    DumpAST,           ///< Parse, type-check, and dump AST
+    PrintAST,          ///< Parse, type-check, and pretty-print AST
 
     /// Parse and dump scope map.
     DumpScopeMaps,
@@ -313,30 +316,30 @@ public:
     DumpTypeRefinementContexts,
 
     EmitImportedModules, ///< Emit the modules that this one imports
-    EmitPCH, ///< Emit PCH of imported bridging header
+    EmitPCH,             ///< Emit PCH of imported bridging header
 
     EmitSILGen, ///< Emit raw SIL
-    EmitSIL, ///< Emit canonical SIL
+    EmitSIL,    ///< Emit canonical SIL
 
     EmitModuleOnly, ///< Emit module only
-    MergeModules, ///< Merge modules only
+    MergeModules,   ///< Merge modules only
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
-    EmitSIB, ///< Emit serialized AST + canonical SIL
+    EmitSIB,    ///< Emit serialized AST + canonical SIL
 
     Immediate, ///< Immediate mode
-    REPL, ///< REPL mode
+    REPL,      ///< REPL mode
 
     EmitAssembly, ///< Emit assembly
-    EmitIR, ///< Emit LLVM IR
-    EmitBC, ///< Emit LLVM BC
-    EmitObject, ///< Emit object file
+    EmitIR,       ///< Emit LLVM IR
+    EmitBC,       ///< Emit LLVM BC
+    EmitObject,   ///< Emit object file
   };
 
-  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
 
   /// Indicates the action the user requested that the frontend perform.
-  ActionType RequestedAction = NoneAction;
+  ActionType RequestedAction = ActionType::NoneAction;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;

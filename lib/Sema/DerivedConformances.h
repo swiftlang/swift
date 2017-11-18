@@ -185,9 +185,6 @@ declareDerivedReadOnlyProperty(TypeChecker &tc,
 /// Build a reference to the 'self' decl of a derived function.
 DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);
 
-/// Copy access from the source decl to the destination decl.
-void copyFormalAccess(ValueDecl *dest, ValueDecl *source);
-
 }
   
 }

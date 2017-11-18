@@ -334,13 +334,13 @@ extension Gizmo {
   }
 
   // CHECK-LABEL: sil hidden @_T0So5GizmoC7dynamicE{{[_0-9a-zA-Z]*}}fC
-  // CHECK:         objc_method {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
+  // CHECK:         objc_method {{%.*}} : $@objc_metatype Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassFactory x: Int) {
     self.init(stuff: x)
   }
 
   // CHECK-LABEL: sil hidden @_T0So5GizmoC7dynamicE{{[_0-9a-zA-Z]*}}fC
-  // CHECK:         objc_method {{%.*}} : $@thick Gizmo.Type, #Gizmo.init!allocator.1.foreign
+  // CHECK:         objc_method {{%.*}} : $@objc_metatype Gizmo.Type, #Gizmo.init!allocator.1.foreign
   convenience init(foreignClassExactFactory x: Int) {
     self.init(exactlyStuff: x)
   }
@@ -424,8 +424,8 @@ func dynamicExtensionMethods(_ obj: ObjCOtherFile) {
   // CHECK: objc_method {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.extensionProp!getter.1.foreign
   _ = obj.extensionProp
 
-  // CHECK: objc_method {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.extensionClassProp!getter.1.foreign
-  // CHECK-NEXT: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
+  // CHECK: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
+  // CHECK-NEXT: objc_method {{%.*}} : $@objc_metatype ObjCOtherFile.Type, #ObjCOtherFile.extensionClassProp!getter.1.foreign
   _ = type(of: obj).extensionClassProp
 
   // CHECK: objc_method {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionMethod!1.foreign
@@ -433,8 +433,8 @@ func dynamicExtensionMethods(_ obj: ObjCOtherFile) {
   // CHECK: objc_method {{%.*}} : $ObjCOtherFile, #ObjCOtherFile.dynExtensionProp!getter.1.foreign
   _ = obj.dynExtensionProp
 
-  // CHECK: objc_method {{%.*}} : $@thick ObjCOtherFile.Type, #ObjCOtherFile.dynExtensionClassProp!getter.1.foreign
-  // CHECK-NEXT: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
+  // CHECK: thick_to_objc_metatype {{%.*}} : $@thick ObjCOtherFile.Type to $@objc_metatype ObjCOtherFile.Type
+  // CHECK-NEXT: objc_method {{%.*}} : $@objc_metatype ObjCOtherFile.Type, #ObjCOtherFile.dynExtensionClassProp!getter.1.foreign
   _ = type(of: obj).dynExtensionClassProp
 }
 
@@ -445,16 +445,15 @@ public class Base {
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @_T07dynamic3SubC1xSbvg : $@convention(method) (@guaranteed Sub) -> Bool {
   // CHECK: bb0([[SELF:%.*]] : $Sub):
-  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error)
+  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error)
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:     = partial_apply [[AUTOCLOSURE]]([[SELF_COPY]])
+  // CHECK:     = partial_apply [callee_guaranteed] [[AUTOCLOSURE]]([[SELF_COPY]])
   // CHECK:     return {{%.*}} : $Bool
   // CHECK: } // end sil function '_T07dynamic3SubC1xSbvg'
 
-  // CHECK-LABEL: sil private [transparent] @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
+  // CHECK-LABEL: sil private [transparent] @_T07dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error) {
   // CHECK: bb0([[VALUE:%.*]] : $Sub):
-  // CHECK:     [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
-  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[BORROWED_VALUE]]
+  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
   // CHECK:     [[BORROWED_CASTED_VALUE_COPY:%.*]] = begin_borrow [[CASTED_VALUE_COPY]]
   // CHECK:     [[DOWNCAST_FOR_SUPERMETHOD:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_VALUE_COPY]]
@@ -462,8 +461,6 @@ public class Sub : Base {
   // CHECK:     end_borrow [[BORROWED_CASTED_VALUE_COPY]]
   // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
   // CHECK:     destroy_value [[CASTED_VALUE_COPY]]
-  // CHECK:     end_borrow [[BORROWED_VALUE]] from [[VALUE]]
-  // CHECK:     destroy_value [[VALUE]]
   // CHECK: } // end sil function '_T07dynamic3SubC1xSbvgSbyKXKfu_'
   override var x: Bool { return false || super.x }
 }

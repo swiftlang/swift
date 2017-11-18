@@ -1486,3 +1486,10 @@ rdar32301091_1 { _ in } // Ok in Swift 3
 
 func rdar32301091_2(_ :(Int, Int) -> ()) {}
 rdar32301091_2 { _ in } // Ok in Swift 3
+
+// rdar://problem/35198459 - source-compat-suite failure: Moya (toType->hasUnresolvedType() && "Should have handled this above")
+do {
+  func foo(_: (() -> Void)?) {}
+  func bar() -> ((()) -> Void)? { return nil }
+  foo(bar()) // OK in Swift 3 mode
+}

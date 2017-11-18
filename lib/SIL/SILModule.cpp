@@ -27,6 +27,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/YAMLTraits.h"
 #include <functional>
 using namespace swift;
 using namespace Lowering;
@@ -239,8 +240,8 @@ SILFunction *SILModule::getOrCreateFunction(
   assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
-    assert(fn->getLinkage() == linkage ||
-           stripExternalFromLinkage(fn->getLinkage()) == linkage);
+    assert(stripExternalFromLinkage(fn->getLinkage()) ==
+           stripExternalFromLinkage(linkage));
     return fn;
   }
 
@@ -277,6 +278,32 @@ static bool verifySILSelfParameterType(SILDeclRef DeclRef,
   // make sure that we have a +0 self param.
   return !FTy->getExtInfo().hasGuaranteedSelfParam() ||
           PInfo.isGuaranteed() || PInfo.isIndirectMutating();
+}
+
+static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
+                                  SILModule &M) {
+  for (auto *A : Attrs.getAttributes<SemanticsAttr>())
+    F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
+
+  // Propagate @_specialize.
+  for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
+    auto *SA = cast<SpecializeAttr>(A);
+    auto kind = SA->getSpecializationKind() ==
+                        SpecializeAttr::SpecializationKind::Full
+                    ? SILSpecializeAttr::SpecializationKind::Full
+                    : SILSpecializeAttr::SpecializationKind::Partial;
+    F->addSpecializeAttr(SILSpecializeAttr::create(
+        M, SA->getRequirements(), SA->isExported(), kind));
+  }
+
+  if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
+    F->setOptimizationMode(OA->getMode());
+  }
+
+  // @_silgen_name and @_cdecl functions may be called from C code somewhere.
+  if (Attrs.hasAttribute<SILGenNameAttr>() ||
+      Attrs.hasAttribute<CDeclAttr>())
+    F->setHasCReferences(true);
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
@@ -333,19 +360,12 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    auto Attrs = decl->getAttrs();
-    for (auto *A : Attrs.getAttributes<SemanticsAttr>())
-      F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
-
-    for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
-      auto *SA = cast<SpecializeAttr>(A);
-      auto kind = SA->getSpecializationKind() ==
-                          SpecializeAttr::SpecializationKind::Full
-                      ? SILSpecializeAttr::SpecializationKind::Full
-                      : SILSpecializeAttr::SpecializationKind::Partial;
-      F->addSpecializeAttr(SILSpecializeAttr::create(
-          *this, SA->getRequirements(), SA->isExported(), kind));
+    if (auto *FDecl = dyn_cast<FuncDecl>(decl)) {
+      if (auto *StorageDecl = FDecl->getAccessorStorageDecl())
+        // Add attributes for e.g. computed properties.
+        addFunctionAttributes(F, StorageDecl->getAttrs(), *this);
     }
+    addFunctionAttributes(F, decl->getAttrs(), *this);
   }
 
   // If this function has a self parameter, make sure that it has a +0 calling
@@ -505,8 +525,7 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   // compilation, simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
   if (F->isDefinition() &&
-      F->getModule().getOptions().Optimization <
-          SILOptions::SILOptMode::Optimize) {
+      !F->getModule().getOptions().shouldOptimize()) {
     F->convertToDeclaration();
   }
   if (F->isExternalDeclaration())
@@ -761,8 +780,7 @@ bool SILModule::isOnoneSupportModule() const {
 
 /// Returns true if it is the optimized OnoneSupport module.
 bool SILModule::isOptimizedOnoneSupportModule() const {
-  return getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
-         isOnoneSupportModule();
+  return getOptions().shouldOptimize() && isOnoneSupportModule();
 }
 
 void SILModule::setSerializeSILAction(SILModule::ActionCallback Action) {
@@ -781,3 +799,9 @@ void SILModule::serialize() {
   setSerialized();
 }
 
+void SILModule::setOptRecordStream(
+    std::unique_ptr<llvm::yaml::Output> &&Stream,
+    std::unique_ptr<llvm::raw_ostream> &&RawStream) {
+  OptRecordStream = std::move(Stream);
+  OptRecordRawStream = std::move(RawStream);
+}

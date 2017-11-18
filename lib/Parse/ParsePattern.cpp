@@ -19,10 +19,15 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Syntax/SyntaxFactory.h"
+#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
+
 using namespace swift;
+using namespace swift::syntax;
 
 /// \brief Determine the kind of a default argument given a parsed
 /// expression that has not yet been type-checked.
@@ -162,6 +167,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
                       /*AllowSepAfterLast=*/false,
                       diag::expected_rparen_parameter,
+                      SyntaxKind::Unknown,
                       [&]() -> ParserStatus {
     ParsedParameter param;
     ParserStatus status;
@@ -795,7 +801,8 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                             /*isExprBasic=*/false,
                                             lParenLoc, args, argLabels,
                                             argLabelLocs, rParenLoc,
-                                            trailingClosure);
+                                            trailingClosure,
+                                            SyntaxKind::Unknown);
         if (status.isSuccess()) {
           backtrack.cancelBacktrack();
           
@@ -947,6 +954,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
     parseList(tok::r_paren, LPLoc, RPLoc,
               /*AllowSepAfterLast=*/false,
               diag::expected_rparen_tuple_pattern_list,
+              SyntaxKind::Unknown,
               [&] () -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;

@@ -19,6 +19,12 @@ EXPR_NODES = [
     Node('FunctionCallArgumentList', kind='SyntaxCollection',
          element='FunctionCallArgument'),
 
+    Node('ArrayElementList', kind='SyntaxCollection',
+         element='ArrayElement'),
+
+    Node('DictionaryElementList', kind='SyntaxCollection',
+         element='DictionaryElement'),
+
     # The try operator.
     # try foo()
     # try? foo()
@@ -32,6 +38,24 @@ EXPR_NODES = [
                        'PostfixQuestionMarkToken',
                        'ExclamationMarkToken',
                    ]),
+         ]),
+
+    # An identifier expression.
+    Node('IdentifierExpr', kind='Expr',
+         children=[
+             Child('Identifier', kind='IdentifierToken'),
+         ]),
+
+    # A nil expression.
+    Node('NilLiteralExpr', kind='Expr',
+         children=[
+             Child('NilKeyword', kind='NilToken'),
+         ]),
+
+    # A _ expression.
+    Node('DiscardAssignmentExpr', kind='Expr',
+         children=[
+             Child('Wildcard', kind='WildcardToken'),
          ]),
 
     # A #line expression.
@@ -89,6 +113,22 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
+    # Array literal, e.g. [1, 2, 3]
+    Node('ArrayExpr', kind='Expr',
+         children=[
+             Child('LeftSquare', kind='LeftSquareToken'),
+             Child('Elements', kind='ArrayElementList'),
+             Child('RightSquare', kind='RightSquareToken'),
+         ]),
+
+    # Dictionary literal, e.g. [1:1, 2:2, 3:3]
+    Node('DictionaryExpr', kind='Expr',
+         children=[
+             Child('LeftSquare', kind='LeftSquareToken'),
+             Child('Elements', kind='DictionaryElementList'),
+             Child('RightSquare', kind='RightSquareToken'),
+         ]),
+
     # function-call-argument -> label? ':'? expression ','?
     Node('FunctionCallArgument', kind='Syntax',
          children=[
@@ -99,6 +139,22 @@ EXPR_NODES = [
              Child('Expression', kind='Expr'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
+         ]),
+
+    # element inside an array expression: expression ','?
+    Node('ArrayElement', kind='Syntax',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # element inside an array expression: expression ','?
+    Node('DictionaryElement', kind='Syntax',
+         children=[
+             Child('KeyExpression', kind='Expr'),
+             Child('Colon', kind='ColonToken'),
+             Child('ValueExpression', kind='Expr'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     # An integer literal.
@@ -115,5 +171,25 @@ EXPR_NODES = [
     Node('StringLiteralExpr', kind='Expr',
          children=[
              Child("StringLiteral", kind='StringLiteralToken')
-         ])
+         ]),
+
+    # true or false
+    Node('BooleanLiteralExpr', kind='Expr',
+         children=[
+             Child("BooleanLiteral", kind='Token',
+                   token_choices=[
+                       'TrueToken',
+                       'FalseToken',
+                   ])
+         ]),
+
+    # a ? 1 : 0
+    Node('TernaryExpr', kind='Expr',
+         children=[
+             Child("ConditionExpression", kind='Expr'),
+             Child("QuestionMark", kind='InfixQuestionMarkToken'),
+             Child("FirstChoice", kind='Expr'),
+             Child("ColonMark", kind='ColonToken'),
+             Child("SecondChoice", kind='Expr')
+         ]),
 ]

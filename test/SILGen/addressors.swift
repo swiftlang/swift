@@ -48,8 +48,8 @@ struct A {
 // CHECK-LABEL: sil hidden @_T010addressors5test0yyF : $@convention(thin) () -> () {
 func test0() {
 // CHECK: [[A:%.*]] = alloc_stack $A
-// CHECK: [[T0:%.*]] = function_ref @_T010addressors1AV{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[T1:%.*]] = metatype $@thin A.Type
+// CHECK: [[T0:%.*]] = function_ref @_T010addressors1AV{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]]) 
 // CHECK: store [[AVAL]] to [[A]]
   var a = A()
@@ -82,8 +82,8 @@ func test0() {
 
 // CHECK-LABEL: sil hidden @_T010addressors5test1s5Int32VyF : $@convention(thin) () -> Int32
 func test1() -> Int32 {
-// CHECK: [[CTOR:%.*]] = function_ref @_T010addressors1AV{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[T0:%.*]] = metatype $@thin A.Type
+// CHECK: [[CTOR:%.*]] = function_ref @_T010addressors1AV{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[A:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(method) (@thin A.Type) -> A
 // CHECK: [[ACCESSOR:%.*]] = function_ref @_T010addressors1AVs5Int32VAEcilu : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[PTR:%.*]] = apply [[ACCESSOR]]({{%.*}}, [[A]]) : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
@@ -168,7 +168,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_T010addressors6CArrayVxSiciau :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<(Int32) -> Int32>({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<(Int32) -> Int32>, #UnsafeMutablePointer._rawValue
-// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_owned (@in Int32) -> @out Int32
+// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed (@in Int32) -> @out Int32
 // CHECK:   store {{%.*}} to [[T3]] :
   array[0] = id_int
 
@@ -177,7 +177,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T1:%.*]] = function_ref @_T010addressors6CArrayVxSicilu :
 // CHECK:   [[T2:%.*]] = apply [[T1]]<(Int32) -> Int32>({{%.*}}, [[T0]])
 // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<(Int32) -> Int32>, #UnsafePointer._rawValue
-// CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to [strict] $*@callee_owned (@in Int32) -> @out Int32
+// CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed (@in Int32) -> @out Int32
 // CHECK:   [[T5:%.*]] = load [[T4]]
   return array[1](5)
 }
@@ -230,12 +230,12 @@ func test_d(_ array: inout D) -> Int32 {
 // CHECK:   store [[V]] to [[ADDR]] : $*Int32
   array[0] = make_int()
 
-// CHECK:   [[FN:%.*]] = function_ref @_T010addressors14take_int_inoutys5Int32VzF
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [static] [[ARRAY]] : $*D
 // CHECK:   [[T0:%.*]] = function_ref @_T010addressors1DVs5Int32VAEciau
 // CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
+// CHECK:   [[FN:%.*]] = function_ref @_T010addressors14take_int_inoutys5Int32VzF
 // CHECK:   apply [[FN]]([[ADDR]])
   take_int_inout(&array[1])
 

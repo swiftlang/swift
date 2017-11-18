@@ -214,14 +214,13 @@ void CapturePropagationCloner::cloneBlocks(
 }
 
 CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
-  SILFunction *OrigF = PAI->getReferencedFunction();
   // The new partial_apply will no longer take any arguments--they are all
   // expressed as literals. So its callee signature will be the same as its
   // return signature.
   auto FTy = PAI->getType().castTo<SILFunctionType>();
   assert(!PAI->hasSubstitutions() || !hasArchetypes(PAI->getSubstitutions()));
   FTy = cast<SILFunctionType>(
-    OrigF->mapTypeOutOfContext(FTy)->getCanonicalType());
+    FTy->mapTypeOutOfContext()->getCanonicalType());
   auto NewFTy = FTy;
   return NewFTy;
 }
@@ -251,8 +250,9 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   // expressed as literals. So its callee signature will be the same as its
   // return signature.
   auto NewFTy = getPartialApplyInterfaceResultType(PAI);
-  NewFTy = Lowering::adjustFunctionType(NewFTy,
-                                        SILFunctionType::Representation::Thin);
+  NewFTy = Lowering::adjustFunctionType(
+      NewFTy, SILFunctionType::Representation::Thin,
+      OrigF->getModule().getOptions().EnableGuaranteedClosureContexts);
 
   GenericEnvironment *GenericEnv = nullptr;
   if (NewFTy->getGenericSignature())
@@ -404,6 +404,9 @@ static SILFunction *getSpecializedWithDeadParams(
   if (PAI->hasSubstitutions()) {
     if (Specialized->isExternalDeclaration())
       return nullptr;
+    if (!Orig->shouldOptimize())
+      return nullptr;
+
     // Perform a generic specialization of the Specialized function.
     ReabstractionInfo ReInfo(ApplySite(), Specialized, PAI->getSubstitutions(),
                              /* ConvertIndirectToDirect */ false);

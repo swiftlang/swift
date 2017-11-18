@@ -21,6 +21,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
@@ -57,6 +58,7 @@ public:
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
   Optional<StringRef> convention = None;
+  Optional<StringRef> conventionWitnessMethodProtocol = None;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
@@ -921,6 +923,23 @@ public:
   InlineKind getKind() const { return Kind; }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Inline;
+  }
+};
+
+/// Represents the optimize attribute.
+class OptimizeAttr : public DeclAttribute {
+  OptimizationMode Mode;
+public:
+  OptimizeAttr(SourceLoc atLoc, SourceRange range, OptimizationMode mode)
+    : DeclAttribute(DAK_Optimize, atLoc, range, /*Implicit=*/false),
+      Mode(mode) {}
+
+  OptimizeAttr(OptimizationMode mode)
+    : OptimizeAttr(SourceLoc(), SourceRange(), mode) {}
+
+  OptimizationMode getMode() const { return Mode; }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Optimize;
   }
 };
 

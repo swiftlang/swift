@@ -265,6 +265,7 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 ///
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
+/// FIXME(sil-serialize-all): this should be internal
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSObject_isEqual")
@@ -1407,9 +1408,9 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
 
 #endif
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastIndirect")
-public func _setDownCastIndirect<SourceValue, TargetValue>(
+internal func _setDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>) {
   target.initialize(to: _setDownCast(source.pointee))
@@ -1440,9 +1441,9 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   return _setDownCastConditional(source)!
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastConditionalIndirect")
-public func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
+internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>
 ) -> Bool {
@@ -2919,10 +2920,10 @@ public func _dictionaryBridgeToObjectiveC<
 }
 #endif
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_dictionaryDownCastIndirect")
-public func _dictionaryDownCastIndirect<SourceKey, SourceValue,
-                                        TargetKey, TargetValue>(
+internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
+                                          TargetKey, TargetValue>(
   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>) {
   target.initialize(to: _dictionaryDownCast(source.pointee))
@@ -2959,10 +2960,10 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   return _dictionaryDownCastConditional(source)!
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_dictionaryDownCastConditionalIndirect")
-public func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
-                                                   TargetKey, TargetValue>(
+internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
+                                                     TargetKey, TargetValue>(
   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>
 ) -> Bool {

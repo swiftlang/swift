@@ -18,27 +18,29 @@
 #ifndef SWIFT_IRGEN_IRGENMODULE_H
 #define SWIFT_IRGEN_IRGENMODULE_H
 
+#include "IRGen.h"
+#include "SwiftTargetInfo.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/SuccessorMap.h"
+#include "swift/IRGen/ValueWitness.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/ValueHandle.h"
-#include "llvm/IR/Attributes.h"
 #include "llvm/Target/TargetMachine.h"
-#include "IRGen.h"
-#include "SwiftTargetInfo.h"
-#include "swift/IRGen/ValueWitness.h"
 
 #include <atomic>
 
@@ -446,6 +448,7 @@ public:
     llvm::PointerType *WitnessTablePtrTy;
   };
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
+  Size RefCountedStructSize;     /// sizeof(%swift.refcounted)
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
   llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
   llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
@@ -491,6 +494,8 @@ public:
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
+  llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+  llvm::StructType *WitnessTableSliceTy;     /// { witness_table**, i64 }
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
@@ -712,9 +717,50 @@ public:
   llvm::Constant *getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
                                              llvm::Type *llvmType);
 
+  typedef llvm::Constant *(IRGenModule::*OutlinedCopyAddrFunction)(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec);
+
+  void generateCallToOutlinedCopyAddr(
+      IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
+      SILType T, const OutlinedCopyAddrFunction MethodToCall,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
+
+  llvm::Constant *getOrCreateOutlinedInitializeWithTakeFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
+
+  llvm::Constant *getOrCreateOutlinedInitializeWithCopyFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
+
+  llvm::Constant *getOrCreateOutlinedAssignWithTakeFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
+
+  llvm::Constant *getOrCreateOutlinedAssignWithCopyFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
+
+  unsigned getCanTypeID(const CanType type);
+
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
+
+  llvm::Constant *getOrCreateOutlinedCopyAddrHelperFunction(
+      const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+      std::string funcName,
+      llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
+                              Address dest, Address src, SILType T)>
+          Generate,
+      const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec =
+          nullptr);
 
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
@@ -798,6 +844,10 @@ private:
   /// A mapping from order numbers to the LLVM functions which we
   /// created for the SIL functions with those orders.
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
+
+  /// Mapping from archetype-containing CanType to UniqueID (for outline)
+  llvm::DenseMap<const swift::TypeBase *, unsigned> typeToUniqueID;
+  unsigned currUniqueID = 2;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
   void emitLazyObjCProtocolDefinitions();
@@ -928,7 +978,9 @@ public:
   /// invalid.
   bool finalize();
 
-  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs);
+  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
+                                    OptimizationMode FuncOptMode =
+                                      OptimizationMode::NotSet);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);

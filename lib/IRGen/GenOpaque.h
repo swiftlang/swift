@@ -180,6 +180,17 @@ namespace irgen {
                                             llvm::Value *index,
                                             Address destObject);
 
+  /// Emit a call to the 'getEnumTagSinglePayload' operation.
+  llvm::Value *emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF, SILType T,
+                                               llvm::Value *numEmptyCases,
+                                               Address destObject);
+
+  /// Emit a call to the 'storeEnumTagSinglePayload' operation.
+  llvm::Value *emitStoreEnumTagSinglePayloadCall(IRGenFunction &IGF, SILType T,
+                                                 llvm::Value *whichCase,
+                                                 llvm::Value *numEmptyCases,
+                                                 Address destObject);
+
   /// Emit a call to the 'getEnumTag' operation.
   llvm::Value *emitGetEnumTagCall(IRGenFunction &IGF,
                                   SILType T,

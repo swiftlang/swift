@@ -1,10 +1,43 @@
-<StringLiteralExpr>// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
-// RUN: diff %t %s
+// RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
+// RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
-// RUN: diff %t.withkinds %S/Outputs/round_trip_parse_gen.swift.withkinds
+// RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 
-"String Literal"</StringLiteralExpr><StringLiteralExpr>
+class C {
+  func bar(_ a: Int) <CodeBlock>{}</CodeBlock>
+  func bar1(_ a: Float) -> Float <CodeBlock>{ <ReturnStmt>return <FloatLiteralExpr>-0.6 </FloatLiteralExpr>+ <FloatLiteralExpr>0.1 </FloatLiteralExpr>- <FloatLiteralExpr>0.3 </FloatLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar2(a: Int, b: Int, c:Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar3(a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar4(_ a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func foo() <CodeBlock>{
+    var a = /*comment*/<StringLiteralExpr>"abc"/*comment*/</StringLiteralExpr>
+    var b = /*comment*/<IntegerLiteralExpr>+2/*comment*/</IntegerLiteralExpr><IdentifierExpr>
+    bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
+    bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>+10</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
+    bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>-10</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
+    bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>-1.1</FloatLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
+    bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)
+    var f = /*comments*/<FloatLiteralExpr>+0.1/*comments*/</FloatLiteralExpr><IdentifierExpr>
+    foo</IdentifierExpr>()
+  }</CodeBlock>
 
-""</StringLiteralExpr><IntegerLiteralExpr>
+  func foo1() <CodeBlock>{<DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <IdentifierExpr>bar2</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>b:<IntegerLiteralExpr>2</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>c:<IntegerLiteralExpr>2</IntegerLiteralExpr></FunctionCallArgument>)<DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <IdentifierExpr>bar2</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1 </IntegerLiteralExpr>+ <IntegerLiteralExpr>1</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>b:<IntegerLiteralExpr>2 </IntegerLiteralExpr>* <IntegerLiteralExpr>2 </IntegerLiteralExpr>+ <IntegerLiteralExpr>2</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>c:<IntegerLiteralExpr>2 </IntegerLiteralExpr>+ <IntegerLiteralExpr>2</IntegerLiteralExpr></FunctionCallArgument>)<DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <IdentifierExpr>bar2</IdentifierExpr>(<FunctionCallArgument>a : <IdentifierExpr>bar2</IdentifierExpr>(<FunctionCallArgument>a: <IntegerLiteralExpr>1</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>b: <IntegerLiteralExpr>2</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>c: <IntegerLiteralExpr>3</IntegerLiteralExpr></FunctionCallArgument>), </FunctionCallArgument><FunctionCallArgument>b: <IntegerLiteralExpr>2</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument>c: <IntegerLiteralExpr>3</IntegerLiteralExpr></FunctionCallArgument>)<DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a : <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a: <IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallArgument>)</FunctionCallArgument>)<DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <IdentifierExpr>bar4</IdentifierExpr>(<FunctionCallArgument><IdentifierExpr>bar4</IdentifierExpr>(<FunctionCallArgument><IdentifierExpr>bar4</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</FunctionCallArgument>)</FunctionCallArgument>)<DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <ArrayExpr>[<ArrayElement><IntegerLiteralExpr>1</IntegerLiteralExpr>, </ArrayElement><ArrayElement><IntegerLiteralExpr>2</IntegerLiteralExpr>, </ArrayElement><ArrayElement><IntegerLiteralExpr>3</IntegerLiteralExpr>, </ArrayElement><ArrayElement><IntegerLiteralExpr>4</IntegerLiteralExpr></ArrayElement>]</ArrayExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <DictionaryExpr>[<DictionaryElement><IntegerLiteralExpr>1</IntegerLiteralExpr>:<IntegerLiteralExpr>1</IntegerLiteralExpr>, </DictionaryElement><DictionaryElement><IntegerLiteralExpr>2</IntegerLiteralExpr>:<IntegerLiteralExpr>2</IntegerLiteralExpr>, </DictionaryElement><DictionaryElement><IntegerLiteralExpr>3</IntegerLiteralExpr>:<IntegerLiteralExpr>3</IntegerLiteralExpr>, </DictionaryElement><DictionaryElement><IntegerLiteralExpr>4</IntegerLiteralExpr>:<IntegerLiteralExpr>4</IntegerLiteralExpr></DictionaryElement>]</DictionaryExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <ArrayExpr>[<ArrayElement><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </ArrayElement><ArrayElement><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </ArrayElement><ArrayElement><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </ArrayElement><ArrayElement><IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</ArrayElement>]</ArrayExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <DictionaryExpr>[<DictionaryElement><StringLiteralExpr>"a"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </DictionaryElement><DictionaryElement><StringLiteralExpr>"b"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </DictionaryElement><DictionaryElement><StringLiteralExpr>"c"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>), </DictionaryElement><DictionaryElement><StringLiteralExpr>"d"</StringLiteralExpr>: <IdentifierExpr>bar3</IdentifierExpr>(<FunctionCallArgument>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)</DictionaryElement>]</DictionaryExpr><IdentifierExpr>
+    foo</IdentifierExpr>(<FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><NilLiteralExpr>nil</NilLiteralExpr></FunctionCallArgument>)
+  }</CodeBlock>
+  func boolAnd() -> Bool <CodeBlock>{ <ReturnStmt>return <BooleanLiteralExpr>true </BooleanLiteralExpr>&& <BooleanLiteralExpr>false </BooleanLiteralExpr></ReturnStmt>}</CodeBlock>
+  func boolOr() -> Bool <CodeBlock>{ <ReturnStmt>return <BooleanLiteralExpr>true </BooleanLiteralExpr>|| <BooleanLiteralExpr>false </BooleanLiteralExpr></ReturnStmt>}</CodeBlock>
 
-/*comments*/+3 // comments</IntegerLiteralExpr>
+  func foo2() <CodeBlock>{<DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr>= <TernaryExpr>(<FunctionCallArgument><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr></FunctionCallArgument>) ? (<FunctionCallArgument><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr></FunctionCallArgument>) : (<FunctionCallArgument><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>1 </IntegerLiteralExpr>: <IntegerLiteralExpr>0</IntegerLiteralExpr></TernaryExpr></FunctionCallArgument>)</TernaryExpr>
+  }</CodeBlock>
+}

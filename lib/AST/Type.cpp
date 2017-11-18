@@ -18,6 +18,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -219,6 +220,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::TypeVariable:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
+  case TypeKind::SILToken:
   case TypeKind::UnownedStorage:
   case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:
@@ -1156,6 +1158,7 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
+  case TypeKind::SILToken:
     llvm_unreachable("SIL-only types are always canonical!");
 
   case TypeKind::Function: {
@@ -1275,6 +1278,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
+  case TypeKind::SILToken:
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::ProtocolComposition:
@@ -1493,6 +1497,7 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::SILFunction:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
+  case TypeKind::SILToken:
   case TypeKind::GenericFunction: {
     // Polymorphic function types should never be explicitly spelled.
     return false;
@@ -3010,8 +3015,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     if (!conformance) return failed();
     if (!conformance->isConcrete()) return failed();
-    assert(conformance->getConditionalRequirements().empty() &&
-           "unhandled conditional requirements");
 
     // Retrieve the type witness.
     auto witness =
@@ -3089,15 +3092,110 @@ Type DependentMemberType::substBaseType(Type substBase,
                               getAssocType(), getName(), None);
 }
 
+static Type substGenericFunctionType(GenericFunctionType *genericFnType,
+                                     TypeSubstitutionFn substitutions,
+                                     LookupConformanceFn lookupConformances,
+                                     SubstOptions options) {
+  // Substitute into the function type (without generic signature).
+  auto *bareFnType = FunctionType::get(genericFnType->getInput(),
+                                       genericFnType->getResult(),
+                                       genericFnType->getExtInfo());
+  Type result =
+    Type(bareFnType).subst(substitutions, lookupConformances, options);
+  if (!result || result->is<ErrorType>()) return result;
+
+  auto *fnType = result->castTo<FunctionType>();
+  // Substitute generic parameters.
+  bool anySemanticChanges = false;
+  SmallVector<GenericTypeParamType *, 4> genericParams;
+  for (auto param : genericFnType->getGenericParams()) {
+    Type paramTy =
+      Type(param).subst(substitutions, lookupConformances, options);
+    if (!paramTy)
+      return Type();
+
+    if (auto newParam = paramTy->getAs<GenericTypeParamType>()) {
+      if (!newParam->isEqual(param))
+        anySemanticChanges = true;
+
+      genericParams.push_back(newParam);
+    } else {
+      anySemanticChanges = true;
+    }
+  }
+
+  // If no generic parameters remain, this is a non-generic function type.
+  if (genericParams.empty())
+    return result;
+
+  // Transform requirements.
+  SmallVector<Requirement, 4> requirements;
+  for (const auto &req : genericFnType->getRequirements()) {
+    // Substitute into the requirement.
+    auto substReqt = req.subst(substitutions, lookupConformances, options);
+    if (!substReqt) {
+      anySemanticChanges = true;
+      continue;
+    }
+
+    // Did anything change?
+    if (!anySemanticChanges &&
+        (!req.getFirstType()->isEqual(substReqt->getFirstType()) ||
+         (req.getKind() != RequirementKind::Layout &&
+          !req.getSecondType()->isEqual(substReqt->getSecondType())))) {
+      anySemanticChanges = true;
+    }
+
+    // Skip any erroneous requirements.
+    if (substReqt->getFirstType()->hasError() ||
+        (substReqt->getKind() != RequirementKind::Layout &&
+         substReqt->getSecondType()->hasError()))
+      continue;
+
+    requirements.push_back(*substReqt);
+  }
+
+  GenericSignature *genericSig = nullptr;
+  if (anySemanticChanges) {
+    // If there were semantic changes, we need to build a new generic
+    // signature.
+    GenericSignatureBuilder builder(genericFnType->getASTContext());
+
+    // Add the generic parameters to the builder.
+    for (auto gp : genericParams)
+      builder.addGenericParameter(gp);
+
+    // Add the requirements to the builder.
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+    for (const auto &req : requirements)
+      builder.addRequirement(req, source, /*inferForModule=*/nullptr);
+
+    // Form the generic signature.
+    genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  } else {
+    // Use the mapped generic signature.
+    genericSig = GenericSignature::get(genericParams, requirements);
+  }
+
+  // Produce the new generic function type.
+  return GenericFunctionType::get(genericSig, fnType->getInput(),
+                                  fnType->getResult(), fnType->getExtInfo());
+}
+
 static Type substType(Type derivedType,
                       TypeSubstitutionFn substitutions,
                       LookupConformanceFn lookupConformances,
                       SubstOptions options) {
+  // Handle substitutions into generic function types.
+  if (auto genericFnType = derivedType->getAs<GenericFunctionType>()) {
+    return substGenericFunctionType(genericFnType, substitutions,
+                                    lookupConformances, options);
+  }
 
   // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
   if (!derivedType->hasArchetype() &&
-      !derivedType->hasTypeParameter() &&
-      !derivedType->is<GenericFunctionType>())
+      !derivedType->hasTypeParameter())
     return derivedType;
 
   return derivedType.transformRec([&](TypeBase *type) -> Optional<Type> {
@@ -3236,17 +3334,22 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
 
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
   Type t(this);
+
+  if (!t->getAnyNominal()) {
+    if (auto archetype = t->getAs<ArchetypeType>()) {
+      t = archetype->getSuperclass();
+    } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
+      t = dynamicSelfTy->getSelfType();
+    } else if (auto compositionTy = t->getAs<ProtocolCompositionType>()) {
+      t = compositionTy->getExistentialLayout().superclass;
+    }
+  }
+
   while (t) {
     // If we have a class-constrained archetype or class-constrained
     // existential, get the underlying superclass constraint.
     auto *nominalDecl = t->getAnyNominal();
-    if (!nominalDecl) {
-      assert(t->is<ArchetypeType>() || t->isExistentialType() &&
-             "expected a class, archetype or existential");
-      t = t->getSuperclass();
-      assert(t && "archetype or existential is not class constrained");
-      continue;
-    }
+    assert(nominalDecl && "expected nominal type here");
     assert(isa<ClassDecl>(nominalDecl) && "expected a class here");
 
     if (nominalDecl == baseClass)
@@ -3263,7 +3366,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(dc->isTypeContext());
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() && !baseTy->is<AnyMetatypeType>());
+  assert(!baseTy->hasLValueType() &&
+         !baseTy->is<AnyMetatypeType>() &&
+         !baseTy->is<ErrorType>());
 
   // The resulting set of substitutions. Always use this to ensure we
   // don't miss out on NRVO anywhere.
@@ -3409,6 +3514,7 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
 
   assert(memberType);
 
+  // Perform the substitution.
   auto substitutions = getMemberSubstitutionMap(module, member);
   return memberType.subst(substitutions, SubstFlags::UseErrorType);
 }
@@ -3463,6 +3569,20 @@ static bool transformSILResult(
   return false;
 }
 
+static bool transformSILYield(
+                            SILYieldInfo &yield, bool &changed,
+                            llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
+  Type transType = yield.getType().transformRec(fn);
+  if (!transType) return true;
+
+  CanType canTransType = transType->getCanonicalType();
+  if (canTransType != yield.getType()) {
+    changed = true;
+    yield = yield.getWithType(canTransType);
+  }
+  return false;
+}
+
 static bool transformSILParameter(
                             SILParameterInfo &param, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
@@ -3513,6 +3633,7 @@ case TypeKind::Id:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
   case TypeKind::GenericTypeParam:
+  case TypeKind::SILToken:
     return *this;
 
   case TypeKind::Enum:
@@ -3568,6 +3689,12 @@ case TypeKind::Id:
       transInterfaceParams.push_back(param);
     }
 
+    SmallVector<SILYieldInfo, 8> transInterfaceYields;
+    for (SILYieldInfo yield : fnTy->getYields()) {
+      if (transformSILYield(yield, changed, fn)) return Type();
+      transInterfaceYields.push_back(yield);
+    }
+
     SmallVector<SILResultInfo, 8> transInterfaceResults;
     for (SILResultInfo result : fnTy->getResults()) {
       if (transformSILResult(result, changed, fn)) return Type();
@@ -3585,11 +3712,14 @@ case TypeKind::Id:
 
     return SILFunctionType::get(fnTy->getGenericSignature(),
                                 fnTy->getExtInfo(),
+                                fnTy->getCoroutineKind(),
                                 fnTy->getCalleeConvention(),
                                 transInterfaceParams,
+                                transInterfaceYields,
                                 transInterfaceResults,
                                 transErrorResult,
-                                Ptr->getASTContext());
+                                Ptr->getASTContext(),
+                                fnTy->getWitnessMethodConformanceOrNone());
   }
 
   case TypeKind::UnownedStorage:
@@ -3779,6 +3909,7 @@ case TypeKind::Id:
     return DependentMemberType::get(dependentBase, dependent->getName());
   }
 
+  case TypeKind::GenericFunction:
   case TypeKind::Function: {
     auto function = cast<AnyFunctionType>(base);
     auto inputTy = function->getInput().transformRec(fn);
@@ -3788,129 +3919,31 @@ case TypeKind::Id:
     if (!resultTy)
       return Type();
 
-    if (inputTy.getPointer() == function->getInput().getPointer() &&
-        resultTy.getPointer() == function->getResult().getPointer())
-      return *this;
+    bool isUnchanged =
+        inputTy.getPointer() == function->getInput().getPointer() &&
+        resultTy.getPointer() == function->getResult().getPointer();
+
+    if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
+
+#ifndef NDEBUG
+      // Check that generic parameters won't be trasnformed.
+      // Transform generic parameters.
+      for (auto param : genericFnType->getGenericParams()) {
+        assert(Type(param).transformRec(fn).getPointer() == param &&
+               "GenericFunctionType transform() changes type parameter");
+      }
+#endif
+      if (isUnchanged) return *this;
+      
+      auto genericSig = genericFnType->getGenericSignature();
+      return GenericFunctionType::get(genericSig, inputTy, resultTy,
+                                      function->getExtInfo());
+    }
+
+    if (isUnchanged) return *this;
 
     return FunctionType::get(inputTy, resultTy,
                              function->getExtInfo());
-  }
-
-  case TypeKind::GenericFunction: {
-    GenericFunctionType *function = cast<GenericFunctionType>(base);
-    bool anyChanges = false;
-
-    // Transform generic parameters.
-    SmallVector<GenericTypeParamType *, 4> genericParams;
-    for (auto param : function->getGenericParams()) {
-      Type paramTy = Type(param).transformRec(fn);
-      if (!paramTy)
-        return Type();
-
-      if (auto newParam = paramTy->getAs<GenericTypeParamType>()) {
-        if (newParam != param)
-          anyChanges = true;
-
-        genericParams.push_back(newParam);
-      } else {
-        anyChanges = true;
-      }
-    }
-
-    // Transform requirements.
-    SmallVector<Requirement, 4> requirements;
-    for (const auto &req : function->getRequirements()) {
-      auto firstType = req.getFirstType().transformRec(fn);
-      if (!firstType)
-        return Type();
-
-      if (firstType.getPointer() != req.getFirstType().getPointer())
-        anyChanges = true;
-
-      if (req.getKind() == RequirementKind::Layout) {
-        if (!firstType->isTypeParameter())
-          continue;
-
-        requirements.push_back(Requirement(req.getKind(), firstType,
-                                           req.getLayoutConstraint()));
-        continue;
-      }
-
-      Type secondType = req.getSecondType();
-      if (secondType) {
-        secondType = secondType.transformRec(fn);
-        if (!secondType)
-          return Type();
-
-        if (secondType.getPointer() != req.getSecondType().getPointer())
-          anyChanges = true;
-      }
-
-      if (!firstType->isTypeParameter()) {
-        if (!secondType || !secondType->isTypeParameter())
-          continue;
-        std::swap(firstType, secondType);
-      }
-
-      requirements.push_back(Requirement(req.getKind(), firstType,
-                                         secondType));
-    }
-    
-    // Transform input type.
-    auto inputTy = function->getInput().transformRec(fn);
-    if (!inputTy)
-      return Type();
-
-    // Transform result type.
-    auto resultTy = function->getResult().transformRec(fn);
-    if (!resultTy)
-      return Type();
-
-    // Check whether anything changed.
-    if (!anyChanges &&
-        inputTy.getPointer() == function->getInput().getPointer() &&
-        resultTy.getPointer() == function->getResult().getPointer())
-      return *this;
-
-    // If no generic parameters remain, this is a non-generic function type.
-    if (genericParams.empty()) {
-      return FunctionType::get(inputTy, resultTy, function->getExtInfo());
-    }
-
-    // Sort/unique the generic parameters by depth/index.
-    using llvm::array_pod_sort;
-    array_pod_sort(genericParams.begin(), genericParams.end(),
-                   [](GenericTypeParamType * const * gpp1,
-                      GenericTypeParamType * const * gpp2) {
-                     auto gp1 = *gpp1;
-                     auto gp2 = *gpp2;
-
-                     if (gp1->getDepth() < gp2->getDepth())
-                       return -1;
-
-                     if (gp1->getDepth() > gp2->getDepth())
-                       return 1;
-
-                     if (gp1->getIndex() < gp2->getIndex())
-                       return -1;
-
-                     if (gp1->getIndex() > gp2->getIndex())
-                       return 1;
-
-                     return 0;
-                   });
-    genericParams.erase(std::unique(genericParams.begin(), genericParams.end(),
-                                    [](GenericTypeParamType *gp1,
-                                       GenericTypeParamType *gp2) {
-                                      return gp1->getDepth() == gp2->getDepth()
-                                          && gp1->getIndex() == gp2->getIndex();
-                                    }),
-                        genericParams.end());
-
-    // Produce the new generic function type.
-    auto sig = GenericSignature::get(genericParams, requirements);
-    return GenericFunctionType::get(sig, inputTy, resultTy,
-                                    function->getExtInfo());
   }
 
   case TypeKind::ArraySlice: {
@@ -4186,6 +4219,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::TypeVariable:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
+  case TypeKind::SILToken:
   case TypeKind::UnownedStorage:
   case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:

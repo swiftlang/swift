@@ -219,9 +219,9 @@ public:
 class StructLayoutBuilder {
 protected:
   IRGenModule &IGM;
-private:
   SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
+private:
   Alignment CurAlignment = Alignment(1);
   SpareBitVector CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
@@ -394,8 +394,6 @@ public:
   Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,
                      const llvm::Twine &name = "") const;
 };
-
-Size getHeapHeaderSize(IRGenModule &IGM);
 
 /// Different policies for accessing a physical field.
 enum class FieldAccess : uint8_t {

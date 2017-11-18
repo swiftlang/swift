@@ -201,10 +201,7 @@ func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by native storage
 func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<NSObject> {
-  // SR-4724: Should not need to be split out but if it is not it
-  // is considered ambiguous.
-  let temp = members.map({ TestObjCKeyTy($0) })
-  let result: Set<NSObject> = Set(temp)
+  let result: Set<NSObject> = Set(members.map({ TestObjCKeyTy($0) }))
   expectTrue(isNativeSet(result))
   return result
 }
@@ -2226,7 +2223,9 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
     s, { s.objectEnumerator() },
     { ($0 as! TestObjCKeyTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt: (3, 0))
+  let autoreleased  = _isDebugAssertConfiguration() ?
+    (0, 0) : (3, 0)
+  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromObjC") {
@@ -2237,7 +2236,9 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
     s, { s.objectEnumerator() },
     { ($0 as! TestObjCKeyTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt: (3, 0))
+  let autoreleased  = _isDebugAssertConfiguration() ?
+    (0, 0) : (3, 0)
+  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty") {
@@ -2260,7 +2261,9 @@ SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFrom
     s, { s.objectEnumerator() },
     { ($0 as! TestObjCKeyTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt: (3, 0))
+  let autoreleased  = _isDebugAssertConfiguration() ?
+    (0, 0) : (3, 0)
+  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift") {
@@ -2271,7 +2274,9 @@ SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFrom
     s, { s.objectEnumerator() },
     { ($0 as! TestObjCKeyTy).value })
 
-  expectAutoreleasedKeysAndValues(unopt: (3, 0))
+  let autoreleased  = _isDebugAssertConfiguration() ?
+    (0, 0) : (3, 0)
+  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 0))
 }
 
 SetTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {

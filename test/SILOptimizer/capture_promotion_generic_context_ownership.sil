@@ -22,17 +22,17 @@ entry(%b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 
 // CHECK-LABEL: sil {{.*}}@call_promotable_box_from_generic
 // CHECK:         [[F:%.*]] = function_ref @_T014promotable_boxTf2i_n
-// CHECK:         partial_apply [[F]](
+// CHECK:         partial_apply [callee_guaranteed] [[F]](
 
-sil @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @owned @callee_owned () -> Int {
+sil @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @owned @callee_guaranteed () -> Int {
 entry(%0 : @trivial $*T, %1 : @trivial $Int):
   destroy_addr %0 : $*T
   %f = function_ref @promotable_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %1 to [trivial] %a : $*Int
-  %k = partial_apply %f(%b) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
-  return %k : $@callee_owned () -> Int
+  %k = partial_apply [callee_guaranteed] %f(%b) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  return %k : $@callee_guaranteed () -> Int
 }
 
 protocol P {}
@@ -54,10 +54,10 @@ entry(%0 : @trivial $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
 // CHECK-NEXT:    destroy_addr [[ARG0]] : $*T
 // CHECK-NEXT:    destroy_addr [[ARG1]] : $*U
 // CHECK:         [[F:%.*]] = function_ref @_T022generic_promotable_boxTf2ni_n : $@convention(thin) <τ_0_0> (@in τ_0_0, Builtin.Int32) -> Builtin.Int32
-// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [[F]]<U>([[ARG2]])
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[F]]<U>([[ARG2]])
 // CHECK-NEXT:    return [[CLOSURE]]
 
-sil @call_generic_promotable_box_from_different_generic : $@convention(thin) <T, U: P> (@in T, @in U, Int) -> @owned @callee_owned (@in U) -> Int {
+sil @call_generic_promotable_box_from_different_generic : $@convention(thin) <T, U: P> (@in T, @in U, Int) -> @owned @callee_guaranteed (@in U) -> Int {
 entry(%0 : @trivial $*T, %1 : @trivial $*U, %2 : @trivial $Int):
   destroy_addr %0 : $*T
   destroy_addr %1 : $*U
@@ -65,8 +65,8 @@ entry(%0 : @trivial $*T, %1 : @trivial $*U, %2 : @trivial $Int):
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %2 to [trivial] %a : $*Int
-  %k = partial_apply %f<U>(%b) : $@convention(thin) <V> (@in V, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
-  return %k : $@callee_owned (@in U) -> Int
+  %k = partial_apply [callee_guaranteed] %f<U>(%b) : $@convention(thin) <V> (@in V, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  return %k : $@callee_guaranteed (@in U) -> Int
 }
 
 enum E<X> {
@@ -92,8 +92,11 @@ entry(%0 : @trivial $*R<T>, %1 : @trivial $*Int, %b : @owned $<τ_0_0> { var E<(
   %e = load [copy] %a : $*E<(R<T>)->Int>
   switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt.1 : bb1, default bb2
 
-bb1(%f : @owned $@callee_owned (@in R<T>) -> @out Int):
-  apply %f(%1, %0) : $@callee_owned (@in R<T>) -> @out Int
+bb1(%f : @owned $@callee_guaranteed (@in R<T>) -> @out Int):
+  %bf = begin_borrow %f : $@callee_guaranteed (@in R<T>) -> @out Int
+  apply %bf(%1, %0) : $@callee_guaranteed (@in R<T>) -> @out Int
+  end_borrow %bf from %f : $@callee_guaranteed (@in R<T>) -> @out Int , $@callee_guaranteed (@in R<T>) -> @out Int
+  destroy_value %f : $@callee_guaranteed (@in R<T>) -> @out Int
   br exit
 
 bb2(%original : @owned $E<(R<T>)->Int>):
@@ -112,16 +115,16 @@ exit:
 // CHECK:       bb0([[ARG0:%.*]] : $*R<T>, [[ARG1:%.*]] : $*E<(R<U>) -> Builtin.Int32>, [[ARG2:%.*]] : $*Builtin.Int32):
 // CHECK:         %3 = load [[ARG1]] : $*E<(R<U>) -> Builtin.Int32>
 // CHECK:         [[F:%.*]] = function_ref @_T023generic_promotable_box2Tf2nni_n : $@convention(thin) <τ_0_0> (@in R<τ_0_0>, @in Builtin.Int32, @owned E<(R<τ_0_0>) -> Builtin.Int32>) -> ()
-// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [[F]]<U>(%2, %3)
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[F]]<U>(%2, %3)
 // CHECK-NEXT:    return [[CLOSURE]]
 
-sil @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in R<T>, @in E<(R<U>)->Int>, @in Int) -> @owned @callee_owned (@in R<U>) -> () {
+sil @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in R<T>, @in E<(R<U>)->Int>, @in Int) -> @owned @callee_guaranteed (@in R<U>) -> () {
 entry(%0 : @trivial $*R<T>, %1 : @trivial $*E<(R<U>)->Int>, %2 : @trivial $*Int):
   destroy_addr %0 : $*R<T>
   %f = function_ref @generic_promotable_box2 : $@convention(thin) <V> (@in R<V>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> ()
   %b = alloc_box $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>, 0
   copy_addr [take] %1 to [initialization] %a : $*E<(R<U>)->Int>
-  %k = partial_apply %f<U>(%2, %b) : $@convention(thin) <V> (@in R<V>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> ()
-  return %k : $@callee_owned (@in R<U>) -> ()
+  %k = partial_apply [callee_guaranteed] %f<U>(%2, %b) : $@convention(thin) <V> (@in R<V>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> ()
+  return %k : $@callee_guaranteed (@in R<U>) -> ()
 }

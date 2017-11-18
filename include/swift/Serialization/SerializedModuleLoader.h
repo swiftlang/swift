@@ -195,6 +195,10 @@ public:
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
 
+  virtual bool getAllGenericSignatures(
+                   SmallVectorImpl<GenericSignature*> &genericSignatures)
+                override;
+
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;
   }

@@ -13,6 +13,27 @@
 @_versioned
 @_semantics("crazy") func foo() -> Int  { return 5}
 
+// @_optimize
+// -----------------------------------------------------------------------------
+
+//CHECK-DAG: @_optimize(none) func test_onone()
+@_inlineable
+@_versioned
+@_optimize(none)
+func test_onone() -> Int  { return 5}
+
+//CHECK-DAG: @_optimize(speed) func test_ospeed()
+@_inlineable
+@_versioned
+@_optimize(speed)
+func test_ospeed() -> Int  { return 5}
+ 
+//CHECK-DAG: @_optimize(size) func test_osize()
+@_inlineable
+@_versioned
+@_optimize(size)
+func test_osize() -> Int  { return 5}
+
 // @_specialize
 // -----------------------------------------------------------------------------
 

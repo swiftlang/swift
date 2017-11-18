@@ -106,7 +106,7 @@ class Hoozit : Gizmo {
   // CHECK:   [[RES:%.*]] = apply [[FR]]([[VALUE_COPY]], [[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
-  // CHECK:   return [[RES]] : $(), scope {{.*}} // id: {{.*}} line:[[@LINE-34]]:13:auto_gen
+  // CHECK:   return [[RES]] : $(), loc {{.*}}, scope {{.*}} // id: {{.*}} line:[[@LINE-34]]:13:auto_gen
   // CHECK: } // end sil function '_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCvsTo'
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks6HoozitC15typicalPropertySo5GizmoCvs
@@ -492,10 +492,10 @@ class DesignatedStubs : Gizmo {
   override init() { i = 5 }
 
   // CHECK-LABEL: sil hidden @_T011objc_thunks15DesignatedStubsCSQyACGSi7bellsOn_tcfc
-  // CHECK: function_ref @_T0s25_unimplementedInitializers5NeverOs12StaticStringV9className_AE04initG0AE4fileSu4lineSu6columntF
   // CHECK: string_literal utf8 "objc_thunks.DesignatedStubs"
   // CHECK: string_literal utf8 "init(bellsOn:)"
   // CHECK: string_literal utf8 "{{.*}}objc_thunks.swift"
+  // CHECK: function_ref @_T0s25_unimplementedInitializers5NeverOs12StaticStringV9className_AE04initG0AE4fileSu4lineSu6columntF
   // CHECK: return
 
   // CHECK-NOT: sil hidden @_TFCSo15DesignatedStubsc{{.*}}

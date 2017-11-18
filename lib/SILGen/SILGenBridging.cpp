@@ -127,6 +127,16 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy.substGenericArgs(SGF.SGM.M, typeSubMap);
 
+  // We might have to re-abstract the 'self' value if it is an
+  // Optional.
+  AbstractionPattern origSelfType(witness->getInterfaceType());
+  origSelfType = origSelfType.getFunctionInputType();
+
+  swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
+                                        origSelfType,
+                                        swiftValueType,
+                                        SGFContext());
+
   // The witness may be more abstract than the concrete value we're bridging,
   // for instance, if the value is a concrete instantiation of a generic type.
   //
@@ -345,6 +355,12 @@ expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
   return results;
 }
 
+static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
+                                              CanAnyFunctionType blockType) {
+  return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
+                                         blockType, blockType->getExtInfo());
+}
+
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
                                        SILLocation loc,
                                        CanAnyFunctionType formalFuncType,
@@ -358,10 +374,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   SILFunctionConventions funcConv(funcTy, SGF.SGM.M);
 
   // Make sure we lower the component types of the formal block type.
-  formalBlockType =
-    SGF.SGM.Types.getBridgedFunctionType(AbstractionPattern(formalBlockType),
-                                         formalBlockType,
-                                         formalBlockType->getExtInfo());
+  formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType);
 
   // Set up the indirect result.
   SILType blockResultTy = blockTy->getAllResultsType();
@@ -494,9 +507,11 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(loweredFuncTy)->getCanonicalType());
+    loweredFuncTy->mapTypeOutOfContext()->getCanonicalType());
   auto blockInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(loweredBlockTy)->getCanonicalType());
+    loweredBlockTy->mapTypeOutOfContext()->getCanonicalType());
+
+  assert(!blockInterfaceTy->isCoroutine());
 
   auto storageTy = SILBlockStorageType::get(loweredFuncTy);
   auto storageInterfaceTy = SILBlockStorageType::get(fnInterfaceTy);
@@ -535,14 +550,14 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   }
 
   auto invokeTy = SILFunctionType::get(
-      genericSig, extInfo, ParameterConvention::Direct_Unowned, params,
-      blockInterfaceTy->getResults(),
+      genericSig, extInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, params, 
+      /*yields*/ {}, blockInterfaceTy->getResults(),
       blockInterfaceTy->getOptionalErrorResult(), getASTContext());
 
   // Create the invoke function. Borrow the mangling scheme from reabstraction
   // thunks, which is what we are in spirit.
-  auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
-                                                 invokeTy,
+  auto thunk = SGM.getOrCreateReabstractionThunk(invokeTy,
                                                  loweredFuncTy,
                                                  loweredBlockTy,
                                                  F.isSerialized());
@@ -751,6 +766,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   // Collect the native arguments, which should all be +1.
   Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
+  // Make sure we lower the component types of the formal block type.
+  formalBlockTy = getBridgedBlockType(SGF.SGM, formalBlockTy);
+
   assert(blockTy->getNumParameters() == funcTy->getNumParameters()
          && "block and function types don't match");
 
@@ -792,7 +810,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   // Add the block argument.
   SILValue blockV =
       entry->createFunctionArgument(SILType::getPrimitiveObjectType(blockTy));
-  ManagedValue block = SGF.emitManagedRValueWithCleanup(blockV);
+  ManagedValue block = SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
+                           ? ManagedValue::forUnmanaged(blockV)
+                           : SGF.emitManagedRValueWithCleanup(blockV);
 
   CanType formalResultType = formalFuncTy.getResult();
 
@@ -854,8 +874,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
                                 inputSubstType, outputSubstType,
                                 genericEnv, interfaceSubs);
 
-  auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
-                                                 thunkTy,
+  auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
                                                  loweredFuncTy,
                                                  F.isSerialized());

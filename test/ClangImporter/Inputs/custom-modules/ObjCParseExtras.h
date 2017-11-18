@@ -203,3 +203,12 @@ typedef SomeCell <NSCopying> *CopyableSomeCell;
 @property (class, readonly) InstancetypeAccessor *prop;
 + (instancetype)prop;
 @end
+
+typedef NSArray<NSString *> *NSStringArray;
+
+@interface BridgedTypedefs : NSObject
+@property (readonly,nonnull) NSArray<NSStringArray> *arrayOfArrayOfStrings;
+@end
+
+typedef NSString * _Nonnull (*FPTypedef)(NSString * _Nonnull);
+extern FPTypedef _Nonnull getFP(void);

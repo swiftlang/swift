@@ -28,6 +28,19 @@
 // BASICMODULE: 1: compile, {0}, swiftmodule
 // BASICMODULE: 2: merge-module, {1}, swiftmodule
 
+// RUN: touch %t/a.swiftmodule
+// RUN: %swiftc_driver -driver-print-actions -emit-module -module-name foo %s %t/a.swiftmodule 2>&1 | %FileCheck %s -check-prefix=SWIFTMODULE-INPUT
+// SWIFTMODULE-INPUT: 0: input, "{{.*}}actions.swift", swift
+// SWIFTMODULE-INPUT: 1: compile, {0}, swiftmodule
+// SWIFTMODULE-INPUT: 2: input, "{{.*}}a.swiftmodule", swift
+// SWIFTMODULE-INPUT: 3: merge-module, {1, 2}, swiftmodule
+
+// RUN: %swiftc_driver -driver-print-actions -g -emit-module -module-name foo %s %t/a.swiftmodule 2>&1 | %FileCheck %s -check-prefix=SWIFTMODULE-INPUT
+// SWIFTMODULE-DEBUG-INPUT: 0: input, "{{.*}}actions.swift", swift
+// SWIFTMODULE-DEBUG-INPUT: 1: compile, {0}, swiftmodule
+// SWIFTMODULE-DEBUG-INPUT: 2: input, "{{.*}}a.swiftmodule", swift
+// SWIFTMODULE-DEBUG-INPUT: 3: merge-module, {1, 2}, swiftmodule
+
 // RUN: %swiftc_driver -driver-print-actions -emit-executable -emit-module %s 2>&1 | %FileCheck %s -check-prefix=EXEC-AND-MODULE
 // EXEC-AND-MODULE: 0: input, "{{.*}}actions.swift", swift
 // EXEC-AND-MODULE: 1: compile, {0}, object
@@ -114,9 +127,8 @@
 // DEBUG-LINK-ONLY: 1: input, "{{.*}}/b.o", object
 // DEBUG-LINK-ONLY: 2: input, "{{.*}}/a.swiftmodule", swiftmodule
 // DEBUG-LINK-ONLY: 3: input, "{{.*}}/b.swiftmodule", swiftmodule
-// DEBUG-LINK-ONLY: 4: merge-module, {2, 3}, swiftmodule
-// DEBUG-LINK-ONLY: 5: link, {0, 1, 4}, image
-// DEBUG-LINK-ONLY: 6: generate-dSYM, {5}, dSYM
+// DEBUG-LINK-ONLY: 4: link, {0, 1, 2, 3}, image
+// DEBUG-LINK-ONLY: 5: generate-dSYM, {4}, dSYM
 
 // RUN: touch %t/c.swift
 // RUN: %swiftc_driver -driver-print-actions %t/c.swift %t/a.o %t/b.o %t/a.swiftmodule %t/b.swiftmodule -o main 2>&1 | %FileCheck %s -check-prefix=LINK-SWIFTMODULES
@@ -127,6 +139,16 @@
 // LINK-SWIFTMODULES: 4: input, "{{.*}}/a.swiftmodule", swiftmodule
 // LINK-SWIFTMODULES: 5: input, "{{.*}}/b.swiftmodule", swiftmodule
 // LINK-SWIFTMODULES: 6: link, {1, 2, 3, 4, 5}, image
+
+// RUN: %swiftc_driver -driver-print-actions -g %t/c.swift %t/a.o %t/b.o %t/a.swiftmodule %t/b.swiftmodule -o main 2>&1 | %FileCheck %s -check-prefix=LINK-DEBUG-SWIFTMODULES
+// LINK-DEBUG-SWIFTMODULES: 0: input, "{{.*}}/c.swift", swift
+// LINK-DEBUG-SWIFTMODULES: 1: compile, {0}, object
+// LINK-DEBUG-SWIFTMODULES: 2: input, "{{.*}}/a.o", object
+// LINK-DEBUG-SWIFTMODULES: 3: input, "{{.*}}/b.o", object
+// LINK-DEBUG-SWIFTMODULES: 4: input, "{{.*}}/a.swiftmodule", swiftmodule
+// LINK-DEBUG-SWIFTMODULES: 5: input, "{{.*}}/b.swiftmodule", swiftmodule
+// LINK-DEBUG-SWIFTMODULES: 6: merge-module, {1}, swiftmodule
+// LINK-DEBUG-SWIFTMODULES: 7: link, {1, 2, 3, 4, 5, 6}, image
 
 // RUN: touch %t/a.o %t/b.o
 // RUN: %swiftc_driver -driver-print-actions %t/a.o %s -o main 2>&1 | %FileCheck %s -check-prefix=COMPILE-PLUS-OBJECT

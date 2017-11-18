@@ -54,9 +54,8 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 374; // Last change: has forced static dispatch
+const uint16_t VERSION_MINOR = 387; // Last change: dependencies for typealiases
 
-using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
 
 // TypeID must be the same as DeclID because it is stored in the same way.
@@ -77,6 +76,11 @@ using DeclContextIDField = DeclIDField;
 // in the same way.
 using NormalConformanceID = DeclID;
 using NormalConformanceIDField = DeclIDField;
+
+// GenericSignatureID must be the same as DeclID because it is stored in the
+// same way.
+using GenericSignatureID = DeclID;
+using GenericSignatureIDField = DeclIDField;
 
 // GenericEnvironmentID must be the same as DeclID because it is stored in the
 // same way.
@@ -154,6 +158,15 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Closure,
 };
 using SILFunctionTypeRepresentationField = BCFixed<4>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class SILCoroutineKind : uint8_t {
+  None = 0,
+  YieldOnce = 1,
+  YieldMany = 2,
+};
+using SILCoroutineKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -464,7 +477,12 @@ enum BlockID {
   /// The comment block, which contains documentation comments.
   ///
   /// \sa comment_block
-  COMMENT_BLOCK_ID
+  COMMENT_BLOCK_ID,
+
+  /// The declaration member-tables index block, a sub-blocb of the index block.
+  ///
+  /// \sa decl_member_tables_block
+  DECL_MEMBER_TABLES_BLOCK_ID
 };
 
 /// The record types within the control block.
@@ -725,24 +743,25 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
-    BCArray<TypeIDField> // generic parameters
-                         // followed by requirements
+    GenericSignatureIDField // generic signture
   >;
 
   using SILFunctionTypeLayout = BCRecordLayout<
     SIL_FUNCTION_TYPE,
+    SILCoroutineKindField, // coroutine kind
     ParameterConventionField, // callee convention
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters
+    BCFixed<30>,           // number of yields
     BCFixed<30>,           // number of results
+    GenericSignatureIDField, // generic signature
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
-                           // followed by generic parameter types
-    // Trailed by its generic requirements, if any.
+    // Optionally a protocol conformance (for witness_methods)
   >;
   
   using SILBlockStorageTypeLayout = BCRecordLayout<
@@ -752,10 +771,9 @@ namespace decls_block {
 
   using SILLayoutLayout = BCRecordLayout<
     SIL_LAYOUT,
+    GenericSignatureIDField,    // generic signature
     BCFixed<31>,                // number of fields
     BCArray<TypeIDWithBitField> // field types with mutability
-                                // followed by generic parameters
-                                // trailed by generic requirements, if any
   >;
 
   using SILBoxTypeLayout = BCRecordLayout<
@@ -801,7 +819,8 @@ namespace decls_block {
     TypeIDField, // interface type (no longer used)
     BCFixed<1>,  // implicit flag
     GenericEnvironmentIDField, // generic environment
-    AccessLevelField // access level
+    AccessLevelField, // access level
+    BCArray<TypeIDField> // dependency types
     // Trailed by generic parameters (if any).
   >;
 
@@ -874,6 +893,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
+    BCFixed<1>,             // existential-type-supported?
     GenericEnvironmentIDField, // generic environment
     AccessLevelField, // access level
     BCArray<DeclIDField>    // inherited types
@@ -1148,9 +1168,9 @@ namespace decls_block {
     DeclIDField // Typealias
   >;
 
-  using GenericEnvironmentLayout = BCRecordLayout<
-    GENERIC_ENVIRONMENT,
-    BCArray<TypeIDField>         // sugared interface types
+  using GenericSignatureLayout = BCRecordLayout<
+    GENERIC_SIGNATURE,
+    BCArray<TypeIDField>         // generic parameter types
   >;
 
   using SILGenericEnvironmentLayout = BCRecordLayout<
@@ -1265,8 +1285,8 @@ namespace decls_block {
   using XRefExtensionPathPieceLayout = BCRecordLayout<
     XREF_EXTENSION_PATH_PIECE,
     ModuleIDField,       // module ID
-    BCArray<TypeIDField> // for a constrained extension, the type parameters
-    // for a constrained extension, requirements follow
+    GenericSignatureIDField  // for a constrained extension,
+                             // the generic signature
   >;
 
   using XRefOperatorOrAccessorPathPieceLayout = BCRecordLayout<
@@ -1380,6 +1400,11 @@ namespace decls_block {
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
     BCFixed<2>  // inline value
+  >;
+
+  using OptimizeDeclAttrLayout = BCRecordLayout<
+    Optimize_DECL_ATTR,
+    BCFixed<2>  // optimize value
   >;
 
   // Encodes a VersionTuple:
@@ -1498,7 +1523,7 @@ namespace index_block {
     TOP_LEVEL_DECLS,
     OPERATORS,
     EXTENSIONS,
-    CLASS_MEMBERS,
+    CLASS_MEMBERS_FOR_DYNAMIC_LOOKUP,
     OPERATOR_METHODS,
 
     /// The Objective-C method index, which contains a mapping from
@@ -1516,8 +1541,10 @@ namespace index_block {
 
     PRECEDENCE_GROUPS,
     NESTED_TYPE_DECLS,
+    DECL_MEMBER_NAMES,
 
-    LastRecordKind = PRECEDENCE_GROUPS,
+    GENERIC_SIGNATURE_OFFSETS,
+    LastRecordKind = GENERIC_SIGNATURE_OFFSETS,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;
@@ -1559,10 +1586,30 @@ namespace index_block {
     BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
+  using DeclMemberNamesLayout = BCRecordLayout<
+    DECL_MEMBER_NAMES, // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from member DeclBaseNames to offsets of DECL_MEMBERS records
+  >;
+
   using EntryPointLayout = BCRecordLayout<
     ENTRY_POINT,
     DeclIDField  // the ID of the main class; 0 if there was a main source file
   >;
+}
+
+/// \sa DECL_MEMBER_TABLES_BLOCK_ID
+namespace decl_member_tables_block {
+  enum RecordKind {
+    DECL_MEMBERS = 1,
+  };
+
+  using DeclMembersLayout = BCRecordLayout<
+    DECL_MEMBERS, // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // maps from DeclIDs to DeclID vectors
+  >;
+
 }
 
 /// \sa COMMENT_BLOCK_ID

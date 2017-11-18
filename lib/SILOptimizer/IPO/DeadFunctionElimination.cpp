@@ -126,6 +126,10 @@ protected:
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
 
+    // Functions that may be used externally cannot be removed.
+    if (F->isPossiblyUsedExternally())
+      return true;
+
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
@@ -228,6 +232,10 @@ protected:
       }
     }
 
+    for (const auto &conf : WT->getConditionalConformances()) {
+      if (conf.Conformance.isConcrete())
+        ensureAliveConformance(conf.Conformance.getConcrete());
+    }
   }
 
   /// Marks the declarations referenced by a key path pattern as alive if they

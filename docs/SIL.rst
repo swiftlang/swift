@@ -582,6 +582,46 @@ autorelease in the callee.
     importer only imports non-native methods and types as ``throws``
     when it is possible to do this automatically.
 
+Coroutine Types
+```````````````
+
+A coroutine is a function which can suspend itself and return control to
+its caller without terminating the function.  That is, it does not need to
+obey a strict stack discipline.
+
+SIL supports two kinds of coroutine: ``@yield_many`` and ``@yield_once``.
+Either of these attributes may be written before a function type to
+indicate that it is a coroutine type.
+
+A coroutine type may declare any number of *yielded values*, which is to
+say, values which are provided to the caller at a yield point.  Yielded
+values are written in the result list of a function type, prefixed by
+the ``@yields`` attribute.  A yielded value may have a convention attribute,
+taken from the set of parameter attributes and interpreted as if the yield
+site were calling back to the calling function.
+
+Currently, a coroutine may not have normal results.
+
+Coroutine functions may be used in many of the same ways as normal
+function values.  However, they cannot be called with the standard
+``apply`` or ``try_apply`` instructions.  A non-throwing yield-once
+coroutine can be called with the ``begin_apply`` instruction.  There
+is no support yet for calling a throwing yield-once coroutine or for
+calling a yield-many coroutine of any kind.
+
+Coroutines may contain the special ``yield`` and ``unwind`` instructions.
+
+A ``@yield_many`` coroutine may yield as many times as it desires.
+A ``@yield_once`` coroutine may yield exactly once before returning,
+although it may also ``throw`` before reaching that point.
+
+This coroutine representation is well-suited to coroutines whose control
+flow is tightly integrated with their callers and which intend to pass
+information back and forth.  This matches the needs of generalized
+accessor and generator features in Swift.  It is not a particularly good
+match for ``async``/``await``-style features; a simpler representation
+would probably do fine for that.
+
 Properties of Types
 ```````````````````
 
@@ -3100,6 +3140,102 @@ If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments and return value is
 given with these generic substitutions applied.
 
+begin_apply
+```````````
+::
+
+  sil-instruction ::= 'begin_apply' '[nothrow]'? sil-value
+                        sil-apply-substitution-list?
+                        '(' (sil-value (',' sil-value)*)? ')'
+                        ':' sil-type
+
+  (%anyAddr, %float, %token) = begin_apply %0() : $@yield_once () -> (@yields @inout %Any, @yields Float)
+  // %anyAddr : $*Any
+  // %float : $Float
+  // %token is a token
+
+Transfers control to coroutine ``%0``, passing it the given arguments.
+The rules for the application generally follow the rules for ``apply``,
+except:
+
+- the callee value must have a ``yield_once`` coroutine type,
+
+- control returns to this function not when the coroutine performs a
+  ``return``, but when it performs a ``yield``, and
+
+- the instruction results are derived from the yields of the coroutine
+  instead of its normal results.
+
+The final result of a ``begin_apply`` is a "token", a special value which
+can only be used as the operand of an ``end_apply`` or ``abort_apply``
+instruction.  Before this second instruction is executed, the coroutine
+is said to be "suspended", and the token represents a reference to its
+suspended activation record.
+
+The other results of the instruction correspond to the yields in the
+coroutine type.  In general, the rules of a yield are similar to the rules
+for a parameter, interpreted as if the coroutine caller (the one
+executing the ``begin_apply``) were being "called" by the ``yield``:
+
+- If a yield has an indirect convention, the corresponding result will
+  have an address type; otherwise it has an object type.  For example,
+  a result corresponding to an ``@in Any`` yield will have type ``$Any``.
+
+- The convention attributes are the same as the parameter convention
+  attributes, interpreted as if the ``yield`` were the "call" and the
+  ``begin_apply`` marked the entry to the "callee".  For example,
+  an ``@in Any`` yield transferrs ownership of the ``Any`` value
+  reference from the coroutine to the caller, which must destroy
+  or move the value from that position before ending or aborting the
+  coroutine.
+
+A ``begin_apply`` must be uniquely either ended or aborted before
+exiting the function or looping to an earlier portion of the function.
+
+When throwing coroutines are supported, there will need to be a
+``try_begin_apply`` instruction.
+
+abort_apply
+```````````
+::
+
+  sil-instruction ::= 'abort_apply' sil-value
+
+  abort_apply %token
+
+Aborts the given coroutine activation, which is currently suspended at
+a ``yield`` instruction.  Transfers control to the coroutine and takes
+the ``unwind`` path from the ``yield``.  Control is transferred back
+when the coroutine reaches an ``unwind`` instruction.
+
+The operand must always be the token result of a ``begin_apply``
+instruction, which is why it need not specify a type.
+
+Throwing coroutines will not require a new instruction for aborting
+a coroutine; a coroutine is not allowed to throw when it is being aborted.
+
+end_apply
+`````````
+::
+
+  sil-instruction ::= 'end_apply' sil-value
+
+  end_apply %token
+
+Ends the given coroutine activation, which is currently suspended at
+a ``yield`` instruction.  Transfers control to the coroutine and takes
+the ``resume`` path from the ``yield``.  Control is transferred back
+when the coroutine reaches a ``return`` instruction.
+
+The operand must always be the token result of a ``begin_apply``
+instruction, which is why it need not specify a type.
+
+``end_apply`` currently has no instruction results.  If coroutines were
+allowed to have normal results, they would be producted by ``end_apply``.
+
+When throwing coroutines are supported, there will need to be a
+``try_end_apply`` instruction.
+
 partial_apply
 `````````````
 ::
@@ -4698,6 +4834,10 @@ the current function was invoked with a ``try_apply` instruction, control
 resumes at the normal destination, and the value of the basic block argument
 will be the operand of this ``return`` instruction.
 
+If the current function is a ``yield_once`` coroutine, there must not be
+a path from the entry block to a ``return`` which does not pass through
+a ``yield`` instruction. This rule does not apply in the ``raw`` SIL stage.
+
 ``return`` does not retain or release its operand or any other values.
 
 A function must not contain more than one ``return`` instruction.
@@ -4713,13 +4853,57 @@ throw
 
 Exits the current function and returns control to the calling
 function. The current function must have an error result, and so the
-function must have been invoked with a ``try_apply` instruction.
+function must have been invoked with a ``try_apply`` instruction.
 Control will resume in the error destination of that instruction, and
 the basic block argument will be the operand of the ``throw``.
 
 ``throw`` does not retain or release its operand or any other values.
 
 A function must not contain more than one ``throw`` instruction.
+
+yield
+`````
+::
+
+  sil-terminator ::= 'yield' sil-yield-values
+                       ',' 'resume' sil-identifier
+                       ',' 'unwind' sil-identifier
+  sil-yield-values ::= sil-operand
+  sil-yield-values ::= '(' (sil-operand (',' sil-operand)*)? ')'
+
+Temporarily suspends the current function and provides the given
+values to the calling function. The current function must be a coroutine,
+and the yield values must match the yield types of the coroutine.
+If the calling function resumes the coroutine normally, control passes to
+the ``resume`` destination. If the calling function aborts the coroutine,
+control passes to the ``unwind`` destination.
+
+The ``resume`` and ``unwind`` destination blocks must be uniquely
+referenced by the ``yield`` instruction.  This prevents them from becoming
+critical edges.
+
+In a ``yield_once`` coroutine, there must not be a control flow path leading
+from the ``resume`` edge to another ``yield`` instruction in this function.
+This rule does not apply in the ``raw`` SIL stage.
+
+There must not be a control flow path leading from the ``unwind`` edge to
+a ``return`` instruction, to a ``throw`` instruction, or to any block
+reachable from the entry block via a path that does not pass through
+an ``unwind`` edge. That is, the blocks reachable from ``unwind`` edges
+must jointly form a disjoint subfunction of the coroutine.
+
+unwind
+``````
+::
+
+  sil-terminator ::= 'unwind'
+
+Exits the current function and returns control to the calling function,
+completing an unwind from a ``yield``. The current function must be a
+coroutine.
+
+``unwind`` is only permitted in blocks reachable from the ``unwind`` edges
+of ``yield`` instructions.
 
 br
 ``

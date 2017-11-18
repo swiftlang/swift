@@ -12,36 +12,36 @@ func transform(_ i: Int) -> Double {
 
 // CHECK-LABEL: sil hidden @_T017reabstract_lvalue0A13FunctionInOutyyF : $@convention(thin) () -> ()
 func reabstractFunctionInOut() {
-  // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_owned (Int) -> Double }
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed (Int) -> Double }
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
   // CHECK: [[ARG:%.*]] = function_ref @_T017reabstract_lvalue9transformSdSiF
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
   // CHECK: store [[THICK_ARG:%.*]] to [init] [[PB]]
-  // CHECK: [[FUNC:%.*]] = function_ref @_T017reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F
-  // CHECK:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*@callee_owned (Int) -> Double
-  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_owned (@in Int) -> @out Double
+  // CHECK:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*@callee_guaranteed (Int) -> Double
+  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_guaranteed (@in Int) -> @out Double
   // CHECK: [[THICK_ARG:%.*]] = load [copy] [[WRITE]]
-  // CHECK: [[THUNK1:%.*]] = function_ref @_T0SiSdIexyd_SiSdIexir_TR
-  // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [[THUNK1]]([[THICK_ARG]])
+  // CHECK: [[THUNK1:%.*]] = function_ref @_T0SiSdIegyd_SiSdIegir_TR
+  // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK1]]([[THICK_ARG]])
   // CHECK: store [[ABSTRACTED_ARG]] to [init] [[ABSTRACTED_BOX]]
+  // CHECK: [[FUNC:%.*]] = function_ref @_T017reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]<(Int) -> Double>([[ABSTRACTED_BOX]])
   // CHECK: [[NEW_ABSTRACTED_ARG:%.*]] = load [take] [[ABSTRACTED_BOX]]
-  // CHECK: [[THUNK2:%.*]] = function_ref @_T0SiSdIexir_SiSdIexyd_TR
-  // CHECK: [[NEW_ARG:%.*]] = partial_apply [[THUNK2]]([[NEW_ABSTRACTED_ARG]])
+  // CHECK: [[THUNK2:%.*]] = function_ref @_T0SiSdIegir_SiSdIegyd_TR
+  // CHECK: [[NEW_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[NEW_ABSTRACTED_ARG]])
   var minimallyAbstracted = transform
   consumeGenericInOut(&minimallyAbstracted)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIexyd_SiSdIexir_TR : $@convention(thin) (@in Int, @owned @callee_owned (Int) -> Double) -> @out Double
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIexir_SiSdIexyd_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Double) -> Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIegyd_SiSdIegir_TR : $@convention(thin) (@in Int, @guaranteed @callee_guaranteed (Int) -> Double) -> @out Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0SiSdIegir_SiSdIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in Int) -> @out Double) -> Double
 
 // CHECK-LABEL: sil hidden @_T017reabstract_lvalue0A13MetatypeInOutyyF : $@convention(thin) () -> ()
 func reabstractMetatypeInOut() {
   var thinMetatype = MyMetatypeIsThin.self
-  // CHECK: [[FUNC:%.*]] = function_ref @_T017reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F
   // CHECK: [[BOX:%.*]] = alloc_stack $@thick MyMetatypeIsThin.Type
   // CHECK: [[THICK:%.*]] = metatype $@thick MyMetatypeIsThin.Type
   // CHECK: store [[THICK]] to [trivial] [[BOX]]
+  // CHECK: [[FUNC:%.*]] = function_ref @_T017reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]<MyMetatypeIsThin.Type>([[BOX]])
   consumeGenericInOut(&thinMetatype)
 }

@@ -60,6 +60,9 @@ TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 TYPE_ATTR(pseudogeneric)
+TYPE_ATTR(yields)
+TYPE_ATTR(yield_once)
+TYPE_ATTR(yield_many)
 
 // SIL metatype attributes.
 TYPE_ATTR(thin)
@@ -291,6 +294,14 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
 // due to an SDK change in Dispatch
 SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
                  OnEnumElement | LongAttribute | UserInaccessible, 71)
+
+SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional,
+                 ImplicitlyUnwrappedOptional,
+                 OnFunc | OnVar | OnSubscript | OnConstructor | RejectByParser, 72)
+
+DECL_ATTR(_optimize, Optimize,
+          OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar |
+          UserInaccessible, 73)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -138,16 +138,16 @@ protocol P {
 
 // Lookup of same-named associated types aren't ambiguous in this context.
 protocol P1 {
-  associatedtype A // expected-note 2{{declared here}}
+  associatedtype A
 }
 
 protocol P2: P1 {
-  associatedtype A // expected-warning{{redeclaration of associated type}}
+  associatedtype A
   associatedtype B where A == B
 }
 
 protocol P3: P1 {
-  associatedtype A // expected-warning{{redeclaration of associated type}}
+  associatedtype A
 }
 
 protocol P4 {

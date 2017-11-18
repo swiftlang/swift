@@ -490,7 +490,7 @@ public struct S : P {
 }
 
 // CHECK-LABEL: sil shared @_T04test1SVAA1PA2aDP3fooS2iycFZTW8closure2SiTf1cn_n : $@convention(thin) (@thick S.Type, Int) -> Int
-sil @_T04test1SVAA1PA2aDP3fooS2iycFZTW : $@convention(witness_method) (@owned @callee_owned () -> Int, @thick S.Type) -> Int {
+sil @_T04test1SVAA1PA2aDP3fooS2iycFZTW : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int {
 bb0(%0 : $@callee_owned () -> Int, %1 : $@thick S.Type):
   %3 = apply %0() : $@callee_owned () -> Int
   return %3 : $Int
@@ -506,8 +506,8 @@ bb0(%0 : $Int, %1 : $S):
   %3 = function_ref @closure2 : $@convention(thin) (Int) -> Int
   %4 = partial_apply %3(%0) : $@convention(thin) (Int) -> Int
   %5 = metatype $@thick S.Type
-  %6 = function_ref @_T04test1SVAA1PA2aDP3fooS2iycFZTW : $@convention(witness_method) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
-  %7 = apply %6(%4, %5) : $@convention(witness_method) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
+  %6 = function_ref @_T04test1SVAA1PA2aDP3fooS2iycFZTW : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
+  %7 = apply %6(%4, %5) : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
   return %7 : $Int
 }
 

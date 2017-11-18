@@ -1,13 +1,21 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-build-swift -swift-version 3 %s -o %t/a.out3 && %target-run %t/a.out3
+// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-run %t/a.out4
 // REQUIRES: executable_test
-// REQUIRES: OS=ios
+// UNSUPPORTED: OS=macosx
+// REQUIRES: objc_interop
 
 import UIKit
 import StdlibUnittest
 import StdlibUnittestFoundationExtras
 
-let UIKitTests = TestSuite("UIKit")
+#if swift(>=4)
+  let UIKitTests = TestSuite("UIKit_Swift4")
+#else
+  let UIKitTests = TestSuite("UIKit_Swift3")
+#endif
 
+#if !os(watchOS) && !os(tvOS)
 private func printDevice(_ o: UIDeviceOrientation) -> String {
   var s = "\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), "
   s += "\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), "
@@ -60,6 +68,7 @@ UIKitTests.test("UIInterfaceOrientation") {
   expectEqual("false false, true true",
     printInterface(.landscapeRight))
 }
+#endif
 
 UIKitTests.test("UIEdgeInsets") {
   let insets = [
@@ -79,6 +88,66 @@ UIKitTests.test("UIOffset") {
   checkEquatable(offsets, oracle: { $0 == $1 })
 }
 
+UIKitTests.test("UIFont.Weight") {
+  guard #available(iOS 8.2, *) else { return }
+  #if swift(>=4) // Swift 4
+    let regularFontWeight: UIFont.Weight = .regular
+
+    expectTrue(regularFontWeight == .regular)
+    expectTrue(regularFontWeight > .light)
+    expectTrue(regularFontWeight < .heavy)
+    expectTrue(regularFontWeight + 0.1 == 0.1 + regularFontWeight)
+  #else // Swift 3
+    let regularFontWeight: UIFontWeight = UIFontWeightRegular
+
+    expectTrue(regularFontWeight == UIFontWeightRegular)
+    expectTrue(regularFontWeight > UIFontWeightLight)
+    expectTrue(regularFontWeight < UIFontWeightHeavy)
+    expectTrue(regularFontWeight + 0.1 == 0.1 + UIFontWeightRegular)
+  #endif
+}
+
+#if !os(watchOS)
+UIKitTests.test("UILayoutPriority") {
+  #if swift(>=4) // Swift 4
+    let lowLayoutPriority: UILayoutPriority = .defaultLow
+    let highLayoutPriority: UILayoutPriority = .defaultHigh
+
+    expectTrue(lowLayoutPriority < highLayoutPriority)
+
+    expectTrue(lowLayoutPriority + 2.0 == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
+    expectTrue(2.0 + lowLayoutPriority == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
+    expectTrue(lowLayoutPriority - 2.0 == UILayoutPriority(lowLayoutPriority.rawValue - 2.0))
+    expectTrue(highLayoutPriority - lowLayoutPriority == highLayoutPriority.rawValue - lowLayoutPriority.rawValue)
+
+    expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
+
+    var mutablePriority = lowLayoutPriority
+    mutablePriority -= 1.0
+    mutablePriority += 2.0
+    expectTrue(mutablePriority == lowLayoutPriority + 1.0)
+
+    let priorotyRange = lowLayoutPriority...highLayoutPriority
+    expectTrue(priorotyRange.contains(.defaultLow))
+    expectFalse(priorotyRange.contains(.required))
+  #else // Swift 3
+    let lowLayoutPriority: UILayoutPriority = UILayoutPriorityDefaultLow
+    let highLayoutPriority: UILayoutPriority = UILayoutPriorityDefaultHigh
+
+    expectTrue(lowLayoutPriority < highLayoutPriority)
+
+    expectTrue(2.0 + lowLayoutPriority == lowLayoutPriority + 2.0)
+    expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
+
+    var mutablePriority = lowLayoutPriority
+    mutablePriority -= 1.0
+    mutablePriority += 2.0
+    expectTrue(mutablePriority == lowLayoutPriority + 1.0)
+  #endif
+}
+#endif
+
+#if !os(watchOS)
 class TestChildView : UIView, CustomPlaygroundQuickLookable {
   convenience init() {
     self.init(frame: CGRect(x: 0, y: 0, width: 10, height: 10))
@@ -95,6 +164,7 @@ UIKitTests.test("CustomPlaygroundQuickLookable") {
     "TestChildView custom quicklookable should have been invoked")
   }
 }
+#endif
 
 UIKitTests.test("NSValue bridging") {
   expectBridgeToNSValue(UIEdgeInsets(top: 17, left: 38, bottom: 6, right: 79),

@@ -107,8 +107,8 @@ func address_only_call_1() -> Unloadable {
 func address_only_call_1_ignore_return() {
   // CHECK: bb0:
   some_address_only_function_1()
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_1AA10Unloadable_pyF
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_1AA10Unloadable_pyF
   // CHECK: apply [[FUNC]]([[TEMP]])
   // CHECK: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
@@ -120,9 +120,9 @@ func address_only_call_2(_ x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : @trivial $*Unloadable):
   // CHECK: debug_value_addr [[XARG]] : $*Unloadable
   some_address_only_function_2(x)
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_2{{[_0-9a-zA-Z]*}}F
   // CHECK: [[X_CALL_ARG:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: copy_addr [[XARG]] to [initialization] [[X_CALL_ARG]]
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_2{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]([[X_CALL_ARG]])
   // CHECK: dealloc_stack [[X_CALL_ARG]]
   // CHECK: return
@@ -132,10 +132,10 @@ func address_only_call_2(_ x: Unloadable) {
 func address_only_call_1_in_2() {
   // CHECK: bb0:
   some_address_only_function_2(some_address_only_function_1())
-  // CHECK: [[FUNC2:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_2{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[FUNC1:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_1{{[_0-9a-zA-Z]*}}F
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
+  // CHECK: [[FUNC1:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_1{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC1]]([[TEMP]])
+  // CHECK: [[FUNC2:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_2{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC2]]([[TEMP]])
   // CHECK: dealloc_stack [[TEMP]]
   // CHECK: return
@@ -145,8 +145,8 @@ func address_only_call_1_in_2() {
 func address_only_materialize() -> Int {
   // CHECK: bb0:
   return some_address_only_function_1().foo()
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_1{{[_0-9a-zA-Z]*}}F
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T018address_only_types05some_a1_B11_function_1{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]([[TEMP]])
   // CHECK: [[TEMP_PROJ:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*Unloadable to $*[[OPENED:@opened(.*) Unloadable]]
   // CHECK: [[FOO_METHOD:%[0-9]+]] = witness_method $[[OPENED]], #Unloadable.foo!1
@@ -194,8 +194,8 @@ var global_prop : Unloadable {
 func address_only_assignment_from_temp_to_property() {
   // CHECK: bb0:
   global_prop = some_address_only_function_1()
-  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_T018address_only_types11global_propAA10Unloadable_pvs
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
+  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_T018address_only_types11global_propAA10Unloadable_pvs
   // CHECK: apply [[SETTER]]([[TEMP]])
   // CHECK: dealloc_stack [[TEMP]]
 }
@@ -204,9 +204,9 @@ func address_only_assignment_from_temp_to_property() {
 func address_only_assignment_from_lv_to_property(_ v: Unloadable) {
   // CHECK: bb0([[VARG:%[0-9]+]] : @trivial $*Unloadable):
   // CHECK: debug_value_addr [[VARG]] : $*Unloadable
-  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_T018address_only_types11global_propAA10Unloadable_pvs
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
   // CHECK: copy_addr [[VARG]] to [initialization] [[TEMP]]
+  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_T018address_only_types11global_propAA10Unloadable_pvs
   // CHECK: apply [[SETTER]]([[TEMP]])
   // CHECK: dealloc_stack [[TEMP]]
   global_prop = v

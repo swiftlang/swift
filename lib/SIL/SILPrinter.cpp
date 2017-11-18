@@ -351,7 +351,7 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   }
 
-  auto uncurryLevel = getUncurryLevel();
+  auto uncurryLevel = getParameterListCount() - 1;
   if (uncurryLevel != 0)
     OS << (isDot ? '.' : '!')  << uncurryLevel;
 
@@ -1073,9 +1073,8 @@ public:
     *this << '>';
   }
 
-  void visitApplyInst(ApplyInst *AI) {
-    if (AI->isNonThrowing())
-      *this << "[nothrow] ";
+  template <class Inst>
+  void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutions());
     *this << '(';
@@ -1085,14 +1084,20 @@ public:
     *this << ") : " << AI->getCallee()->getType();
   }
 
+  void visitApplyInst(ApplyInst *AI) {
+    if (AI->isNonThrowing())
+      *this << "[nothrow] ";
+    visitApplyInstBase(AI);
+  }
+
+  void visitBeginApplyInst(BeginApplyInst *AI) {
+    if (AI->isNonThrowing())
+      *this << "[nothrow] ";
+    visitApplyInstBase(AI);
+  }
+
   void visitTryApplyInst(TryApplyInst *AI) {
-    *this << Ctx.getID(AI->getCallee());
-    printSubstitutions(AI->getSubstitutions());
-    *this << '(';
-    interleave(AI->getArguments(),
-               [&](const SILValue &arg) { *this << Ctx.getID(arg); },
-               [&] { *this << ", "; });
-    *this << ") : " << AI->getCallee()->getType();
+    visitApplyInstBase(AI);
     *this << ", normal " << Ctx.getID(AI->getNormalBB());
     *this << ", error " << Ctx.getID(AI->getErrorBB());
   }
@@ -1115,13 +1120,15 @@ public:
     case ParameterConvention::Indirect_InoutAliasable:
       llvm_unreachable("unexpected callee convention!");
     }
-    *this << Ctx.getID(CI->getCallee());
-    printSubstitutions(CI->getSubstitutions());
-    *this << '(';
-    interleave(CI->getArguments(),
-               [&](const SILValue &arg) { *this << Ctx.getID(arg); },
-               [&] { *this << ", "; });
-    *this << ") : " << CI->getCallee()->getType();
+    visitApplyInstBase(CI);
+  }
+
+  void visitAbortApplyInst(AbortApplyInst *AI) {
+    *this << Ctx.getID(AI->getOperand());
+  }
+
+  void visitEndApplyInst(EndApplyInst *AI) {
+    *this << Ctx.getID(AI->getOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -1854,6 +1861,21 @@ public:
     *this << getIDAndType(TI->getOperand());
   }
 
+  void visitUnwindInst(UnwindInst *UI) {
+    // no operands
+  }
+
+  void visitYieldInst(YieldInst *YI) {
+    auto values = YI->getYieldedValues();
+    if (values.size() != 1) *this << '(';
+    interleave(values,
+               [&](SILValue value) { *this << getIDAndType(value); },
+               [&] { *this << ", "; });
+    if (values.size() != 1) *this << ')';
+    *this << ", resume " << Ctx.getID(YI->getResumeBB())
+          << ", unwind " << Ctx.getID(YI->getUnwindBB());
+  }
+
   void visitSwitchValueInst(SwitchValueInst *SII) {
     *this << getIDAndType(SII->getOperand());
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
@@ -2228,6 +2250,13 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case NoInline: OS << "[noinline] "; break;
     case AlwaysInline: OS << "[always_inline] "; break;
     case InlineDefault: break;
+  }
+
+  switch (getOptimizationMode()) {
+    case OptimizationMode::NoOptimization: OS << "[Onone] "; break;
+    case OptimizationMode::ForSpeed: OS << "[Ospeed] "; break;
+    case OptimizationMode::ForSize: OS << "[Osize] "; break;
+    default: break;
   }
 
   if (getEffectsKind() == EffectsKind::ReadOnly)
@@ -2658,6 +2687,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "[serialized] ";
 
   getConformance()->printName(OS, Options);
+  Options.GenericEnv =
+    getConformance()->getDeclContext()->getGenericEnvironmentOfContext();
 
   if (isDeclaration()) {
     OS << "\n\n";
@@ -2698,7 +2729,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       auto &assocWitness = witness.getAssociatedTypeWitness();
       OS << "associated_type ";
       OS << assocWitness.Requirement->getName() << ": ";
-      assocWitness.Witness->print(OS, PrintOptions::printSIL());
+      assocWitness.Witness->print(OS, Options);
       break;
     }
     case AssociatedTypeProtocol: {
@@ -2731,7 +2762,22 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     }
     OS << '\n';
   }
-  
+
+  for (auto conditionalConformance : getConditionalConformances()) {
+    // conditional_conformance (TypeName: Protocol):
+    // <conformance>
+    OS << "  conditional_conformance (";
+    conditionalConformance.Requirement.print(OS, Options);
+    OS << ": " << conditionalConformance.Conformance.getRequirement()->getName()
+       << "): ";
+    if (conditionalConformance.Conformance.isConcrete())
+      conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
+    else
+      OS << "dependent";
+
+    OS << '\n';
+  }
+
   OS << "}\n\n";
 }
 

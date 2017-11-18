@@ -106,11 +106,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 115,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -119,11 +114,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 123,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 123,
     key.length: 1
   },
@@ -172,16 +162,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 180,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 182,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -195,16 +175,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 192,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 190,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 192,
     key.length: 1
   },
@@ -277,11 +247,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 295,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.class,
     key.name: "CC",
     key.usr: "s:8__main__2CCC",
@@ -290,11 +255,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 303,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 303,
     key.length: 1
   },
@@ -409,11 +369,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 448,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Prot",
     key.usr: "s:8__main__4ProtP",
@@ -441,11 +396,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 471,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.class,
     key.name: "CC",
     key.usr: "s:8__main__2CCC",
@@ -454,11 +404,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 478,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 478,
     key.length: 1
   },
@@ -687,11 +632,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 686,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.typealias,
     key.name: "CCAlias",
     key.usr: "s:8__main__7CCAliasa",
@@ -715,11 +655,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 719,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 719,
     key.length: 1
   },
@@ -860,11 +795,6 @@
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 914,
-    key.length: 6
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.comment,
     key.offset: 930,
     key.length: 25
@@ -927,11 +857,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1033,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Prot",
     key.usr: "s:8__main__4ProtP",
@@ -988,11 +913,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1100,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Prot",
     key.usr: "s:8__main__4ProtP",
@@ -1016,11 +936,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1140,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1140,
     key.length: 1
   },
@@ -1061,11 +976,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1197,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1197,
     key.length: 3
   },
@@ -1113,11 +1023,6 @@
     key.length: 2
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1246,
-    key.length: 2
-  },
-  {
     key.kind: source.lang.swift.ref.class,
     key.name: "ComputedProperty",
     key.usr: "s:8__main__16ComputedPropertyC",
@@ -1126,11 +1031,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1268,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1268,
     key.length: 3
   },
@@ -1509,11 +1409,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1651,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.class,
     key.name: "SB1",
     key.usr: "s:8__main__3SB1C",
@@ -1522,11 +1417,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1659,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1659,
     key.length: 1
   },
@@ -1587,11 +1477,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1715,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1715,
     key.length: 1
   },
@@ -1748,17 +1633,19 @@
     key.length: 5
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 1919,
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.syntaxtype.parameter,
     key.offset: 1921,
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "T",
+    key.usr: "s:8__main__6genfooyxAA5Prot2RzSi7ElementRtzlF1TL_xmfp",
     key.offset: 1924,
     key.length: 1
   },
@@ -1782,28 +1669,11 @@
     key.length: 7
   },
   {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 1919,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1921,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
     key.offset: 1946,
     key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.generic_type_param,
-    key.name: "T",
-    key.usr: "s:8__main__6genfooyxAA5Prot2RzSi7ElementRtzlF1TL_xmfp",
-    key.offset: 1924,
-    key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -1831,11 +1701,6 @@
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1987,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
     key.usr: "s:8__main__5Prot3P4Selfxmfp",
@@ -1844,11 +1709,6 @@
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 1996,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1996,
     key.length: 1
   },

@@ -313,6 +313,12 @@ extension OuterS.InnerS : AProtocol {
   func foo() -> Int { return 1 }
 }
 
+protocol ExtendMe {}
+protocol Whatever {}
+// CHECK: [[@LINE-1]]:10 | protocol/Swift | Whatever | [[Whatever_USR:.*]] | Def | rel: 0
+extension ExtendMe where Self: Whatever {}
+// CHECK: [[@LINE-1]]:32 | protocol/Swift | Whatever | [[Whatever_USR]] | Ref | rel: 0
+
 var anInstance = AClass(x: 1)
 // CHECK: [[@LINE-1]]:18 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref | rel: 0
 // CHECK: [[@LINE-2]]:18 | constructor/Swift | init(x:) | s:14swift_ide_test6AClassCACSi1x_tcfc | Ref,Call | rel: 0

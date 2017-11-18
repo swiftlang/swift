@@ -219,10 +219,16 @@ namespace {
       addFields(Elements, LayoutStrategy::Universal);
     }
 
-    /// Adds an element layout.
-    void addElement(const ElementLayout &Elt) {
+    /// Adds a layout of a tail-allocated element.
+    void addTailElement(const ElementLayout &Elt) {
       Elements.push_back(Elt);
-      addField(Elements.back(), LayoutStrategy::Universal);
+      if (!addField(Elements.back(), LayoutStrategy::Universal)) {
+        // For empty tail allocated elements we still add 1 padding byte.
+        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
+               "empty elements should have stride 1");
+        StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
+        CurSize += Size(1);
+      }
     }
 
     /// Return the element layouts.
@@ -246,16 +252,6 @@ namespace {
     void addFieldsForClass(ClassDecl *theClass, SILType classType) {
       if (theClass->isGenericContext())
         ClassMetadataRequiresDynamicInitialization = true;
-
-      if (!ClassMetadataRequiresDynamicInitialization) {
-        if (auto parentType =
-              theClass->getDeclContext()->getDeclaredTypeInContext()) {
-          if (!tryEmitConstantTypeMetadataRef(IGM,
-                                              parentType->getCanonicalType(),
-                                              SymbolReferenceKind::Absolute))
-            ClassMetadataRequiresDynamicInitialization = true;
-        }
-      }
 
       if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
@@ -443,7 +439,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
   // Add the tail elements.
   for (SILType TailTy : tailTypes) {
     const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
-    builder.addElement(ElementLayout::getIncomplete(tailTI));
+    builder.addTailElement(ElementLayout::getIncomplete(tailTI));
   }
 
   // Create a name for the new llvm type.

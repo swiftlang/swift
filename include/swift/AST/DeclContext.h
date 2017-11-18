@@ -26,6 +26,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -66,6 +67,10 @@ namespace swift {
   class SerializedDefaultArgumentInitializer;
   class SerializedTopLevelCodeDecl;
   class StructDecl;
+
+namespace serialization {
+using DeclID = llvm::PointerEmbeddedInt<unsigned, 31>;
+}
 
 enum class DeclContextKind : uint8_t {
   AbstractClosureExpr,
@@ -318,9 +323,6 @@ public:
   /// Map an interface type to a contextual type within this context.
   Type mapTypeIntoContext(Type type) const;
 
-  /// Map a type within this context to an interface type.
-  Type mapTypeOutOfContext(Type type) const;
-
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();
@@ -379,6 +381,10 @@ public:
         return true;
     return false;
   }
+
+  /// Compute a context C such that C is a parent context of A and B.
+  /// If no such context exists, return \c nullptr.
+  static DeclContext *getCommonParentContext(DeclContext *A, DeclContext *B);
 
   /// Returns the module context that contains this context.
   ModuleDecl *getParentModule() const;
@@ -604,6 +610,10 @@ class IterableDeclContext {
   mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
     LastDeclAndKind;
 
+  // The DeclID this IDC was deserialized from, if any. Used for named lazy
+  // member loading, as a key when doing lookup in this IDC.
+  serialization::DeclID SerialID;
+
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
@@ -631,13 +641,32 @@ public:
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
     return FirstDeclAndLazyMembers.getInt();
-  }  
+  }
 
   /// Setup the loader for lazily-loaded members.
   void setMemberLoader(LazyMemberLoader *loader, uint64_t contextData);
 
   /// Load all of the members of this context.
   void loadAllMembers() const;
+
+  /// Determine whether this was deserialized (and thus SerialID is
+  /// valid).
+  bool wasDeserialized() const;
+
+  /// Return 'this' as a \c Decl.
+  const Decl *getDecl() const;
+
+  /// Get the DeclID this Decl was deserialized from.
+  serialization::DeclID getDeclID() const {
+    assert(wasDeserialized());
+    return SerialID;
+  }
+
+  /// Set the DeclID this Decl was deserialized from.
+  void setDeclID(serialization::DeclID d) {
+    assert(wasDeserialized());
+    SerialID = d;
+  }
 
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);

@@ -476,7 +476,6 @@ static bool FindFirstNamedDeclWithKind(
       }
     }
   } else if (result._module) {
-    ModuleDecl::AccessPathTy access_path;
     SmallVector<ValueDecl *, 4> decls;
     if (priv_decl_id)
       result._module.lookupMember(

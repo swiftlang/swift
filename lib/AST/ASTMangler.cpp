@@ -527,6 +527,7 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
     case SymbolKind::DynamicThunk: return appendOperator("TD");
+    case SymbolKind::SwiftDispatchThunk: return appendOperator("Tj");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
     case SymbolKind::DirectMethodReferenceThunk: return appendOperator("Td");
@@ -704,6 +705,8 @@ void ASTMangler::appendType(Type type) {
       return appendOperator("BO");
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
+    case TypeKind::SILToken:
+      return appendOperator("Bt");
     case TypeKind::BuiltinVector:
       appendType(cast<BuiltinVectorType>(tybase)->getElementType());
       return appendOperator("Bv",
@@ -1497,7 +1500,7 @@ void ASTMangler::appendFunctionInputType(
     // it as a single type dropping sugar.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
-      appendType(type);
+      appendTypeListElement(param.getLabel(), type, param.getParameterFlags());
       break;
     }
 
@@ -1777,7 +1780,7 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
   if (!Ty)
     Ty = ErrorType::get(localContext->getASTContext());
 
-  Ty = parentContext->mapTypeOutOfContext(Ty);
+  Ty = Ty->mapTypeOutOfContext();
   appendType(Ty->getCanonicalType());
   appendOperator(isImplicit ? "fu" : "fU", Index(discriminator));
 }
@@ -1975,9 +1978,7 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendProtocolName(conformance->getProtocol());
     appendIdentifier(behaviorStorage->getBaseName().getIdentifier().str());
   } else {
-    auto conformanceDC = conformance->getDeclContext();
-    auto conformingType =
-      conformanceDC->mapTypeOutOfContext(conformance->getType());
+    auto conformingType = conformance->getType();
     appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
     appendModule(conformance->getDeclContext()->getParentModule());

@@ -191,10 +191,13 @@ enum class Bridgeability {
   Full
 };
 
+/// Controls whether a typedef for \p type should name the fully-bridged Swift
+/// type or the original Clang type.
+///
+/// In either case we end up losing sugar at some uses sites, so this is more
+/// about what the right default is.
 static inline Bridgeability getTypedefBridgeability(clang::QualType type) {
-  return (type->isBlockPointerType() || type->isFunctionType())
-            ? Bridgeability::Full
-            : Bridgeability::None;
+  return type->isBlockPointerType() ? Bridgeability::Full : Bridgeability::None;
 }
 
 /// \brief Describes the kind of the C type that can be mapped to a stdlib
@@ -907,22 +910,45 @@ public:
   ///
   /// \param type The Clang type to import.
   ///
-  /// \param kind The kind of type import we're performing.
+  /// \param kind A classification of the immediate context in which this type
+  ///   will be used. Different contexts result in the type being imported
+  ///   differently; for example, CF types are normally considered Unmanaged,
+  ///   but in parameter position they are known to always be passed at +0.
+  ///   See also the \p topLevelBridgeability parameter.
   ///
   /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
-  ///        in certain contexts. If false, it will always be imported as UInt.
+  ///   in certain contexts. If false, it will always be imported as UInt.
   ///
-  /// \param bridgeability Whether we can bridge types in this context.
-  ///        This may restrict the ability to bridge types even in contexts
-  ///        that otherwise allow bridging, such as function results and
-  ///        parameters.
+  /// \param topLevelBridgeability A classification of the top-level context in
+  ///   which this type will be used. This and \p kind are used together to
+  ///   determine whether a type can be imported in a more Swifty way than
+  ///   a naive translation of its C type. Full bridgeability requires that SIL
+  ///   can get back to the original Clang type if it needs to, which implies
+  ///   that this type is part of a top-level declaration where we do bridging.
+  ///   Without full bridgeability, we can still do some Swifty importing (e.g.
+  ///   mapping NSString to String) if we're in an immediate context \p kind
+  ///   that allows bridging, but only in cases where Swift's default mapping
+  ///   "back" to C is the correct one. If the original type has something
+  ///   funny going on, we either have to use a less lossy version of the type
+  ///   (ObjCBool rather than Bool) or refuse to import it at all (a block with
+  ///   the \c ns_returns_retained attribute).
+  ///
+  /// \param optional If the imported type was a pointer-like type in C, this
+  ///   optionality is applied to the resulting Swift type.
+  ///
+  /// \param resugarNSErrorPointer If true, Objective-C's `NSError **` is
+  ///   imported as Foundation.NSErrorPointer rather than
+  ///   AutoreleasingUnsafeMutablePointer<...>. This is usually desirable
+  ///   behavior, but isn't necessary when we use Swift's \c throws anyway.
+  ///   Strictly speaking, though, this is a hack used to break cyclic
+  ///   dependencies.
   ///
   /// \returns The imported type, or null if this type could
-  /// not be represented in Swift.
+  ///   not be represented in Swift.
   Type importType(clang::QualType type,
                   ImportTypeKind kind,
                   bool allowNSUIntegerAsInt,
-                  Bridgeability bridgeability,
+                  Bridgeability topLevelBridgeability,
                   OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
                   bool resugarNSErrorPointer = true);
 
@@ -1123,7 +1149,8 @@ public:
   loadAllMembers(Decl *D, uint64_t unused) override;
 
   virtual Optional<TinyPtrVector<ValueDecl *>>
-  loadNamedMembers(const Decl *D, DeclName N, uint64_t contextData) override;
+  loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
+                   uint64_t contextData) override;
 
 private:
   void

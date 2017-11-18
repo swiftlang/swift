@@ -458,8 +458,12 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     unsigned HasLazyConformances : 1;
+
+    /// Whether we have already validated all members of the type that
+    /// affect layout.
+    unsigned HasValidatedLayout : 1;
   };
-  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 3 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 4 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -770,6 +774,9 @@ public:
 
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
+
+  /// Returns the source range of the declaration including its attributes.
+  SourceRange getSourceRangeIncludingAttrs() const;
 
   SourceLoc TrailingSemiLoc;
 
@@ -1288,8 +1295,7 @@ public:
     return Requirements.slice(0, FirstTrailingWhereArg);
   }
 
-  /// Retrieve only those requirements that are written within the brackets,
-  /// which does not include any requirements written in a trailing where
+  /// Retrieve only those requirements written in a trailing where
   /// clause.
   ArrayRef<RequirementRepr> getTrailingRequirements() const {
     return Requirements.slice(FirstTrailingWhereArg);
@@ -2218,6 +2224,10 @@ public:
   getFormalAccessScope(const DeclContext *useDC = nullptr,
                        bool respectVersionedAttr = false) const;
 
+
+  /// Copy the formal access level and @_versioned attribute from source.
+  void copyFormalAccessAndVersionedAttrFrom(ValueDecl *source);
+
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
   ///
@@ -2814,6 +2824,7 @@ protected:
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     NominalTypeDeclBits.HasLazyConformances = false;
+    NominalTypeDeclBits.HasValidatedLayout = false;
   }
 
   friend class ProtocolType;
@@ -2856,11 +2867,23 @@ public:
     return NominalTypeDeclBits.AddedImplicitInitializers;
   }
 
-  /// Note that we have attempted to
+  /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     NominalTypeDeclBits.AddedImplicitInitializers = true;
   }
-              
+
+  /// Determine whether we have already validated any members
+  /// which affect layout.
+  bool hasValidatedLayout() const {
+    return NominalTypeDeclBits.HasValidatedLayout;
+  }
+
+  /// Note that we have attempted to validate any members
+  /// which affect layout.
+  void setHasValidatedLayout() {
+    NominalTypeDeclBits.HasValidatedLayout = true;
+  }
+
   /// Compute the type of this nominal type.
   void computeType();
 
@@ -3380,6 +3403,10 @@ public:
   /// Retrieve the destructor for this class.
   DestructorDecl *getDestructor();
 
+  /// Synthesize implicit, trivial destructor, add it to this ClassDecl
+  /// and return it.
+  void addImplicitDestructor();
+
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
   ///
@@ -3653,6 +3680,14 @@ public:
 
     return const_cast<ProtocolDecl *>(this)
              ->existentialTypeSupportedSlow(resolver);
+  }
+
+  /// Explicitly set the existentialTypeSupported flag, without computing
+  /// it from members. Only called from deserialization, where the flag
+  /// was stored in the serialized record.
+  void setExistentialTypeSupported(bool supported) {
+    ProtocolDeclBits.ExistentialTypeSupported = supported;
+    ProtocolDeclBits.ExistentialTypeSupportedValid = true;
   }
 
   /// If this is known to be a compiler-known protocol, returns the kind.

@@ -73,9 +73,9 @@ func test3() {
   
   // CHECK-NOT: destroy_value
 
-  // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
-  // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+  // CHECK: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK-NEXT: [[STR_COPY:%.*]] = copy_value [[BORROWED_STR]]
+  // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_COPY]])
   // CHECK-NEXT: end_borrow [[BORROWED_STR]] from [[STR]]
   useAString(o)
@@ -98,10 +98,10 @@ func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
-  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: [[ARG:%.*]] = alloc_stack $T
   // CHECK: copy_addr [[FUNC_ARG]] to [initialization] [[ARG]]
+  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
   // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
@@ -115,9 +115,9 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
 func testAddressOnlyStructElt<T>(_ a : T) -> T {
   return produceAddressOnlyStruct(a).elt
   
-  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: [[ARG:%.*]] = alloc_stack $T
+  // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
   // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
@@ -377,10 +377,12 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
-// CHECK: bb0([[CLOSURE:%.*]] : @owned $@noescape @callee_owned () -> Bool):
+// CHECK: bb0([[CLOSURE:%.*]] : @owned $@noescape @callee_guaranteed () -> Bool):
 // CHECK:   [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
 // CHECK:   [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
-// CHECK:   apply [[CLOSURE_COPY]]() : $@noescape @callee_owned () -> Bool
+// CHECK:   [[BORROW:%.*]] =  begin_borrow [[CLOSURE_COPY]]
+// CHECK:   apply [[BORROW]]() : $@noescape @callee_guaranteed () -> Bool
+// CHECK:   destroy_value [[CLOSURE_COPY]]
 // CHECK:   end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
 // CHECK:   destroy_value [[CLOSURE]]
 // CHECK: } // end sil function '{{.*}}call_auto_closure{{.*}}'

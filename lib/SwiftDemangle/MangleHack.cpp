@@ -17,11 +17,39 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Strings.h"
 #include "swift/SwiftDemangle/MangleHack.h"
+#include "swift/Strings.h"
 #include <cassert>
-#include <cstring>
+#include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#if defined(_WIN32)
+static int vasprintf(char **strp, const char *fmt, va_list ap) {
+  int len = _vscprintf(fmt, ap);
+  if (len < 0)
+    return len;
+  char *buffer = static_cast<char *>(malloc(len + 1));
+  if (buffer == nullptr)
+    return -1;
+  int result = vsprintf(buffer, fmt, ap);
+  if (result < 0) {
+    free(buffer);
+    return -1;
+  }
+  *strp = buffer;
+  return result;
+}
+
+static int asprintf(char **strp, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  int result = vasprintf(strp, fmt, args);
+  va_end(args);
+  return result;
+}
+#endif
 
 const char *
 _swift_mangleSimpleClass(const char *module, const char *class_) {

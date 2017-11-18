@@ -18,6 +18,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -347,12 +348,6 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 
 static bool shouldNotSpecializeCallee(SILFunction *Callee,
                                       SubstitutionList Subs = {}) {
-  if (!Callee->shouldOptimize()) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize function " << Callee->getName()
-          << " marked to be excluded from optimizations.\n");
-    return true;
-  }
-
   if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
     return true;
 
@@ -368,7 +363,8 @@ static bool shouldNotSpecializeCallee(SILFunction *Callee,
 /// Returns false, if the current function cannot be specialized.
 /// Returns true otherwise.
 bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
-                                        SubstitutionList ParamSubs) {
+                                        SubstitutionList ParamSubs,
+                                        OptRemark::Emitter *ORE) {
   if (shouldNotSpecializeCallee(Callee))
     return false;
 
@@ -387,6 +383,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   if (CalleeGenericSig)
     InterfaceSubs = CalleeGenericSig->getSubstitutionMap(ParamSubs);
 
+  using namespace OptRemark;
   // We do not support partial specialization.
   if (!EnablePartialSpecialization && InterfaceSubs.hasArchetypes()) {
     DEBUG(llvm::dbgs() << "    Partial specialization is not supported.\n");
@@ -396,7 +393,10 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   // Perform some checks to see if we need to bail.
   if (InterfaceSubs.hasDynamicSelf()) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
+    REMARK_OR_DEBUG(ORE, [&]() {
+      return RemarkMissed("DynamicSelf", *Apply.getInstruction())
+             << IndentDebug(4) << "Cannot specialize with dynamic self";
+    });
     return false;
   }
 
@@ -406,8 +406,11 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   for (auto Sub : ParamSubs) {
     auto Replacement = Sub.getReplacement();
     if (isTypeTooComplex(Replacement)) {
-      DEBUG(llvm::dbgs()
-            << "    Cannot specialize because the generic type is too deep.\n");
+      REMARK_OR_DEBUG(ORE, [&]() {
+        return RemarkMissed("TypeTooDeep", *Apply.getInstruction())
+               << IndentDebug(4)
+               << "Cannot specialize because the generic type is too deep";
+      });
       NumPreventedTooComplexGenericSpecializations++;
       return false;
     }
@@ -481,11 +484,14 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   // Check if specializing this call site would create in an infinite generic
   // specialization loop.
   if (createsInfiniteSpecializationLoop(Apply)) {
-    DEBUG(llvm::dbgs() << "    Generic specialization is not supported if "
-                          "it would result in a generic specialization of "
-                          "infinite depth.\n");
-    DEBUG(llvm::dbgs() << "Callee " << Callee->getName()
-                       << " occurs multiple times on the call chain\n");
+    REMARK_OR_DEBUG(ORE, [&]() {
+      return RemarkMissed("SpecializationLoop", *Apply.getInstruction())
+             << IndentDebug(4)
+             << "Generic specialization is not supported if it would result in "
+                "a generic specialization of infinite depth. Callee "
+             << NV("Callee", Callee)
+             << " occurs multiple times on the call chain";
+    });
     if (PrintGenericSpecializationLoops)
       llvm::errs() << "Detected and prevented an infinite "
                       "generic specialization loop for callee: "
@@ -505,8 +511,9 @@ bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
 
 ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
                                      ArrayRef<Substitution> ParamSubs,
-                                     bool ConvertIndirectToDirect) {
-  if (!prepareAndCheck(Apply, Callee, ParamSubs))
+                                     bool ConvertIndirectToDirect,
+                                     OptRemark::Emitter *ORE) {
+  if (!prepareAndCheck(Apply, Callee, ParamSubs, ORE))
     return;
 
   this->ConvertIndirectToDirect = ConvertIndirectToDirect;
@@ -721,9 +728,11 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
-      CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCalleeConvention(),
-      FnTy->getParameters(), FnTy->getResults(), FnTy->getOptionalErrorResult(),
-      M.getASTContext());
+      CanSpecializedGenericSig, FnTy->getExtInfo(),
+      FnTy->getCoroutineKind(), FnTy->getCalleeConvention(),
+      FnTy->getParameters(), FnTy->getYields(),
+      FnTy->getResults(), FnTy->getOptionalErrorResult(),
+      M.getASTContext(), FnTy->getWitnessMethodConformanceOrNone());
 
   // This is an interface type. It should not have any archetypes.
   assert(!NewFnTy->hasArchetype());
@@ -735,6 +744,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   llvm::SmallVector<SILResultInfo, 8> SpecializedResults;
+  llvm::SmallVector<SILYieldInfo, 8> SpecializedYields;
   llvm::SmallVector<SILParameterInfo, 8> SpecializedParams;
 
   unsigned IndirectResultIdx = 0;
@@ -769,12 +779,17 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
       SpecializedParams.push_back(PI);
     }
   }
-  return
-    SILFunctionType::get(SubstFTy->getGenericSignature(),
-                         SubstFTy->getExtInfo(),
-                         SubstFTy->getCalleeConvention(), SpecializedParams,
-                         SpecializedResults, SubstFTy->getOptionalErrorResult(),
-                         M.getASTContext());
+  for (SILYieldInfo YI : SubstFTy->getYields()) {
+    // For now, always just use the original, substituted parameter info.
+    SpecializedYields.push_back(YI);
+  }
+  return SILFunctionType::get(
+      SubstFTy->getGenericSignature(),
+      SubstFTy->getExtInfo(), SubstFTy->getCoroutineKind(),
+      SubstFTy->getCalleeConvention(),
+      SpecializedParams, SpecializedYields, SpecializedResults,
+      SubstFTy->getOptionalErrorResult(), M.getASTContext(),
+      SubstFTy->getWitnessMethodConformanceOrNone());
 }
 
 /// Create a new generic signature from an existing one by adding
@@ -1392,10 +1407,7 @@ void FunctionSignaturePartialSpecializer::
 
     // Add a same type requirement based on the provided generic parameter
     // substitutions.
-    auto ReplacementCallerInterfaceTy = Replacement;
-    if (CallerGenericEnv)
-      ReplacementCallerInterfaceTy =
-          CallerGenericEnv->mapTypeOutOfContext(Replacement);
+    auto ReplacementCallerInterfaceTy = Replacement->mapTypeOutOfContext();
 
     auto SpecializedReplacementCallerInterfaceTy =
         ReplacementCallerInterfaceTy.subst(
@@ -1535,8 +1547,8 @@ void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
         // First, map callee's interface type to specialized interface type.
         auto Ty = Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
         Type SpecializedInterfaceTy =
-            SpecializedGenericEnv->mapTypeOutOfContext(
-                SpecializedGenericEnv->mapTypeIntoContext(Ty));
+          SpecializedGenericEnv->mapTypeIntoContext(Ty)
+            ->mapTypeOutOfContext();
         assert(!SpecializedInterfaceTy->hasError());
         return SpecializedInterfaceTy;
       },
@@ -1833,12 +1845,10 @@ void ReabstractionInfo::verify() const {
 /// Create a new specialized function if possible, and cache it.
 SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   // Do not create any new specializations at Onone.
-  if (M.getOptions().Optimization <= SILOptions::SILOptMode::None)
+  if (!GenericFunc->shouldOptimize())
     return nullptr;
 
-  DEBUG(
-    if (M.getOptions().Optimization <= SILOptions::SILOptMode::Debug) {
-      llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n"; });
+  DEBUG(llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n";);
 
   ReInfo.verify();
 
@@ -2244,7 +2254,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
 
 void swift::trySpecializeApplyOfGeneric(
     ApplySite Apply, DeadInstructionSet &DeadApplies,
-    llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
+    llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
+    OptRemark::Emitter &ORE) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
   auto *RefF = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
@@ -2278,7 +2289,8 @@ void swift::trySpecializeApplyOfGeneric(
   if (Apply.getModule().isOptimizedOnoneSupportModule())
     Serialized = IsNotSerialized;
 
-  ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutions());
+  ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutions(),
+                           /*ConvertIndirectToDirect=*/true, &ORE);
   if (!ReInfo.canBeSpecialized())
     return;
 
@@ -2339,6 +2351,18 @@ void swift::trySpecializeApplyOfGeneric(
     assert(SpecializedF->hasUnqualifiedOwnership());
     NewFunctions.push_back(SpecializedF);
   }
+
+  ORE.emit([&]() {
+    std::string Str;
+    llvm::raw_string_ostream OS(Str);
+    SpecializedF->getLoweredFunctionType().print(
+        OS, PrintOptions::printQuickHelpDeclaration());
+
+    using namespace OptRemark;
+    return RemarkPassed("Specialized", *Apply.getInstruction())
+           << "Specialized function " << NV("Function", RefF) << " with type "
+           << NV("FuncType", OS.str());
+  });
 
   assert(ReInfo.getSpecializedType()
          == SpecializedF->getLoweredFunctionType() &&

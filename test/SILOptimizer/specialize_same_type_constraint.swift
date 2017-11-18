@@ -16,10 +16,10 @@ protocol SecondParent {
   var secondChild: Child { get }
 }
 
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func takesFirstChild<T : FirstChild>(t: T) {}
 
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func takesSecondChild<T : SecondChild>(t: T) {}
 
 @inline(never)

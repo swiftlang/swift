@@ -1146,10 +1146,8 @@ namespace {
 
       // If the declaration is in a different resilience domain, we have
       // to use materializeForSet.
-      //
-      // FIXME: Use correct ResilienceExpansion if SGF is @transparent
       if (!decl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
-                                ResilienceExpansion::Maximal))
+                                SGF.F.getResilienceExpansion()))
         return true;
 
       // If the declaration is dynamically dispatched through a class,
@@ -1297,13 +1295,18 @@ namespace {
 
         // Cast the callback to the correct polymorphic function type.
         SILFunctionTypeRepresentation rep;
-        if (isa<ProtocolDecl>(decl->getDeclContext()))
+        Optional<ProtocolConformanceRef> witnessMethodConformance;
+        if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
           rep = SILFunctionTypeRepresentation::WitnessMethod;
-        else
+          witnessMethodConformance = ProtocolConformanceRef(proto);
+        } else {
           rep = SILFunctionTypeRepresentation::Method;
+        }
 
-        auto origCallbackFnType = SGF.SGM.Types.getMaterializeForSetCallbackType(
-          decl, materialized.genericSig, materialized.origSelfType, rep);
+        auto origCallbackFnType =
+            SGF.SGM.Types.getMaterializeForSetCallbackType(
+                decl, materialized.genericSig, materialized.origSelfType, rep,
+                witnessMethodConformance);
         auto origCallbackType = SILType::getPrimitiveObjectType(origCallbackFnType);
         callback = SGF.B.createPointerToThinFunction(loc, callback, origCallbackType);
 

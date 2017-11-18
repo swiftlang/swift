@@ -111,7 +111,7 @@ class SILPerformanceInliner {
     DefaultApplyLength = 10
   };
 
-  SILOptions::SILOptMode OptMode;
+  OptimizationMode OptMode;
 
 #ifndef NDEBUG
   SILFunction *LastPrintedCaller = nullptr;
@@ -161,7 +161,7 @@ class SILPerformanceInliner {
 public:
   SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
                         SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
-                        SILOptions::SILOptMode OptMode, OptRemark::Emitter &ORE)
+                        OptimizationMode OptMode, OptRemark::Emitter &ORE)
       : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA), ORE(ORE),
         OptMode(OptMode) {}
 
@@ -243,7 +243,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = RemovedCallBenefit;
 
   // Osize heuristic.
-  if (OptMode == SILOptions::SILOptMode::OptimizeForSize) {
+  if (OptMode == OptimizationMode::ForSize) {
     // Don't inline into thunks.
     if (AI.getFunction()->isThunk())
       return false;
@@ -256,7 +256,9 @@ bool SILPerformanceInliner::isProfitableToInline(
         return false;
     }
 
-    BaseBenefit = BaseBenefit / 2;
+    // Use command line option to control inlining in Osize mode.
+    const uint64_t CallerBaseBenefitReductionFactor = AI.getFunction()->getModule().getOptions().CallerBaseBenefitReductionFactor;
+    BaseBenefit = BaseBenefit / CallerBaseBenefitReductionFactor;
   }
 
   // It is always OK to inline a simple call.
@@ -290,11 +292,6 @@ bool SILPerformanceInliner::isProfitableToInline(
       ->getGenericSignature()
       ->getSubstitutionMap(AI.getSubstitutions());
   }
-
-  // For some reason -Ounchecked can accept a higher base benefit without
-  // increasing the code size too much.
-  if (OptMode == SILOptions::SILOptMode::OptimizeUnchecked)
-    BaseBenefit *= 2;
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
   //  Benefit = 1;
@@ -441,7 +438,8 @@ bool SILPerformanceInliner::isProfitableToInline(
     ORE.emit([&]() {
       using namespace OptRemark;
       return RemarkMissed("NoInlinedCost", *AI.getInstruction())
-             << "Not profitable to inline (cost = " << NV("Cost", CalleeCost)
+             << "Not profitable to inline function " << NV("Callee", Callee)
+             << " (cost = " << NV("Cost", CalleeCost)
              << ", benefit = " << NV("Benefit", Benefit) << ")";
     });
     return false;
@@ -897,14 +895,13 @@ public:
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-    OptRemark::Emitter ORE(DEBUG_TYPE,
-                           getFunction()->getModule().getASTContext());
+    OptRemark::Emitter ORE(DEBUG_TYPE, getFunction()->getModule());
 
     if (getOptions().InlineThreshold == 0) {
       return;
     }
 
-    auto OptMode = getFunction()->getModule().getOptions().Optimization;
+    auto OptMode = getFunction()->getEffectiveOptimizationMode();
 
     SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA, OptMode, ORE);
 

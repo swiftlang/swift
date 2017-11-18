@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -160,10 +161,19 @@ private:
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
 
-  /// This flag indicates if a function can be eliminated by dead function
-  /// elimination. If it is unset, DFE will preserve the function and make
-  /// it public.
+  /// Set if the function may be referenced from C code and should thus be
+  /// preserved and exported more widely than its Swift linkage and usage
+  /// would indicate.
+  unsigned HasCReferences : 1;
+
+  /// Set if the function should be preserved and changed to public linkage
+  /// during dead function elimination. This is used for some generic
+  /// pre-specialization.
   unsigned KeepAsPublic : 1;
+
+  /// If != OptimizationMode::NotSet, the optimization mode specified with an
+  /// function attribute.
+  OptimizationMode OptMode;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
@@ -323,6 +333,12 @@ public:
     return getLoweredFunctionType()->getRepresentation();
   }
 
+  ResilienceExpansion getResilienceExpansion() const {
+    return (isSerialized()
+            ? ResilienceExpansion::Minimal
+            : ResilienceExpansion::Maximal);
+  }
+
   /// Returns true if this function has a calling convention that has a self
   /// argument.
   bool hasSelfParam() const {
@@ -401,7 +417,7 @@ public:
   }
 
   /// Helper method which returns true if the linkage of the SILFunction
-  /// indicates that the objects definition might be required outside the
+  /// indicates that the object's definition might be required outside the
   /// current SILModule.
   bool isPossiblyUsedExternally() const;
 
@@ -409,6 +425,10 @@ public:
   /// is a (private or internal) vtable method which can be referenced by
   /// vtables of derived classes outside the compilation unit.
   bool isExternallyUsedSymbol() const;
+
+  /// Return whether this function may be referenced by C code.
+  bool hasCReferences() const { return HasCReferences; }
+  void setHasCReferences(bool value) { HasCReferences = value; }
 
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const {
@@ -463,9 +483,25 @@ public:
 
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
+
+  /// Get this function's optimization mode or OptimizationMode::NotSet if it is
+  /// not set for this specific function.
+  OptimizationMode getOptimizationMode() const { return OptMode; }
+
+  /// Returns the optimization mode for the function. If no mode is set for the
+  /// function, returns the global mode, i.e. the mode of the module's options.
+  OptimizationMode getEffectiveOptimizationMode() const;
+
+  void setOptimizationMode(OptimizationMode mode) { OptMode = mode; }
+
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
   ///          or is raw SIL (so that the mandatory passes still run).
   bool shouldOptimize() const;
+
+  /// Returns true if this function should be optimized for size.
+  bool optimizeForSize() const {
+    return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
+  }
 
   /// Returns true if this is a function that should have its ownership
   /// verified.
@@ -611,10 +647,6 @@ public:
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
   SILType mapTypeIntoContext(SILType type) const;
-
-  /// Map the given type, which is based on a contextual SILFunctionType and may
-  /// therefore contain context archetypes, to an interface type.
-  Type mapTypeOutOfContext(Type type) const;
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration();

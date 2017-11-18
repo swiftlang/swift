@@ -35,18 +35,18 @@ var raw3 = getSecond(raw, y: raw2)
 // SIL:   {{%.+}} = apply [[USE_NESTED]]({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(thin) (Int, Int, Int) -> ()
 useNested((raw, raw2), n: raw3)
 
-// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func8variadicySd1x_SidtF : $@convention(thin) (Double, @owned Array<Int>) -> ()
 // SIL:   [[VA_SIZE:%.+]] = integer_literal $Builtin.Word, 2
 // SIL:   {{%.+}} = apply {{%.*}}<Int>([[VA_SIZE]])
+// SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func8variadicySd1x_SidtF : $@convention(thin) (Double, @owned Array<Int>) -> ()
 // SIL:   {{%.+}} = apply [[VARIADIC]]({{%.+}}, {{%.+}}) : $@convention(thin) (Double, @owned Array<Int>) -> ()
 variadic(x: 2.5, 4, 5)
 
 // SIL:   [[VARIADIC:%.+]] = function_ref @_T08def_func9variadic2ySid_Sd1xtF : $@convention(thin) (@owned Array<Int>, Double) -> ()
 variadic2(1, 2, 3, x: 5.0)
 
-// SIL:   [[SLICE:%.+]] = function_ref @_T08def_func5sliceySaySiG1x_tF : $@convention(thin) (@owned Array<Int>) -> ()
 // SIL:   [[SLICE_SIZE:%.+]] = integer_literal $Builtin.Word, 3
 // SIL:   {{%.+}} = apply {{%.*}}<Int>([[SLICE_SIZE]])
+// SIL:   [[SLICE:%.+]] = function_ref @_T08def_func5sliceySaySiG1x_tF : $@convention(thin) (@owned Array<Int>) -> ()
 // SIL:   {{%.+}} = apply [[SLICE]]({{%.+}}) : $@convention(thin) (@owned Array<Int>) -> ()
 slice(x: [2, 4, 5])
 

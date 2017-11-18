@@ -87,12 +87,12 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK-LABEL: sil hidden @_T013objc_bridging6setFoo{{.*}}F
 // CHECK: bb0([[ARG0:%.*]] : @owned $Foo, {{%.*}} : @owned $String):
 // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK:   [[SET_FOO:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setFoo!1.foreign
 // CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK:   [[SET_FOO:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setFoo!1.foreign
 // CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Optional<NSString>, Foo) -> ()
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
@@ -109,9 +109,9 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-ios-i386:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
+// CHECK-ios-i386:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-ios-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
-// CHECK-ios-i386:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-ios-i386:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-ios-i386: }
 
@@ -129,9 +129,9 @@ func getZim(_ f: Foo) -> Bool {
 // CHECK-macosx-x86_64:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
+// CHECK-macosx-x86_64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-macosx-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
-// CHECK-macosx-x86_64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK-macosx-x86_64:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-macosx-x86_64: }
 
@@ -160,9 +160,9 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-ios-i386-LABEL: sil hidden @_T013objc_bridging6setZim{{.*}}F
 // CHECK-ios-i386: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-ios-i386:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-ios-i386:   apply [[METHOD]]([[OBJC_BOOL]], [[BORROWED_ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()
 // CHECK-ios-i386:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
 // CHECK-ios-i386:   destroy_value [[ARG0]]
@@ -171,9 +171,9 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-macosx-x86_64-LABEL: sil hidden @_T013objc_bridging6setZim{{.*}}F
 // CHECK-macosx-x86_64: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-macosx-x86_64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-macosx-x86_64:   apply [[METHOD]]([[OBJC_BOOL]], [[BORROWED_ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()
 // CHECK-macosx-x86_64:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
 // CHECK-macosx-x86_64:   destroy_value [[ARG0]]
@@ -258,13 +258,13 @@ func callSetBar(_ s: String) {
 }
 // CHECK-LABEL: sil hidden @_T013objc_bridging10callSetBar{{.*}}F
 // CHECK: bb0({{%.*}} : @owned $String):
-// CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
 // CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
+// CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK: }
@@ -643,13 +643,13 @@ func takeTwoAnys(_ lhs: Any, _ rhs: Any) -> Any { return lhs }
 // CHECK-LABEL: sil hidden @_T013objc_bridging22defineNonStandardBlockyyp1x_tF
 func defineNonStandardBlock(x: Any) {
   // CHECK: function_ref @_T013objc_bridging22defineNonStandardBlockyyp1x_tFypypcfU_
-  // CHECK: function_ref @_T0ypypIexir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+  // CHECK: function_ref @_T0ypypIegir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
 
   let fn : @convention(block) (Any) -> Any = { y in takeTwoAnys(x, y) }
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIexir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
-// CHECK: bb0(%0 : @trivial $*@block_storage @callee_owned (@in Any) -> @out Any, %1 : @unowned $AnyObject):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypypIegir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+// CHECK: bb0(%0 : @trivial $*@block_storage @callee_guaranteed (@in Any) -> @out Any, %1 : @unowned $AnyObject):
 // CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
 // CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject
 // CHECK:   [[ARG:%.*]] = alloc_stack $Any
@@ -660,13 +660,13 @@ func defineNonStandardBlock(x: Any) {
 
 // CHECK-LABEL: sil hidden @_T013objc_bridging15castToCFunctionySV3ptr_tF : $@convention(thin) (UnsafeRawPointer) -> () {
 func castToCFunction(ptr: UnsafeRawPointer) {
-  // CHECK: [[CASTFN:%.*]] = function_ref @_T0s13unsafeBitCastq_x_q_m2totr0_lF
   // CHECK: [[OUT:%.*]] = alloc_stack $@convention(c) (Optional<AnyObject>) -> ()
   // CHECK: [[IN:%.]] = alloc_stack $UnsafeRawPointer
   // CHECK: store %0 to [trivial] [[IN]] : $*UnsafeRawPointer
   // CHECK: [[META:%.*]] = metatype $@thick (@convention(c) (Optional<AnyObject>) -> ()).Type
+  // CHECK: [[CASTFN:%.*]] = function_ref @_T0s13unsafeBitCastq_x_q_m2totr0_lF
   // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (AnyObject?) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
-  // CHECK: [[RESULT:%.*]] = load [trivial] %3 : $*@convention(c) (Optional<AnyObject>) -> ()
+  // CHECK: [[RESULT:%.*]] = load [trivial] [[OUT]] : $*@convention(c) (Optional<AnyObject>) -> ()
   typealias Fn = @convention(c) (AnyObject?) -> Void
   unsafeBitCast(ptr, to: Fn.self)(nil)
 }

@@ -10,9 +10,9 @@
 
 // Default argument for first parameter.
 // CHECK-LABEL: sil hidden @_T017default_arguments7defarg1ySi1i_Sd1dSS1stFfA_ : $@convention(thin) () -> Int
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 17
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK: return [[RESULT]] : $Int
 
@@ -28,15 +28,15 @@ func defarg1(i: Int = 17, d: Double, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden @_T017default_arguments15testDefaultArg1yyF
 func testDefaultArg1() {
-  // CHECK: [[FNREF:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_T0S2d{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[FLOAT64:%[0-9]+]] = metatype $@thin Double.Type
   // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4009000000000000|0x4000C800000000000000}}
+  // CHECK: [[LITFN:%[0-9]+]] = function_ref @_T0S2d{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[FLOATVAL:%[0-9]+]] = apply [[LITFN]]([[FLOATLIT]], [[FLOAT64]])
   // CHECK: [[DEF0FN:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{.*}}A_
   // CHECK: [[DEF0:%[0-9]+]] = apply [[DEF0FN]]()
   // CHECK: [[DEF2FN:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{.*}}A1_
   // CHECK: [[DEF2:%[0-9]+]] = apply [[DEF2FN]]()
+  // CHECK: [[FNREF:%[0-9]+]] = function_ref @_T017default_arguments7defarg1{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FNREF]]([[DEF0]], [[FLOATVAL]], [[DEF2]])
   defarg1(d:3.125)
 }
@@ -45,15 +45,15 @@ func defarg2(_ i: Int, d: Double = 3.125, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden @_T017default_arguments15testDefaultArg2{{[_0-9a-zA-Z]*}}F
 func testDefaultArg2() {
-// CHECK:  [[FNREF:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Double, @owned String) -> ()
-// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC
 // CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
+// CHECK:  [[LITFN:%[0-9]+]] = function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC
 // CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK:  [[DFN:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{.*}}A0_ : $@convention(thin) () -> Double
 // CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@convention(thin) () -> Double
 // CHECK:  [[SFN:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{.*}}A1_ : $@convention(thin) () -> @owned String
 // CHECK:  [[S:%[0-9]+]] = apply [[SFN]]() : $@convention(thin) () -> @owned String
+// CHECK:  [[FNREF:%[0-9]+]] = function_ref @_T017default_arguments7defarg2{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Double, @owned String) -> ()
 // CHECK:  apply [[FNREF]]([[I]], [[D]], [[S]]) : $@convention(thin) (Int, Double, @owned String) -> ()
   defarg2(5)
 }
@@ -178,8 +178,8 @@ class SubDefArg : SuperDefArg { }
 
 // CHECK: sil hidden @_T017default_arguments13testSubDefArgAA0deF0CyF : $@convention(thin) () -> @owned SubDefArg
 func testSubDefArg() -> SubDefArg {
-  // CHECK: function_ref @_T017default_arguments9SubDefArgC{{[_0-9a-zA-Z]*}}fC
   // CHECK: function_ref @_T017default_arguments11SuperDefArgCACSi3int_tcfcfA_
+  // CHECK: function_ref @_T017default_arguments9SubDefArgC{{[_0-9a-zA-Z]*}}fC
   // CHECK: return
   return SubDefArg()
 }
@@ -219,20 +219,18 @@ class ReabstractDefaultArgument<T> {
 
 // CHECK-LABEL: sil hidden @_T017default_arguments32testDefaultArgumentReabstractionyyF
 // function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
+// CHECK: [[FN:%.*]] = function_ref @_T017default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_guaranteed (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_guaranteed (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: function_ref reabstraction thunk helper from @callee_guaranteed (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
+// CHECK-NEXT: [[THUNK:%.*]] = function_ref @_T0S2iSbIgiid_S2iSbIgyyd_TR : $@convention(thin) (Int, Int, @guaranteed @noescape @callee_guaranteed (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT]]) : $@convention(thin) (Int, Int, @guaranteed @noescape @callee_guaranteed (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: [[CONV_FN:%.*]] = convert_function [[FN]]
+// function_ref reabstraction thunk helper from @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
+// CHECK: [[THUNK:%.*]] = function_ref @_T0S2iSbIgyyd_S2iSbIgiid_TR : $@convention(thin) (@in Int, @in Int, @guaranteed @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in Int, @in Int, @guaranteed @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: [[CONV_FN:%.*]] = convert_function [[FN]]
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @_T017default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
-// %1 = metatype $@thick ReabstractDefaultArgument<Int>.Type
-// function_ref default_arguments.ReabstractDefaultArgument.(init <A>(default_arguments.ReabstractDefaultArgument<A>.Type) -> (a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>).(default argument 0)
-// CHECK: %2 = function_ref @_T017default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: %3 = apply %2<Int>() : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: function_ref reabstraction thunk helper from @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
-// CHECK-NEXT: %4 = function_ref @_T0S2iSbIxiid_S2iSbIxyyd_TR : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: %5 = partial_apply %4(%3) : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: %6 = convert_function %5
-// function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
-// CHECK: %7 = function_ref @_T0S2iSbIxyyd_S2iSbIxiid_TR : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: %8 = partial_apply %7(%6) : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: %9 = convert_function %8
-// CHECK-NEXT: apply [[INITFN]]<Int>(%9, 
+// CHECK-NEXT: apply [[INITFN]]<Int>([[CONV_FN]], 
 
 func testDefaultArgumentReabstraction() {
   _ = ReabstractDefaultArgument<Int>()
@@ -256,9 +254,9 @@ func r18400194(_ a: Int, x: Int = 97) {}
 // CHECK: integer_literal $Builtin.Int2048, 97
 
 // CHECK-LABEL: sil hidden @_T017default_arguments14test_r18400194yyF
-// CHECK: function_ref @_T017default_arguments9r18400194ySi_Si1xtF : $@convention(thin) (Int, Int) -> (){{.*}} // user: %7
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK:  function_ref @_T017default_arguments9r18400194ySi_Si1xtFfA0_ : $@convention(thin) () -> Int
+// CHECK: function_ref @_T017default_arguments9r18400194ySi_Si1xtF : $@convention(thin) (Int, Int) -> (){{.*}}
 func test_r18400194() {
   (r18400194)(1)
 }

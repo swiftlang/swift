@@ -22,7 +22,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LangOptions.h"
@@ -35,6 +34,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Index/Index.h"
@@ -636,6 +636,16 @@ static llvm::cl::opt<bool> DebugConstraintSolver("debug-constraints",
 static llvm::cl::opt<bool>
 IncludeLocals("include-locals", llvm::cl::desc("Index local symbols too."),
               llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+    EnableObjCInterop("enable-objc-interop",
+                      llvm::cl::desc("Enable ObjC interop."),
+                      llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+    DisableObjCInterop("disable-objc-interop",
+                       llvm::cl::desc("Disable ObjC interop."),
+                       llvm::cl::cat(Category), llvm::cl::init(false));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -942,7 +952,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   Invocation.getLangOptions().Playground = Playground;
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   if (CI.setup(Invocation))
     return 1;
   if (!RunTypeChecker)
@@ -1153,7 +1163,7 @@ private:
 static int doStructureAnnotation(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   Invocation.addInputFilename(SourceFilename);
 
   CompilerInstance CI;
@@ -1254,9 +1264,10 @@ private:
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               Optional<AccessKind> AccKind,
                                bool IsOpenBracket) override {
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
   }
 
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
@@ -2670,7 +2681,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
 
   CompilerInstance CI;
 
@@ -2991,6 +3002,7 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
+  InitInvok.getLangOptions().KeepSyntaxInfoInSourceFile = true;
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
@@ -3003,6 +3015,14 @@ int main(int argc, char *argv[]) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
+  }
+  if (options::DisableObjCInterop) {
+    InitInvok.getLangOptions().EnableObjCInterop = false;
+  } else if (options::EnableObjCInterop) {
+    InitInvok.getLangOptions().EnableObjCInterop = true;
+  } else {
+    InitInvok.getLangOptions().EnableObjCInterop =
+        llvm::Triple(InitInvok.getTargetTriple()).isOSDarwin();
   }
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;

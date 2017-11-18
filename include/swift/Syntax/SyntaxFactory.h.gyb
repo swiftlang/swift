@@ -54,7 +54,15 @@ struct SyntaxFactory {
   static Optional<Syntax>
   createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements);
 
+  /// Count the number of children for a given syntax node kind,
+  /// returning a pair of mininum and maximum count of children. The gap
+  /// between these two numbers is the number of optional children.
+  static std::pair<unsigned, unsigned> countChildren(SyntaxKind Kind);
+
   static SyntaxKind getUnknownKind(SyntaxKind Kind);
+
+  static Syntax
+  makeBlankCollectionSyntax(SyntaxKind Kind);
 
 % for node in SYNTAX_NODES:
 %   if node.children:

@@ -17,6 +17,26 @@ public func finalPropertyOfOther(_ other: ResilientOutsideParent) {
 
 public class MyResilientClass {
   public final var finalProperty: String = "MyResilientClass.finalProperty"
+
+  // CHECK-LABEL: sil [thunk] @_T016class_resilience16MyResilientClassC17publicMethodFirstSiSgyFTj : $@convention(method) (@guaranteed MyResilientClass) -> Optional<Int>
+  // CHECK:   class_method %0 : $MyResilientClass, #MyResilientClass.publicMethodFirst!1 : (MyResilientClass) -> () -> Int?, $@convention(method) (@guaranteed MyResilientClass) -> Optional<Int>
+  // CHECK:   return
+  public func publicMethodFirst() -> Int? { return nil }
+
+  // CHECK-LABEL: sil [thunk] @_T016class_resilience16MyResilientClassC18publicMethodSecondyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
+  // CHECK:   class_method %1 : $MyResilientClass, #MyResilientClass.publicMethodSecond!1 : (MyResilientClass) -> (AnyObject) -> (), $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
+  // CHECK:   return
+  public func publicMethodSecond(_ a: AnyObject) {}
+}
+
+public class MyResilientSubclass : MyResilientClass {
+  // This override changes ABI so it gets its own dispatch thunk
+  // CHECK-LABEL: sil [thunk] @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTj : $@convention(method) (@guaranteed MyResilientSubclass) -> Int
+  // CHECK:   class_method %0 : $MyResilientSubclass, #MyResilientSubclass.publicMethodFirst!1 : (MyResilientSubclass) -> () -> Int, $@convention(method) (@guaranteed MyResilientSubclass) -> Int
+  // CHECK: return
+  public override func publicMethodFirst() -> Int { return 0 }
+
+  public override func publicMethodSecond(_ a: AnyObject?) {}
 }
 
 // Accessing final property of resilient class from my resilience domain
@@ -37,6 +57,39 @@ class SubclassOfOutsideChild : ResilientOutsideChild {
 
   func newMethod() {}
 }
+
+// CHECK-LABEL: sil @_T016class_resilience19callResilientMethodyAA02MyD8SubclassCF : $@convention(thin) (@owned MyResilientSubclass) -> ()
+public func callResilientMethod(_ s: MyResilientSubclass) {
+// CHECK:   class_method {{.*}} : $MyResilientSubclass, #MyResilientSubclass.publicMethodFirst!1
+  _ = s.publicMethodFirst()
+// CHECK:   class_method {{.*}} : $MyResilientSubclass, #MyResilientSubclass.publicMethodSecond!1
+  s.publicMethodSecond(nil)
+// CHECK:   return
+}
+
+// CHECK-LABEL: sil [serialized] @_T016class_resilience29callResilientMethodInlineableyAA02MyD8SubclassCF : $@convention(thin) (@owned MyResilientSubclass) -> ()
+@_inlineable public func callResilientMethodInlineable(_ s: MyResilientSubclass) {
+// CHECK:   [[FN:%.*]] = function_ref @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTj : $@convention(method) (@guaranteed MyResilientSubclass) -> Int
+  _ = s.publicMethodFirst()
+  // CHECK:   [[FN:%.*]] = function_ref @_T016class_resilience16MyResilientClassC18publicMethodSecondyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
+  // CHECK:   [[CONVERTED:%.*]] = convert_function [[FN]] : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> () to $@convention(method) (@owned Optional<AnyObject>, @guaranteed MyResilientSubclass) -> ()
+  s.publicMethodSecond(nil)
+
+  // CHECK:   function_ref @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTc
+  _ = s.publicMethodFirst
+
+  // CHECK:   function_ref @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyXlSgFTc
+  _ = s.publicMethodSecond
+// CHECK:   return
+}
+
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_guaranteed () -> Int
+// CHECK:     function_ref @_T016class_resilience19MyResilientSubclassC17publicMethodFirstSiyFTj
+// CHECK:     return
+
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T016class_resilience19MyResilientSubclassC18publicMethodSecondyyXlSgFTc : $@convention(thin) (@owned MyResilientSubclass) -> @owned @callee_guaranteed (@owned Optional<AnyObject>) -> ()
+// CHECK:     function_ref @_T016class_resilience16MyResilientClassC18publicMethodSecondyyXlFTj : $@convention(method) (@owned AnyObject, @guaranteed MyResilientClass) -> ()
+// CHECK:     return
 
 // Note: no entries for [inherited] methods
 

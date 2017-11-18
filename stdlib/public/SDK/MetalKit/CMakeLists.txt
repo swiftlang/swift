@@ -4,7 +4,7 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 add_swift_library(swiftMetalKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     MetalKit.swift
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-swift-version" "3"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_MODULE_DEPENDS_OSX Darwin AppKit CoreData CoreFoundation CoreGraphics CoreImage Dispatch Foundation IOKit Metal ModelIO ObjectiveC QuartzCore simd XPC # auto-updated

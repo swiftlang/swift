@@ -22,6 +22,39 @@ CHANGELOG
 Swift 4.1
 ---------
 
+* [SE-0157][] is implemented. Associated types can now declare "recursive"
+	constraints, which require that the associated type conform to the enclosing
+	protocol. The standard library protocols have been updated to make use of
+	recursive constraints. For example, the `SubSequence` associated type of
+	`Sequence` follows the enclosing protocol:
+
+        protocol Sequence {
+          associatedtype Element
+          associatedtype SubSequence: Sequence
+            where SubSequence.Element == Element,
+                  SubSequence.SubSequence == SubSequence
+          // ...
+        }
+
+        protocol Collection: Sequence where Self.SubSequence: Collection {
+          // ...
+        }
+
+  As a result, a number of new constraints have been introduced into the
+	standard library protocols:
+
+	* Make the `Indices` associated type have the same traversal requirements as
+	its enclosing protocol, e.g., `Collection.Indices` conforms to
+	`Collection`, `BidirectionalCollection.Indices` conforms to
+	`BidirectionalCollection`, and so on
+	* Make `Numeric.Magnitude` conform to `Numeric`
+	* Use more efficient `SubSequence` types for lazy filter and map
+	* Eliminate the `*Indexable` protocols
+
+
+* [SE-0161][] is fully implemented. KeyPaths now support subscript, optional
+  chaining, and optional force-unwrapping components.
+
 * [SE-0186][]
 
   It is no longer valid to use the ownership keywords `weak` and `unowned` for property declarations in protocols. These keywords are meaningless and misleading when used in a protocol as they don't have any effect.
@@ -68,6 +101,8 @@ Swift 4.1
   ```
 
   If you wish to provide your own implementation of `==`/`hashValue`, you still can; a custom implementation will replace the one synthesized by the compiler.
+
+  **Add new entries to the top of this file, not here!**
 
 Swift 4.0
 ---------
@@ -357,8 +392,6 @@ Swift 4.0
   #define TINY    (BITWIDTH <= 16)
   #define LIMITED (SMALL || TINY)   // now imported as Bool.
   ```
-
-  **Add new entries to the top of this file, not here!**
 
 Swift 3.1
 ---------

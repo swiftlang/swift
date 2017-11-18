@@ -16,7 +16,7 @@ set(swiftDriver_targetDefines)
 
 add_swift_library(swiftDriver STATIC
   ${swiftDriver_sources}
-  DEPENDS SwiftOptions
+  DEPENDS swift-syntax-generated-headers SwiftOptions
   LINK_LIBRARIES swiftAST swiftBasic swiftFrontend swiftOption)
 
 # Generate the static-stdlib-args.lnk file used by -static-stdlib option

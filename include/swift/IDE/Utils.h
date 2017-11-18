@@ -19,7 +19,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/SourceEntityWalker.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
@@ -242,6 +242,7 @@ private:
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               Optional<AccessKind> AccKind,
                                bool IsOpenBracket) override;
 };
 
@@ -316,7 +317,7 @@ public:
   std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
 };
 
-enum class RangeKind : int8_t{
+enum class RangeKind : int8_t {
   Invalid = -1,
   SingleExpression,
   SingleStatement,
@@ -324,6 +325,8 @@ enum class RangeKind : int8_t{
 
   MultiStatement,
   PartOfExpression,
+
+  MultiTypeMemberDecl,
 };
 
 struct DeclaredDecl {

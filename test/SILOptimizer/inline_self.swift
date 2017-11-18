@@ -76,9 +76,9 @@ _ = Z().capturesSelf()
 // CHECK: [[F:%[0-9]+]] = function_ref @_T011inline_self1CC7factory{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Int, @thick C.Type) -> @owned C
 // CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(method) (Int, @thick C.Type) -> @owned C
 
+// CHECK: [[Z:%.*]] = alloc_ref $Z
 // CHECK: function_ref inline_self.Z.capturesSelf() -> Self
 // CHECK: [[F:%[0-9]+]] = function_ref @_T011inline_self1ZC12capturesSelfACXDyF : $@convention(method) (@guaranteed Z) -> @owned Z
-// CHECK: [[Z:%.*]] = alloc_ref $Z
 // CHECK: apply [[F]]([[Z]]) : $@convention(method) (@guaranteed Z) -> @owned
 // CHECK: return
 

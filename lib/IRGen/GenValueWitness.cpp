@@ -34,6 +34,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
+#include "GenMeta.h"
 #include "GenOpaque.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -65,6 +66,8 @@ const char *irgen::getValueWitnessName(ValueWitness witness) {
   CASE(Flags)
   CASE(Stride)
   CASE(ExtraInhabitantFlags)
+  CASE(GetEnumTagSinglePayload)
+  CASE(StoreEnumTagSinglePayload)
 #undef CASE
   }
   llvm_unreachable("bad value witness kind");
@@ -240,8 +243,8 @@ static Address emitDefaultProjectBuffer(IRGenFunction &IGF, Address buffer,
         buffer.getAlignment());
     auto *boxStart = IGF.Builder.CreateLoad(boxAddress);
     auto *alignmentMask = type.getAlignmentMask(IGF, T);
-    auto *heapHeaderSize =
-        llvm::ConstantInt::get(IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+    auto *heapHeaderSize = llvm::ConstantInt::get(
+        IGM.SizeTy, IGM.RefCountedStructSize.getValue());
     auto *startOffset =
         Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
                           Builder.CreateNot(alignmentMask));
@@ -310,7 +313,7 @@ static Address emitDefaultInitializeBufferWithCopyOfBuffer(
         emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
     Address srcObject =
         emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
-    type.initializeWithCopy(IGF, destObject, srcObject, T);
+    type.initializeWithCopy(IGF, destObject, srcObject, T, true);
     return destObject;
   } else {
     assert(packing == FixedPacking::Allocate);
@@ -350,7 +353,7 @@ emitDefaultInitializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
       emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
     Address srcObject =
       emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
-    type.initializeWithTake(IGF, destObject, srcObject, T);
+    type.initializeWithTake(IGF, destObject, srcObject, T, true);
     return destObject;
   }
 
@@ -453,11 +456,8 @@ static CanType getFormalTypeInContext(CanType abstractType) {
   return abstractType;
 }
 
-/// Get the next argument and use it as the 'self' type metadata.
-static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
-                                          llvm::Function::arg_iterator &it,
+void irgen::getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
                                           CanType abstractType) {
-  llvm::Value *arg = &*it++;
   assert(arg->getType() == IGF.IGM.TypeMetadataPtrTy &&
          "Self argument is not a type?!");
 
@@ -465,6 +465,13 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg);
 }
 
+/// Get the next argument and use it as the 'self' type metadata.
+static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
+                                          llvm::Function::arg_iterator &it,
+                                          CanType abstractType) {
+  llvm::Value *arg = &*it++;
+  getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
+}
 
 /// Build a specific value-witness function.
 static void buildValueWitnessFunction(IRGenModule &IGM,
@@ -486,7 +493,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.assignWithCopy(IGF, dest, src, concreteType);
+    type.assignWithCopy(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -496,7 +503,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-    type.assignWithTake(IGF, dest, src, concreteType);
+    type.assignWithTake(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -541,7 +548,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    type.initializeWithCopy(IGF, dest, src, concreteType);
+    type.initializeWithCopy(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -552,7 +559,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    type.initializeWithTake(IGF, dest, src, concreteType);
+    type.initializeWithTake(IGF, dest, src, concreteType, true);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
@@ -624,6 +631,39 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
                           Address(value, type.getBestKnownAlignment()),
                           tag);
 
+    IGF.Builder.CreateRetVoid();
+    return;
+  }
+
+  case ValueWitness::GetEnumTagSinglePayload: {
+    llvm::Value *value = getArg(argv, "value");
+    auto enumTy = type.getStorageType()->getPointerTo();
+    value = IGF.Builder.CreateBitCast(value, enumTy);
+
+    llvm::Value *numEmptyCases = getArg(argv, "numEmptyCases");
+
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
+    llvm::Value *idx = type.getEnumTagSinglePayload(
+        IGF, numEmptyCases, Address(value, type.getBestKnownAlignment()),
+        concreteType);
+    IGF.Builder.CreateRet(idx);
+    return;
+  }
+
+  case ValueWitness::StoreEnumTagSinglePayload: {
+    llvm::Value *value = getArg(argv, "value");
+    auto enumTy = type.getStorageType()->getPointerTo();
+    value = IGF.Builder.CreateBitCast(value, enumTy);
+
+    llvm::Value *whichCase = getArg(argv, "whichCase");
+    llvm::Value *numEmptyCases = getArg(argv, "numEmptyCases");
+
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
+    type.storeEnumTagSinglePayload(IGF, whichCase, numEmptyCases,
+                                   Address(value, type.getBestKnownAlignment()),
+                                   concreteType);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -785,7 +825,7 @@ getCopyOutOfLineBoxPointerFunction(IRGenModule &IGM,
         IGF.Builder.CreateStore(ptr, dest);
         auto *alignmentMask = fixedTI.getStaticAlignmentMask(IGM);
         auto *heapHeaderSize = llvm::ConstantInt::get(
-            IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+            IGM.SizeTy, IGM.RefCountedStructSize.getValue());
         auto *startOffset = IGF.Builder.CreateAnd(
             IGF.Builder.CreateAdd(heapHeaderSize, alignmentMask),
             IGF.Builder.CreateNot(alignmentMask));
@@ -941,6 +981,11 @@ static void addValueWitness(IRGenModule &IGM,
     // Otherwise, just fill in null here if the type can't be statically
     // queried for extra inhabitants.
     return B.add(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+  }
+
+  case ValueWitness::GetEnumTagSinglePayload:
+  case ValueWitness::StoreEnumTagSinglePayload: {
+    goto standard;
   }
 
   case ValueWitness::GetEnumTag:
@@ -1345,4 +1390,13 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
   }
 
   emitAssignArrayWithTakeCall(IGF, T, dest, src, count);
+}
+
+void TypeInfo::collectArchetypeMetadata(
+    IRGenFunction &IGF,
+    llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
+    SILType T) const {
+  auto canType = T.getSwiftRValueType();
+  assert(!canType->getWithoutSpecifierType()->is<ArchetypeType>() &&
+         "Did not expect an ArchetypeType");
 }

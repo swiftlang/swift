@@ -66,6 +66,7 @@ class ModuleFile
 
   llvm::BitstreamCursor SILCursor;
   llvm::BitstreamCursor SILIndexCursor;
+  llvm::BitstreamCursor DeclMemberTablesCursor;
 
   /// The name of the module.
   StringRef Name;
@@ -298,6 +299,9 @@ private:
   /// Types referenced by this module.
   std::vector<Serialized<Type>> Types;
 
+  /// Generic signatures referenced by this module.
+  std::vector<Serialized<GenericSignature *>> GenericSignatures;
+
   /// Generic environments referenced by this module.
   std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
 
@@ -335,14 +339,26 @@ private:
   using SerializedNestedTypeDeclsTable =
       llvm::OnDiskIterableChainedHashTable<NestedTypeDeclsTableInfo>;
 
+  class DeclMemberNamesTableInfo;
+  using SerializedDeclMemberNamesTable =
+      llvm::OnDiskIterableChainedHashTable<DeclMemberNamesTableInfo>;
+
+  class DeclMembersTableInfo;
+  using SerializedDeclMembersTable =
+      llvm::OnDiskIterableChainedHashTable<DeclMembersTableInfo>;
+
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
-  std::unique_ptr<SerializedDeclTable> ClassMembersByName;
+  std::unique_ptr<SerializedDeclTable> ClassMembersForDynamicLookup;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
   std::unique_ptr<SerializedExtensionTable> ExtensionDecls;
   std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
   std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
+  std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
+
+  llvm::DenseMap<uint32_t,
+           std::unique_ptr<SerializedDeclMembersTable>> DeclMembersTables;
 
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
@@ -476,6 +492,21 @@ private:
   /// index_block::NestedTypeDeclsLayout format.
   std::unique_ptr<SerializedNestedTypeDeclsTable>
   readNestedTypeDeclsTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk local decl-name hash table stored in
+  /// index_block::DeclMemberNamesLayout format.
+  std::unique_ptr<SerializedDeclMemberNamesTable>
+  readDeclMemberNamesTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk local decl-members hash table stored in
+  /// index_block::DeclMembersLayout format.
+  std::unique_ptr<SerializedDeclMembersTable>
+  readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Main logic of getDeclChecked.
+  llvm::Expected<Decl *>
+  getDeclCheckedImpl(serialization::DeclID DID,
+                     Optional<DeclContext *> ForcedContext = None);
 
   /// Reads the index block, which contains global tables.
   ///
@@ -702,7 +733,7 @@ public:
 
   virtual
   Optional<TinyPtrVector<ValueDecl *>>
-  loadNamedMembers(const Decl *D, DeclName N,
+  loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
                    uint64_t contextData) override;
 
   virtual void
@@ -789,6 +820,9 @@ public:
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
   ModuleDecl *getModule(ArrayRef<Identifier> name);
+
+  /// Returns the generic signature for the given ID.
+  GenericSignature *getGenericSignature(serialization::GenericSignatureID ID);
 
   /// Returns the generic signature or environment for the given ID,
   /// deserializing it if needed.

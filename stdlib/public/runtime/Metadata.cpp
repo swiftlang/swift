@@ -14,22 +14,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/MathExtras.h"
-#include "swift/Demangling/Demangler.h"
+#include "swift/Runtime/Metadata.h"
+#include "MetadataCache.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Range.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Range.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
-#include "MetadataCache.h"
+#include "llvm/Support/MathExtras.h"
+#include "llvm/Support/PointerLikeTypeTraits.h"
 #include <algorithm>
-#include <condition_variable>
-#include <new>
 #include <cctype>
+#include <condition_variable>
 #include <iostream>
+#include <new>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -281,8 +282,6 @@ namespace {
 /// The uniquing structure for ObjC class-wrapper metadata.
 static SimpleGlobalCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
-#endif
-
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
   // Make calls resilient against receiving a null Objective-C class. This can
@@ -295,13 +294,23 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
     return theClass;
   }
 
-#if SWIFT_OBJC_INTEROP
   return &ObjCClassWrappers.getOrInsert(theClass).first->Data;
-#else
-  fatalError(/* flags = */ 0,
-             "swift_getObjCClassMetadata: no Objective-C interop");
-#endif
 }
+
+const ClassMetadata *
+swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
+  // Unwrap ObjC class wrappers.
+  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+    return wrapper->Class;
+  }
+
+  // Otherwise, the input should already be a Swift class object.
+  auto theClass = cast<ClassMetadata>(theMetadata);
+  assert(theClass->isTypeMetadata() && !theClass->isArtificialSubclass());
+  return theClass;
+}
+
+#endif
 
 /***************************************************************************/
 /*** Functions *************************************************************/
@@ -314,20 +323,34 @@ public:
   FullMetadata<FunctionTypeMetadata> Data;
 
   struct Key {
-    const void * const *FlagsArgsAndResult;
+    const FunctionTypeFlags Flags;
 
-    FunctionTypeFlags getFlags() const {
-      return FunctionTypeFlags::fromIntValue(size_t(FlagsArgsAndResult[0]));
+    const Metadata *const *Parameters;
+    const uint32_t *ParameterFlags;
+    const Metadata *Result;
+
+    Key(FunctionTypeFlags flags,
+        const Metadata *const *params,
+        const uint32_t *paramFlags,
+        const Metadata *result)
+      : Flags(flags), Parameters(params), ParameterFlags(paramFlags),
+        Result(result) {}
+
+    FunctionTypeFlags getFlags() const { return Flags; }
+    const Metadata *getParameter(unsigned index) const {
+      assert(index < Flags.getNumParameters());
+      return Parameters[index];
+    }
+    const Metadata *getResult() const { return Result; }
+
+    const uint32_t *getParameterFlags() const {
+      return ParameterFlags;
     }
 
-    const Metadata *getResult() const {
-      auto opaqueResult = FlagsArgsAndResult[getFlags().getNumArguments() + 1];
-      return reinterpret_cast<const Metadata *>(opaqueResult);
-    }
-
-    const void * const *getArguments() const {
-      return getFlags().getNumArguments() == 0
-              ? nullptr : &FlagsArgsAndResult[1];
+    ::ParameterFlags getParameterFlags(unsigned index) const {
+      assert(index < Flags.getNumParameters());
+      auto flags = Flags.hasParameterFlags() ? ParameterFlags[index] : 0;
+      return ParameterFlags::fromIntValue(flags);
     }
   };
 
@@ -346,23 +369,35 @@ public:
     if (auto result = comparePointers(key.getResult(), Data.ResultType))
       return result;
 
-    for (unsigned i = 0, e = keyFlags.getNumArguments(); i != e; ++i) {
+    for (unsigned i = 0, e = keyFlags.getNumParameters(); i != e; ++i) {
       if (auto result =
-            comparePointers(key.getArguments()[i],
-                            Data.getArguments()[i].getOpaqueValue()))
+              comparePointers(key.getParameter(i), Data.getParameter(i)))
+        return result;
+
+      if (auto result =
+              compareIntegers(key.getParameterFlags(i).getIntValue(),
+                              Data.getParameterFlags(i).getIntValue()))
         return result;
     }
 
     return 0;
   }
-
   static size_t getExtraAllocationSize(Key key) {
-    return key.getFlags().getNumArguments()
-         * sizeof(FunctionTypeMetadata::Argument);
+    return getExtraAllocationSize(key.Flags);
   }
+
   size_t getExtraAllocationSize() const {
-    return Data.Flags.getNumArguments()
-         * sizeof(FunctionTypeMetadata::Argument);
+    return getExtraAllocationSize(Data.Flags);
+  }
+
+  static size_t getExtraAllocationSize(const FunctionTypeFlags flags) {
+    const auto numParams = flags.getNumParameters();
+    auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
+    if (flags.hasParameterFlags())
+      size += numParams * sizeof(uint32_t);
+
+    const auto alignment = sizeof(void *);
+    return (size + alignment - 1) & ~(alignment - 1);
   }
 };
 
@@ -373,53 +408,101 @@ static SimpleGlobalCache<FunctionCacheEntry> FunctionTypes;
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
-                                      const void *arg0,
+                                      const Metadata *arg0,
                                       const Metadata *result) {
-  assert(flags.getNumArguments() == 1
+  assert(flags.getNumParameters() == 1
          && "wrong number of arguments in function metadata flags?!");
-  const void *flagsArgsAndResult[] = {
-    reinterpret_cast<const void*>(flags.getIntValue()),
-    arg0,
-    static_cast<const void *>(result)                      
-  };                                                       
-  return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}                                                          
-const FunctionTypeMetadata *                               
-swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
-                                      const void *arg0,
-                                      const void *arg1,
-                                      const Metadata *result) {
-  assert(flags.getNumArguments() == 2
-         && "wrong number of arguments in function metadata flags?!");
-  const void *flagsArgsAndResult[] = {
-    reinterpret_cast<const void*>(flags.getIntValue()),
-    arg0,
-    arg1,                                                  
-    static_cast<const void *>(result)                      
-  };                                                       
-  return swift_getFunctionTypeMetadata(flagsArgsAndResult);
-}                                                          
-const FunctionTypeMetadata *                               
-swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
-                                      const void *arg0,
-                                      const void *arg1,
-                                      const void *arg2,
-                                      const Metadata *result) {
-  assert(flags.getNumArguments() == 3
-         && "wrong number of arguments in function metadata flags?!");
-  const void *flagsArgsAndResult[] = {
-    reinterpret_cast<const void*>(flags.getIntValue()),
-    arg0,                                                  
-    arg1,                                                  
-    arg2,                                                  
-    static_cast<const void *>(result)                      
-  };                                                       
-  return swift_getFunctionTypeMetadata(flagsArgsAndResult);
+  const Metadata *parameters[] = { arg0 };
+  return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
 }
 
 const FunctionTypeMetadata *
-swift::swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]) {
-  FunctionCacheEntry::Key key = { flagsArgsAndResult };
+swift::swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
+                                               const Metadata *arg0,
+                                               ParameterFlags flags0,
+                                               const Metadata *result) {
+  assert(flags.getNumParameters() == 1
+         && "wrong number of arguments in function metadata flags?!");
+  const Metadata *parameters[] = { arg0 };
+  const uint32_t parameterFlags[] = { flags0.getIntValue() };
+  return swift_getFunctionTypeMetadata(flags,
+                                       parameters,
+                                       parameterFlags,
+                                       result);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
+                                      const Metadata *arg0,
+                                      const Metadata *arg1,
+                                      const Metadata *result) {
+  assert(flags.getNumParameters() == 2
+         && "wrong number of arguments in function metadata flags?!");
+  const Metadata *parameters[] = { arg0, arg1 };
+  return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
+                                               const Metadata *arg0,
+                                               ParameterFlags flags0,
+                                               const Metadata *arg1,
+                                               ParameterFlags flags1,
+                                               const Metadata *result) {
+  assert(flags.getNumParameters() == 2
+         && "wrong number of arguments in function metadata flags?!");
+  const Metadata *parameters[] = { arg0, arg1 };
+  const uint32_t parameterFlags[] = {
+    flags0.getIntValue(),
+    flags1.getIntValue()
+  };
+  return swift_getFunctionTypeMetadata(flags,
+                                       parameters,
+                                       parameterFlags,
+                                       result);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
+                                      const Metadata *arg0,
+                                      const Metadata *arg1,
+                                      const Metadata *arg2,
+                                      const Metadata *result) {
+  assert(flags.getNumParameters() == 3
+         && "wrong number of arguments in function metadata flags?!");
+  const Metadata *parameters[] = { arg0, arg1, arg2 };
+  return swift_getFunctionTypeMetadata(flags, parameters, nullptr, result);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata3WithFlags(FunctionTypeFlags flags,
+                                               const Metadata *arg0,
+                                               ParameterFlags flags0,
+                                               const Metadata *arg1,
+                                               ParameterFlags flags1,
+                                               const Metadata *arg2,
+                                               ParameterFlags flags2,
+                                               const Metadata *result) {
+  assert(flags.getNumParameters() == 3
+         && "wrong number of arguments in function metadata flags?!");
+  const Metadata *parameters[] = { arg0, arg1, arg2 };
+  const uint32_t parameterFlags[] = {
+    flags0.getIntValue(),
+    flags1.getIntValue(),
+    flags2.getIntValue()
+  };
+  return swift_getFunctionTypeMetadata(flags,
+                                       parameters,
+                                       parameterFlags,
+                                       result);
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
+                                     const Metadata *const *parameters,
+                                     const uint32_t *parameterFlags,
+                                     const Metadata *result) {
+  FunctionCacheEntry::Key key = { flags, parameters, parameterFlags, result };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
 
@@ -450,16 +533,16 @@ FunctionCacheEntry::FunctionCacheEntry(Key key) {
     break;
   }
 
-  unsigned numArguments = flags.getNumArguments();
+  unsigned numParameters = flags.getNumParameters();
 
   Data.setKind(MetadataKind::Function);
   Data.Flags = flags;
   Data.ResultType = key.getResult();
 
-  for (size_t i = 0; i < numArguments; ++i) {
-    auto opaqueArg = key.getArguments()[i];
-    auto arg = FunctionTypeMetadata::Argument::getFromOpaqueValue(opaqueArg);
-    Data.getArguments()[i] = arg;
+  for (unsigned i = 0; i < numParameters; ++i) {
+    Data.getParameters()[i] = key.getParameter(i);
+    if (flags.hasParameterFlags())
+      Data.getParameterFlags()[i] = key.getParameterFlags(i).getIntValue();
   }
 }
 
@@ -714,6 +797,37 @@ static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
+template <bool IsPOD, bool IsInline>
+static int tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
+                                         unsigned numEmptyCases,
+                                         const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto getExtraInhabitantIndex =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->getExtraInhabitantIndex);
+
+  return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
+                                     numExtraInhabitants,
+                                     getExtraInhabitantIndex);
+}
+
+template <bool IsPOD, bool IsInline>
+static void
+tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
+                                unsigned numEmptyCases, const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto storeExtraInhabitant =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->storeExtraInhabitant);
+
+  storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
+                                numExtraInhabitants, storeExtraInhabitant);
+}
+
 static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
                                        int index,
                                        const Metadata *_metatype) {
@@ -870,6 +984,18 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Witnesses.flags = layout.flags;
   Witnesses.stride = layout.stride;
 
+  // We have extra inhabitants if the first element does.
+  // FIXME: generalize this.
+  bool hasExtraInhabitants = false;
+  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                             key.Elements[0]->getValueWitnesses())) {
+    hasExtraInhabitants = true;
+    Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
+    Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
+    Witnesses.storeExtraInhabitant = tuple_storeExtraInhabitant;
+    Witnesses.getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
+  }
+
   // Copy the function witnesses in, either from the proposed
   // witnesses or from the standard table.
   if (!proposedWitnesses) {
@@ -882,13 +1008,13 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
       // into something better).
     } else if (layout.flags.isInlineStorage()
                && layout.flags.isPOD()) {
-      if (layout.size == 8 && layout.flags.getAlignmentMask() == 7)
+      if (!hasExtraInhabitants && layout.size == 8 && layout.flags.getAlignmentMask() == 7)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi64_);
-      else if (layout.size == 4 && layout.flags.getAlignmentMask() == 3)
+      else if (!hasExtraInhabitants && layout.size == 4 && layout.flags.getAlignmentMask() == 3)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi32_);
-      else if (layout.size == 2 && layout.flags.getAlignmentMask() == 1)
+      else if (!hasExtraInhabitants && layout.size == 2 && layout.flags.getAlignmentMask() == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi16_);
-      else if (layout.size == 1)
+      else if (!hasExtraInhabitants && layout.size == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi8_);
       else
         proposedWitnesses = &tuple_witnesses_pod_inline;
@@ -909,16 +1035,6 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Witnesses.LOWER_ID = proposedWitnesses->LOWER_ID;
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
-
-  // We have extra inhabitants if the first element does.
-  // FIXME: generalize this.
-  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
-                             key.Elements[0]->getValueWitnesses())) {
-    Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
-    Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
-    Witnesses.storeExtraInhabitant = tuple_storeExtraInhabitant;
-    Witnesses.getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
-  }
 }
 
 const TupleTypeMetadata *
@@ -1039,10 +1155,44 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
 #define pod_direct_assignWithTake pod_direct_initializeWithCopy
 #define pod_indirect_assignWithTake pod_direct_initializeWithCopy
 
+static int pod_direct_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
+                                              unsigned numEmptyCases,
+                                              const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto getExtraInhabitantIndex =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->getExtraInhabitantIndex);
+
+  return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
+                                     numExtraInhabitants,
+                                     getExtraInhabitantIndex);
+}
+
+static void pod_direct_storeEnumTagSinglePayload(OpaqueValue *enumAddr,
+                                                 int whichCase,
+                                                 unsigned numEmptyCases,
+                                                 const Metadata *self) {
+  auto *witnesses = self->getValueWitnesses();
+  auto size = witnesses->getSize();
+  auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
+  auto storeExtraInhabitant =
+      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
+           ->storeExtraInhabitant);
+
+  storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
+                                numExtraInhabitants, storeExtraInhabitant);
+}
+
+#define pod_indirect_getEnumTagSinglePayload pod_direct_getEnumTagSinglePayload
+#define pod_indirect_storeEnumTagSinglePayload \
+  pod_direct_storeEnumTagSinglePayload
 
 static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
-                                                uint64_t alignmentMask) {
-  return (size << 16) | alignmentMask;
+                                                uint64_t alignmentMask,
+                                                uint64_t hasExtraInhabitants) {
+  return (hasExtraInhabitants << 48) | (size << 16) | alignmentMask;
 }
 
 void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
@@ -1052,7 +1202,9 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
     // If the value has a common size and alignment, use specialized value
     // witnesses we already have lying around for the builtin types.
     const ValueWitnessTable *commonVWT;
-    switch (sizeWithAlignmentMask(vwtable->size, vwtable->getAlignmentMask())) {
+    bool hasExtraInhabitants = flags.hasExtraInhabitants();
+    switch (sizeWithAlignmentMask(vwtable->size, vwtable->getAlignmentMask(),
+                                  hasExtraInhabitants)) {
     default:
       // For uncommon layouts, use value witnesses that work with an arbitrary
       // size and alignment.
@@ -1071,25 +1223,25 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       }
       return;
       
-    case sizeWithAlignmentMask(1, 0):
+    case sizeWithAlignmentMask(1, 0, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi8_);
       break;
-    case sizeWithAlignmentMask(2, 1):
+    case sizeWithAlignmentMask(2, 1, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi16_);
       break;
-    case sizeWithAlignmentMask(4, 3):
+    case sizeWithAlignmentMask(4, 3, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi32_);
       break;
-    case sizeWithAlignmentMask(8, 7):
+    case sizeWithAlignmentMask(8, 7, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi64_);
       break;
-    case sizeWithAlignmentMask(16, 15):
+    case sizeWithAlignmentMask(16, 15, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi128_);
       break;
-    case sizeWithAlignmentMask(32, 31):
+    case sizeWithAlignmentMask(32, 31, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi256_);
       break;
-    case sizeWithAlignmentMask(64, 63):
+    case sizeWithAlignmentMask(64, 63, 0):
       commonVWT = &VALUE_WITNESS_SYM(Bi512_);
       break;
     }
@@ -1146,9 +1298,6 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
   
-  // Substitute in better value witnesses if we have them.
-  installCommonValueWitnesses(vwtable);
-
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
   if (fieldTypes[0]->flags.hasExtraInhabitants()) {
@@ -1160,6 +1309,9 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
     assert(xiVWT->storeExtraInhabitant);
     assert(xiVWT->getExtraInhabitantIndex);
   }
+
+  // Substitute in better value witnesses if we have them.
+  installCommonValueWitnesses(vwtable);
 }
 
 /***************************************************************************/

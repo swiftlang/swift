@@ -1,0 +1,4 @@
+module CounterFramework {
+  header "counter.h"
+  export *
+}

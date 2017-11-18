@@ -536,6 +536,9 @@ enum TypeResolutionFlags : unsigned {
 
   /// Whether we are checking the parameter list of a subscript.
   TR_SubscriptParameters = 0x2000000,
+
+  /// Is it okay to resolve an IUO sigil ("!") here?
+  TR_AllowIUO = 0x4000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -554,6 +557,7 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   options -= TR_VariadicFunctionInput;
   options -= TR_EnumCase;
   options -= TR_ImmediateOptionalTypeArgument;
+  options -= TR_AllowIUO;
   if (!preserveSIL) options -= TR_SILType;
   return options;
 }
@@ -711,6 +715,11 @@ public:
   /// we can hand them off to SILGen etc.
   llvm::SetVector<ValueDecl *> DeclsToFinalize;
 
+  /// The list of protocols that need their requirement signatures computed,
+  /// because they were first validated by validateDeclForNameLookup(),
+  /// which skips this step.
+  llvm::SetVector<ProtocolDecl *> DelayedRequirementSignatures;
+
   /// The list of types whose circularity checks were delayed.
   SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
@@ -736,12 +745,6 @@ public:
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
-
-  /// Describes an attempt to capture a local function.
-  struct LocalFunctionCapture {
-    FuncDecl *LocalFunction;
-    SourceLoc CaptureLoc;
-  };
 
   /// Local functions that have been captured before their definitions.
   ///
@@ -1070,7 +1073,7 @@ public:
 
   /// Request that the given class needs to have all members validated
   /// after everything in the translation unit has been processed.
-  void requestClassLayout(ClassDecl *classDecl);
+  void requestNominalLayout(NominalTypeDecl *nominalDecl);
 
   /// Request that the superclass of the given class, if any, needs to have
   /// all members validated after everything in the translation unit has
@@ -1512,10 +1515,6 @@ public:
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);
-
-  /// \brief Add an implicitly-defined destructor, if there is no
-  /// user-provided destructor.
-  void addImplicitDestructor(ClassDecl *CD);
 
   /// \brief Add the RawOptionSet (todo:, Equatable, and Hashable) methods to an
   /// imported NS_OPTIONS struct.
@@ -2371,6 +2370,12 @@ public:
   /// unavailable (or obsoleted) declaration.
   bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
                                       const DeclContext *DC);
+
+  /// Returns true if the reference or any of its parents is an
+  /// unconditional unavailable declaration for the same platform.
+  bool isInsideCompatibleUnavailableDeclaration(SourceRange ReferenceRange,
+                                                const DeclContext *DC,
+                                                const AvailableAttr *attr);
 
   /// Returns true if the reference is lexically contained in a declaration
   /// that is deprecated on all deployment targets.

@@ -121,20 +121,22 @@ Function Metadata
 In addition to the `common metadata layout`_ fields, function metadata records
 contain the following fields:
 
-- The function flags are stored at **offset 1**, information contained by flags
-  includes 'throws' indicator (8 bits), metadata convention (8 bits)
-  and number of arguments (remaining N bits).
-- The **argument vector** begins at **offset 2** and consists of pointers to
-  metadata records of the function's arguments.
-- A reference to the **result type** metadata record is stored after the end
-  of **argument vector**. If the function has multiple returns, this references a
-  `tuple metadata`_ record.
+- The function flags are stored at **offset 1**, information contained by function
+  flags includes flags (8 bits) which _currently_ consists of 'throws' bit and
+  'parameter flags' bit, function convention (8 bits), and number of parameters (16 bits).
+- A reference to the **result type** metadata record is stored after function
+  flags. If the function has multiple returns, this references a `tuple metadata`_
+  record.
+- The **parameter type vector** follows the result type and consists of
+  NumParameters type metadata pointers corresponding to the types of the parameters.
+- The optional **parameter flags vector** begins after the end of **parameter type vector**
+  and consists of NumParameters unsigned 32-bit integer values representing flags
+  for each parameter such as inout, __shared, variadic and possibly others. This
+  vector is present only if the hasParameterFlags() function flag is set; otherwise
+  all of the parameter flags are assumed to be zero.
 
-  A pointer to each argument's metadata record will be appended separately,
-  the lowest bit being set if it is **inout**. Because of pointer alignment,
-  the lowest bit will always be free to hold this tag.
-
-  If the function takes no arguments, **argument vector** is going to be empty.
+  If the function takes no arguments, **parameter type vector** as well as
+  **parameter flags vector** are going to be empty.
 
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~

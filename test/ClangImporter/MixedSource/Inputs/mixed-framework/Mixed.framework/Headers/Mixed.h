@@ -62,9 +62,8 @@ SWIFT_PROTOCOL("SwiftProto")
 @property (nonatomic) long protoProperty;
 @end
 
-
-id <SwiftProtoWithCustomName> __nonnull convertToProto(SwiftClassWithCustomName * __nonnull obj);
-
+id<SwiftProtoWithCustomName> _Nonnull
+convertToProto(SwiftClassWithCustomName *_Nonnull obj);
 
 SWIFT_CLASS("BOGUS")
 @interface BogusClass

@@ -518,6 +518,8 @@ public:
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
+  /// Generates a resilient method dispatch thunk.
+  void emitDispatchThunk(SILDeclRef constant);
   
   /// Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
@@ -952,7 +954,8 @@ public:
   /// Generate SIL for the given expression, storing the final result into the
   /// specified Initialization buffer(s). This avoids an allocation and copy if
   /// the result would be allocated into temporary memory normally.
-  void emitExprInto(Expr *E, Initialization *I);
+  /// The location defaults to \c E.
+  void emitExprInto(Expr *E, Initialization *I, Optional<SILLocation> L = None);
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
@@ -1044,6 +1047,11 @@ public:
   SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
                                 CanSILFunctionType constantTy);
 
+  /// Returns a reference to a vtable-dispatched method.
+  SILValue emitClassMethodRef(SILLocation loc, SILValue selfPtr,
+                              SILDeclRef constant,
+                              CanSILFunctionType constantTy);
+
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
@@ -1120,13 +1128,11 @@ public:
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
                                 SILValue buffer, SILValue callbackStorage);
-  bool maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
+  bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
-                                       Type selfInterfaceType,
-                                       Type selfType,
+                                       Type selfInterfaceType, Type selfType,
                                        GenericEnvironment *genericEnv,
-                                       FuncDecl *requirement,
-                                       FuncDecl *witness,
+                                       FuncDecl *requirement, FuncDecl *witness,
                                        SubstitutionList witnessSubs);
   void emitMaterializeForSet(FuncDecl *decl);
 
@@ -1812,15 +1818,15 @@ public:
 
 
 /// A utility class for saving and restoring the insertion point.
-class SavedInsertionPoint {
+class SILGenSavedInsertionPoint {
   SILGenFunction &SGF;
   SILBasicBlock *SavedIP;
   FunctionSection SavedSection;
 public:
-  SavedInsertionPoint(SILGenFunction &SGF, SILBasicBlock *newIP,
-                      Optional<FunctionSection> optSection = None)
-    : SGF(SGF), SavedIP(SGF.B.getInsertionBB()),
-      SavedSection(SGF.CurFunctionSection) {
+  SILGenSavedInsertionPoint(SILGenFunction &SGF, SILBasicBlock *newIP,
+                            Optional<FunctionSection> optSection = None)
+      : SGF(SGF), SavedIP(SGF.B.getInsertionBB()),
+        SavedSection(SGF.CurFunctionSection) {
     FunctionSection section = (optSection ? *optSection : SavedSection);
     assert((section != FunctionSection::Postmatter ||
             SGF.StartOfPostmatter != SGF.F.end()) &&
@@ -1831,10 +1837,11 @@ public:
     SGF.CurFunctionSection = section;
   }
 
-  SavedInsertionPoint(const SavedInsertionPoint &) = delete;
-  SavedInsertionPoint &operator=(const SavedInsertionPoint &) = delete;
+  SILGenSavedInsertionPoint(const SILGenSavedInsertionPoint &) = delete;
+  SILGenSavedInsertionPoint &
+  operator=(const SILGenSavedInsertionPoint &) = delete;
 
-  ~SavedInsertionPoint() {
+  ~SILGenSavedInsertionPoint() {
     if (SavedIP) {
       SGF.B.setInsertionPoint(SavedIP);
     } else {

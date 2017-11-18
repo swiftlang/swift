@@ -23,12 +23,15 @@ using namespace swift::syntax;
 
 namespace {
 static bool isTrivialSyntaxKind(SyntaxKind Kind) {
+  if (isUnknownKind(Kind))
+    return true;
   if (isCollectionKind(Kind))
     return true;
   switch(Kind) {
   case SyntaxKind::SourceFile:
   case SyntaxKind::TopLevelCodeDecl:
   case SyntaxKind::ExpressionStmt:
+  case SyntaxKind::DeclarationStmt:
     return true;
   default:
     return false;

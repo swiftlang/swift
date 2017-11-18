@@ -2,8 +2,8 @@
 enum MSV : Error {
   case Foo, Bar, Baz
 
-  var domain: String { return "" }
-  var code: Int { return 0 }
+  var _domain: String { return "" }
+  var _code: Int { return 0 }
 }
 
 func a() {}

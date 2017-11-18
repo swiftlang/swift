@@ -21,6 +21,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
+#include "swift/Syntax/RawTokenSyntax.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -737,14 +738,15 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-syntax::RawTokenInfo Lexer::fullLex() {
+syntax::RawSyntaxInfo Lexer::fullLex() {
   if (NextToken.isEscapedIdentifier()) {
     LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
-    TrailingTrivia.push_front(syntax::TriviaPiece::backtick());
+    TrailingTrivia.insert(TrailingTrivia.begin(),
+                          syntax::TriviaPiece::backtick());
   }
   auto Loc = NextToken.getLoc();
   auto Result = syntax::RawTokenSyntax::make(NextToken.getKind(),
-                                        OwnedString(NextToken.getText()).copy(),
+                                        OwnedString(NextToken.getText()),
                                         syntax::SourcePresence::Present,
                                         {LeadingTrivia}, {TrailingTrivia});
   LeadingTrivia.clear();

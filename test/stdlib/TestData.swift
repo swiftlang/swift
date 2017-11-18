@@ -3677,6 +3677,50 @@ class TestData : TestDataSuper {
         let h3 = d3.hashValue
         expectEqual(h1, h3)
     }
+    
+    func test_validateMutation_slice_withUnsafeMutableBytes_lengthLessThanLowerBound() {
+        var data = Data(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])[4..<6]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data, Data(bytes: [4, 0xFF]))
+    }
+    
+    func test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() {
+        var data = Data(referencing: NSData(bytes: "hello world", length: 11))[4..<6]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
+    
+    func test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() {
+        var base = Data(referencing: NSData(bytes: "hello world", length: 11))
+        base.append(contentsOf: [1, 2, 3, 4, 5, 6])
+        var data = base[4..<6]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
+    
+    func test_validateMutation_slice_customBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() {
+        var data = Data(referencing: AllOnesImmutableData(length: 10))[4..<6]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
+    
+    func test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() {
+        var base = Data(referencing: AllOnesData(length: 1))
+        base.count = 10
+        var data = base[4..<6]
+        data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+            ptr.advanced(by: 1).pointee = 0xFF
+        }
+        expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -3988,6 +4032,11 @@ DataTests.test("test_sliceHash") { TestData().test_sliceHash() }
 DataTests.test("test_slice_resize_growth") { TestData().test_slice_resize_growth() }
 DataTests.test("test_sliceEnumeration") { TestData().test_sliceEnumeration() }
 DataTests.test("test_hashEmptyData") { TestData().test_hashEmptyData() }
+DataTests.test("test_validateMutation_slice_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_withUnsafeMutableBytes_lengthLessThanLowerBound() }
+DataTests.test("test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
+DataTests.test("test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
+DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
+DataTests.test("test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

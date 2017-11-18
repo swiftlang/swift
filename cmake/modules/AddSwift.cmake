@@ -719,7 +719,8 @@ function(_add_swift_library_single target name)
   # On platforms that use ELF binaries we add markers for metadata sections in
   # the shared libraries using these object files.  This wouldn't be necessary
   # if the link was done by the swift binary: rdar://problem/19007002
-  if("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY AND
+     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     if("${libkind}" STREQUAL "SHARED")
       set(arch_subdir "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
 
@@ -730,6 +731,10 @@ function(_add_swift_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
+    swift_windows_generate_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS)
+    foreach(flag ${SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS})
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;${flag})
+    endforeach()
     foreach(directory ${SWIFTLIB_INCLUDE})
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-I${directory})
     endforeach()
@@ -869,7 +874,8 @@ function(_add_swift_library_single target name)
 
   # The section metadata objects are generated sources, and we need to tell CMake
   # not to expect to find them prior to their generation.
-  if("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+  if(SWIFTLIB_SINGLE_TARGET_LIBRARY AND
+     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     if("${libkind}" STREQUAL "SHARED")
       set_source_files_properties(${SWIFT_SECTIONS_OBJECT_BEGIN} PROPERTIES GENERATED 1)
       set_source_files_properties(${SWIFT_SECTIONS_OBJECT_END} PROPERTIES GENERATED 1)
@@ -1531,6 +1537,11 @@ function(add_swift_library name)
             if("${sdk}" STREQUAL "ANDROID")
               list(APPEND swiftlib_private_link_libraries_targets
                    "-latomic")
+            # the same issue on FreeBSD, missing symbols:
+            # __atomic_store, __atomic_compare_exchange, __atomic_load
+            elseif("${sdk}" STREQUAL "FREEBSD")
+              list(APPEND swiftlib_private_link_libraries_targets
+                   "${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${arch}.a")
             endif()
           elseif("${lib}" STREQUAL "ICU_I18N")
             list(APPEND swiftlib_private_link_libraries_targets

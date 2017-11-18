@@ -290,7 +290,8 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false, /*noescape*/ false);
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, ParameterConvention::Direct_Unowned, Parameters,
+      nullptr, ExtInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
       Results, None, M.getASTContext());
   return FunctionType;
 }
@@ -697,6 +698,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   if (!Enum)
     return BridgedArgument();
 
+  if (SILBasicBlock::iterator(Enum) == Enum->getParent()->begin())
+    return BridgedArgument();
   auto *BridgeCall =
       dyn_cast<ApplyInst>(std::prev(SILBasicBlock::iterator(Enum)));
   if (!BridgeCall || BridgeCall->getNumArguments() != 1 ||
@@ -704,11 +707,16 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
     return BridgedArgument();
 
   auto BridgedValue = BridgeCall->getArgument(0);
+  auto Next = std::next(SILBasicBlock::iterator(Enum));
+  if (Next == Enum->getParent()->end())
+    return BridgedArgument();
   auto *BridgedValueRelease =
       dyn_cast<ReleaseValueInst>(std::next(SILBasicBlock::iterator(Enum)));
   if (!BridgedValueRelease || BridgedValueRelease->getOperand() != BridgedValue)
     return BridgedArgument();
 
+  if (SILBasicBlock::iterator(BridgeCall) == BridgeCall->getParent()->begin())
+    return BridgedArgument();
   auto *FunRef =
       dyn_cast<FunctionRefInst>(std::prev(SILBasicBlock::iterator(BridgeCall)));
   if (!FunRef || !FunRef->hasOneUse() || BridgeCall->getCallee() != FunRef)
@@ -1197,7 +1205,8 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
         SILResultInfo(BridgedReturn.getReturnType(), ResultConvention::Owned));
   }
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, ParameterConvention::Direct_Unowned, Parameters,
+      nullptr, ExtInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, Parameters, {},
       Results, None, M.getASTContext());
   return FunctionType;
 }
@@ -1280,8 +1289,7 @@ public:
     auto *Fun = getFunction();
 
     // Only outline if we optimize for size.
-    if (Fun->getModule().getOptions().Optimization !=
-        SILOptions::SILOptMode::OptimizeForSize)
+    if (!Fun->optimizeForSize())
       return;
 
     // Dump function if requested.

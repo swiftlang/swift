@@ -996,7 +996,7 @@ bb0(%0 : $T):
 }
 
 // protocol witness for p.Reachable.reach <A where A: p.Reachable> (A)() -> () in conformance p.T : p.Reachable in p
-sil hidden [transparent] [thunk] @_TTWC1p1TS_9ReachableS_FS1_5reachuRq_S1__fq_FT_T_ : $@convention(witness_method) (@in_guaranteed T) -> () {
+sil hidden [transparent] [thunk] @_TTWC1p1TS_9ReachableS_FS1_5reachuRq_S1__fq_FT_T_ : $@convention(witness_method: Reachable) (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %1 = load %0 : $*T                              // users: %2, %3, %4, %5
   strong_retain %1 : $T                           // id: %2
@@ -1021,18 +1021,18 @@ bb0(%0 : $*T):
 // p.foo <A where A: p.Reachable> (A, a : Swift.Int) -> ()
 sil hidden @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_ : $@convention(thin) <T where T : Reachable> (@in T, Int) -> () {
 bb0(%0 : $*T, %1 : $Int):
-  %4 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %5
-  %5 = apply %4<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
-  %6 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %7
-  %7 = apply %6<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
-  %8 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %9
-  %9 = apply %8<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
-  %10 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %11
-  %11 = apply %10<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
-  %12 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %13
-  %13 = apply %12<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
-  %14 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %15
-  %15 = apply %14<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
+  %4 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %5
+  %5 = apply %4<T>(%0) : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
+  %6 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %7
+  %7 = apply %6<T>(%0) : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
+  %8 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %9
+  %9 = apply %8<T>(%0) : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
+  %10 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %11
+  %11 = apply %10<T>(%0) : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
+  %12 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %13
+  %13 = apply %12<T>(%0) : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
+  %14 = witness_method $T, #Reachable.reach!1 : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> () // user: %15
+  %15 = apply %14<T>(%0) : $@convention(witness_method: Reachable) <τ_0_0 where τ_0_0 : Reachable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*T                           // id: %16
   %17 = tuple ()                                  // user: %18
   return %17 : $()                                // id: %18
@@ -1068,7 +1068,7 @@ bb0(%0 : $Airplane):
 }
 
 // protocol witness for p2.Flyable.fly <A where A: p2.Flyable> (A)() -> () in conformance p2.Airplane : p2.Flyable in p2
-sil hidden [transparent] [thunk] @_TTWV2p28AirplaneS_7FlyableS_FS1_3flyuRq_S1__fq_FT_T_ : $@convention(witness_method) (@in_guaranteed Airplane) -> () {
+sil hidden [transparent] [thunk] @_TTWV2p28AirplaneS_7FlyableS_FS1_3flyuRq_S1__fq_FT_T_ : $@convention(witness_method: Flyable) (@in_guaranteed Airplane) -> () {
 bb0(%0 : $*Airplane):
   %1 = alloc_stack $Airplane                      // users: %2, %6
   copy_addr %0 to [initialization] %1 : $*Airplane // id: %2
@@ -1099,16 +1099,16 @@ bb0(%0 : $*Airplane):
 sil hidden @_TF2p28trytoflyFPS_7Flyable_T_ : $@convention(thin) (@in Flyable) -> () {
 bb0(%0 : $*Flyable):
   %2 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %3, %4
-  %3 = witness_method $@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %2 : $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %4
-  %4 = apply %3<@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %3 = witness_method $@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %2 : $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %4
+  %4 = apply %3<@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%2) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
   %5 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %6, %7
-  %6 = witness_method $@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %5 : $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %7
-  %7 = apply %6<@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %6 = witness_method $@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %5 : $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %7
+  %7 = apply %6<@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%5) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
   %8 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %9, %10
-  %9 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %10
-  %10 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%8) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %11 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %12
-  %12 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%8) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %9 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %10
+  %10 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %11 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %12
+  %12 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Flyable                     // id: %11
   %13 = tuple ()                                  // user: %13
   return %13 : $()                                // id: %13
@@ -1133,11 +1133,11 @@ sil hidden @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
   debug_value_addr %0 : $*Pingable  // let x      // id: %1
   %2 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable // users: %3, %4
-  %3 = witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %2 : $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %4
-  %4 = apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %3 = witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %2 : $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %4
+  %4 = apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   %5 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable // users: %6, %7
-  %6 = witness_method $@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %5 : $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %7
-  %7 = apply %6<@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %6 = witness_method $@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %5 : $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %7
+  %7 = apply %6<@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable>(%5) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable                    // id: %8
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
@@ -1149,10 +1149,10 @@ bb0(%0 : $*Pingable, %1 : $Int):
   debug_value_addr %0 : $*Pingable  // let x      // id: %2
   debug_value %1 : $Int  // let y                 // id: %3
   %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable // users: %5, %6
-  %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %6
+  %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %6
 
   // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
-  %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   %7 = integer_literal $Builtin.Int64, 3          // user: %9
   %8 = integer_literal $Builtin.Int64, 3          // user: %9
   %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1 // user: %10
@@ -1160,18 +1160,18 @@ bb0(%0 : $*Pingable, %1 : $Int):
 
 bb1:                                              // Preds: bb0
   %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable // users: %12, %13
-  %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %13
+  %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %13
 
   // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
-  %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable>(%11) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   br bb2                                          // id: %14
 
 bb2:                                              // Preds: bb0 bb1
   %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable // users: %16, %17
-  %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %17
+  %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %17
 
   // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
-  %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable>(%15) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable                    // id: %18
   %19 = tuple ()                                  // user: %20
 
@@ -1222,21 +1222,21 @@ protocol Proto : class {
 sil @cse_open_existential : $@convention(thin) (@guaranteed Proto, Bool) -> () {
 bb0(%0 : $Proto, %1 : $Bool):
   %4 = open_existential_ref %0 : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto
-  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis!1, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis!1, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   %7 = struct_extract %1 : $Bool, #Bool._value
   cond_br %7, bb1, bb2
 
 bb1:
   %9 = open_existential_ref %0 : $Proto to $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto
-  %10 = witness_method $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThat!1, %9 : $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %11 = apply %10<@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto>(%9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %10 = witness_method $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThat!1, %9 : $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   br bb3
 
 bb2:                                              // Preds: bb0
   %13 = open_existential_ref %0 : $Proto to $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto
-  %14 = witness_method $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis!1, %13 : $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto>(%13) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %14 = witness_method $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis!1, %13 : $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto>(%13) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   %16 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto
   store %13 to %16 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto
   // This is to check that result types of instructions are updated by CSE as well.
@@ -1248,5 +1248,22 @@ bb2:                                              // Preds: bb0
 bb3:
   %20 = tuple ()
   return %20 : $()
+}
+
+// Check that we don't CSE open_existential_ref if they are not compeltely equal.
+// CHECK-LABEL: sil @dont_cse_open_existential_ref
+// CHECK: open_existential_ref
+// CHECK: open_existential_ref
+// CHECK: return
+sil @dont_cse_open_existential_ref : $@convention(thin) (@guaranteed Proto & Ping) -> @owned Ping {
+bb0(%0 : $Proto & Ping):
+  %4 = open_existential_ref %0 : $Proto & Ping to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto
+  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis!1, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %9 = open_existential_ref %0 : $Proto & Ping to $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83") Proto & Ping
+  %10 = upcast %9 : $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83") Proto & Ping to $Ping
+  %11 = class_method %10 : $Ping, #Ping.ping!1 : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
+  %12 = apply %11(%10) : $@convention(method) (@guaranteed Ping) -> @owned Ping
+  return %12 : $Ping
 }
 

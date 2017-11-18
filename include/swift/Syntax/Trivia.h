@@ -82,7 +82,7 @@
 #include "swift/Basic/OwnedString.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <deque>
+#include <vector>
 
 namespace swift {
 namespace syntax {
@@ -204,7 +204,7 @@ struct TriviaPiece {
   }
 };
 
-using TriviaList = std::deque<TriviaPiece>;
+using TriviaList = std::vector<TriviaPiece>;
 
 /// A collection of leading or trailing trivia. This is the main data structure
 /// for thinking about trivia.
@@ -228,7 +228,7 @@ struct Trivia {
 
   /// Add a piece to the beginning of the collection.
   void push_front(const TriviaPiece &Piece) {
-    Pieces.push_front(Piece);
+    Pieces.insert(Pieces.begin(), Piece);
   }
 
   /// Return a reference to the first piece.

@@ -108,7 +108,9 @@ protected:
   bool handleTailAddr(int TailIdx, SILInstruction *I,
                       llvm::SmallVectorImpl<StoreInst *> &TailStores);
 
-  void optimizeObjectAllocation(AllocRefInst *ARI);
+  void
+  optimizeObjectAllocation(AllocRefInst *ARI,
+                           llvm::SmallVector<SILInstruction *, 4> &ToRemove);
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
   SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
@@ -258,7 +260,8 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, Results, None,
+      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
+      /*params*/ {}, /*yields*/ {}, Results, None,
       Store->getModule().getASTContext());
   auto *GetterF = Store->getModule().getOrCreateFunction(
       Store->getLoc(),
@@ -512,7 +515,8 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, Results, None,
+      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
+      /*params*/ {}, /*yields*/ {}, Results, None,
       InitF->getASTContext());
   auto *GetterF = InitF->getModule().getOrCreateFunction(
       InitF->getLocation(),
@@ -1029,19 +1033,6 @@ static bool isValidInitVal(SILValue V) {
   return false;
 }
 
-/// Check if \p V is an empty tuple or empty struct.
-static bool isEmptyInitVal(SILValue V) {
-  if (!isa<StructInst>(V) && !isa<TupleInst>(V))
-    return false;
-
-  // If any of the operands is not empty, the whole struct/tuple is not empty.
-  for (Operand &Op : cast<SingleValueInstruction>(V)->getAllOperands()) {
-    if (!isEmptyInitVal(Op.get()))
-      return false;
-  }
-  return true;
-}
-
 /// Check if a use of an object may prevent outlining the object.
 ///
 /// If \p isCOWObject is true, then the object reference is wrapped into a
@@ -1132,11 +1123,6 @@ bool SILGlobalOpt::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
     if (auto *SI = dyn_cast<StoreInst>(TailAddr)) {
       if (!isValidInitVal(SI->getSrc()) || TailStores[TailIdx])
         return false;
-      // We don't optimize arrays with an empty element type. This would
-      // generate a wrong initializer with zero-sized elements. But the stride
-      // of zero sized types is (artificially) set to 1 in IRGen.
-      if (isEmptyInitVal(SI->getSrc()))
-        return false;
       TailStores[TailIdx] = SI;
       return true;
     }
@@ -1218,7 +1204,8 @@ public:
 ///     func getarray() -> [Int] {
 ///       return [1, 2, 3]
 ///     }
-void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
+void SILGlobalOpt::optimizeObjectAllocation(
+    AllocRefInst *ARI, llvm::SmallVector<SILInstruction *, 4> &ToRemove) {
 
   if (ARI->isObjC())
     return;
@@ -1270,6 +1257,10 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
   DEBUG(llvm::dbgs() << "Outline global variable in " <<
         ARI->getFunction()->getName() << '\n');
 
+  assert(Cl->hasFixedLayout(Module->getSwiftModule(),
+                            ResilienceExpansion::Minimal) &&
+    "constructor call of resilient class should prevent static allocation");
+
   // Create a name for the outlined global variable.
   GlobalVariableMangler Mangler;
   std::string GlobName =
@@ -1296,14 +1287,14 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
     assert(MemberStore);
     ObjectArgs.push_back(Cloner.clone(
                            cast<SingleValueInstruction>(MemberStore->getSrc())));
-    MemberStore->eraseFromParent();
+    ToRemove.push_back(MemberStore);
   }
   // Create the initializers for the tail elements.
   unsigned NumBaseElements = ObjectArgs.size();
   for (StoreInst *TailStore : TailStores) {
     ObjectArgs.push_back(Cloner.clone(
                            cast<SingleValueInstruction>(TailStore->getSrc())));
-    TailStore->eraseFromParent();
+    ToRemove.push_back(TailStore);
   }
   // Create the initializer for the object itself.
   SILBuilder StaticInitBuilder(Glob);
@@ -1314,12 +1305,13 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
   SILBuilder B(ARI);
   GlobalValueInst *GVI = B.createGlobalValue(ARI->getLoc(), Glob);
   B.createStrongRetain(ARI->getLoc(), GVI, B.getDefaultAtomicity());
-  while (!ARI->use_empty()) {
-    Operand *Use = *ARI->use_begin();
+  llvm::SmallVector<Operand *, 8> Worklist(ARI->use_begin(), ARI->use_end());
+  while (!Worklist.empty()) {
+    auto *Use = Worklist.pop_back_val();
     SILInstruction *User = Use->getUser();
     switch (User->getKind()) {
       case SILInstructionKind::DeallocRefInst:
-        User->eraseFromParent();
+        ToRemove.push_back(User);
         break;
       default:
         Use->set(GVI);
@@ -1332,8 +1324,7 @@ void SILGlobalOpt::optimizeObjectAllocation(AllocRefInst *ARI) {
     replaceFindStringCall(FindStringCall);
   }
 
-  ARI->eraseFromParent();
-
+  ToRemove.push_back(ARI);
   HasChanged = true;
 }
 
@@ -1365,6 +1356,9 @@ void SILGlobalOpt::replaceFindStringCall(ApplyInst *FindStringCall) {
   NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
   if (!cacheDecl)
     return;
+
+  assert(cacheDecl->hasFixedLayout(Module->getSwiftModule(),
+                                   ResilienceExpansion::Minimal));
 
   SILType wordTy = cacheType.getFieldType(
                             cacheDecl->getStoredProperties().front(), *Module);
@@ -1456,6 +1450,15 @@ bool SILGlobalOpt::run() {
     for (auto &BB : F) {
       bool IsCold = ColdBlocks.isCold(&BB);
       auto Iter = BB.begin();
+
+      // We can't remove instructions willy-nilly as we iterate because
+      // that might cause a pointer to the next instruction to become
+      // garbage, causing iterator invalidations (and crashes).
+      // Instead, we collect in a list the instructions we want to remove
+      // and erase the BB they belong to at the end of the loop, once we're
+      // sure it's safe to do so.
+      llvm::SmallVector<SILInstruction *, 4> ToRemove;
+
       while (Iter != BB.end()) {
         SILInstruction *I = &*Iter;
         Iter++;
@@ -1473,10 +1476,12 @@ bool SILGlobalOpt::run() {
             // for serializable functions.
             // TODO: We may do the optimization _after_ serialization in the
             // pass pipeline.
-            optimizeObjectAllocation(ARI);
+            optimizeObjectAllocation(ARI, ToRemove);
           }
         }
       }
+      for (auto *I : ToRemove)
+        I->eraseFromParent();
     }
   }
 

@@ -5,7 +5,7 @@ protocol Incrementable  {
 }
 
 protocol _ForwardIndex  {
-  associatedtype Distance  = MyInt // expected-note{{declared here}}
+  associatedtype Distance  = MyInt
 }
 
 protocol ForwardIndex : _ForwardIndex {
@@ -19,7 +19,7 @@ protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndex {
 }
 
 protocol _RandomAccessIndex : _BidirectionalIndex {
-  associatedtype Distance // expected-warning{{redeclaration of associated type 'Distance}}
+  associatedtype Distance
 }
 
 protocol RandomAccessIndex 

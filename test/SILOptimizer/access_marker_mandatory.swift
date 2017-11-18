@@ -49,9 +49,9 @@ func takeS(_ s: S) {}
 // CHECK: [[ADDRI:%.*]] = struct_element_addr [[WRITE]] : $*S, #S.i
 // CHECK: store %{{.*}} to [[ADDRI]] : $*Int
 // CHECK: end_access [[WRITE]]
-// CHECK: [[FTAKE:%.*]] = function_ref @_T023access_marker_mandatory5takeSyAA1SVF : $@convention(thin) (@owned S) -> ()
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*S
 // CHECK: end_access [[READ]]
+// CHECK: [[FTAKE:%.*]] = function_ref @_T023access_marker_mandatory5takeSyAA1SVF : $@convention(thin) (@owned S) -> ()
 // CHECK: apply [[FTAKE]](%{{.*}}) : $@convention(thin) (@owned S) -> ()
 // CHECK-LABEL: } // end sil function '_T023access_marker_mandatory14modifyAndReadSyyXl1o_tF'
 public func modifyAndReadS(o: AnyObject) {
@@ -66,16 +66,16 @@ public func modifyAndReadS(o: AnyObject) {
 // Otherwise, we may try to convert the access to [deinit] which
 // doesn't make sense dynamically.
 //
-// CHECK-LABEL: sil hidden @_T023access_marker_mandatory19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_owned () -> Int {
+// CHECK-LABEL: sil hidden @_T023access_marker_mandatory19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
 // CHECK-LABEL: bb0:
 // CHECK: [[STK:%.*]] = alloc_stack $Int, var, name "x"
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*Int
 // CHECK: store %{{.*}} to [[WRITE]] : $*Int
 // CHECK: end_access [[WRITE]] : $*Int
 // CHECK: [[F:%.*]] = function_ref @_T023access_marker_mandatory19captureStackPromoteSiycyFSiycfU_Tf2i_n : $@convention(thin) (Int) -> Int
-// CHECK: [[C:%.*]] = partial_apply [[F]](%{{.*}}) : $@convention(thin) (Int) -> Int
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[F]](%{{.*}}) : $@convention(thin) (Int) -> Int
 // CHECK: dealloc_stack [[STK]] : $*Int
-// CHECK: return [[C]] : $@callee_owned () -> Int
+// CHECK: return [[C]] : $@callee_guaranteed () -> Int
 // CHECK-LABEL: } // end sil function '_T023access_marker_mandatory19captureStackPromoteSiycyF'
 func captureStackPromote() -> () -> Int {
   var x = 1

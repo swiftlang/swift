@@ -305,11 +305,6 @@ Type DeclContext::mapTypeIntoContext(Type type) const {
       getGenericEnvironmentOfContext(), type);
 }
 
-Type DeclContext::mapTypeOutOfContext(Type type) const {
-  return GenericEnvironment::mapTypeOutOfContext(
-      getGenericEnvironmentOfContext(), type);
-}
-
 DeclContext *DeclContext::getLocalContext() {
   if (isLocalContext())
     return this;
@@ -434,6 +429,23 @@ DeclContext *DeclContext::getParentForLookup() const {
       return getModuleScopeContext();
   }
   return getParent();
+}
+
+DeclContext *DeclContext::getCommonParentContext(DeclContext *A,
+                                                 DeclContext *B) {
+  if (A == B)
+    return A;
+
+  if (A->isChildContextOf(B))
+    return B;
+
+  // Peel away layers of A until we reach a common parent
+  for (DeclContext *CurDC = A; CurDC; CurDC = CurDC->getParent()) {
+    if (B->isChildContextOf(CurDC))
+      return CurDC;
+  }
+
+  return nullptr;
 }
 
 ModuleDecl *DeclContext::getParentModule() const {
@@ -867,16 +879,22 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   return Depth + 1;
 }
 
-ASTContext &IterableDeclContext::getASTContext() const {
+const Decl *
+IterableDeclContext::getDecl() const {
   switch (getIterableContextKind()) {
   case IterableDeclContextKind::NominalTypeDecl:
-    return cast<NominalTypeDecl>(this)->getASTContext();
+    return cast<NominalTypeDecl>(this);
+    break;
 
   case IterableDeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(this)->getASTContext();
+    return cast<ExtensionDecl>(this);
+    break;
   }
-
   llvm_unreachable("Unhandled IterableDeclContextKind in switch.");
+}
+
+ASTContext &IterableDeclContext::getASTContext() const {
+  return getDecl()->getASTContext();
 }
 
 DeclRange IterableDeclContext::getMembers() const {
@@ -963,17 +981,7 @@ void IterableDeclContext::loadAllMembers() const {
     /*lazyLoader=*/nullptr);
   FirstDeclAndLazyMembers.setInt(false);
 
-  const Decl *container = nullptr;
-  switch (getIterableContextKind()) {
-  case IterableDeclContextKind::NominalTypeDecl:
-    container = cast<NominalTypeDecl>(this);
-    break;
-
-  case IterableDeclContextKind::ExtensionDecl:
-    container = cast<ExtensionDecl>(this);
-    break;
-  }
-
+  const Decl *container = getDecl();
   contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
                                       contextInfo->memberData);
 
@@ -981,6 +989,14 @@ void IterableDeclContext::loadAllMembers() const {
   // FIXME: (transitional) decrement the redundant "always-on" counter.
   if (auto s = ctx.Stats)
     s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts--;
+}
+
+bool IterableDeclContext::wasDeserialized() const {
+  const DeclContext *DC = cast<DeclContext>(getDecl());
+  if (auto F = dyn_cast<FileUnit>(DC->getModuleScopeContext())) {
+    return F->getKind() == FileUnitKind::SerializedAST;
+  }
+  return false;
 }
 
 bool IterableDeclContext::classof(const Decl *D) {

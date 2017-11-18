@@ -117,10 +117,16 @@ struct Computed<T, U> : Assocked {
 // CHECK-NEXT:    store atomic %swift.type* [[FETCH_RESULT]], %swift.type** [[CACHE]] release, align 8
 // CHECK-NEXT:    br label %cont
 
-//   Witness table instantiation function for Computed : Assocked.
-// CHECK-LABEL: define hidden i8** @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWa(%swift.type*)
+//   Witness table accessor function for Computed : Assocked.
+// CHECK-LABEL: define hidden i8** @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWa(%swift.type*, i8***, i64)
 // CHECK:         entry:
-// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG, %swift.type* %0, i8** null)
+// CHECK-NEXT:     %conditional.tables = alloca %swift.witness_table_slice, align 8
+// CHECK-NEXT:     [[TABLES:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 0
+// CHECK-NEXT:     store i8*** %1, i8**** [[TABLES]], align 8
+// CHECK-NEXT:     [[COUNT:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 1
+// CHECK-NEXT:     store i64 %2, i64* [[COUNT]], align 8
+// CHECK-NEXT:     [[INSTANTIATION_ARGS:%.*]] = bitcast %swift.witness_table_slice* %conditional.tables to i8**
+// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG, %swift.type* %0, i8** [[INSTANTIATION_ARGS]])
 // CHECK-NEXT:     ret i8** [[WTABLE]]
 
 
@@ -151,17 +157,23 @@ struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
 
 //   Instantiation function for GenericComputed : DerivedFromSimpleAssoc.
 // CHECK-LABEL: define internal void @_T023associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI(i8**, %swift.type*, i8**)
-// CHECK:         [[T0:%.*]] = call i8** @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa(%swift.type* %1)
+// CHECK:         [[T0:%.*]] = call i8** @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa(%swift.type* %1, i8*** undef, i64 0)
 // CHECK-NEXT:    [[T1:%.*]] = bitcast i8** [[T0]] to i8*
 // CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds i8*, i8** %0, i32 0
 // CHECK-NEXT:    store i8* [[T1]], i8** [[T2]], align 8
 // CHECK-NEXT:    ret void
 
-//   Witness table instantiation function for GenericComputed : HasSimpleAssoc..
-// CHECK-LABEL: define hidden i8** @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa(%swift.type*)
+//   Witness table accessor function for GenericComputed : HasSimpleAssoc..
+// CHECK-LABEL: define hidden i8** @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa(%swift.type*, i8***, i64)
 // CHECK-NEXT:   entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWG, %swift.type* %0, i8** null)
-// CHECK-NEXT:    ret i8** %1
+// CHECK-NEXT:    %conditional.tables = alloca %swift.witness_table_slice, align 8
+// CHECK-NEXT:    [[TABLES:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 0
+// CHECK-NEXT:    store i8*** %1, i8**** [[TABLES]], align 8
+// CHECK-NEXT:    [[COUNT:%.*]] = getelementptr inbounds %swift.witness_table_slice, %swift.witness_table_slice* %conditional.tables, i32 0, i32 1
+// CHECK-NEXT:    store i64 %2, i64* [[COUNT]], align 8
+// CHECK-NEXT:    [[INSTANTIATION_ARGS:%.*]] = bitcast %swift.witness_table_slice* %conditional.tables to i8**
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_rt_swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @_T023associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWG, %swift.type* %0, i8** [[INSTANTIATION_ARGS]])
+// CHECK-NEXT:    ret i8** [[WTABLE]]
 
 
 protocol HasAssocked {

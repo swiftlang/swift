@@ -23,7 +23,6 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/SourceManager.h"
@@ -33,6 +32,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Formatting.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/Subsystems.h"
 
@@ -876,10 +876,11 @@ public:
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               Optional<AccessKind> AccKind,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {
@@ -1536,27 +1537,39 @@ private:
   /// For example, if the CallExpr is enclosed in another expression or statement
   /// such as "outer(inner(<#closure#>))", or "if inner(<#closure#>)", then trailing
   /// closure should not be applied to the inner call.
-  std::pair<CallExpr *, bool> enclosingCallExpr(SourceFile &SF, SourceLoc SL) {
+  std::pair<Expr*, bool> enclosingCallExprArg(SourceFile &SF, SourceLoc SL) {
 
     class CallExprFinder : public SourceEntityWalker {
     public:
       const SourceManager &SM;
       SourceLoc TargetLoc;
-      CallExpr *EnclosingCall;
+      std::pair<Expr *, Expr*> EnclosingCallAndArg;
       Expr *OuterExpr;
       Stmt *OuterStmt;
       explicit CallExprFinder(const SourceManager &SM)
         :SM(SM) { }
 
+      bool checkCallExpr(Expr *E) {
+        Expr* Arg = nullptr;
+        if (auto *CE = dyn_cast<CallExpr>(E)) {
+          // Call expression can have argument.
+          Arg = CE->getArg();
+        } else if (auto UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+          // Unresolved member can have argument too.
+          Arg = UME->getArgument();
+        }
+        if (!Arg)
+          return false;
+        if (EnclosingCallAndArg.first)
+          OuterExpr = EnclosingCallAndArg.first;
+        EnclosingCallAndArg = {E, Arg};
+        return true;
+      }
+
       bool walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (auto *CE = dyn_cast<CallExpr>(E)) {
-            if (EnclosingCall)
-              OuterExpr = EnclosingCall;
-            EnclosingCall = CE;
-          }
-          else if (!EnclosingCall)
+          if (!checkCallExpr(E) && !EnclosingCallAndArg.first)
             OuterExpr = E;
         }
         return true;
@@ -1571,7 +1584,7 @@ private:
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (!EnclosingCall) {
+          if (!EnclosingCallAndArg.first) {
             if (isa<BraceStmt>(S))
               // In case OuterStmt is already set, we should clear it to nullptr.
               OuterStmt = nullptr;
@@ -1582,18 +1595,18 @@ private:
         return true;
       }
 
-      CallExpr *findEnclosingCall(SourceFile &SF, SourceLoc SL) {
-        EnclosingCall = nullptr;
+      Expr *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
+        EnclosingCallAndArg = {nullptr, nullptr};
         OuterExpr = nullptr;
         OuterStmt = nullptr;
         TargetLoc = SL;
         walk(SF);
-        return EnclosingCall;
+        return EnclosingCallAndArg.second;
       }
     };
 
     CallExprFinder CEFinder(SM);
-    auto *CE = CEFinder.findEnclosingCall(SF, SL);
+    auto *CE = CEFinder.findEnclosingCallArg(SF, SL);
 
     if (!CE)
       return std::make_pair(CE, false);
@@ -1646,8 +1659,8 @@ public:
     // and if the call parens can be removed in that case.
     // We'll first find the enclosing CallExpr, and then do further analysis.
     bool UseTrailingClosure = false;
-    std::pair<CallExpr*, bool> ECE = enclosingCallExpr(SF, PlaceholderStartLoc);
-    Expr *Args = ECE.first ? ECE.first->getArg() : nullptr;
+    auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
+    Expr *Args = ECE.first;
     if (Args && ECE.second) {
       if (isa<ParenExpr>(Args)) {
         UseTrailingClosure = true;

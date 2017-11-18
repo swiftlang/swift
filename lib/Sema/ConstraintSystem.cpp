@@ -390,14 +390,12 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
                                               OpenedTypeMap &replacements) {
   auto unboundDecl = unbound->getDecl();
-  if (unboundDecl->isInvalid())
-    return ErrorType::get(getASTContext());
 
   // If the unbound decl hasn't been validated yet, we have a circular
   // dependency that isn't being diagnosed properly.
   if (!unboundDecl->getGenericSignature()) {
     TC.diagnose(unboundDecl, diag::circular_reference);
-    return ErrorType::get(unbound);
+    return Type();
   }
 
   auto parentTy = unbound->getParent();
@@ -458,7 +456,7 @@ Type ConstraintSystem::openUnboundGenericType(
   if (!type->hasUnboundGenericType())
     return type;
 
-  return type.transform([&](Type type) -> Type {
+  type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         OpenedTypeMap replacements;
         return openUnboundGenericType(unbound, locator, replacements);
@@ -466,6 +464,11 @@ Type ConstraintSystem::openUnboundGenericType(
 
       return type;
     });
+
+  if (!type)
+    return ErrorType::get(getASTContext());
+
+  return type;
 }
 
 Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
@@ -714,7 +717,7 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
   if (!wantInterfaceType && requestedType->hasArchetype()) {
     auto valueDC = value->getDeclContext();
     if (valueDC != UseDC) {
-      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
+      Type mapped = requestedType->mapTypeOutOfContext();
       requestedType = UseDC->mapTypeIntoContext(mapped);
     }
   }

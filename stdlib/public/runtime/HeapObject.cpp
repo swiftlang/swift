@@ -248,6 +248,8 @@ BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
 
 void swift::swift_deallocBox(HeapObject *o) {
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
+  // Move the object to the deallocating state (+1 -> +0).
+  o->refCounts.decrementFromOneNonAtomic();
   SWIFT_RT_ENTRY_CALL(swift_deallocObject)(o, metadata->getAllocSize(),
                                            metadata->getAllocAlignMask());
 }
@@ -774,10 +776,15 @@ static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
 }
 #endif
 
-void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
-                                size_t allocatedAlignMask)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+static inline void swift_deallocObjectImpl(HeapObject *object,
+                                           size_t allocatedSize,
+                                           size_t allocatedAlignMask,
+                                           bool isDeiniting) {
   assert(isAlignmentMask(allocatedAlignMask));
+  if (!isDeiniting) {
+    assert(object->refCounts.isUniquelyReferenced());
+    object->refCounts.decrementFromOneNonAtomic();
+  }
   assert(object->refCounts.isDeiniting());
   SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
@@ -869,6 +876,17 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
     // object state DEINITING -> DEINITED
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
   }
+}
+
+void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
+                                size_t allocatedAlignMask) {
+  swift_deallocObjectImpl(object, allocatedSize, allocatedAlignMask, true);
+}
+
+void swift::swift_deallocUninitializedObject(HeapObject *object,
+                                             size_t allocatedSize,
+                                             size_t allocatedAlignMask) {
+  swift_deallocObjectImpl(object, allocatedSize, allocatedAlignMask, false);
 }
 
 WeakReference *swift::swift_weakInit(WeakReference *ref, HeapObject *value) {

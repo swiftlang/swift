@@ -83,8 +83,8 @@ public:
 
   // We can give these reasonable default implementations.
 
-  void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr, SILType T) const override;
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override;
 
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
@@ -227,7 +227,23 @@ public:
                           llvm::Value *metadata,
                           llvm::Value *vwtable,
                           SILType T) const override {}
-  
+
+  void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
+      SILType T) const override {
+    return;
+  }
+
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr,
+                                       SILType T) const override;
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T) const override;
+
   static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };

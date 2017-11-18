@@ -2,9 +2,9 @@
 @import SwiftName;
 
 @interface PointerWrapper
-@property void * __null_unspecified voidPtr;
-@property int * __null_unspecified intPtr;
-@property __null_unspecified id __autoreleasing * __null_unspecified idPtr;
+@property void *_Null_unspecified voidPtr;
+@property int *_Null_unspecified intPtr;
+@property _Null_unspecified id __autoreleasing *_Null_unspecified idPtr;
 @end
 
 #pragma clang assume_nonnull begin

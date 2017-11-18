@@ -368,7 +368,8 @@ computeNewArgInterfaceTypes(SILFunction *F,
     } else if (paramTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
-      convention = ParameterConvention::Direct_Owned;
+      convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
+                                        : ParameterConvention::Direct_Owned;
     }
     OutTys.push_back(SILParameterInfo(paramBoxedTy.getSwiftRValueType(),
                                       convention));
@@ -415,9 +416,10 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
   // Create the thin function type for the cloned closure.
   auto ClonedTy = SILFunctionType::get(
       OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
-      OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
+      OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
+      ClonedInterfaceArgTys, OrigFTI->getYields(),
       OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      M.getASTContext());
+      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");

@@ -49,7 +49,7 @@ public class CircleManager : ShapeManager {
 
 // CHECK-LABEL: sil @_T04test17versionedFunctionyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T04test9RectangleVAA5ShapeA2aDP4drawyyFTW : $@convention(witness_method) (@in_guaranteed Rectangle) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T04test9RectangleVAA5ShapeA2aDP4drawyyFTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> () {
 // CHECK: function_ref @_T04test14publicFunctionyyF
 // CHECK: }
 
@@ -59,7 +59,7 @@ public class CircleManager : ShapeManager {
 
 // CHECK-LABEL: sil @_T04test14publicFunctionyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T04test9RectangleVAA5ShapeA2aDP4areaSfvgTW : $@convention(witness_method) (@in_guaranteed Rectangle) -> Float {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T04test9RectangleVAA5ShapeA2aDP4areaSfvgTW : $@convention(witness_method: Shape) (@in_guaranteed Rectangle) -> Float {
 // CHECK: function_ref @_T04test9RectangleV4areaSfvg
 // CHECK: }
 
@@ -72,6 +72,6 @@ public class CircleManager : ShapeManager {
 
 // NEGATIVE-NOT: sil {{.*}}internalFunction
 
-// NEGATIVE: sil_witness_table {{.*}}Circle: Shape
+// NEGATIVE-NOT: sil_witness_table {{.*}}Circle: Shape
 
 // NEGATIVE-NOT: sil_vtable

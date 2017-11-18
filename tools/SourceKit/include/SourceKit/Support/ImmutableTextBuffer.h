@@ -153,7 +153,7 @@ public:
 };
 
 class EditableTextBuffer : public ThreadSafeRefCountedBase<EditableTextBuffer> {
-  llvm::sys::Mutex EditMtx;
+  mutable llvm::sys::Mutex EditMtx;
   ImmutableTextBufferRef Root;
   ImmutableTextUpdateRef CurrUpd;
   std::string Filename;

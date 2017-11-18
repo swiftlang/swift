@@ -407,11 +407,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
-      inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
+      inlineStrategy, optimizationMode, effect, numSpecAttrs,
+      hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
-  // TODO: read fragile
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
-                                isThunk, isGlobal, inlineStrategy, effect,
+                                isThunk, isGlobal, inlineStrategy,
+                                optimizationMode, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
                                 genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
@@ -475,6 +476,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         SubclassScope::NotApplicable, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
+    fn->setOptimizationMode((OptimizationMode)optimizationMode);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -710,7 +712,7 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
                   (SILDeclRef::Kind)ListOfValues[NextIdx+1],
                   (swift::ResilienceExpansion)ListOfValues[NextIdx+2],
                   /*isCurried=*/false, ListOfValues[NextIdx+4] > 0);
-  if (ListOfValues[NextIdx+3] < DRef.getUncurryLevel())
+  if (ListOfValues[NextIdx+3] < DRef.getParameterListCount() - 1)
     DRef = DRef.asCurried();
   NextIdx += 5;
   return DRef;
@@ -804,6 +806,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       break;
     case SIL_NON_THROWING_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
+      IsNonThrowingApply = true;
+      break;
+    case SIL_BEGIN_APPLY:
+      RawOpCode = (unsigned)SILInstructionKind::BeginApplyInst;
+      break;
+    case SIL_NON_THROWING_BEGIN_APPLY:
+      RawOpCode = (unsigned)SILInstructionKind::BeginApplyInst;
       IsNonThrowingApply = true;
       break;
         
@@ -1067,7 +1076,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
-  case SILInstructionKind::ApplyInst: {
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::BeginApplyInst: {
     // Format: attributes such as transparent, the callee's type, a value for
     // the callee and a list of values for the arguments. Each value in the list
     // is represented with 2 IDs: ValueID and ValueResultNumber.
@@ -1092,9 +1102,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       Substitutions.push_back(*sub);
     }
 
-    ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
-                                    Substitutions, Args,
-                                    IsNonThrowingApply != 0);
+    if (OpCode == SILInstructionKind::ApplyInst) {
+      ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
+                                      Substitutions, Args,
+                                      IsNonThrowingApply != 0);
+    } else {
+      ResultVal = Builder.createBeginApply(Loc, getLocalValue(ValID, FnTy),
+                                           Substitutions, Args,
+                                           IsNonThrowingApply != 0);
+    }
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -1417,6 +1433,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
+  UNARY_INSTRUCTION(AbortApply)
+  UNARY_INSTRUCTION(EndApply)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -2112,6 +2130,27 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createUnreachable(Loc);
     break;
   }
+  case SILInstructionKind::UnwindInst: {
+    ResultVal = Builder.createUnwind(Loc);
+    break;
+  }
+  case SILInstructionKind::YieldInst: {
+    SILBasicBlock *unwindBB = getBBForReference(Fn, ListOfValues.back());
+    ListOfValues = ListOfValues.drop_back();
+    SILBasicBlock *resumeBB = getBBForReference(Fn, ListOfValues.back());
+    ListOfValues = ListOfValues.drop_back();
+
+    SmallVector<SILValue, 4> yieldedValues;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3) {
+      auto valueTy = MF->getType(ListOfValues[I]);
+      auto valueCategory = (SILValueCategory) ListOfValues[I+1];
+      yieldedValues.push_back(
+        getLocalValue(ListOfValues[I+2], getSILType(valueTy, valueCategory)));
+    }
+
+    ResultVal = Builder.createYield(Loc, yieldedValues, resumeBB, unwindBB);
+    break;
+  }
   case SILInstructionKind::KeyPathInst: {
     unsigned nextValue = 0;
     SILType kpTy
@@ -2337,10 +2376,12 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
-    inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
+    inlineStrategy, optimizationMode, effect, numSpecAttrs,
+    hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
-                                isThunk, isGlobal, inlineStrategy, effect,
+                                isThunk, isGlobal, inlineStrategy,
+                                optimizationMode, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
                                 genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
@@ -2465,13 +2506,8 @@ void SILDeserializer::getAllSILFunctions() {
     auto DI = FuncTable->find(*KI);
     assert(DI != FuncTable->end() && "There should never be a key without data.");
 
-    SILFunction *fn = readSILFunction(*DI, nullptr, *KI, false,
-                                      false/*errorIfEmptyBody*/);
-
-    // Update linkage for global addressors to make it pass verifier.
-    if (fn && fn->isGlobalInit() && fn->isExternalDeclaration() &&
-        fn->getLinkage() == SILLinkage::Public)
-      fn->setLinkage(SILLinkage::PublicExternal);
+    readSILFunction(*DI, nullptr, *KI, false,
+                    false/*errorIfEmptyBody*/);
   }
 }
 
@@ -2667,6 +2703,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   kind = SILCursor.readRecord(entry.ID, scratch);
 
   std::vector<SILWitnessTable::Entry> witnessEntries;
+  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+
   // Another record means the end of this WitnessTable.
   while (kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
@@ -2697,9 +2735,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
         assoc, MF->getType(tyId)->getCanonicalType()
       });
-    } else {
-      assert(kind == SIL_WITNESS_METHOD_ENTRY &&
-             "Content of WitnessTable should be in SIL_WITNESS_METHOD_ENTRY.");
+    } else if (kind == SIL_WITNESS_METHOD_ENTRY) {
       ArrayRef<uint64_t> ListOfValues;
       DeclID NameID;
       WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
@@ -2713,6 +2749,16 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
           getSILDeclRef(MF, ListOfValues, NextValueIndex), Func
         });
       }
+    } else {
+      assert(kind == SIL_WITNESS_CONDITIONAL_CONFORMANCE &&
+             "Content of WitnessTable should be in "
+             "SIL_WITNESS_CONDITIONAL_CONFORMANCE.");
+      TypeID assocId;
+      WitnessConditionalConformanceLayout::readRecord(scratch, assocId);
+      CanType type = MF->getType(assocId)->getCanonicalType();
+      auto conformance = MF->readConformance(SILCursor);
+      conditionalConformances.push_back(
+          SILWitnessTable::ConditionalConformance{type, conformance});
     }
 
     // Fetch the next record.
@@ -2724,7 +2770,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
 
-  wT->convertToDefinition(witnessEntries,
+  wT->convertToDefinition(witnessEntries, conditionalConformances,
                           Serialized ? IsSerialized : IsNotSerialized);
   wTableOrOffset.set(wT, /*fully deserialized*/ true);
   if (Callback)

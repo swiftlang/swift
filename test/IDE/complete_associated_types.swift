@@ -32,8 +32,8 @@ protocol FooBaseProtocolWithAssociatedTypes {
   associatedtype FooBaseDefaultedTypeB = Int
   associatedtype FooBaseDefaultedTypeC = Int
 
-  associatedtype DeducedTypeCommonA // expected-note{{declared here}}
-  associatedtype DeducedTypeCommonB // expected-note{{declared here}}
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonB
   associatedtype DeducedTypeCommonC
   associatedtype DeducedTypeCommonD
   func deduceCommonA() -> DeducedTypeCommonA
@@ -57,8 +57,8 @@ protocol FooProtocolWithAssociatedTypes : FooBaseProtocolWithAssociatedTypes {
 
   associatedtype FooBaseDefaultedTypeB = Double
 
-  associatedtype DeducedTypeCommonA // expected-warning{{redeclaration of associated type}}
-  associatedtype DeducedTypeCommonB // expected-warning{{redeclaration of associated type}}
+  associatedtype DeducedTypeCommonA
+  associatedtype DeducedTypeCommonB
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonB() -> DeducedTypeCommonB
 
@@ -79,7 +79,7 @@ protocol BarBaseProtocolWithAssociatedTypes {
   associatedtype DefaultedTypeCommonA = Int
   associatedtype DefaultedTypeCommonC = Int
 
-  associatedtype DeducedTypeCommonA // expected-note{{'DeducedTypeCommonA' declared here}}
+  associatedtype DeducedTypeCommonA
   associatedtype DeducedTypeCommonC
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonC() -> DeducedTypeCommonC
@@ -102,7 +102,7 @@ protocol BarProtocolWithAssociatedTypes : BarBaseProtocolWithAssociatedTypes {
   associatedtype DefaultedTypeCommonA = Int
   associatedtype DefaultedTypeCommonD = Int
 
-  associatedtype DeducedTypeCommonA // expected-warning{{redeclaration of associated type}}
+  associatedtype DeducedTypeCommonA
   associatedtype DeducedTypeCommonD
   func deduceCommonA() -> DeducedTypeCommonA
   func deduceCommonD() -> DeducedTypeCommonD

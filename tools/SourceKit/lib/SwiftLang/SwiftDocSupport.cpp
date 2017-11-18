@@ -21,11 +21,11 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?
@@ -346,7 +346,7 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
 
   if (DefaultImplementationOf) {
     llvm::raw_svector_ostream OS(Info.ProvideImplementationOfUSR);
-    SwiftLangSupport::printUSR((ValueDecl*)DefaultImplementationOf, OS);
+    SwiftLangSupport::printUSR((const ValueDecl*)DefaultImplementationOf, OS);
   }
 
   Info.IsUnavailable = AvailableAttr::isUnavailable(D);
@@ -369,13 +369,13 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
         assert(DocRef.find(Open) != StringRef::npos);
         auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
         auto SecondPart = DocRef.substr(FirstPart.size());
-        auto ExtendedName = ((ExtensionDecl*)D)->getExtendedType()->
+        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedType()->
           getAnyNominal()->getName().str();
         assert(SecondPart.startswith(ExtendedName));
         SecondPart = SecondPart.substr(ExtendedName.size());
         llvm::SmallString<128> UpdatedDocBuffer;
         UpdatedDocBuffer.append(FirstPart);
-        UpdatedDocBuffer.append(((NominalTypeDecl*)SynthesizedTarget)->getName().
+        UpdatedDocBuffer.append(((const NominalTypeDecl*)SynthesizedTarget)->getName().
                                 str());
         UpdatedDocBuffer.append(SecondPart);
         OS << UpdatedDocBuffer;
@@ -522,7 +522,7 @@ static void reportRelated(ASTContext &Ctx,
     return;
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (SynthesizedTarget) {
-      passExtends((ValueDecl*)SynthesizedTarget, Consumer);
+      passExtends((const ValueDecl*)SynthesizedTarget, Consumer);
     } else if (Type T = ED->getExtendedType()) {
       if (auto TD = getTypeDeclFromType(T))
         passExtends(TD, Consumer);
@@ -677,12 +677,12 @@ public:
       return true;
 
     case SyntaxNodeKind::Keyword:
+    case SyntaxNodeKind::Identifier:
       if (Node.Range.getStart() == LastArgLoc ||
           Node.Range.getStart() == LastParamLoc)
         return true;
       break;
 
-    case SyntaxNodeKind::Identifier:
     case SyntaxNodeKind::DollarIdent:
     case SyntaxNodeKind::Integer:
     case SyntaxNodeKind::Floating:
@@ -1041,10 +1041,11 @@ public:
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               Optional<AccessKind> AccKind,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
   }
 
   bool isLocal(Decl *D) const {

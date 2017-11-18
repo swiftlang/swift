@@ -1346,7 +1346,7 @@ static void performAutoImport(
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
                        ImplicitModuleImportKind ModImpKind,
-                       bool KeepTokens)
+                       bool KeepSyntaxInfo)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
     Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo()) {
@@ -1358,7 +1358,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
-  if (KeepTokens) {
+  if (KeepSyntaxInfo) {
     AllCorrectedTokens = std::vector<Token>();
   }
 }
@@ -1366,17 +1366,24 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
 SourceFile::~SourceFile() { delete &SyntaxInfo; }
 
 std::vector<Token> &SourceFile::getTokenVector() {
-  assert(shouldKeepTokens() && "Disabled");
+  assert(shouldKeepSyntaxInfo() && "Disabled");
   return *AllCorrectedTokens;
 }
 
 ArrayRef<Token> SourceFile::getAllTokens() const {
-  assert(shouldKeepTokens() && "Disabled");
+  assert(shouldKeepSyntaxInfo() && "Disabled");
   return *AllCorrectedTokens;
 }
 
-bool SourceFile::shouldKeepTokens() const {
-  return (bool)AllCorrectedTokens;
+bool SourceFile::shouldKeepSyntaxInfo() const {
+  switch (Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    return (bool)AllCorrectedTokens;
+  case SourceFileKind::REPL:
+  case SourceFileKind::SIL:
+    return false;
+  }
 }
 
 bool FileUnit::walk(ASTWalker &walker) {

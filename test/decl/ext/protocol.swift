@@ -510,7 +510,7 @@ struct SConforms7a : PConforms7 { }
 protocol PConforms8 {
   associatedtype Assoc
 
-  func method() -> Assoc
+  func method() -> Assoc // expected-note{{requirement 'method()' declared here}}
   var property: Assoc { get }
   subscript (i: Assoc) -> Assoc { get }
 }
@@ -535,7 +535,10 @@ func testSConforms8b() {
 }
 
 struct SConforms8c : PConforms8 { 
-  func method() -> String { return "" }
+  func method() -> String { return "" } // expected-warning{{instance method 'method()' nearly matches defaulted requirement 'method()' of protocol 'PConforms8'}}
+  // expected-note@-1{{candidate has non-matching type '() -> String' [with Assoc = Int]}}
+  // expected-note@-2{{move 'method()' to an extension to silence this warning}}
+  // expected-note@-3{{make 'method()' private to silence this warning}}
 }
 
 func testSConforms8c() {
@@ -955,4 +958,44 @@ typealias B = BadProto1
 
 extension A & B { // okay
 
+}
+
+// Suppress near-miss warning for unlabeled initializers.
+protocol P9 {
+  init(_: Int)
+  init(_: Double)
+}
+
+extension P9 {
+  init(_ i: Int) {
+    self.init(Double(i))
+  }
+}
+
+struct X9 : P9 {
+  init(_: Float) { }
+}
+
+extension X9 {
+  init(_: Double) { }
+}
+
+// Suppress near-miss warning for unlabeled subscripts.
+protocol P10 {
+  subscript (_: Int) -> Int { get }
+  subscript (_: Double) -> Double { get }
+}
+
+extension P10 {
+  subscript(i: Int) -> Int {
+    return Int(self[Double(i)])
+  }
+}
+
+struct X10 : P10 {
+  subscript(f: Float) -> Float { return f }
+}
+
+extension X10 {
+  subscript(d: Double) -> Double { return d }
 }

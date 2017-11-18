@@ -227,29 +227,6 @@ static bool hasLoweredLocalCaptures(AnyFunctionRef AFR,
   return false;
 }
 
-static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
-  assert(AFR.getParameterLists().size() >= 1 && "no arguments for func?!");
-  return AFR.getParameterLists().size() - 1;
-}
-
-unsigned swift::getNaturalUncurryLevel(ValueDecl *vd) {
-  if (auto *func = dyn_cast<FuncDecl>(vd)) {
-    return getFuncNaturalUncurryLevel(func);
-  } else if (isa<ConstructorDecl>(vd)) {
-    return 1;
-  } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
-    return ed->hasAssociatedValues() ? 1 : 0;
-  } else if (isa<DestructorDecl>(vd)) {
-    return 0;
-  } else if (isa<ClassDecl>(vd)) {
-    return 1;
-  } else if (isa<VarDecl>(vd)) {
-    return 0;
-  } else {
-    llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
-  }
-}
-
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
                        ResilienceExpansion expansion,
                        bool isCurried, bool isForeign)
@@ -709,6 +686,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     case SILDeclRef::ManglingKind::DynamicThunk:
       SKind = ASTMangler::SymbolKind::DynamicThunk;
       break;
+    case SILDeclRef::ManglingKind::SwiftDispatchThunk:
+      assert(!isForeign && !isDirectReference && !isCurried);
+      SKind = ASTMangler::SymbolKind::SwiftDispatchThunk;
+      break;
   }
 
   switch (kind) {
@@ -720,7 +701,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()
+      if (!NameA->Name.empty() &&
+          !isForeignToNativeThunk() && !isNativeToForeignThunk()
           && !isCurried) {
         return NameA->Name;
       }
@@ -793,6 +775,22 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   }
 
   llvm_unreachable("bad entity kind!");
+}
+
+bool SILDeclRef::requiresNewVTableEntry() const {
+  if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
+    return true;
+  if (kind == SILDeclRef::Kind::Allocator) {
+    auto *cd = cast<ConstructorDecl>(getDecl());
+    if (cd->isRequired()) {
+      auto *baseCD = cd->getOverriddenDecl();
+      if(!baseCD ||
+         !baseCD->isRequired() ||
+         baseCD->hasClangNode())
+        return true;
+    }
+  }
+  return false;
 }
 
 SILDeclRef SILDeclRef::getOverridden() const {
@@ -888,12 +886,23 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
-unsigned SILDeclRef::getUncurryLevel() const {
-  if (isCurried)
-    return 0;
-  if (!hasDecl())
-    return getFuncNaturalUncurryLevel(*getAnyFunctionRef());
-  if (kind == Kind::DefaultArgGenerator)
-    return 0;
-  return getNaturalUncurryLevel(getDecl());
+unsigned SILDeclRef::getParameterListCount() const {
+  if (isCurried || !hasDecl() || kind == Kind::DefaultArgGenerator)
+    return 1;
+
+  auto *vd = getDecl();
+
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
+    return func->getParameterLists().size();
+  } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
+    return ed->hasAssociatedValues() ? 2 : 1;
+  } else if (isa<DestructorDecl>(vd)) {
+    return 1;
+  } else if (isa<ClassDecl>(vd)) {
+    return 2;
+  } else if (isa<VarDecl>(vd)) {
+    return 1;
+  } else {
+    llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
+  }
 }

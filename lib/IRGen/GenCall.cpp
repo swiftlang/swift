@@ -938,13 +938,16 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
         break;
       }
 
-      // If the coercion type is a struct, we need to expand it.
-      auto type = AI.getCoerceToType();
-      if (auto expandedType = dyn_cast<llvm::StructType>(type)) {
-        for (size_t j = 0, e = expandedType->getNumElements(); j != e; ++j)
-          ParamIRTypes.push_back(expandedType->getElementType(j));
+      // If the coercion type is a struct which can be flattened, we need to
+      // expand it.
+      auto *coercedTy = AI.getCoerceToType();
+      if (AI.isDirect() && AI.getCanBeFlattened() &&
+          isa<llvm::StructType>(coercedTy)) {
+        const auto *ST = cast<llvm::StructType>(coercedTy);
+        for (unsigned EI : range(ST->getNumElements()))
+          ParamIRTypes.push_back(ST->getElementType(EI));
       } else {
-        ParamIRTypes.push_back(type);
+        ParamIRTypes.push_back(coercedTy);
       }
       break;
     }
@@ -1328,15 +1331,16 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
 
 /// Emit the result of this call to memory.
 void CallEmission::emitToMemory(Address addr,
-                                const LoadableTypeInfo &indirectedResultTI) {
+                                const LoadableTypeInfo &indirectedResultTI,
+                                bool isOutlined) {
   assert(LastArgWritten <= 1);
 
   // If the call is naturally to an explosion, emit it that way and
   // then initialize the temporary.
   if (LastArgWritten == 0) {
     Explosion result;
-    emitToExplosion(result);
-    indirectedResultTI.initialize(IGF, result, addr);
+    emitToExplosion(result, isOutlined);
+    indirectedResultTI.initialize(IGF, result, addr, isOutlined);
     return;
   }
 
@@ -1370,7 +1374,7 @@ void CallEmission::emitToMemory(Address addr,
 }
 
 /// Emit the result of this call to an explosion.
-void CallEmission::emitToExplosion(Explosion &out) {
+void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   assert(LastArgWritten <= 1);
 
   SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
@@ -1386,8 +1390,8 @@ void CallEmission::emitToExplosion(Explosion &out) {
     StackAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
                                                      false, "call.aggresult");
     Address temp = ctemp.getAddress();
-    emitToMemory(temp, substResultTI);
- 
+    emitToMemory(temp, substResultTI, isOutlined);
+
     // We can use a take.
     substResultTI.loadAsTake(IGF, temp, out);
 
@@ -1597,13 +1601,13 @@ static llvm::Type *getOutputType(TranslationDirection direction, unsigned index,
             : nativeSchema[index].getScalarType());
 }
 
-
-static void emitCoerceAndExpand(IRGenFunction &IGF,
-                                Explosion &in, Explosion &out, SILType paramTy,
+static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
+                                Explosion &out, SILType paramTy,
                                 const LoadableTypeInfo &paramTI,
                                 llvm::StructType *coercionTy,
-                                ArrayRef<llvm::Type*> expandedTys,
-                                TranslationDirection direction) {
+                                ArrayRef<llvm::Type *> expandedTys,
+                                TranslationDirection direction,
+                                bool isOutlined) {
   // If we can directly coerce the scalar values, avoid going through memory.
   auto schema = paramTI.getSchema();
   if (canCoerceToSchema(IGF.IGM, expandedTys, schema)) {
@@ -1638,7 +1642,7 @@ static void emitCoerceAndExpand(IRGenFunction &IGF,
   // If we're translating *to* the foreign expansion, do an ordinary
   // initialization from the input explosion.
   if (direction == TranslationDirection::ToForeign) {
-    paramTI.initialize(IGF, in, temporary);
+    paramTI.initialize(IGF, in, temporary, isOutlined);
   }
 
   Address coercedTemporary =
@@ -1685,18 +1689,25 @@ static void emitCoerceAndExpand(IRGenFunction &IGF,
 }
 
 static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
-                                       llvm::Type *toTy, Explosion &in,
-                                       Explosion &out) {
+                                       const clang::CodeGen::ABIArgInfo &AI,
+                                       Explosion &in, Explosion &out,
+                                       bool isOutlined) {
+  bool IsDirectFlattened = AI.isDirect() && AI.getCanBeFlattened();
+  bool IsIndirect = !AI.isDirect();
+
   // If we're supposed to pass directly as a struct type, that
   // really means expanding out as multiple arguments.
-  ArrayRef<llvm::Type *> expandedTys = expandScalarOrStructTypeToArray(toTy);
+  llvm::Type *coercedTy = AI.getCoerceToType();
+  ArrayRef<llvm::Type *> expandedTys =
+      expandScalarOrStructTypeToArray(coercedTy);
 
   auto &argTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(argType));
   auto inputSchema = argTI.getSchema();
 
   // Check to see if we can pairwise coerce Swift's exploded scalars
   // to Clang's expanded elements.
-  if (canCoerceToSchema(IGF.IGM, expandedTys, inputSchema)) {
+  if ((IsDirectFlattened || IsIndirect) &&
+      canCoerceToSchema(IGF.IGM, expandedTys, inputSchema)) {
     for (auto outputTy : expandedTys) {
       llvm::Value *arg = in.claimNext();
       if (arg->getType() != outputTy)
@@ -1710,29 +1721,29 @@ static void emitDirectExternalArgument(IRGenFunction &IGF, SILType argType,
   Address temporary;
   Size tempSize;
   std::tie(temporary, tempSize) =
-      allocateForCoercion(IGF, argTI.getStorageType(), toTy, "coerced-arg");
+      allocateForCoercion(IGF, argTI.getStorageType(), coercedTy, "coerced-arg");
   IGF.Builder.CreateLifetimeStart(temporary, tempSize);
 
   // Store to a temporary.
   Address tempOfArgTy = IGF.Builder.CreateBitCast(
       temporary, argTI.getStorageType()->getPointerTo());
-  argTI.initializeFromParams(IGF, in, tempOfArgTy, argType);
+  argTI.initializeFromParams(IGF, in, tempOfArgTy, argType, isOutlined);
 
   // Bitcast the temporary to the expected type.
   Address coercedAddr =
-    IGF.Builder.CreateBitCast(temporary, toTy->getPointerTo());
+      IGF.Builder.CreateBitCast(temporary, coercedTy->getPointerTo());
 
-  // Project out individual elements if necessary.
-  if (auto expansionTy = dyn_cast<llvm::StructType>(toTy)) {
-    auto layout = IGF.IGM.DataLayout.getStructLayout(expansionTy);
-    for (unsigned i = 0, e = expansionTy->getNumElements(); i != e; ++i) {
-      auto fieldOffset = Size(layout->getElementOffset(i));
-      auto fieldAddr = IGF.Builder.CreateStructGEP(coercedAddr, i, fieldOffset);
-      out.add(IGF.Builder.CreateLoad(fieldAddr));
+  if (IsDirectFlattened && isa<llvm::StructType>(coercedTy)) {
+    // Project out individual elements if necessary.
+    auto *ST = cast<llvm::StructType>(coercedTy);
+    const auto *layout = IGF.IGM.DataLayout.getStructLayout(ST);
+    for (unsigned EI : range(ST->getNumElements())) {
+      auto offset = Size(layout->getElementOffset(EI));
+      auto address = IGF.Builder.CreateStructGEP(coercedAddr, EI, offset);
+      out.add(IGF.Builder.CreateLoad(address));
     }
-
-  // Otherwise, collect the single scalar.
   } else {
+    // Otherwise, collect the single scalar.
     out.add(IGF.Builder.CreateLoad(coercedAddr));
   }
 
@@ -1774,11 +1785,10 @@ namespace {
 
 /// Given a Swift value explosion in 'in', produce a Clang expansion
 /// (according to ABIArgInfo::Expand) in 'out'.
-static void emitClangExpandedArgument(IRGenFunction &IGF,
-                                      Explosion &in, Explosion &out,
-                                      clang::CanQualType clangType,
-                                      SILType swiftType,
-                                      const LoadableTypeInfo &swiftTI) {
+static void
+emitClangExpandedArgument(IRGenFunction &IGF, Explosion &in, Explosion &out,
+                          clang::CanQualType clangType, SILType swiftType,
+                          const LoadableTypeInfo &swiftTI, bool isOutlined) {
   // If Clang's expansion schema matches Swift's, great.
   auto swiftSchema = swiftTI.getSchema();
   if (doesClangExpansionMatchSchema(IGF.IGM, clangType, swiftSchema)) {
@@ -1788,7 +1798,7 @@ static void emitClangExpandedArgument(IRGenFunction &IGF,
   // Otherwise, materialize to a temporary.
   Address temp = swiftTI.allocateStack(IGF, swiftType, false,
                                        "clang-expand-arg.temp").getAddress();
-  swiftTI.initialize(IGF, in, temp);
+  swiftTI.initialize(IGF, in, temp, isOutlined);
 
   Address castTemp = IGF.Builder.CreateBitCast(temp, IGF.IGM.Int8PtrTy);
   ClangExpandLoadEmitter(IGF, out).visit(clangType, castTemp);
@@ -1818,7 +1828,8 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
 }
 
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
-                                 Explosion &in, Explosion &out) {
+                                 Explosion &in, Explosion &out,
+                                 bool isOutlined) {
   auto silConv = IGF.IGM.silConv;
   auto fnType = callee.getOrigFunctionType();
   auto params = fnType->getParameters();
@@ -1880,7 +1891,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
         break;
       }
 
-      emitDirectExternalArgument(IGF, paramType, toTy, in, out);
+      emitDirectExternalArgument(IGF, paramType, AI, in, out, isOutlined);
       break;
     }
     case clang::CodeGen::ABIArgInfo::Indirect: {
@@ -1897,7 +1908,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
         }
       }
 
-      ti.initialize(IGF, in, addr);
+      ti.initialize(IGF, in, addr, isOutlined);
 
       out.add(addr.getAddress());
       break;
@@ -1907,12 +1918,13 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       emitCoerceAndExpand(IGF, in, out, paramType, paramTI,
                           AI.getCoerceAndExpandType(),
                           AI.getCoerceAndExpandTypeSequence(),
-                          TranslationDirection::ToForeign);
+                          TranslationDirection::ToForeign, isOutlined);
       break;
     }
     case clang::CodeGen::ABIArgInfo::Expand:
-      emitClangExpandedArgument(IGF, in, out, clangParamTy, paramType,
-                         cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType)));
+      emitClangExpandedArgument(
+          IGF, in, out, clangParamTy, paramType,
+          cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType)), isOutlined);
       break;
     case clang::CodeGen::ABIArgInfo::Ignore:
       break;
@@ -1925,7 +1937,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
 /// Returns whether allocas are needed.
 bool irgen::addNativeArgument(IRGenFunction &IGF, Explosion &in,
-                              SILParameterInfo origParamInfo, Explosion &out) {
+                              SILParameterInfo origParamInfo, Explosion &out,
+                              bool isOutlined) {
   // Addresses consist of a single pointer argument.
   if (IGF.IGM.silConv.isSILIndirect(origParamInfo)) {
     out.add(in.claimNext());
@@ -1939,7 +1952,7 @@ bool irgen::addNativeArgument(IRGenFunction &IGF, Explosion &in,
     // Pass the argument indirectly.
     auto buf = IGF.createAlloca(ti.getStorageType(),
                                 ti.getFixedAlignment(), "");
-    ti.initialize(IGF, in, buf);
+    ti.initialize(IGF, in, buf, isOutlined);
     out.add(buf.getAddress());
     return true;
   } else {
@@ -1953,31 +1966,32 @@ bool irgen::addNativeArgument(IRGenFunction &IGF, Explosion &in,
     // calling convention.
     Explosion nonNativeParam;
     ti.reexplode(IGF, in, nonNativeParam);
-    Explosion nativeParam = nativeSchema.mapIntoNative(IGF.IGM, IGF, nonNativeParam, paramType);
+    Explosion nativeParam = nativeSchema.mapIntoNative(
+        IGF.IGM, IGF, nonNativeParam, paramType, isOutlined);
     nativeParam.transferInto(out, nativeParam.size());
     return false;
   }
 }
 
 /// Emit a direct parameter that was passed under a C-based CC.
-static void emitDirectForeignParameter(IRGenFunction &IGF,
-                                       Explosion &in,
-                                       llvm::Type *coercionTy,
-                                       Explosion &out,
-                                       SILType paramType,
+static void emitDirectForeignParameter(IRGenFunction &IGF, Explosion &in,
+                                       const clang::CodeGen::ABIArgInfo &AI,
+                                       Explosion &out, SILType paramType,
                                        const LoadableTypeInfo &paramTI) {
   // The ABI IR types for the entrypoint might differ from the
   // Swift IR types for the body of the function.
 
-  ArrayRef<llvm::Type*> expandedTys;
-  if (auto expansionTy = dyn_cast<llvm::StructType>(coercionTy)) {
-    expandedTys = makeArrayRef(expansionTy->element_begin(),
-                               expansionTy->getNumElements());
+  llvm::Type *coercionTy = AI.getCoerceToType();
 
-  // Fast-path a really common case.  This check assumes that either
-  // the storage type of a type is an llvm::StructType or it has a
-  // single-element explosion.
+  ArrayRef<llvm::Type*> expandedTys;
+  if (AI.isDirect() && AI.getCanBeFlattened() &&
+      isa<llvm::StructType>(coercionTy)) {
+    const auto *ST = cast<llvm::StructType>(coercionTy);
+    expandedTys = makeArrayRef(ST->element_begin(), ST->getNumElements());
   } else if (coercionTy == paramTI.getStorageType()) {
+    // Fast-path a really common case.  This check assumes that either
+    // the storage type of a type is an llvm::StructType or it has a
+    // single-element explosion.
     out.add(in.claimNext());
     return;
   } else {
@@ -2038,10 +2052,9 @@ static void emitDirectForeignParameter(IRGenFunction &IGF,
 
 void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
                                  ForeignFunctionInfo foreignInfo,
-                                 unsigned foreignParamIndex,
-                                 SILType paramTy,
+                                 unsigned foreignParamIndex, SILType paramTy,
                                  const LoadableTypeInfo &paramTI,
-                                 Explosion &paramExplosion) {
+                                 Explosion &paramExplosion, bool isOutlined) {
   assert(foreignInfo.ClangInfo);
   auto &FI = *foreignInfo.ClangInfo;
 
@@ -2060,11 +2073,10 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
 
   switch (AI.getKind()) {
   case clang::CodeGen::ABIArgInfo::Extend:
-  case clang::CodeGen::ABIArgInfo::Direct: {
-    emitDirectForeignParameter(IGF, params, AI.getCoerceToType(),
-                               paramExplosion, paramTy, paramTI);
+  case clang::CodeGen::ABIArgInfo::Direct:
+    emitDirectForeignParameter(IGF, params, AI, paramExplosion, paramTy,
+                               paramTI);
     return;
-  }
   case clang::CodeGen::ABIArgInfo::Indirect: {
     Address address = paramTI.getAddressForPointer(params.claimNext());
     paramTI.loadAsTake(IGF, address, paramExplosion);
@@ -2080,7 +2092,7 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
     emitCoerceAndExpand(IGF, params, paramExplosion, paramTy, paramTI,
                         AI.getCoerceAndExpandType(),
                         AI.getCoerceAndExpandTypeSequence(),
-                        TranslationDirection::ToNative);
+                        TranslationDirection::ToNative, isOutlined);
     break;
   }
 
@@ -2094,7 +2106,7 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
 
 
 /// Add a new set of arguments to the function.
-void CallEmission::setArgs(Explosion &original,
+void CallEmission::setArgs(Explosion &original, bool isOutlined,
                            WitnessMetadata *witnessMetadata) {
   // Convert arguments to a representation appropriate to the calling
   // convention.
@@ -2111,7 +2123,7 @@ void CallEmission::setArgs(Explosion &original,
   case SILFunctionTypeRepresentation::ObjCMethod:
     adjusted.add(getCallee().getObjCMethodReceiver());
     adjusted.add(getCallee().getObjCMethodSelector());
-    externalizeArguments(IGF, getCallee(), original, adjusted);
+    externalizeArguments(IGF, getCallee(), original, adjusted, isOutlined);
     break;
 
   case SILFunctionTypeRepresentation::Block:
@@ -2119,7 +2131,7 @@ void CallEmission::setArgs(Explosion &original,
     LLVM_FALLTHROUGH;
 
   case SILFunctionTypeRepresentation::CFunctionPointer:
-    externalizeArguments(IGF, getCallee(), original, adjusted);
+    externalizeArguments(IGF, getCallee(), original, adjusted, isOutlined);
     break;
 
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -2144,7 +2156,7 @@ void CallEmission::setArgs(Explosion &original,
       params = params.drop_back();
     }
     for (auto param : params) {
-      addNativeArgument(IGF, original, param, adjusted);
+      addNativeArgument(IGF, original, param, adjusted, isOutlined);
     }
 
     // Anything else, just pass along.  This will include things like
@@ -2569,7 +2581,8 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
 Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
                                                 IRGenFunction &IGF,
                                                 Explosion &fromNonNative,
-                                                SILType type) const {
+                                                SILType type,
+                                                bool isOutlined) const {
   if (fromNonNative.size() == 0) {
     assert(empty() && "Empty explosion must match the native convention");
     return Explosion();
@@ -2660,7 +2673,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
   // Initialize the memory of the temporary.
   Address storageAddr = Builder.CreateBitCast(
       temporary, loadableTI.getStorageType()->getPointerTo());
-  loadableTI.initialize(IGF, fromNonNative, storageAddr);
+  loadableTI.initialize(IGF, fromNonNative, storageAddr, isOutlined);
 
   // Load the expanded type elements from memory.
   auto coercionAddr = Builder.CreateElementBitCast(temporary, coercionTy);
@@ -2702,7 +2715,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
 }
 
 void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
-                                     bool isSwiftCCReturn) {
+                                     bool isSwiftCCReturn, bool isOutlined) {
   if (result.size() == 0) {
     assert(IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM).empty() &&
            "Empty explosion must match the native calling convention");
@@ -2718,7 +2731,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
     assert(!nativeSchema.requiresIndirect());
 
     Explosion native =
-        nativeSchema.mapIntoNative(IGM, *this, result, resultType);
+        nativeSchema.mapIntoNative(IGM, *this, result, resultType, isOutlined);
     if (native.size() == 1) {
       Builder.CreateRet(native.claimNext());
       return;

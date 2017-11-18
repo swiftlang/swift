@@ -474,6 +474,9 @@ ERROR(unsupported_keypath_tuple_element_reference,none,
       "key path cannot reference tuple elements", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
+ERROR(expr_smart_keypath_application_type_mismatch,none,
+      "key path of type %0 cannot be applied to a base of type %1",
+      (Type, Type))
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -1024,12 +1027,10 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(transparent_stored_property,none,
-      "@_transparent cannot be applied to stored properties", ())
 ERROR(transparent_in_protocols_not_supported,none,
-      "@_transparent is not supported on declarations within protocols", ())
+      "'@_transparent' attribute is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,none,
-      "@_transparent is not supported on declarations within classes", ())
+      "'@_transparent' attribute is not supported on declarations within classes", ())
 
 ERROR(invalid_iboutlet,none,
       "only instance properties can be declared @IBOutlet", ())
@@ -1123,7 +1124,7 @@ ERROR(access_control_open_bad_decl,none,
 ERROR(invalid_decl_attribute_simple,none,
       "attribute cannot be applied to declaration", ())
 ERROR(invalid_decl_attribute,none,
-      "%0 cannot be applied to this declaration", (DeclAttribute))
+      "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,none,
@@ -1543,7 +1544,7 @@ NOTE(bad_associated_type_deduction,none,
 NOTE(associated_type_deduction_witness_failed,none,
      "inferred type %1 (by matching requirement %0) is invalid: "
      "does not %select{inherit from|conform to}3 %2",
-     (DeclName, Type, DeclName, bool))
+     (DeclName, Type, Type, bool))
 NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
@@ -1635,17 +1636,18 @@ NOTE(redundant_conformance_witness_ignored,none,
      (DescriptiveDeclKind, DeclName, DeclName))
 
 // "Near matches"
-WARNING(optional_req_near_match,none,
-        "%0 %1 nearly matches optional requirement %2 of protocol %3",
-        (DescriptiveDeclKind, DeclName, DeclName, DeclName))
+WARNING(req_near_match,none,
+        "%0 %1 nearly matches %select{defaulted|optional}2 requirement %3 "
+        "of protocol %4",
+        (DescriptiveDeclKind, DeclName, bool, DeclName, DeclName))
 NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_near_match_move,none,
+NOTE(req_near_match_move,none,
      "move %0 to %select{an|another}1 extension to silence this warning",
      (DeclName, unsigned))
-NOTE(optional_req_near_match_nonobjc,none,
+NOTE(req_near_match_nonobjc,none,
      "add '@nonobjc' to silence this %select{warning|error}0", (bool))
-NOTE(optional_req_near_match_access,none,
+NOTE(req_near_match_access,none,
      "make %0 %select{ERROR|private|private|non-public|non-public}1 to silence this "
      "warning", (DeclName, AccessLevel))
 
@@ -1732,13 +1734,13 @@ NOTE(superclass_redundancy_here,none,
      (unsigned, Type, Type))
 
 ERROR(conflicting_layout_constraints,none,
-      "%select{generic parameter |protocol |}0%1 has conflicting layout "
+      "%select{generic parameter |protocol |}0%1 has conflicting "
       "constraints %2 and %3",
       (unsigned, Type, LayoutConstraint, LayoutConstraint))
 WARNING(redundant_layout_constraint,none,
-        "redundant layout constraint %0 : %1", (Type, LayoutConstraint))
+        "redundant constraint %0 : %1", (Type, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-     "layout constraint constraint %1 : %2 %select{written here|implied here|"
+     "constraint %1 : %2 %select{written here|implied here|"
      "inferred from type here}0",
      (unsigned, Type, LayoutConstraint))
 
@@ -1923,10 +1925,6 @@ NOTE(override_unnecessary_IUO_use_strict,none,
      "use '?' to make the result optional", ())
 NOTE(override_unnecessary_IUO_silence,none,
      "add parentheses to silence this warning", ())
-
-ERROR(iuo_in_illegal_position,none,
-      "implicitly unwrapped optionals are only allowed at top level and as "
-      "function results", ())
 
 ERROR(override_mutable_covariant_property,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
@@ -2235,11 +2233,6 @@ ERROR(autoclosure_function_type,none,
       ())
 ERROR(autoclosure_function_input_nonunit,none,
       "argument type of @autoclosure parameter must be '()'", ())
-
-// FIXME: drop these when we drop @noescape
-ERROR(noescape_implied_by_autoclosure,none,
-      "@noescape is implied by @autoclosure and should not be "
-      "redundantly specified", ())
 
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
@@ -3111,6 +3104,22 @@ ERROR(tuple_single_element,none,
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
 
+WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated", ())
+
+WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' in unsupported; use an explicit type followed by '!'", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error_with_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use '!' after the type name", ())
+
+ERROR(iuo_in_illegal_position,none,
+      "implicitly unwrapped optionals are only allowed at top level and as "
+      "function results", ())
+
 // Ownership
 ERROR(invalid_ownership_type,none,
       "'%select{strong|weak|unowned|unowned}0' may only be applied to "
@@ -3175,6 +3184,8 @@ ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
 ERROR(sil_function_output_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled results", ())
+ERROR(sil_non_coro_yields,PointsToFirstBadToken,
+      "non-coroutine SIL function types cannot have @yield results", ())
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
       "repeated %select{parameter|result|callee}0 convention attribute",
       (unsigned))
@@ -3655,6 +3666,9 @@ ERROR(versioned_attr_with_explicit_access,
 ERROR(versioned_attr_in_protocol,none,
       "'@_versioned' attribute cannot be used in protocols", ())
 
+ERROR(versioned_dynamic_not_supported,none,
+      "'@_versioned' attribute cannot be applied to 'dynamic' declarations", ())
+
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
@@ -3692,8 +3706,11 @@ ERROR(class_designated_init_inlineable_resilient,none,
       "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
-ERROR(inlineable_stored_property,
-      none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+ERROR(attribute_invalid_on_stored_property,
+      none, "'@%0' attribute cannot be applied to stored properties", (StringRef))
+
+ERROR(inlineable_dynamic_not_supported,
+      none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())
 
 ERROR(inlineable_decl_not_public,
       none, "'@_inlineable' attribute can only be applied to public declarations, "

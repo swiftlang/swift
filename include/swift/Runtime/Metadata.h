@@ -357,6 +357,7 @@ namespace value_witness_types {
 #define TYPE_TYPE const Metadata *
 #define SIZE_TYPE size_t
 #define INT_TYPE int
+#define UINT_TYPE unsigned
 #define VOID_TYPE void
 #include "swift/ABI/ValueWitness.def"
 
@@ -1744,35 +1745,52 @@ using EnumMetadata = TargetEnumMetadata<InProcess>;
 template <typename Runtime>
 struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
-
-  // TODO: Make this target agnostic
-  using Argument = FlaggedPointer<const TargetMetadata<Runtime> *, 0>;
+  using Parameter = ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
 
   TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ResultType;
 
-  TargetPointer<Runtime, Argument> getArguments() {
-    return reinterpret_cast<TargetPointer<Runtime, Argument>>(this + 1);
+  Parameter *getParameters() { return reinterpret_cast<Parameter *>(this + 1); }
+
+  const Parameter *getParameters() const {
+    return reinterpret_cast<const Parameter *>(this + 1);
   }
 
-  TargetPointer<Runtime, const Argument> getArguments() const {
-    return reinterpret_cast<TargetPointer<Runtime, const Argument>>(this + 1);
+  Parameter getParameter(unsigned index) const {
+    assert(index < getNumParameters());
+    return getParameters()[index];
   }
-  
-  StoredSize getNumArguments() const {
-    return Flags.getNumArguments();
+
+  ParameterFlags getParameterFlags(unsigned index) const {
+    assert(index < getNumParameters());
+    auto flags = hasParameterFlags() ? getParameterFlags()[index] : 0;
+    return ParameterFlags::fromIntValue(flags);
+  }
+
+  StoredSize getNumParameters() const {
+    return Flags.getNumParameters();
   }
   FunctionMetadataConvention getConvention() const {
     return Flags.getConvention();
   }
   bool throws() const { return Flags.throws(); }
+  bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
 
   static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Function;
+  }
+
+  uint32_t *getParameterFlags() {
+    return reinterpret_cast<uint32_t *>(getParameters() + getNumParameters());
+  }
+
+  const uint32_t *getParameterFlags() const {
+    return reinterpret_cast<const uint32_t *>(getParameters() +
+                                              getNumParameters());
   }
 };
 using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;
@@ -2403,7 +2421,9 @@ template <typename Runtime>
 struct TargetProtocolConformanceRecord {
 public:
   using WitnessTableAccessorFn
-    = const WitnessTable *(const TargetMetadata<Runtime>*);
+    = const WitnessTable *(const TargetMetadata<Runtime>*,
+                           const WitnessTable **,
+                           size_t);
 
 private:
   /// The protocol being conformed to.
@@ -2638,28 +2658,58 @@ swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata(const void *flagsArgsAndResult[]);
+swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
+                              const Metadata *const *parameters,
+                              const uint32_t *parameterFlags,
+                              const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
-                               const void *arg0,
-                               const Metadata *resultMetadata);
+                               const Metadata *arg0,
+                               const Metadata *result);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *
+swift_getFunctionTypeMetadata1WithFlags(FunctionTypeFlags flags,
+                                        const Metadata *arg0,
+                                        ParameterFlags flags0,
+                                        const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata2(FunctionTypeFlags flags,
-                               const void *arg0,
-                               const void *arg1,
-                               const Metadata *resultMetadata);
+                               const Metadata *arg0,
+                               const Metadata *arg1,
+                               const Metadata *result);
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
-swift_getFunctionTypeMetadata3(FunctionTypeFlags flags,
-                               const void *arg0,
-                               const void *arg1,
-                               const void *arg2,
-                               const Metadata *resultMetadata);
+swift_getFunctionTypeMetadata2WithFlags(FunctionTypeFlags flags,
+                                        const Metadata *arg0,
+                                        ParameterFlags flags0,
+                                        const Metadata *arg1,
+                                        ParameterFlags flags1,
+                                        const Metadata *result);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *swift_getFunctionTypeMetadata3(
+                                                FunctionTypeFlags flags,
+                                                const Metadata *arg0,
+                                                const Metadata *arg1,
+                                                const Metadata *arg2,
+                                                const Metadata *result);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *swift_getFunctionTypeMetadata3WithFlags(
+                                                FunctionTypeFlags flags,
+                                                const Metadata *arg0,
+                                                ParameterFlags flags0,
+                                                const Metadata *arg1,
+                                                ParameterFlags flags1,
+                                                const Metadata *arg2,
+                                                ParameterFlags flags2,
+                                                const Metadata *result);
 
 /// \brief Fetch a uniqued metadata for a thin function type.
 SWIFT_RUNTIME_EXPORT
@@ -2749,12 +2799,17 @@ swift_getBlockTypeMetadata3(const void *arg0,
 SWIFT_RUNTIME_EXPORT
 void
 swift_instantiateObjCClass(const ClassMetadata *theClass);
-#endif
 
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 SWIFT_RUNTIME_EXPORT
 const Metadata *
 swift_getObjCClassMetadata(const ClassMetadata *theClass);
+
+/// \brief Get the ObjC class object from class type metadata.
+SWIFT_RUNTIME_EXPORT
+const ClassMetadata *
+swift_getObjCClassFromMetadata(const Metadata *theClass);
+#endif
 
 /// \brief Fetch a unique type metadata object for a foreign type.
 SWIFT_RUNTIME_EXPORT
