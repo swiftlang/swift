@@ -1485,6 +1485,9 @@ namespace {
         llvm::Function::Create(consumeTy, llvm::GlobalValue::InternalLinkage,
                                llvm::StringRef(name), IGM.getModule());
     func->setAttributes(IGM.constructInitialAttributes());
+    func->setDoesNotThrow();
+    func->setCallingConv(IGM.DefaultCC);
+    func->addFnAttr(llvm::Attribute::NoInline);
     return func;
   }
 
