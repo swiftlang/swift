@@ -183,6 +183,18 @@ extension String.CharacterView : _SwiftStringView {
     // _StringGuts can never be a slice.
     return String(self._guts)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _wholeString : String {
+    return String(_guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _encodedOffsetRange : Range<Int> {
+    return 0..<_guts.count
+  }
 }
 
 
@@ -732,7 +744,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     if let c0 = c._smallUTF16 {
-      _core.append(contentsOf: c0)
+      _guts.append(contentsOf: c0)
       return
     }
     _guts.append(c._largeUTF16!)
@@ -746,11 +758,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   where S.Element == Character {
     if _fastPath(newElements is _SwiftStringView) {
       let v = newElements as! _SwiftStringView
-      if _fastPath(_guts.count == 0) {
-        _guts = v._persistentContent._guts
-        return
-      }
-      _guts.append(v._ephemeralContent._guts)
+      _guts.append(v._wholeString._guts, range: v._encodedOffsetRange)
       return
     }
     reserveCapacity(_guts.count + newElements.underestimatedCount)

@@ -91,6 +91,7 @@ extension _StringGuts {
     return (_objectBitPattern & _twoByteCodeUnitBit) == 0
   }
 
+  @_versioned
   var byteWidth: Int {
     return isSingleByte ? 1 : 2
   }
@@ -462,6 +463,16 @@ struct NativeString {
   }
 
   @_versioned
+  init(capacity: Int, byteWidth: Int) {
+    _sanityCheck(byteWidth == 1 || byteWidth == 2)
+    self.stringBuffer = _StringBuffer(
+      capacity: capacity,
+      initialSize: 0,
+      elementWidth: byteWidth)
+    self.count = 0
+  }
+
+  @_versioned
   init(nativeObject: _BuiltinNativeObject, count: Int) {
     self.stringBuffer = _StringBuffer(
       _StringBuffer._Storage(_nativeObject: nativeObject))
@@ -469,23 +480,79 @@ struct NativeString {
     _invariantCheck()
   }
 
-  // Copy in `other` code units direclty.
   @_versioned
   internal
   mutating
-  func _appendInPlace(_ other: _StringGuts) {
-    let otherCount = other.count
-    _sanityCheck(self.capacity >= self.count + otherCount)
+  func _appendInPlace(_ u: UTF16.CodeUnit) {
+    _sanityCheck(self.capacity >= self.count + 1)
+    _sanityCheck(u <= 0x7f || byteWidth == 2)
+    if _fastPath(byteWidth == 1) {
+      stringBuffer.usedEnd
+        .assumingMemoryBound(to: UInt8.self).pointee = UInt8(u)
+      stringBuffer.usedEnd += 1
+    } else {
+      stringBuffer.usedEnd
+        .assumingMemoryBound(to: UTF16.CodeUnit.self).pointee = u
+      stringBuffer.usedEnd += 2
+    }
+    self.count += 1
+  }
 
-    // TODO: Does this incur ref counting?
-    var buffer = self.stringBuffer
+  @_versioned
+  internal
+  mutating
+  func _appendInPlace(_ u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit) {
+    _sanityCheck(self.capacity >= self.count + 2)
+    _sanityCheck(byteWidth == 2)
+    let d = stringBuffer.usedEnd.assumingMemoryBound(to: UTF16.CodeUnit.self)
+    d[0] = u0
+    d[1] = u1
+    stringBuffer.usedEnd += 4
+    self.count += 2
+  }
+  
+  // Append a range of code units from `other` directly to the end of
+  // this string, which must have uniquely referenced storage with
+  // large enough capacity.
+  @_versioned
+  internal
+  mutating
+  func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
+    _sanityCheck(self.capacity >= self.count + range.count)
 
     other._copy(
-      into: buffer.usedEnd,
-      capacityEnd: buffer.capacityEnd,
-      accomodatingElementWidth: buffer.elementWidth)
-    buffer.usedEnd += otherCount &<< buffer.elementShift
-    self.count = buffer.usedCount
+      range: range,
+      into: stringBuffer.usedEnd,
+      capacityEnd: stringBuffer.capacityEnd,
+      accomodatingElementWidth: stringBuffer.elementWidth)
+    stringBuffer.usedEnd += range.count &<< stringBuffer.elementShift
+    self.count = stringBuffer.usedCount
+  }
+
+  // Append directly to the end of this string, whose buffer must be
+  // uniquely referenced. Grow buffer if there isn't enough capacity.
+  @_versioned
+  internal mutating func append(_ other: _StringGuts, range: Range<Int>) {
+    let count = self.count
+    if _slowPath(self.capacity < count + range.count) {
+      let width = max(self.byteWidth, other.byteWidth)
+      let buffer = _StringBuffer(
+        capacity: max(_growArrayCapacity(self.capacity), range.count),
+        initialSize: count,
+        elementWidth: width)
+      self.unsafe._copy(
+        into: buffer.start,
+        capacityEnd: buffer.capacityEnd,
+        accomodatingElementWidth: width)
+    }
+    _appendInPlace(other, range: range)
+  }
+
+  // Append directly to the end of this string, whose buffer must be
+  // uniquely referenced. Grow buffer if there isn't enough capacity.
+  @_versioned
+  internal mutating func append<S: StringProtocol>(_ other: S) {
+    self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
 
   internal func _invariantCheck() {
@@ -944,6 +1011,7 @@ extension _StringGuts {
 
     // Copy ourselves in
     self._copy(
+      range: 0..<self.count,
       into: buffer.start,
       capacityEnd: buffer.capacityEnd,
       accomodatingElementWidth: byteWidth)
@@ -951,13 +1019,15 @@ extension _StringGuts {
   }
 
   @_inlineable
-  // TODO: @_versioned
-  // TODO: internal
+  @_transparent
   public // TODO(StringGuts): for testing only
   mutating func isUniqueNative() -> Bool {
     return _isUnique(&_storage.0) && _isNative
   }
 
+  // Convert ourselves (if needed) to a native string with the specified
+  // storage parameters. After this call, self is ready to be memcpy-ed into.
+  // Does not affect count.
   @_versioned
   internal
   mutating func _ensureUniqueNative(
@@ -987,44 +1057,35 @@ extension _StringGuts {
     self = _StringGuts(newBuffer)
   }
 
-  // Convert ourselves (if needed) to a NativeString for appending purposes.
-  // After this call, self is ready to be memcpy-ed into. Does not adjust the
-  // referenced StringBuffer's usedCount.
-  @_versioned
-  internal
-  mutating func _formNative(forAppending other: _StringGuts) {
-    _ensureUniqueNative(
-      minimumCapacity: self.count + other.count,
-      minimumByteWidth: other.byteWidth)
-  }
-
-  // Copy in our elements to the new storage
-  //
+  // Copy code units from a slice of this string into a buffer.
   @_versioned
   internal
   func _copy(
+    range: Range<Int>,
     into dest: UnsafeMutableRawPointer,
     capacityEnd: UnsafeMutableRawPointer,
     accomodatingElementWidth width: Int
   ) {
     _sanityCheck(byteWidth == 1 || byteWidth == 2)
-    _sanityCheck(capacityEnd >= dest + (self.count &<< (byteWidth &- 1)))
+    _sanityCheck(capacityEnd >= dest + (range.count &<< (byteWidth &- 1)))
 
     // TODO: Eventual small form check on other. We could even do this now for
     // the tagged cocoa strings.
     let unmanagedSelfOpt = self._unmanagedContiguous
     if _fastPath(unmanagedSelfOpt != nil) {
-      unmanagedSelfOpt._unsafelyUnwrappedUnchecked._copy(
+      let unsafe = unmanagedSelfOpt._unsafelyUnwrappedUnchecked
+      unsafe[range]._copy(
         into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
       _fixLifetime(self)
       return
     }
 
-    _sanityCheck(width == 2)
+    _sanityCheck(width == 2) // TODO: CFStringGetBytes
     let opaque = getOpaque()
-    _cocoaStringReadAll(
-      opaque.object,
-      dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
+    _cocoaStringCopyCharacters(
+      from: opaque.object,
+      range: range,
+      into: dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
   }
 
   @inline(__always)
@@ -1081,13 +1142,10 @@ extension _StringGuts {
     return nil
   }
 
-  // TODO(perf): guarantee this is a simple bitmask operation, and probably
-  // make inlineable or inline allways
   @_versioned
   internal
   var _isOpaque: Bool {
-      @inline(never) // TODO(perf): to inspect code quality
-      get { return _unmanagedContiguous == nil }
+    return _unmanagedContiguous == nil
   }
 
   @_versioned
@@ -1164,22 +1222,87 @@ extension _StringGuts {
     self = _StringGuts(newBuffer)
   }
 
+  @_inlineable
+  public // TODO(StringGuts): for testing only
+  mutating func append(_ other: _StringGuts) {
+    self.append(other, range: 0..<other.count)
+  }
+
   // @_inlineable // TODO: internal-inlineable, if that's possible
   // TODO: @_versioned
   // TODO: internal
   public // TODO(StringGuts): for testing only
-  mutating func append(_ other: _StringGuts) {
-    guard !other._isEmpty else { return }
+  mutating func append(_ other: _StringGuts, range: Range<Int>) {
+    _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
+    guard range.count > 0 else { return }
+    if _isEmpty &&
+      capacity == 0 && // Don't discard reserved capacity, if any
+      range.count == other.count {
+      self = other
+      return
+    }
 
     // TODO: Eventual small form check on self and other. We could even do this
     // now for the tagged cocoa strings.
 
-    self._formNative(forAppending: other)
+    self._ensureUniqueNative(
+      minimumCapacity: self.count + range.count,
+      minimumByteWidth: other.byteWidth)
     var nativeSelf = self._asNative
-    nativeSelf._appendInPlace(other)
+    nativeSelf._appendInPlace(other, range: range)
     self = _StringGuts(nativeSelf)
     _invariantCheck()
   }
+
+  @_versioned
+  internal mutating func append<C : Collection>(contentsOf other: C)
+    where C.Element == UTF16.CodeUnit {
+    var byteWidth = 1
+    if byteWidth == 1 &&
+      // Don't widen string when appending CR+LF
+      (other.count > 2 || other.contains { $0 > 0x7f }) {
+      byteWidth = 2
+    }
+    self._ensureUniqueNative(
+      minimumCapacity: self.count + numericCast(other.count),
+      minimumByteWidth: byteWidth)
+    var nativeSelf = self._asNative
+    for codeunit in other {
+      nativeSelf._appendInPlace(codeunit)
+    }
+    _invariantCheck()    
+  }
+
+  @_versioned
+  internal mutating func append(_ c: Unicode.Scalar) {
+    let width = UTF16.width(c)
+    if _fastPath(width == 1) {
+      append(UTF16.CodeUnit(c.value))
+    } else {
+      append(UTF16.leadSurrogate(c), UTF16.trailSurrogate(c))
+    }
+  }
+
+  @_versioned
+  internal mutating func append(_ u: UTF16.CodeUnit) {
+    _ensureUniqueNative(
+      minimumCapacity: count + 1,
+      minimumByteWidth: (u <= 0x7f ? 1 : 2))
+    var nativeSelf = self._asNative
+    nativeSelf._appendInPlace(u)
+    _invariantCheck()
+  }
+
+  @_versioned
+  internal mutating func append(_ u0: UTF16.CodeUnit, _ u1: UTF16.CodeUnit) {
+    _ensureUniqueNative(
+      minimumCapacity: count + 2,
+      minimumByteWidth: 2)
+    var nativeSelf = self._asNative
+    nativeSelf._appendInPlace(u0, u1)
+    _invariantCheck()
+  }
+
 }
 
 @_versioned // FIXME(sil-serialize-all)
@@ -1211,8 +1334,7 @@ extension Substring {
   @_versioned
   internal
   var _unmanagedContiguous: UnsafeString? {
-    return self._wholeString._unmanagedContiguous?[
-      self.startIndex.encodedOffset..<self.endIndex.encodedOffset]
+    return self._wholeString._unmanagedContiguous?[self._encodedOffsetRange]
   }
 }
 
@@ -1229,9 +1351,7 @@ extension StringProtocol {
           self as? String
         )._unsafelyUnwrappedUnchecked._unmanagedContiguous
       }
-      return (
-        self as? Substring
-      )._unsafelyUnwrappedUnchecked._unmanagedContiguous
+      return (self as? Substring)?._unmanagedContiguous
     }
   }
 }

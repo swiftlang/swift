@@ -113,6 +113,11 @@ public protocol StringProtocol
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
+
+  /// The entire String onto whose slice this view is a projection.
+  var _wholeString : String { get }
+  /// The range of storage offsets of this view in `_wholeString`.
+  var _encodedOffsetRange : Range<Int> { get }
 }
 
 extension StringProtocol {
@@ -142,6 +147,11 @@ internal protocol _SwiftStringView {
   //
   // FIXME: Remove once _StringGuts has append(contentsOf:).
   var _persistentContent : String { get }
+
+  /// The entire String onto whose slice this view is a projection.
+  var _wholeString : String { get }
+  /// The range of storage offsets of this view in `_wholeString`.
+  var _encodedOffsetRange : Range<Int> { get }
 }
 
 extension _SwiftStringView {
@@ -166,6 +176,16 @@ extension String : _SwiftStringView {
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
     return self
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _wholeString : String {
+    return self
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _encodedOffsetRange : Range<Int> {
+    return 0..<_guts.count
   }
 }
 
@@ -935,12 +955,7 @@ extension String {
   // String append
   @_inlineable // FIXME(sil-serialize-all)
   public static func += (lhs: inout String, rhs: String) {
-    if lhs.isEmpty {
-      lhs = rhs
-    }
-    else {
-      lhs._guts.append(rhs._guts)
-    }
+    lhs._guts.append(rhs._guts)
   }
 
   /// Constructs a `String` in `resultStorage` containing the given UTF-8.
@@ -987,44 +1002,40 @@ extension Sequence where Element: StringProtocol {
   @_versioned // FIXME(sil-serialize-all)
   @inline(__always)
   internal func _joined(separator: String = "") -> String {
-    var result = ""
-
-    // FIXME(performance): this code assumes UTF-16 in-memory representation.
-    // It should be switched to low-level APIs.
-    let separatorSize = separator.utf16.count
+    let separatorSize = separator._guts.count
+    var byteWidth = separator._guts.byteWidth
 
     let reservation = self._preprocessingPass {
       () -> Int in
       var r = 0
       for chunk in self {
-        // FIXME(performance): this code assumes UTF-16 in-memory representation.
-        // It should be switched to low-level APIs.
-        r += separatorSize + chunk._ephemeralString.utf16.count
+        r += separatorSize + chunk._encodedOffsetRange.count
+        byteWidth = Swift.max(byteWidth, chunk._wholeString._guts.byteWidth)
       }
       return r - separatorSize
     }
 
-    if let n = reservation {
-      result.reserveCapacity(n)
-    }
+    var result = NativeString(
+      capacity: reservation ?? 0,
+      byteWidth: byteWidth)
 
     if separatorSize == 0 {
       for x in self {
-        result.append(x._ephemeralString)
+        result.append(x)
       }
-      return result
+      return String(_StringGuts(result))
     }
 
     var iter = makeIterator()
     if let first = iter.next() {
-      result.append(first._ephemeralString)
+      result.append(first)
       while let next = iter.next() {
         result.append(separator)
-        result.append(next._ephemeralString)
+        result.append(next)
       }
     }
 
-    return result
+    return String(_StringGuts(result))
   }
 }
 

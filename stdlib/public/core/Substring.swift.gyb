@@ -335,10 +335,13 @@ extension Substring : _SwiftStringView {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal
-  var _wholeString: String {
+  public var _wholeString: String {
     return _slice._base
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var _encodedOffsetRange: Range<Int> {
+    return startIndex.encodedOffset..<endIndex.encodedOffset
   }
 }
 
@@ -456,6 +459,12 @@ extension Substring.${View} : BidirectionalCollection {
   @_versioned // FIXME(sil-serialize-all)
   internal var _wholeString: String {
     return String(_slice._base._guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _encodedOffsetRange: Range<Int> {
+    return startIndex.encodedOffset..<endIndex.encodedOffset
   }
 
   @_inlineable // FIXME(sil-serialize-all)
