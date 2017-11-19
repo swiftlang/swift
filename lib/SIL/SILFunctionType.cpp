@@ -1104,12 +1104,22 @@ public:
 };
 
 /// The default conventions for Swift initializing constructors.
+///
+/// Initializing constructors take all parameters (including) self at +1. This
+/// is because:
+///
+/// 1. We are likely to be initializing fields of self implying that the
+///    parameters are likely to be forwarded into memory without further
+///    copies.
+/// 2. Initializers must take 'self' at +1, since they will return it back
+///    at +1, and may chain onto Objective-C initializers that replace the
+///    instance.
 struct DefaultInitializerConventions : DefaultConventions {
-  using DefaultConventions::DefaultConventions;
+  DefaultInitializerConventions()
+      : DefaultConventions(NormalParameterConvention::Owned) {}
 
-  /// Initializers must take 'self' at +1, since they will return it back
-  /// at +1, and may chain onto Objective-C initializers that replace the
-  /// instance.
+  /// Initializers must take 'self' at +1, since they will return it back at +1,
+  /// and may chain onto Objective-C initializers that replace the instance.
   ParameterConvention
   getDirectSelfParameter(const AbstractionPattern &type) const override {
     return ParameterConvention::Direct_Owned;
