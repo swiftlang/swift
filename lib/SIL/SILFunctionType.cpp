@@ -1131,6 +1131,17 @@ struct DefaultInitializerConventions : DefaultConventions {
   }
 };
 
+/// The default conventions for Swift setter acccessors.
+///
+/// These take self at +0, but all other parameters at +1. This is because we
+/// assume that setter parameters are likely to be values to be forwarded into
+/// memory. Thus by passing in the +1 value, we avoid a potential copy in that
+/// case.
+struct DefaultSetterConventions : DefaultConventions {
+  DefaultSetterConventions()
+      : DefaultConventions(NormalParameterConvention::Owned) {}
+};
+
 /// The default conventions for ObjC blocks.
 struct DefaultBlockConventions : Conventions {
   DefaultBlockConventions() : Conventions(ConventionsKind::DefaultBlock) {}
@@ -1204,6 +1215,14 @@ static CanSILFunctionType getNativeSILFunctionType(
                                 constant, witnessMethodConformance);
 
     case SILDeclRef::Kind::Func:
+      // If we have a setter, use the special setter convention. This ensures
+      // that we take normal parameters at +1.
+      if (constant && constant->isSetter()) {
+        return getSILFunctionType(M, origType, substInterfaceType, extInfo,
+                                  DefaultSetterConventions(), ForeignInfo(),
+                                  constant, witnessMethodConformance);
+      }
+      LLVM_FALLTHROUGH;
     case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Destroyer:
     case SILDeclRef::Kind::GlobalAccessor:
