@@ -1045,21 +1045,36 @@ struct DeallocatorConventions : Conventions {
 
 namespace {
 
-/// The default Swift conventions.
-struct DefaultConventions : Conventions {
+enum class NormalParameterConvention { Owned, Guaranteed };
 
-  DefaultConventions()
-    : Conventions(ConventionsKind::Default) {}
+/// The default Swift conventions.
+class DefaultConventions : public Conventions {
+  NormalParameterConvention normalParameterConvention;
+
+public:
+  DefaultConventions(NormalParameterConvention normalParameterConvention =
+                         NormalParameterConvention::Owned)
+      : Conventions(ConventionsKind::Default),
+        normalParameterConvention(normalParameterConvention) {}
+
+  bool isNormalParameterConventionGuaranteed() const {
+    return normalParameterConvention == NormalParameterConvention::Guaranteed;
+  }
 
   ParameterConvention getIndirectParameter(unsigned index,
                             const AbstractionPattern &type,
                             const TypeLowering &substTL) const override {
+    if (isNormalParameterConventionGuaranteed()) {
+      return ParameterConvention::Indirect_In_Guaranteed;
+    }
     return ParameterConvention::Indirect_In;
   }
 
   ParameterConvention getDirectParameter(unsigned index,
                             const AbstractionPattern &type,
                             const TypeLowering &substTL) const override {
+    if (isNormalParameterConventionGuaranteed())
+      return ParameterConvention::Direct_Guaranteed;
     return ParameterConvention::Direct_Owned;
   }
 
