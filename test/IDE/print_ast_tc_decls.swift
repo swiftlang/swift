@@ -58,7 +58,7 @@
 // FIXME: %FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
+// XFAIL: linux, freebsd
 
 import Bar
 import ObjectiveC
