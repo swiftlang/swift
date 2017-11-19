@@ -740,6 +740,125 @@ static bool isPseudogeneric(SILDeclRef c) {
   return (classDecl && classDecl->usesObjCGenericsModel());
 }
 
+/// Update the result type given the foreign error convention that we will be
+/// using.
+static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
+    ForeignErrorConvention convention, CanGenericSignature genericSig,
+    AbstractionPattern origResultType, CanType substFormalResultType) {
+  switch (convention.getKind()) {
+  // These conventions replace the result type.
+  case ForeignErrorConvention::ZeroResult:
+  case ForeignErrorConvention::NonZeroResult:
+    assert(substFormalResultType->isVoid());
+    substFormalResultType = convention.getResultType();
+    origResultType = AbstractionPattern(genericSig, substFormalResultType);
+    return {origResultType, substFormalResultType};
+
+  // These conventions wrap the result type in a level of optionality.
+  case ForeignErrorConvention::NilResult:
+    assert(!substFormalResultType->getAnyOptionalObjectType());
+    substFormalResultType =
+        OptionalType::get(substFormalResultType)->getCanonicalType();
+    origResultType =
+        AbstractionPattern::getOptional(origResultType, OTK_Optional);
+    return {origResultType, substFormalResultType};
+
+  // These conventions don't require changes to the formal error type.
+  case ForeignErrorConvention::ZeroPreservedResult:
+  case ForeignErrorConvention::NonNilError:
+    return {origResultType, substFormalResultType};
+  }
+}
+
+/// Lower any/all capture context parameters.
+///
+/// *NOTE* Currently default arg generators can not capture anything.
+/// If we ever add that ability, it will be a different capture list
+/// from the function to which the argument is attached.
+static void
+lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
+                              CanGenericSignature genericSig,
+                              SmallVectorImpl<SILParameterInfo> &inputs) {
+
+  // NB: The generic signature may be elided from the lowered function type
+  // if the function is in a fully-specialized context, but we still need to
+  // canonicalize references to the generic parameters that may appear in
+  // non-canonical types in that context. We need the original generic
+  // signature from the AST for that.
+  auto origGenericSig = function.getGenericSignature();
+
+  auto &Types = M.Types;
+  auto loweredCaptures = Types.getLoweredLocalCaptures(function);
+
+  for (auto capture : loweredCaptures.getCaptures()) {
+    if (capture.isDynamicSelfMetadata()) {
+      ParameterConvention convention = ParameterConvention::Direct_Unowned;
+      auto dynamicSelfInterfaceType =
+          loweredCaptures.getDynamicSelfType()->mapTypeOutOfContext();
+
+      auto selfMetatype = MetatypeType::get(dynamicSelfInterfaceType,
+                                            MetatypeRepresentation::Thick);
+
+      auto canSelfMetatype = selfMetatype->getCanonicalType(origGenericSig);
+      SILParameterInfo param(canSelfMetatype, convention);
+      inputs.push_back(param);
+
+      continue;
+    }
+
+    auto *VD = capture.getDecl();
+    auto type = VD->getInterfaceType();
+    auto canType = type->getCanonicalType(origGenericSig);
+
+    auto &loweredTL =
+        Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType);
+    auto loweredTy = loweredTL.getLoweredType();
+    switch (Types.getDeclCaptureKind(capture)) {
+    case CaptureKind::None:
+      break;
+    case CaptureKind::Constant: {
+      // Constants are captured by value.
+      ParameterConvention convention;
+      if (loweredTL.isAddressOnly()) {
+        convention = M.getOptions().EnableGuaranteedClosureContexts
+                         ? ParameterConvention::Indirect_In_Guaranteed
+                         : ParameterConvention::Indirect_In;
+      } else if (loweredTL.isTrivial()) {
+        convention = ParameterConvention::Direct_Unowned;
+      } else {
+        convention = M.getOptions().EnableGuaranteedClosureContexts
+                         ? ParameterConvention::Direct_Guaranteed
+                         : ParameterConvention::Direct_Owned;
+      }
+      SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
+      inputs.push_back(param);
+      break;
+    }
+    case CaptureKind::Box: {
+      // Lvalues are captured as a box that owns the captured value.
+      auto boxTy = Types.getInterfaceBoxTypeForCapture(
+          VD, loweredTy.getSwiftRValueType(),
+          /*mutable*/ true);
+      auto convention = M.getOptions().EnableGuaranteedClosureContexts
+                            ? ParameterConvention::Direct_Guaranteed
+                            : ParameterConvention::Direct_Owned;
+      auto param = SILParameterInfo(boxTy, convention);
+      inputs.push_back(param);
+      break;
+    }
+    case CaptureKind::StorageAddress: {
+      // Non-escaping lvalues are captured as the address of the value.
+      SILType ty = loweredTy.getAddressType();
+      auto param =
+          SILParameterInfo(ty.getSwiftRValueType(),
+                           ParameterConvention::Indirect_InoutAliasable);
+      inputs.push_back(param);
+      break;
+    }
+    }
+  }
+}
+
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
 ///
@@ -814,36 +933,14 @@ static CanSILFunctionType getSILFunctionType(
   }
 
   // Lower the result type.
-
   AbstractionPattern origResultType = origType.getFunctionResultType();
   CanType substFormalResultType = substFnInterfaceType.getResult();
 
   // If we have a foreign error convention, restore the original result type.
-  if (foreignInfo.Error) {
-    auto &foreignError = *foreignInfo.Error;
-    switch (foreignError.getKind()) {
-    // These conventions replace the result type.
-    case ForeignErrorConvention::ZeroResult:
-    case ForeignErrorConvention::NonZeroResult:
-      assert(substFormalResultType->isVoid());
-      substFormalResultType = foreignError.getResultType();
-      origResultType = AbstractionPattern(genericSig, substFormalResultType);
-      break;
-
-    // These conventions wrap the result type in a level of optionality.
-    case ForeignErrorConvention::NilResult:
-      assert(!substFormalResultType->getAnyOptionalObjectType());
-      substFormalResultType =
-        OptionalType::get(substFormalResultType)->getCanonicalType();
-      origResultType =
-        AbstractionPattern::getOptional(origResultType, OTK_Optional);
-      break;
-
-    // These conventions don't require changes to the formal error type.
-    case ForeignErrorConvention::ZeroPreservedResult:
-    case ForeignErrorConvention::NonNilError:
-      break;
-    }
+  if (auto convention = foreignInfo.Error) {
+    std::tie(origResultType, substFormalResultType) =
+        updateResultTypeForForeignError(*convention, genericSig, origResultType,
+                                        substFormalResultType);
   }
 
   // Destructure the result tuple type.
@@ -863,89 +960,13 @@ static CanSILFunctionType getSILFunctionType(
   }
   
   // Lower the capture context parameters, if any.
-  // But note that default arg generators can't capture anything right now,
-  // and if we ever add that ability, it will be a different capture list
+  //
+  // *NOTE* Currently default arg generators can not capture anything.
+  // If we ever add that ability, it will be a different capture list
   // from the function to which the argument is attached.
-  if (constant && !constant->isDefaultArgGenerator())
-  if (auto function = constant->getAnyFunctionRef()) {
-    // NB: The generic signature may be elided from the lowered function type
-    // if the function is in a fully-specialized context, but we still need to
-    // canonicalize references to the generic parameters that may appear in
-    // non-canonical types in that context. We need the original generic
-    // signature from the AST for that.
-    auto origGenericSig
-      = function->getGenericSignature();
-
-    auto &Types = M.Types;
-    auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
-    
-    for (auto capture : loweredCaptures.getCaptures()) {
-      if (capture.isDynamicSelfMetadata()) {
-        ParameterConvention convention = ParameterConvention::Direct_Unowned;
-        auto dynamicSelfInterfaceType =
-            loweredCaptures.getDynamicSelfType()->mapTypeOutOfContext();
-        
-        auto selfMetatype = MetatypeType::get(
-            dynamicSelfInterfaceType,
-            MetatypeRepresentation::Thick);
-        
-        auto canSelfMetatype =
-          selfMetatype->getCanonicalType(origGenericSig);
-        SILParameterInfo param(canSelfMetatype, convention);
-        inputs.push_back(param);
-
-        continue;
-      }
-
-      auto *VD = capture.getDecl();
-      auto type = VD->getInterfaceType();
-      auto canType = type->getCanonicalType(origGenericSig);
-
-      auto &loweredTL = Types.getTypeLowering(
-                              AbstractionPattern(genericSig, canType), canType);
-      auto loweredTy = loweredTL.getLoweredType();
-      switch (Types.getDeclCaptureKind(capture)) {
-      case CaptureKind::None:
-        break;
-      case CaptureKind::Constant: {
-        // Constants are captured by value.
-        ParameterConvention convention;
-        if (loweredTL.isAddressOnly()) {
-          convention = M.getOptions().EnableGuaranteedClosureContexts
-            ? ParameterConvention::Indirect_In_Guaranteed
-            : ParameterConvention::Indirect_In;
-        } else if (loweredTL.isTrivial()) {
-          convention = ParameterConvention::Direct_Unowned;
-        } else {
-          convention = M.getOptions().EnableGuaranteedClosureContexts
-            ? ParameterConvention::Direct_Guaranteed
-            : ParameterConvention::Direct_Owned;
-        }
-        SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
-        inputs.push_back(param);
-        break;
-      }
-      case CaptureKind::Box: {
-        // Lvalues are captured as a box that owns the captured value.
-        auto boxTy = Types.getInterfaceBoxTypeForCapture(VD,
-                                                 loweredTy.getSwiftRValueType(),
-                                                 /*mutable*/ true);
-        auto convention = M.getOptions().EnableGuaranteedClosureContexts
-          ? ParameterConvention::Direct_Guaranteed
-          : ParameterConvention::Direct_Owned;
-        auto param = SILParameterInfo(boxTy, convention);
-        inputs.push_back(param);
-        break;
-      }
-      case CaptureKind::StorageAddress: {
-        // Non-escaping lvalues are captured as the address of the value.
-        SILType ty = loweredTy.getAddressType();
-        auto param = SILParameterInfo(ty.getSwiftRValueType(),
-                                  ParameterConvention::Indirect_InoutAliasable);
-        inputs.push_back(param);
-        break;
-      }
-      }
+  if (constant && !constant->isDefaultArgGenerator()) {
+    if (auto function = constant->getAnyFunctionRef()) {
+      lowerCaptureContextParameters(M, *function, genericSig, inputs);
     }
   }
   
