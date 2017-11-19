@@ -230,6 +230,10 @@ public:
   InputFileKind getInputKind() const {
     return FrontendOpts.InputKind;
   }
+  
+  bool isInputSwift() { return getInputKind() == InputFileKind::IFK_Swift; }
+  bool isInputSIL() { return getInputKind() == InputFileKind::IFK_SIL; }
+
 
   SourceFileKind getSourceFileKind() const;
 
@@ -441,6 +445,9 @@ private:
   bool setupModuleLoaders();
   Optional<unsigned> setupCodeCompletionBuffer();
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
+  bool isInMainMode() { return Invocation.isInputSwift(); }
+  bool isInSILMode() { return Invocation.isInputSIL(); }
+  
 public:
   /// Parses and type-checks all input files.
   void performSema();
