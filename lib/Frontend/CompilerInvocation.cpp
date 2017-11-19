@@ -114,17 +114,9 @@ class ArgsToFrontendInputsConverter {
 
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
 
-  llvm::StringMap<unsigned> FileIndices;
-  std::vector<StringRef> PrimaryFiles;
+  std::set<StringRef> PrimaryFilesToAdd;
 
   StringRef filelistPath() { return FilelistPathArg->getValue(); }
-
-  void addPrimary(StringRef file) { PrimaryFiles.push_back(file); }
-
-  void addInput(StringRef file) {
-    FileIndices.insert({file, Inputs.inputFilenameCount()});
-    Inputs.addInputFilename(file);
-  }
 
   bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
     return FilelistPathArg != nullptr;
@@ -139,13 +131,23 @@ class ArgsToFrontendInputsConverter {
   void addFile(StringRef file, Whence whence) {
     switch (whence) {
     case Whence::PrimaryFromCommandLine:
-      addPrimary(file);
-      if (!arePrimariesOnCommandLineAlsoAppearingInFilelist())
-        addInput(file);
+        if (arePrimariesOnCommandLineAlsoAppearingInFilelist())
+          PrimaryFilesToAdd.insert(file);
+        else
+          Inputs.addPrimaryInputFilename(file);
       break;
-    case Whence::SecondaryFromCommandLine:
+
+      case Whence::SecondaryFromCommandLine:
+        Inputs.addInputFilename(file);
+        break;
+        
     case Whence::SecondaryFromFileList:
-      addInput(file);
+        if (PrimaryFilesToAdd.count(file)) {
+          Inputs.addPrimaryInputFilename(file);
+          PrimaryFilesToAdd.erase(file);
+        }
+        else
+          Inputs.addInputFilename(file);
       break;
     }
   }
@@ -162,7 +164,7 @@ public:
     getFilesFromCommandLine();
     if (getFilesFromFilelist())
       return true;
-    return setPrimaryFiles();
+    return checkForUnusedPrimaries();
   }
 
 private:
@@ -206,21 +208,18 @@ private:
     return false;
   }
 
-  bool setPrimaryFiles() {
-    for (StringRef primaryFile : PrimaryFiles) {
-      const auto iterator = FileIndices.find(primaryFile);
+  bool checkForUnusedPrimaries() {
+    bool hadError = false;
+    for (StringRef primaryFile : PrimaryFilesToAdd) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
-      if (iterator == FileIndices.end()) {
-        assert(FilelistPathArg != nullptr &&
-               "Missing primary with no filelist");
-        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
+      assert(FilelistPathArg != nullptr &&
+             "Missing primary with no filelist");
+      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
                        primaryFile, filelistPath());
-        return true;
-      }
-      Inputs.addPrimaryInputFilename(iterator->second);
+      hadError = true;
     }
-    return false;
+    return hadError;
   }
 };
 class FrontendArgsToOptionsConverter {

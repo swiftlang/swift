@@ -91,6 +91,9 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
 
 void FrontendInputs::transformInputFilenames(
     const llvm::function_ref<std::string(std::string)> &fn) {
+  for (auto input: Inputs) {
+    input.transformFilename(fn);
+  }
   for (auto &InputFile : InputFilenames) {
     InputFile = fn(InputFile);
   }

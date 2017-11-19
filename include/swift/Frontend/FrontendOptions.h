@@ -66,7 +66,28 @@ enum class InputFileKind {
 class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
 
-private:
+  // Inputs may be files, buffers, or buffers substituting for files.
+  class InputFileOrBuffer {
+    bool IsPrimary;
+    llvm::MemoryBuffer *Buffer;
+    Optional<std::string> Filename;
+    
+//    InputFileOrBuffer(bool isPrimary, llvm::MemoryBuffer *buffer, Optional<std::string> filename) : IsPrimary(isPrimary), Buffer(buffer), Filename(filename) {}
+    
+    
+  public:
+    InputFileOrBuffer(StringRef filename, bool isPrimary = false)
+    : IsPrimary(isPrimary), Buffer(nullptr), Filename(filename)
+    {}
+    
+    void transformFilename(const llvm::function_ref<std::string(std::string)> &fn) {
+      assert(Filename);
+      Filename = fn(*Filename);
+    }
+  };
+  std::vector<InputFileOrBuffer> Inputs;
+  
+  
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
 
@@ -188,8 +209,9 @@ public:
 
   // Input filename writers
 
-  void addInputFilename(StringRef Filename) {
-    InputFilenames.push_back(Filename);
+  void addInputFilename(StringRef filename) {
+    InputFilenames.push_back(filename);
+    Inputs.push_back(filename);
   }
   void transformInputFilenames(
       const llvm::function_ref<std::string(std::string)> &fn);
@@ -221,8 +243,18 @@ public:
     getMutablePrimaryInputs().push_back(si);
   }
 
-  void addPrimaryInputFilename(unsigned index) {
+  void old_addPrimaryInputFilename(unsigned index) {
     addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
+  }
+  void addPrimaryInputFilename(StringRef filename) {
+    Inputs.push_back(InputFileOrBuffer(filename, true));
+    for (unsigned i: indices(InputFilenames)) {
+      if (InputFilenames[i] == filename) {
+        old_addPrimaryInputFilename(i);
+        return;
+      }
+    }
+    assert(false && "what???");
   }
 
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
@@ -238,6 +270,7 @@ public:
   void clearInputs() {
     InputFilenames.clear();
     InputBuffers.clear();
+    Inputs.clear();
   }
 };
 
