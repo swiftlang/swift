@@ -4054,7 +4054,6 @@ irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                 llvm::Value *metadata) {
   // FIXME: The below checks should capture this property already, but
   // resilient class metadata layout is not fully implemented yet.
-  auto expansion = IGF.IGM.getResilienceExpansionForLayout(theClass);
   if (theClass->getParentModule() != IGF.IGM.getSwiftModule()) {
     return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
   }
