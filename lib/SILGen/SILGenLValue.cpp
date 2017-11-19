@@ -3358,7 +3358,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
       std::move(component.asPhysical()).offset(*this, loc, destAddr,
                                                AccessKind::Write);
 
-    auto value = std::move(src).getAsRValue(*this);
+    auto value = std::move(src).getAsRValue(*this).ensurePlusOne(*this, loc);
     std::move(value).assignInto(*this, loc, finalDestAddr.getValue());
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
