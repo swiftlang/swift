@@ -101,6 +101,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   
   const Optional<unsigned> codeCompletionBufferID = setupCodeCompletionBuffer();
   
+  if (isInSILMode())
+    Invocation.getLangOptions().EnableAccessControl = false;
+
   return setupInputs(codeCompletionBufferID);
 }
 
@@ -178,35 +181,12 @@ Optional<unsigned> CompilerInstance::setupCodeCompletionBuffer() {
 
 
 bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
-  if (isInSILMode())
-    Invocation.getLangOptions().EnableAccessControl = false;
-
-  const Optional<SelectedInput> &primaryInput =
-      Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
-
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (unsigned i = 0,
                 e = Invocation.getFrontendOptions().Inputs.inputBufferCount();
        i != e; ++i) {
-    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    auto *inputBuffer =
-        Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
-    auto copy = std::unique_ptr<llvm::MemoryBuffer>(
-        llvm::MemoryBuffer::getMemBufferCopy(
-            inputBuffer->getBuffer(), inputBuffer->getBufferIdentifier()));
-    if (serialization::isSerializedAST(copy->getBuffer())) {
-      PartialModules.push_back({ std::move(copy), nullptr });
-    } else {
-      unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(copy));
-      InputSourceCodeBufferIDs.push_back(bufferID);
-
-      if (isInSILMode())
-        MainBufferID = bufferID;
-
-      if (primaryInput && primaryInput->isBuffer() && primaryInput->Index == i)
-        PrimaryBufferID = bufferID;
-    }
+    setupForBufferAt(i);
   }
 
   for (unsigned i = 0,
@@ -227,6 +207,30 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
     MainBufferID = InputSourceCodeBufferIDs.front();
 
   return false;
+}
+
+void CompilerInstance::setupForBufferAt(unsigned i) {
+  // CompilerInvocation doesn't own the buffers, copy to a new buffer.
+  auto *inputBuffer =
+  Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
+  auto copy = std::unique_ptr<llvm::MemoryBuffer>(
+                                                  llvm::MemoryBuffer::getMemBufferCopy(
+                                                                                       inputBuffer->getBuffer(), inputBuffer->getBufferIdentifier()));
+  if (serialization::isSerializedAST(copy->getBuffer())) {
+    PartialModules.push_back({ std::move(copy), nullptr });
+  } else {
+    unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(copy));
+    InputSourceCodeBufferIDs.push_back(bufferID);
+    
+    if (isInSILMode())
+      MainBufferID = bufferID;
+    
+    const Optional<SelectedInput> &primaryInput =
+    Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
+
+    if (primaryInput && primaryInput->isBuffer() && primaryInput->Index == i)
+      PrimaryBufferID = bufferID;
+  }
 }
 
 

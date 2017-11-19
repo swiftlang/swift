@@ -363,8 +363,6 @@ class CompilerInstance {
   void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
 
-  bool setupForFileAt(unsigned i);
-
 public:
   SourceManager &getSourceMgr() { return SourceMgr; }
 
@@ -447,6 +445,9 @@ private:
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() { return Invocation.isInputSwift(); }
   bool isInSILMode() { return Invocation.isInputSIL(); }
+  void setupForBufferAt(unsigned i);
+  bool setupForFileAt(unsigned i);
+
   
 public:
   /// Parses and type-checks all input files.
