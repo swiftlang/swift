@@ -194,8 +194,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _mixForSynthesizedHashValue(Int, Int) -> Int
-  FuncDecl *MixForSynthesizedHashValueDecl = nullptr;
+  /// func _combineHashValues(Int, Int) -> Int
+  FuncDecl *CombineHashValuesDecl = nullptr;
 
   /// func _mixInt(Int) -> Int
   FuncDecl *MixIntDecl = nullptr;
@@ -1048,9 +1048,9 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
-  if (Impl.MixForSynthesizedHashValueDecl)
-    return Impl.MixForSynthesizedHashValueDecl;
+FuncDecl *ASTContext::getCombineHashValuesDecl() const {
+  if (Impl.CombineHashValuesDecl)
+    return Impl.CombineHashValuesDecl;
 
   auto resolver = getLazyResolver();
   auto intType = getIntDecl()->getDeclaredType();
@@ -1066,8 +1066,8 @@ FuncDecl *ASTContext::getMixForSynthesizedHashValueDecl() const {
   };
 
   auto decl = lookupLibraryIntrinsicFunc(
-      *this, "_mixForSynthesizedHashValue", resolver, callback);
-  Impl.MixForSynthesizedHashValueDecl = decl;
+      *this, "_combineHashValues", resolver, callback);
+  Impl.CombineHashValuesDecl = decl;
   return decl;
 }
 
