@@ -230,10 +230,9 @@ public:
   InputFileKind getInputKind() const {
     return FrontendOpts.InputKind;
   }
-  
+
   bool isInputSwift() { return getInputKind() == InputFileKind::IFK_Swift; }
   bool isInputSIL() { return getInputKind() == InputFileKind::IFK_SIL; }
-
 
   SourceFileKind getSourceFileKind() const;
 
@@ -437,6 +436,7 @@ public:
 
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
+
 private:
   void setupLLVMArguments();
   void setupDiagnosticOptions();
@@ -448,7 +448,6 @@ private:
   void setupForBufferAt(unsigned i);
   bool setupForFileAt(unsigned i);
 
-  
 public:
   /// Parses and type-checks all input files.
   void performSema();

@@ -44,7 +44,7 @@ bool FrontendInputs::shouldTreatAsSIL() const {
     return llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
   }
   // If we have one primary input and it's a filename with extension "sil",
-    // treat the input as SIL.
+  // treat the input as SIL.
   if (const Optional<StringRef> filename =
           getOptionalUniquePrimaryInputFilename()) {
     return llvm::sys::path::extension(filename.getValue())

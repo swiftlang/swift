@@ -71,50 +71,47 @@ void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
   PrimarySourceFile->setReferencedNameTracker(NameTracker);
 }
 
-
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
-  
+
   setupLLVMArguments();
   setupDiagnosticOptions();
-  
-  
+
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
   if (!Invocation.getFrontendOptions().ModuleDocOutputPath.empty())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
-  
+
   // If we are doing index-while-building, configure lexing and parsing to
   // remember comments.
   if (!Invocation.getFrontendOptions().IndexStorePath.empty()) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
-  
+
   Context.reset(new ASTContext(Invocation.getLangOptions(),
-                               Invocation.getSearchPathOptions(),
-                               SourceMgr, Diagnostics));
-  
+                               Invocation.getSearchPathOptions(), SourceMgr,
+                               Diagnostics));
+
   if (setupModuleLoaders())
     return true;
-  
+
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
-  
+
   const Optional<unsigned> codeCompletionBufferID = setupCodeCompletionBuffer();
-  
+
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
 
   return setupInputs(codeCompletionBufferID);
 }
 
-
 void CompilerInstance::setupLLVMArguments() {
   // Honor -Xllvm.
   if (!Invocation.getFrontendOptions().LLVMArgs.empty()) {
     llvm::SmallVector<const char *, 4> Args;
     Args.push_back("swift (LLVM option parsing)");
-    for (unsigned i = 0, e = Invocation.getFrontendOptions().LLVMArgs.size(); i != e;
-         ++i)
+    for (unsigned i = 0, e = Invocation.getFrontendOptions().LLVMArgs.size();
+         i != e; ++i)
       Args.push_back(Invocation.getFrontendOptions().LLVMArgs[i].c_str());
     Args.push_back(nullptr);
     llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
@@ -152,15 +149,14 @@ bool CompilerInstance::setupModuleLoaders() {
     // Otherwise, we just keep it around as our interface to Clang's ABI
     // knowledge.
     auto clangImporter =
-    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getPCHHash(),
-                          DepTracker);
+        ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                              Invocation.getPCHHash(), DepTracker);
     if (!clangImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
     }
-    
-    Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
+
+    Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   }
   return false;
 }
@@ -178,7 +174,6 @@ Optional<unsigned> CompilerInstance::setupCodeCompletionBuffer() {
   }
   return codeCompletionBufferID;
 }
-
 
 bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   // Add the memory buffers first, these will be associated with a filename
@@ -212,45 +207,45 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
 void CompilerInstance::setupForBufferAt(unsigned i) {
   // CompilerInvocation doesn't own the buffers, copy to a new buffer.
   auto *inputBuffer =
-  Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
-  auto copy = std::unique_ptr<llvm::MemoryBuffer>(
-                                                  llvm::MemoryBuffer::getMemBufferCopy(
-                                                                                       inputBuffer->getBuffer(), inputBuffer->getBufferIdentifier()));
+      Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
+  auto copy =
+      std::unique_ptr<llvm::MemoryBuffer>(llvm::MemoryBuffer::getMemBufferCopy(
+          inputBuffer->getBuffer(), inputBuffer->getBufferIdentifier()));
   if (serialization::isSerializedAST(copy->getBuffer())) {
-    PartialModules.push_back({ std::move(copy), nullptr });
+    PartialModules.push_back({std::move(copy), nullptr});
   } else {
     unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(copy));
     InputSourceCodeBufferIDs.push_back(bufferID);
-    
+
     if (isInSILMode())
       MainBufferID = bufferID;
-    
+
     const Optional<SelectedInput> &primaryInput =
-    Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
+        Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
 
     if (primaryInput && primaryInput->isBuffer() && primaryInput->Index == i)
       PrimaryBufferID = bufferID;
   }
 }
 
-
 bool CompilerInstance::setupForFileAt(unsigned i) {
-  auto &fileName = Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
-  
+  auto &fileName =
+      Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
+
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using namespace llvm::sys::path;
   if (Optional<unsigned> existingBufferID =
-      SourceMgr.getIDForBufferIdentifier(fileName)) {
+          SourceMgr.getIDForBufferIdentifier(fileName)) {
     if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
       MainBufferID = existingBufferID.getValue();
-    
+
     if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
       PrimaryBufferID = existingBufferID.getValue();
-    
+
     return false; // replaced by a memory buffer.
   }
-  
+
   // Open the input file.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
   FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(fileName);
@@ -259,13 +254,13 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
                          inputFileOrErr.getError().message());
     return true;
   }
-  
+
   if (serialization::isSerializedAST(inputFileOrErr.get()->getBuffer())) {
     llvm::SmallString<128> ModuleDocFilePath(fileName);
     llvm::sys::path::replace_extension(ModuleDocFilePath,
                                        SERIALIZED_MODULE_DOC_EXTENSION);
     FileOrError moduleDocOrErr =
-    llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
+        llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
     if (!moduleDocOrErr &&
         moduleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
       Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, fileName,
@@ -273,26 +268,25 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
       return true;
     }
     PartialModules.push_back(
-                             {std::move(inputFileOrErr.get()),
-                               moduleDocOrErr ? std::move(moduleDocOrErr.get()) : nullptr});
+        {std::move(inputFileOrErr.get()),
+         moduleDocOrErr ? std::move(moduleDocOrErr.get()) : nullptr});
     return false;
   }
-  
+
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
   unsigned bufferID =
-  SourceMgr.addNewSourceBuffer(std::move(inputFileOrErr.get()));
-  
+      SourceMgr.addNewSourceBuffer(std::move(inputFileOrErr.get()));
+
   InputSourceCodeBufferIDs.push_back(bufferID);
-  
+
   if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
     MainBufferID = bufferID;
-  
+
   if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
     PrimaryBufferID = bufferID;
-  
+
   return false;
 }
-
 
 ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
