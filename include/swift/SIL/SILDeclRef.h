@@ -227,6 +227,10 @@ struct SILDeclRef {
   bool isFunc() const {
     return kind == Kind::Func;
   }
+
+  /// True if the SILDeclRef references a setter function.
+  bool isSetter() const;
+
   /// True if the SILDeclRef references a constructor entry point.
   bool isConstructor() const {
     return kind == Kind::Allocator || kind == Kind::Initializer;
