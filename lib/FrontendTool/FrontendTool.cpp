@@ -780,8 +780,8 @@ static bool performCompile(CompilerInstance &Instance,
     if (opts.Inputs.haveAPrimaryInputFile()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
-        auto Index = opts.Inputs.getRequiredUniquePrimaryInput().Index;
-        PrimaryFile = Instance.getMainModule()->getFiles()[Index];
+        auto Filename = opts.Inputs.getRequiredUniquePrimaryInputFilename();
+        Instance.getMainModule()->getFiles()[Index];
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),

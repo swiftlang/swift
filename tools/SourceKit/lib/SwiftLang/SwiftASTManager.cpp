@@ -400,11 +400,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   sanitizeCompilerArgs(OrigArgs, Args);
 
   Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
-  bool Err = Invocation.parseArgs(Args, Diags);
-  if (Err) {
+  if (Invocation.parseArgs(Args, Diags)) {
     // FIXME: Get the actual diagnostic.
     Error = "error when parsing the compiler arguments";
-    return Err;
+    return true;
   }
 
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
@@ -437,30 +436,22 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
 
-  if (!PrimaryFile.empty()) {
-    Optional<unsigned> PrimaryIndex;
-    for (auto i :
-         indices(Invocation.getFrontendOptions().Inputs.getInputFilenames())) {
-      auto &CurFile =
-          Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
-      if (PrimaryFile == CurFile) {
-        PrimaryIndex = i;
-        break;
-      }
+  if (PrimaryFile.empty())
+    return false;
+  assertMustNotBeMoreThanOnePrimaryInput();
+  for (auto &input = Invocation.getFrontendOptions().Inputs.getInputs()) {
+    if (input.getFile()  &&  *input.getFile() == PrimaryFile) {
+      input.bePrimary();
+      return false;
     }
-    if (!PrimaryIndex) {
-      llvm::SmallString<64> Err;
-      llvm::raw_svector_ostream OS(Err);
-      OS << "'" << PrimaryFile << "' is not part of the input files";
-      Error = OS.str();
-      return true;
-    }
-    Invocation.getFrontendOptions().Inputs.setPrimaryInput(
-        SelectedInput(*PrimaryIndex));
   }
-
-  return Err;
+  llvm::SmallString<64> Err;
+  llvm::raw_svector_ostream OS(Err);
+  OS << "'" << PrimaryFile << "' is not part of the input files";
+  Error = OS.str();
+  return true;
 }
+
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
                                              ArrayRef<const char *> OrigArgs,
@@ -674,19 +665,20 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   SmallVector<BufferStamp, 8> InputStamps;
   InputStamps.reserve(
       Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
-  for (auto &File :
-       Invok.Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
-    bool FoundSnapshot = false;
-    for (auto &Snap : Snapshots) {
-      if (Snap->getFilename() == File) {
-        FoundSnapshot = true;
-        InputStamps.push_back(Snap->getStamp());
-        break;
-      }
-    }
-    if (!FoundSnapshot)
-      InputStamps.push_back(MgrImpl.getBufferStamp(File));
-  }
+  Opts.Invok.getFrontendOptions().Inputs.forEachFilename(
+                                                         [](StringRef File) {
+                                                           bool FoundSnapshot = false;
+                                                           for (auto &Snap : Snapshots) {
+                                                             if (Snap->getFilename() == File) {
+                                                               FoundSnapshot = true;
+                                                               InputStamps.push_back(Snap->getStamp());
+                                                               break;
+                                                             }
+                                                           }
+                                                           if (!FoundSnapshot)
+                                                             InputStamps.push_back(MgrImpl.getBufferStamp(File));
+                                                         });
+
   assert(InputStamps.size() ==
          Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
   if (Stamps != InputStamps)
@@ -762,27 +754,27 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
 
   SmallVector<FileContent, 8> Contents;
-  for (auto &File :
-       Opts.Invok.getFrontendOptions().Inputs.getInputFilenames()) {
-    bool FoundSnapshot = false;
-    for (auto &Snap : Snapshots) {
-      if (Snap->getFilename() == File) {
-        FoundSnapshot = true;
-        Contents.push_back(getFileContentFromSnap(Snap, File));
-        break;
-      }
-    }
-    if (FoundSnapshot)
-      continue;
-
-    auto Content = MgrImpl.getFileContent(File, Error);
-    if (!Content.Buffer) {
-      LOG_WARN_FUNC("failed getting file contents for " << File << ": " << Error);
-      // File may not exist, continue and recover as if it was empty.
-      Content.Buffer = llvm::MemoryBuffer::getNewMemBuffer(0, File);
-    }
-    Contents.push_back(std::move(Content));
-  }
+  Opts.Invok.getFrontendOptions().Inputs.forEachFilename(
+                                                         [](StringRef File) {
+                                                           bool FoundSnapshot = false;
+                                                           for (auto &Snap : Snapshots) {
+                                                             if (Snap->getFilename() == File) {
+                                                               FoundSnapshot = true;
+                                                               Contents.push_back(getFileContentFromSnap(Snap, File));
+                                                               break;
+                                                             }
+                                                           }
+                                                           if (FoundSnapshot)
+                                                             return;
+                                                           
+                                                           auto Content = MgrImpl.getFileContent(File, Error);
+                                                           if (!Content.Buffer) {
+                                                             LOG_WARN_FUNC("failed getting file contents for " << File << ": " << Error);
+                                                             // File may not exist, continue and recover as if it was empty.
+                                                             Content.Buffer = llvm::MemoryBuffer::getNewMemBuffer(0, File);
+                                                           }
+                                                           Contents.push_back(std::move(Content));
+                                                         });
   assert(Contents.size() ==
          Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
 

@@ -760,9 +760,7 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
 std::string FrontendArgsToOptionsConverter::computeBaseNameOfOutput() const {
   std::string nameToStem;
   if (Opts.Inputs.haveAPrimaryInputFile()) {
-    assert(Opts.Inputs.haveUniquePrimaryInput() &&
-           "Cannot handle multiple primaries yet");
-    nameToStem = Opts.Inputs.primaryInputFilenameIfAny();
+    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInputFilename();
   } else if (auto UserSpecifiedModuleName =
                  Args.getLastArg(options::OPT_module_name)) {
     nameToStem = std::string(UserSpecifiedModuleName->getValue());

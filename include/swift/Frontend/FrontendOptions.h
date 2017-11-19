@@ -65,15 +65,12 @@ enum class InputFileKind {
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
-
+public:
   // Inputs may be files, buffers, or buffers substituting for files.
   class InputFileOrBuffer {
     bool IsPrimary;
     llvm::MemoryBuffer *Buffer;
     Optional<std::string> Filename;
-    
-//    InputFileOrBuffer(bool isPrimary, llvm::MemoryBuffer *buffer, Optional<std::string> filename) : IsPrimary(isPrimary), Buffer(buffer), Filename(filename) {}
-    
     
   public:
     InputFileOrBuffer(StringRef filename, bool isPrimary = false)
@@ -84,12 +81,18 @@ class FrontendInputs {
       assert(Filename);
       Filename = fn(*Filename);
     }
+    bool getIsPrimary() const { return IsPrimary; }
+    llvm::MemoryBuffer *getBuffer() const { return Buffer; }
+    Optional<StringRef> getFile() const { return Filename ? Optional<StringRef>(*Filename) : Optional<StringRef>(); }
+    
+    void bePrimary() { IsPrimary = true; }
   };
+private:
   std::vector<InputFileOrBuffer> Inputs;
   
   
   /// The names of input files to the frontend.
-  std::vector<std::string> InputFilenames;
+  std::vector<std::string> InputFilenamesxxx;
 
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
@@ -102,16 +105,27 @@ class FrontendInputs {
 
 public:
   // Readers:
+  
+  ArrayRef<InputFileOrBuffer> getInputs() const {
+    return Inputs;
+  }
 
   // Input filename readers
-  ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
-  bool haveInputFilenames() const { return !getInputFilenames().empty(); }
-  unsigned inputFilenameCount() const { return getInputFilenames().size(); }
+  ArrayRef<std::string> getInputFilenamesxxx() const { return InputFilenamesxxx; }
+  void forEachInputFilename(const llvm::function_ref<void(StringRef)> &fn) {
+    for (auto input: getInputs()) {
+      if (auto file = input.getFile())
+        fn(*file);
+    }
+  }
+
+  bool haveInputFilenames() const { return !getInputFilenamesxxx().empty(); }
+  unsigned inputFilenameCount() const { return getInputFilenamesxxx().size(); }
 
   bool haveUniqueInputFilename() const { return inputFilenameCount() == 1; }
   const std::string &getFilenameOfFirstInput() const {
     assert(haveInputFilenames());
-    return getInputFilenames()[0];
+    return getInputFilenamesxxx()[0];
   }
 
   bool isReadingFromStdin() const {
@@ -152,20 +166,24 @@ public:
 
   // Count-dependend readers:
 
-  Optional<SelectedInput> getOptionalPrimaryInput() const {
-    return havePrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
-                               : Optional<SelectedInput>();
+  Optional<const InputFileOrBuffer&> getOptionalUniquePrimaryInput() const {
+    assertMustNotBeMoreThanOnePrimaryInput();
+    for (const auto &input: getInputs())
+      if (input.getIsPrimary())
+        return input;
+    return Optional<const InputFileOrBuffer&>();
+  }
+  
+  const InputFileOrBuffer &getRequiredUniquePrimaryInput() const {
+    if (auto input = getOptionalUniquePrimaryInput())
+      return *input;
+    assert(false);
   }
 
-  SelectedInput getRequiredUniquePrimaryInput() const {
-    assert(haveUniquePrimaryInput());
-    return getPrimaryInputs()[0];
-  }
-
-  Optional<SelectedInput> getOptionalUniquePrimaryInput() const {
-    return haveUniquePrimaryInput()
-               ? Optional<SelectedInput>(getPrimaryInputs()[0])
-               : Optional<SelectedInput>();
+  StringRef getRequiredUniquePrimaryInputFilename() const {
+    const InputFileOrBuffer &input = getRequiredUniquePrimaryInput();
+    assert(input.getFile());
+    return *input.getFile();
   }
 
   bool haveAPrimaryInputFile() const {
@@ -173,10 +191,8 @@ public:
   }
 
   Optional<StringRef> getOptionalUniquePrimaryInputFilename() const {
-    Optional<SelectedInput> primaryInput = getOptionalUniquePrimaryInput();
-    return (primaryInput && primaryInput->isFilename())
-               ? Optional<StringRef>(getInputFilenames()[primaryInput->Index])
-               : Optional<StringRef>();
+    auto &input = getOptionalUniquePrimaryInput();
+    return input ? input->getFile() : Optional<StringRef>();
   }
 
   bool isPrimaryInputAFileAt(unsigned i) const {
@@ -192,13 +208,7 @@ public:
                : None;
   }
 
-  StringRef primaryInputFilenameIfAny() const {
-    if (auto Index = primaryInputFileIndex()) {
-      return getInputFilenames()[*Index];
-    }
-    return StringRef();
-  }
-
+  
 public:
   // Multi-facet readers
   bool shouldTreatAsSIL() const;
@@ -210,7 +220,7 @@ public:
   // Input filename writers
 
   void addInputFilename(StringRef filename) {
-    InputFilenames.push_back(filename);
+    InputFilenamesxxx.push_back(filename);
     Inputs.push_back(filename);
   }
   void transformInputFilenames(
@@ -248,8 +258,8 @@ public:
   }
   void addPrimaryInputFilename(StringRef filename) {
     Inputs.push_back(InputFileOrBuffer(filename, true));
-    for (unsigned i: indices(InputFilenames)) {
-      if (InputFilenames[i] == filename) {
+    for (unsigned i: indices(InputFilenamesxxx)) {
+      if (InputFilenamesxxx[i] == filename) {
         old_addPrimaryInputFilename(i);
         return;
       }
@@ -268,7 +278,7 @@ public:
   // Multi-faceted writers
 
   void clearInputs() {
-    InputFilenames.clear();
+    InputFilenamesxxx.clear();
     InputBuffers.clear();
     Inputs.clear();
   }

@@ -445,8 +445,9 @@ private:
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() { return Invocation.isInputSwift(); }
   bool isInSILMode() { return Invocation.isInputSIL(); }
-  void setupForBufferAt(unsigned i);
-  bool setupForFileAt(unsigned i);
+  bool setupForInput(const FrontendInputs::InputFileOrBuffer &input);
+  void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
+  bool setupForFile(StringRef file, bool isPrimary);
 
 public:
   /// Parses and type-checks all input files.

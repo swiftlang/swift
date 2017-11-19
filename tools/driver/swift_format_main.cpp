@@ -102,7 +102,7 @@ public:
   const std::string &getOutputFilename() { return OutputFilename; }
 
   const std::vector<std::string> &getInputFilenames() { return InputFilenames; }
-
+ 
   const std::vector<std::string> &getLineRanges() { return LineRanges; }
 
   int parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags) {

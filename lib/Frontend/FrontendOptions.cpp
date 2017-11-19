@@ -62,17 +62,16 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
       return true;
     }
   } else if (TreatAsSIL && havePrimaryInputs()) {
+    assertMustNotBeMoreThanOnePrimaryInput();
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
-    for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
-      if (i == getOptionalUniquePrimaryInput()->Index)
-        continue;
-
-      StringRef File(getInputFilenames()[i]);
-      if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
-        Diags.diagnose(SourceLoc(),
-                       diag::error_mode_requires_one_sil_multi_sib);
-        return true;
+    for (const InputFileOrBuffer &input: getInputs()) {
+      if (Optional<StringRef> File = input.getFile()) {
+        if (!input.getIsPrimary() &&  !llvm::sys::path::extension(*File).endswith(SIB_EXTENSION)) {
+          Diags.diagnose(SourceLoc(),
+                         diag::error_mode_requires_one_sil_multi_sib);
+          return true;
+        }
       }
     }
   } else if (TreatAsSIL) {
@@ -94,7 +93,7 @@ void FrontendInputs::transformInputFilenames(
   for (auto input: Inputs) {
     input.transformFilename(fn);
   }
-  for (auto &InputFile : InputFilenames) {
+  for (auto &InputFile : InputFilenamesxxx) {
     InputFile = fn(InputFile);
   }
 }
@@ -191,11 +190,11 @@ StringRef FrontendOptions::originalPath() const {
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
 
-  StringRef fn = Inputs.primaryInputFilenameIfAny();
+  auto fn = Inputs.getOptionalUniquePrimaryInputFilename();
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
   // module name.
-  return !fn.empty() ? llvm::sys::path::filename(fn) : StringRef(ModuleName);
+  return fn ? llvm::sys::path::filename(*fn) : StringRef(ModuleName);
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {
