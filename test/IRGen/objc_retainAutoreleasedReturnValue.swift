@@ -3,6 +3,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
+// REQUIRES: OS=macosx
 import Foundation
 
 @inline(never)
