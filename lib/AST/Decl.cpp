@@ -3973,7 +3973,12 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 }
 
 Type VarDecl::getType() const {
-  assert(!typeInContext.isNull() && "no contextual type set yet");
+  if (!typeInContext) {
+    const_cast<VarDecl *>(this)->typeInContext =
+      getDeclContext()->mapTypeIntoContext(
+        getInterfaceType())->getInOutObjectType();
+  }
+
   // FIXME(Remove InOutType): This grossness will go away when Sema is weaned
   // off of InOutType.  Until then we should respect our parameter flags and
   // return the type it expects.
@@ -4366,22 +4371,20 @@ ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
 ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = DC->getSelfTypeInContext();
   auto selfInterfaceType = DC->getSelfInterfaceType();
   auto specifier = VarDecl::Specifier::Owned;
-  assert(selfType && selfInterfaceType);
+  assert(selfInterfaceType);
 
   if (isStaticMethod) {
-    selfType = MetatypeType::get(selfType);
     selfInterfaceType = MetatypeType::get(selfInterfaceType);
   }
-    
+
   if (isInOut) {
     specifier = VarDecl::Specifier::InOut;
   }
 
   auto *selfDecl = new (C) ParamDecl(specifier, SourceLoc(),SourceLoc(),
-                                     Identifier(), loc, C.Id_self, selfType,DC);
+                                     Identifier(), loc, C.Id_self, Type(), DC);
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);
   selfDecl->setValidationStarted();

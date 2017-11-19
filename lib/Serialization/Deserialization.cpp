@@ -2788,12 +2788,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       return nullptr;
     }
 
-    auto *bodyParams0 = readParameterList();
-    bodyParams0->get(0)->setImplicit();  // self is implicit.
-    
-    auto *bodyParams1 = readParameterList();
-    assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
-    ctor->setParameterLists(bodyParams0->get(0), bodyParams1);
+    bool mutating = parent->getDeclaredInterfaceType()->hasReferenceSemantics();
+    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parent,
+                                           /*static*/ false,
+                                           /*mutating*/ mutating);
+    selfDecl->setImplicit();
+
+    auto *bodyParams = readParameterList();
+    assert(bodyParams && "missing parameters for constructor");
+    ctor->setParameterLists(selfDecl, bodyParams);
 
     auto interfaceType = getType(interfaceID);
     ctor->setInterfaceType(interfaceType);
@@ -2988,7 +2991,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind, rawMutModifier;
     bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
-    unsigned numParamPatterns, numNameComponentsBiased;
+    unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
     DeclID associatedDeclID;
@@ -3002,7 +3005,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
                                         isStatic, rawStaticSpelling, isObjC,
                                         rawMutModifier, hasDynamicSelf,
                                         hasForcedStaticDispatch, throws,
-                                        numParamPatterns, genericEnvID,
+                                        genericEnvID,
                                         interfaceTypeID,
                                         associatedDeclID, overriddenID,
                                         accessorStorageDeclID,
@@ -3074,6 +3077,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    auto numParamPatterns = DC->isTypeContext() ? 2 : 1;
     auto fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
@@ -3125,13 +3129,16 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     fn->setInterfaceType(interfaceType);
 
     SmallVector<ParameterList*, 2> paramLists;
-    for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
-      paramLists.push_back(readParameterList());
+    if (DC->isTypeContext()) {
+      auto *selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
+                                             fn->isStatic(),
+                                             fn->isMutating());
+      selfDecl->setImplicit();
+      paramLists.push_back(ParameterList::create(ctx, selfDecl));
+    }
 
-    // If the first parameter list is (self), mark it implicit.
-    if (numParamPatterns && DC->isTypeContext())
-      paramLists[0]->get(0)->setImplicit();
-    
+    paramLists.push_back(readParameterList());
+
     fn->setDeserializedSignature(paramLists, TypeLoc());
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
@@ -3780,11 +3787,11 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    auto *selfParams = readParameterList();
-    selfParams->get(0)->setImplicit();  // self is implicit.
-
-    assert(selfParams && "Didn't get self pattern?");
-    dtor->setSelfDecl(selfParams->get(0));
+    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
+                                           /*static*/ false,
+                                           /*mutating*/ false);
+    selfDecl->setImplicit();
+    dtor->setSelfDecl(selfDecl);
 
     auto interfaceType = getType(interfaceID);
     dtor->setInterfaceType(interfaceType);
