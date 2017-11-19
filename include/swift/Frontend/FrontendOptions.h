@@ -76,6 +76,17 @@ public:
     InputFileOrBuffer(StringRef filename, bool isPrimary = false)
     : IsPrimary(isPrimary), Buffer(nullptr), Filename(filename)
     {}
+    InputFileOrBuffer(bool isPrimary, llvm::MemoryBuffer *buffer, Optional<std::string> filename ) :
+    IsPrimary(isPrimary), Buffer(buffer), Filename(filename) {}
+    
+    InputFileOrBuffer(const InputFileOrBuffer &other) :
+      IsPrimary(other.IsPrimary), Buffer(other.Buffer), Filename(other.Filename) {}
+
+    
+    InputFileOrBuffer(InputFileOrBuffer &&) = default;
+
+
+    InputFileOrBuffer &operator=(const InputFileOrBuffer&) = default;
     
     void transformFilename(const llvm::function_ref<std::string(std::string)> &fn) {
       assert(Filename);
@@ -113,7 +124,7 @@ public:
   // Input filename readers
   ArrayRef<std::string> getInputFilenamesxxx() const { return InputFilenamesxxx; }
   void forEachInputFilename(const llvm::function_ref<void(StringRef)> &fn) {
-    for (auto input: getInputs()) {
+    for (auto &input: getInputs()) {
       if (auto file = input.getFile())
         fn(*file);
     }
@@ -166,16 +177,16 @@ public:
 
   // Count-dependend readers:
 
-  Optional<const InputFileOrBuffer&> getOptionalUniquePrimaryInput() const {
+  const InputFileOrBuffer* getOptionalUniquePrimaryInput() const {
     assertMustNotBeMoreThanOnePrimaryInput();
     for (const auto &input: getInputs())
       if (input.getIsPrimary())
-        return input;
-    return Optional<const InputFileOrBuffer&>();
+        return &input;
+    return nullptr;
   }
   
   const InputFileOrBuffer &getRequiredUniquePrimaryInput() const {
-    if (auto input = getOptionalUniquePrimaryInput())
+    if (const auto *input = getOptionalUniquePrimaryInput())
       return *input;
     assert(false);
   }
@@ -187,27 +198,14 @@ public:
   }
 
   bool haveAPrimaryInputFile() const {
-    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename();
+    const auto *input = getOptionalUniquePrimaryInput();
+    return input != nullptr &&  input->getFile();
   }
 
   Optional<StringRef> getOptionalUniquePrimaryInputFilename() const {
-    auto &input = getOptionalUniquePrimaryInput();
-    return input ? input->getFile() : Optional<StringRef>();
+    const auto *input = getOptionalUniquePrimaryInput();
+    return input != nullptr ? input->getFile() : Optional<StringRef>();
   }
-
-  bool isPrimaryInputAFileAt(unsigned i) const {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    if (Optional<SelectedInput> primaryInput = getOptionalPrimaryInput())
-      return primaryInput->isFilename() && primaryInput->Index == i;
-    return false;
-  }
-
-  Optional<unsigned> primaryInputFileIndex() const {
-    return haveAPrimaryInputFile()
-               ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
-               : None;
-  }
-
   
 public:
   // Multi-facet readers
