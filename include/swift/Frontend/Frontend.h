@@ -435,7 +435,13 @@ public:
 
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
-
+private:
+  void setupLLVMArguments();
+  void setupDiagnosticOptions();
+  bool setupModuleLoaders();
+  Optional<unsigned> setupCodeCompletionBuffer();
+  bool setupInputs(Optional<unsigned> codeCompletionBufferID);
+public:
   /// Parses and type-checks all input files.
   void performSema();
 
