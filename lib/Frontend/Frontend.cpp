@@ -118,36 +118,39 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
                                                   enableResilience,
                                                   DepTracker));
   }
-  
-  auto SML = SerializedModuleLoader::create(*Context, DepTracker);
-  this->SML = SML.get();
-  Context->addModuleLoader(std::move(SML));
-
-  // Wire up the Clang importer. If the user has specified an SDK, use it.
-  // Otherwise, we just keep it around as our interface to Clang's ABI
-  // knowledge.
-  auto clangImporter =
+  {
+    auto SML = SerializedModuleLoader::create(*Context, DepTracker);
+    this->SML = SML.get();
+    Context->addModuleLoader(std::move(SML));
+  }
+  {
+    // Wire up the Clang importer. If the user has specified an SDK, use it.
+    // Otherwise, we just keep it around as our interface to Clang's ABI
+    // knowledge.
+    auto clangImporter =
     ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
                           Invocation.getPCHHash(),
                           DepTracker);
-  if (!clangImporter) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
-    return true;
+    if (!clangImporter) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+      return true;
+    }
+    
+    Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
   }
-
-  Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
-
+  
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
-
-  Optional<unsigned> CodeCompletionBufferID;
-  auto CodeCompletePoint = Invocation.getCodeCompletionPoint();
-  if (CodeCompletePoint.first) {
-    auto MemBuf = CodeCompletePoint.first;
-    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    CodeCompletionBufferID = SourceMgr.addMemBufferCopy(MemBuf);
-    InputSourceCodeBufferIDs.push_back(*CodeCompletionBufferID);
-    SourceMgr.setCodeCompletionPoint(*CodeCompletionBufferID,
-                                     CodeCompletePoint.second);
+  {
+    Optional<unsigned> CodeCompletionBufferID;
+    auto CodeCompletePoint = Invocation.getCodeCompletionPoint();
+    if (CodeCompletePoint.first) {
+      auto MemBuf = CodeCompletePoint.first;
+      // CompilerInvocation doesn't own the buffers, copy to a new buffer.
+      CodeCompletionBufferID = SourceMgr.addMemBufferCopy(MemBuf);
+      InputSourceCodeBufferIDs.push_back(*CodeCompletionBufferID);
+      SourceMgr.setCodeCompletionPoint(*CodeCompletionBufferID,
+                                       CodeCompletePoint.second);
+    }
   }
 
   bool MainMode = (Invocation.getInputKind() == InputFileKind::IFK_Swift);
