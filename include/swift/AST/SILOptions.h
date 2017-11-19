@@ -117,6 +117,9 @@ public:
   /// conventions.
   bool EnableGuaranteedClosureContexts = true;
 
+  /// Emit normal function arguments using the +0 guaranteed convention.
+  bool EnableGuaranteedNormalArguments = false;
+
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;
 

@@ -1052,8 +1052,7 @@ class DefaultConventions : public Conventions {
   NormalParameterConvention normalParameterConvention;
 
 public:
-  DefaultConventions(NormalParameterConvention normalParameterConvention =
-                         NormalParameterConvention::Owned)
+  DefaultConventions(NormalParameterConvention normalParameterConvention)
       : Conventions(ConventionsKind::Default),
         normalParameterConvention(normalParameterConvention) {}
 
@@ -1190,6 +1189,14 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
                                        AnyFunctionType::ExtInfo extInfo,
                                        Optional<SILDeclRef> constant);
 
+/// If EnableGuaranteedNormalArguments is set, return a default convention that
+/// uses guaranteed.
+static DefaultConventions getNormalArgumentConvention(SILModule &M) {
+  if (M.getOptions().EnableGuaranteedNormalArguments)
+    return DefaultConventions(NormalParameterConvention::Guaranteed);
+  return DefaultConventions(NormalParameterConvention::Owned);
+}
+
 static CanSILFunctionType getNativeSILFunctionType(
     SILModule &M, AbstractionPattern origType,
     CanAnyFunctionType substInterfaceType, AnyFunctionType::ExtInfo extInfo,
@@ -1233,8 +1240,8 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::IVarDestroyer:
     case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
-                                DefaultConventions(), ForeignInfo(), constant,
-                                witnessMethodConformance);
+                                getNormalArgumentConvention(M), ForeignInfo(),
+                                constant, witnessMethodConformance);
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 DeallocatorConventions(), ForeignInfo(),
