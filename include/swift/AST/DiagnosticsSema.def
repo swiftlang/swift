@@ -3105,20 +3105,31 @@ ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
 
 WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated", ())
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use an explicit type followed by '!'", ())
 
 WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
         "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
 
-ERROR(implicitly_unwrapped_optional_spelling_error,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' in unsupported; use an explicit type followed by '!'", ())
+WARNING(implicitly_unwrapped_optional_spelling_decay_to_optional,none,
+        "'ImplicitlyUnwrappedOptional' is not allowed here; interpreting this as 'Optional' instead", ())
 
-ERROR(implicitly_unwrapped_optional_spelling_error_with_fixit,none,
+WARNING(implicitly_unwrapped_optional_in_illegal_position_decay_to_optional,none,
+        "'!' is not allowed here; interpreting this as '?' instead", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use an explicit type followed by '!'", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error_with_bang_fixit,none,
         "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use '!' after the type name", ())
 
-ERROR(iuo_in_illegal_position,none,
-      "implicitly unwrapped optionals are only allowed at top level and as "
-      "function results", ())
+ERROR(implicitly_unwrapped_optional_spelling_error_with_optional_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use 'Optional' instead", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_in_illegal_position,none,
+        "'ImplicitlyUnwrappedOptional' is not allowed here; perhaps 'Optional' was intended?", ())
+
+ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
+        "'!' is not allowed here; perhaps '?' was intended?", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,
