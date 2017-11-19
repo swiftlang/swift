@@ -271,6 +271,10 @@ public:
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
 
+  /// If this managed value is a plus one value, return *this. If this is a plus
+  /// zero value, return a copy instead.
+  ManagedValue ensurePlusOne(SILGenFunction &SGF, SILLocation loc) const;
+
   /// Given a scalar value, materialize it into memory with the
   /// exact same level of cleanup it had before.
   ManagedValue materialize(SILGenFunction &SGF, SILLocation loc) const;
