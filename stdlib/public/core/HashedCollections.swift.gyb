@@ -2154,8 +2154,8 @@ extension Dictionary {
       return _variantBuffer.maybeGet(key) ?? defaultValue()
     }
     mutableAddressWithNativeOwner {
-      let address = _variantBuffer
-        .pointerToValue(forKey: key, insertingDefault: defaultValue).pointer
+      let (_, address) = _variantBuffer
+        .pointerToValue(forKey: key, insertingDefault: defaultValue)
       return (address, Builtin.castToNativeObject(
         _variantBuffer.asNative._storage))
     }
@@ -5336,7 +5336,16 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
     if found {
-      _ = ensureUniqueNativeBuffer(asNative.capacity)
+      // This is a performance optimization that was put in to ensure that we
+      // did not make a copy of self to call asNative.capacity over
+      // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
+      // fail. This code used to be:
+      //
+      // _ = ensureUniqueNativeBuffer(asNative.capacity)
+      //
+      // SR-6437
+      let capacity = asNative.capacity
+      _ = ensureUniqueNativeBuffer(capacity)
       return (inserted: false, pointer: asNative.values + i.offset)
     }
 
