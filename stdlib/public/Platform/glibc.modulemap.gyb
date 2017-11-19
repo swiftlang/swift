@@ -36,6 +36,13 @@ module SwiftGlibc [system] {
   link "execinfo"
 % end
 
+% if CMAKE_SDK in ["FREEBSD"]:
+  module cdefs {
+    header "${GLIBC_INCLUDE_PATH}/sys/cdefs.h"
+    export *
+  }
+% end
+
   // C standard library
   module C {
 % if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
@@ -453,6 +460,9 @@ module SwiftGlibc [system] {
       }
       module types {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/types.h"
+% if CMAKE_SDK in ["FREEBSD"]:
+        header "${GLIBC_INCLUDE_PATH}/sys/_types.h"
+% end
         export *
       }
 % if CMAKE_SDK in ["FREEBSD"]:
