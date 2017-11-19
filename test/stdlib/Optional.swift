@@ -16,12 +16,6 @@ extension Optional where Wrapped : TestProtocol1 {
   }
 }
 
-extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
-  var _wrappedIsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
 OptionalTests.test("nil comparison") {
   var x: Int? = nil
   expectFalse(x != nil)

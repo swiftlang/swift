@@ -603,17 +603,11 @@ func s260_______AOnly_enum(_ s: AddressOnlyStruct) {
 // CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct>
 // CHECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out Optional<AnyStruct>
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct, $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
-// CHECK:   [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[COPY_ARG2:%.*]] = copy_value [[BORROWED_ARG2]]
-// CHECK:   [[PAPPLY2:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG2]]) : $@convention(thin) (@in Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct>
-// CHECK:   destroy_value [[PAPPLY2]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out Optional<AnyStruct>
-// CHECK:   end_borrow [[BORROWED_ARG2]] from [[ARG]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct, $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
 // CHECK:   destroy_value [[ARG]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s270_convOptAnyStructyAA0gH0VADSgcF'
 func s270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
   let _: (AnyStruct?) -> AnyStruct? = a1
-  let _: (AnyStruct!) -> AnyStruct? = a1
 }
 
 // Tests conversion between existential types

@@ -129,7 +129,7 @@ func convOptionalTrivial(_ t1: @escaping (Trivial?) -> Trivial) {
 
 // CHECK:         function_ref @_T019function_conversion7TrivialVSgACIegyd_A2DIegyd_TR
 // CHECK:         partial_apply
-  let _: (Trivial!) -> Trivial? = t1
+  let _: (Trivial?) -> Trivial? = t1
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion7TrivialVSgACIegyd_AcDIegyd_TR : $@convention(thin) (Trivial, @guaranteed @callee_guaranteed (Optional<Trivial>) -> Trivial) -> Optional<Trivial>
@@ -159,7 +159,7 @@ func convOptionalLoadable(_ l1: @escaping (Loadable?) -> Loadable) {
 
 // CHECK:         function_ref @_T019function_conversion8LoadableVSgACIegxo_A2DIegxo_TR
 // CHECK:         partial_apply
-  let _: (Loadable!) -> Loadable? = l1
+  let _: (Loadable?) -> Loadable? = l1
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion8LoadableVSgACIegxo_A2DIegxo_TR : $@convention(thin) (@owned Optional<Loadable>, @guaranteed @callee_guaranteed (@owned Optional<Loadable>) -> @owned Loadable) -> @owned Optional<Loadable>
@@ -176,10 +176,6 @@ func convOptionalAddrOnly(_ a1: @escaping (AddrOnly?) -> AddrOnly) {
 // CHECK:         function_ref @_T019function_conversion8AddrOnlyVSgACIegir_A2DIegir_TR
 // CHECK:         partial_apply
   let _: (AddrOnly?) -> AddrOnly? = a1
-
-// CHECK:         function_ref @_T019function_conversion8AddrOnlyVSgACIegir_A2DIegir_TR
-// CHECK:         partial_apply
-  let _: (AddrOnly!) -> AddrOnly? = a1
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T019function_conversion8AddrOnlyVSgACIegir_A2DIegir_TR : $@convention(thin) (@in Optional<AddrOnly>, @guaranteed @callee_guaranteed (@in Optional<AddrOnly>) -> @out AddrOnly) -> @out Optional<AddrOnly>
