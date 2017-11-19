@@ -120,7 +120,16 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferenced_native_noSpareBits()
     }
-    return _storage.isUniquelyReferencedNative() && _isNative
+
+    // This is a performance optimization. This code used to be:
+    //
+    //   return _storage.isUniquelyReferencedNative() && _isNative.
+    //
+    // SR-6437
+    if !_storage.isUniquelyReferencedNative() {
+      return false
+    }
+    return _isNative
   }
 
   /// Returns `true` iff this buffer's storage is either
@@ -131,7 +140,16 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
     }
-    return _storage.isUniquelyReferencedOrPinnedNative() && _isNative
+
+    // This is a performance optimization. This code used to be:
+    //
+    //   return _storage.isUniquelyReferencedOrPinnedNative() && _isNative.
+    //
+    // SR-6437
+    if !_storage.isUniquelyReferencedOrPinnedNative() {
+      return false
+    }
+    return _isNative
   }
 
   /// Convert to an NSArray.
