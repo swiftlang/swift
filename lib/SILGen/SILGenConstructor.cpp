@@ -518,85 +518,279 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
                  initedSelfValue);
 }
 
-void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
-  MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
+namespace {
 
-  assert(ctor->getBody() && "Class constructor without a body?");
+class ClassConstructorInitializerEmitter {
+  SILGenFunction &SGF;
+  ConstructorDecl *ctor;
+  VarDecl *selfDecl;
+  ClassDecl *selfClassDecl;
 
-  // True if this constructor delegates to a peer constructor with self.init().
-  bool isDelegating = false;
-  if (!ctor->hasStubImplementation()) {
-    isDelegating = ctor->getDelegatingOrChainedInitKind(nullptr) ==
-      ConstructorDecl::BodyInitKind::Delegating;
+  /// Helper builder to reduce the amount of times SGF needs to be referred to.
+  SILGenBuilder &B;
+
+public:
+  /// Construct our emitter, setting up the 'self' argument at the same time.
+  ///
+  /// If this class has a superclass, we set up self as a box.  This allows
+  /// "self reassignment" to happen in super init method chains, which is
+  /// important for interoperating with Objective-C classes.  We also use a box
+  /// for delegating constructors, since the delegated-to initializer may also
+  /// replace self.
+  ///
+  /// TODO: If we could require Objective-C classes to have an attribute to get
+  /// this behavior, we could avoid runtime overhead here.
+  ClassConstructorInitializerEmitter(SILGenFunction &SGF, ConstructorDecl *ctor)
+      : SGF(SGF), ctor(ctor), selfDecl(ctor->getImplicitSelfDecl()),
+        selfClassDecl(
+            ctor->getDeclContext()->getAsClassOrClassExtensionContext()),
+        B(SGF.B) {
+    assert(ctor->getBody() && "Class constructor without a body?");
   }
 
-  // Set up the 'self' argument.  If this class has a superclass, we set up
-  // self as a box.  This allows "self reassignment" to happen in super init
-  // method chains, which is important for interoperating with Objective-C
-  // classes.  We also use a box for delegating constructors, since the
-  // delegated-to initializer may also replace self.
-  //
-  // TODO: If we could require Objective-C classes to have an attribute to get
-  // this behavior, we could avoid runtime overhead here.
-  VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto *dc = ctor->getDeclContext();
-  auto selfClassDecl = dc->getAsClassOrClassExtensionContext();
-  bool NeedsBoxForSelf = isDelegating ||
-    (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
-  bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
+  // This is a move only type.
+  ClassConstructorInitializerEmitter(
+      const ClassConstructorInitializerEmitter &) = delete;
+  ClassConstructorInitializerEmitter &
+  operator=(const ClassConstructorInitializerEmitter &) = delete;
+  ClassConstructorInitializerEmitter(ClassConstructorInitializerEmitter &&) =
+      delete;
+  ClassConstructorInitializerEmitter &
+  operator=(ClassConstructorInitializerEmitter &&) = delete;
 
+  void initializeMembers();
+
+  ManagedValue emitPrologForSelfArgument(MarkUninitializedInst::Kind MUKind,
+                                         ManagedValue selfArg, SILType selfTy);
+
+  std::pair<SILArgument *, SILBasicBlock *>
+  setupFailureBlocksForFailingConstructor(SILArgument *failureExitArg,
+                                          SILBasicBlock *failureExitBlock,
+                                          SILType loweredType);
+
+  /// Build up our vusotm epilog block for this initializer. \p selfArg is
+  /// forwarded through this routine, with it being returned after any
+  /// transformations in our epilog emission are performed.
+  ManagedValue
+  buildCustomEpilogBlock(CleanupStateRestorationScope &SelfCleanupSave,
+                         Type resultType, ManagedValue selfArg);
+
+  void emit() &&;
+
+private:
+  /// Returns true if this constructor delegates to a peer constructor with
+  /// self.init().
+  bool isDelegating() const {
+    if (ctor->hasStubImplementation())
+      return false;
+    return ctor->getDelegatingOrChainedInitKind(nullptr) ==
+           ConstructorDecl::BodyInitKind::Delegating;
+  }
+
+  /// Returns true if self was allocated by the Objective-C memory allocator.
+  bool isSelfObjCAllocated() const {
+    return Lowering::usesObjCAllocator(selfClassDecl);
+  }
+
+  /// Returns true if we need a box to store self.
+  ///
+  /// We store self into a box when we need to perform "self reassignment" in
+  /// super init method chains. That is important for interoperating with
+  /// Objective-C classes. We also use a box for delegating constructors, since
+  /// the delegated-to initializer may also replace self.
+  bool isBoxingSelf() const {
+    if (isDelegating())
+      return true;
+    return selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation();
+  }
+
+  ASTContext &getASTContext() const { return SGF.getASTContext(); }
+
+  MarkUninitializedInst::Kind getMarkUninitializedKind() const {
+    if (isDelegating()) {
+      return MarkUninitializedInst::DelegatingSelf;
+    }
+
+    if (selfClassDecl->requiresStoredPropertyInits() && isSelfObjCAllocated()) {
+      // Stored properties will be initialized in a separate
+      // .cxx_construct method called by the Objective-C runtime.
+      assert(selfClassDecl->hasSuperclass() &&
+             "Cannot use ObjC allocation without a superclass");
+      return MarkUninitializedInst::DerivedSelfOnly;
+    }
+
+    if (selfClassDecl->hasSuperclass())
+      return MarkUninitializedInst::DerivedSelf;
+
+    return MarkUninitializedInst::RootSelf;
+  }
+};
+
+} // end anonymous namespace
+
+void ClassConstructorInitializerEmitter::initializeMembers() {
+  // A delegating initializer does not initialize instance
+  // variables.
+  if (isDelegating()) {
+    return;
+  }
+
+  // Nor does a stub implementation.
+  if (ctor->hasStubImplementation()) {
+    return;
+  }
+
+  // When the class requires all stored properties to have initial
+  // values and we're using Objective-C's allocation, stored
+  // properties are initialized via the .cxx_construct method, which
+  // will be called by the runtime.
+  //
+  // Note that 'self' has been fully initialized at this point.
+  if (selfClassDecl->requiresStoredPropertyInits() && isSelfObjCAllocated()) {
+    return;
+  }
+
+  // Otherwise, we need to actually emit member inits. Do so.
+  SGF.emitMemberInitializers(ctor, selfDecl, selfClassDecl);
+}
+
+ManagedValue
+ClassConstructorInitializerEmitter::emitPrologForSelfArgument(
+    MarkUninitializedInst::Kind MUKind, ManagedValue selfArg, SILType selfTy) {
+  if (!isBoxingSelf()) {
+    SILLocation PrologueLoc(selfDecl);
+    PrologueLoc.markAsPrologue();
+    B.createDebugValue(PrologueLoc, selfArg);
+  }
+
+  if (ctor->hasStubImplementation()) {
+    return selfArg;
+  }
+
+  assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
+  if (isBoxingSelf()) {
+    SILLocation prologueLoc = RegularLocation(ctor);
+    prologueLoc.markAsPrologue();
+    B.createStore(prologueLoc, selfArg, SGF.VarLocs[selfDecl].value,
+                  StoreOwnershipQualifier::Init);
+    return ManagedValue();
+  }
+
+  selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
+  SGF.VarLocs[selfDecl] = SILGenFunction::VarLoc::get(selfArg.getValue());
+  return selfArg;
+}
+
+std::pair<SILArgument *, SILBasicBlock *>
+ClassConstructorInitializerEmitter::setupFailureBlocksForFailingConstructor(
+    SILArgument *failureExitArg, SILBasicBlock *failureExitBlock,
+    SILType loweredType) {
+  SILBasicBlock *failureBlock =
+      SGF.createBasicBlock(FunctionSection::Postmatter);
+
+  RegularLocation loc(ctor);
+  loc.markAutoGenerated();
+
+  // On failure, we'll clean up everything and return nil instead.
+  SILGenSavedInsertionPoint savedIP(SGF, failureBlock,
+                                    FunctionSection::Postmatter);
+
+  failureExitBlock = SGF.createBasicBlock();
+  failureExitArg = failureExitBlock->createPHIArgument(
+      loweredType, ValueOwnershipKind::Owned);
+
+  SGF.Cleanups.emitCleanupsForReturn(ctor);
+  SILValue nilResult = B.createEnum(
+      loc, SILValue(), getASTContext().getOptionalNoneDecl(), loweredType);
+  B.createBranch(loc, failureExitBlock, nilResult);
+
+  B.setInsertionPoint(failureExitBlock);
+  B.createReturn(loc, failureExitArg);
+
+  SGF.FailDest =
+      JumpDest(failureExitBlock, SGF.Cleanups.getCleanupsDepth(), ctor);
+
+  return {failureExitArg, failureExitBlock};
+}
+
+ManagedValue ClassConstructorInitializerEmitter::buildCustomEpilogBlock(
+    CleanupStateRestorationScope &SelfCleanupSave, Type resultType,
+    ManagedValue selfArg) {
+  SILGenSavedInsertionPoint savedIP(SGF, SGF.ReturnDest.getBlock());
+  assert(B.getInsertionBB()->empty() && "Epilog already set up?");
+  auto cleanupLoc = CleanupLocation(ctor);
+
+  // If we're using a box for self, reload the value at the end of the init
+  // method.
+  if (isBoxingSelf()) {
+    // Emit the call to super.init() right before exiting from the initializer.
+    if (Expr *SI = ctor->getSuperInitCall())
+      SGF.emitRValue(SI);
+
+    assert(!selfArg && "Expected selfArg to be empty");
+    auto storedSelf = ManagedValue::forUnmanaged(SGF.VarLocs[selfDecl].value);
+    selfArg = B.createLoadCopy(cleanupLoc, storedSelf);
+  } else {
+    // We have to do a retain because we are returning the pointer +1.
+    //
+    // SEMANTIC ARC TODO: When the verifier is complete, we will need to
+    // change this to selfArg = B.emitCopyValueOperation(...). Currently due
+    // to the way that SILGen performs folding of copy_value, destroy_value,
+    // the returned selfArg may be deleted causing us to have a
+    // dead-pointer. Instead just use the old self value since we have a
+    // class.
+    selfArg = B.createCopyValue(cleanupLoc, selfArg);
+  }
+
+  // Inject the self value into an optional if the constructor is failable.
+  if (ctor->getFailability() != OTK_None) {
+    RegularLocation loc(ctor);
+    loc.markAutoGenerated();
+    selfArg = B.createEnum(loc, selfArg, getASTContext().getOptionalSomeDecl(),
+                           SGF.getLoweredLoadableType(resultType));
+  }
+
+  // Save our cleanup state. We want all other potential cleanups to fire, but
+  // not this one.
+  if (selfArg.hasCleanup())
+    SelfCleanupSave.pushCleanupState(selfArg.getCleanup(),
+                                     CleanupState::Dormant);
+
+  // Translate our cleanup to the new top cleanup.
+  //
+  // This is needed to preserve the invariant in getEpilogBB that when
+  // cleanups are emitted, everything above ReturnDest.getDepth() has been
+  // emitted. This is not true if we use ManagedValue and friends in the
+  // epilogBB, thus the translation. We perform the same check above that
+  // getEpilogBB performs to ensure that we still do not have the same
+  // problem.
+  SGF.ReturnDest = std::move(SGF.ReturnDest).translate(SGF.getTopCleanup());
+
+  return selfArg;
+}
+
+void ClassConstructorInitializerEmitter::emit() && {
   // If needed, mark 'self' as uninitialized so that DI knows to
   // enforce its DI properties on stored properties.
-  MarkUninitializedInst::Kind MUKind;
+  MarkUninitializedInst::Kind MUKind = getMarkUninitializedKind();
 
-  if (isDelegating)
-    MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->requiresStoredPropertyInits() &&
-           usesObjCAllocator) {
-    // Stored properties will be initialized in a separate
-    // .cxx_construct method called by the Objective-C runtime.
-    assert(selfClassDecl->hasSuperclass() &&
-           "Cannot use ObjC allocation without a superclass");
-    MUKind = MarkUninitializedInst::DerivedSelfOnly;
-  } else if (selfClassDecl->hasSuperclass())
-    MUKind = MarkUninitializedInst::DerivedSelf;
-  else
-    MUKind = MarkUninitializedInst::RootSelf;
-
-  if (NeedsBoxForSelf) {
-    // Allocate the local variable for 'self'.
-    emitLocalVariableWithCleanup(selfDecl, MUKind)->finishInitialization(*this);
+  // Then check if we need a box for self. In such a case, allocate a local
+  // variable for 'self'.
+  if (isBoxingSelf()) {
+    SGF.emitLocalVariableWithCleanup(selfDecl, MUKind)
+        ->finishInitialization(SGF);
   }
 
   // Emit the prolog for the non-self arguments.
+  //
   // FIXME: Handle self along with the other body patterns.
-  emitProlog(ctor->getParameterList(1),
-             TupleType::getEmpty(F.getASTContext()), ctor, ctor->hasThrows());
+  SGF.emitProlog(ctor->getParameterList(1),
+                 TupleType::getEmpty(getASTContext()), ctor, ctor->hasThrows());
 
-  SILType selfTy = getLoweredLoadableType(selfDecl->getType());
+  // Emit the prolog for the self argument.
+  SILType selfTy = SGF.getLoweredLoadableType(selfDecl->getType());
   ManagedValue selfArg = B.createFunctionArgument(selfTy, selfDecl);
-
-  if (!NeedsBoxForSelf) {
-    SILLocation PrologueLoc(selfDecl);
-    PrologueLoc.markAsPrologue();
-    B.createDebugValue(PrologueLoc, selfArg.getValue());
-  }
-
-  if (!ctor->hasStubImplementation()) {
-    assert(selfTy.hasReferenceSemantics() &&
-           "can't emit a value type ctor here");
-    if (NeedsBoxForSelf) {
-      SILLocation prologueLoc = RegularLocation(ctor);
-      prologueLoc.markAsPrologue();
-      // SEMANTIC ARC TODO: When the verifier is complete, review this.
-      B.emitStoreValueOperation(prologueLoc, selfArg.forward(*this),
-                                VarLocs[selfDecl].value,
-                                StoreOwnershipQualifier::Init);
-    } else {
-      selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
-      VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
-    }
-  }
+  selfArg = emitPrologForSelfArgument(MUKind, selfArg, selfTy);
 
   // Prepare the end of initializer location.
   SILLocation endOfInitLoc = RegularLocation(ctor);
@@ -604,132 +798,46 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(Type(), ctor->hasThrows(),
-                CleanupLocation::get(endOfInitLoc));
+  SGF.prepareEpilog(Type(), ctor->hasThrows(),
+                    CleanupLocation::get(endOfInitLoc));
 
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
-  SILBasicBlock *failureExitBB = nullptr;
   SILArgument *failureExitArg = nullptr;
-  auto &resultLowering = getTypeLowering(resultType);
+  SILBasicBlock *failureExitBB = nullptr;
+  auto &resultLowering = SGF.getTypeLowering(resultType);
 
   if (ctor->getFailability() != OTK_None) {
-    SILBasicBlock *failureBB = createBasicBlock(FunctionSection::Postmatter);
-
-    RegularLocation loc(ctor);
-    loc.markAutoGenerated();
-
-    // On failure, we'll clean up everything and return nil instead.
-    SILGenSavedInsertionPoint savedIP(*this, failureBB,
-                                      FunctionSection::Postmatter);
-
-    failureExitBB = createBasicBlock();
-    failureExitArg = failureExitBB->createPHIArgument(
-        resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
-
-    Cleanups.emitCleanupsForReturn(ctor);
-    SILValue nilResult =
-        B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(),
-                     resultLowering.getLoweredType());
-    B.createBranch(loc, failureExitBB, nilResult);
-
-    B.setInsertionPoint(failureExitBB);
-    B.createReturn(loc, failureExitArg);
-
-    FailDest = JumpDest(failureBB, Cleanups.getCleanupsDepth(), ctor);
+    std::tie(failureExitArg, failureExitBB) =
+        setupFailureBlocksForFailingConstructor(
+            failureExitArg, failureExitBB, resultLowering.getLoweredType());
   }
 
-  // Handle member initializers.
-  if (isDelegating) {
-    // A delegating initializer does not initialize instance
-    // variables.
-  } else if (ctor->hasStubImplementation()) {
-    // Nor does a stub implementation.
-  } else if (selfClassDecl->requiresStoredPropertyInits() &&
-             usesObjCAllocator) {
-    // When the class requires all stored properties to have initial
-    // values and we're using Objective-C's allocation, stored
-    // properties are initialized via the .cxx_construct method, which
-    // will be called by the runtime.
+  // Then initialize any members that we need to.
+  initializeMembers();
 
-    // Note that 'self' has been fully initialized at this point.
-  } else {
-    // Emit the member initializers.
-    emitMemberInitializers(ctor, selfDecl, selfClassDecl);
-  }
-
-  emitProfilerIncrement(ctor->getBody());
+  SGF.emitProfilerIncrement(ctor->getBody());
   // Emit the constructor body.
-  emitStmt(ctor->getBody());
+  SGF.emitStmt(ctor->getBody());
 
-  CleanupStateRestorationScope SelfCleanupSave(Cleanups);
+  CleanupStateRestorationScope SelfCleanupSave(SGF.Cleanups);
 
   // Build a custom epilog block, since the AST representation of the
   // constructor decl (which has no self in the return type) doesn't match the
   // SIL representation.
   {
-    // Ensure that before we add additional cleanups, that we have emitted all
-    // cleanups at this point.
-    assert(!Cleanups.hasAnyActiveCleanups(getCleanupsDepth(),
-                                          ReturnDest.getDepth()) &&
+    // Ensure that before we add additional cleanups for our custom epilog, that
+    // we have emitted all other cleanups at this point.
+    assert(!SGF.Cleanups.hasAnyActiveCleanups(SGF.getCleanupsDepth(),
+                                              SGF.ReturnDest.getDepth()) &&
            "emitting epilog in wrong scope");
-
-    SILGenSavedInsertionPoint savedIP(*this, ReturnDest.getBlock());
-    assert(B.getInsertionBB()->empty() && "Epilog already set up?");
-    auto cleanupLoc = CleanupLocation(ctor);
-
-    // If we're using a box for self, reload the value at the end of the init
-    // method.
-    if (NeedsBoxForSelf) {
-      // Emit the call to super.init() right before exiting from the initializer.
-      if (Expr *SI = ctor->getSuperInitCall())
-        emitRValue(SI);
-
-      ManagedValue storedSelf =
-          ManagedValue::forUnmanaged(VarLocs[selfDecl].value);
-      selfArg = B.createLoadCopy(cleanupLoc, storedSelf);
-    } else {
-      // We have to do a retain because we are returning the pointer +1.
-      //
-      // SEMANTIC ARC TODO: When the verifier is complete, we will need to
-      // change this to selfArg = B.emitCopyValueOperation(...). Currently due
-      // to the way that SILGen performs folding of copy_value, destroy_value,
-      // the returned selfArg may be deleted causing us to have a
-      // dead-pointer. Instead just use the old self value since we have a
-      // class.
-      selfArg = B.createCopyValue(cleanupLoc, selfArg);
-    }
-
-    // Inject the self value into an optional if the constructor is failable.
-    if (ctor->getFailability() != OTK_None) {
-      RegularLocation loc(ctor);
-      loc.markAutoGenerated();
-      selfArg = B.createEnum(loc, selfArg,
-                             getASTContext().getOptionalSomeDecl(),
-                             getLoweredLoadableType(resultType));
-    }
-
-    // Save our cleanup state. We want all other potential cleanups to fire, but
-    // not this one.
-    if (selfArg.hasCleanup())
-      SelfCleanupSave.pushCleanupState(selfArg.getCleanup(),
-                                       CleanupState::Dormant);
-
-    // Translate our cleanup to the new top cleanup.
-    //
-    // This is needed to preserve the invariant in getEpilogBB that when
-    // cleanups are emitted, everything above ReturnDest.getDepth() has been
-    // emitted. This is not true if we use ManagedValue and friends in the
-    // epilogBB, thus the translation. We perform the same check above that
-    // getEpilogBB performs to ensure that we still do not have the same
-    // problem.
-    ReturnDest = std::move(ReturnDest).translate(getTopCleanup());
+    selfArg = buildCustomEpilogBlock(SelfCleanupSave, resultType, selfArg);
   }
-  
+
   // Emit the epilog and post-matter.
-  auto returnLoc = emitEpilog(ctor, /*UsesCustomEpilog*/true);
+  auto returnLoc = SGF.emitEpilog(ctor, /*UsesCustomEpilog*/ true);
 
   // Unpop our selfArg cleanup, so we can forward.
   std::move(SelfCleanupSave).pop();
@@ -739,10 +847,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // only one SIL return instruction per SIL function.
   if (B.hasValidInsertionPoint()) {
     if (failureExitBB)
-      B.createBranch(returnLoc, failureExitBB, selfArg.forward(*this));
+      B.createBranch(returnLoc, failureExitBB, selfArg.forward(SGF));
     else
-      B.createReturn(returnLoc, selfArg.forward(*this));
+      B.createReturn(returnLoc, selfArg.forward(SGF));
   }
+}
+
+void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
+  MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
+  ClassConstructorInitializerEmitter(*this, ctor).emit();
 }
 
 static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
