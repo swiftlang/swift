@@ -718,11 +718,10 @@ static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
     SILValue result = SILUndef::get(destType, SGF.SGM.M);
     return ManagedValue::forUnmanaged(result);
   }
-  
-  SILValue result = SGF.B.createBridgeObjectToRef(loc, args[0].forward(SGF),
-                                                  destType);
-  return SGF.emitManagedRValueWithCleanup(result);
+
+  return SGF.B.createBridgeObjectToRef(loc, args[0], destType);
 }
+
 static ManagedValue emitBuiltinCastBitPatternFromBridgeObject(
                                                   SILGenFunction &SGF,
                                                   SILLocation loc,

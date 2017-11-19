@@ -323,6 +323,10 @@ public:
   using SILBuilder::createValueMetatype;
   ManagedValue createValueMetatype(SILLocation loc, SILType metatype,
                                    ManagedValue base);
+
+  using SILBuilder::createBridgeObjectToRef;
+  ManagedValue createBridgeObjectToRef(SILLocation loc, ManagedValue mv,
+                                       SILType destType);
 };
 
 class SwitchCaseFullExpr;
