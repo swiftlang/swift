@@ -484,6 +484,12 @@ FuncDecl *SILDeclRef::getFuncDecl() const {
   return dyn_cast<FuncDecl>(getDecl());
 }
 
+bool SILDeclRef::isSetter() const {
+  if (!hasFuncDecl())
+    return false;
+  return getFuncDecl()->isSetter();
+}
+
 AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
   return dyn_cast<AbstractFunctionDecl>(getDecl());
 }
