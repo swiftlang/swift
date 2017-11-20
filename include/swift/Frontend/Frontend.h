@@ -245,6 +245,10 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  /// Does not take ownership of \p Buf.
+  void addInput(const FrontendInputs::InputFileOrBuffer &input) {
+    FrontendOpts.Inputs.addInput(input);
+  }
   void addInputFilename(StringRef Filename) {
     FrontendOpts.Inputs.addInputFilename(Filename);
   }

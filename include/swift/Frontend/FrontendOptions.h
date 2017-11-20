@@ -122,21 +122,25 @@ public:
   }
 
   // Input filename readers
-  ArrayRef<std::string> getInputFilenamesxxx() const { return InputFilenamesxxx; }
-  void forEachInputFilename(const llvm::function_ref<void(StringRef)> &fn) {
+  std::vector<std::string> getInputFilenames() const {
+    std::vector<std::string> filenames;
+    forEachInputFilename( [&] (StringRef fn) -> void { filenames.push_back(fn); } );
+    return filenames;
+  }
+  void forEachInputFilename(const llvm::function_ref<void(StringRef)> &fn) const {
     for (auto &input: getInputs()) {
       if (auto file = input.getFile())
         fn(*file);
     }
   }
 
-  bool haveInputFilenames() const { return !getInputFilenamesxxx().empty(); }
-  unsigned inputFilenameCount() const { return getInputFilenamesxxx().size(); }
+  bool haveInputFilenames() const { return !getInputFilenames().empty(); }
+  unsigned inputFilenameCount() const { return getInputFilenames().size(); }
 
   bool haveUniqueInputFilename() const { return inputFilenameCount() == 1; }
   const std::string &getFilenameOfFirstInput() const {
     assert(haveInputFilenames());
-    return getInputFilenamesxxx()[0];
+    return getInputFilenames()[0];
   }
 
   bool isReadingFromStdin() const {
@@ -274,6 +278,10 @@ public:
   }
 
   // Multi-faceted writers
+  
+  void addInput(const InputFileOrBuffer &input) {
+    Inputs.push_back(input);
+  }
 
   void clearInputs() {
     InputFilenamesxxx.clear();
