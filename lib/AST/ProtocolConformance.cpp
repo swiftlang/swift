@@ -983,13 +983,10 @@ ProtocolConformance::subst(Type substType,
       // the underlying class type.
       auto targetClass =
         inheritedConformance->getType()->getClassOrBoundGenericClass();
-      auto superclassType = substType;
-      while (superclassType->getClassOrBoundGenericClass() != targetClass)
-        superclassType = superclassType->getSuperclass();
+      auto superclassType = substType->getSuperclassForDecl(targetClass);
 
       // Substitute into the superclass.
-      newBase = inheritedConformance->subst(superclassType, subs,
-                                            conformances);
+      newBase = inheritedConformance->subst(superclassType, subs, conformances);
     } else {
       newBase = inheritedConformance;
     }
