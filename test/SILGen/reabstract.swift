@@ -23,14 +23,10 @@ func test0() {
 // CHECK-NEXT: return
 
 // CHECK:    sil shared [transparent] [serializable] [reabstraction_thunk] [[THUNK]] : $@convention(thin) (@in Int, @guaranteed @noescape @callee_guaranteed (Int) -> Optional<Int>) -> @out Optional<Int> {
-// CHECK:      [[COPY:%.*]] = copy_value %2
 // CHECK:      [[T0:%.*]] = load [trivial] %1 : $*Int
-// CHECK:      [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK-NEXT: [[T1:%.*]] = apply [[BORROW]]([[T0]])
+// CHECK-NEXT: [[T1:%.*]] = apply %2([[T0]])
 // CHECK-NEXT: store [[T1]] to [trivial] %0
 // CHECK-NEXT: tuple ()
-// CHECK-NEXT: end_borrow [[BORROW]]
-// CHECK-NEXT: destroy_value [[COPY]]
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil hidden @_T010reabstract10testThrowsyypF

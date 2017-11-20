@@ -114,10 +114,12 @@ public:
 
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
       // An owned or 'in' parameter is passed in at +1. We can claim ownership
       // of the parameter and clean it up when it goes out of scope.
       return SGF.emitManagedRValueWithCleanup(arg);
+
+    case ParameterConvention::Indirect_In_Constant:
+      break;
     }
     llvm_unreachable("bad parameter convention");
   }

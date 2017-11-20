@@ -221,6 +221,18 @@ extension ReabstractSelfBase {
   }
 }
 
+// CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvg : $@convention(witness_method: ReabstractSelfRefined) <τ_0_0 where τ_0_0 : ReabstractSelfRefined> (@guaranteed τ_0_0) -> @owned @callee_guaranteed (@owned τ_0_0) -> @owned τ_0_0
+// CHECK: [[SELF_BOX:%.*]] = alloc_stack $τ_0_0
+// CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value %0 : $τ_0_0
+// CHECK-NEXT: store [[SELF_COPY]] to [init] [[SELF_BOX]] : $*τ_0_0
+// CHECK: [[WITNESS:%.*]] = function_ref @_T019protocol_resilience18ReabstractSelfBasePAAE8callbackxxcvg
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]<τ_0_0>([[SELF_BOX]])
+// CHECK: [[THUNK_FN:%.*]] = function_ref @_T0xxIegir_xxIegxo_19protocol_resilience21ReabstractSelfRefinedRzlTR
+// CHECK-NEXT: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0>([[RESULT]])
+// CHECK-NEXT: destroy_addr [[SELF_BOX]]
+// CHECK-NEXT: dealloc_stack [[SELF_BOX]]
+// CHECK-NEXT: return [[THUNK]]
+
 final class X : ReabstractSelfRefined {}
 
 func inoutFunc(_ x: inout Int) {}

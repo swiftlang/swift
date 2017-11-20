@@ -23,9 +23,6 @@ extension Single: P1 where A: P2 {
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2_i8star:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[A_P2:%.*]] = bitcast i8* [[A_P2_i8star]] to i8**
-// CHECK-NEXT:    [[DEST:%.*]] = bitcast %T42conditional_conformance_basic_conformances6SingleV* undef to i8*
-// CHECK-NEXT:    [[SRC:%.*]] = bitcast %T42conditional_conformance_basic_conformances6SingleV* %0 to i8*
-// CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[DEST]], i8* [[SRC]], i64 0, i32 1, i1 false)
 // CHECK-NEXT:    [[SELF_AS_TYPE_ARRAY:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK-NEXT:    [[A_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[SELF_AS_TYPE_ARRAY]], i64 2
 // CHECK-NEXT:    [[A:%.*]] = load %swift.type*, %swift.type** [[A_PTR]], align 8
@@ -40,9 +37,6 @@ extension Single: P1 where A: P2 {
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -1
 // CHECK-NEXT:    [[A_P2_i8star:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    [[A_P2:%.*]] = bitcast i8* [[A_P2_i8star]] to i8**
-// CHECK-NEXT:    [[DEST:%.*]] = bitcast %T42conditional_conformance_basic_conformances6SingleV* undef to i8*
-// CHECK-NEXT:    [[SRC:%.*]] = bitcast %T42conditional_conformance_basic_conformances6SingleV* %1 to i8*
-// CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[DEST]], i8* [[SRC]], i64 0, i32 1, i1 false)
 // CHECK-NEXT:    [[SELF_AS_TYPE_ARRAY:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK-NEXT:    [[A_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[SELF_AS_TYPE_ARRAY]], i64 2
 // CHECK-NEXT:    [[A:%.*]] = load %swift.type*, %swift.type** [[A_PTR]], align 8
@@ -136,10 +130,6 @@ extension Double: P1 where B: P2, C: P3 {
 // CHECK-NEXT:    [[C_P3_i8star:%.*]] = load i8*, i8** [[C_P3_PTR]], align 8
 // CHECK-NEXT:    [[C_P3:%.*]] = bitcast i8* [[C_P3_i8star]] to i8**
 
-// CHECK-NEXT:    [[DEST:%.*]] = bitcast %T42conditional_conformance_basic_conformances6DoubleV* undef to i8*
-// CHECK-NEXT:    [[SRC:%.*]] = bitcast %T42conditional_conformance_basic_conformances6DoubleV* %0 to i8*
-// CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[DEST]], i8* [[SRC]], i64 0, i32 1, i1 false)
-
 // CHECK-NEXT:    [[SELF_AS_TYPE_ARRAY:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK-NEXT:    [[B_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[SELF_AS_TYPE_ARRAY]], i64 2
 // CHECK-NEXT:    [[B:%.*]] = load %swift.type*, %swift.type** [[B_PTR]], align 8
@@ -164,10 +154,6 @@ extension Double: P1 where B: P2, C: P3 {
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8*, i8** %SelfWitnessTable, i32 -2
 // CHECK-NEXT:    [[C_P3_i8star:%.*]] = load i8*, i8** [[C_P3_PTR]], align 8
 // CHECK-NEXT:    [[C_P3:%.*]] = bitcast i8* [[C_P3_i8star]] to i8**
-
-// CHECK-NEXT:    [[DEST:%.*]] = bitcast %T42conditional_conformance_basic_conformances6DoubleV* undef to i8*
-// CHECK-NEXT:    [[SRC:%.*]] = bitcast %T42conditional_conformance_basic_conformances6DoubleV* %1 to i8*
-// CHECK-NEXT:    call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[DEST]], i8* [[SRC]], i64 0, i32 1, i1 false)
 
 // CHECK-NEXT:    [[SELF_AS_TYPE_ARRAY:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK-NEXT:    [[B_PTR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[SELF_AS_TYPE_ARRAY]], i64 2

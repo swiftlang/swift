@@ -228,9 +228,7 @@ class Noot : Aap {
 // CHECK:         return [[OUTER]]
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVIegd_ACSgIegd_TR
-// CHECK:         [[COPY:%.*]] = copy_value %0
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:         [[INNER:%.*]] = apply [[BORROW]]()
+// CHECK:         [[INNER:%.*]] = apply %0()
 // CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, [[INNER]] : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
 
@@ -242,12 +240,11 @@ class Noot : Aap {
 // CHECK:         return [[OUTER]]
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
-// CHECK:         [[COPY:%.*]] = copy_value %1
 // CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:         [[INNER:%.*]] = apply [[BORROW]]([[ARG]])
+// CHECK:         [[INNER:%.*]] = apply %1([[ARG]])
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_guaranteed () -> @owned Noot to $@callee_guaranteed () -> @owned Optional<Aap>
 // CHECK:         return [[OUTER]]
+
 // CHECK-LABEL: sil_vtable D {
 // CHECK:         #B.iuo!1: {{.*}} : hidden _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.f!1: {{.*}} : _T013vtable_thunks1D{{[A-Z0-9a-z_]*}}F

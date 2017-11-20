@@ -110,10 +110,15 @@ SILValue ManagedValue::forward(SILGenFunction &SGF) const {
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                SILValue address) {
+  if (!hasCleanup() && getOwnershipKind() != ValueOwnershipKind::Trivial)
+    return copyUnmanaged(SGF, loc).forwardInto(SGF, loc, address);
+
   if (hasCleanup())
     forwardCleanup(SGF);
+
   auto &addrTL = SGF.getTypeLowering(address->getType());
-  SGF.emitSemanticStore(loc, getValue(), address, addrTL, IsInitialization);
+  SGF.emitSemanticStore(loc, getValue(), address,
+                        addrTL, IsInitialization);
 }
 
 void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,

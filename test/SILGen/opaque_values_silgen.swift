@@ -90,13 +90,8 @@ enum AddressOnlyEnum {
 // ---
 // CHECK-LABEL: sil private @_T020opaque_values_silgen16OpaqueTupleClassC8inAndOutx_xtx_xt1x_tFAA0dF0CADxxAE_tFTV : $@convention(method) <U> (@in (U, U), @guaranteed OpaqueTupleClass<U>) -> @out (U, U) {
 // CHECK: bb0([[ARG0:%.*]] : $(U, U), [[ARG1:%.*]] : $OpaqueTupleClass<U>):
-// CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]] : $(U, U)
-// CHECK:   [[TELEM0:%.*]] = tuple_extract [[BORROWED_ARG0]] : $(U, U), 0
-// CHECK:   [[COPY0:%.*]] = copy_value [[TELEM0]] : $U
-// CHECK:   [[TELEM1:%.*]] = tuple_extract [[BORROWED_ARG0]] : $(U, U), 1
-// CHECK:   [[COPY1:%.*]] = copy_value [[TELEM1]] : $U
-// CHECK:   end_borrow [[BORROWED_ARG0]]
-// CHECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[COPY0]], [[COPY1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
+// CHECK:   ([[TELEM0:%.*]], [[TELEM1:%.*]]) = destructure_tuple [[ARG0]] : $(U, U)
+// CHECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[TELEM0]], [[TELEM1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
 // CHECK:   [[BORROWED_CALL:%.*]] = begin_borrow [[APPLY]]
 // CHECK:   [[BORROWED_CALL_EXT0:%.*]] = tuple_extract [[BORROWED_CALL]] : $(U, U), 0
 // CHECK:   [[RETVAL0:%.*]] = copy_value [[BORROWED_CALL_EXT0]] : $U
@@ -133,16 +128,12 @@ enum AddressOnlyEnum {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIegid_AA2P2_pAaE_pIegir_TR : $@convention(thin) (@in P2, @guaranteed @callee_guaranteed (@in P) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_guaranteed (@in P) -> TrivialStruct):
-// CHECK:   [[FUN_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]] : $P2
 // CHECK:   [[OPENED_ARG:%.*]] = open_existential_value [[BORROWED_ARG]] : $P2 to $@opened({{.*}}) P2
 // CHECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
 // CHECK:   [[INIT_P:%.*]] = init_existential_value [[COPIED_VAL]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[FUN_COPY]]
-// CHECK:   [[APPLY_P:%.*]] = apply [[BORROW]]([[INIT_P]]) : $@callee_guaranteed (@in P) -> TrivialStruct
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[INIT_P]]) : $@callee_guaranteed (@in P) -> TrivialStruct
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG0]] : $P2, $P2
-// CHECK:   destroy_value [[FUN_COPY]]
 // CHECK:   destroy_value [[ARG0]]
 // CHECK:   return [[RETVAL]] : $P2
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pAA13TrivialStructVIegid_AA2P2_pAaE_pIegir_TR'
@@ -151,7 +142,6 @@ enum AddressOnlyEnum {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pSgAA13TrivialStructVIegid_AESgAA2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in Optional<P>) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : $@callee_guaranteed (@in Optional<P>) -> TrivialStruct):
-// CHECK:   [[FUN_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   switch_enum [[ARG0]] : $Optional<TrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK:   [[ONONE:%.*]] = enum $Optional<P>, #Optional.none!enumelt
@@ -161,10 +151,8 @@ enum AddressOnlyEnum {
 // CHECK:   [[ENUM_S:%.*]] = enum $Optional<P>, #Optional.some!enumelt.1, [[INIT_S]] : $P
 // CHECK:   br bb3([[ENUM_S]] : $Optional<P>)
 // CHECK: bb3([[OPT_S:%.*]] : $Optional<P>):
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[FUN_COPY]]
-// CHECK:   [[APPLY_P:%.*]] = apply [[BORROW]]([[OPT_S]]) : $@callee_guaranteed (@in Optional<P>) -> TrivialStruct
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[OPT_S]]) : $@callee_guaranteed (@in Optional<P>) -> TrivialStruct
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
-// CHECK:   destroy_value [[FUN_COPY]]
 // CHECK:   return [[RETVAL]] : $P2
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pSgAA13TrivialStructVIegid_AESgAA2P2_pIegyr_TR'
 
@@ -901,19 +889,10 @@ func s420__globalLvalueGet(_ i : Int) -> Int {
 // CHECK:   [[APPLY_T:%.*]] = apply %{{.*}}<((T) -> (), T)>() : $@convention(thin) <τ_0_0> () -> @out Optional<(Int, τ_0_0)>
 // CHECK:   switch_enum [[APPLY_T]] : $Optional<(Int, (@callee_guaranteed (@in T) -> @out (), T))>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb2([[ENUMARG:%.*]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))):
-// CHECK:   [[BORROWED_ENUMARG:%.*]] = begin_borrow [[ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))
-// CHECK:   [[TELEM0:%.*]] = tuple_extract [[BORROWED_ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T)), 0
-// CHECK:   [[TELEM1:%.*]] = tuple_extract [[BORROWED_ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T)), 1
-// CHECK:   [[COPY1:%.*]] = copy_value [[TELEM1]] : $(@callee_guaranteed (@in T) -> @out (), T)
-// CHECK:   end_borrow [[BORROWED_ENUMARG]]
-// CHECK:   [[BORROWED_COPY1:%.*]] = begin_borrow [[COPY1]] : $(@callee_guaranteed (@in T) -> @out (), T)
-// CHECK:   [[TELEM1P0:%.*]] = tuple_extract [[BORROWED_COPY1]] : $(@callee_guaranteed (@in T) -> @out (), T), 0
-// CHECK:   [[COPY1P0:%.*]] = copy_value [[TELEM1P0]] : $@callee_guaranteed (@in T) -> @out ()
-// CHECK:   [[TELEM1P1:%.*]] = tuple_extract [[BORROWED_COPY1]] : $(@callee_guaranteed (@in T) -> @out (), T), 1
-// CHECK:   [[COPY1P1:%.*]] = copy_value [[TELEM1P1]] : $T
-// CHECK:   end_borrow [[BORROWED_COPY1]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<T>([[COPY1P0]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out ()) -> ()
-// CHECK:   [[NEWT0:%.*]] = tuple ([[PAPPLY]] : $@callee_guaranteed (@in T) -> (), [[COPY1P1]] : $T)
+// CHECK:   ([[TELEM0:%.*]], [[TELEM1:%.*]]) = destructure_tuple [[ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))
+// CHECK:   ([[TELEM10:%.*]], [[TELEM11:%.*]]) = destructure_tuple [[TELEM1]] : $(@callee_guaranteed (@in T) -> @out (), T)
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<T>([[TELEM10]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out ()) -> ()
+// CHECK:   [[NEWT0:%.*]] = tuple ([[PAPPLY]] : $@callee_guaranteed (@in T) -> (), [[TELEM11]] : $T)
 // CHECK:   [[NEWT1:%.*]] = tuple ([[TELEM0]] : $Int, [[NEWT0]] : $(@callee_guaranteed (@in T) -> (), T))
 // CHECK:   [[NEWENUM:%.*]] = enum $Optional<(Int, (@callee_guaranteed (@in T) -> (), T))>, #Optional.some!enumelt.1, [[NEWT1]] : $(Int, (@callee_guaranteed (@in T) -> (), T))
 // CHECK:   br bb3([[NEWENUM]] : $Optional<(Int, (@callee_guaranteed (@in T) -> (), T))>)
@@ -1089,12 +1068,8 @@ public protocol FooP {
 // ---
 // CHECK-LABEL: sil private [transparent] [thunk] @_T020opaque_values_silgen21s510_______OpaqueSelfVyxGAA4FooPA2aEP3fooxyFTW : $@convention(witness_method: FooP) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0> {
 // CHECK: bb0(%0 : $s510_______OpaqueSelf<τ_0_0>):
-// CHECK:   [[COPY:%.*]] = copy_value %0 : $s510_______OpaqueSelf<τ_0_0>
 // CHECK:   [[FN:%.*]] = function_ref @_T020opaque_values_silgen21s510_______OpaqueSelfV3fooACyxGyF : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
-// CHECK:   [[RESULT:%.*]] = apply [[FN]]<τ_0_0>([[BORROW]]) : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
-// CHECK:   end_borrow [[BORROW]] from [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
-// CHECK:   destroy_value [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
+// CHECK:   [[RESULT:%.*]] = apply [[FN]]<τ_0_0>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
 // CHECK:   return [[RESULT]] : $s510_______OpaqueSelf<τ_0_0>
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s510_______OpaqueSelfVyxGAA4FooPA2aEP3fooxyFTW'
 struct s510_______OpaqueSelf<Base> : FooP {
@@ -1160,12 +1135,8 @@ public func s020_______assignToVar() {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen9AnyStructVSgACIegir_A2DIegir_TR : $@convention(thin) (@in Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
 // CHECK: bb0([[ARG0:%.*]] : $Optional<AnyStruct>, [[ARG1:%.*]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct):
-// CHECK:   [[COPY_FUNC:%.*]] = copy_value [[ARG1]]
-// CHECK:   [[BORROW_FUNC:%.*]] = begin_borrow [[COPY_FUNC]]
-// CHECK:   [[APPLYARG:%.*]] = apply [[BORROW_FUNC]]([[ARG0]]) : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG1]]([[ARG0]]) : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
 // CHECK:   [[RETVAL:%.*]] = enum $Optional<AnyStruct>, #Optional.some!enumelt.1, [[APPLYARG]] : $AnyStruct
-// CHECK:   end_borrow [[BORROW_FUNC]]
-// CHECK:   destroy_value [[COPY_FUNC]]
 // CHECK:   return [[RETVAL]] : $Optional<AnyStruct>
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen9AnyStructVSgACIegir_A2DIegir_TR'
 
@@ -1173,15 +1144,11 @@ public func s020_______assignToVar() {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Ieg_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> ()):
-// CHECK:   [[COPY_FUNC:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $()
-// CHECK:   [[BORROW_FUNC:%.*]] = begin_borrow [[COPY_FUNC]]
-// CHECK:   [[APPLYARG:%.*]] = apply [[BORROW_FUNC]]() : $@callee_guaranteed () -> ()
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_guaranteed () -> ()
 // CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*()
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[LOAD_EXIST]] : $(), $(), $Any
-// CHECK:   end_borrow [[BORROW_FUNC]]
-// CHECK:   destroy_value [[COPY_FUNC]]
 // CHECK:   return [[RETVAL]] : $Any
 // CHECK-LABEL: } // end sil function '_T0Ieg_ypIegr_TR'
 
@@ -1189,34 +1156,28 @@ public func s020_______assignToVar() {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIegdd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Int, Int)) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> (Int, Int)):
-// CHECK:   [[COPY_FUNC:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)
 // CHECK:   [[TADDR0:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 0
 // CHECK:   [[TADDR1:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 1
-// CHECK:   [[BORROW_FUNC:%.*]] = begin_borrow [[COPY_FUNC]]
-// CHECK:   [[APPLYARG:%.*]] = apply [[BORROW_FUNC]]() : $@callee_guaranteed () -> (Int, Int)
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_guaranteed () -> (Int, Int)
 // CHECK:   [[TEXTRACT0:%.*]] = tuple_extract [[APPLYARG]] : $(Int, Int), 0
 // CHECK:   [[TEXTRACT1:%.*]] = tuple_extract [[APPLYARG]] : $(Int, Int), 1
 // CHECK:   store [[TEXTRACT0]] to [trivial] [[TADDR0]] : $*Int
 // CHECK:   store [[TEXTRACT1]] to [trivial] [[TADDR1]] : $*Int
 // CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*(Int, Int)
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[LOAD_EXIST]] : $(Int, Int), $(Int, Int), $Any
-// CHECK:   end_borrow [[BORROW_FUNC]]
 // CHECK:   dealloc_stack [[ASTACK]] : $*Any
-// CHECK:   destroy_value [[COPY_FUNC]]
 // CHECK:   return [[RETVAL]] : $Any
 // CHECK-LABEL: } // end sil function '_T0S2iIegdd_ypIegr_TR'
 
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @guaranteed @callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
-// CHECK:   [[COPY_FUNC:%.*]] = copy_value [[ARG5]]
 // CHECK:   [[TUPLE_TO_APPLY0:%.*]] = tuple ([[ARG2]] : $Int, [[ARG3]] : $Int)
 // CHECK:   [[TUPLE_TO_APPLY1:%.*]] = tuple ([[ARG1]] : $Int, [[TUPLE_TO_APPLY0]] : $(Int, Int))
 // CHECK:   [[TUPLE_TO_APPLY2:%.*]] = tuple ([[ARG0]] : $Int, [[TUPLE_TO_APPLY1]] : $(Int, (Int, Int)), [[ARG4]] : $Int)
-// CHECK:   [[BORROW_FUNC:%.*]] = begin_borrow [[COPY_FUNC]]
-// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[BORROW_FUNC]]([[TUPLE_TO_APPLY2]]) : $@callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)
+// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG5]]([[TUPLE_TO_APPLY2]]) : $@callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)
 // CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_APPLY]] : $(Int, (Int, (Int, Int)), Int), 0
 // CHECK:   [[TUPLE_EXTRACT1:%.*]] = tuple_extract [[TUPLE_APPLY]] : $(Int, (Int, (Int, Int)), Int), 1
 // CHECK:   [[RET_VAL1:%.*]] = tuple_extract [[TUPLE_EXTRACT1]] : $(Int, (Int, Int)), 0
@@ -1230,10 +1191,8 @@ public func s020_______assignToVar() {
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) <T> (Int, @in T, @guaranteed @callee_guaranteed (@in (Int, T)) -> @out (Int, T)) -> (Int, @out T) {
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T, [[ARG2:%.*]] : $@callee_guaranteed (@in (Int, T)) -> @out (Int, T)):
-// CHECK:   [[COPY_FUNC:%.*]] = copy_value [[ARG2]]
 // CHECK:   [[TUPLE_TO_APPLY:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
-// CHECK:   [[BORROW_FUNC:%.*]] = begin_borrow [[COPY_FUNC]]
-// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[BORROW_FUNC]]([[TUPLE_TO_APPLY]]) : $@callee_guaranteed (@in (Int, T)) -> @out (Int, T)
+// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG2]]([[TUPLE_TO_APPLY]]) : $@callee_guaranteed (@in (Int, T)) -> @out (Int, T)
 // CHECK:   [[TUPLE_BORROW:%.*]] = begin_borrow [[TUPLE_APPLY]] : $(Int, T)
 // CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 0
 // CHECK:   [[TUPLE_EXTRACT:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 1
@@ -1290,9 +1249,7 @@ extension Dictionary {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xSgIegr_20opaque_values_silgen8Clonable_pSgIegr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out Optional<τ_0_0>) -> @out Optional<Clonable> {
 // CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> @out Optional<τ_0_0>):
-// CHECK:   [[COPY:%.*]] = copy_value [[ARG]]
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:   [[APPLY_ARG:%.*]] = apply [[BORROW]]() : $@callee_guaranteed () -> @out Optional<τ_0_0>
+// CHECK:   [[APPLY_ARG:%.*]] = apply [[ARG]]() : $@callee_guaranteed () -> @out Optional<τ_0_0>
 // CHECK:   switch_enum [[APPLY_ARG]] : $Optional<τ_0_0>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK:   [[ONONE:%.*]] = enum $Optional<Clonable>, #Optional.none!enumelt
@@ -1302,7 +1259,6 @@ extension Dictionary {
 // CHECK:   [[OSOME:%.*]] = enum $Optional<Clonable>, #Optional.some!enumelt.1, [[INIT_OPAQUE]] : $Clonable
 // CHECK:   br bb3([[OSOME]] : $Optional<Clonable>)
 // CHECK: bb3([[RETVAL:%.*]] : $Optional<Clonable>):
-// CHECK:   destroy_value [[COPY]]
 // CHECK:   return [[RETVAL]] : $Optional<Clonable>
 // CHECK-LABEL: } // end sil function '_T0xSgIegr_20opaque_values_silgen8Clonable_pSgIegr_AbCRzlTR'
 
@@ -1310,7 +1266,6 @@ extension Dictionary {
 // ---
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIegi_S2iIegyy_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in Any) -> ()) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@callee_guaranteed (@in Any) -> ()):
-// CHECK:   [[COPY:%.*]] = copy_value [[ARG2]]
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)
 // CHECK:   [[TADDR0:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 0
@@ -1319,9 +1274,7 @@ extension Dictionary {
 // CHECK:   store [[ARG1]] to [trivial] [[TADDR1]] : $*Int
 // CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*(Int, Int)
 // CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[LOAD_EXIST]] : $(Int, Int), $(Int, Int), $Any
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:   [[APPLYARG:%.*]] = apply [[BORROW]]([[INIT_OPAQUE]]) : $@callee_guaranteed (@in Any) -> ()
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG2]]([[INIT_OPAQUE]]) : $@callee_guaranteed (@in Any) -> ()
 // CHECK:   dealloc_stack [[ASTACK]] : $*Any
-// CHECK:   destroy_value [[COPY]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T0ypIegi_S2iIegyy_TR'
