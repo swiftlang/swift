@@ -292,19 +292,27 @@ struct UnsafeString {
   }
 
   @_versioned
+  var utf16Start: UnsafePointer<UInt16> {
+    _sanityCheck(!isSingleByte)
+    return baseAddress.assumingMemoryBound(to: UInt16.self)
+  }
+  @_versioned
   var utf16Buffer: UnsafeBufferPointer<UInt16> {
     _sanityCheck(!isSingleByte)
-    return UnsafeBufferPointer(
-      start: baseAddress.assumingMemoryBound(to: UInt16.self),
-      count: count)
+    return UnsafeBufferPointer(start: utf16Start, count: count)
+  }
+
+  @_versioned
+  var asciiStart: UnsafePointer<UInt8> {
+    _sanityCheck(isSingleByte)
+    return baseAddress.assumingMemoryBound(to: UInt8.self)
   }
   @_versioned
   var asciiBuffer: UnsafeBufferPointer<UInt8> {
     _sanityCheck(isSingleByte)
-    return UnsafeBufferPointer(
-      start: baseAddress.assumingMemoryBound(to: UInt8.self),
-      count: count)
+    return UnsafeBufferPointer(start: asciiStart, count: count)
   }
+
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -1627,18 +1635,24 @@ extension UnsafeString {
   @_inlineable
   @_versioned
   internal
+  func characterStride(from i: String.Index) -> Int {
+    // TODO: should _fastPath the case somehow
+    if case .character(let _stride) = i._cache {
+      return Int(truncatingIfNeeded: _stride)
+    } else {
+      return self._measureExtendedGraphemeClusterForward(from: i.encodedOffset)
+    }
+  }
+
+  @_inlineable
+  @_versioned
+  internal
   func character(at i: String.Index) -> Character {
     let offset = i.encodedOffset
     _precondition(offset < self.count, "String index is out of range")
     _precondition(offset >= 0, "String index cannot be negative")
 
-    let stride: Int
-    if case .character(let _stride) = i._cache {
-      stride = Int(truncatingIfNeeded: _stride)
-    } else {
-      stride = self._measureExtendedGraphemeClusterForward(from: offset)
-    }
-
+    let stride = self.characterStride(from: i)
     if _fastPath(stride == 1) {
       return Character(_singleCodeUnit: self[offset])
     }
@@ -1646,12 +1660,26 @@ extension UnsafeString {
     return Character(self[offset..<offset+stride])
   }
 
-  @inline(never) // @_inlineable
   @_versioned
   internal
   func characterIndex(after i: String.Index) -> String.Index {
-    // TODO: implement directly
-    return String.CharacterView(_StringGuts(self)).index(after: i)
+    // TODO: Is this the right place to do precondition checking?
+    _precondition(i.encodedOffset >= startIndex,
+      "cannot increment invalid index")
+    _precondition(i.encodedOffset < endIndex,
+      "cannot increment beyond endIndex")
+
+    let stride = self.characterStride(from: i)
+    let newOffset = i.encodedOffset + stride
+    _sanityCheck(newOffset <= endIndex, "walked off the end")
+
+    // Calculate and cache the next grapheme distance
+    let newStride = self._measureExtendedGraphemeClusterForward(from: newOffset)
+    _sanityCheck(newStride >= 0 && newStride <= UInt16.max)
+
+    return String.Index(
+      encodedOffset: newOffset,
+      .character(stride: UInt16(truncatingIfNeeded: newStride)))
   }
 
   @inline(never) // @_inlineable
@@ -1670,15 +1698,62 @@ extension UnsafeString {
   //   return String.CharacterView(_StringGuts(self)).index(i, offsetBy: n)
   // }
 
-  // TODO: Implement directly
-  @inline(never) // FIXME: remove
   @_versioned
+  @_inlineable
   internal
   func _measureExtendedGraphemeClusterForward(from idx: Int) -> Int {
+    let startOffset = idx
+    let endOffset = self.endIndex
+
+    // No more graphemes
+    if startOffset == endOffset {
+      return 0
+    }
+
+    // Last code unit means final grapheme length of 1
+    if startOffset == endOffset - 1 {
+      return 1
+    }
+
+    // Grapheme breaking is much simpler if known ASCII
+    if self.isASCII{
+      _onFastPath() // Please aggressively inline
+
+      // We already checked bounds above, use pointer
+      let asciiBuffer = self.asciiStart
+
+      // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
+      // for that one exception.
+      if _slowPath(
+        asciiBuffer[startOffset] == _CR &&
+        asciiBuffer[startOffset+1] == _LF
+      ) {
+        return 2
+      }
+
+      return 1
+    }
+
+    // Perform a quick single-code-unit grapheme check.
+    let utf16Buffer = self.utf16Start
+    if _fastPath(String.CharacterView._quickCheckGraphemeBreakBetween(
+        utf16Buffer[startOffset],
+        utf16Buffer[startOffset+1])
+    ) {
+      return 1
+    }
+
+    return _measureExtendedGraphemeClusterForwardSlow(startOffset: startOffset)
+  }
+
+  @inline(never)
+  @_versioned
+  internal
+  func _measureExtendedGraphemeClusterForwardSlow(startOffset: Int) -> Int {
+    // TODO: implement directly
     return String.CharacterView(
       _StringGuts(self)
-    )._measureExtendedGraphemeClusterForward(
-      from: String.Index(encodedOffset: idx))
+    )._measureExtendedGraphemeClusterForwardSlow(startOffset: startOffset)
   }
 }
 
@@ -1687,7 +1762,6 @@ extension OpaqueCocoaString {
     return String.CharacterView(_StringGuts(self))
   }
 
-  @inline(never) // @_inlineable
   @_versioned
   internal
   func characterIndex(after i: String.Index) -> String.Index {
@@ -1695,7 +1769,6 @@ extension OpaqueCocoaString {
     return characterView.index(after: i)
   }
 
-  @inline(never) // @_inlineable
   @_versioned
   internal
   func characterIndex(before i: String.Index) -> String.Index {
@@ -1703,7 +1776,6 @@ extension OpaqueCocoaString {
     return characterView.index(before: i)
   }
 
-  @inline(never) // @_inlineable
   @_versioned
   internal
   func character(at i: String.Index) -> Character {
