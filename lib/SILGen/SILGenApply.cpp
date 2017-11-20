@@ -4159,13 +4159,13 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
                               firstLevelResult.foreignSelf, uncurriedArgs,
                               uncurriedLoc, formalApplyType);
 
-  // Emit the uncurried call.
+  // If we have a late emitter, just delegate to that emitter and return.
   if (specializedEmitter.isLateEmitter()) {
     auto emitter = specializedEmitter.getLateEmitter();
+    ManagedValue mv = emitter(SGF, *uncurriedLoc, callee.getSubstitutions(),
+                              uncurriedArgs, uncurriedContext);
     firstLevelResult.value =
-        RValue(SGF, *uncurriedLoc, formalApplyType.getResult(),
-               emitter(SGF, uncurriedLoc.getValue(), callee.getSubstitutions(),
-                       uncurriedArgs, uncurriedContext));
+        RValue(SGF, *uncurriedLoc, formalApplyType.getResult(), mv);
     return firstLevelResult;
   }
 
