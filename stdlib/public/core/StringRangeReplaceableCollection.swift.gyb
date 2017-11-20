@@ -124,10 +124,10 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
-    return _guts.characterIndex(i, offsetBy: n)
-  }
+//  @_inlineable // FIXME(sil-serialize-all)
+//  public func index(_ i: Index, offsetBy n: Int) -> Index {
+//    return _guts.characterIndex(i, offsetBy: n)
+//  }
 
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
@@ -166,12 +166,12 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
-  ) -> Index? {
-    return _characters.index(i, offsetBy: n, limitedBy: limit)
-  }
+//  @_inlineable // FIXME(sil-serialize-all)
+//  public func index(
+//    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+//  ) -> Index? {
+//    return _characters.index(i, offsetBy: n, limitedBy: limit)
+//  }
 
   /// Returns the distance between two indices.
   ///

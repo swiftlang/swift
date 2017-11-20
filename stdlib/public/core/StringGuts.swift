@@ -1148,6 +1148,7 @@ extension _StringGuts {
     return _unmanagedContiguous == nil
   }
 
+  @inline(never)
   @_versioned
   internal
   func getOpaque() -> OpaqueCocoaString {
@@ -1157,6 +1158,12 @@ extension _StringGuts {
     } else {
       return OpaqueCocoaString(self._smallCocoa!.taggedObject)
     }
+  }
+
+  @_versioned
+  internal
+  init(_ s: OpaqueCocoaString) {
+    self = _makeCocoaStringGuts(s.object)
   }
 
   @_versioned
@@ -1575,7 +1582,7 @@ extension _StringGuts {
   func character(at i: String.Index) -> Character {
     let contigOpt = self._unmanagedContiguous
     if _slowPath(contigOpt == nil) {
-      return String.CharacterView(self)[i] // TODO: opaque string
+      return getOpaque().character(at: i)
     }
     return contigOpt._unsafelyUnwrappedUnchecked.character(at: i)
   }
@@ -1586,7 +1593,7 @@ extension _StringGuts {
   func characterIndex(after i: String.Index) -> String.Index {
     let contigOpt = self._unmanagedContiguous
     if _slowPath(contigOpt == nil) {
-      return String.CharacterView(self).index(after: i) // TODO: opaque string
+      return getOpaque().characterIndex(after: i)
     }
     return contigOpt._unsafelyUnwrappedUnchecked.characterIndex(after: i)
   }
@@ -1597,23 +1604,23 @@ extension _StringGuts {
   func characterIndex(before i: String.Index) -> String.Index {
     let contigOpt = self._unmanagedContiguous
     if _slowPath(contigOpt == nil) {
-      return String.CharacterView(self).index(before: i) // TODO: opaque string
+      return getOpaque().characterIndex(before: i)
     }
     return contigOpt._unsafelyUnwrappedUnchecked.characterIndex(before: i)
   }
 
-  @_inlineable
-  @_versioned
-  internal
-  func characterIndex(
-    _ i: String.Index, offsetBy n: String.IndexDistance
-  ) -> String.Index {
-    let contigOpt = self._unmanagedContiguous
-    if _slowPath(contigOpt == nil) {
-      return String.CharacterView(self).index(i, offsetBy: n) // TODO: opaque string
-    }
-    return contigOpt._unsafelyUnwrappedUnchecked.characterIndex(i, offsetBy: n)
-  }
+  // @_inlineable
+  // @_versioned
+  // internal
+  // func characterIndex(
+  //   _ i: String.Index, offsetBy n: String.IndexDistance
+  // ) -> String.Index {
+  //   let contigOpt = self._unmanagedContiguous
+  //   if _slowPath(contigOpt == nil) {
+  //     return String.CharacterView(self).index(i, offsetBy: n) // TODO: opaque string
+  //   }
+  //   return contigOpt._unsafelyUnwrappedUnchecked.characterIndex(i, offsetBy: n)
+  // }
 }
 
 extension UnsafeString {
@@ -1655,13 +1662,13 @@ extension UnsafeString {
     return String.CharacterView(_StringGuts(self)).index(before: i)
   }
 
-  @inline(never) // @_inlineable
-  @_versioned
-  internal
-  func characterIndex(_ i: String.Index, offsetBy n: String.IndexDistance) -> String.Index {
-    // TODO: implement directly
-    return String.CharacterView(_StringGuts(self)).index(i, offsetBy: n)
-  }
+  // @inline(never) // @_inlineable
+  // @_versioned
+  // internal
+  // func characterIndex(_ i: String.Index, offsetBy n: String.IndexDistance) -> String.Index {
+  //   // TODO: implement directly
+  //   return String.CharacterView(_StringGuts(self)).index(i, offsetBy: n)
+  // }
 
   // TODO: Implement directly
   @inline(never) // FIXME: remove
@@ -1672,6 +1679,36 @@ extension UnsafeString {
       _StringGuts(self)
     )._measureExtendedGraphemeClusterForward(
       from: String.Index(encodedOffset: idx))
+  }
+}
+
+extension OpaqueCocoaString {
+  var characterView: String.CharacterView {
+    return String.CharacterView(_StringGuts(self))
+  }
+
+  @inline(never) // @_inlineable
+  @_versioned
+  internal
+  func characterIndex(after i: String.Index) -> String.Index {
+    // TODO: implement directly
+    return characterView.index(after: i)
+  }
+
+  @inline(never) // @_inlineable
+  @_versioned
+  internal
+  func characterIndex(before i: String.Index) -> String.Index {
+    // TODO: implement directly
+    return characterView.index(before: i)
+  }
+
+  @inline(never) // @_inlineable
+  @_versioned
+  internal
+  func character(at i: String.Index) -> Character {
+    // TODO: implement directly
+    return characterView[i]
   }
 }
 
