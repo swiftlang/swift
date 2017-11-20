@@ -258,10 +258,6 @@ public:
     FrontendOpts.Inputs.addInputBuffer(Buf);
   }
 
-  void setPrimaryInput(SelectedInput pi) {
-    FrontendOpts.Inputs.setPrimaryInput(pi);
-  }
-
   void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
 
   StringRef getOutputFilename() const {
@@ -314,7 +310,7 @@ public:
   /// Return value includes the buffer so caller can keep it alive.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   setUpInputForSILTool(StringRef InputFilename, StringRef ModuleNameArg,
-                       bool alwaysSetModuleToMain,
+                       bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;

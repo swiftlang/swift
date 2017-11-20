@@ -1901,6 +1901,7 @@ llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInvocation::setUpInputForSILTool(
     StringRef InputFilename, StringRef ModuleNameArg,
     bool alwaysSetModuleToMain,
+                                         bool bePrimary,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -1911,7 +1912,10 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  addInputBuffer(FileBufOrErr.get().get());
+  
+  addInput(FrontendInputs::InputFileOrBuffer(bePrimary,
+                                             FileBufOrErr.get().get(),
+                                             InputFilename.empty() || InputFilename == "-" ? Optional<std::string>() : InputFilename.str()));
 
   auto result = serialization::validateSerializedAST(
       FileBufOrErr.get()->getBuffer(), &extendedInfo);

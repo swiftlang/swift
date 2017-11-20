@@ -147,12 +147,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   for (const auto &input: OrigFrontendOpts.Inputs.getInputs()) {
     Invocation.addInput(input);
   }
-  const unsigned PrimaryIndex =
-      Invocation.getFrontendOptions().Inputs.getInputBuffers().size();
-
-  Invocation.addInputBuffer(InputBuffer.get());
-  Invocation.getFrontendOptions().Inputs.setPrimaryInput(
-      {PrimaryIndex, SelectedInput::InputKind::Buffer});
+  Invocation.getFrontendOptions().Inputs.addInput( FrontendInputs::InputFileOrBuffer(true, InputBuffer.get(), Optional<std::string>()));
 
   auto Instance = llvm::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation)) {

@@ -101,17 +101,7 @@ public:
 private:
   std::vector<InputFileOrBuffer> Inputs;
   
-  
-  /// Input buffers which may override the file contents of input files.
-  std::vector<llvm::MemoryBuffer *> InputBuffers;
-
-  /// The inputs for which output should be generated. If empty, output will
-  /// be generated for the whole module, in other words, whole-module mode.
-  /// Even if every input file is mentioned here, it is not the same as
-  /// whole-module mode.
-  std::vector<SelectedInput> PrimaryInputs;
-
-public:
+ public:
   // Readers:
   
   ArrayRef<InputFileOrBuffer> getInputs() const {
@@ -159,13 +149,6 @@ public:
   // If we have exactly one input filename, and its extension is "bc" or "ll",
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
-
-  // Input buffer readers
-
-  ArrayRef<llvm::MemoryBuffer *> getInputBuffers() const {
-    return InputBuffers;
-  }
-  unsigned inputBufferCount() const { return getInputBuffers().size(); }
 
   // Primary input readers
 
@@ -248,44 +231,18 @@ public:
 
   // Input buffer writers
 
-  void addInputBuffer(llvm::MemoryBuffer *Buf) { InputBuffers.push_back(Buf); }
+  void addInputBuffer(llvm::MemoryBuffer *Buf) {
+    Inputs.push_back(InputFileOrBuffer(false, Buf, Optional<std::string>()));
+  }
 
   // Primary input writers
 
-private:
-  std::vector<SelectedInput> &getMutablePrimaryInputs() {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    return PrimaryInputs;
-  }
 
 public:
-  void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
 
-  void setPrimaryInputToFirstFile() {
-    clearPrimaryInputs();
-    addPrimaryInput(SelectedInput(0, SelectedInput::InputKind::Filename));
-  }
-
-  void addPrimaryInput(SelectedInput si) { PrimaryInputs.push_back(si); }
-
-  void setPrimaryInput(SelectedInput si) {
-    clearPrimaryInputs();
-    getMutablePrimaryInputs().push_back(si);
-  }
-
-  void old_addPrimaryInputFilename(unsigned index) {
-    addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
-  }
+ 
   void addPrimaryInputFilename(StringRef filename) {
     Inputs.push_back(InputFileOrBuffer(filename, true));
-  }
-
-  void setPrimaryInputForInputFilename(const std::string &inputFilename) {
-    setPrimaryInput(!inputFilename.empty() && inputFilename != "-"
-                        ? SelectedInput(inputFilenameCount(),
-                                        SelectedInput::InputKind::Filename)
-                        : SelectedInput(inputBufferCount(),
-                                        SelectedInput::InputKind::Buffer));
   }
 
   // Multi-faceted writers
@@ -295,7 +252,6 @@ public:
   }
 
   void clearInputs() {
-    InputBuffers.clear();
     Inputs.clear();
   }
 };
