@@ -348,6 +348,10 @@ public:
   /// Emit an equivalent value with independent ownership.
   RValue copy(SILGenFunction &SGF, SILLocation loc) const &;
 
+  /// If this RValue is a +0 value, copy the RValue and return. Otherwise,
+  /// return std::move(*this);
+  RValue ensurePlusOne(SILGenFunction &SGF, SILLocation loc) &&;
+
   /// Borrow all subvalues of the rvalue.
   RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;
 

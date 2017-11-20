@@ -698,6 +698,12 @@ RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
   return RValue(SGF, std::move(copiedValues), type, elementsToBeAdded);
 }
 
+RValue RValue::ensurePlusOne(SILGenFunction &SGF, SILLocation loc) && {
+  if (SGF.getOptions().EnableGuaranteedNormalArguments && isPlusZero(SGF))
+    return copy(SGF, loc);
+  return std::move(*this);
+}
+
 RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
   assert((isComplete() || isInSpecialState()) &&
          "can't borrow incomplete rvalue");

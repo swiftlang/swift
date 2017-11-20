@@ -195,3 +195,13 @@ void ManagedValue::dump(raw_ostream &os, unsigned indent) const {
     os << "<null>\n";
   }
 }
+
+ManagedValue ManagedValue::ensurePlusOne(SILGenFunction &SGF,
+                                         SILLocation loc) const {
+  // guaranteed-normal-args-todo: We only copy here when guaranteed normal args
+  // are explicitly enabled. Otherwise, this always just returns self.
+  if (SGF.getOptions().EnableGuaranteedNormalArguments && !hasCleanup()) {
+    return copy(SGF, loc);
+  }
+  return *this;
+}
