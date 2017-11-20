@@ -188,6 +188,17 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
   auto call = IGF.Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
 
+  const llvm::Triple &triple = IGF.IGM.Context.LangOpts.Target;
+  if (triple.getArch() == llvm::Triple::x86_64) {
+    // Don't tail call objc_retainAutoreleasedReturnValue. This blocks the
+    // autoreleased return optimization.
+    // callq  0x01ec08 ; symbol stub for: objc_msgSend
+    // movq   %rax, %rdi
+    // popq   %rbp  ;<== Blocks the handshake from objc_autoreleaseReturnValue
+    // jmp    0x01ec20 ; symbol stub for: objc_retainAutoreleasedReturnValue
+    call->setTailCallKind(llvm::CallInst::TCK_NoTail);
+  }
+
   llvm::Value *result = call;
   if (isa<llvm::PointerType>(valueType)) {
     result = IGF.Builder.CreateBitCast(result, valueType);
