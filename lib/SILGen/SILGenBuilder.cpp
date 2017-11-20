@@ -731,6 +731,14 @@ void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
   createStoreBorrow(loc, value, address);
 }
 
+ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,
+                                                    ManagedValue mv,
+                                                    SILType destType) {
+  CleanupCloner cloner(*this, mv);
+  SILValue result = createBridgeObjectToRef(loc, mv.forward(SGF), destType);
+  return cloner.clone(result);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//
