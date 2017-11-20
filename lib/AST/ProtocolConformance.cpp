@@ -958,10 +958,8 @@ ProtocolConformance::subst(Type substType,
              && "substitution mapped to different nominal?!");
 
       SubstitutionMap subMap;
-      if (getGenericSignature()) {
-        auto *genericEnv = getGenericEnvironment();
-        subMap = genericEnv->getSubstitutionMap(subs, conformances);
-      }
+      if (auto *genericSig = getGenericSignature())
+        subMap = genericSig->getSubstitutionMap(subs, conformances);
 
       return substType->getASTContext()
         .getSpecializedConformance(substType,

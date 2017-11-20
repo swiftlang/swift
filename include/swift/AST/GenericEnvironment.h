@@ -155,12 +155,6 @@ public:
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
 
-  /// Build a contextual type substitution map from a type substitution function
-  /// and conformance lookup function.
-  SubstitutionMap
-  getSubstitutionMap(TypeSubstitutionFn subs,
-                     LookupConformanceFn lookupConformance) const;
-
   SubstitutionList getForwardingSubstitutions() const;
 
   void dump(raw_ostream &os) const;
