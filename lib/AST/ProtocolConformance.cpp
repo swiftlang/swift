@@ -979,7 +979,17 @@ ProtocolConformance::subst(Type substType,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(substType, subs, conformances);
+      // Follow the substituted type up the superclass chain until we reach
+      // the underlying class type.
+      auto targetClass =
+        inheritedConformance->getType()->getClassOrBoundGenericClass();
+      auto superclassType = substType;
+      while (superclassType->getClassOrBoundGenericClass() != targetClass)
+        superclassType = superclassType->getSuperclass();
+
+      // Substitute into the superclass.
+      newBase = inheritedConformance->subst(superclassType, subs,
+                                            conformances);
     } else {
       newBase = inheritedConformance;
     }
