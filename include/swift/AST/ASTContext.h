@@ -751,10 +751,11 @@ public:
   /// \param substitutions The set of substitutions required to produce the
   /// specialized conformance from the generic conformance. This list is
   /// copied so passing a temporary is permitted.
-  SpecializedProtocolConformance *
+  ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            SubstitutionList substitutions);
+                            SubstitutionList substitutions,
+                            bool alreadyCheckedCollapsed = false);
 
   /// \brief Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic
@@ -768,7 +769,7 @@ public:
   /// specialized conformance from the generic conformance. The keys must
   /// be generic parameters, not archetypes, so for example passing in
   /// TypeBase::getContextSubstitutionMap() is OK.
-  SpecializedProtocolConformance *
+  ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
                             const SubstitutionMap &substitutions);
