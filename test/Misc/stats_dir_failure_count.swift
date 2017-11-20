@@ -1,3 +1,4 @@
+// REQUIRES: rdar35537905
 // Check that a failed process-tree emits nonzero failure counters
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: echo zzz >%t/other.swift
