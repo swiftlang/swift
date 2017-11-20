@@ -36,7 +36,7 @@ func repr(_ x: NSString) -> String {
 func repr(_ x: _LegacyStringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
-    var offset = x.elementWidth == 2
+    let offset = x.elementWidth == 2
       ? b.start - UnsafeMutableRawPointer(x.startUTF16)
       : b.start - UnsafeMutableRawPointer(x.startASCII)
       return "Contiguous(owner: "
@@ -80,7 +80,7 @@ func nonASCII() {
   // Cocoa stores non-ASCII in a UTF-16 buffer
   // Code units in each character: 2 1 1 1 2 2 2
   // Offset of each character:     0 2 3 4 5 7 9 11
-  var nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
+  let nsUTF16 = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!
   // CHECK-NEXT: has UTF-16: true
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, to: CFString.self)) != nil)")
 
@@ -92,11 +92,11 @@ func nonASCII() {
   print("  \(repr(nsUTF16))")
 
   // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 11))
-  var newNSUTF16 = nsUTF16 as String
+  let newNSUTF16 = nsUTF16 as String
   print("  \(repr(newNSUTF16))")
 
   // CHECK-NEXT: __NSCFString@[[utf16address]] = "🏂☃❅❆❄︎⛄️❄️"
-  var nsRoundTripUTF16 = newNSUTF16 as NSString
+  let nsRoundTripUTF16 = newNSUTF16 as NSString
   print("  \(repr(nsRoundTripUTF16))")
 
   // CHECK: --- UTF-16 slicing ---
@@ -126,7 +126,7 @@ func ascii() {
   // Cocoa stores ASCII in a buffer of bytes.  This is an important case
   // because it doesn't provide a contiguous array of UTF-16, so we'll be
   // treating it as an opaque NSString.
-  var nsASCII = NSString(utf8String: "foobar")!
+  let nsASCII = NSString(utf8String: "foobar")!
   // CHECK-NEXT: has UTF-16: false
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsASCII, to: CFString.self)) != nil)")
   print("has ASCII pointer: \(CFStringGetCStringPtr(unsafeBitCast(nsASCII, to: CFString.self), 0x0600) != nil)")
@@ -139,11 +139,11 @@ func ascii() {
   print("  \(repr(nsASCII))")
 
   // CHECK-NEXT NO: String(Opaque(buffer: @[[asciiaddress]][0...6]))
-  var newNSASCII = nsASCII as String
+  let newNSASCII = nsASCII as String
   // print("  \(repr(newNSASCII))")
 
   // CHECK-NEXT: [[nsstringclass]]@[[asciiaddress]] = "foobar"
-  var nsRoundTripASCII = newNSASCII as NSString
+  let nsRoundTripASCII = newNSASCII as NSString
   print("  \(repr(nsRoundTripASCII))")
 
   // CHECK: --- ASCII slicing ---
@@ -156,7 +156,7 @@ func ascii() {
   print("  \(repr(newNSASCII[i3..<i6]))")
 
   // Representing a slice as an NSString
-  var nsSliceASCII = newNSASCII[i3..<i6] as NSString
+  let nsSliceASCII = newNSASCII[i3..<i6] as NSString
   print("  \(repr(nsSliceASCII))")
 
   // Round-tripped back to Swift
@@ -173,13 +173,13 @@ print("--- Literals ---")
 
 // CHECK-NEXT: String(Contiguous(owner: null, count: 6)) = "foobar"
 // CHECK-NEXT: true
-var asciiLiteral: String = "foobar"
+let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
 print("  \(asciiLiteral._core.isASCII)")
 
 // CHECK-NEXT: String(Contiguous(owner: null, count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
-var nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
+let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")
 print("  \(!asciiLiteral._core.isASCII)")
 
@@ -190,7 +190,7 @@ print("  \(!asciiLiteral._core.isASCII)")
 // ===---------- Comparison --------===
 
 var s = "ABCDEF"
-var s1 = s + "G"
+let s1 = s + "G"
 
 // CHECK-NEXT: true
 print("\(s) == \(s) => \(s == s)")
