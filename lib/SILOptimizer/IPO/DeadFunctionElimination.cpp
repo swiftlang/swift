@@ -30,16 +30,6 @@ STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
 namespace {
 
-/// Returns true if a given function should always be emitted into client.
-/// Such functions cannot be referenced from outside.
-/// NOTE: Global initializers are never serialized (even if e.g. the
-/// unsafeMutableAddressor is marked as transparent) and thus they cannot be
-/// emitted into clients. They should always be emitted into the defining
-/// module.
-static bool shouldBeAlwaysEmittedIntoClient(SILFunction *F) {
-  return F->isTransparent() && !F->isGlobalInit();
-}
-
 /// Returns true if a function should be SIL serialized or emitted by IRGen.
 static bool shouldBeSerializedOrEmitted(SILFunction *F) {
   // global initializers are always emitted into the defining module and
@@ -48,8 +38,7 @@ static bool shouldBeSerializedOrEmitted(SILFunction *F) {
     return true;
 
   // public_external functions are never SIL serialized or emitted by IRGen.
-  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()) &&
-      !shouldBeAlwaysEmittedIntoClient(F))
+  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()))
     return false;
 
   // [serialized] functions should always be SIL serialized.
@@ -136,12 +125,7 @@ protected:
       return true;
 
     // Functions that may be used externally cannot be removed.
-    // But there is one exception from this rule:
-    // If it is a whole-module compilation and the function is supposed to
-    // always be emitted into client then is does not need to be an anchor as
-    // it cannot be invoked from outside the module.
-    if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()) &&
-        !shouldBeAlwaysEmittedIntoClient(F))
+    if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()))
       return true;
 
     // If function is marked as "keep-as-public", don't remove it.
