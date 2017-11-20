@@ -121,6 +121,16 @@ public protocol StringProtocol
 }
 
 extension StringProtocol {
+  public var _wholeString: String {
+    return String(self)
+  }
+
+  public var _encodedOffsetRange: Range<Int> {
+    return 0 ..< numericCast(self.utf16.count)
+  }
+}
+
+extension StringProtocol {
   //@available(swift, deprecated: 3.2, obsoleted: 4.0, message: "Please use the StringProtocol itself")
   //public var characters: Self { return self }
 
