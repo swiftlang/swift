@@ -211,6 +211,12 @@ public:
     return input != nullptr ? input->getFile() : Optional<StringRef>();
   }
   
+  StringRef getPrimaryInputFilename() const {
+    if (auto fn = getOptionalUniquePrimaryInputFilename())
+      return *fn;
+    return StringRef();
+  }
+  
 public:
   // Multi-facet readers
   bool shouldTreatAsSIL() const;

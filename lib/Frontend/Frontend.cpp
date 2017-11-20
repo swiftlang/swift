@@ -463,7 +463,7 @@ void CompilerInstance::createREPLFile(
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
       Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*SingleInputFile);
+  MainModule->addFile(*SingleInputFile);//xxxdmu
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
 
@@ -488,7 +488,7 @@ void CompilerInstance::addMainFileToModule(
   auto *MainFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), MainBufferID,
       implicitImports.kind, Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*MainFile);
+  MainModule->addFile(*MainFile);//xxxdmu
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 
   if (MainBufferID == PrimaryBufferID)
@@ -566,7 +566,7 @@ void CompilerInstance::parseLibraryFile(
   auto *NextInput = new (*Context) SourceFile(
       *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind,
       Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*NextInput);
+  MainModule->addFile(*NextInput);//xxxdmu
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   auto *DelayedCB = SecondaryDelayedCB;
@@ -744,7 +744,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     auto *MainFile = new (*Context)
         SourceFile(*MainModule, Invocation.getSourceFileKind(), MainBufferID,
                    implicitModuleImportKind, KeepSyntaxInfo);
-    MainModule->addFile(*MainFile);
+    MainModule->addFile(*MainFile);//xxxdmu
 
     if (MainBufferID == PrimaryBufferID)
       setPrimarySourceFile(MainFile);
@@ -760,7 +760,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     auto *NextInput = new (*Context)
         SourceFile(*MainModule, SourceFileKind::Library, BufferID,
                    implicitModuleImportKind, KeepSyntaxInfo);
-    MainModule->addFile(*NextInput);
+    MainModule->addFile(*NextInput);//xxxdmu
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
 

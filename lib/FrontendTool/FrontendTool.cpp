@@ -780,8 +780,10 @@ static bool performCompile(CompilerInstance &Instance,
     if (opts.Inputs.haveAPrimaryInputFile()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
+        // Help, Jordan! Or Erik!
         auto Filename = opts.Inputs.getRequiredUniquePrimaryInputFilename();
-        Instance.getMainModule()->getFiles()[Index];
+        assert(false && "Do I trust the index???");
+        // PrimaryFile = Instance.getMainModule()->getFiles()[Index];
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
@@ -1373,7 +1375,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &FEOpts = Invocation.getFrontendOptions();
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName = FEOpts.Inputs.primaryInputFilenameIfAny();
+    StringRef InputName = FEOpts.Inputs.getPrimaryInputFilename();
     StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
