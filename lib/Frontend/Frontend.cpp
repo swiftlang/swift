@@ -178,7 +178,7 @@ Optional<unsigned> CompilerInstance::setupCodeCompletionBuffer() {
 bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
-  for (const FrontendInputs::InputFileOrBuffer &input: Invocation.getFrontendOptions().Inputs.getInputs())
+  for (const InputFileOrBuffer &input: Invocation.getFrontendOptions().Inputs.getInputs())
     if (setupForInput(input))
       return true;
  
@@ -193,7 +193,7 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   return false;
 }
 
-bool CompilerInstance::setupForInput(const FrontendInputs::InputFileOrBuffer &input) {
+bool CompilerInstance::setupForInput(const InputFileOrBuffer &input) {
   if (llvm::MemoryBuffer *inputBuffer = input.getBuffer())
     setupForBuffer(inputBuffer, input.getIsPrimary());
   if (Optional<StringRef> file = input.getFile())

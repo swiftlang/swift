@@ -134,20 +134,20 @@ class ArgsToFrontendInputsConverter {
         if (arePrimariesOnCommandLineAlsoAppearingInFilelist())
           PrimaryFilesToAdd.insert(file);
         else
-          Inputs.addPrimaryInputFilename(file);
+          Inputs.addPrimaryInputFile(file);
       break;
 
       case Whence::SecondaryFromCommandLine:
-        Inputs.addInputFilename(file);
+        Inputs.addInputFile(file);
         break;
         
     case Whence::SecondaryFromFileList:
         if (PrimaryFilesToAdd.count(file)) {
-          Inputs.addPrimaryInputFilename(file);
+          Inputs.addPrimaryInputFile(file);
           PrimaryFilesToAdd.erase(file);
         }
         else
-          Inputs.addInputFilename(file);
+          Inputs.addInputFile(file);
       break;
     }
   }
@@ -1912,10 +1912,9 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  
-  addInput(FrontendInputs::InputFileOrBuffer(bePrimary,
-                                             FileBufOrErr.get().get(),
-                                             InputFilename.empty() || InputFilename == "-" ? Optional<std::string>() : InputFilename.str()));
+  auto  filename = InputFilename.empty() || InputFilename == "-" ? Optional<std::string>() : InputFilename.str();
+  addInput(InputFileOrBuffer::createFile(filename, bePrimary,
+                                         FileBufOrErr.get().get());
 
   auto result = serialization::validateSerializedAST(
       FileBufOrErr.get()->getBuffer(), &extendedInfo);

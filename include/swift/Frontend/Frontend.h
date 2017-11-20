@@ -245,20 +245,6 @@ public:
     return FrontendOpts.ModuleName;
   }
 
-  /// Does not take ownership of \p Buf.
-  void addInput(const FrontendInputs::InputFileOrBuffer &input) {
-    FrontendOpts.Inputs.addInput(input);
-  }
-  void addInputFilename(StringRef Filename) {
-    FrontendOpts.Inputs.addInputFilename(Filename);
-  }
-
-  /// Does not take ownership of \p Buf.
-  void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    FrontendOpts.Inputs.addInputBuffer(Buf);
-  }
-
-  void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
 
   StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
@@ -445,7 +431,7 @@ private:
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() { return Invocation.isInputSwift(); }
   bool isInSILMode() { return Invocation.isInputSIL(); }
-  bool setupForInput(const FrontendInputs::InputFileOrBuffer &input);
+  bool setupForInput(const InputFileOrBuffer &input);
   void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
   bool setupForFile(StringRef file, bool isPrimary);
 

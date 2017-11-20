@@ -1004,7 +1004,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   auto InputBuffer = llvm::MemoryBuffer::getMemBufferCopy(SourceText,"<extract>");
 
   CompilerInvocation Invocation{};
-  Invocation.addInput(FrontendInputs::InputFileOrBuffer(true, InputBuffer.get(), Optional<std::string>()));
+  Invocation.getFrontendOptions().Inputs.addPrimaryInputBuffer(InputBuffer.get());
   Invocation.getFrontendOptions().ModuleName = "extract";
 
   auto Instance = llvm::make_unique<swift::CompilerInstance>();
