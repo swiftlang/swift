@@ -2582,6 +2582,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Unsolved;
   }
 
+  /// Record the given conformance as the result, adding any conditional
+  /// requirements if necessary.
+  auto recordConformance = [&](ProtocolConformanceRef conformance) {
+    // Record the conformance.
+    CheckedConformances.push_back({getConstraintLocator(locator), conformance});
+
+    // This conformance may be conditional, in which case we need to consider
+    // those requirements as constraints too.
+    if (conformance.isConcrete()) {
+      for (const auto &req : conformance.getConditionalRequirements()) {
+        // FIXME: Use a more specific locator.
+        addConstraint(req, locator);
+      }
+    }
+
+    return SolutionKind::Solved;
+  };
+
   // For purposes of argument type matching, existential types don't need to
   // conform -- they only need to contain the protocol, so check that
   // separately.
@@ -2590,9 +2608,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (auto conformance =
           TC.containsProtocol(type, protocol, DC,
                               ConformanceCheckFlags::InExpression)) {
-      CheckedConformances.push_back({getConstraintLocator(locator),
-                                     *conformance});
-      return SolutionKind::Solved;
+      return recordConformance(*conformance);
     }
     break;
   case ConstraintKind::ConformsTo:
@@ -2601,17 +2617,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (auto conformance =
           TC.conformsToProtocol(type, protocol, DC,
                                 ConformanceCheckFlags::InExpression)) {
-      CheckedConformances.push_back({getConstraintLocator(locator),
-                                     *conformance});
-
-      // This conformance may be conditional, in which case we need to consider
-      // those requirements as constraints too.
-      if (conformance->isConcrete()) {
-        for (auto req : conformance->getConditionalRequirements()) {
-          addConstraint(req, locator);
-        }
-      }
-      return SolutionKind::Solved;
+      return recordConformance(*conformance);
     }
     break;
   }
