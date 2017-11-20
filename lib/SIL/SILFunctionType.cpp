@@ -237,7 +237,7 @@ public:
   getDirectParameter(unsigned index,
                      const AbstractionPattern &type,
                      const TypeLowering &substTL) const = 0;
-  virtual ParameterConvention getCallee(bool useGuaranteedContext) const = 0;
+  virtual ParameterConvention getCallee() const = 0;
   virtual ResultConvention getResult(const TypeLowering &resultTL) const = 0;
   virtual ParameterConvention
   getIndirectSelfParameter(const AbstractionPattern &type) const = 0;
@@ -820,15 +820,11 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       // Constants are captured by value.
       ParameterConvention convention;
       if (loweredTL.isAddressOnly()) {
-        convention = M.getOptions().EnableGuaranteedClosureContexts
-                         ? ParameterConvention::Indirect_In_Guaranteed
-                         : ParameterConvention::Indirect_In;
+        convention = ParameterConvention::Indirect_In_Guaranteed;
       } else if (loweredTL.isTrivial()) {
         convention = ParameterConvention::Direct_Unowned;
       } else {
-        convention = M.getOptions().EnableGuaranteedClosureContexts
-                         ? ParameterConvention::Direct_Guaranteed
-                         : ParameterConvention::Direct_Owned;
+        convention = ParameterConvention::Direct_Guaranteed;
       }
       SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
       inputs.push_back(param);
@@ -839,9 +835,7 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       auto boxTy = Types.getInterfaceBoxTypeForCapture(
           VD, loweredTy.getSwiftRValueType(),
           /*mutable*/ true);
-      auto convention = M.getOptions().EnableGuaranteedClosureContexts
-                            ? ParameterConvention::Direct_Guaranteed
-                            : ParameterConvention::Direct_Owned;
+      auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention);
       inputs.push_back(param);
       break;
@@ -972,8 +966,7 @@ static CanSILFunctionType getSILFunctionType(
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
   if (extInfo.hasContext())
-    calleeConvention =
-        conventions.getCallee(M.getOptions().EnableGuaranteedClosureContexts);
+    calleeConvention = conventions.getCallee();
 
   bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
 
@@ -1012,7 +1005,7 @@ struct DeallocatorConventions : Conventions {
     llvm_unreachable("Deallocators do not have non-self direct parameters");
   }
 
-  ParameterConvention getCallee(bool) const override {
+  ParameterConvention getCallee() const override {
     llvm_unreachable("Deallocators do not have callees");
   }
 
@@ -1077,9 +1070,7 @@ public:
     return ParameterConvention::Direct_Owned;
   }
 
-  ParameterConvention getCallee(bool useGuaranteedContext) const override {
-    if (useGuaranteedContext)
-      return ParameterConvention::Direct_Guaranteed;
+  ParameterConvention getCallee() const override {
     return DefaultThickCalleeConvention;
   }
 
@@ -1174,7 +1165,7 @@ struct DefaultBlockConventions : Conventions {
     return ParameterConvention::Direct_Unowned;
   }
 
-  ParameterConvention getCallee(bool) const override {
+  ParameterConvention getCallee() const override {
     return ParameterConvention::Direct_Unowned;
   }
 
@@ -1364,7 +1355,7 @@ public:
     return getDirectCParameterConvention(Method->param_begin()[index]);
   }
 
-  ParameterConvention getCallee(bool) const override {
+  ParameterConvention getCallee() const override {
     // Always thin.
     return ParameterConvention::Direct_Unowned;
   }
@@ -1515,7 +1506,7 @@ public:
     return getDirectCParameterConvention(getParamType(index));
   }
 
-  ParameterConvention getCallee(bool) const override {
+  ParameterConvention getCallee() const override {
     // FIXME: blocks should be Direct_Guaranteed.
     return ParameterConvention::Direct_Unowned;
   }
@@ -1810,7 +1801,7 @@ public:
     return ParameterConvention::Direct_Unowned;
   }
 
-  ParameterConvention getCallee(bool) const override {
+  ParameterConvention getCallee() const override {
     // Always thin.
     return ParameterConvention::Direct_Unowned;
   }

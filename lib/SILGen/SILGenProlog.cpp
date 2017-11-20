@@ -392,8 +392,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILType ty = lowering.getLoweredType();
     SILValue val = SGF.F.begin()->createFunctionArgument(ty, VD);
 
-    bool NeedToDestroyValueAtExit =
-        !SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts;
+    bool NeedToDestroyValueAtExit = false;
 
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
@@ -401,11 +400,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
       auto addr = SGF.emitTemporaryAllocation(VD, ty);
-      if (SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts) {
-        // We have created a copy that needs to be destroyed.
-        val = SGF.B.createCopyValue(Loc, val);
-        NeedToDestroyValueAtExit = true;
-      }
+      // We have created a copy that needs to be destroyed.
+      val = SGF.B.createCopyValue(Loc, val);
+      NeedToDestroyValueAtExit = true;
       lowering.emitStore(SGF.B, VD, val, addr, StoreOwnershipQualifier::Init);
       val = addr;
     }
@@ -434,8 +431,6 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SGF.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
-    if (!SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts)
-      SGF.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
   case CaptureKind::StorageAddress: {

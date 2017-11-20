@@ -4086,9 +4086,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
                                                 functionTy);
     }
   }
-  auto calleeConvention = SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
-                              ? ParameterConvention::Direct_Guaranteed
-                              : ParameterConvention::Direct_Owned;
+  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
       constantInfo.getSILType(), 1, SGF.B.getModule(), subs, calleeConvention);
 
@@ -5278,9 +5276,7 @@ static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
                                             SILValue self,
                                          CanAnyFunctionType foreignFormalType,
                                          CanAnyFunctionType nativeFormalType) {
-  auto calleeConvention = SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
-                              ? ParameterConvention::Direct_Guaranteed
-                              : ParameterConvention::Direct_Owned;
+  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
   auto partialApplyTy =
       SILBuilder::getPartialApplyResultType(method->getType(),
