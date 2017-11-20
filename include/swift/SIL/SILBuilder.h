@@ -1247,6 +1247,14 @@ public:
     llvm_unreachable("Can not emit a destructure for this type of operand.");
   }
 
+  void
+  emitShallowDestructureValueOperation(SILLocation Loc, SILValue Operand,
+                                       llvm::SmallVectorImpl<SILValue> &Result);
+
+  void emitShallowDestructureAddressOperation(
+      SILLocation Loc, SILValue Operand,
+      llvm::SmallVectorImpl<SILValue> &Result);
+
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ClassMethodInst(
