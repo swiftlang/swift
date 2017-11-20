@@ -115,8 +115,8 @@ struct S: Fooable {
 // in the implementation
 // CHECK-LABEL: sil private [transparent] [thunk] @_T015guaranteed_self1SVAA7FooableA2aDP3bas{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: Fooable) (@inout S) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
-// CHECK:         [[SELF:%.*]] = load [copy] [[SELF_ADDR]]
-// CHECK:         destroy_value [[SELF]]
+// CHECK:         [[SELF:%.*]] = load_borrow [[SELF_ADDR]]
+// CHECK:         end_borrow [[SELF]]
 // CHECK-NOT:     destroy_value [[SELF]]
 
 // Witness thunk for prop1 getter

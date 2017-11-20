@@ -3336,31 +3336,6 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
     witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
-
-  if (!isFree) {
-    // If the requirement has a self parameter passed as an indirect +0 value,
-    // and the witness takes it as a non-inout value, we must load and retain
-    // the self pointer coming in.  This happens when class witnesses implement
-    // non-mutating protocol requirements.
-    auto reqConvention = thunkTy->getSelfParameter().getConvention();
-    auto witnessConvention = witnessFTy->getSelfParameter().getConvention();
-    
-    bool inoutDifference;
-    
-    inoutDifference = reqConvention == ParameterConvention::Indirect_Inout &&
-                    witnessConvention != ParameterConvention::Indirect_Inout;
-
-    if (inoutDifference) {
-      // If there is an inout difference in self, load the inout self parameter.
-      ManagedValue &selfParam = origParams.back();
-      SILValue selfAddr = selfParam.getUnmanagedValue();
-      selfParam = emitLoad(loc, selfAddr,
-                           getTypeLowering(selfType),
-                           SGFContext(),
-                           IsNotTake);
-    }
-  }
-
   AbstractionPattern witnessOrigTy(witnessInfo.LoweredType);
   TranslateArguments(*this, loc,
                      origParams, witnessParams,
