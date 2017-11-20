@@ -90,13 +90,8 @@ enum AddressOnlyEnum {
 // ---
 // CHECK-LABEL: sil private @_T020opaque_values_silgen16OpaqueTupleClassC8inAndOutx_xtx_xt1x_tFAA0dF0CADxxAE_tFTV : $@convention(method) <U> (@in (U, U), @guaranteed OpaqueTupleClass<U>) -> @out (U, U) {
 // CHECK: bb0([[ARG0:%.*]] : $(U, U), [[ARG1:%.*]] : $OpaqueTupleClass<U>):
-// CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]] : $(U, U)
-// CHECK:   [[TELEM0:%.*]] = tuple_extract [[BORROWED_ARG0]] : $(U, U), 0
-// CHECK:   [[COPY0:%.*]] = copy_value [[TELEM0]] : $U
-// CHECK:   [[TELEM1:%.*]] = tuple_extract [[BORROWED_ARG0]] : $(U, U), 1
-// CHECK:   [[COPY1:%.*]] = copy_value [[TELEM1]] : $U
-// CHECK:   end_borrow [[BORROWED_ARG0]]
-// CHECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[COPY0]], [[COPY1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
+// CHECK:   ([[TELEM0:%.*]], [[TELEM1:%.*]]) = destructure_tuple [[ARG0]] : $(U, U)
+// CHECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[TELEM0]], [[TELEM1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
 // CHECK:   [[BORROWED_CALL:%.*]] = begin_borrow [[APPLY]]
 // CHECK:   [[BORROWED_CALL_EXT0:%.*]] = tuple_extract [[BORROWED_CALL]] : $(U, U), 0
 // CHECK:   [[RETVAL0:%.*]] = copy_value [[BORROWED_CALL_EXT0]] : $U
@@ -901,19 +896,10 @@ func s420__globalLvalueGet(_ i : Int) -> Int {
 // CHECK:   [[APPLY_T:%.*]] = apply %{{.*}}<((T) -> (), T)>() : $@convention(thin) <τ_0_0> () -> @out Optional<(Int, τ_0_0)>
 // CHECK:   switch_enum [[APPLY_T]] : $Optional<(Int, (@callee_guaranteed (@in T) -> @out (), T))>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb2([[ENUMARG:%.*]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))):
-// CHECK:   [[BORROWED_ENUMARG:%.*]] = begin_borrow [[ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))
-// CHECK:   [[TELEM0:%.*]] = tuple_extract [[BORROWED_ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T)), 0
-// CHECK:   [[TELEM1:%.*]] = tuple_extract [[BORROWED_ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T)), 1
-// CHECK:   [[COPY1:%.*]] = copy_value [[TELEM1]] : $(@callee_guaranteed (@in T) -> @out (), T)
-// CHECK:   end_borrow [[BORROWED_ENUMARG]]
-// CHECK:   [[BORROWED_COPY1:%.*]] = begin_borrow [[COPY1]] : $(@callee_guaranteed (@in T) -> @out (), T)
-// CHECK:   [[TELEM1P0:%.*]] = tuple_extract [[BORROWED_COPY1]] : $(@callee_guaranteed (@in T) -> @out (), T), 0
-// CHECK:   [[COPY1P0:%.*]] = copy_value [[TELEM1P0]] : $@callee_guaranteed (@in T) -> @out ()
-// CHECK:   [[TELEM1P1:%.*]] = tuple_extract [[BORROWED_COPY1]] : $(@callee_guaranteed (@in T) -> @out (), T), 1
-// CHECK:   [[COPY1P1:%.*]] = copy_value [[TELEM1P1]] : $T
-// CHECK:   end_borrow [[BORROWED_COPY1]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<T>([[COPY1P0]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out ()) -> ()
-// CHECK:   [[NEWT0:%.*]] = tuple ([[PAPPLY]] : $@callee_guaranteed (@in T) -> (), [[COPY1P1]] : $T)
+// CHECK:   ([[TELEM0:%.*]], [[TELEM1:%.*]]) = destructure_tuple [[ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))
+// CHECK:   ([[TELEM10:%.*]], [[TELEM11:%.*]]) = destructure_tuple [[TELEM1]] : $(@callee_guaranteed (@in T) -> @out (), T)
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<T>([[TELEM10]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out ()) -> ()
+// CHECK:   [[NEWT0:%.*]] = tuple ([[PAPPLY]] : $@callee_guaranteed (@in T) -> (), [[TELEM11]] : $T)
 // CHECK:   [[NEWT1:%.*]] = tuple ([[TELEM0]] : $Int, [[NEWT0]] : $(@callee_guaranteed (@in T) -> (), T))
 // CHECK:   [[NEWENUM:%.*]] = enum $Optional<(Int, (@callee_guaranteed (@in T) -> (), T))>, #Optional.some!enumelt.1, [[NEWT1]] : $(Int, (@callee_guaranteed (@in T) -> (), T))
 // CHECK:   br bb3([[NEWENUM]] : $Optional<(Int, (@callee_guaranteed (@in T) -> (), T))>)

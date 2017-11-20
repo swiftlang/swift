@@ -613,47 +613,29 @@ ManagedValue Transform::transformMetatype(ManagedValue meta,
 static void explodeTuple(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue managedTuple,
                          SmallVectorImpl<ManagedValue> &out) {
+  // If the tuple is empty, there's nothing to do.
+  if (managedTuple.getType().castTo<TupleType>()->getNumElements() == 0)
+    return;
 
-  assert(managedTuple.getOwnershipKind() == ValueOwnershipKind::Trivial
-         || managedTuple.hasCleanup());
+  SmallVector<SILValue, 16> elements;
+  bool isPlusOne = managedTuple.hasCleanup();
 
-  // For non-address types, borrow the tuple before extracting and copying its
-  // elements. Creating a scope here ensures that the end_borrow is inserted
-  // correctly and prevents any other cleanup activity from taking meanwhile. We
-  // allow the incoming managedTuple to be destroyed later in its original
-  // scope.
-  //
-  // SEMANTIC SIL TODO: Once we support a SIL "destructure" instruction, we can
-  // remove this borrow scope and all element copies. Instead directly forward
-  // managedTuple into its destructure.
-  Scope destructureScope(SGF, loc);
-  ManagedValue tuple =
-      managedTuple.getType().isAddress()
-          ? ManagedValue::forUnmanaged(managedTuple.forward(SGF))
-          : managedTuple.borrow(SGF, loc);
-
-  auto tupleSILType = tuple.getType();
-  auto tupleType = tupleSILType.castTo<TupleType>();
-
-  llvm::SmallVector<ManagedValue, 16> elements;
-  elements.reserve(tupleType->getNumElements());
-
-  for (auto index : indices(tupleType.getElementTypes())) {
-    // We're starting with a SIL-lowered tuple type, so the elements
-    // must also all be SIL-lowered.
-    SILType eltType = tupleSILType.getTupleElementType(index);
-
-    if (tupleSILType.isAddress()) {
-      elements.push_back(
-          SGF.B.createTupleElementAddr(loc, tuple, index, eltType));
-    } else {
-      ManagedValue extract =
-          SGF.B.createTupleExtract(loc, tuple, index, eltType);
-      elements.push_back(extract.copy(SGF, loc));
-    }
+  if (managedTuple.getType().isAddress()) {
+    SGF.B.emitShallowDestructureAddressOperation(loc, managedTuple.forward(SGF),
+                                                 elements);
+  } else {
+    SGF.B.emitShallowDestructureValueOperation(loc, managedTuple.forward(SGF),
+                                               elements);
   }
-  out.resize(elements.size());
-  destructureScope.popPreservingValues(elements, out);
+
+  for (auto element : elements) {
+    if (!isPlusOne)
+      out.push_back(ManagedValue::forUnmanaged(element));
+    else if (element->getType().isAddress())
+      out.push_back(SGF.emitManagedBufferWithCleanup(element));
+    else
+      out.push_back(SGF.emitManagedRValueWithCleanup(element));
+  }
 }
 
 /// Apply this transformation to all the elements of a tuple value,
