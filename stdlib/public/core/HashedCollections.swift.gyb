@@ -5333,7 +5333,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func nativePointerToValue(
-    forKey key: Key, insertingDefault defaultValue: @autoclosure () -> Value
+    forKey key: Key, insertingDefault defaultValue: () -> Value
   ) -> (inserted: Bool, pointer: UnsafeMutablePointer<Value>) {
 
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
@@ -5369,7 +5369,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func pointerToValue(
-    forKey key: Key, insertingDefault defaultValue: @autoclosure () -> Value
+    forKey key: Key, insertingDefault defaultValue: () -> Value
   ) -> (inserted: Bool, pointer: UnsafeMutablePointer<Value>) {
     ensureNativeBuffer()
     return nativePointerToValue(forKey: key, insertingDefault: defaultValue)
