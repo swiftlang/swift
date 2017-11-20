@@ -1326,6 +1326,17 @@ namespace {
                          SILParameterInfo result) {
       // Easy case: we want to pass exactly this value.
       if (input.getType() == SGF.getSILType(result)) {
+        switch (result.getConvention()) {
+        case ParameterConvention::Direct_Owned:
+        case ParameterConvention::Indirect_In:
+          if (!input.hasCleanup())
+            input = input.copyUnmanaged(SGF, Loc);
+          break;
+
+        default:
+          break;
+        }
+
         Outputs.push_back(input);
         return;
       }
