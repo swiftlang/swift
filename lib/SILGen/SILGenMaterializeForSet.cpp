@@ -524,7 +524,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &SGF) {
   SGF.F.setBare(IsBare);
 
   SmallVector<ManagedValue, 4> params;
-  SGF.collectThunkParams(loc, params, /*allowPlusZero*/ true);
+  SGF.collectThunkParams(loc, params);
 
   ManagedValue self = params.back();
   SILValue resultBuffer = params[0].getUnmanagedValue();

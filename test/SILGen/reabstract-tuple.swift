@@ -16,13 +16,9 @@ class Box<T> {
 // CHECK:   [[CLOSURE:%.*]] = function_ref @_T04main7testBoxyyFyycfU_ : $@convention(thin) () -> ()
 // CHECK:   [[THICK:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
 // CHECK:   [[TUPLEA:%.*]] = tuple (%{{.*}} : $Int, [[THICK]] : $@callee_guaranteed () -> ())
-// CHECK:   [[BORROWA:%.*]] = begin_borrow [[TUPLEA]] : $(Int, @callee_guaranteed () -> ())
-// CHECK:   [[ELTA_0:%.*]] = tuple_extract [[BORROWA]] : $(Int, @callee_guaranteed () -> ()), 0
-// CHECK:   [[ELTA_1:%.*]] = tuple_extract [[BORROWA]] : $(Int, @callee_guaranteed () -> ()), 1
-// CHECK:   [[COPYA_1:%.*]] = copy_value [[ELTA_1]] : $@callee_guaranteed () -> () 
-// CHECK:   end_borrow [[BORROWA]] from %{{.*}} : $(Int, @callee_guaranteed () -> ()), $(Int, @callee_guaranteed () -> ())
+// CHECK:   ([[ELTA_0:%.*]], [[ELTA_1:%.*]]) = destructure_tuple [[TUPLEA]] : $(Int, @callee_guaranteed () -> ())
 // CHECK:   [[THUNK1:%.*]] = function_ref @_T0Ieg_ytytIegir_TR : $@convention(thin) (@in (), @guaranteed @callee_guaranteed () -> ()) -> @out ()
-// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK1]]([[COPYA_1]]) : $@convention(thin) (@in (), @guaranteed @callee_guaranteed () -> ()) -> @out ()
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK1]]([[ELTA_1]]) : $@convention(thin) (@in (), @guaranteed @callee_guaranteed () -> ()) -> @out ()
 // CHECK:   [[TUPLEB:%.*]] = tuple ([[ELTA_0]] : $Int, [[PA]] : $@callee_guaranteed (@in ()) -> @out ())
 // CHECK:   [[BORROWB:%.*]] = begin_borrow [[TUPLEB]] : $(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   [[TUPLEB_0:%.*]] = tuple_extract [[BORROWB]] : $(Int, @callee_guaranteed (@in ()) -> @out ()), 0
@@ -33,7 +29,6 @@ class Box<T> {
 // CHECK:   [[CALL:%.*]] = apply [[INIT_F]]<(Int, () -> ())>(%{{.*}}, %{{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   end_borrow [[BORROWB]] from %{{.*}} : $(Int, @callee_guaranteed (@in ()) -> @out ()), $(Int, @callee_guaranteed (@in ()) -> @out ())
 // CHECK:   destroy_value [[TUPLEB]] : $(Int, @callee_guaranteed (@in ()) -> @out ())
-// CHECK:   destroy_value [[TUPLEA]] : $(Int, @callee_guaranteed () -> ())
 // CHECK:   [[BORROW_CALL:%.*]] = begin_borrow [[CALL]] : $Box<(Int, () -> ())> 
 // CHECK:   [[REF:%.*]] = ref_element_addr [[BORROW_CALL]] : $Box<(Int, () -> ())>, #Box.value
 // CHECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[REF]] : $*(Int, @callee_guaranteed (@in ()) -> @out ())

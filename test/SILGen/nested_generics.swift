@@ -227,16 +227,11 @@ class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
 
 // CHECK-LABEL: sil private [transparent] [thunk] @_T015nested_generics9OuterRingC05InnerD0Cyx_qd__GAA30ProtocolWithGenericRequirementA2aGP6method1TQz_1UQzqd__tAK1t_AM1uqd__1vtlFTW : $@convention(witness_method: ProtocolWithGenericRequirement) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @in_guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0) {
 // CHECK: bb0([[T:%[0-9]+]] : @trivial $*τ_0_0, [[U:%[0-9]+]] : @trivial $*τ_1_0, [[V:%[0-9]+]] : @trivial $*τ_2_0, [[TOut:%[0-9]+]] : @trivial $*τ_0_0, [[UOut:%[0-9]+]] : @trivial $*τ_1_0, [[VOut:%[0-9]+]] : @trivial $*τ_2_0, [[SELF:%[0-9]+]] : @trivial $*OuterRing<τ_0_0>.InnerRing<τ_1_0>):
-// CHECK:   [[SELF_COPY:%[0-9]+]] = alloc_stack $OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   copy_addr [[SELF]] to [initialization] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load [take] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   [[BORROWED_SELF_COPY_VAL:%.*]] = begin_borrow [[SELF_COPY_VAL]]
-// CHECK:   [[METHOD:%[0-9]+]] = class_method [[BORROWED_SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>, #OuterRing.InnerRing.method!1 : <T><U><V> (OuterRing<T>.InnerRing<U>) -> (T, U, V) -> (T, U, V), $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
-// CHECK:   apply [[METHOD]]<τ_0_0, τ_1_0, τ_2_0>([[T]], [[U]], [[V]], [[TOut]], [[UOut]], [[VOut]], [[BORROWED_SELF_COPY_VAL]]) : $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load_borrow [[SELF]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   [[METHOD:%[0-9]+]] = class_method [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>, #OuterRing.InnerRing.method!1 : <T><U><V> (OuterRing<T>.InnerRing<U>) -> (T, U, V) -> (T, U, V), $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   apply [[METHOD]]<τ_0_0, τ_1_0, τ_2_0>([[T]], [[U]], [[V]], [[TOut]], [[UOut]], [[VOut]], [[SELF_COPY_VAL]]) : $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
-// CHECK:   end_borrow [[BORROWED_SELF_COPY_VAL]] from [[SELF_COPY_VAL]]
-// CHECK:   destroy_value [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   dealloc_stack [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   end_borrow [[SELF_COPY_VAL]] from [[SELF]]
 // CHECK:   return [[RESULT]] : $()
 
 // CHECK: sil_witness_table hidden <Spices> Deli<Spices>.Pepperoni: CuredMeat module nested_generics {

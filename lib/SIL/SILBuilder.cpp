@@ -483,12 +483,10 @@ void SILBuilder::emitShallowDestructureValueOperation(
   // In non qualified ownership SIL, drop back to using projection code.
   llvm::SmallVector<Projection, 16> Projections;
   Projection::getFirstLevelProjections(V->getType(), getModule(), Projections);
-  transform(llvm::reverse(Projections), std::back_inserter(Results),
+  transform(Projections, std::back_inserter(Results),
             [&](const Projection &P) -> SILValue {
               return P.createObjectProjection(*this, Loc, V).get();
             });
-  assert(!Results.empty() &&
-         "We should always have at least one value the original value");
 }
 
 // TODO: Can we put this on type lowering? It would take a little bit of work
@@ -503,16 +501,11 @@ void SILBuilder::emitShallowDestructureAddressOperation(
     Results.emplace_back(V);
     return;
   }
-  // Otherwise, we want to destructure and then add our destructured elements
-  // to the worklist in reverse order. This ensures that we visit the
-  // projection tree in topological order since it is a complete tree.
 
   llvm::SmallVector<Projection, 16> Projections;
   Projection::getFirstLevelProjections(V->getType(), getModule(), Projections);
-  transform(llvm::reverse(Projections), std::back_inserter(Results),
+  transform(Projections, std::back_inserter(Results),
             [&](const Projection &P) -> SILValue {
               return P.createAddressProjection(*this, Loc, V).get();
             });
-  assert(!Results.empty() &&
-         "We should always have at least one value the original value");
 }

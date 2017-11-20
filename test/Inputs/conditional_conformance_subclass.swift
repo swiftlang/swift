@@ -22,10 +22,7 @@ extension Base: P1 where A: P2 {
 // CHECK-NEXT:    [[A_P2:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    %"\CF\84_0_0.P2" = bitcast i8* [[A_P2]] to i8**
 // CHECK-NEXT:    [[SELF:%.]] = load %T32conditional_conformance_subclass4BaseC.0*, %T32conditional_conformance_subclass4BaseC.0** %0
-// CHECK-NEXT:    [[RC_SELF:%.*]] = bitcast %T32conditional_conformance_subclass4BaseC.0* [[SELF]] to %swift.refcounted*
-// CHECK-NEXT:    [[RETAINED:%.*]] = call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[RC_SELF]])
 // CHECK-NEXT:    call swiftcc void @_T032conditional_conformance_subclass4BaseCA2A2P2RzlE6normalyyF(i8** %"\CF\84_0_0.P2", %T32conditional_conformance_subclass4BaseC.0* swiftself [[SELF]])
-// CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T32conditional_conformance_subclass4BaseC.0*)*)(%T32conditional_conformance_subclass4BaseC.0* [[SELF]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 
@@ -37,10 +34,7 @@ extension Base: P1 where A: P2 {
 // CHECK-NEXT:    [[A_P2:%.*]] = load i8*, i8** [[A_P2_PTR]], align 8
 // CHECK-NEXT:    %"\CF\84_0_0.P2" = bitcast i8* [[A_P2]] to i8**
 // CHECK-NEXT:    [[SELF:%.]] = load %T32conditional_conformance_subclass4BaseC.1*, %T32conditional_conformance_subclass4BaseC.1** %1, align 8
-// CHECK-NEXT:    [[RC_SELF:%.*]] = bitcast %T32conditional_conformance_subclass4BaseC.1* [[SELF]] to %swift.refcounted*
-// CHECK-NEXT:    [[RETAINED:%.*]] = call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[RC_SELF]])
 // CHECK-NEXT:    call swiftcc void @_T032conditional_conformance_subclass4BaseCA2A2P2RzlE7genericyqd__AA2P3Rd__lF(%swift.opaque* noalias nocapture %0, %swift.type* %"\CF\84_1_0", i8** %"\CF\84_0_0.P2", i8** %"\CF\84_1_0.P3", %T32conditional_conformance_subclass4BaseC.1* swiftself [[SELF]])
-// CHECK-NEXT:    call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T32conditional_conformance_subclass4BaseC.1*)*)(%T32conditional_conformance_subclass4BaseC.1* [[SELF]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 

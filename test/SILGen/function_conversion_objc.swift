@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -verify | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-sil-ownership -enable-source-import -emit-silgen -verify | %FileCheck %s
 
 import Foundation
 
@@ -14,9 +14,7 @@ func convMetatypeToObject(_ f: @escaping (NSObject) -> NSObject.Type) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0So8NSObjectCABXMTIegxd_AByXlIegxo_TR : $@convention(thin) (@owned NSObject, @guaranteed @callee_guaranteed (@owned NSObject) -> @thick NSObject.Type) -> @owned AnyObject {
-// CHECK:         [[COPY:%.*]] = copy_value %1
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:         apply [[BORROW]](%0)
+// CHECK:         apply %1(%0)
 // CHECK:         thick_to_objc_metatype {{.*}} : $@thick NSObject.Type to $@objc_metatype NSObject.Type
 // CHECK:         objc_metatype_to_object {{.*}} : $@objc_metatype NSObject.Type to $AnyObject
 // CHECK:         return
@@ -31,9 +29,7 @@ func convExistentialMetatypeToObject(_ f: @escaping (NSBurrito) -> NSBurrito.Typ
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T024function_conversion_objc9NSBurrito_pAaB_pXmTIegxd_AaB_pyXlIegxo_TR : $@convention(thin) (@owned NSBurrito, @guaranteed @callee_guaranteed (@owned NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
-// CHECK:         [[COPY:%.*]] = copy_value %1
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:         apply [[BORROW]](%0)
+// CHECK:         apply %1(%0)
 // CHECK:         thick_to_objc_metatype {{.*}} : $@thick NSBurrito.Type to $@objc_metatype NSBurrito.Type
 // CHECK:         objc_existential_metatype_to_object {{.*}} : $@objc_metatype NSBurrito.Type to $AnyObject
 // CHECK:         return
@@ -46,9 +42,7 @@ func convProtocolMetatypeToObject(_ f: @escaping () -> NSBurrito.Protocol) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T024function_conversion_objc9NSBurrito_pXMtIegd_So8ProtocolCIego_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @thin NSBurrito.Protocol) -> @owned Protocol
-// CHECK:         [[COPY:%.*]] = copy_value %0
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPY]]
-// CHECK:         apply [[BORROW]]() : $@callee_guaranteed () -> @thin NSBurrito.Protocol
+// CHECK:         apply %0() : $@callee_guaranteed () -> @thin NSBurrito.Protocol
 // CHECK:         objc_protocol #NSBurrito : $Protocol
 // CHECK:         copy_value
 // CHECK:         return
@@ -65,7 +59,7 @@ func funcToBlock(_ x: @escaping () -> ()) -> @convention(block) () -> () {
 }
 
 // CHECK-LABEL: sil hidden @_T024function_conversion_objc11blockToFuncyycyyXBF : $@convention(thin) (@owned @convention(block) () -> ()) -> @owned @callee_guaranteed () -> ()
-// CHECK: bb0([[ARG:%.*]] : $@convention(block) () -> ()):
+// CHECK: bb0([[ARG:%.*]] : @owned $@convention(block) () -> ()):
 // CHECK:   [[COPIED:%.*]] = copy_block [[ARG]]
 // CHECK:   [[BORROWED_COPIED:%.*]] = begin_borrow [[COPIED]]
 // CHECK:   [[COPIED_2:%.*]] = copy_value [[BORROWED_COPIED]]

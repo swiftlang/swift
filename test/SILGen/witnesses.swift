@@ -187,13 +187,9 @@ func <~>(_ x: ConformingClass, y: ConformingClass) -> ConformingClass { return x
 extension ConformingClass : ClassBounded { }
 // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses15ConformingClassCAA0C7BoundedA2aDP9selfTypes{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: ClassBounded) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass {
 // CHECK:  bb0([[C0:%.*]] : @owned $ConformingClass, [[C1:%.*]] : @guaranteed $ConformingClass):
-// CHECK-NEXT:    [[C1_COPY:%.*]] = copy_value [[C1]]
 // CHECK-NEXT:    function_ref
 // CHECK-NEXT:    [[FUN:%.*]] = function_ref @_T09witnesses15ConformingClassC9selfTypes{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:    [[BORROWED_C1_COPY:%.*]] = begin_borrow [[C1_COPY]]
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[BORROWED_C1_COPY]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
-// CHECK-NEXT:    end_borrow [[BORROWED_C1_COPY]] from [[C1_COPY]]
-// CHECK-NEXT:    destroy_value [[C1_COPY]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[C1]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
 // CHECK-NEXT:    return [[RESULT]] : $ConformingClass
 // CHECK-NEXT:  }
 
@@ -509,17 +505,12 @@ class CrashableBase {
 
 // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses16GenericCrashableCyxGAA0C0A2aEP5crashyyFTW : $@convention(witness_method: Crashable) <τ_0_0> (@in_guaranteed GenericCrashable<τ_0_0>) -> ()
 // CHECK:       bb0(%0 : @trivial $*GenericCrashable<τ_0_0>):
-// CHECK-NEXT: [[BOX:%.*]] = alloc_stack $GenericCrashable<τ_0_0>
-// CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<τ_0_0>
-// CHECK-NEXT: [[SELF:%.*]] = load [take] [[BOX]] : $*GenericCrashable<τ_0_0>
+// CHECK-NEXT: [[SELF:%.*]] = load_borrow %0 : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: [[BASE:%.*]] = upcast [[SELF]] : $GenericCrashable<τ_0_0> to $CrashableBase
-// CHECK-NEXT: [[BORROWED_BASE:%.*]] = begin_borrow [[BASE]]
-// CHECK-NEXT: [[FN:%.*]] = class_method [[BORROWED_BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> (), $@convention(method) (@guaranteed CrashableBase) -> ()
-// CHECK-NEXT: apply [[FN]]([[BORROWED_BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
+// CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> (), $@convention(method) (@guaranteed CrashableBase) -> ()
+// CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
-// CHECK-NEXT: end_borrow [[BORROWED_BASE]] from [[BASE]]
-// CHECK-NEXT: destroy_value [[BASE]] : $CrashableBase
-// CHECK-NEXT: dealloc_stack [[BOX]] : $*GenericCrashable<τ_0_0>
+// CHECK-NEXT: end_borrow [[SELF]] from %0
 // CHECK-NEXT: return [[RESULT]] : $()
 
 class GenericCrashable<T> : CrashableBase, Crashable {}
