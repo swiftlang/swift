@@ -119,31 +119,6 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   return RValue(SGF, std::move(managedValues), type, numEltsRemaining);
 }
 
-void Scope::popPreservingValues(ArrayRef<ManagedValue> innerValues,
-                                MutableArrayRef<ManagedValue> outerValues) {
-  auto &SGF = cleanups.SGF;
-  assert(innerValues.size() == outerValues.size());
-
-  // Record the cleanup information for each preserved value and deactivate its
-  // cleanup.
-  SmallVector<CleanupCloner, 4> cleanups;
-  cleanups.reserve(innerValues.size());
-  for (auto &mv : innerValues) {
-    cleanups.emplace_back(SGF, mv);
-    mv.forward(SGF);
-  }
-
-  // Pop any unpreserved cleanups.
-  pop();
-
-  // Create a managed value for each preserved value, cloning its cleanup.
-  // Since the CleanupCloner does not remember its SILValue, grab it from the
-  // original, now-deactivated managed value.
-  for (auto index : indices(innerValues)) {
-    outerValues[index] = cleanups[index].clone(innerValues[index].getValue());
-  }
-}
-
 void Scope::popImpl() {
   cleanups.stack.checkIterator(depth);
   cleanups.stack.checkIterator(cleanups.innermostScope);

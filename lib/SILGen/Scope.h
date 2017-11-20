@@ -65,12 +65,6 @@ public:
   /// plus zero rvalue.
   RValue popPreservingValue(RValue &&rv);
 
-  /// Pop the scope pushing the +1 ManagedValues in `innerValues` through the
-  /// scope. Asserts if any ManagedValue is plus zero. Each cleanup is recreated
-  /// in the outer scope and associated with a managed value in `outerValues`.
-  void popPreservingValues(ArrayRef<ManagedValue> innerValues,
-                           MutableArrayRef<ManagedValue> outerValues);
-
 private:
   /// Internal private implementation of popImpl so we can use it in Scope::pop
   /// and in Scope's destructor.

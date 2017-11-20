@@ -168,14 +168,12 @@ final class ConformingClass : X {
   // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses15ConformingClassCAA1XA2aDP9selfTypes{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: X) (@in ConformingClass, @inout ConformingClass) -> @out ConformingClass {
   // CHECK:  bb0([[ARG1:%.*]] : @trivial $*ConformingClass, [[ARG2:%.*]] : @trivial $*ConformingClass, [[ARG3:%.*]] : @trivial $*ConformingClass):
   // -- load and copy_value 'self' from inout witness 'self' parameter
-  // CHECK:    [[ARG3_LOADED:%.*]] = load [copy] [[ARG3]] : $*ConformingClass
   // CHECK:    [[ARG2_LOADED:%.*]] = load [take] [[ARG2]] : $*ConformingClass
+  // CHECK:    [[ARG3_LOADED:%.*]] = load_borrow [[ARG3]] : $*ConformingClass
   // CHECK:    [[FUNC:%.*]] = function_ref @_T09witnesses15ConformingClassC9selfTypes{{[_0-9a-zA-Z]*}}F
-  // CHECK:    [[BORROWED_ARG3_LOADED:%.*]] = begin_borrow [[ARG3_LOADED]]
-  // CHECK:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[ARG2_LOADED]], [[BORROWED_ARG3_LOADED]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
+  // CHECK:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[ARG2_LOADED]], [[ARG3_LOADED]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
   // CHECK:    store [[FUNC_RESULT]] to [init] [[ARG1]] : $*ConformingClass
-  // CHECK:    end_borrow [[BORROWED_ARG3_LOADED]] from [[ARG3_LOADED]]
-  // CHECK:    destroy_value [[ARG3_LOADED]]
+  // CHECK:    end_borrow [[ARG3_LOADED]] from [[ARG3]]
   // CHECK:  } // end sil function '_T09witnesses15ConformingClassCAA1XA2aDP9selfTypes{{[_0-9a-zA-Z]*}}FTW'
   func loadable(x: Loadable) -> Loadable { return x }
   func addrOnly(x: AddrOnly) -> AddrOnly { return x }
@@ -460,16 +458,14 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
 
   // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP5widthSivmTW : {{.*}} {
   // CHECK: bb0({{.*}} : @trivial $Builtin.RawPointer, {{.*}} : @trivial $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : @trivial $*PropertyRequirementWitnessFromBase):
-  // CHECK-NEXT: [[ARG2_LOADED:%[0-9][0-9]*]] = load [copy] [[ARG2]]
+  // CHECK-NEXT: [[ARG2_LOADED:%[0-9][0-9]*]] = load_borrow [[ARG2]]
   // CHECK-NEXT: [[CAST_ARG2_LOADED:%[0-9][0-9]*]] = upcast [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase to $PropertyRequirementBase
-  // CHECK-NEXT: [[BORROWED_CAST_ARG2_LOADED:%[0-9][0-9]*]] = begin_borrow [[CAST_ARG2_LOADED]] : $PropertyRequirementBase
-  // CHECK-NEXT: [[METH:%.*]] = class_method [[BORROWED_CAST_ARG2_LOADED]] : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
-  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[BORROWED_CAST_ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-NEXT: [[METH:%.*]] = class_method [[CAST_ARG2_LOADED]] : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
+  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[CAST_ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
   // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
-  // CHECK-NEXT: end_borrow [[BORROWED_CAST_ARG2_LOADED]] from [[CAST_ARG2_LOADED]]
-  // CHECK-NEXT: destroy_value [[CAST_ARG2_LOADED]]
+  // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
   // CHECK-NEXT: return [[TUPLE]]
 
   // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP6heightSivmZTW : {{.*}} {
@@ -483,15 +479,13 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
 
   // CHECK-LABEL: sil private [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP5depthSivmTW
   // CHECK: bb0({{.*}} : @trivial $Builtin.RawPointer, {{.*}} : @trivial $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : @trivial $*PropertyRequirementWitnessFromBase):
-  // CHECK: [[ARG2_LOADED:%[0-9][0-9]*]] = load [copy] [[ARG2]]
+  // CHECK: [[ARG2_LOADED:%[0-9][0-9]*]] = load_borrow [[ARG2]]
   // CHECK: [[METH:%.*]] = class_method [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1
-  // CHECK-NEXT: [[BORROWED_ARG2_LOADED:%.*]] = begin_borrow [[ARG2_LOADED]]
-  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[BORROWED_ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementWitnessFromBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementWitnessFromBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   // CHECK-NEXT: tuple_extract
   // CHECK-NEXT: tuple_extract
   // CHECK-NEXT: [[RES:%.*]] = tuple
-  // CHECK-NEXT: end_borrow [[BORROWED_ARG2_LOADED]] from [[ARG2_LOADED]]
-  // CHECK-NEXT: destroy_value [[ARG2_LOADED]]
+  // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
   // CHECK-NEXT: return [[RES]]
 }
 
