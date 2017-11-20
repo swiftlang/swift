@@ -159,6 +159,18 @@ extension _StringGuts {
 
   @_inlineable
   @_versioned
+  public // @testable
+  var _owner: AnyObject? { // For testing only
+    if _isNative {
+      return _bridgeObject(toNative: _object)
+    } else if _isNonTaggedCocoa {
+      return _bridgeObject(toNonTaggedObjC: _object)
+    }
+    return nil
+  }
+
+  @_inlineable
+  @_versioned
   /*private*/ internal init(
     _unflagged object: _BuiltinBridgeObject,
     isSingleByte: Bool,
