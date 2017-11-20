@@ -196,9 +196,7 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
 bool CompilerInstance::setupForInput(const InputFileOrBuffer &input) {
   if (llvm::MemoryBuffer *inputBuffer = input.getBuffer())
     setupForBuffer(inputBuffer, input.getIsPrimary());
-  if (Optional<StringRef> file = input.getFile())
-    return setupForFile(*file, input.getIsPrimary());
-  return false;
+    return setupForFile(input.getFile(), input.getIsPrimary());
 }
 void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary) {
   auto copy =
@@ -219,6 +217,8 @@ void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary
 }
 
 bool CompilerInstance::setupForFile(StringRef fileName, bool isPrimary) {
+  if (fileName.empty())
+    return false;
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using namespace llvm::sys::path;

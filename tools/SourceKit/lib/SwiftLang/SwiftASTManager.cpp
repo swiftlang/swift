@@ -391,28 +391,28 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
   }
 }
 
-static Optional<std::vector<InputFileOrBuffer>> resolveSymbolicLinksInInputs(ArrayRef<const InputFileOrBuffer> oldInputs, StringRef UnresolvedPrimaryFile, std::string &Error) {
+static bool resolveSymbolicLinksInInputs(FrontendInputs &inputs, StringRef UnresolvedPrimaryFile, std::string &Error) {
   unsigned primaryCount = 0;
-  std::vector<InputFileOrBuffer> newInputs;
-  // FIXME: The frontend should be dealing with symlinks, maybe similar to
-  // clang's FileManager ?
   std::string PrimaryFile =
   SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
-  for (const auto &input: oldInputs) {
-    Optional<std::string> newFilename = input.getFile() ? SwiftLangSupport::resolvePathSymlinks(*input.getFile()) : Optional<std::string>();
-    bool newIsPrimary = !PrimaryFile.empty() && newFilename && *newFilename == PrimaryFile;
-    if (newIsPrimary)
+  // FIXME: The frontend should be dealing with symlinks, maybe similar to
+  // clang's FileManager ?
+  inputs.transformInputs( [&] (const InputFileOrBuffer &input) -> InputFileOrBuffer {
+    StringRef newFilename = SwiftLangSupport::resolvePathSymlinks(input.getFile());
+    bool newIsPrimary = input.getIsPrimary() || (!PrimaryFile.empty() && newFilename == PrimaryFile);
+    if (newIsPrimary) {
       ++primaryCount;
+    }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
-    newInputs.push_back(InputFileOrBuffer(newIsPrimary, input.getBuffer(), newFilename));
-  }
+    return InputFileOrBuffer(newIsPrimary, input.getBuffer(), newFilename);
+  });
   if (PrimaryFile.empty() || primaryCount == 1)
-    return newInputs;
+    return false;
   llvm::SmallString<64> Err;
   llvm::raw_svector_ostream OS(Err);
   OS << "'" << PrimaryFile << "' is not part of the input files";
   Error = OS.str();
-  return Optional<std::vector<InputFileOrBuffer>>();
+  return true;
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
@@ -429,11 +429,8 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-  Optional<std::vector<const InputFileOrBuffer>> newInputs = resolveSymbolicLinksInInputs(Invocation.getFrontendOptions().Inputs.getInputs(), UnresolvedPrimaryFile, Error);
-  if (!newInputs) {
+  if (resolveSymbolicLinksInInputs(Invocation.getFrontendOptions().Inputs, UnresolvedPrimaryFile, Error))
     return true;
-  }
-  Invocation.getFrontendOptions().Inputs.replaceInputs(*newInputs);
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;

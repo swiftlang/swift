@@ -1912,9 +1912,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  auto  filename = InputFilename.empty() || InputFilename == "-" ? Optional<std::string>() : InputFilename.str();
-  addInput(InputFileOrBuffer::createFile(filename, bePrimary,
-                                         FileBufOrErr.get().get());
+  getFrontendOptions().Inputs.addInput(InputFileOrBuffer(InputFilename,  FileBufOrErr.get().get(), bePrimary));
 
   auto result = serialization::validateSerializedAST(
       FileBufOrErr.get()->getBuffer(), &extendedInfo);

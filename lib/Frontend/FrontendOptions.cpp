@@ -61,39 +61,34 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
-  } else if (TreatAsSIL && havePrimaryInputs()) {
+    return false;
+  }
+  if (TreatAsSIL) {
+    if (!havePrimaryInputs()) {
+      if (haveUniqueInputFilename())
+        return false;
+      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
+      return true;
+    }
     assertMustNotBeMoreThanOnePrimaryInput();
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
     for (const InputFileOrBuffer &input: getInputs()) {
-      if (Optional<StringRef> File = input.getFile()) {
-        if (!input.getIsPrimary() &&  !llvm::sys::path::extension(*File).endswith(SIB_EXTENSION)) {
-          Diags.diagnose(SourceLoc(),
-                         diag::error_mode_requires_one_sil_multi_sib);
-          return true;
-        }
+      if (!input.getIsPrimary() &&  !input.getFile().empty() && !llvm::sys::path::extension(input.getFile()).endswith(SIB_EXTENSION)) {
+        Diags.diagnose(SourceLoc(),
+                       diag::error_mode_requires_one_sil_multi_sib);
+        return true;
       }
     }
-  } else if (TreatAsSIL) {
-    if (!haveUniqueInputFilename()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
-      return true;
-    }
-  } else if (!isNoneRequested) {
-    if (!haveInputFilenames()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return true;
-    }
+    return false;
+  }
+  if (!isNoneRequested && !haveInputFilenames()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
+    return true;
   }
   return false;
 }
 
-void FrontendInputs::transformInputFilenames(
-    const llvm::function_ref<std::string(std::string)> &fn) {
-  for (auto input: Inputs) {
-    input.transformFilename(fn);
-  }
-}
 
 bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
