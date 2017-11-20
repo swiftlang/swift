@@ -1448,10 +1448,9 @@ extension _StringGuts {
   @_versioned
   internal mutating func append<C : Collection>(contentsOf other: C)
     where C.Element == UTF16.CodeUnit {
-    var byteWidth = 1
-    if byteWidth == 1 &&
-      // Don't widen string when appending CR+LF
-      (other.count > 2 || other.contains { $0 > 0x7f }) {
+    var byteWidth = self.byteWidth
+    // Widen string when needed
+    if byteWidth == 1 && other.contains(where: { $0 > 0x7f }) {
       byteWidth = 2
     }
     self._ensureUniqueNative(
@@ -1461,7 +1460,8 @@ extension _StringGuts {
     for codeunit in other {
       nativeSelf._appendInPlace(codeunit)
     }
-    _invariantCheck()    
+    self = _StringGuts(nativeSelf)
+    _invariantCheck()
   }
 
   @_versioned
