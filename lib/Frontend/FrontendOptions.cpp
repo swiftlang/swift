@@ -186,7 +186,7 @@ StringRef FrontendOptions::originalPath() const {
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
   // module name.
-  return fn ? llvm::sys::path::filename(*fn) : StringRef(ModuleName);
+  return !fn.empty() ? llvm::sys::path::filename(fn) : StringRef(ModuleName);
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {

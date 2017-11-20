@@ -112,7 +112,7 @@ class FrontendInputs {
   }
 
   bool haveUniqueInputFilename() const { return inputFilenameCount() == 1; }
-  const StingRef getFilenameOfFirstInput() const {
+  const StringRef getFilenameOfFirstInput() const {
     assert(haveInputFilenames());
     const InputFileOrBuffer &inp = getInputs()[0];
     StringRef f = inp.getFile();
@@ -182,13 +182,7 @@ public:
 
   StringRef getOptionalUniquePrimaryInputFilename() const {
     const auto *input = getOptionalUniquePrimaryInput();
-    return input == nullptr ? StringRef() : input.getFile();
-  }
-  
-  StringRef getPrimaryInputFilename() const {
-    if (auto fn = getOptionalUniquePrimaryInputFilename())
-      return *fn;
-    return StringRef();
+    return input == nullptr ? StringRef() : input->getFile();
   }
   
 public:

@@ -665,7 +665,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
       !llvm::sys::fs::is_directory((*outputFilenames)[0]);
   std::string nameToStem = isOutputAUniqueOrdinaryFile
                                ? (*outputFilenames)[0]
-                               : Opts.Inputs.getFilenameOfFirstInput();
+                               : Opts.Inputs.getFilenameOfFirstInput().str();
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
 }

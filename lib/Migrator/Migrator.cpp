@@ -436,6 +436,6 @@ const MigratorOptions &Migrator::getMigratorOptions() const {
 const StringRef Migrator::getInputFilename() const {
   auto PrimaryInput = StartInvocation.getFrontendOptions()
                           .Inputs.getRequiredUniquePrimaryInput();
-  assert(PrimaryInput.getFile());
-  return *PrimaryInput.getFile();
+  assert(!PrimaryInput.getFile().empty());
+  return PrimaryInput.getFile();
 }

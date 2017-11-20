@@ -1375,7 +1375,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &FEOpts = Invocation.getFrontendOptions();
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName = FEOpts.Inputs.getPrimaryInputFilename();
+    StringRef InputName = FEOpts.Inputs.getOptionalUniquePrimaryInputFilename();
     StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
