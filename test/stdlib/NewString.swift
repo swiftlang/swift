@@ -14,45 +14,33 @@ func hexAddrVal<T>(_ x: T) -> String {
   return "@0x" + hex(UInt64(unsafeBitCast(x, to: UInt.self)))
 }
 
-func hexAddr(_ x: AnyObject?) -> String {
-  if let owner = x {
-    if let y = owner as? _HeapBufferStorage<_StringBufferIVars, UInt16> {
-      return ".native\(hexAddrVal(y))"
-    }
-    if let y = owner as? NSString {
-      return ".cocoa\(hexAddrVal(y))"
-    }
-    else {
-      return "?Uknown?\(hexAddrVal(owner))"
-    }
-  }
-  return "null"
-}
-
 func repr(_ x: NSString) -> String {
   return "\(NSStringFromClass(object_getClass(x)))\(hexAddrVal(x)) = \"\(x)\""
 }
 
-func repr(_ x: _LegacyStringCore) -> String {
-  if x.hasContiguousStorage {
-    if let b = x.nativeBuffer {
-    let offset = x.elementWidth == 2
-      ? b.start - UnsafeMutableRawPointer(x.startUTF16)
-      : b.start - UnsafeMutableRawPointer(x.startASCII)
-      return "Contiguous(owner: "
-      + "\(hexAddr(x._owner))[\(offset)...\(x.count + offset)]"
-      + ", capacity = \(b.capacity))"
-    }
-    return "Contiguous(owner: \(hexAddr(x._owner)), count: \(x.count))"
-  }
-  else if let b2 = x.cocoaBuffer {
-    return "Opaque(buffer: \(hexAddr(b2))[0...\(x.count)])"
+func repr(_ x: _StringGuts) -> String {
+  if x._isNative {
+    return "Native("
+      + "owner: \(hexAddrVal(x._owner)), "
+      + "count: \(x.count), "
+      + "capacity = \(x.capacity))"
+  } else if x._isNonTaggedCocoa {
+    return "Cocoa("
+      + "owner: \(hexAddrVal(x._owner)), "
+      + "count: \(x.count))"
+  } else if x._isSmallCocoa {
+    return "Cocoa("
+      + "owner: <tagged>, "
+      + "count: \(x.count))"
+  } else if x._isUnsafe {
+    return "Unsafe("
+      + "count: \(x.count))"
   }
   return "?????"
 }
 
 func repr(_ x: String) -> String {
-  return "String(\(repr(x._core))) = \"\(x)\""
+  return "String(\(repr(x._guts))) = \"\(x)\""
 }
 
 // CHECK: Testing
@@ -64,13 +52,13 @@ print("Testing...")
 var nsb = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: Hello, snowy world: 🏂☃❅❆❄︎⛄️❄️
 print("Hello, snowy world: \(nsb)")
-// CHECK-NEXT: String(Contiguous(owner: null, count: 11))
+// CHECK-NEXT: String(Unsafe(count: 11))
 print("  \(repr(nsb))")
 
 var empty = String()
 // CHECK-NEXT: These are empty: <>
 print("These are empty: <\(empty)>")
-// CHECK-NEXT: String(Contiguous(owner: null, count: 0))
+// CHECK-NEXT: String(Unsafe(count: 0))
 print("  \(repr(empty))")
 
 
@@ -91,7 +79,7 @@ func nonASCII() {
   // CHECK-NEXT: __NSCFString@[[utf16address:[x0-9a-f]+]] = "🏂☃❅❆❄︎⛄️❄️"
   print("  \(repr(nsUTF16))")
 
-  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 11))
+  // CHECK-NEXT: String(Cocoa(owner: @[[utf16address]], count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
   let newNSUTF16 = nsUTF16 as String
   print("  \(repr(newNSUTF16))")
 
@@ -102,21 +90,22 @@ func nonASCII() {
   // CHECK: --- UTF-16 slicing ---
   print("--- UTF-16 slicing ---")
 
-  // CHECK-NEXT: String(Contiguous(owner: .native@[[sliceAddress:[x0-9a-f]+]][0...6]
   // Slicing the String allocates a new buffer
+  // CHECK-NOT: String(Native(owner: @[[utf16address]],
+  // CHECK-NEXT: String(Native(owner: @[[sliceAddress:[x0-9a-f]+]], count: 6
   let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
   let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
-  let slice = String(newNSUTF16[i2..<i8])
+  let slice = newNSUTF16[i2..<i8]
   print("  \(repr(slice))")
 
   // Representing a slice as an NSString requires a new object
-  // CHECK-NOT: NSString@[[utf16address]] = "❅❆❄︎⛄️"
+  // CHECK-NOT: @[[utf16address]] = "❅❆❄︎⛄️"
   // CHECK-NEXT: _NSContiguousString@[[nsSliceAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
   let nsSlice = slice as NSString
   print("  \(repr(nsSlice))")
 
   // Check that we can recover the original buffer
-  // CHECK-NEXT: String(Contiguous(owner: .native@[[sliceAddress]][0...6]
+  // CHECK-NEXT: String(Native(owner: @[[sliceAddress]], count: 6
   print("  \(repr(nsSlice as String))")
 }
 nonASCII()
@@ -172,13 +161,13 @@ ascii()
 // CHECK: --- Literals ---
 print("--- Literals ---")
 
-// CHECK-NEXT: String(Contiguous(owner: null, count: 6)) = "foobar"
+// CHECK-NEXT: String(Unsafe(count: 6)) = "foobar"
 // CHECK-NEXT: true
 let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
 print("  \(asciiLiteral._core.isASCII)")
 
-// CHECK-NEXT: String(Contiguous(owner: null, count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
+// CHECK-NEXT: String(Unsafe(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
 let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")
