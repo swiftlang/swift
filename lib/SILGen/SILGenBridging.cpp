@@ -313,7 +313,6 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
     return ManagedValue::forLValue(value);
 
   case ParameterConvention::Indirect_In_Guaranteed:
-  case ParameterConvention::Indirect_In_Constant:
     if (valueTL.isLoadable()) {
       return SGF.emitLoad(loc, value, valueTL, SGFContext(), IsNotTake);
     } else {
@@ -327,8 +326,9 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
       return SGF.emitManagedRValueWithCleanup(value, valueTL);
     }
 
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_InoutAliasable:
-    llvm_unreachable("unexpected inout_aliasable argument");
+    llvm_unreachable("unexpected convention");
   }
   llvm_unreachable("bad convention");
 }
@@ -1632,14 +1632,16 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = ManagedValue::forLValue(paramValue);
           break;
         case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
-        case ParameterConvention::Indirect_In_Guaranteed:
+        case ParameterConvention::Indirect_In_Guaranteed: {
           auto tmp = emitTemporaryAllocation(fd, paramValue->getType());
           B.createCopyAddr(fd, paramValue, tmp, IsNotTake, IsInitialization);
           param = emitManagedRValueWithCleanup(tmp);
           break;
+        }
+        case ParameterConvention::Indirect_In_Constant:
+          llvm_unreachable("unsupported convention");
         }
 
         maybeAddForeignErrorArg();

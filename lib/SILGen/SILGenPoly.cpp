@@ -800,7 +800,6 @@ static ManagedValue manageParam(SILGenFunction &SGF,
     return SGF.emitManagedRValueWithCleanup(paramValue);
 
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
     if (SGF.silConv.useLoweredAddresses())
       return SGF.emitManagedBufferWithCleanup(paramValue);
     return SGF.emitManagedRValueWithCleanup(paramValue);
@@ -808,6 +807,8 @@ static ManagedValue manageParam(SILGenFunction &SGF,
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     return ManagedValue::forLValue(paramValue);
+  case ParameterConvention::Indirect_In_Constant:
+    break;
   }
   llvm_unreachable("bad parameter convention");
 }
@@ -1368,8 +1369,7 @@ namespace {
         llvm::errs() << "output type " << SGF.getSILType(result) << "\n";
         abort();
       }
-      case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Constant: {
+      case ParameterConvention::Indirect_In: {
         if (SGF.silConv.useLoweredAddresses()) {
           translateIndirect(inputOrigType, inputSubstType, outputOrigType,
                             outputSubstType, input, SGF.getSILType(result));
@@ -1391,10 +1391,11 @@ namespace {
         assert(Outputs.back().getType() == SGF.getSILType(result));
         return;
       }
-      case ParameterConvention::Indirect_InoutAliasable: {
+      case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("abstraction difference in aliasable argument not "
                          "allowed");
-      }
+      case ParameterConvention::Indirect_In_Constant:
+        llvm_unreachable("in_constant convention not allowed in SILGen");
       }
 
       llvm_unreachable("Covered switch isn't covered?!");
