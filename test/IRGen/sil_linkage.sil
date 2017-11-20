@@ -3,7 +3,7 @@
 sil_stage canonical
 
 // CHECK: define{{( protected)?}} swiftcc void @public_fragile_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} internal swiftcc void @public_transparent_fragile_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc void @public_transparent_fragile_function_test() {{.*}} {
 // CHECK: define{{( protected)?}} swiftcc void @public_transparent_function_test() {{.*}} {
 // CHECK: define{{( hidden)?}} swiftcc void @hidden_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_fragile_function_test() {{.*}} {
