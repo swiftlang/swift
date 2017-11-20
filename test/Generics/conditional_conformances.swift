@@ -323,3 +323,14 @@ struct RedundancyOrderDependenceBad<T, U: P1> {}
 // CHECK-NEXT:   conforms_to: τ_0_0 P1
 // CHECK-NEXT:   same_type: τ_0_0 τ_0_1)
 extension RedundancyOrderDependenceBad: P2 where T: P1, T == U {}
+
+// Checking of conditional requirements for existential conversions.
+func existential_good<T: P1>(_: T.Type) {
+  _ = Free<T>() as P2
+}
+
+func existential_bad<T>(_: T.Type) {
+  // FIXME: Poor diagnostic.
+  _ = Free<T>() as P2 // expected-error{{'Free<T>' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}}
+}
+
