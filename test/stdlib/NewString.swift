@@ -102,21 +102,22 @@ func nonASCII() {
   // CHECK: --- UTF-16 slicing ---
   print("--- UTF-16 slicing ---")
 
-  // Slicing the String does not allocate
-  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
+  // CHECK-NEXT: String(Contiguous(owner: .native@[[sliceAddress:[x0-9a-f]+]][0...6]
+  // Slicing the String allocates a new buffer
   let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
   let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
-  print("  \(repr(newNSUTF16[i2..<i8]))")
+  let slice = String(newNSUTF16[i2..<i8])
+  print("  \(repr(slice))")
 
   // Representing a slice as an NSString requires a new object
   // CHECK-NOT: NSString@[[utf16address]] = "❅❆❄︎⛄️"
-  // CHECK-NEXT: _NSContiguousString@[[nsContiguousStringAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
-  var nsSliceUTF16 = newNSUTF16[i2..<i8] as NSString
-  print("  \(repr(nsSliceUTF16))")
+  // CHECK-NEXT: _NSContiguousString@[[nsSliceAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
+  let nsSlice = slice as NSString
+  print("  \(repr(nsSlice))")
 
   // Check that we can recover the original buffer
-  // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
-  print("  \(repr(nsSliceUTF16 as String))")
+  // CHECK-NEXT: String(Contiguous(owner: .native@[[sliceAddress]][0...6]
+  print("  \(repr(nsSlice as String))")
 }
 nonASCII()
 
