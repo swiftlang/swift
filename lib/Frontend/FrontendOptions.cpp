@@ -93,9 +93,6 @@ void FrontendInputs::transformInputFilenames(
   for (auto input: Inputs) {
     input.transformFilename(fn);
   }
-  for (auto &InputFile : InputFilenamesxxx) {
-    InputFile = fn(InputFile);
-  }
 }
 
 bool FrontendOptions::actionHasOutput() const {

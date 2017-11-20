@@ -102,9 +102,6 @@ private:
   std::vector<InputFileOrBuffer> Inputs;
   
   
-  /// The names of input files to the frontend.
-  std::vector<std::string> InputFilenamesxxx;
-
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
@@ -134,13 +131,25 @@ public:
     }
   }
 
-  bool haveInputFilenames() const { return !getInputFilenames().empty(); }
-  unsigned inputFilenameCount() const { return getInputFilenames().size(); }
+  bool haveInputFilenames() const {
+    for (const auto &input: getInputs())
+      if (input.getFile()) return true;
+    return false;
+  }
+  unsigned inputFilenameCount() const {
+    unsigned N = 0;
+    for (const auto &input: getInputs())
+      if (input.getFile()) ++N;
+    return N;
+  }
 
   bool haveUniqueInputFilename() const { return inputFilenameCount() == 1; }
-  const std::string &getFilenameOfFirstInput() const {
+  const std::string getFilenameOfFirstInput() const {
     assert(haveInputFilenames());
-    return getInputFilenames()[0];
+    const InputFileOrBuffer &inp = getInputs()[0];
+    Optional<StringRef> f = inp.getFile();
+    assert(f);
+    return f->str();
   }
 
   bool isReadingFromStdin() const {
@@ -162,14 +171,18 @@ public:
 
 private:
   void assertMustNotBeMoreThanOnePrimaryInput() const {
-    assert(PrimaryInputs.size() < 2 &&
+    assert(primaryInputCount() < 2 &&
            "have not implemented >1 primary input yet");
   }
 
 public:
-  ArrayRef<SelectedInput> getPrimaryInputs() const { return PrimaryInputs; }
-
-  unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+  unsigned primaryInputCount() const {
+    unsigned N = 0;
+    for (const InputFileOrBuffer &inp: getInputs()) {
+      if (inp.getIsPrimary()) ++N;
+    }
+    return N;
+  }
 
   // Primary count readers:
 
@@ -228,8 +241,7 @@ public:
   // Input filename writers
 
   void addInputFilename(StringRef filename) {
-    InputFilenamesxxx.push_back(filename);
-    Inputs.push_back(filename);
+     Inputs.push_back(filename);
   }
   void transformInputFilenames(
       const llvm::function_ref<std::string(std::string)> &fn);
@@ -266,13 +278,6 @@ public:
   }
   void addPrimaryInputFilename(StringRef filename) {
     Inputs.push_back(InputFileOrBuffer(filename, true));
-    for (unsigned i: indices(InputFilenamesxxx)) {
-      if (InputFilenamesxxx[i] == filename) {
-        old_addPrimaryInputFilename(i);
-        return;
-      }
-    }
-    assert(false && "what???");
   }
 
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
@@ -290,7 +295,6 @@ public:
   }
 
   void clearInputs() {
-    InputFilenamesxxx.clear();
     InputBuffers.clear();
     Inputs.clear();
   }
