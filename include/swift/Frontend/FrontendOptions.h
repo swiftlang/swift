@@ -41,14 +41,10 @@ class InputFileOrBuffer {
   llvm::MemoryBuffer *Buffer;
   bool IsPrimary;
   
-  static StringRef emptyIfStdin(StringRef s) {
-    return s.empty() ? s : s == "-" ? StringRef() : s;
-  }
-  
   public:
   /// Does not take ownership of \p buffer. Does take ownership of a string.
   InputFileOrBuffer(StringRef name, llvm::MemoryBuffer *buffer, bool isPrimary)
-  : Filename(InputFileOrBuffer::emptyIfStdin(name).str()), Buffer(buffer), IsPrimary(isPrimary) {}
+  : Filename(name), Buffer(buffer), IsPrimary(isPrimary) {}
              
   InputFileOrBuffer(const InputFileOrBuffer &other) :
   Filename(other.Filename), Buffer(other.Buffer), IsPrimary(other.IsPrimary) {}

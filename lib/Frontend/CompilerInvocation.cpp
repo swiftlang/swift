@@ -1912,7 +1912,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  getFrontendOptions().Inputs.addInput(InputFileOrBuffer(InputFilename,  FileBufOrErr.get().get(), bePrimary));
+  getFrontendOptions().Inputs.addInput(InputFileOrBuffer(InputFilename == "-" ? StringRef() : InputFilename,  FileBufOrErr.get().get(), bePrimary));
 
   auto result = serialization::validateSerializedAST(
       FileBufOrErr.get()->getBuffer(), &extendedInfo);
