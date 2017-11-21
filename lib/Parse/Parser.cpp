@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
@@ -235,9 +236,10 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
   }
 
   std::vector<Token> Tokens;
+  Trivia LeadingTrivia, TrailingTrivia;
   do {
     Tokens.emplace_back();
-    L.lex(Tokens.back());
+    L.lex(Tokens.back(), LeadingTrivia, TrailingTrivia);
 
     // If the token has the same location as a reset location,
     // reset the token stream
@@ -280,29 +282,23 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
   std::vector<std::pair<RC<syntax::RawTokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   syntax::AbsolutePosition RunningPos;
+  Token Tok;
+  Trivia LeadingTrivia, TrailingTrivia;
   do {
-    auto ThisToken = L.fullLex().getRaw<syntax::RawTokenSyntax>();
+    L.lex(Tok, LeadingTrivia, TrailingTrivia);
+    if (Tok.isEscapedIdentifier()) {
+      LeadingTrivia.push_back(TriviaPiece::backtick());
+      TrailingTrivia.push_front(TriviaPiece::backtick());
+    }
+    auto ThisToken = RawTokenSyntax::make(Tok.getKind(), Tok.getText(),
+                                      SourcePresence::Present, LeadingTrivia,
+                                      TrailingTrivia);
+
     auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
     Tokens.push_back({ThisToken, ThisTokenPos});
   } while (Tokens.back().first->isNot(tok::eof));
 
   return Tokens;
-}
-
-void swift::populateTokenSyntaxMap(const LangOptions &LangOpts,
-                                   const SourceManager &SM,
-                                   unsigned BufferID,
-                                   std::vector<syntax::RawSyntaxInfo> &Result) {
-  if (!Result.empty())
-    return;
-  Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::AttachToNextToken,
-          TriviaRetentionMode::WithTrivia);
-  do {
-    Result.emplace_back(L.fullLex());
-    if (Result.back().getRaw<syntax::RawTokenSyntax>()->is(tok::eof))
-      return;
-  } while (true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -311,14 +307,18 @@ void swift::populateTokenSyntaxMap(const LangOptions &LangOpts,
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState)
-  : Parser(std::unique_ptr<Lexer>(
-             new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-                   BufferID, &SF.getASTContext().Diags,
-                   /*InSILMode=*/SIL != nullptr,
-                   SF.getASTContext().LangOpts.AttachCommentsToDecls
-                   ? CommentRetentionMode::AttachToNextToken
-                   : CommentRetentionMode::None)), SF, SIL, PersistentState){
-}
+    : Parser(
+          std::unique_ptr<Lexer>(new Lexer(
+              SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
+              BufferID, &SF.getASTContext().Diags,
+              /*InSILMode=*/SIL != nullptr,
+              SF.getASTContext().LangOpts.AttachCommentsToDecls
+                  ? CommentRetentionMode::AttachToNextToken
+                  : CommentRetentionMode::None,
+              SF.shouldKeepSyntaxInfo()
+                  ? TriviaRetentionMode::WithTrivia
+                  : TriviaRetentionMode::WithoutTrivia)),
+          SF, SIL, PersistentState) {}
 
 namespace {
 
@@ -447,8 +447,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldKeepSyntaxInfo() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new syntax::SyntaxParsingContextRoot(SF, L->getBufferID(),
-                                                       Tok)) {
+    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF)) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
@@ -469,6 +468,9 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
 }
 
 Parser::~Parser() {
+  if (Tok.is(tok::eof))
+    SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
+
   delete L;
   delete TokReceiver;
   delete SyntaxContext;
@@ -485,7 +487,7 @@ SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
     SF.recordInterfaceToken(Tok.getText());
   }
-  L->lex(Tok);
+  L->lex(Tok, LeadingTrivia, TrailingTrivia);
   PreviousLoc = Loc;
   return Loc;
 }
@@ -496,6 +498,7 @@ void Parser::consumeExtraToken(Token Extra) {
 
 SourceLoc Parser::consumeToken() {
   TokReceiver->receive(Tok);
+  SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
   return consumeTokenWithoutFeedingReceiver();
 }
 
@@ -531,6 +534,10 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
 void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
+  Trivia EmptyTrivia;
+  SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
+  LeadingTrivia.empty();
+  TokReceiver->receive(SplitTokens.back());
 }
 
 SourceLoc Parser::consumeStartingLess() {
@@ -826,7 +833,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
-static Optional<SyntaxKind> getListElementKind(SyntaxKind ListKind) {
+static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   switch (ListKind) {
   case SyntaxKind::FunctionCallArgumentList:
     return SyntaxKind::FunctionCallArgument;
@@ -835,7 +842,7 @@ static Optional<SyntaxKind> getListElementKind(SyntaxKind ListKind) {
   case SyntaxKind::DictionaryElementList:
     return SyntaxKind::DictionaryElement;
   default:
-    return None;
+    return SyntaxKind::Unknown;
   }
 }
 
@@ -843,16 +850,12 @@ ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
                   std::function<ParserStatus()> callback) {
-  SyntaxParsingContextChild ListContext(SyntaxContext);
-  Optional<SyntaxKind> ElementKind = getListElementKind(Kind);
-  if (ElementKind)
-    ListContext.setSyntaxKind(Kind);
-  else
-    // FIXME: we shouldn't need this when all cases are handled.
-    ListContext.disable();
+  llvm::Optional<SyntaxParsingContext> ListContext;
+  ListContext.emplace(SyntaxContext, Kind);
+
+  SyntaxKind ElementKind = getListElementKind(Kind);
 
   if (Tok.is(RightK)) {
-    ListContext.finalize();
     RightLoc = consumeToken(RightK);
     return makeParserSuccess();
   }
@@ -865,12 +868,9 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
-    SyntaxParsingContextChild ElementContext(SyntaxContext);
-    if (ElementKind) {
-      ElementContext.setSyntaxKind(*ElementKind);
-    } else {
-      ElementContext.disable();
-    }
+
+    SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
+
     Status |= callback();
     if (Tok.is(RightK))
       break;
@@ -914,7 +914,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     Status.setIsParseError();
   }
 
-  ListContext.finalize();
+  ListContext.reset();
+
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;

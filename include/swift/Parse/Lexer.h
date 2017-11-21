@@ -28,11 +28,6 @@
 
 namespace swift {
 
-namespace syntax {
-  struct RawTokenSyntax;
-  struct RawSyntaxInfo;
-}
-
   /// Given a pointer to the starting byte of a UTF8 character, validate it and
   /// advance the lexer past it.  This returns the encoded character or ~0U if
   /// the encoding is invalid.
@@ -239,14 +234,24 @@ public:
     return CodeCompletionPtr != nullptr;
   }
 
-  void lex(Token &Result) {
+  /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
+  /// to trivias are populated.
+  void lex(Token &Result, syntax::Trivia &LeadingTriviaResult,
+           syntax::Trivia &TrailingTriviaResult) {
     Result = NextToken;
-    if (Result.isNot(tok::eof))
+    LeadingTriviaResult = {LeadingTrivia};
+    TrailingTriviaResult = {TrailingTrivia};
+    if (Result.isNot(tok::eof)) {
+      LeadingTrivia.clear();
+      TrailingTrivia.clear();
       lexImpl();
+    }
   }
 
-  /// Lex a full token including leading and trailing trivia.
-  syntax::RawSyntaxInfo fullLex();
+  void lex(Token &Result) {
+    syntax::Trivia LeadingTrivia, TrailingTrivia;
+    lex(Result, LeadingTrivia, TrailingTrivia);
+  }
 
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;

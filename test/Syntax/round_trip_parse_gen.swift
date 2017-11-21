@@ -10,7 +10,7 @@ class C {
   func bar3(a: Int) -> Int { return 1 }
   func bar4(_ a: Int) -> Int { return 1 }
   func foo() {
-    var a = /*comment*/"abc"/*comment*/
+    var a = /*comment*/"ab\(x)c"/*comment*/
     var b = /*comment*/+2/*comment*/
     bar(1)
     bar(+10)

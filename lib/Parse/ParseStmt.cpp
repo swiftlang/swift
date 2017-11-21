@@ -226,7 +226,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
                                      BraceItemListKind ConditionalBlockKind) {
-  SyntaxParsingContextChild StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+  SyntaxParsingContext StmtListContext(SyntaxContext, SyntaxKind::StmtList);
+
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
   bool isActiveConditionalBlock =
@@ -262,7 +263,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::kw_sil_default_witness_table) &&
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
-    SyntaxParsingContextChild StmtContext(SyntaxContext, SyntaxContextKind::Stmt);
+
+    SyntaxParsingContext StmtContext(SyntaxContext, SyntaxContextKind::Stmt);
+
     if (Kind == BraceItemListKind::TopLevelLibrary &&
         skipExtraTopLevelRBraces())
       continue;
@@ -493,7 +496,8 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 }
 
 ParserResult<Stmt> Parser::parseStmt() {
-  SyntaxParsingContextChild LocalContext(SyntaxContext, SyntaxContextKind::Stmt);
+  SyntaxParsingContext LocalContext(SyntaxContext, SyntaxContextKind::Stmt);
+
   // Note that we're parsing a statement.
   StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
                                   StructureMarkerKind::Statement);
@@ -590,7 +594,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     if (Tok.isNot(tok::l_brace))
       return nullptr;
   }
-  SyntaxParsingContextChild LocalContext(SyntaxContext, SyntaxKind::CodeBlock);
+  SyntaxParsingContext LocalContext(SyntaxContext, SyntaxKind::CodeBlock);
   SourceLoc LBLoc = consumeToken(tok::l_brace);
 
   SmallVector<ASTNode, 16> Entries;
@@ -656,7 +660,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ///     'return' expr?
 ///   
 ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
-  SyntaxParsingContextChild LocalContext(SyntaxContext, SyntaxKind::ReturnStmt);
+  SyntaxParsingContext LocalContext(SyntaxContext, SyntaxKind::ReturnStmt);
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   if (Tok.is(tok::code_complete)) {

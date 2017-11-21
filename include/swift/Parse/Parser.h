@@ -31,6 +31,7 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
+#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -55,8 +56,6 @@ namespace swift {
   
   namespace syntax {
     class AbsolutePosition;
-    class SyntaxParsingContext;
-    struct RawSyntaxInfo;
     struct RawTokenSyntax;
     enum class SyntaxKind;
   }// end of syntax namespace
@@ -197,6 +196,14 @@ public:
 
   /// \brief This is the current token being considered by the parser.
   Token Tok;
+
+  /// \brief leading trivias for \c Tok.
+  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  syntax::Trivia LeadingTrivia;
+
+  /// \brief trailing trivias for \c Tok.
+  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  syntax::Trivia TrailingTrivia;
 
   /// \brief The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -411,16 +418,24 @@ public:
     Parser &P;
     ParserPosition PP;
     DiagnosticTransaction DT;
+    /// This context immediately deconstructed with transparent accumulation
+    /// on cancelBacktrack().
+    llvm::Optional<syntax::SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
   public:
     BacktrackingScope(Parser &P)
-      : P(P), PP(P.getParserPosition()), DT(P.Diags) {}
+        : P(P), PP(P.getParserPosition()), DT(P.Diags) {
+      SynContext.emplace(P.SyntaxContext);
+      SynContext->setDiscard();
+    }
 
     ~BacktrackingScope();
 
     void cancelBacktrack() {
       Backtrack = false;
+      SynContext->setTransparent();
+      SynContext.reset();
       DT.commit();
     }
   };
@@ -1426,12 +1441,6 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
                    unsigned BufferID,
                    unsigned Offset = 0,
                    unsigned EndOffset = 0);
-
-
-void populateTokenSyntaxMap(const LangOptions &LangOpts,
-                            const SourceManager &SM,
-                            unsigned BufferID,
-                            std::vector<syntax::RawSyntaxInfo> &Result);
 } // end namespace swift
 
 #endif
