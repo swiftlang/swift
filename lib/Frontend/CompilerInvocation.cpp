@@ -1662,11 +1662,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
+  StringRef primaryFile =
+  FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename();
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const Optional<StringRef> filename =
-                 FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename()) {
-    Opts.MainInputFilename = filename.getValue();
+  } else if (!primaryFile.empty()) {
+    Opts.MainInputFilename = primaryFile;
   } else if (FrontendOpts.Inputs.haveUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
