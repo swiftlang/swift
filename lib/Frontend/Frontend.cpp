@@ -187,7 +187,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   for (unsigned i = 0,
                 e = Invocation.getFrontendOptions().Inputs.inputFilenameCount();
        i != e; ++i) {
-    bool hasError = setupForFileAt(i);
+    bool hasError = setUpForFileAt(i);
     if (hasError) {
       return true;
     }
@@ -726,7 +726,7 @@ void CompilerInstance::freeContextAndSIL() {
   PrimarySourceFile = nullptr;
 }
 
-bool CompilerInstance::setupForFileAt(unsigned i) {
+bool CompilerInstance::setUpForFileAt(unsigned i) {
   bool MainMode = (Invocation.getInputKind() == InputFileKind::IFK_Swift);
   bool SILMode = (Invocation.getInputKind() == InputFileKind::IFK_SIL);
 
