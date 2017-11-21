@@ -433,7 +433,7 @@ private:
   bool isInSILMode() { return Invocation.isInputSIL(); }
   bool setupForInput(const InputFileOrBuffer &input);
   void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
-  bool setupForFile(StringRef file, bool isPrimary);
+  bool setUpForFile(StringRef file, bool isPrimary);
 
 public:
   /// Parses and type-checks all input files.
