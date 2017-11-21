@@ -1021,7 +1021,7 @@ extension Sequence where Element: StringProtocol {
         r += separatorSize + chunk._encodedOffsetRange.count
         byteWidth = Swift.max(byteWidth, chunk._wholeString._guts.byteWidth)
       }
-      return r - separatorSize
+      return r > 0 ? r - separatorSize : 0
     }
 
     var result = NativeString(
