@@ -1713,7 +1713,7 @@ extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
   /// `arrayDescription`, `String`.
   ///
   /// - Parameter path: The key path to append.
-  /// - Returns: A key path from the root of this key path to the the value type
+  /// - Returns: A key path from the root of this key path to the value type
   ///   of `path`, if `path` can be appended. If `path` can't be appended,
   ///   returns `nil`.
   @_inlineable // FIXME(sil-serialize-all)
@@ -1732,7 +1732,7 @@ extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
   /// root type for `path` matches this key path's value type.
   ///
   /// - Parameter path: The reference writeable key path to append.
-  /// - Returns: A key path from the root of this key path to the the value type
+  /// - Returns: A key path from the root of this key path to the value type
   ///   of `path`, if `path` can be appended. If `path` can't be appended,
   ///   returns `nil`.
   @_inlineable // FIXME(sil-serialize-all)
