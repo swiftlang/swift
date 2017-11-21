@@ -598,12 +598,15 @@ struct NativeString {
   }
 
   internal var unsafe: UnsafeString? {
-    guard let start = start else { return nil }
-    let count = _stdlib_binary_CFStringGetLength(owner)
-    return UnsafeString(
-      baseAddress: UnsafeMutableRawPointer(mutating: start),
-      count: count,
-      isSingleByte: isSingleByte)
+    @inline(never)
+    get {
+      guard let start = start else { return nil }
+      let count = _stdlib_binary_CFStringGetLength(owner)
+      return UnsafeString(
+        baseAddress: UnsafeMutableRawPointer(mutating: start),
+        count: count,
+        isSingleByte: isSingleByte)
+    }
   }
 }
 
@@ -616,6 +619,7 @@ internal struct OpaqueCocoaString {
   @_versioned
   let count: Int
 
+  @inline(never)
   init(_ object: AnyObject) {
     self.init(object, count: _stdlib_binary_CFStringGetLength(object))
   }
@@ -1033,14 +1037,16 @@ extension _StringGuts {
     return _isUnique(&_storage.0) && _isNative
   }
 
-  // Convert ourselves (if needed) to a native string with the specified
-  // storage parameters. After this call, self is ready to be memcpy-ed into.
-  // Does not affect count.
+  // Convert ourselves (if needed) to a native string with the specified storage
+  // parameters. After this call, self is ready to be memcpy-ed into. Does not
+  // affect count. Returns the extra capacity.
+  @inline(never)
   @_versioned
   internal
   mutating func _ensureUniqueNative(
-    minimumCapacity: Int,
-    minimumByteWidth: Int
+    minimumCapacity: Int, minimumByteWidth: Int
+  ) -> (
+    capBegin: UnsafeMutableRawPointer, capEnd: UnsafeMutableRawPointer
   ) {
     _sanityCheck(minimumByteWidth == 1 || minimumByteWidth == 2)
     var newCapacity = minimumCapacity
@@ -1055,14 +1061,43 @@ extension _StringGuts {
           minimumCapacity)
       } else if _fastPath(isUnique && self.byteWidth == newWidth) {
         // TODO: width extension can be done in place if there's capacity
-        return
+        return (nativeBuffer.usedEnd, nativeBuffer.capacityEnd)
       }
     }
 
     let newBuffer = _copyToStringBuffer(
       capacity: newCapacity,
       byteWidth: newWidth)
+    let (capBegin, capEnd) = (newBuffer.usedEnd, newBuffer.capacityEnd)
     self = _StringGuts(newBuffer)
+    return (capBegin, capEnd)
+  }
+  @inline(never)
+  @_versioned
+  internal
+  mutating func _ensureUniqueNative(
+    increasingCountBy otherCount: Int, minimumByteWidth: Int
+  ) -> (
+    capBegin: UnsafeMutableRawPointer, capEnd: UnsafeMutableRawPointer
+  ) {
+    _sanityCheck(otherCount >= 0)
+    let (capBegin, capEnd) = _ensureUniqueNative(
+      minimumCapacity: self.count + otherCount,
+      minimumByteWidth: minimumByteWidth)
+
+    // Adjust the count
+    //
+    // TODO: probably better to find a way to do in place, i.e. bitcast the
+    // references as we know lifetime
+    _sanityCheck(_isNative)
+    var nativeBuffer = self._asNative.stringBuffer
+    nativeBuffer.usedEnd += otherCount &<< nativeBuffer.elementShift
+    self._otherBits += UInt(truncatingIfNeeded: otherCount)
+
+    _sanityCheck(
+      capBegin + otherCount == self._asNative.stringBuffer.usedEnd
+      && capEnd == self._asNative.stringBuffer.capacityEnd)
+    return (capBegin, capEnd)
   }
 
   // Copy code units from a slice of this string into a buffer.
@@ -1237,11 +1272,63 @@ extension _StringGuts {
     self = _StringGuts(newBuffer)
   }
 
+  @inline(never)
+  @_versioned
+  internal
+  mutating func assignTo(_ other: _StringGuts) {
+    self = other
+    return
+  }
+
   @_inlineable
   public // TODO(StringGuts): for testing only
-  mutating func append(_ other: _StringGuts) {
-    self.append(other, range: 0..<other.count)
+  mutating func append(_ other: /* @shared */ _StringGuts) {
+    // TODO(perf): We just need to check for being the interned native empty
+    // string
+    if self._isEmpty && self.capacity == 0 {
+      self.assignTo(other)
+      return
+    }
+
+    let otherContigOpt = other._unmanagedContiguous
+    if _slowPath(otherContigOpt == nil) {
+      return self.append(opaque: other)
+    }
+    self.append(otherContigOpt._unsafelyUnwrappedUnchecked)
+    _fixLifetime(other)
   }
+
+  @inline(never)
+  @_versioned
+  internal
+  mutating func append(opaque other: _StringGuts) {
+    // TODO: implement more directly. Small cocoa strings are common and should
+    // be fast-pathed here.
+    _ = self._ensureUniqueNative(
+      minimumCapacity: self.count + other.count,
+      minimumByteWidth: other.byteWidth)
+    var nativeSelf = self._asNative
+    nativeSelf._appendInPlace(other, range: 0..<other.count)
+    self = _StringGuts(nativeSelf)
+    _invariantCheck()
+  }
+
+  @_versioned
+  internal
+  mutating func append(_ other: UnsafeString) {
+    let (capBegin, capEnd) = self._ensureUniqueNative(
+      increasingCountBy: other.count,
+      minimumByteWidth: other.byteWidth)
+    _sanityCheck(capEnd - capBegin >= other.count)
+
+    other._copy(
+      into: capBegin,
+      capacityEnd: capEnd,
+      accomodatingElementWidth: self.byteWidth
+    )
+    _invariantCheck()
+  }
+
 
   // @_inlineable // TODO: internal-inlineable, if that's possible
   // TODO: @_versioned
