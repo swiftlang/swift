@@ -58,6 +58,8 @@ STATISTIC(NumRegisteredGenericSignatureBuilders,
           "# of generic signature builders successfully registered");
 STATISTIC(NumRegisteredGenericSignatureBuildersAlready,
           "# of generic signature builders already registered");
+STATISTIC(NumCollapsedSpecializedProtocolConformances,
+          "# of specialized protocol conformances collapsed");
 
 /// Define this to 1 to enable expensive assertions of the
 /// GenericSignatureBuilder.
@@ -1897,10 +1899,48 @@ ASTContext::getConformance(Type conformingType,
   return result;
 }
 
-SpecializedProtocolConformance *
+/// If one of the ancestor conformances already has a matching type, use
+/// that instead.
+static ProtocolConformance *collapseSpecializedConformance(
+                                             Type type,
+                                             ProtocolConformance *conformance) {
+  while (true) {
+    // If the conformance matches, return it.
+    if (conformance->getType()->isEqual(type))
+      return conformance;
+
+    switch (conformance->getKind()) {
+    case ProtocolConformanceKind::Inherited:
+      conformance = cast<InheritedProtocolConformance>(conformance)
+                      ->getInheritedConformance();
+      break;
+
+    case ProtocolConformanceKind::Specialized:
+      conformance = cast<SpecializedProtocolConformance>(conformance)
+                      ->getGenericConformance();
+      break;
+
+    case ProtocolConformanceKind::Normal:
+      return nullptr;
+    }
+  }
+}
+
+ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
-                                      SubstitutionList substitutions) {
+                                      SubstitutionList substitutions,
+                                      bool alreadyCheckedCollapsed) {
+  // If we are performing a substitution that would get us back to the
+  // a prior conformance (e.g., mapping into and then out of a conformance),
+  // return the existing conformance.
+  if (!alreadyCheckedCollapsed) {
+    if (auto existing = collapseSpecializedConformance(type, generic)) {
+      ++NumCollapsedSpecializedProtocolConformances;
+      return existing;
+    }
+  }
+
   llvm::FoldingSetNodeID id;
   SpecializedProtocolConformance::Profile(id, type, generic, substitutions);
 
@@ -1922,15 +1962,24 @@ ASTContext::getSpecializedConformance(Type type,
   return result;
 }
 
-SpecializedProtocolConformance *
+ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
                                       const SubstitutionMap &subMap) {
+  // If we are performing a substitution that would get us back to the
+  // a prior conformance (e.g., mapping into and then out of a conformance),
+  // return the existing conformance.
+  if (auto existing = collapseSpecializedConformance(type, generic)) {
+    ++NumCollapsedSpecializedProtocolConformances;
+    return existing;
+  }
+
   SmallVector<Substitution, 4> subs;
   if (auto *genericSig = generic->getGenericSignature())
     genericSig->getSubstitutions(subMap, subs);
 
-  return getSpecializedConformance(type, generic, subs);
+  return getSpecializedConformance(type, generic, subs,
+                                   /*alreadyCheckedCollapsed=*/true);
 }
 
 InheritedProtocolConformance *
