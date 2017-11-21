@@ -341,17 +341,16 @@ int main(int argc, char **argv) {
       break;
     }
   }
-
+  
   serialization::ExtendedValidationInfo extendedInfo;
-  {
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    Invocation.setUpInputForSILTool(InputFilename, ModuleName, false, !PerformWMO,
-                                    extendedInfo);
-    if (!FileBufOrErr) {
-      fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
-      exit(-1);
-    }
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+  Invocation.setUpInputForSILTool(InputFilename, ModuleName, false, !PerformWMO,
+                                  extendedInfo);
+  if (!FileBufOrErr) {
+    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    exit(-1);
   }
+
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
