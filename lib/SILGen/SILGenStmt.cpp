@@ -388,7 +388,8 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
-    emitRValue(ret).forwardAll(*this, directResults);
+    RValue RV = emitRValue(ret).ensurePlusOne(*this, CleanupLocation(ret));
+    std::move(RV).forwardAll(*this, directResults);
   }
   Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc, directResults);
 }
