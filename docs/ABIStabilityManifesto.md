@@ -266,7 +266,7 @@ Alternatively, we may decide to perform inter-module calls through opaque *thunk
 
 ### Protocol and Existential Metadata
 
-#####<a name="witness-tables"></a>Protocol Witness Tables
+##### <a name="witness-tables"></a>Protocol Witness Tables
 
 The protocol witness table is a function table of a type's conformance to the protocol's interfaces. If the protocol also has an associated type requirement, then the witness table will store the metadata for the associated type. Protocol witness tables are used with [existential containers](#existential-containers) where the run time type is not known.
 
