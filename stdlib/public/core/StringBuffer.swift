@@ -75,7 +75,8 @@ public struct _StringBuffer {
   @_inlineable // FIXME(sil-serialize-all)
   public init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
-    _sanityCheck(initialSize <= capacity)
+    _sanityCheck(capacity >= 0)
+    _sanityCheck(initialSize >= 0 && initialSize <= capacity)
     // We don't check for elementWidth overflow and underflow because
     // elementWidth is known to be 1 or 2.
     let elementShift = elementWidth &- 1
