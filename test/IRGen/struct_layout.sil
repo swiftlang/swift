@@ -7,7 +7,7 @@ import Swift
 // 64: %T4main14Rdar15410780_BV = type <{ %T4main14Rdar15410780_AVSg }>
 // 64: %T4main14Rdar15410780_AVSg = type <{ [257 x i8], [1 x i8] }>
 // 64: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
-// 64: %TSSSg = type <{ [24 x i8], [1 x i8] }>
+// 64: %TSSSg = type <{ [16 x i8] }>
 
 // 64: @_T04main14Rdar15410780_AVWV = internal constant {{.*}} (i64 257
 // 64: @_T04main14Rdar15410780_BVWV = internal constant {{.*}} (i64 258
