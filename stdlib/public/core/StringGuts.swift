@@ -576,10 +576,10 @@ struct NativeString {
     stringBuffer.usedEnd += 4
     self.count += 2
   }
-  
+
   // Append a range of code units from `other` directly to the end of
   // this string, which must have uniquely referenced storage with
-  // large enough capacity.
+  // large enough capacity of a suitable element width.
   @_versioned
   internal
   mutating
@@ -595,22 +595,51 @@ struct NativeString {
     self.count = stringBuffer.usedCount
   }
 
+  // Ensure that this string has enough capacity for at least `minimumCapacity`
+  // number of code units of `minimumByteWidth` width, copying contents
+  // into a newly allocated buffer if necessary.
+  //
+  // If `forcingRellocation` is true, a new buffer is allocated regardless
+  // of the properties of current storage.
+  @_versioned
+  internal mutating func _ensureStorage(
+    minimumCapacity: Int,
+    minimumByteWidth: Int,
+    forcingReallocation: Bool = false
+  ) {
+    _sanityCheck(minimumByteWidth == 1 || minimumByteWidth == 2)
+    _sanityCheck(minimumCapacity >= 0)
+    let oldCapacity = self.capacity
+    var newCapacity = minimumCapacity
+    let newWidth = Swift.max(self.byteWidth, minimumByteWidth)
+    if _slowPath(oldCapacity < minimumCapacity) {
+      newCapacity = Swift.max(_growArrayCapacity(oldCapacity), minimumCapacity)
+    } else if _fastPath(!forcingReallocation && self.byteWidth == newWidth) {
+      return
+    }
+    // TODO: width extension can be done in place if there's capacity
+    let buffer = _StringBuffer(
+      capacity: newCapacity,
+      initialSize: count,
+      elementWidth: newWidth)
+    self.unsafe._copy(
+      into: buffer.start,
+      capacityEnd: buffer.capacityEnd,
+      accomodatingElementWidth: newWidth)
+    self.stringBuffer = buffer
+  }
+
   // Append directly to the end of this string, whose buffer must be
-  // uniquely referenced. Grow buffer if there isn't enough capacity.
+  // uniquely referenced. Grow buffer if there isn't enough capacity
+  // and widen storage when necessary.
   @_versioned
   internal mutating func append(_ other: _StringGuts, range: Range<Int>) {
-    let count = self.count
-    if _slowPath(self.capacity < count + range.count) {
-      let width = max(self.byteWidth, other.byteWidth)
-      let buffer = _StringBuffer(
-        capacity: max(_growArrayCapacity(self.capacity), range.count),
-        initialSize: count,
-        elementWidth: width)
-      self.unsafe._copy(
-        into: buffer.start,
-        capacityEnd: buffer.capacityEnd,
-        accomodatingElementWidth: width)
-    }
+    _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
+    guard !range.isEmpty else { return }
+    _ensureStorage(
+      minimumCapacity: count + range.count,
+      minimumByteWidth: other.byteWidth,
+      forcingReallocation: false)
     _appendInPlace(other, range: range)
   }
 
