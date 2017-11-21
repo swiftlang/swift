@@ -2591,9 +2591,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
     if (conformance.isConcrete()) {
+      unsigned index = 0;
       for (const auto &req : conformance.getConditionalRequirements()) {
-        // FIXME: Use a more specific locator.
-        addConstraint(req, locator);
+        addConstraint(
+          req,
+          locator.withPathElement(
+            LocatorPathElt::getConditionalRequirementComponent(index++)));
       }
     }
 
