@@ -25,23 +25,29 @@ struct _StringGuts {
   public // FIXME for testing only
   var _storage: (_BuiltinBridgeObject, UInt)
 
-  @_versioned
+  @_inlineable
+  public
   var _object: _BuiltinBridgeObject {
     get { return _storage.0 }
     set { _storage.0 = newValue }
   }
-  @_versioned
+  @_inlineable
+  public
   var _otherBits: UInt {
+    @inline(__always)
     get { return _storage.1 }
     set { _storage.1 = newValue }
   }
-  @_versioned
+  @_inlineable
+  public
   var _objectBitPattern: UInt {
+    @inline(__always)
     get { return _bitPattern(_object) }
     set { _object = Builtin.reinterpretCast(newValue) }
   }
 
-  internal
+  @_inlineable
+  public
   init(_ object: _BuiltinBridgeObject, _ otherBits: UInt) {
     self._storage.0 = object
     self._storage.1 = otherBits
@@ -1507,6 +1513,11 @@ extension String : Equatable, Comparable {
   // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
   @_inlineable // FIXME(sil-serialize-all)
   public static func ==(lhs: String, rhs: String) -> Bool {
+    // Bitwise equality implies string equality
+    if _slowPath(lhs._guts._bitwiseEqualTo(rhs._guts)) {
+      return true
+    }
+
 #if _runtime(_ObjC)
     let lhsContigOpt = lhs._unmanagedContiguous
     let rhsContigOpt = rhs._unmanagedContiguous
@@ -1667,6 +1678,15 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Character {
     return _guts.character(at: i)
+  }
+}
+
+extension _StringGuts {
+  @inline(__always)
+  @_inlineable
+  public func _bitwiseEqualTo(_ other: _StringGuts) -> Bool {
+    return self._objectBitPattern == other._objectBitPattern
+      && self._otherBits == other._otherBits
   }
 }
 
