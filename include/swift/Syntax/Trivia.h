@@ -231,6 +231,11 @@ struct Trivia {
     Pieces.insert(Pieces.begin(), Piece);
   }
 
+  /// Clear pieces.
+  void clear() {
+    Pieces.clear();
+  }
+
   /// Return a reference to the first piece.
   ///
   /// Precondition: !empty()

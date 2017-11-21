@@ -15,146 +15,184 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/TokenSyntax.h"
 
 namespace swift {
-  class SourceLoc;
-  class SourceFile;
-  class Token;
+class SourceLoc;
+class SourceFile;
+class Token;
 
 namespace syntax {
-  struct RawTokenSyntax;
-  struct RawSyntax;
-  enum class SyntaxKind;
+struct RawTokenSyntax;
+struct RawSyntax;
+enum class SyntaxKind;
 
-enum class SyntaxContextKind: uint8_t{
-  Expr,
+enum class SyntaxContextKind {
   Decl,
   Stmt,
+  Expr,
+  Type,
+  Pattern,
 };
 
-/// The handler for parser to generate libSyntax entities.
-struct RawSyntaxInfo {
-  /// Start and end location of this syntax node.
-  SourceRange SyntaxRange;
+/// Indicates what action should be performed on the destruction of
+///  SyntaxParsingContext
+enum class AccumulationMode {
+  // Coerece the result to one of ContextKind.
+  // E.g. for ContextKind::Expr, passthroug if the result is CallExpr, whereas
+  // <UnknownExpr><SomeDecl /></UnknownDecl> for non Exprs.
+  CoerceKind,
 
-  /// This location must be valid if this node is an implicit node, e.g.
-  /// an empty statement list collection.
-  /// This location indicates the implicit node should appear before the token
-  /// on the location.
-  SourceLoc BeforeLoc;
+  // Construct a result Syntax with specified SyntaxKind.
+  CreateSyntax,
 
-  /// The raw node.
-  RC<RawSyntax> RawNode;
-  RawSyntaxInfo(RC<RawSyntax> RawNode): RawNode(RawNode) {}
-  RawSyntaxInfo(SourceLoc StartLoc, RC<RawSyntax> RawNode):
-    SyntaxRange(StartLoc), RawNode(RawNode) {}
-  RawSyntaxInfo(SourceRange SyntaxRange, RC<RawSyntax> RawNode):
-    SyntaxRange(SyntaxRange), RawNode(RawNode) {}
+  // Pass through all parts to the parent context.
+  Transparent,
 
-  bool isImplicit() const { return SyntaxRange.isInvalid(); }
-  SourceLoc getStartLoc() const { return SyntaxRange.Start; }
-  SourceLoc getEndLoc() const { return SyntaxRange.End; }
+  // Discard all parts in the context.
+  Discard,
 
-  template <typename SyntaxNode>
-  SyntaxNode makeSyntax() const { return make<SyntaxNode>(RawNode); }
-
-  template <typename RawSyntaxNode>
-  RC<RawSyntaxNode> getRaw() const {
-    return RC<RawSyntaxNode>(cast<RawSyntaxNode>(RawNode));
-  }
-  void brigeWithContext(SyntaxContextKind Kind);
-  void setBeforeLoc(SourceLoc Loc) {
-    assert(isImplicit());
-    BeforeLoc = Loc;
-  }
-};
-
-enum class SyntaxParsingContextKind: uint8_t {
+  // Construct SourceFile syntax to the specified SF.
   Root,
-  Child,
+
+  // Invalid.
+  NotSet,
 };
 
-/// The base class of different kinds of Syntax context that Parser should use to
-/// create syntax nodes.
+/// RAII object which receive RawSyntax parts. On destruction, this constructs
+/// a specified syntax node from received parts and propagate it to the parent
+/// context.
+///
+/// e.g.
+///   parseExprParen() {
+///     SyntaxParsingContext LocalCtxt(SyntaxKind::ParenExpr, SyntaxContext);
+///     consumeToken(tok::l_paren) // In consumeToken(), a RawTokenSyntax is
+///                                // added to the context.
+///     parseExpr(); // On returning from parseExpr(), a Expr Syntax node is
+///                  // created and added to the context.
+///     consumeToken(tok::r_paren)
+///     // Now the context holds { '(' Expr ')' }.
+///     // From these parts, it creates ParenExpr node and add it to the parent.
+///   }
 class SyntaxParsingContext {
-protected:
-  SyntaxParsingContext(SourceFile &SF, unsigned BufferID, Token &Tok);
-  SyntaxParsingContext(SyntaxParsingContext &Another);
-public:
-  struct ContextInfo;
-  ContextInfo &ContextData;
-  const Token &Tok;
-
-  // Get the context kind.
-  virtual SyntaxParsingContextKind getKind() = 0;
-
-  // Create a syntax node of the given kind.
-  virtual void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) = 0;
-  virtual ~SyntaxParsingContext();
-  virtual void setSyntaxKind(SyntaxKind Kind) = 0;
-  virtual void setContextKind(SyntaxContextKind CKind) = 0;
-  virtual void finalize() = 0;
-
-  // Disable the building of syntax tree in the current context.
-  void disable();
-};
-
-// The start point of syntax tree parsing. This context is the root
-// of all other entity-specific contexts. This is the context Parser
-// has when the parser instance is firstly created.
-class SyntaxParsingContextRoot: public SyntaxParsingContext {
-  SourceFile &File;
-public:
-  SyntaxParsingContextRoot(SourceFile &File, unsigned BufferID, Token &Tok):
-    SyntaxParsingContext(File, BufferID, Tok), File(File) {}
-  ~SyntaxParsingContextRoot();
-  void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override {};
-  void setSyntaxKind(SyntaxKind Kind) override {};
-  void setContextKind(SyntaxContextKind CKind) override {};
-  void finalize() override {};
-  SyntaxParsingContextKind getKind() override {
-    return SyntaxParsingContextKind::Root;
-  };
-};
-
-// The base class for contexts that are created from a parent context.
-// The stack instance will set the context holder when the context
-// is firstly created and reset the context holder to the parent when
-// it's destructed.
-class SyntaxParsingContextChild: public SyntaxParsingContext {
+  // Parent context. Only the root context has nullptr.
   SyntaxParsingContext *Parent;
-  SyntaxParsingContext *&ContextHolder;
-  Optional<SyntaxContextKind> ContextKind;
-  Optional<SyntaxKind> KnownSyntax;
-  void makeNodeWhole(SyntaxKind Kind);
-  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-                            Optional<SyntaxContextKind> Kind,
-                            Optional<SyntaxKind> KnownSyntax);
-  bool isTopOfContextStack() const { return this == ContextHolder; }
-public:
-  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-    SyntaxContextKind Kind): SyntaxParsingContextChild(ContextHolder,
-                                                       Kind, None) {}
 
-  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-    SyntaxKind KnownSyntax): SyntaxParsingContextChild(ContextHolder,
-                             None, KnownSyntax) {};
+  // Reference to the
+  SyntaxParsingContext *&CtxtHolder;
 
-  SyntaxParsingContextChild(SyntaxParsingContext *&ContextHolder,
-                            bool Disable = false);
+  // Collected parts.
+  std::vector<RC<RawSyntax>> Parts;
 
-  ~SyntaxParsingContextChild();
-  void makeNode(SyntaxKind Kind, SourceLoc LastTokLoc) override;
-  void finalize() override;
-  SyntaxParsingContext* getParent() { return Parent; }
-  void setSyntaxKind(SyntaxKind SKind) override;
-  void setContextKind(SyntaxContextKind CKind) override;
-  SyntaxParsingContextRoot &getRoot();
-  SyntaxParsingContextKind getKind() override {
-    return SyntaxParsingContextKind::Child;
+  // Operation on destruction.
+  AccumulationMode Mode = AccumulationMode::NotSet;
+
+  // Additional info depending on \c Mode.
+  union {
+    // For AccumulationMode::CreateSyntax; desired syntax node kind.
+    SyntaxKind SynKind;
+    // For AccumulationMode::CoerceKind; desired syntax node category.
+    SyntaxContextKind CtxtKind;
+    // For AccumulationMode::Root; the parsing source file.
+    SourceFile *SF;
   };
-};
-}
-}
-#endif // SWIFT_SYNTAX_PARSING_CONTEXT_H
 
+  // If false, context does nothing.
+  bool Enabled;
+
+public:
+  /// Construct root context.
+  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF);
+
+  /// Designated constructor for child context.
+  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
+      : Parent(CtxtHolder), CtxtHolder(CtxtHolder), 
+        Enabled(Parent->isEnabled()) {
+    assert(CtxtHolder->isTopOfContextStack() &&
+           "SyntaxParsingContext cannot have multiple children");
+    CtxtHolder = this;
+  }
+
+  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SyntaxContextKind Kind)
+      : SyntaxParsingContext(CtxtHolder) {
+    setCoerceKind(Kind);
+  }
+
+  SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SyntaxKind Kind)
+      : SyntaxParsingContext(CtxtHolder) {
+    setCreateSyntax(Kind);
+  }
+
+  ~SyntaxParsingContext();
+
+  void disable() { Enabled = false; }
+  bool isEnabled() const { return Enabled; }
+  bool isRoot() const { return !Parent; }
+  bool isTopOfContextStack() const { return this == CtxtHolder; }
+
+  SyntaxParsingContext *getRoot();
+
+  /// Add RawSyntax to the parts.
+  void addRawSyntax(RC<RawSyntax> Raw);
+
+  /// Add Token with Trivia to the parts.
+  void addToken(Token &Tok, Trivia &LeadingTrivia, Trivia &TrailingTrivia);
+
+  /// Add Syntax to the parts.
+  void addSyntax(Syntax Node);
+
+  RC<RawSyntax> popBack() {
+    auto Raw = std::move(Parts.back());
+    Parts.pop_back();
+    return Raw;
+  }
+
+  template<typename SyntaxNode>
+  llvm::Optional<SyntaxNode> popIf() {
+    if (auto Node = make<Syntax>(Parts.back()).getAs<SyntaxNode>()) {
+      Parts.pop_back();
+      return Node;
+    }
+    return None;
+  }
+
+  TokenSyntax popToken() {
+    assert(Parts.back()->Kind == SyntaxKind::Token);
+    return make<TokenSyntax>(popBack());
+  }
+
+  /// Create a syntax node using the tail \c N elements of collected parts and
+  /// replace those parts with the single result.
+  void createNodeInPlace(SyntaxKind Kind, size_t N);
+
+  /// Create a node using the tail of the collected parts. The number of parts
+  /// is automatically determined from \c Kind. Node: limited number of \c Kind
+  /// are supported. See the implementation.
+  void createNodeInPlace(SyntaxKind Kind);
+
+  /// On destruction, construct a specified kind of RawSyntax node consuming the
+  /// collected parts, then append it to the parent context.
+  void setCreateSyntax(SyntaxKind Kind) {
+    Mode = AccumulationMode::CreateSyntax;
+    SynKind = Kind;
+  }
+
+  /// On destruction, if the parts size is 1 and it's kind of \c Kind, just
+  /// append it to the parent context. Otherwise, create Unknown{Kind} node from
+  /// the collected parts.
+  void setCoerceKind(SyntaxContextKind Kind) {
+    Mode = AccumulationMode::CoerceKind;
+    CtxtKind = Kind;
+  }
+
+  /// Move the collected parts to the tail of parent context.
+  void setTransparent() { Mode = AccumulationMode::Transparent; }
+
+  /// Discard collected parts on this context.
+  void setDiscard() { Mode = AccumulationMode::Discard; }
+
+};
+
+} // namespace syntax
+} // namespace swift
+#endif // SWIFT_SYNTAX_PARSING_CONTEXT_H

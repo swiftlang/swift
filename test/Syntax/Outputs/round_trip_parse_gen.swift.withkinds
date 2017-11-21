@@ -10,14 +10,14 @@ class C {
   func bar3(a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
   func bar4(_ a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
   func foo() <CodeBlock>{
-    var a = /*comment*/<StringLiteralExpr>"abc"/*comment*/</StringLiteralExpr>
-    var b = /*comment*/<IntegerLiteralExpr>+2/*comment*/</IntegerLiteralExpr><IdentifierExpr>
+    var a = <StringLiteralExpr>/*comment*/"ab\(x)c"</StringLiteralExpr>/*comment*/
+    var b = <IntegerLiteralExpr>/*comment*/+2</IntegerLiteralExpr><IdentifierExpr>/*comment*/
     bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
     bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>+10</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
     bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>-10</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
     bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>-1.1</FloatLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
     bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)
-    var f = /*comments*/<FloatLiteralExpr>+0.1/*comments*/</FloatLiteralExpr><IdentifierExpr>
+    var f = <FloatLiteralExpr>/*comments*/+0.1</FloatLiteralExpr><IdentifierExpr>/*comments*/
     foo</IdentifierExpr>()
   }</CodeBlock>
 
