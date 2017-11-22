@@ -424,9 +424,9 @@ public:
   bool setup(const CompilerInvocation &Invocation);
 
 private:
-  void setupLLVMArguments();
-  void setupDiagnosticOptions();
-  bool setupModuleLoaders();
+  void setUpLLVMArguments();
+  void setUpDiagnosticOptions();
+  bool setUpModuleLoaders();
   Optional<unsigned> setupCodeCompletionBuffer();
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() { return Invocation.isInputSwift(); }

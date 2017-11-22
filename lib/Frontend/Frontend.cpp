@@ -74,8 +74,8 @@ void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
-  setupLLVMArguments();
-  setupDiagnosticOptions();
+  setUpLLVMArguments();
+  setUpDiagnosticOptions();
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
@@ -92,7 +92,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
                                Invocation.getSearchPathOptions(), SourceMgr,
                                Diagnostics));
 
-  if (setupModuleLoaders())
+  if (setUpModuleLoaders())
     return true;
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
@@ -105,7 +105,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   return setupInputs(codeCompletionBufferID);
 }
 
-void CompilerInstance::setupLLVMArguments() {
+void CompilerInstance::setUpLLVMArguments() {
   // Honor -Xllvm.
   if (!Invocation.getFrontendOptions().LLVMArgs.empty()) {
     llvm::SmallVector<const char *, 4> Args;
@@ -118,7 +118,7 @@ void CompilerInstance::setupLLVMArguments() {
   }
 }
 
-void CompilerInstance::setupDiagnosticOptions() {
+void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
@@ -129,8 +129,7 @@ void CompilerInstance::setupDiagnosticOptions() {
     Diagnostics.setWarningsAsErrors(true);
   }
 }
-
-bool CompilerInstance::setupModuleLoaders() {
+bool CompilerInstance::setUpModuleLoaders() {
   if (Invocation.getFrontendOptions().EnableSourceImport) {
     bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
     bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
