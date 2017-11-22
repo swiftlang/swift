@@ -79,6 +79,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     @_versioned
     @inline(__always)
     set {
+      let count = self.count
       withUnsafeBytes(of: &storage) {
         (rawPtr : UnsafeRawBufferPointer) -> () in
         let rawPtr = UnsafeMutableRawBufferPointer(mutating: rawPtr)

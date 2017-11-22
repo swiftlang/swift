@@ -1159,6 +1159,7 @@ extension _StringGuts {
   // affect count. Returns the extra capacity.
   @inline(never)
   @_versioned
+  @discardableResult
   internal
   mutating func _ensureUniqueNative(
     minimumCapacity: Int, minimumByteWidth: Int
@@ -1191,6 +1192,7 @@ extension _StringGuts {
   }
   @inline(never)
   @_versioned
+  @discardableResult
   internal
   mutating func _ensureUniqueNative(
     increasingCountBy otherCount: Int, minimumByteWidth: Int
