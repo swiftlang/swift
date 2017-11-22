@@ -21,6 +21,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Config.h"
 #include <cassert>
 #include <string>
 #include <vector>
@@ -29,7 +30,9 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <linux/limits.h>
+#if HAVE_GETAUXVAL
 #include <sys/auxv.h>
+#endif
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -60,6 +63,35 @@ typedef Elf32_Section Elf_Section;
 #endif
 
 extern const Elf_Ehdr elfHeader asm("__ehdr_start");
+
+static unsigned long getAuxVal(unsigned long type) {
+#if HAVE_GETAUXVAL
+  return getauxval(type);
+#else
+  struct AuxvEntry {
+    unsigned long tag;
+    unsigned long value;
+  };
+
+  int fd = open("/proc/self/auxv", O_RDONLY);
+  if (fd < 0) {
+    return 0;
+  }
+
+  AuxvEntry entry;
+  while (read(fd, &entry, sizeof(AuxvEntry)) == sizeof(AuxvEntry)) {
+    if (entry.tag == 0 && entry.value == 0) {
+      break;
+    }
+    if (entry.tag == type) {
+      close(fd);
+      return entry.value;
+    }
+  }
+  close(fd);
+  return 0;
+#endif
+}
 
 class StaticBinaryELF {
 
@@ -117,7 +149,7 @@ public:
   StaticBinaryELF() {
     getExecutablePathName();
 
-    programHeaders = reinterpret_cast<const Elf_Phdr *>(getauxval(AT_PHDR));
+    programHeaders = reinterpret_cast<const Elf_Phdr *>(getAuxVal(AT_PHDR));
     if (programHeaders == nullptr) {
       return;
     }
