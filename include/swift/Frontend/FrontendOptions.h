@@ -64,6 +64,8 @@ class InputFileOrBuffer {
   bool getIsPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *getBuffer() const { return Buffer; }
   StringRef getFile() const { return Filename; }
+  
+  void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
 };
 
 /// Information about all the inputs to the frontend.
@@ -189,7 +191,6 @@ public:
   bool verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
-public:
   void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
     addInput(InputFileOrBuffer::createFile(file, false, buffer));
   }
@@ -198,6 +199,9 @@ public:
   }
   void addInputBuffer(llvm::MemoryBuffer *buffer) {
     addInput(InputFileOrBuffer::createBuffer(buffer, false));
+  }
+  void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
+    Inputs[index].setBuffer(buffer);
   }
   void addPrimaryInputBuffer(llvm::MemoryBuffer *buffer) {
     addInput(InputFileOrBuffer::createBuffer(buffer, true));

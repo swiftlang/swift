@@ -815,8 +815,9 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   CompilerInvocation Invocation;
   Opts.applyTo(Invocation);
   Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
-  for (auto &Content : Contents)
-    Invocation.getFrontendOptions().Inputs.addInputBuffer(Content.Buffer.get());
+  for (auto i: indices(Contents)) {
+    Invocation.getFrontendOptions().Inputs.setBuffer(Contents[i].Buffer.get(), i);
+  }
 
   if (CompIns.setup(Invocation)) {
     // FIXME: Report the diagnostic.
