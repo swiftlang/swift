@@ -4975,8 +4975,10 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
       TC.diagnose(Candidate, note, first, second,
                   rawFirstType, rawSecondType,
-                  genericSig->gatherGenericParamBindingsText(
-                                 {rawFirstType, rawSecondType}, Substitutions));
+                  TypeChecker::gatherGenericParamBindingsText(
+                    {rawFirstType, rawSecondType},
+                    genericSig->getGenericParams(),
+                    Substitutions));
 
       ParentConditionalConformance::diagnoseConformanceStack(
           TC.Diags, Candidate->getLoc(), parents);
@@ -4992,7 +4994,9 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
   auto result = TC.checkGenericArguments(
       dc, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
-      env->getGenericSignature(), substitutionFn,
+      env->getGenericSignature()->getGenericParams(),
+      env->getGenericSignature()->getRequirements(),
+      substitutionFn,
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 

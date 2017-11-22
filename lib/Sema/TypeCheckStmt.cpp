@@ -620,9 +620,6 @@ public:
       if (!conformance)
         return nullptr;
 
-      assert(conformance->getConditionalRequirements().empty() &&
-             "conditionally conforming to Sequence is not currently supported");
-
       generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
                                       *conformance,
                                       TC.Context.Id_Iterator,
