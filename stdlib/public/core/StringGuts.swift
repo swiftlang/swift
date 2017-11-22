@@ -742,6 +742,81 @@ extension OpaqueCocoaString {
   }
 }
 
+extension OpaqueCocoaString : Sequence {
+  typealias Element = UTF16.CodeUnit
+
+  @_inlineable
+  @_versioned
+  func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+
+  @_versioned
+  @_fixed_layout
+  struct Iterator : IteratorProtocol {
+    @_versioned
+    internal let _object: _CocoaString
+
+    @_versioned
+    internal let _endIndex: Int
+
+    @_versioned
+    internal var _nextIndex: Int
+
+    @_versioned
+    internal var _buffer = _FixedArray16<Element>(allZeros: ())
+
+    @_versioned
+    internal var _bufferIndex: Int8 = 0
+
+    @_versioned
+    internal var _bufferCount: Int8 = 0
+
+    @_inlineable
+    @_versioned
+    init(_ string: OpaqueCocoaString) {
+      self._object = string.object
+      self._endIndex = string.range.upperBound
+      self._nextIndex = string.range.lowerBound
+    }
+
+    @_inlineable
+    @_versioned
+    @inline(__always)
+    mutating func next() -> Element? {
+      if _fastPath(_bufferIndex < _bufferCount) {
+        let result = _buffer[Int(_bufferIndex)]
+        _bufferIndex += 1
+        return result
+      }
+      if _slowPath(_nextIndex == _endIndex) { return nil }
+      return _nextOnSlowPath()
+    }
+
+    @_inlineable
+    @_versioned
+    mutating func _nextOnSlowPath() -> Element {
+      // Fill buffer
+      _sanityCheck(Element.self == UTF16.CodeUnit.self)
+      _sanityCheck(_nextIndex < _endIndex)
+      let capacity = _buffer.count
+      let end = Swift.min(_nextIndex + capacity, _endIndex)
+      unowned(unsafe) let object = _object
+      withUnsafeMutableBytes(of: &_buffer.storage) { b in
+        _sanityCheck(b.count == MemoryLayout<Element>.stride * capacity)
+        _cocoaStringCopyCharacters(
+          from: object,
+          range: _nextIndex..<end,
+          into: b.baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self))
+      }
+      _bufferIndex = 1
+      _bufferCount = Int8(end - _nextIndex)
+      _nextIndex = end
+      _fixLifetime(_object)
+      return _buffer[0]
+    }
+  }
+}
 
 extension OpaqueCocoaString : RandomAccessCollection {
   typealias Index = Int
