@@ -1208,11 +1208,12 @@ extension _StringGuts {
     // references as we know lifetime
     _sanityCheck(_isNative)
     var nativeBuffer = self._asNative.stringBuffer
-    nativeBuffer.usedEnd += otherCount &<< nativeBuffer.elementShift
+    let otherByteCount = otherCount &<< nativeBuffer.elementShift
+    nativeBuffer.usedEnd += otherByteCount
     self._otherBits += UInt(truncatingIfNeeded: otherCount)
 
     _sanityCheck(
-      capBegin + otherCount == self._asNative.stringBuffer.usedEnd
+      capBegin + otherByteCount == self._asNative.stringBuffer.usedEnd
       && capEnd == self._asNative.stringBuffer.capacityEnd)
     return (capBegin, capEnd)
   }
