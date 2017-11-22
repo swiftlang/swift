@@ -374,35 +374,23 @@ struct UnsafeString {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal subscript(position: Int) -> UTF16.CodeUnit {
-    @inline(__always)
-    get {
-      _sanityCheck(
-        position >= 0,
-        "subscript: index precedes String start")
-      _sanityCheck(
-        position <= count,
-        "subscript: index points past String end")
-      if isSingleByte {
-        return UTF16.CodeUnit(asciiBuffer[position])
-      }
-      return utf16Buffer[position]
-    }
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal subscript(bounds: Range<Int>) -> UnsafeString {
-    _sanityCheck(
-      bounds.lowerBound >= 0,
+  internal func slice(_ bounds: Range<Int>) -> UnsafeString {
+    _sanityCheck(bounds.lowerBound >= 0,
       "subscript: subrange start precedes String start")
-    _sanityCheck(
-      bounds.upperBound <= count,
+    _sanityCheck(bounds.upperBound <= count,
       "subscript: subrange extends past String end")
     return UnsafeString(
       baseAddress: _pointer(toElementAt: bounds.lowerBound),
       count: bounds.upperBound - bounds.lowerBound,
       isSingleByte: self.isSingleByte)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func slice<R: RangeExpression>(_ bounds: R) -> UnsafeString
+    where R.Bound == Index {
+    return self.slice(bounds.relative(to: self))
   }
 
   /// Returns a pointer to the Nth element of contiguous
@@ -451,9 +439,11 @@ struct UnsafeString {
 
 extension UnsafeString: RandomAccessCollection {
   typealias Index = Int
-  typealias Element = UInt16
-  typealias SubSequence = UnsafeString
+  typealias IndexDistance = Int
   typealias Indices = CountableRange<Int>
+  typealias Element = UInt16
+  // SubSequence can't be UnsafeString because it needs to preserve indices.
+  typealias SubSequence = RandomAccessSlice<UnsafeString>
 
   @_inlineable
   @_versioned
@@ -477,6 +467,24 @@ extension UnsafeString: RandomAccessCollection {
   internal
   func index(before i: Int) -> Int {
     return i-1
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(position: Int) -> UTF16.CodeUnit {
+    @inline(__always)
+    get {
+      _sanityCheck(
+        position >= 0,
+        "subscript: index precedes String start")
+      _sanityCheck(
+        position <= count,
+        "subscript: index points past String end")
+      if isSingleByte {
+        return UTF16.CodeUnit(asciiBuffer[position])
+      }
+      return utf16Buffer[position]
+    }
   }
 }
 
@@ -1226,7 +1234,7 @@ extension _StringGuts {
     let unmanagedSelfOpt = self._unmanagedContiguous
     if _fastPath(unmanagedSelfOpt != nil) {
       let unsafe = unmanagedSelfOpt._unsafelyUnwrappedUnchecked
-      unsafe[range]._copy(
+      unsafe.slice(range)._copy(
         into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
       _fixLifetime(self)
       return
@@ -1554,7 +1562,7 @@ extension Substring {
   @_versioned
   internal
   var _unmanagedContiguous: UnsafeString? {
-    return self._wholeString._unmanagedContiguous?[self._encodedOffsetRange]
+    return _wholeString._unmanagedContiguous?.slice(_encodedOffsetRange)
   }
 }
 
@@ -1876,7 +1884,7 @@ extension UnsafeString {
       return Character(_singleCodeUnit: self[offset])
     }
     _precondition(offset + stride <= self.count, "String index is out of range")
-    return Character(self[offset..<offset+stride])
+    return Character(self.slice(offset..<offset+stride))
   }
 
   @_versioned
