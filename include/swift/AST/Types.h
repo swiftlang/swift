@@ -289,9 +289,9 @@ protected:
 
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    unsigned ExtInfo : 16;
+    unsigned ExtInfo : 7; enum { NumExtInfoBits = 7 };
   };
-  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 16 };
+  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct ArchetypeTypeBitfields {
@@ -316,12 +316,12 @@ protected:
 
   struct SILFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
-    unsigned ExtInfo : 16;
+    unsigned ExtInfo : 6; enum { NumExtInfoBits = 6 };
     unsigned CalleeConvention : 3;
     unsigned HasErrorResult : 1;
     unsigned CoroutineKind : 2;
   };
-  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16 + 6 };
+  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 12 };
   static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct AnyMetatypeTypeBitfields {
@@ -2391,21 +2391,22 @@ public:
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // Feel free to rearrange or add bits, but if you go over 15,
-    // you'll need to adjust both the Bits field below and
-    // BaseType::AnyFunctionTypeBits.
+    // NOTE: If bits are added or removed, then TypeBase::AnyFunctionTypeBits
+    // must be updated to match.
 
     //   |representation|isAutoClosure|noEscape|throws|
     //   |    0 .. 3    |      4      |    5   |   6  |
     //
-    enum : uint16_t { RepresentationMask     = 0x00F };
-    enum : uint16_t { AutoClosureMask        = 0x010 };
-    enum : uint16_t { NoEscapeMask           = 0x020 };
-    enum : uint16_t { ThrowsMask             = 0x040 };
+    enum : unsigned {
+      RepresentationMask     = 0x0F,
+      AutoClosureMask        = 0x10,
+      NoEscapeMask           = 0x20,
+      ThrowsMask             = 0x40,
+    };
 
-    uint16_t Bits;
+    unsigned Bits;
 
-    ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
+    ExtInfo(unsigned Bits) : Bits(Bits) {}
 
     friend class AnyFunctionType;
     
@@ -2536,6 +2537,8 @@ protected:
                   unsigned NumParams, const ExtInfo &Info)
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
     NumParams(NumParams) {
+    assert(Info.Bits < (1u<<TypeBase::AnyFunctionTypeBitfields::NumExtInfoBits)
+           && "ExtInfo bits must not exceed underlying bits");
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
   }
 
@@ -3246,20 +3249,21 @@ public:
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // Feel free to rearrange or add bits, but if you go over 15,
-    // you'll need to adjust both the Bits field below and
-    // TypeBase::AnyFunctionTypeBits.
+    // NOTE: If bits are added or removed, then TypeBase::SILFunctionTypeBits
+    // must be updated to match.
 
     //   |representation|pseudogeneric| noescape |
     //   |    0 .. 3    |      4      |     5    |
     //
-    enum : uint16_t { RepresentationMask = 0x00F };
-    enum : uint16_t { PseudogenericMask  = 0x010 };
-    enum : uint16_t { NoEscapeMask       = 0x020 };
+    enum : unsigned {
+      RepresentationMask = 0x0F,
+      PseudogenericMask  = 0x10,
+      NoEscapeMask       = 0x20,
+    };
 
-    uint16_t Bits;
+    unsigned Bits;
 
-    ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
+    ExtInfo(unsigned Bits) : Bits(Bits) {}
 
     friend class SILFunctionType;
     
