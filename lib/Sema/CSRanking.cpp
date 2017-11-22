@@ -232,8 +232,10 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, DeclContext *dc1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = tc.conformsToProtocol(modelTy, proto, dc,
-                                           ConformanceCheckFlags::InExpression);
+  auto conformance = tc.conformsToProtocol(
+                         modelTy, proto, dc,
+                         (ConformanceCheckFlags::InExpression|
+                          ConformanceCheckFlags::SkipConditionalRequirements));
   if (!conformance)
     return {SelfTypeRelationship::Unrelated, None};
 

@@ -599,7 +599,9 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic signature.
   if (!hasTypeParameterOrVariable) {
     auto result =
-      checkGenericArguments(dc, loc, noteLoc, unboundType, genericSig,
+      checkGenericArguments(dc, loc, noteLoc, unboundType,
+                            genericSig->getGenericParams(),
+                            genericSig->getRequirements(),
                             QueryTypeSubstitutionMap{subs},
                             LookUpConformance(*this, dc),
                             unsatisfiedDependency);

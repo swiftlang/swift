@@ -2618,8 +2618,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
     if (auto conformance =
-          TC.conformsToProtocol(type, protocol, DC,
-                                ConformanceCheckFlags::InExpression)) {
+          TC.conformsToProtocol(
+                      type, protocol, DC,
+                      (ConformanceCheckFlags::InExpression|
+                       ConformanceCheckFlags::SkipConditionalRequirements))) {
       return recordConformance(*conformance);
     }
     break;

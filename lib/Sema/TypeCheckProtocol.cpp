@@ -2266,9 +2266,11 @@ namespace {
     // Check that T conforms to all inherited protocols.
     for (auto InheritedProto : Proto->getInheritedProtocols()) {
       auto InheritedConformance =
-      TC.conformsToProtocol(T, InheritedProto, DC,
-                            ConformanceCheckFlags::Used,
-                            ComplainLoc);
+      TC.conformsToProtocol(
+                          T, InheritedProto, DC,
+                          (ConformanceCheckFlags::Used|
+                           ConformanceCheckFlags::SkipConditionalRequirements),
+                          ComplainLoc);
       if (!InheritedConformance || !InheritedConformance->isConcrete()) {
         // Recursive call already diagnosed this problem, but tack on a note
         // to establish the relationship.
@@ -3558,7 +3560,9 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   // Check protocol conformances.
   for (auto reqProto : genericSig->getConformsTo(depTy)) {
-    if (!tc.conformsToProtocol(contextType, reqProto, dc, None))
+    if (!tc.conformsToProtocol(
+                          contextType, reqProto, dc,
+                          ConformanceCheckFlags::SkipConditionalRequirements))
       return CheckTypeWitnessResult(reqProto->getDeclaredType());
 
     // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
@@ -4659,7 +4663,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
       // If that failed, check whether it's because of the conformance we're
       // evaluating.
       auto localConformance
-        = TC.conformsToProtocol(baseTy, assocType->getProtocol(), DC, None);
+        = TC.conformsToProtocol(
+                          baseTy, assocType->getProtocol(), DC,
+                          ConformanceCheckFlags::SkipConditionalRequirements);
       if (!localConformance || localConformance->isAbstract() ||
           (localConformance->getConcrete()->getRootNormalConformance()
              != Conformance)) {
@@ -4731,12 +4737,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
       SmallVector<Requirement, 4> sanitizedRequirements;
       sanitizeProtocolRequirements(Proto, Proto->getRequirementSignature(),
                                    sanitizedRequirements);
-      auto requirementSig =
-        GenericSignature::get({Proto->getProtocolSelfType()},
-                               sanitizedRequirements);
       auto result =
         TC.checkGenericArguments(DC, SourceLoc(), SourceLoc(),
-                                 typeInContext, requirementSig,
+                                 typeInContext,
+                                 { Proto->getProtocolSelfType() },
+                                 sanitizedRequirements,
                                  QuerySubstitutionMap{substitutions},
                                  TypeChecker::LookUpConformance(
                                    TC, Conformance->getDeclContext()),
@@ -5421,9 +5426,6 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   if (!Conformance->getSignatureConformances().empty())
     return;
 
-  auto reqSig = GenericSignature::get({proto->getProtocolSelfType()},
-                                      proto->getRequirementSignature());
-
   auto DC = Conformance->getDeclContext();
   auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
@@ -5471,10 +5473,11 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
           concreteConformance->getType()->mapTypeOutOfContext();
 
         conformance = *tc.conformsToProtocol(
-                           interfaceType,
-                           conformance.getRequirement(),
-                           dc,
-                           ConformanceCheckFlags::SuppressDependencyTracking);
+                         interfaceType,
+                         conformance.getRequirement(),
+                         dc,
+                         (ConformanceCheckFlags::SuppressDependencyTracking|
+                          ConformanceCheckFlags::SkipConditionalRequirements));
 
         // Reinstate inherited conformance.
         if (inheritedInterfaceType) {
@@ -5492,7 +5495,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
       // FIXME: maybe this should be the conformance's type
-      proto->getDeclaredInterfaceType(), reqSig,
+      proto->getDeclaredInterfaceType(),
+      { proto->getProtocolSelfType() },
+      proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
       TypeChecker::LookUpConformance(TC, DC),
       nullptr,
@@ -5919,6 +5924,43 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     markConformanceUsed(*lookupResult, DC);
   }
 
+  // If we have a concrete conformance with conditional requirements that
+  // we need to check, do so now.
+  if (lookupResult->isConcrete() &&
+      !lookupResult->getConditionalRequirements().empty() &&
+      !options.contains(ConformanceCheckFlags::SkipConditionalRequirements)) {
+    // Figure out the location of the conditional conformance.
+    auto conformanceDC = lookupResult->getConcrete()->getDeclContext();
+    SourceLoc noteLoc;
+    if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC))
+      noteLoc = ext->getLoc();
+    else
+      noteLoc = cast<NominalTypeDecl>(conformanceDC)->getLoc();
+
+    auto conditionalCheckResult =
+      checkGenericArguments(DC, ComplainLoc, noteLoc, T,
+                            { lookupResult->getRequirement()
+                                ->getProtocolSelfType() },
+                            lookupResult->getConditionalRequirements(),
+                            [](SubstitutableType *dependentType) {
+                              return Type(dependentType);
+                            },
+                            LookUpConformance(*this, DC),
+                            /*unsatisfiedDependency=*/nullptr,
+                            options);
+    switch (conditionalCheckResult) {
+    case RequirementCheckResult::Success:
+      break;
+
+    case RequirementCheckResult::Failure:
+    case RequirementCheckResult::SubstitutionFailure:
+      return None;
+
+    case RequirementCheckResult::UnsatisfiedDependency:
+      llvm_unreachable("Not permissible here");
+    }
+  }
+
   // When requested, print the conformance access path used to find this
   // conformance.
   if (Context.LangOpts.DebugGenericSignatures &&
@@ -6004,11 +6046,13 @@ TypeChecker::LookUpConformance::operator()(
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol->getDecl());
 
-  return tc.conformsToProtocol(conformingReplacementType,
-                               conformedProtocol->getDecl(),
-                               dc,
-                               (ConformanceCheckFlags::Used|
-                                ConformanceCheckFlags::InExpression));
+  return tc.conformsToProtocol(
+                         conformingReplacementType,
+                         conformedProtocol->getDecl(),
+                         dc,
+                         (ConformanceCheckFlags::Used|
+                          ConformanceCheckFlags::InExpression|
+                          ConformanceCheckFlags::SkipConditionalRequirements));
 }
 
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
@@ -6053,8 +6097,6 @@ bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
         if (WasUnsatisfied)
           return Action::Stop;
         if (result.getStatus() == RequirementCheckResult::Success)
-          assert(result.getConformance().getConditionalRequirements().empty() &&
-                 "cannot conform conditionally to _ObjectiveCBridgeable");
 
         // Set and Dictionary bridging also requires the conformance
         // of the key type to Hashable.
@@ -6149,9 +6191,6 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
   auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
                                         ConformanceCheckFlags::Used);
   if (conformance && conformance->isConcrete()) {
-    assert(conformance->getConditionalRequirements().empty() &&
-           "cannot conform condtionally to _BridgedStoredNSError");
-
     // Hack: If we've used a conformance to the _BridgedStoredNSError
     // protocol, also use the RawRepresentable and _ErrorCodeProtocol
     // conformances on the Code associated type witness.
