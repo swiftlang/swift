@@ -63,7 +63,15 @@ struct _StringGuts {
 // won't work out-of-the-box for 32bit platforms.
 
 // The bit used to discriminate value or managed.
-/*fileprivate*/ internal var _tagBit: UInt { return _objCTaggedPointerBits }
+/*fileprivate*/
+@_versioned
+@_inlineable
+internal var _tagBit: UInt {
+  @inline(__always)
+  get {
+    return _objCTaggedPointerBits
+  }
+}
 
 // When a value, the bit that discriminates a small string from an unsafe string
 //
@@ -71,7 +79,13 @@ struct _StringGuts {
 // can store are tagged NSStrings. For now, this is synonymous with a tagged
 // NSString but this will be expanded in the future to store other forms.
 //
-/*fileprivate*/ internal var _smallBit: UInt { return _tagBit >> 1 }
+/*fileprivate*/
+@_versioned
+@_inlineable
+internal var _smallBit: UInt {
+  @inline(__always)
+  get { return _tagBit >> 1 }
+}
 
 // When managed, or an unsafe string, the bit used to discriminate two-byte or
 // one-byte code units.
@@ -116,7 +130,12 @@ extension _StringGuts {
     return Builtin.reinterpretCast(_objectBitPattern & ~_flagsMask)
   }
 
-  var _isTagged: Bool { return _isTaggedObject(_object) }
+  @_versioned
+  @_inlineable
+  var _isTagged: Bool {
+    @inline(__always)
+    get { return _isTaggedObject(_object) }
+  }
 
   var _untaggedUnflaggedBitPattern: UInt {
     _sanityCheck(_isTagged)
@@ -707,9 +726,12 @@ extension _StringGuts {
   // Cocoa (non-tagged) Strings
   //
   ///*fileprivate*/ internal // TODO: private in Swift 4
-  public // TODO(StringGuts): for testing only
+  @_versioned
+  @_inlineable
+  internal
   var _isNonTaggedCocoa: Bool {
-    return _isNonTaggedObjCPointer(_object)
+    @inline(__always)
+    get { return _isNonTaggedObjCPointer(_object) }
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
@@ -777,9 +799,12 @@ extension _StringGuts {
   //
 
   ///*fileprivate*/ internal // TODO: private in Swift 4
-  public // TODO(StringGuts): for testing only
+  @_versioned
+  @_inlineable
+  internal
   var _isSmallCocoa: Bool {
-    return _isTagged && _objectBitPattern & _smallBit != 0
+    @inline(__always)
+    get { return _isTagged && _objectBitPattern & _smallBit != 0 }
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
@@ -1234,21 +1259,30 @@ extension _StringGuts {
 // TODO: Probably better to host top level API directly on the String type itself
 extension _StringGuts {
   @_versioned
+  @_inlineable
   internal
   var startIndex: Int { return 0 }
 
   @_versioned
+  @_inlineable
   internal
   var endIndex: Int { return count }
 
   @_versioned
+  @_inlineable
   internal
   var count: Int {
-    let contigOpt = self._unmanagedContiguous
-    if _fastPath(contigOpt != nil) {
-      return contigOpt._unsafelyUnwrappedUnchecked.count
+    if _isSmallCocoa {
+      return _stdlib_binary_CFStringGetLength(
+        Builtin.reinterpretCast(self._otherBits))
     }
-    return self.getOpaque().count
+    if _isNonTaggedCocoa {
+      return _stdlib_binary_CFStringGetLength(
+        _bridgeObject(toNonTaggedObjC: _object))
+    }
+
+    _sanityCheck(Int(self._otherBits) >= 0)
+    return Int(truncatingIfNeeded: self._otherBits)
   }
 
   @_versioned
