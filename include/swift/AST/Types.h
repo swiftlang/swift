@@ -123,7 +123,7 @@ public:
   };
 
 private:
-  unsigned Bits : BitWidth;
+  unsigned Bits;
 
 public:
   RecursiveTypeProperties() : Bits(0) {}
@@ -376,6 +376,7 @@ protected:
 
   void setRecursiveProperties(RecursiveTypeProperties properties) {
     TypeBaseBits.Properties = properties.getBits();
+    assert(TypeBaseBits.Properties == properties.getBits() && "Bits dropped!");
   }
 
 public:
