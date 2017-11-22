@@ -185,6 +185,40 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
                                       originalSelfType);
 }
 
+static ManagedValue convertOwnershipConventionGivenParamInfo(SILGenFunction &SGF,
+                                                             SILParameterInfo param,
+                                                             ManagedValue value,
+                                                             SILLocation loc) {
+  if (param.isConsumed() &&
+      value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+    return value.copyUnmanaged(SGF, loc);
+  }
+
+  if (SGF.F.getModule().getOptions().EnableSILOwnership &&
+      value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+    if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
+                                       param.isIndirectInGuaranteed())) {
+      return value.borrow(SGF, loc);
+    }
+  }
+
+  return value;
+}
+
+static void convertOwnershipConventionsGivenParamInfos(
+    SILGenFunction &SGF,
+    ArrayRef<SILParameterInfo> params,
+    ArrayRef<ManagedValue> values,
+    SILLocation loc,
+    llvm::SmallVectorImpl<ManagedValue> &outVar) {
+  assert(params.size() == values.size() &&
+         "Different number of params from arguments");
+  transform(indices(params), std::back_inserter(outVar),
+            [&](unsigned i) -> ManagedValue {
+              return convertOwnershipConventionGivenParamInfo(SGF, params[i], values[i], loc);
+            });
+}
+
 namespace {
 
 /// Abstractly represents a callee, which may be a constant or function value,
@@ -2809,20 +2843,7 @@ private:
     auto loc = arg.getLocation();
 
     auto convertOwnershipConvention = [&](ManagedValue value) {
-      if (param.isConsumed() &&
-          value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-        return value.copyUnmanaged(SGF, loc);
-      }
-
-      if (SGF.F.getModule().getOptions().EnableSILOwnership &&
-          value.getOwnershipKind() == ValueOwnershipKind::Owned) {
-        if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
-                                           param.isIndirectInGuaranteed())) {
-          return value.borrow(SGF, loc);
-        }
-      }
-
-      return value;
+      return convertOwnershipConventionGivenParamInfo(SGF, param, value, loc);
     };
 
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
@@ -4410,11 +4431,15 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   calleeTypeInfo.origResultType = origFormalType.getFunctionResultType();
   calleeTypeInfo.substResultType = substFormalType.getResult();
 
+  SILFunctionConventions silConv(calleeTypeInfo.substFnType, getModule());
+  llvm::SmallVector<ManagedValue, 8> finalArgs;
+  convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(), args, loc, finalArgs);
+
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subs,
-                   args, calleeTypeInfo, ApplyOptions::None, ctx);
+                   finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
 }
 
 static StringRef
