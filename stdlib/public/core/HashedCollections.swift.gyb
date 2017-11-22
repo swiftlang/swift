@@ -1256,7 +1256,7 @@ internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
 // ordering we can get the `true` response without ever hashing. If the two
 // buffers' contents differ at all then we have to fall back to hashing the
 // rest of the elements (but we don't need to hash any prefix that did match).
-extension Set {
+extension Set : Equatable {
   /// Returns a Boolean value indicating whether two sets have equal elements.
   ///
   /// - Parameters:
