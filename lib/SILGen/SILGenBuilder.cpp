@@ -739,6 +739,19 @@ ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,
   return cloner.clone(result);
 }
 
+void SILGenBuilder::createBranch(SILLocation returnLoc, SILBasicBlock *block,
+                                 ManagedValue mv) {
+  createBranch(returnLoc, block, mv.forward(SGF));
+}
+
+void SILGenBuilder::createReturn(SILLocation returnLoc, ManagedValue mv) {
+  createReturn(returnLoc, mv.forward(SGF));
+}
+
+void SILGenBuilder::createDebugValue(SILLocation loc, ManagedValue mv) {
+  createDebugValue(loc, mv.getValue());
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//
