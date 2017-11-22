@@ -822,20 +822,19 @@ extension String : _ExpressibleByBuiltinStringLiteral {
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1) {
-    if Bool(isASCII) {
-        self = String(_StringGuts(UnsafeString(
-          baseAddress: UnsafeRawPointer(start),
-          count: Int(utf8CodeUnitCount),
-          isSingleByte: true)))
+    isASCII: Builtin.Int1
+  ) {
+    if _fastPath(Bool(isASCII)) {
+      self = String(_StringGuts(
+        _asciiPointer: UnsafeRawPointer(start),
+        codeUnitCount: Int(utf8CodeUnitCount)))
+      return
     }
-    else {
-      self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(
-          start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
-          count: Int(utf8CodeUnitCount)))
-    }
+    self = String._fromWellFormedCodeUnitSequence(
+      UTF8.self,
+      input: UnsafeBufferPointer(
+        start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+        count: Int(utf8CodeUnitCount)))
   }
 }
 

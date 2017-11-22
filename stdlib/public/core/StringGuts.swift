@@ -89,7 +89,13 @@ internal var _smallBit: UInt {
 
 // When managed, or an unsafe string, the bit used to discriminate two-byte or
 // one-byte code units.
-/*fileprivate*/ internal var _twoByteCodeUnitBit: UInt { return _smallBit >> 1 }
+/*fileprivate*/
+@_versioned
+@_inlineable
+internal var _twoByteCodeUnitBit: UInt {
+  @inline(__always)
+  get { return _smallBit >> 1 }
+}
 
 //
 // Flags
@@ -98,8 +104,11 @@ internal var _smallBit: UInt {
 // "StringObject"-like struct, and provide this funcitonality on that.
 //
 extension _StringGuts {
+  @_versioned
+  @_inlineable
   /*private*/ internal var _flagsMask: UInt {
-    return _twoByteCodeUnitBit
+    @inline(__always)
+    get { return _twoByteCodeUnitBit }
   }
 
   @_versioned
@@ -125,9 +134,15 @@ extension _StringGuts {
     return isSingleByte
   }
 
+  @_inlineable
+  @_versioned
+  internal
   var _unflaggedObject: _BuiltinBridgeObject {
-    _sanityCheck(!_isSmallCocoa, "TODO: drop small cocoa")
-    return Builtin.reinterpretCast(_objectBitPattern & ~_flagsMask)
+    @inline(__always)
+    get {
+      _sanityCheck(!_isSmallCocoa, "TODO: drop small cocoa")
+      return Builtin.reinterpretCast(_objectBitPattern & ~_flagsMask)
+    }
   }
 
   @_versioned
@@ -142,6 +157,8 @@ extension _StringGuts {
     return _bridgeObject(toTagPayload: _unflaggedObject)
   }
 
+  @_inlineable
+  @_versioned
   /*private*/ internal init(
     _unflagged object: _BuiltinBridgeObject,
     isSingleByte: Bool,
@@ -165,6 +182,7 @@ extension _StringGuts {
         isSingleByte: true))
   }
 
+  @_versioned
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     if let native = self._native {
@@ -305,7 +323,10 @@ struct UnsafeString {
     return isSingleByte
   }
 
+  @inline(__always)
+  @_inlineable
   @_versioned
+  internal
   init(
     baseAddress: UnsafeRawPointer,
     count: Int,
@@ -784,6 +805,7 @@ extension _StringGuts {
       isSingleByte: self.isSingleByte)
   }
 
+  @_inlineable
   @_versioned
   init(_ s: UnsafeString) {
     // Tag it, flag it, and go
@@ -792,6 +814,16 @@ extension _StringGuts {
       _unflagged: object,
       isSingleByte: s.isSingleByte,
       otherBits: UInt(s.count))
+  }
+
+  @inline(__always)
+  @_inlineable
+  @_versioned
+  init(_asciiPointer ptr: UnsafeRawPointer, codeUnitCount: Int) {
+    _sanityCheck(codeUnitCount >= 0)
+    self.init(
+      _bridgeObject(taggingPayload: UInt(bitPattern: ptr)),
+      UInt(bitPattern: codeUnitCount))
   }
 
   //
