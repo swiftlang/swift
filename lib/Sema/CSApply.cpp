@@ -471,9 +471,10 @@ namespace {
           if (!baseTy->is<ArchetypeType>() && !baseTy->isAnyExistentialType()) {
             auto &tc = cs.getTypeChecker();
             auto conformance =
-              tc.conformsToProtocol(baseTy, proto, cs.DC,
-                                    (ConformanceCheckFlags::InExpression|
-                                         ConformanceCheckFlags::Used));
+              tc.conformsToProtocol(
+                        baseTy, proto, cs.DC,
+                        (ConformanceCheckFlags::InExpression|
+                         ConformanceCheckFlags::Used));
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
                         conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
@@ -2261,8 +2262,6 @@ namespace {
         tc.conformsToProtocol(conformingType, proto, cs.DC,
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "object literal type conforms to protocol");
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
@@ -2713,8 +2712,6 @@ namespace {
         tc.conformsToProtocol(arrayTy, arrayProto, cs.DC,
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "Type does not conform to protocol?");
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       // Call the witness that builds the array literal.
       // FIXME: callWitness() may end up re-doing some work we already did
@@ -2796,9 +2793,6 @@ namespace {
                               ConformanceCheckFlags::InExpression);
       if (!conformance)
         return nullptr;
-
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       // Call the witness that builds the dictionary literal.
       // FIXME: callWitness() may end up re-doing some work we already did
@@ -4295,8 +4289,9 @@ namespace {
         for (auto indexType : indexTypes) {
           auto conformance =
             cs.TC.conformsToProtocol(indexType.getType(), hashable,
-                                     cs.DC, ConformanceCheckFlags::Used
-                                          |ConformanceCheckFlags::InExpression);
+                                     cs.DC,
+                                     (ConformanceCheckFlags::Used|
+                                      ConformanceCheckFlags::InExpression));
           if (!conformance) {
             cs.TC.diagnose(component.getIndexExpr()->getLoc(),
                            diag::expr_keypath_subscript_index_not_hashable,
@@ -6122,12 +6117,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Find the conformance of the source type to Hashable.
       auto hashable = tc.Context.getProtocol(KnownProtocolKind::Hashable);
       auto conformance =
-        tc.conformsToProtocol(cs.getType(expr), hashable, cs.DC,
-                              (ConformanceCheckFlags::InExpression |
-                               ConformanceCheckFlags::Used));
+        tc.conformsToProtocol(
+                        cs.getType(expr), hashable, cs.DC,
+                        (ConformanceCheckFlags::InExpression |
+                         ConformanceCheckFlags::Used));
       assert(conformance && "must conform to Hashable");
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       return cs.cacheType(
           new (tc.Context) AnyHashableErasureExpr(expr, toType, *conformance));
@@ -6556,10 +6550,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   Optional<ProtocolConformanceRef> builtinConformance;
   if (builtinProtocol &&
       (builtinConformance =
-         tc.conformsToProtocol(type, builtinProtocol, cs.DC,
-                               ConformanceCheckFlags::InExpression))) {
-    assert(builtinConformance->getConditionalRequirements().empty() &&
-           "conditional conformance to builtins not handled");
+         tc.conformsToProtocol(
+                      type, builtinProtocol, cs.DC,
+                      (ConformanceCheckFlags::InExpression)))) {
 
     // Find the builtin argument type we'll use.
     Type argType;
@@ -6710,8 +6703,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       (builtinConformance =
          tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                ConformanceCheckFlags::InExpression))) {
-    assert(builtinConformance->getConditionalRequirements().empty() &&
-           "conditional conformance to builtins not handled");
+
     // Find the witness that we'll use to initialize the type via a builtin
     // literal.
     auto witness = findNamedWitnessImpl<AbstractFunctionDecl>(

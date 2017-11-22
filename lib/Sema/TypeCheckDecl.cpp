@@ -8824,9 +8824,11 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
   // complete.
   auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
     auto targetType = target->getDeclaredInterfaceType();
-    if (auto ref = conformsToProtocol(targetType, protocol, target,
-                                      ConformanceCheckFlags::Used,
-                                      SourceLoc())) {
+    if (auto ref = conformsToProtocol(
+                        targetType, protocol, target,
+                        (ConformanceCheckFlags::Used|
+                         ConformanceCheckFlags::SkipConditionalRequirements),
+                         SourceLoc())) {
       if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
         if (conformance->isIncomplete()) {
           // Check conformance, forcing synthesis.

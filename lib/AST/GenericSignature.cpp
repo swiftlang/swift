@@ -110,45 +110,6 @@ GenericSignature::getSubstitutableParams() const {
   return result;
 }
 
-std::string GenericSignature::gatherGenericParamBindingsText(
-    ArrayRef<Type> types, TypeSubstitutionFn substitutions) const {
-  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
-  for (auto type : types) {
-    type.visit([&](Type type) {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        knownGenericParams.insert(
-            gp->getCanonicalType()->castTo<GenericTypeParamType>());
-      }
-    });
-  }
-
-  if (knownGenericParams.empty())
-    return "";
-
-  SmallString<128> result;
-  for (auto gp : this->getGenericParams()) {
-    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-    if (!knownGenericParams.count(canonGP))
-      continue;
-
-    if (result.empty())
-      result += " [with ";
-    else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
-
-    auto type = substitutions(canonGP);
-    if (!type)
-      return "";
-
-    result += type.getString();
-  }
-
-  result += "]";
-  return result.str().str();
-}
-
 ASTContext &GenericSignature::getASTContext(
                                 ArrayRef<swift::GenericTypeParamType *> params,
                                 ArrayRef<swift::Requirement> requirements) {

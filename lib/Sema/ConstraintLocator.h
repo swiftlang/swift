@@ -123,6 +123,8 @@ public:
     OpenedGeneric,
     /// A component of a key path.
     KeyPathComponent,
+    /// The Nth conditional requirement in the parent locator's conformance.
+    ConditionalRequirement,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -161,6 +163,7 @@ public:
     case NamedTupleElement:
     case TupleElement:
     case KeyPathComponent:
+    case ConditionalRequirement:
       return 1;
 
     case ApplyArgToParam:
@@ -213,6 +216,7 @@ public:
     case Requirement:
     case Witness:
     case KeyPathComponent:
+    case ConditionalRequirement:
       return 0;
 
     case FunctionArgument:
@@ -342,6 +346,11 @@ public:
     /// Get a path element for a key path component.
     static PathElement getKeyPathComponent(unsigned position) {
       return PathElement(KeyPathComponent, position);
+    }
+
+    /// Get a path element for a conditional requirement.
+    static PathElement getConditionalRequirementComponent(unsigned index) {
+      return PathElement(ConditionalRequirement, index);
     }
 
     /// \brief Retrieve the kind of path element.
