@@ -327,6 +327,13 @@ public:
   using SILBuilder::createBridgeObjectToRef;
   ManagedValue createBridgeObjectToRef(SILLocation loc, ManagedValue mv,
                                        SILType destType);
+
+  using SILBuilder::createBranch;
+  BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
+                           ArrayRef<ManagedValue> Args);
+
+  using SILBuilder::createReturn;
+  ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
 };
 
 class SwitchCaseFullExpr;
