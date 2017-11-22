@@ -1329,8 +1329,8 @@ namespace {
     }
 
     Type resolveTypeReferenceInExpression(TypeRepr *rep) {
-      TypeResolutionOptions options = TR_AllowUnboundGenerics;
-      options |= TR_InExpression;
+      TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::InExpression;
       return CS.TC.resolveType(rep, CS.DC, options);
     }
 
@@ -1553,9 +1553,9 @@ namespace {
           // open type.
           auto locator = CS.getConstraintLocator(expr);
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
-            if (tc.validateType(specializations[i], CS.DC,
-                                (TR_InExpression |
-                                 TR_AllowUnboundGenerics)))
+            TypeResolutionOptions options = TypeResolutionFlags::InExpression;
+            options |= TypeResolutionFlags::AllowUnboundGenerics;
+            if (tc.validateType(specializations[i], CS.DC, options))
               return Type();
 
             CS.addConstraint(ConstraintKind::Equal,
@@ -2169,7 +2169,7 @@ namespace {
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
             if (CS.TC.validateType(isp->getCastTypeLoc(), CS.DC,
-                                   TR_InExpression))
+                                   TypeResolutionFlags::InExpression))
               return false;
 
             if (!isp->hasSubPattern()) {
@@ -2189,7 +2189,7 @@ namespace {
           Type exnType = CS.TC.getExceptionType(CS.DC, clause->getCatchLoc());
           if (!exnType ||
               CS.TC.coercePatternToType(pattern, CS.DC, exnType,
-                                        TR_InExpression)) {
+                                        TypeResolutionFlags::InExpression)) {
             return false;
           }
 
@@ -2500,8 +2500,8 @@ namespace {
         return nullptr;
 
       // Validate the resulting type.
-      TypeResolutionOptions options = TR_AllowUnboundGenerics;
-      options |= TR_InExpression;
+      TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::InExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2523,8 +2523,8 @@ namespace {
       auto &tc = CS.getTypeChecker();
       
       // Validate the resulting type.
-      TypeResolutionOptions options = TR_AllowUnboundGenerics;
-      options |= TR_InExpression;
+      TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::InExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2548,8 +2548,8 @@ namespace {
         return nullptr;
 
       // Validate the resulting type.
-      TypeResolutionOptions options = TR_AllowUnboundGenerics;
-      options |= TR_InExpression;
+      TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::InExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2567,8 +2567,8 @@ namespace {
     Type visitIsExpr(IsExpr *expr) {
       // Validate the type.
       auto &tc = CS.getTypeChecker();
-      TypeResolutionOptions options = TR_AllowUnboundGenerics;
-      options |= TR_InExpression;
+      TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::InExpression;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 

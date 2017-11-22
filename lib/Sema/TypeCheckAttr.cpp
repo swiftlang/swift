@@ -1979,8 +1979,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   TypeLoc &ProtoTypeLoc = attr->getProtocolType();
-  TypeResolutionOptions options;
-  options |= TR_AllowUnboundGenerics;
+  auto options = TypeResolutionFlags::AllowUnboundGenerics;
 
   DeclContext *DC = D->getDeclContext();
   Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),

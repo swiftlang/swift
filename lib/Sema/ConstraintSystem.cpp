@@ -893,7 +893,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
     auto type = TC.resolveTypeInContext(typeDecl, nullptr, DC,
-                                        TR_InExpression,
+                                        TypeResolutionFlags::InExpression,
                                         /*isSpecialized=*/false);
 
     // Open the type.
