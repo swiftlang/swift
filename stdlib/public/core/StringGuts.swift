@@ -709,34 +709,78 @@ struct NativeString {
 @_fixed_layout
 internal struct OpaqueCocoaString {
   @_versioned
-  let object: AnyObject
+  let object: _CocoaString
 
   @_versioned
-  let count: Int
+  let range: Range<Int>
 
   @inline(never)
   init(_ object: AnyObject) {
-    self.init(object, count: _stdlib_binary_CFStringGetLength(object))
+    self.init(object, range: 0 ..< _stdlib_binary_CFStringGetLength(object))
   }
 
-  init(_ object: AnyObject, count: Int) {
+  init(_ object: AnyObject, range: Range<Int>) {
     self.object = object
-    self.count = count
+    self.range = range
   }
+}
+
+extension OpaqueCocoaString {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _copy(
+    into dest: UnsafeMutableRawPointer,
+    capacityEnd: UnsafeMutableRawPointer,
+    accomodatingElementWidth width: Int
+  ) {
+    _sanityCheck(width == 2) // TODO: CFStringGetBytes
+    _sanityCheck(capacityEnd - dest >= range.count &<< 1)
+    _cocoaStringCopyCharacters(
+      from: object,
+      range: range,
+      into: dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
+  }
+}
+
+
+extension OpaqueCocoaString : RandomAccessCollection {
+  typealias Index = Int
+  typealias IndexDistance = Int
+  typealias SubSequence = OpaqueCocoaString
 
   @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
+  @_inlineable
+  var startIndex: Int { return range.lowerBound }
+
+  @_versioned
+  @_inlineable
+  var endIndex: Int { return range.upperBound }
+
+  @_versioned
+  @_inlineable
+  var count: Int { return range.count }
+
+  @_versioned
+  @_inlineable
+  func index(after i: Int) -> Int { return i + 1 }
+
+  @_versioned
+  @_inlineable
+  func index(before i: Int) -> Int { return i - 1 }
+
+  @_versioned
   subscript(position: Int) -> UTF16.CodeUnit {
+    _sanityCheck(range.contains(position))
     return _cocoaStringSubscript(object, position)
   }
 
   @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
-  subscript(bounds: Range<Int>) -> _StringGuts {
-    return _makeCocoaStringGuts(_cocoaStringSlice(object, bounds))
+  subscript(bounds: Range<Int>) -> OpaqueCocoaString {
+    _sanityCheck(bounds.lowerBound >= range.lowerBound)
+    _sanityCheck(bounds.upperBound >= range.upperBound)
+    return OpaqueCocoaString(object, range: bounds)
   }
 }
-
 
 //
 // Masks
@@ -1242,13 +1286,8 @@ extension _StringGuts {
       _fixLifetime(self)
       return
     }
-
-    _sanityCheck(width == 2) // TODO: CFStringGetBytes
-    let opaque = getOpaque()
-    _cocoaStringCopyCharacters(
-      from: opaque.object,
-      range: range,
-      into: dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
+    getOpaque()._copy(
+      into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
   }
 
   @inline(__always)
