@@ -1070,12 +1070,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if (auto nominalType2 = type2->getNominalOrBoundGenericNominal()) {
         if ((nominalType2->getName() ==
              cs.TC.Context.Id_OptionalNilComparisonType)) {
-          ++score1;
+          ++score2;
         }
-      } else if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
+      }
+
+      if (auto nominalType1 = type1->getNominalOrBoundGenericNominal()) {
         if ((nominalType1->getName() ==
              cs.TC.Context.Id_OptionalNilComparisonType)) {
-          ++score2;
+          ++score1;
         }
       }
     }
