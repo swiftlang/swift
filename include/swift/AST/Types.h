@@ -289,7 +289,7 @@ protected:
 
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    unsigned ExtInfo : 7; enum { NumExtInfoBits = 7 };
+    unsigned ExtInfo : 7;
   };
   enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
@@ -316,7 +316,7 @@ protected:
 
   struct SILFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
-    unsigned ExtInfo : 6; enum { NumExtInfoBits = 6 };
+    unsigned ExtInfo : 6;
     unsigned CalleeConvention : 3;
     unsigned HasErrorResult : 1;
     unsigned CoroutineKind : 2;
@@ -2537,9 +2537,8 @@ protected:
                   unsigned NumParams, const ExtInfo &Info)
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
     NumParams(NumParams) {
-    assert(Info.Bits < (1u<<TypeBase::AnyFunctionTypeBitfields::NumExtInfoBits)
-           && "ExtInfo bits must not exceed underlying bits");
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
+    assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
   }
 
 public:

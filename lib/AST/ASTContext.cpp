@@ -3868,9 +3868,8 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
       WitnessMethodConformance(witnessMethodConformance) {
 
   SILFunctionTypeBits.HasErrorResult = errorResult.hasValue();
-  assert(ext.Bits < (1u << TypeBase::SILFunctionTypeBitfields::NumExtInfoBits)
-         && "ExtInfo bits must not exceed underlying bits");
   SILFunctionTypeBits.ExtInfo = ext.Bits;
+  assert(SILFunctionTypeBits.ExtInfo == ext.Bits && "Bits were dropped!");
   SILFunctionTypeBits.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
