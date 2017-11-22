@@ -322,9 +322,15 @@ extension String {
     public subscript(position: Index) -> UTF8.CodeUnit {
       @inline(__always)
       get {
-        if _fastPath(_core.asciiBuffer != nil), let ascii = _core.asciiBuffer {
-          _precondition(position < endIndex, "Index out of bounds")
-          return ascii[position.encodedOffset]
+        if _fastPath(_guts.isASCII) {
+          let contigOpt = _guts._unmanagedContiguous
+          if _fastPath(contigOpt != nil) {
+            let offset = position.encodedOffset
+            _precondition(offset < contigOpt._unsafelyUnwrappedUnchecked.count,
+              "Index out of bounds")
+            return contigOpt._unsafelyUnwrappedUnchecked.asciiBuffer[
+              position.encodedOffset]
+          }
         }
         var j = position
         while true {
