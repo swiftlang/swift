@@ -158,7 +158,6 @@ extension _StringGuts {
   }
 
   @_inlineable
-  @_versioned
   public // @testable
   var _owner: AnyObject? { // For testing only
     if _isNative {
@@ -1238,6 +1237,21 @@ extension _StringGuts {
       return _asNative.stringBuffer
     }
     return _copyToStringBuffer(capacity: self.count, byteWidth: self.byteWidth)
+  }
+
+  @_versioned
+  internal
+  func _copySliceToStringBuffer(_ bounds: Range<Int>) -> _StringBuffer {
+    let buffer = _StringBuffer(
+      capacity: bounds.count,
+      initialSize: bounds.count,
+      elementWidth: byteWidth)
+    self._copy(
+      range: bounds,
+      into: buffer.start,
+      capacityEnd: buffer.capacityEnd,
+      accomodatingElementWidth: byteWidth)
+    return buffer
   }
 
   @_versioned
