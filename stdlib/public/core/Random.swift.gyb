@@ -1,4 +1,4 @@
-//===--- Random.swift -----------------------------------------------------===//
+//===--- Random.swift.gyb -------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,8 +19,8 @@ import SwiftShims
 /// that implement their own pseudo-random or cryptographically secure
 /// pseudo-random number generation. Using the RandomNumberGenerator protocol
 /// allows these types to be used with types that conform to `Randomizable`,
-/// collections with .random, and collections/sequences with .shuffle() and
-/// .shuffled()
+/// collections with .random and .pick(_:), and collections/sequences with
+/// .shuffle() and .shuffled()
 ///
 /// Conforming to the RandomNumberGenerator protocol
 /// ==========================================
@@ -100,20 +100,20 @@ extension RandomNumberGenerator {
 /// Using those functions should be preferred over using this directly. An
 /// example of calling this directly:
 ///
-///     let random = Random.default.next(Int.self)
-///     let randomToTen = Random.default.next(Int.self, upperBound: 10)
+///     let random = Random.default.next(UInt8.self)
+///     let randomToTen = Random.default.next(UInt32.self, upperBound: 128)
 ///
 /// However, you should strive to use the random functions on the numeric types.
 /// Using the preferred way:
 ///
-///     let random = Int.random
-///     let randomToTen = (0 ... 10).random
+///     let random = UInt8.random
+///     let randomToTen = UInt32.random(in: 0 ... 128)
 ///
 /// - Note: The default implementation of randomness is cryptographically secure.
 ///   It utilizes arc4random on newer versions of macOS, iOS, etc. On older
-///   versions of these operating systems it uses /dev/urandom and SecRandomCopyBytes
-///   on iOS. For Linux, it tries to use the getrandom(2) system call on newer
-///   kernel versions. On older kernel versions, it uses /dev/urandom.
+///   versions of these operating systems it uses SecRandomCopyBytes. For Linux,
+///   it tries to use the getrandom(2) system call on newer kernel versions. On
+///   older kernel versions, it reads from /dev/urandom.
 public struct Random : RandomNumberGenerator {
   /// This random number generator generates the machine's bit width unsigned integer
   public typealias GeneratedNumber = UInt
@@ -150,37 +150,26 @@ public struct Random : RandomNumberGenerator {
 /// =======================================
 ///
 /// In order to conform to the Randomizable protocol, all one must implement is
-/// the random(using:) function. As an example, below is a custom Date structure:
+/// the random(using:) function. As an example, below is a custom Color structure:
 ///
-///     struct Date {
-///         let year: Int
-///         let month: Int
-///         let day: Int
+///     struct Color {
+///         let value: UInt32
 ///     }
 ///
-/// In order for `Date` to conform to `Randomizable`, it must declare conformance
+/// In order for `Color` to conform to `Randomizable`, it must declare conformance
 /// and implement the random(using:) function.
 ///
-///     extension Date : Randomizable {
+///     extension Color : Randomizable {
 ///         static func random<T: RandomNumberGenerator>(using generator: T) -> Self {
-///             let randomYear = (0 ... 3000).random(using: generator)
-///             let randomMonth = (1 ... 12).random(using: generator)
-///             let randomDay = (1 ... 31).random(using: generator)
-///             // This could produce a date with day 31 on months without 31 days
-///             // Ideally, you should check for this
-///             return Date(year: randomYear, month: randomMonth, day: randomDay)
+///             let value = UInt32.random(in: 0x0 ... 0xFFFFFF, using: generator)
+///             return Color(value: value)
 ///         }
 ///     }
 ///
-/// Note how the ranges use the random(using:) function that is defined for them.
+/// Note how the function .random(in:using:) is using custom generator argument.
 /// Make sure to do this for custom types as it allows developers the ability
 /// to use their own random number generators on custom types.
 public protocol Randomizable {
-  /// The random representation of this type.
-  ///
-  /// Shorthand for using the random(using:) function. This uses the default
-  /// random implementation defined in the standard library.
-  static var random: Self { get }
 
   /// Returns a random representation of this type.
   ///
@@ -191,7 +180,7 @@ public protocol Randomizable {
 }
 
 extension Randomizable {
-  /// The random representation of this type.
+  /// Returns a random representation of this type.
   ///
   /// Shorthand for using the random(using:) function. This uses the default
   /// random implementation defined in the standard library.
@@ -200,3 +189,63 @@ extension Randomizable {
     return self.random(using: Random.default)
   }
 }
+
+% for Range in ['Range', 'ClosedRange']:
+
+extension Randomizable where Self: BinaryFloatingPoint {
+  /// Returns a random representation of this type within the range
+  ///
+  /// - Parameter range: The range to select a random value from.
+  /// - Returns: A random representation of this type within the range.
+  ///
+  /// Shorthand for using the random(in:using:) function. This uses the default
+  /// random implementation defined in the standard library.
+  public static func random(in range: ${Range}<Self>) -> Self {
+    return range.random!
+  }
+
+  /// Returns a random representation of this type within the range
+  ///
+  /// - Parameter range: The range to select a random value from.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random value from the range.
+  /// - Returns: A random representation of this type within the range.
+  public static func random<T: RandomNumberGenerator>(
+    in range: ${Range}<Self>,
+    using generator: T
+  ) -> Self {
+    return range.random(using: generator)!
+  }
+}
+
+% end
+
+% for Range in ['CountableRange', 'CountableClosedRange']:
+
+extension Randomizable where Self: Strideable, Self.Stride: SignedInteger {
+  /// Returns a random representation of this type within the range
+  ///
+  /// - Parameter range: The range to select a random value from.
+  /// - Returns: A random representation of this type within the range.
+  ///
+  /// Shorthand for using the random(in:using:) function. This uses the default
+  /// random implementation defined in the standard library.
+  public static func random(in range: ${Range}<Self>) -> Self {
+    return range.random!
+  }
+
+  /// Returns a random representation of this type within the range
+  ///
+  /// - Parameter range: The range to select a random value from.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   a random value from the range.
+  /// - Returns: A random representation of this type within the range.
+  public static func random<T: RandomNumberGenerator>(
+    in range: ${Range}<Self>,
+    using generator: T
+  ) -> Self {
+    return range.random(using: generator)!
+  }
+}
+
+% end

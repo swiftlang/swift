@@ -267,7 +267,7 @@ extension MutableCollection {
     guard count > 1 else { return }
     var amount = count
     while amount > 1 {
-      var random = generator.next(upperBound: UInt(count))
+      let random = generator.next(upperBound: UInt(count))
       guard amount != random else { continue }
       amount -= 1
       swapAt(

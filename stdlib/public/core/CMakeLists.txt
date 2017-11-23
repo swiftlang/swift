@@ -98,7 +98,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   PrefixWhile.swift.gyb
   Print.swift
-  Random.swift
+  Random.swift.gyb
   RandomAccessCollection.swift
   Range.swift.gyb
   RangeReplaceableCollection.swift.gyb

@@ -783,6 +783,7 @@ public protocol Collection : Sequence
 
   /// Returns a random element from this collection.
   ///
+  /// This uses the default random number generator provided by the standard library.
   /// A good example of this is getting a random number from 1 to 10:
   ///
   ///     let randomToTen = (1 ... 10).random
@@ -1048,7 +1049,7 @@ extension Collection {
   ///
   /// - Parameter generator: The random number generator to use when getting
   ///   a random element.
-  /// - Returns: A random element this collection.
+  /// - Returns: A random element from this collection.
   ///
   /// A good example of this is getting a random number from 1 to 10:
   ///
@@ -1064,13 +1065,45 @@ extension Collection {
   @_inlineable
   public func random<T: RandomNumberGenerator>(using generator: T) -> Element? {
     guard !isEmpty else { return nil }
-    var random = generator.next(upperBound: UInt(self.count))
+    let random = generator.next(upperBound: UInt(self.count))
     let index = self.index(
       self.startIndex,
       offsetBy: IndexDistance(random),
       limitedBy: self.endIndex
     )
     return self[index!]
+  }
+
+  /// Randomly samples n elements from the collection
+  ///
+  /// - Parameter n: Number of elements to randomly sample without replacement
+  ///   from this collection.
+  /// - Returns: An array of randomly sampled elements from this collection.
+  @_inlineable
+  public func sampling(_ n: Int) -> [Element] {
+    return self.sampling(n, using: Random.default)
+  }
+
+  /// Randomly samples n elements from the collection
+  ///
+  /// - Parameter n: Number of elements to randomly sample without replacement
+  ///   from this collection.
+  /// - Parameter generator: The random number generator to use when getting
+  ///   random elements.
+  /// - Returns: An array of randomly sampled elements from this collection.
+  @_inlineable
+  public func sampling<T: RandomNumberGenerator>(
+    _ n: Int,
+    using generator: T
+  ) -> [Element] {
+    guard n < count, n >= 0 else { return Array(self) }
+    var copySelf = Array(self)
+    copySelf.shuffle(using: generator)
+    var arr = [Element]()
+    for _ in 0 ..< n {
+      arr.append(copySelf.removeFirst())
+    }
+    return arr
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.
