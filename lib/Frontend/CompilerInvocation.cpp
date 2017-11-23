@@ -92,7 +92,10 @@ namespace swift {
 ///
 /// Semantics today:
 /// If input files are on command line, primary files on command line are also
-/// input files; they are not repeated without -primary-file. If input files are
+/// input files; they are may or may not be repeated on the command line with a -primary-file prefix.
+/// For example in the test: SourceKit/CursorInfo/Inputs/rdar_18677108-2-a.swift, the arguments are essentially:
+/// b.swift a.swift -primary a.swift. (A redundant primary can only come *after* the bare filename in the argument list.)
+/// If input files are
 /// in a file list, the primary files on the command line are repeated in the
 /// file list. Thus, if there are any primary files, it is illegal to have both
 /// (non-primary) input files and a file list. Finally, the order of input files
@@ -114,9 +117,12 @@ class ArgsToFrontendInputsConverter {
 
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
 
-  std::set<StringRef> PrimaryFilesToAdd;
+  std::set<StringRef> PrimaryFilesToExpectInFilelist;
+  
 
   StringRef filelistPath() { return FilelistPathArg->getValue(); }
+  
+  llvm::StringMap<unsigned> IndicesOfFilesAlreadyAdded; // Sigh, some tests duplicate files on command line.
 
   bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
     return FilelistPathArg != nullptr;
@@ -127,24 +133,35 @@ class ArgsToFrontendInputsConverter {
     SecondaryFromCommandLine,
     SecondaryFromFileList
   };
-
+  
+  void addFileFromCommandLine(StringRef file, bool isPrimary) {
+    if (isPrimary && arePrimariesOnCommandLineAlsoAppearingInFilelist()) {
+      PrimaryFilesToExpectInFilelist.insert(file);
+      return;
+    }
+    const auto iterator = IndicesOfFilesAlreadyAdded.find(file);
+    if (iterator == IndicesOfFilesAlreadyAdded.end()) {
+      IndicesOfFilesAlreadyAdded.insert(std::make_pair(file, Inputs.inputCount()));
+      Inputs.addInput(InputFileOrBuffer::createFile(file, isPrimary));
+    }
+    else if (isPrimary)
+      Inputs.bePrimaryAt(iterator->second);
+  }
+  
   void addFile(StringRef file, Whence whence) {
     switch (whence) {
-    case Whence::PrimaryFromCommandLine:
-        if (arePrimariesOnCommandLineAlsoAppearingInFilelist())
-          PrimaryFilesToAdd.insert(file);
-        else
-          Inputs.addPrimaryInputFile(file);
-      break;
+      case Whence::PrimaryFromCommandLine:
+        addFileFromCommandLine(file, true);
+        break;
 
       case Whence::SecondaryFromCommandLine:
-        Inputs.addInputFile(file);
+        addFileFromCommandLine(file, false);
         break;
         
     case Whence::SecondaryFromFileList:
-        if (PrimaryFilesToAdd.count(file)) {
+        if (PrimaryFilesToExpectInFilelist.count(file)) {
           Inputs.addPrimaryInputFile(file);
-          PrimaryFilesToAdd.erase(file);
+          PrimaryFilesToExpectInFilelist.erase(file);
         }
         else
           Inputs.addInputFile(file);
@@ -210,7 +227,7 @@ private:
 
   bool checkForUnusedPrimaries() {
     bool hadError = false;
-    for (StringRef primaryFile : PrimaryFilesToAdd) {
+    for (StringRef primaryFile : PrimaryFilesToExpectInFilelist) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
       assert(FilelistPathArg != nullptr &&
