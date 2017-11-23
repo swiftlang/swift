@@ -199,14 +199,6 @@ extension _UIntBuffer : RangeReplaceableCollection {
 
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public mutating func removeFirst() {
-    _debugPrecondition(!isEmpty)
-    _bitCount = _bitCount &- _elementWidth
-    _storage = _storage._fullShiftRight(_elementWidth)
-  }
-  
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Element == Element {
@@ -233,5 +225,20 @@ extension _UIntBuffer : RangeReplaceableCollection {
     _storage |= tailBits &<< ((tailOffset &+ growth) &* w)
     _bitCount = UInt8(
       truncatingIfNeeded: IndexDistance(_bitCount) &+ growth &* w)
+  }
+}
+
+extension _UIntBuffer {
+//===----------------------------------------------------------------------===//
+//  The following method does not match the signature of (and therefore does
+//  not override) a similarly named defaulted requirement.
+//===----------------------------------------------------------------------===//
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @inline(__always)
+  public mutating func removeFirst() {
+    _debugPrecondition(!isEmpty)
+    _bitCount = _bitCount &- _elementWidth
+    _storage = _storage._fullShiftRight(_elementWidth)
   }
 }

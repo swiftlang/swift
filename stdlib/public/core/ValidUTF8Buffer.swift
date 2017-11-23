@@ -174,13 +174,6 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public mutating func removeFirst() {
-    _debugPrecondition(!isEmpty)
-    _biasedBits = _biasedBits._fullShiftRight(8)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal func _isValid(_ i: Index) -> Bool {
     return i == endIndex || indices.contains(i)
@@ -199,6 +192,25 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
     for x in self[target.upperBound...] { r.append(x) }
     self = r
   }
+}
+
+extension _ValidUTF8Buffer {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static var encodedReplacementCharacter: _ValidUTF8Buffer {
+    return _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
+  }
+
+//===----------------------------------------------------------------------===//
+//  The following methods do not match the signature of (and therefore do
+//  not override) similarly named defaulted requirements.
+//===----------------------------------------------------------------------===//
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @inline(__always)
+  public mutating func removeFirst() {
+    _debugPrecondition(!isEmpty)
+    _biasedBits = _biasedBits._fullShiftRight(8)
+  }
 
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
@@ -206,13 +218,6 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
     _debugPrecondition(count + other.count <= capacity)
     _biasedBits |= Storage(
       truncatingIfNeeded: other._biasedBits) &<< (count &<< 3)
-  }
-}
-
-extension _ValidUTF8Buffer {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static var encodedReplacementCharacter : _ValidUTF8Buffer {
-    return _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
   }
 }
 
