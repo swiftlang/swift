@@ -279,6 +279,46 @@ extension Decimal : Strideable {
     public func advanced(by n: Decimal) -> Decimal {
         return self + n
     }
+
+    public func _steps(to other: Decimal, by n: Decimal) -> Int {
+        // This is the generic floating-point algorithm, copied here because
+        // `Decimal` does not yet conform to `FloatingPoint`.
+        let distance = self.distance(to: other)
+        _precondition(n != 0 && distance != 0)
+        guard (n < 0) == (distance < 0) else { return 0 }
+
+        var low = 0, mid = Int.max / 2, high = Int.max
+        if n > 0 {
+            guard other <= _advanced(by: n, count: high) else {
+                fatalError("Steps from \(self) to \(other) exceed Int.max - 1")
+            }
+            while mid > low {
+                if _advanced(by: n, count: mid) < other {
+                    low = mid
+                } else {
+                    high = mid
+                }
+                mid = low + (high - low) / 2
+            }
+        } else {
+            guard other >= _advanced(by: n, count: high) else {
+                fatalError("Steps from \(self) to \(other) exceed Int.max - 1")
+            }
+            while mid > low {
+                if _advanced(by: n, count: mid) > other {
+                    low = mid
+                } else {
+                    high = mid
+                }
+                mid = low + (high - low) / 2
+            }
+        }
+        return low
+    }
+
+    public func _advanced(by n: Decimal, count i: Int) -> Decimal {
+        return advanced(by: Decimal(i) * n)
+    }
 }
 
 extension Decimal {
