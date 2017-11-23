@@ -130,7 +130,7 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
 }
 bool CompilerInstance::setUpModuleLoaders() {
-  if (Invocation.getFrontendOptions().EnableSourceImport) {
+  if (hasSourceImport()) {
     bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
     bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
     Context->addModuleLoader(SourceLoader::create(*Context,
