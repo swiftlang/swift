@@ -387,11 +387,12 @@ public:
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
     unsigned Length, IndentToStrip;
-    bool IsFirstSegment, IsLastSegment;
+    bool IsFirstSegment, IsLastSegment, RawString;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
                                     bool IsFirstSegment, bool IsLastSegment,
-                                    unsigned IndentToStrip) {
+                                    unsigned IndentToStrip,
+                                    bool RawString) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
@@ -399,6 +400,7 @@ public:
       Result.IsFirstSegment = IsFirstSegment;
       Result.IsLastSegment = IsLastSegment;
       Result.IndentToStrip = IndentToStrip;
+      Result.RawString = RawString;
       return Result;
     }
     
@@ -410,6 +412,7 @@ public:
       Result.IsFirstSegment = false;
       Result.IsLastSegment = false;
       Result.IndentToStrip = 0;
+      Result.RawString = false;
       return Result;
     }
 
@@ -425,13 +428,14 @@ public:
                                            SmallVectorImpl<char> &Buffer,
                                            bool IsFirstSegment = false,
                                            bool IsLastSegment = false,
-                                           unsigned IndentToStrip = 0);
+                                           unsigned IndentToStrip = 0,
+                                           bool RawString = false);
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
         Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
-        Segment.IndentToStrip);
+        Segment.IndentToStrip, Segment.RawString);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
@@ -493,7 +497,8 @@ private:
     return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
 
-  void formToken(tok Kind, const char *TokStart, bool MultilineString = false);
+  void formToken(tok Kind, const char *TokStart,
+                 bool MultilineString = false, bool RawString = false);
 
   /// Advance to the end of the line but leave the current buffer pointer
   /// at that newline character.
@@ -525,8 +530,9 @@ private:
 
   unsigned lexCharacter(const char *&CurPtr,
                         char StopQuote, bool EmitDiagnostics,
-                        bool MultilineString = false);
-  void lexStringLiteral();
+                        bool MultilineString = false,
+                        bool RawString = false);
+  void lexStringLiteral(bool RawString);
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
