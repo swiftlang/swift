@@ -1473,10 +1473,9 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
 void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
+
   // Do not emit bodies of public_external functions.
-  // The only exception is transparent functions.
-  if (hasPublicVisibility(f->getLinkage()) && f->isAvailableExternally() &&
-      !f->isTransparent())
+  if (hasPublicVisibility(f->getLinkage()) && f->isAvailableExternally())
     return;
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
@@ -5097,7 +5096,6 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
 
-  // Otherwise, do the normal thing.
   Address base = getLoweredAddress(i->getOperand());
   addrTI.destroy(*this, base, addrTy, false /*isOutlined*/);
 }
