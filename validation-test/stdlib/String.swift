@@ -32,31 +32,37 @@ extension String {
 
 extension String {
   var bufferID: UInt {
-    return unsafeBitCast(_core._owner, to: UInt.self)
+    return unsafeBitCast(_guts._owner, to: UInt.self)
   }
   var nativeCapacity: Int {
-    return _core.nativeBuffer!.capacity
+    precondition(_guts._isNative)
+    return _guts.capacity
   }
   var capacity: Int {
-    return _core.nativeBuffer?.capacity ?? 0
+    return _guts.capacity
   }
-  func _rawIdentifier() -> (UInt, UInt) {
-    let triple = unsafeBitCast(self, to: (UInt, UInt, UInt).self)
-    let minusCount = (triple.0, triple.2)
-    return minusCount
+  func _rawIdentifier() -> UInt64 {
+    let bits = unsafeBitCast(self, to: (UInt64, UInt64).self)
+    if _guts._isNative || _guts._isNonTaggedCocoa || _guts._isUnsafe {
+      return bits.0 // Raw storage pointer or object reference, plus flags
+    } else {
+      precondition(_guts._isSmallCocoa)
+      return bits.1 // Tagged Cocoa pointer
+    }
   }
 }
 
 extension Substring {
   var bufferID: UInt {
-    return _ephemeralContent.bufferID
+    return _wholeString.bufferID
   }
 }
 
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
-  expectEqual(3 * MemoryLayout<Int>.size, MemoryLayout<String>.size)
+  // Size of a String is 16 bytes on all platforms.
+  expectEqual(16, MemoryLayout<String>.size)
 }
 
 StringTests.test("AssociatedTypes-UTF8View") {
@@ -857,12 +863,12 @@ StringTests.test("CharacterViewReplace") {
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
       checkRangeReplaceable(
-        { String(makeStringCore(s1)) },
-        { String(makeStringCore(s2 + s2)[0..<$0]) }
+        { String._CharacterView(_fixmeLegacyCore: makeStringCore(s1)) },
+        { String._CharacterView(_fixmeLegacyCore: makeStringCore(s2 + s2)[0..<$0]) }
       )
       checkRangeReplaceable(
-        { String(makeStringCore(s1)) },
-        { Array(String(makeStringCore(s2 + s2)[0..<$0])) }
+        { String._CharacterView(_fixmeLegacyCore: makeStringCore(s1)) },
+        { Array(String._CharacterView(_fixmeLegacyCore: makeStringCore(s2 + s2)[0..<$0])) }
       )
     }
   }
@@ -874,12 +880,12 @@ StringTests.test("UnicodeScalarViewReplace") {
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
       checkRangeReplaceable(
-        { String(makeStringCore(s1)).unicodeScalars },
-        { String(makeStringCore(s2 + s2)[0..<$0]).unicodeScalars }
+        { String(_fixmeLegacyCore: makeStringCore(s1)).unicodeScalars },
+        { String(_fixmeLegacyCore: makeStringCore(s2 + s2)[0..<$0]).unicodeScalars }
       )
       checkRangeReplaceable(
-        { String(makeStringCore(s1)).unicodeScalars },
-        { Array(String(makeStringCore(s2 + s2)[0..<$0]).unicodeScalars) }
+        { String(_fixmeLegacyCore: makeStringCore(s1)).unicodeScalars },
+        { Array(String(_fixmeLegacyCore: makeStringCore(s2 + s2)[0..<$0]).unicodeScalars) }
       )
     }
   }

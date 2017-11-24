@@ -89,11 +89,18 @@ extension String {
       self._guts = text._guts
       self._coreOffset = 0
     }
-    
+
     @_inlineable // FIXME(sil-serialize-all)
     public // @testable
     init(_ _guts: _StringGuts, coreOffset: Int = 0) {
       self._guts = _guts
+      self._coreOffset = coreOffset
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    public // @testable
+    init(_fixmeLegacyCore core: _LegacyStringCore, coreOffset: Int = 0) {
+      self._guts = _StringGuts(core)
       self._coreOffset = coreOffset
     }
   }
