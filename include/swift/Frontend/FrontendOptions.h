@@ -185,6 +185,14 @@ public:
     assert(!input.getFile().empty());
     return input.getFile();
   }
+  // FIXME: find a better way than trucking in indices!
+  bool getRequiredUniquePrimaryInputIndex() const {
+    assertMustNotBeMoreThanOnePrimaryInput();
+    for (auto i: indices(Inputs))
+      if (Inputs[i].getIsPrimary())
+        return i;
+    assert(false && "Must be a primary input to get here");
+  }
 
   bool haveAPrimaryInputFile() const {
     const auto *input = getOptionalUniquePrimaryInput();
