@@ -3,6 +3,10 @@
 // This test checks specific codegen related to normal arguments being passed at
 // +0. Eventually, it should be merged into normal SILGen tests.
 
+/////////////////
+// Fake Stdlib //
+/////////////////
+
 precedencegroup AssignmentPrecedence {
   assignment: true
 }
@@ -23,7 +27,13 @@ struct Buffer {
   }
 }
 
-class Klass2 {
+typealias AnyObject = Builtin.AnyObject
+
+///////////
+// Tests //
+///////////
+
+class KlassWithBuffer {
   var buffer: Buffer
   init() {
     buffer = Buffer(inK: Klass())
@@ -34,10 +44,10 @@ class Klass2 {
   // 1. Are able to propagate a +0 value value buffer.k into a +0 value and that
   // we then copy that +0 value into a +1 value, before we begin the epilog and
   // then return that value.
-  // CHECK-LABEL: sil hidden @_T0s6Klass2C23getBufferAsNativeObjectBoyF : $@convention(method) (@guaranteed Klass2) -> @owned Builtin.NativeObject {
-  // CHECK: bb0([[SELF:%.*]] : @guaranteed $Klass2):
+  // CHECK-LABEL: sil hidden @_T0s15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $KlassWithBuffer):
   // CHECK:   [[BUF_BOX:%.*]] = alloc_stack $Buffer
-  // CHECK:   [[METHOD:%.*]] = class_method [[SELF]] : $Klass2, #Klass2.buffer!getter.1
+  // CHECK:   [[METHOD:%.*]] = class_method [[SELF]] : $KlassWithBuffer, #KlassWithBuffer.buffer!getter.1
   // CHECK:   [[BUF:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK:   store [[BUF]] to [init] [[BUF_BOX]]
   // CHECK:   [[GEP:%.*]] = struct_element_addr [[BUF_BOX]] : $*Buffer, #Buffer.k
@@ -49,9 +59,22 @@ class Klass2 {
   // CHECK:   end_borrow [[BORROWED_BUF_KLASS]]
   // CHECK:   destroy_value [[BUF_KLASS]]
   // CHECK:   return [[COPY_CASTED_BORROWED_BUF_KLASS]]
-  // CHECK: } // end sil function '_T0s6Klass2C23getBufferAsNativeObjectBoyF'
+  // CHECK: } // end sil function '_T0s15KlassWithBufferC03getC14AsNativeObjectBoyF'
   func getBufferAsNativeObject() -> Builtin.NativeObject {
     return Builtin.unsafeCastToNativeObject(buffer.k)
   }
 }
 
+struct StructContainingBridgeObject {
+  var rawValue: Builtin.BridgeObject
+
+  // CHECK-LABEL: sil hidden @_T0s28StructContainingBridgeObjectVAByXl8swiftObj_tcfC : $@convention(method) (@guaranteed AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject,
+  // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[ARG]] : $AnyObject to $Builtin.BridgeObject
+  // CHECK:   [[COPY_CASTED_ARG:%.*]] = copy_value [[CASTED_ARG]]
+  // CHECK:   assign [[COPY_CASTED_ARG]] to
+  // CHECK: } // end sil function '_T0s28StructContainingBridgeObjectVAByXl8swiftObj_tcfC'
+  init(swiftObj: AnyObject) {
+    rawValue = Builtin.reinterpretCast(swiftObj)
+  }
+}
