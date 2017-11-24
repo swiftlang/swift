@@ -520,8 +520,10 @@ struct NativeString {
     return stringBuffer.start
   }
 
+  @_versioned
   var count: Int
 
+  @_versioned
   var capacity: Int {
     return stringBuffer.capacity
   }
@@ -874,6 +876,7 @@ extension _StringGuts {
     return _isNativePointer(_object)
   }
 
+  @_versioned
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _asNative: NativeString {
     _sanityCheck(_isNative)
@@ -914,9 +917,8 @@ extension _StringGuts {
   // Cocoa (non-tagged) Strings
   //
   ///*fileprivate*/ internal // TODO: private in Swift 4
-  @_versioned
   @_inlineable
-  internal
+  public // @testable
   var _isNonTaggedCocoa: Bool {
     @inline(__always)
     get { return _isNonTaggedObjCPointer(_object) }
@@ -998,9 +1000,8 @@ extension _StringGuts {
   //
 
   ///*fileprivate*/ internal // TODO: private in Swift 4
-  @_versioned
   @_inlineable
-  internal
+  public // @testable
   var _isSmallCocoa: Bool {
     @inline(__always)
     get { return _isTagged && _objectBitPattern & _smallBit != 0 }
@@ -1502,8 +1503,8 @@ extension _StringGuts {
     return Int(truncatingIfNeeded: self._otherBits)
   }
 
-  @_versioned
-  internal
+  @_inlineable
+  public // @testable
   var capacity: Int {
     if _fastPath(_isNative) {
       return self._asNative.capacity
@@ -1511,6 +1512,7 @@ extension _StringGuts {
     return 0
   }
 
+  @_inlineable
   @_versioned
   internal
   var _isEmpty: Bool {
