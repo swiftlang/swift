@@ -64,10 +64,8 @@ typedef Elf32_Section Elf_Section;
 
 extern const Elf_Ehdr elfHeader asm("__ehdr_start");
 
-static unsigned long getAuxVal(unsigned long type) {
-#if HAVE_GETAUXVAL
-  return getauxval(type);
-#else
+#if !HAVE_GETAUXVAL
+static unsigned long getauxval(unsigned long type) {
   struct AuxvEntry {
     unsigned long tag;
     unsigned long value;
@@ -90,8 +88,8 @@ static unsigned long getAuxVal(unsigned long type) {
   }
   close(fd);
   return 0;
-#endif
 }
+#endif
 
 class StaticBinaryELF {
 
@@ -149,7 +147,7 @@ public:
   StaticBinaryELF() {
     getExecutablePathName();
 
-    programHeaders = reinterpret_cast<const Elf_Phdr *>(getAuxVal(AT_PHDR));
+    programHeaders = reinterpret_cast<const Elf_Phdr *>(getauxval(AT_PHDR));
     if (programHeaders == nullptr) {
       return;
     }

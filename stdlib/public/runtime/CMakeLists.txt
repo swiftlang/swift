@@ -23,6 +23,8 @@ set(section_magic_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
+check_symbol_exists(getauxval "sys/auxv.h" HAVE_GETAUXVAL)
+
 set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm

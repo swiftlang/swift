@@ -851,8 +851,6 @@ if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")
 endif()
 
-check_symbol_exists(getauxval "sys/auxv.h" HAVE_GETAUXVAL)
-
 #
 # Set up global CMake variables for API notes.
 #
