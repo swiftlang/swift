@@ -600,17 +600,6 @@ where ${Where} {
       _preconditionFailure("Incrementing past end index")
     }
   }
-
-  // FIXME(ABI)#175 (Type checker)
-  @_inlineable
-  public // WORKAROUND: needed because of rdar://25584401
-  var indices: DefaultRandomAccessIndices<${Self}> {
-    return DefaultRandomAccessIndices(
-      _elements: self,
-      startIndex: self.startIndex,
-      endIndex: self.endIndex)
-  }
-
 }
 
 % end
