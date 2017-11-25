@@ -156,7 +156,8 @@ class ArgsToFrontendInputsConverter {
       -parse-sil \
       -emit-sil /s/PR3/swift/test/Driver/options.swift /s/PR3/swift/test/Driver/options.swift
        */
-      Inputs.addInput(InputFileOrBuffer::createFile(file, false));
+       // Inputs.addInput(InputFileOrBuffer::createFile(file, false));
+      Diags.diagnose(SourceLoc(), diag::error_duplicate_input_file_on_command_line, file);
     }
   }
   
