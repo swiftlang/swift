@@ -17,9 +17,6 @@
 
 #include "swift/Demangling/Demangle.h"
 #include "swift/SwiftDemangle/SwiftDemangle.h"
-#if defined(__linux__) || defined(_WIN32)
-#include <bsd/string.h>
-#endif
 
 static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
     char *OutputBuffer, size_t Length,
@@ -36,8 +33,12 @@ static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
   if (Result == MangledName)
     return 0; // Not a mangled name
 
-  // Copy the result to an output buffer.
-  return strlcpy(OutputBuffer, Result.c_str(), Length);
+  // Copy the result to an output buffer and ensure '\0' termination.
+  if (OutputBuffer && Length > 0) {
+    auto Dest = strncpy(OutputBuffer, Result.c_str(), Length);
+    Dest[Length - 1] = '\0';
+  }
+  return Result.length();
 }
 
 size_t swift_demangle_getDemangledName(const char *MangledName,
