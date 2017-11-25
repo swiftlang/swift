@@ -107,10 +107,9 @@ public struct Slice<Base: Collection> {
     self._endIndex = bounds.upperBound
   }
 
-  @_versioned // FIXME(sil-serialize-all)
   public var _startIndex: Base.Index
-  @_versioned // FIXME(sil-serialize-all)
   public var _endIndex: Base.Index
+
   @_versioned // FIXME(sil-serialize-all)
   internal var _base: Base
 
@@ -144,7 +143,6 @@ extension Slice: Collection {
   public typealias IndexDistance = Base.IndexDistance  
   public typealias Element = Base.Element
   public typealias SubSequence = Slice<Base>
-  public typealias IndexDistance = Base.IndexDistance
   public typealias Iterator = IndexingIterator<Slice<Base>>
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -251,8 +249,6 @@ extension Slice: MutableCollection where Base: MutableCollection {
     }
   }
 
-  public typealias SubSequence = Slice<Base>
-
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
@@ -357,7 +353,7 @@ extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollecti
   }
 }
 
-extension Slice: RangeReplaceableCollection
+extension Slice
 where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   
   @_inlineable // FIXME(sil-serialize-all)
