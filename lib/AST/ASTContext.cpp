@@ -3869,6 +3869,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
 
   SILFunctionTypeBits.HasErrorResult = errorResult.hasValue();
   SILFunctionTypeBits.ExtInfo = ext.Bits;
+  assert(SILFunctionTypeBits.ExtInfo == ext.Bits && "Bits were dropped!");
   SILFunctionTypeBits.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
