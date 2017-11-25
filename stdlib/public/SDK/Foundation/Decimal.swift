@@ -55,9 +55,6 @@ extension Decimal {
         return Decimal(_exponent: _exponent, _length: 8, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
     }
 
-    @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
-    public mutating func formTruncatingRemainder(dividingBy other: Decimal) { fatalError("Decimal does not yet fully adopt FloatingPoint") }
-
     public mutating func negate() {
         _isNegative = _isNegative == 0 ? 1 : 0
     }
@@ -136,6 +133,68 @@ extension Decimal {
         var rightOp = rhs
         NSDecimalMultiply(&res, &leftOp, &rightOp, .plain)
         return res
+    }
+
+    public mutating func formRemainder(dividingBy other: Decimal) {
+        var quotient = Decimal()
+        var rhs = other
+        NSDecimalDivide(&quotient, &self, &rhs, .bankers)
+        quotient.round(.toNearestOrEven)
+        self.addProduct(other, -quotient)
+    }
+
+    public mutating func formTruncatingRemainder(dividingBy other: Decimal) {
+        var quotient = Decimal()
+        var rhs = other
+        NSDecimalDivide(&quotient, &self, &rhs, self < 0 ? .up : .down)
+        quotient.round(.towardZero)
+        self.addProduct(other, -quotient)
+    }
+
+    public mutating func formSquareRoot() {
+        guard !isZero else { return }
+        guard !isSignMinus else { self = .nan; return }
+
+        var previous = 1 as Decimal
+        var difference = Decimal.nan
+        for _ in 0..<256 {
+            // The Bakhshali method is quartically convergent.
+            let a = (self - previous * previous) / (2 * previous)
+            let b = previous + a
+            let current = b - a * a / (2 * b)
+            let distinction = abs(current * current - self)
+            if !difference.isNaN && distinction >= difference { break }
+            previous = current
+            difference = distinction
+        }
+        self = previous
+    }
+
+    public mutating func round(_ rule: FloatingPointRoundingRule) {
+        let mode: RoundingMode
+
+        switch rule {
+        case .toNearestOrAwayFromZero:
+          mode = .plain
+        case .toNearestOrEven:
+          mode = .bankers
+        case .up:
+          mode = .up
+        case .down:
+          mode = .down
+        case .towardZero:
+          mode = self < 0 ? .up : .down
+        case .awayFromZero:
+          mode = self < 0 ? .down : .up
+        }
+
+        var lhs = self
+        NSDecimalRound(&self, &lhs, 0, mode)
+    }
+
+    @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
+    public mutating func addProduct(_ lhs: Decimal, _ rhs: Decimal) {
+        fatalError()
     }
 }
 
@@ -426,6 +485,70 @@ extension Decimal {
     public var isNaN: Bool { return _length == 0 && _isNegative == 1 }
     /// `true` iff `self` is a signaling NaN.
     public var isSignaling: Bool { return false }
+}
+
+extension Decimal {
+    // The following methods have default implementations on `FloatingPoint`, to which `Decimal` does not yet conform.
+    public static var ulpOfOne: Self {
+        return Self(1).ulp
+    }
+
+    public func rounded(_ rule: FloatingPointRoundingRule) -> Decimal {
+        var lhs = self
+        lhs.round(rule)
+        return lhs
+    }
+
+    public func rounded() -> Decimal {
+        return rounded(.toNearestOrAwayFromZero)
+    }
+
+    public mutating func round() {
+        round(.toNearestOrAwayFromZero)
+    }
+
+    public func truncatingRemainder(dividingBy other: Decimal) -> Decimal {
+        var lhs = self
+        lhs.formTruncatingRemainder(dividingBy: other)
+        return lhs
+    }
+
+    public func remainder(dividingBy other: Decimal) -> Decimal {
+        var lhs = self
+        lhs.formRemainder(dividingBy: other)
+        return lhs
+    }
+
+    public func squareRoot() -> Decimal {
+        var lhs = self
+        lhs.formSquareRoot()
+        return lhs
+    }
+
+    @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
+    public func addingProduct(_ lhs: Decimal, _ rhs: Decimal) -> Decimal {
+        fatalError()
+    }
+
+    public static func minimum(_ x: Self, _ y: Self) -> Self {
+        if x <= y || y.isNaN { return x }
+        return y
+    }
+
+    public static func maximum(_ x: Self, _ y: Self) -> Self {
+        if x > y || y.isNaN { return x }
+        return y
+    }
+
+    public static func minimumMagnitude(_ x: Self, _ y: Self) -> Self {
+        if x.magnitude <= y.magnitude || y.isNaN { return x }
+        return y
+    }
+
+    public static func maximumMagnitude(_ x: Self, _ y: Self) -> Self {
+        if x.magnitude > y.magnitude || y.isNaN { return x }
+        return y
+    }
 }
 
 extension Decimal : CustomStringConvertible {
