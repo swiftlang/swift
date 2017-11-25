@@ -768,7 +768,7 @@ CountableClosedRangeTestSuite.test("AssociatedTypes") {
   typealias Collection = CountableClosedRange<MinimalStrideableValue>
   expectCollectionAssociatedTypes(
     collectionType: Collection.self,
-    iteratorType: ClosedRangeIterator<MinimalStrideableValue>.self,
+    iteratorType: IndexingIterator<Collection>.self,
     subSequenceType: RandomAccessSlice<Collection>.self,
     indexType: ClosedRangeIndex<MinimalStrideableValue>.self,
     indexDistanceType: MinimalStrideableValue.Stride.self,

@@ -85,40 +85,6 @@ extension ClosedRangeIndex : Comparable {
   }
 }
 
-// FIXME(ABI)#175 (Type checker)
-// WORKAROUND: needed because of rdar://25584401
-/// An iterator over the elements of a `CountableClosedRange` instance.
-@_fixed_layout
-public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
-  where
-  Bound : Strideable, Bound.Stride : SignedInteger {
-
-  @_inlineable
-  @_versioned
-  internal init(_range r: CountableClosedRange<Bound>) {
-    _nextResult = r.lowerBound
-    _upperBound = r.upperBound
-  }
-
-  @_inlineable
-  public func makeIterator() -> ClosedRangeIterator {
-    return self
-  }
-
-  @_inlineable
-  public mutating func next() -> Bound? {
-    let r = _nextResult
-    if let x = r {
-      _nextResult = x == _upperBound ? nil : x.advanced(by: 1)
-    }
-    return r
-  }
-  @_versioned
-  internal var _nextResult: Bound?
-  @_versioned
-  internal let _upperBound: Bound
-}
-
 /// A closed range that forms a collection of consecutive values.
 ///
 /// You create a `CountableClosedRange` instance by using the closed range
@@ -186,17 +152,6 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   public typealias Index = ClosedRangeIndex<Bound>
 
   public typealias IndexDistance = Bound.Stride
-
-  // FIXME(ABI)#175 (Type checker)
-  // WORKAROUND: needed because of rdar://25584401
-  public typealias Iterator = ClosedRangeIterator<Bound>
-
-  // FIXME(ABI)#175 (Type checker)
-  // WORKAROUND: needed because of rdar://25584401
-  @_inlineable
-  public func makeIterator() -> ClosedRangeIterator<Bound> {
-    return ClosedRangeIterator(_range: self)
-  }
 
   /// The position of the first element in the range.
   @_inlineable
@@ -297,16 +252,6 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   public subscript(bounds: Range<Index>)
     -> RandomAccessSlice<CountableClosedRange<Bound>> {
     return RandomAccessSlice(base: self, bounds: bounds)
-  }
-
-  // FIXME(ABI)#175 (Type checker)
-  @_inlineable
-  public // WORKAROUND: needed because of rdar://25584401
-  var indices: DefaultRandomAccessIndices<CountableClosedRange<Bound>> {
-    return DefaultRandomAccessIndices(
-      _elements: self,
-      startIndex: self.startIndex,
-      endIndex: self.endIndex)
   }
 
   /// Creates an instance with the given bounds.
