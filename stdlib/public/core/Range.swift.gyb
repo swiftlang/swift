@@ -80,13 +80,6 @@ extension RangeExpression {
   }  
 }
 
-// FIXME(ABI)#55 (Statically Unavailable/Dynamically Available): remove this
-// type, it creates an ABI burden on the library.
-//
-// A dummy type that we can use when we /don't/ want to create an
-// ambiguity indexing CountableRange<T> outside a generic context.
-public enum _DisabledRangeIndex_ {}
-
 /// A half-open range that forms a collection of consecutive values.
 ///
 /// You create a `CountableRange` instance by using the half-open range
