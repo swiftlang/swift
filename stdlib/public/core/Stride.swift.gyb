@@ -141,11 +141,7 @@ extension Strideable where Stride : FloatingPoint {
       // rounding error from repeated addition.
       return (i + 1, start.advanced(by: Stride(i + 1) * distance))
     }
-    // If current.index == nil, either we're just starting out (in which case
-    // the next index is 1), or we should proceed without an index just as
-    // though this floating point specialization doesn't exist.
-    return (current.value == start ? 1 : nil,
-            current.value.advanced(by: distance))
+    return (nil, current.value.advanced(by: distance))
   }
 }
 
@@ -161,11 +157,7 @@ extension Strideable where Self : FloatingPoint, Self == Stride {
       // intermediate rounding error.
       return (i + 1, start.addingProduct(Stride(i + 1), distance))
     }
-    // If current.index == nil, either we're just starting out (in which case
-    // the next index is 1), or we should proceed without an index just as
-    // though this floating point specialization doesn't exist.
-    return (current.value == start ? 1 : nil,
-            current.value.advanced(by: distance))
+    return (nil, current.value.advanced(by: distance))
   }
 }
 
@@ -190,7 +182,7 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
     self._start = _start
     _end = end
     _stride = stride
-    _current = (nil, _start)
+    _current = (0, _start)
   }
 
   /// Advances to the next element and returns it, or `nil` if no next element
@@ -413,7 +405,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
     self._start = _start
     _end = end
     _stride = stride
-    _current = (nil, _start)
+    _current = (0, _start)
   }
 
   /// Advances to the next element and returns it, or `nil` if no next element
