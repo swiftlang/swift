@@ -224,7 +224,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
-        return *M->lookupConformance(substType, proto);
+        return M->lookupConformance(substType, proto);
       }
 
       return ProtocolConformanceRef(proto);
