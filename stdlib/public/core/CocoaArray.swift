@@ -29,6 +29,8 @@ import SwiftShims
 @_fixed_layout
 internal struct _CocoaArrayWrapper : RandomAccessCollection {
   typealias Indices = CountableRange<Int>
+  typealias SubSequence = Slice<_CocoaArrayWrapper>
+  
   @_inlineable
   @_versioned
   internal var startIndex: Int {

@@ -439,6 +439,7 @@ extension Substring {
 }
 
 extension Substring.${View} : BidirectionalCollection {
+  public typealias Element = String.${View}.Element
   public typealias Index = String.Index
   public typealias SubSequence = Substring.${View}
 

@@ -104,6 +104,7 @@ extension String {
     CustomStringConvertible,
     CustomDebugStringConvertible {
 
+    public typealias Element = UTF16.CodeUnit
     public typealias Index = String.Index
     public typealias IndexDistance = Int
 
@@ -447,6 +448,7 @@ extension String.UTF16View : CustomPlaygroundQuickLookable {
 }
 
 extension String.UTF16View.Indices : BidirectionalCollection {
+  public typealias Element = String.UTF16View.Index
   public typealias Index = String.UTF16View.Index
   public typealias IndexDistance = String.UTF16View.IndexDistance
   public typealias Indices = String.UTF16View.Indices

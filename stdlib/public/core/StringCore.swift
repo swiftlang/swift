@@ -662,7 +662,8 @@ public struct _StringCore {
 extension _StringCore : RandomAccessCollection {
   
   public typealias Indices = CountableRange<Int>
-
+  public typealias SubSequence = _StringCore
+  
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   var startIndex: Int {

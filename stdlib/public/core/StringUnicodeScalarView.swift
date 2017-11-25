@@ -95,6 +95,7 @@ extension String {
       }
     }
 
+    public typealias Element = UnicodeScalar
     public typealias Index = String.Index
     public typealias IndexDistance = Int
     

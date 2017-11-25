@@ -177,6 +177,8 @@ public struct DoubleWidth<Base : FixedWidthInteger> :
 
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : Collection {
+    public typealias Element = UInt
+
     public enum _IndexValue {
       case low(Base.Magnitude.Words.Index)
       case high(Base.Words.Index)

@@ -194,7 +194,8 @@ extension String.CharacterView : BidirectionalCollection {
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
-  
+
+  public typealias Element = Character
   public typealias Index = String.Index
   public typealias IndexDistance = Int
 
