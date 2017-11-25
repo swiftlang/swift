@@ -317,8 +317,8 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     range aRange: _SwiftNSRange) {
     _precondition(aRange.location >= 0 && aRange.length >= 0)
     _precondition(aRange.location + aRange.length <= Int(_guts.count))
-    let slice = _unmanagedContiguous[
-      aRange.location ..< aRange.location + aRange.length]
+    let slice = _unmanagedContiguous.slice(
+      aRange.location ..< aRange.location + aRange.length)
     slice._copy(
       into: UnsafeMutableRawPointer(buffer),
       capacityEnd: UnsafeMutableRawPointer(buffer + aRange.length),

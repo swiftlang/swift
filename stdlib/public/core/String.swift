@@ -121,6 +121,16 @@ public protocol StringProtocol
 }
 
 extension StringProtocol {
+  public var _wholeString: String {
+    return String(self)
+  }
+
+  public var _encodedOffsetRange: Range<Int> {
+    return 0 ..< numericCast(self.utf16.count)
+  }
+}
+
+extension StringProtocol {
   //@available(swift, deprecated: 3.2, obsoleted: 4.0, message: "Please use the StringProtocol itself")
   //public var characters: Self { return self }
 
@@ -1011,7 +1021,7 @@ extension Sequence where Element: StringProtocol {
         r += separatorSize + chunk._encodedOffsetRange.count
         byteWidth = Swift.max(byteWidth, chunk._wholeString._guts.byteWidth)
       }
-      return r - separatorSize
+      return r > 0 ? r - separatorSize : 0
     }
 
     var result = NativeString(

@@ -158,6 +158,17 @@ extension _StringGuts {
   }
 
   @_inlineable
+  public // @testable
+  var _owner: AnyObject? { // For testing only
+    if _isNative {
+      return _bridgeObject(toNative: _object)
+    } else if _isNonTaggedCocoa {
+      return _bridgeObject(toNonTaggedObjC: _object)
+    }
+    return nil
+  }
+
+  @_inlineable
   @_versioned
   /*private*/ internal init(
     _unflagged object: _BuiltinBridgeObject,
@@ -362,35 +373,23 @@ struct UnsafeString {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal subscript(position: Int) -> UTF16.CodeUnit {
-    @inline(__always)
-    get {
-      _sanityCheck(
-        position >= 0,
-        "subscript: index precedes String start")
-      _sanityCheck(
-        position <= count,
-        "subscript: index points past String end")
-      if isSingleByte {
-        return UTF16.CodeUnit(asciiBuffer[position])
-      }
-      return utf16Buffer[position]
-    }
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal subscript(bounds: Range<Int>) -> UnsafeString {
-    _sanityCheck(
-      bounds.lowerBound >= 0,
+  internal func slice(_ bounds: Range<Int>) -> UnsafeString {
+    _sanityCheck(bounds.lowerBound >= 0,
       "subscript: subrange start precedes String start")
-    _sanityCheck(
-      bounds.upperBound <= count,
+    _sanityCheck(bounds.upperBound <= count,
       "subscript: subrange extends past String end")
     return UnsafeString(
       baseAddress: _pointer(toElementAt: bounds.lowerBound),
       count: bounds.upperBound - bounds.lowerBound,
       isSingleByte: self.isSingleByte)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func slice<R: RangeExpression>(_ bounds: R) -> UnsafeString
+    where R.Bound == Index {
+    return self.slice(bounds.relative(to: self))
   }
 
   /// Returns a pointer to the Nth element of contiguous
@@ -439,9 +438,11 @@ struct UnsafeString {
 
 extension UnsafeString: RandomAccessCollection {
   typealias Index = Int
-  typealias Element = UInt16
-  typealias SubSequence = UnsafeString
+  typealias IndexDistance = Int
   typealias Indices = CountableRange<Int>
+  typealias Element = UInt16
+  // SubSequence can't be UnsafeString because it needs to preserve indices.
+  typealias SubSequence = RandomAccessSlice<UnsafeString>
 
   @_inlineable
   @_versioned
@@ -465,6 +466,24 @@ extension UnsafeString: RandomAccessCollection {
   internal
   func index(before i: Int) -> Int {
     return i-1
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(position: Int) -> UTF16.CodeUnit {
+    @inline(__always)
+    get {
+      _sanityCheck(
+        position >= 0,
+        "subscript: index precedes String start")
+      _sanityCheck(
+        position <= count,
+        "subscript: index points past String end")
+      if isSingleByte {
+        return UTF16.CodeUnit(asciiBuffer[position])
+      }
+      return utf16Buffer[position]
+    }
   }
 }
 
@@ -501,8 +520,10 @@ struct NativeString {
     return stringBuffer.start
   }
 
+  @_versioned
   var count: Int
 
+  @_versioned
   var capacity: Int {
     return stringBuffer.capacity
   }
@@ -564,10 +585,10 @@ struct NativeString {
     stringBuffer.usedEnd += 4
     self.count += 2
   }
-  
+
   // Append a range of code units from `other` directly to the end of
   // this string, which must have uniquely referenced storage with
-  // large enough capacity.
+  // large enough capacity of a suitable element width.
   @_versioned
   internal
   mutating
@@ -583,22 +604,51 @@ struct NativeString {
     self.count = stringBuffer.usedCount
   }
 
+  // Ensure that this string has enough capacity for at least `minimumCapacity`
+  // number of code units of `minimumByteWidth` width, copying contents
+  // into a newly allocated buffer if necessary.
+  //
+  // If `forcingRellocation` is true, a new buffer is allocated regardless
+  // of the properties of current storage.
+  @_versioned
+  internal mutating func _ensureStorage(
+    minimumCapacity: Int,
+    minimumByteWidth: Int,
+    forcingReallocation: Bool = false
+  ) {
+    _sanityCheck(minimumByteWidth == 1 || minimumByteWidth == 2)
+    _sanityCheck(minimumCapacity >= 0)
+    let oldCapacity = self.capacity
+    var newCapacity = minimumCapacity
+    let newWidth = Swift.max(self.byteWidth, minimumByteWidth)
+    if _slowPath(oldCapacity < minimumCapacity) {
+      newCapacity = Swift.max(_growArrayCapacity(oldCapacity), minimumCapacity)
+    } else if _fastPath(!forcingReallocation && self.byteWidth == newWidth) {
+      return
+    }
+    // TODO: width extension can be done in place if there's capacity
+    let buffer = _StringBuffer(
+      capacity: newCapacity,
+      initialSize: count,
+      elementWidth: newWidth)
+    self.unsafe._copy(
+      into: buffer.start,
+      capacityEnd: buffer.capacityEnd,
+      accomodatingElementWidth: newWidth)
+    self.stringBuffer = buffer
+  }
+
   // Append directly to the end of this string, whose buffer must be
-  // uniquely referenced. Grow buffer if there isn't enough capacity.
+  // uniquely referenced. Grow buffer if there isn't enough capacity
+  // and widen storage when necessary.
   @_versioned
   internal mutating func append(_ other: _StringGuts, range: Range<Int>) {
-    let count = self.count
-    if _slowPath(self.capacity < count + range.count) {
-      let width = max(self.byteWidth, other.byteWidth)
-      let buffer = _StringBuffer(
-        capacity: max(_growArrayCapacity(self.capacity), range.count),
-        initialSize: count,
-        elementWidth: width)
-      self.unsafe._copy(
-        into: buffer.start,
-        capacityEnd: buffer.capacityEnd,
-        accomodatingElementWidth: width)
-    }
+    _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
+    guard !range.isEmpty else { return }
+    _ensureStorage(
+      minimumCapacity: count + range.count,
+      minimumByteWidth: other.byteWidth,
+      forcingReallocation: false)
     _appendInPlace(other, range: range)
   }
 
@@ -660,34 +710,153 @@ struct NativeString {
 @_fixed_layout
 internal struct OpaqueCocoaString {
   @_versioned
-  let object: AnyObject
+  let object: _CocoaString
 
   @_versioned
-  let count: Int
+  let range: Range<Int>
 
   @inline(never)
   init(_ object: AnyObject) {
-    self.init(object, count: _stdlib_binary_CFStringGetLength(object))
+    self.init(object, range: 0 ..< _stdlib_binary_CFStringGetLength(object))
   }
 
-  init(_ object: AnyObject, count: Int) {
+  init(_ object: AnyObject, range: Range<Int>) {
     self.object = object
-    self.count = count
+    self.range = range
+  }
+}
+
+extension OpaqueCocoaString {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _copy(
+    into dest: UnsafeMutableRawPointer,
+    capacityEnd: UnsafeMutableRawPointer,
+    accomodatingElementWidth width: Int
+  ) {
+    _sanityCheck(width == 2) // TODO: CFStringGetBytes
+    _sanityCheck(capacityEnd - dest >= range.count &<< 1)
+    _cocoaStringCopyCharacters(
+      from: object,
+      range: range,
+      into: dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
+  }
+}
+
+extension OpaqueCocoaString : Sequence {
+  typealias Element = UTF16.CodeUnit
+
+  @_inlineable
+  @_versioned
+  func makeIterator() -> Iterator {
+    return Iterator(self)
   }
 
   @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
+  @_fixed_layout
+  struct Iterator : IteratorProtocol {
+    @_versioned
+    internal let _object: _CocoaString
+
+    @_versioned
+    internal let _endIndex: Int
+
+    @_versioned
+    internal var _nextIndex: Int
+
+    @_versioned
+    internal var _buffer = _FixedArray16<Element>(allZeros: ())
+
+    @_versioned
+    internal var _bufferIndex: Int8 = 0
+
+    @_versioned
+    internal var _bufferCount: Int8 = 0
+
+    @_inlineable
+    @_versioned
+    init(_ string: OpaqueCocoaString) {
+      self._object = string.object
+      self._endIndex = string.range.upperBound
+      self._nextIndex = string.range.lowerBound
+    }
+
+    @_inlineable
+    @_versioned
+    @inline(__always)
+    mutating func next() -> Element? {
+      if _fastPath(_bufferIndex < _bufferCount) {
+        let result = _buffer[Int(_bufferIndex)]
+        _bufferIndex += 1
+        return result
+      }
+      if _slowPath(_nextIndex == _endIndex) { return nil }
+      return _nextOnSlowPath()
+    }
+
+    @_inlineable
+    @_versioned
+    mutating func _nextOnSlowPath() -> Element {
+      // Fill buffer
+      _sanityCheck(Element.self == UTF16.CodeUnit.self)
+      _sanityCheck(_nextIndex < _endIndex)
+      let capacity = _buffer.count
+      let end = Swift.min(_nextIndex + capacity, _endIndex)
+      unowned(unsafe) let object = _object
+      withUnsafeMutableBytes(of: &_buffer.storage) { b in
+        _sanityCheck(b.count == MemoryLayout<Element>.stride * capacity)
+        _cocoaStringCopyCharacters(
+          from: object,
+          range: _nextIndex..<end,
+          into: b.baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self))
+      }
+      _bufferIndex = 1
+      _bufferCount = Int8(end - _nextIndex)
+      _nextIndex = end
+      _fixLifetime(_object)
+      return _buffer[0]
+    }
+  }
+}
+
+extension OpaqueCocoaString : RandomAccessCollection {
+  typealias Index = Int
+  typealias IndexDistance = Int
+  typealias SubSequence = OpaqueCocoaString
+
+  @_versioned
+  @_inlineable
+  var startIndex: Int { return range.lowerBound }
+
+  @_versioned
+  @_inlineable
+  var endIndex: Int { return range.upperBound }
+
+  @_versioned
+  @_inlineable
+  var count: Int { return range.count }
+
+  @_versioned
+  @_inlineable
+  func index(after i: Int) -> Int { return i + 1 }
+
+  @_versioned
+  @_inlineable
+  func index(before i: Int) -> Int { return i - 1 }
+
+  @_versioned
   subscript(position: Int) -> UTF16.CodeUnit {
+    _sanityCheck(range.contains(position))
     return _cocoaStringSubscript(object, position)
   }
 
   @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
-  subscript(bounds: Range<Int>) -> _StringGuts {
-    return _makeCocoaStringGuts(_cocoaStringSlice(object, bounds))
+  subscript(bounds: Range<Int>) -> OpaqueCocoaString {
+    _sanityCheck(bounds.lowerBound >= range.lowerBound)
+    _sanityCheck(bounds.upperBound >= range.upperBound)
+    return OpaqueCocoaString(object, range: bounds)
   }
 }
-
 
 //
 // Masks
@@ -707,6 +876,7 @@ extension _StringGuts {
     return _isNativePointer(_object)
   }
 
+  @_versioned
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _asNative: NativeString {
     _sanityCheck(_isNative)
@@ -747,9 +917,8 @@ extension _StringGuts {
   // Cocoa (non-tagged) Strings
   //
   ///*fileprivate*/ internal // TODO: private in Swift 4
-  @_versioned
   @_inlineable
-  internal
+  public // @testable
   var _isNonTaggedCocoa: Bool {
     @inline(__always)
     get { return _isNonTaggedObjCPointer(_object) }
@@ -831,9 +1000,8 @@ extension _StringGuts {
   //
 
   ///*fileprivate*/ internal // TODO: private in Swift 4
-  @_versioned
   @_inlineable
-  internal
+  public // @testable
   var _isSmallCocoa: Bool {
     @inline(__always)
     get { return _isTagged && _objectBitPattern & _smallBit != 0 }
@@ -1074,6 +1242,21 @@ extension _StringGuts {
 
   @_versioned
   internal
+  func _copySliceToStringBuffer(_ bounds: Range<Int>) -> _StringBuffer {
+    let buffer = _StringBuffer(
+      capacity: bounds.count,
+      initialSize: bounds.count,
+      elementWidth: byteWidth)
+    self._copy(
+      range: bounds,
+      into: buffer.start,
+      capacityEnd: buffer.capacityEnd,
+      accomodatingElementWidth: byteWidth)
+    return buffer
+  }
+
+  @_versioned
+  internal
   func _copyToStringBuffer(capacity: Int, byteWidth: Int) -> _StringBuffer {
     _sanityCheck(capacity >= self.count)
     _sanityCheck(byteWidth == 1 || byteWidth == 2)
@@ -1097,7 +1280,12 @@ extension _StringGuts {
   @_transparent
   public // TODO(StringGuts): for testing only
   mutating func isUniqueNative() -> Bool {
-    return _isUnique(&_storage.0) && _isNative
+    guard _isNative else { return false }
+    // Note that the isUnique test must be in a separate statement;
+    // `_isNative && _isUnique` always evaluates to false in debug builds,
+    // because SILGen keeps the self reference in `_isNative` alive for the
+    // duration of the expression.
+    return _isUnique(&_storage.0)
   }
 
   // Convert ourselves (if needed) to a native string with the specified storage
@@ -1105,6 +1293,7 @@ extension _StringGuts {
   // affect count. Returns the extra capacity.
   @inline(never)
   @_versioned
+  @discardableResult
   internal
   mutating func _ensureUniqueNative(
     minimumCapacity: Int, minimumByteWidth: Int
@@ -1137,6 +1326,7 @@ extension _StringGuts {
   }
   @inline(never)
   @_versioned
+  @discardableResult
   internal
   mutating func _ensureUniqueNative(
     increasingCountBy otherCount: Int, minimumByteWidth: Int
@@ -1154,11 +1344,12 @@ extension _StringGuts {
     // references as we know lifetime
     _sanityCheck(_isNative)
     var nativeBuffer = self._asNative.stringBuffer
-    nativeBuffer.usedEnd += otherCount &<< nativeBuffer.elementShift
+    let otherByteCount = otherCount &<< nativeBuffer.elementShift
+    nativeBuffer.usedEnd += otherByteCount
     self._otherBits += UInt(truncatingIfNeeded: otherCount)
 
     _sanityCheck(
-      capBegin + otherCount == self._asNative.stringBuffer.usedEnd
+      capBegin + otherByteCount == self._asNative.stringBuffer.usedEnd
       && capEnd == self._asNative.stringBuffer.capacityEnd)
     return (capBegin, capEnd)
   }
@@ -1180,18 +1371,13 @@ extension _StringGuts {
     let unmanagedSelfOpt = self._unmanagedContiguous
     if _fastPath(unmanagedSelfOpt != nil) {
       let unsafe = unmanagedSelfOpt._unsafelyUnwrappedUnchecked
-      unsafe[range]._copy(
+      unsafe.slice(range)._copy(
         into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
       _fixLifetime(self)
       return
     }
-
-    _sanityCheck(width == 2) // TODO: CFStringGetBytes
-    let opaque = getOpaque()
-    _cocoaStringCopyCharacters(
-      from: opaque.object,
-      range: range,
-      into: dest.assumingMemoryBound(to: UTF16.CodeUnit.self))
+    getOpaque()._copy(
+      into: dest, capacityEnd: capacityEnd, accomodatingElementWidth: width)
   }
 
   @inline(__always)
@@ -1317,8 +1503,8 @@ extension _StringGuts {
     return Int(truncatingIfNeeded: self._otherBits)
   }
 
-  @_versioned
-  internal
+  @_inlineable
+  public // @testable
   var capacity: Int {
     if _fastPath(_isNative) {
       return self._asNative.capacity
@@ -1326,6 +1512,7 @@ extension _StringGuts {
     return 0
   }
 
+  @_inlineable
   @_versioned
   internal
   var _isEmpty: Bool {
@@ -1431,10 +1618,9 @@ extension _StringGuts {
   @_versioned
   internal mutating func append<C : Collection>(contentsOf other: C)
     where C.Element == UTF16.CodeUnit {
-    var byteWidth = 1
-    if byteWidth == 1 &&
-      // Don't widen string when appending CR+LF
-      (other.count > 2 || other.contains { $0 > 0x7f }) {
+    var byteWidth = self.byteWidth
+    // Widen string when needed
+    if byteWidth == 1 && other.contains(where: { $0 > 0x7f }) {
       byteWidth = 2
     }
     self._ensureUniqueNative(
@@ -1444,7 +1630,8 @@ extension _StringGuts {
     for codeunit in other {
       nativeSelf._appendInPlace(codeunit)
     }
-    _invariantCheck()    
+    self = _StringGuts(nativeSelf)
+    _invariantCheck()
   }
 
   @_versioned
@@ -1508,7 +1695,7 @@ extension Substring {
   @_versioned
   internal
   var _unmanagedContiguous: UnsafeString? {
-    return self._wholeString._unmanagedContiguous?[self._encodedOffsetRange]
+    return _wholeString._unmanagedContiguous?.slice(_encodedOffsetRange)
   }
 }
 
@@ -1830,7 +2017,7 @@ extension UnsafeString {
       return Character(_singleCodeUnit: self[offset])
     }
     _precondition(offset + stride <= self.count, "String index is out of range")
-    return Character(self[offset..<offset+stride])
+    return Character(self.slice(offset..<offset+stride))
   }
 
   @_versioned
