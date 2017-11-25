@@ -269,6 +269,8 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   }
 }
 
+// FIXME(conditional-conformances): This does not yet compile (SR-6474).
+#if false
 extension StrideTo : RandomAccessCollection
 where Element.Stride : BinaryInteger {
   public typealias Index = Int
@@ -312,6 +314,7 @@ where Element.Stride : BinaryInteger {
     return i + 1
   }
 }
+#endif
 
 /// Returns the sequence of values (`self`, `self + stride`, `self +
 /// 2 * stride`, ... *last*) where *last* is the last value in the
@@ -439,6 +442,8 @@ public struct StrideThrough<
   }
 }
 
+// FIXME(conditional-conformances): This does not yet compile (SR-6474).
+#if false
 extension StrideThrough : RandomAccessCollection
 where Element.Stride : BinaryInteger {
   public typealias Index = ClosedRangeIndex<Int>
@@ -499,6 +504,7 @@ where Element.Stride : BinaryInteger {
     }
   }
 }
+#endif
 
 /// Returns the sequence of values (`self`, `self + stride`, `self +
 /// 2 * stride`, ... *last*) where *last* is the last value in the
