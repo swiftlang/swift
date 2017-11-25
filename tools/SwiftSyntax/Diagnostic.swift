@@ -12,8 +12,10 @@
 // This file provides the Diagnostic, Note, and FixIt types.
 //===----------------------------------------------------------------------===//
 
+import Foundation
+
 /// Represents a source location in a Swift file.
-public struct SourceLocation {
+public struct SourceLocation: Codable {
   /// The line in the file where this location resides.
   public let line: Int
 
@@ -36,7 +38,7 @@ public struct SourceLocation {
 }
 
 /// Represents a start and end location in a Swift file.
-public struct SourceRange {
+public struct SourceRange: Codable {
   /// The beginning location in the source range.
   public let start: SourceLocation
 
@@ -51,7 +53,7 @@ public struct SourceRange {
 
 /// A FixIt represents a change to source code in order to "correct" a
 /// diagnostic.
-public enum FixIt {
+public enum FixIt: Codable {
   /// Remove the characters from the source file over the provided source range.
   case remove(SourceRange)
 
@@ -61,6 +63,47 @@ public enum FixIt {
   /// Replace the characters at the provided source range with the provided
   /// string.
   case replace(SourceRange, String)
+
+  enum CodingKeys: String, CodingKey {
+    case type
+    case range
+    case location
+    case string
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let type = try container.decode(String.self, forKey: .type)
+    switch type {
+    case "remove":
+      let range = try container.decode(SourceRange.self, forKey: .range)
+      self = .remove(range)
+    case "insert":
+      let string = try container.decode(String.self, forKey: .string)
+      let loc = try container.decode(SourceLocation.self, forKey: .location)
+      self = .insert(loc, string)
+    case "replace": 
+      let string = try container.decode(String.self, forKey: .string)
+      let range = try container.decode(SourceRange.self, forKey: .range)
+      self = .replace(range, string)
+    default:
+      fatalError("unknown FixIt type \(type)")
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case let .remove(range):
+      try container.encode(range, forKey: .range)
+    case let .insert(location, string):
+      try container.encode(location, forKey: .location)
+      try container.encode(string, forKey: .string)
+    case let .replace(range, string):
+      try container.encode(range, forKey: .range)
+      try container.encode(string, forKey: .string)
+    }
+  }
 
   /// The source range associated with a FixIt. If this is an insertion,
   /// it is a range with the same start and end location.
@@ -83,7 +126,7 @@ public enum FixIt {
 
 /// A Note attached to a Diagnostic. This provides more context for a specific
 /// error, and optionally allows for FixIts.
-public struct Note {
+public struct Note: Codable {
   /// The note's message.
   public let message: Diagnostic.Message
 
@@ -115,8 +158,8 @@ public struct Note {
 }
 
 /// A Diagnostic message that can be emitted regarding some piece of code.
-public struct Diagnostic {
-  public struct Message {
+public struct Diagnostic: Codable {
+  public struct Message: Codable {
     /// The severity of diagnostic. This can be note, error, or warning.
     public let severity: Severity
 
@@ -132,7 +175,7 @@ public struct Diagnostic {
 
   // These values must match clang/Frontend/SerializedDiagnostics.h
   /// The severity of the diagnostic.
-  public enum Severity: UInt8 {
+  public enum Severity: UInt8, Codable {
     case note = 1
     case warning = 2
     case error = 3

@@ -64,12 +64,12 @@ public typealias ToolHandler = (SourceFileSyntax, DiagnosticEngine) -> Int
 /// - Note: This function calls exit(_:) on your behalf.
 public func runSwiftTool(file: URL, _ body: ToolHandler) throws -> Never {
   let outputURL = file.deletingPathExtension()
-                      .appendingPathExtension("dia")
-  let consumer = SerializedDiagnosticConsumer(outputURL: outputURL)
+                      .appendingPathExtension("json")
+  let jsonConsumer = JSONDiagnosticConsumer(outputURL: outputURL)
   let printingConsumer = PrintingDiagnosticConsumer()
 
   let engine = DiagnosticEngine()
-  engine.addConsumer(consumer)
+  engine.addConsumer(jsonConsumer)
   engine.addConsumer(printingConsumer)
 
   let sourceFile = try Syntax.parse(file)
