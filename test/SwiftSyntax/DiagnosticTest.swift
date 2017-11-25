@@ -1,10 +1,13 @@
 // RUN: %target-run-simple-swift 2>&1 | %FileCheck %s
+// REQUIRES: executable_test
+// REQUIRES: OS=macosx
+// REQUIRES: sdk_overlay
 
 import Foundation
 import StdlibUnittest
 import SwiftSyntax
 
-func loc(_ file: String = #file, line: Int = #line, 
+func loc(_ file: String = #file, line: Int = #line,
          column: Int = #line) -> SourceLocation {
   return SourceLocation(line: line, column: column, offset: 0, file: file)
 }
@@ -14,7 +17,7 @@ extension Diagnostic.Message {
   /// Error thrown when a conversion between two types is impossible.
   static func cannotConvert(fromType: String,
                             toType: String) -> Diagnostic.Message {
-    return .init(.error, 
+    return .init(.error,
       "cannot convert value of type '\(fromType)' to '\(toType)'")
   }
 
