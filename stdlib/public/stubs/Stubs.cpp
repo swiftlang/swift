@@ -64,6 +64,8 @@ static long double swift_strtold_l(const char *nptr,
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
 #define strtold_l swift_strtold_l
+#elif defined(__linux__)
+#include <locale.h>
 #else
 #include <xlocale.h>
 #endif
