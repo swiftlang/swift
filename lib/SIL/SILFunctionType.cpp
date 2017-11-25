@@ -1130,6 +1130,23 @@ struct DefaultInitializerConventions : DefaultConventions {
   }
 };
 
+/// The convention used for allocating inits. Allocating inits take their normal
+/// parameters at +1 and do not have a self parameter.
+struct DefaultAllocatorConventions : DefaultConventions {
+  DefaultAllocatorConventions()
+      : DefaultConventions(NormalParameterConvention::Owned) {}
+
+  ParameterConvention
+  getDirectSelfParameter(const AbstractionPattern &type) const override {
+    llvm_unreachable("Allocating inits do not have self parameters");
+  }
+
+  ParameterConvention
+  getIndirectSelfParameter(const AbstractionPattern &type) const override {
+    llvm_unreachable("Allocating inits do not have self parameters");
+  }
+};
+
 /// The default conventions for Swift setter acccessors.
 ///
 /// These take self at +0, but all other parameters at +1. This is because we
@@ -1220,7 +1237,10 @@ static CanSILFunctionType getNativeSILFunctionType(
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 DefaultInitializerConventions(), ForeignInfo(),
                                 constant, witnessMethodConformance);
-
+    case SILDeclRef::Kind::Allocator:
+      return getSILFunctionType(M, origType, substInterfaceType, extInfo,
+                                DefaultAllocatorConventions(), ForeignInfo(),
+                                constant, witnessMethodConformance);
     case SILDeclRef::Kind::Func:
       // If we have a setter, use the special setter convention. This ensures
       // that we take normal parameters at +1.
@@ -1230,7 +1250,6 @@ static CanSILFunctionType getNativeSILFunctionType(
                                   constant, witnessMethodConformance);
       }
       LLVM_FALLTHROUGH;
-    case SILDeclRef::Kind::Allocator:
     case SILDeclRef::Kind::Destroyer:
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
