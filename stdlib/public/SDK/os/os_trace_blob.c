@@ -14,7 +14,7 @@
 #include <dispatch/dispatch.h>
 #include <os/base.h>
 #include <os/log.h>
-#include <xlocale.h>
+#include <locale.h>
 #include "os_trace_blob.h"
 
 OS_NOINLINE
