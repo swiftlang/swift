@@ -147,17 +147,7 @@ class ArgsToFrontendInputsConverter {
     else if (isPrimary)
       Inputs.bePrimaryAt(iterator->second);
     else {
-      // Driver/options.swift test requires failure caused by duplicates for arguments:
-      /*   -frontend \
-      -target x86_64-apple-macosx10.9  \
-      -module-cache-path '/var/folders/55/zdb0sqks67517vdkw_nrqq5r0000gn/T/swift-testsuite-clang-module-cacheDoNvav' \
-      -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk \
-      -swift-version 3 \
-      -parse-sil \
-      -emit-sil /s/PR3/swift/test/Driver/options.swift /s/PR3/swift/test/Driver/options.swift
-       */
-       // Inputs.addInput(InputFileOrBuffer::createFile(file, false));
-      Diags.diagnose(SourceLoc(), diag::error_duplicate_input_file_on_command_line, file);
+       Diags.diagnose(SourceLoc(), diag::error_duplicate_input_file_on_command_line, file);
     }
   }
   
