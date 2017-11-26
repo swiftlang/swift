@@ -829,6 +829,40 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/set
   expectEqual(1, buffer[3])
 }
 
+UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("nonmutating-swapAt") {
+% if IsRaw:
+  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
+% else:
+  let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 3)
+% end
+  defer { buffer.deallocate() }
+
+  buffer[0] = 0
+  buffer[1] = 1
+  buffer[2] = 2
+
+  buffer.swapAt(0, 0)
+  expectEqual(Array(buffer), [0, 1, 2])
+
+  buffer.swapAt(0, 2)
+  expectEqual(Array(buffer), [2, 1, 0])
+}
+
+% if not IsRaw:
+UnsafeMutableBufferPointerTestSuite.test("nonmutating-swapAt-withARC") {
+  let buffer = UnsafeMutableBufferPointer<String>.allocate(capacity: 3)
+  defer { buffer.deallocate() }
+
+  _ = buffer.initialize(from: (0..<3).map(String.init(describing:)))
+
+  buffer.swapAt(0, 0)
+  expectEqual(Array(buffer), ["0", "1", "2"])
+
+  buffer.swapAt(0, 2)
+  expectEqual(Array(buffer), ["2", "1", "0"])
+}
+% end
+
 % end # SelfName
 
 runAllTests()
