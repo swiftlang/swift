@@ -412,7 +412,6 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
     assert(primaryCount < 2 && "cannot handle multiple primaries");
     replacementInputs.addInput(InputFileOrBuffer::createFile(
         newFilename, newIsPrimary, input.getBuffer()));
-    )
   }
   if (PrimaryFile.empty() || primaryCount == 1)
     return std::move(replacementInputs);
@@ -421,7 +420,7 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
   llvm::raw_svector_ostream OS(Err);
   OS << "'" << PrimaryFile << "' is not part of the input files";
   Error = OS.str();
-  return true;
+  return std::move(replacementInputs);
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
@@ -438,8 +437,8 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-  Invocation.getFrontendOptions().setInputs(resolveSymbolicLinksInInputs(
-      Invocation.getFrontendOptions().Inputs, UnresolvedPrimaryFile, Error));
+  Invocation.getFrontendOptions().Inputs = resolveSymbolicLinksInInputs(
+                                                                        Invocation.getFrontendOptions().Inputs, UnresolvedPrimaryFile, Error);
   if (!Error.empty())
     return true;
 
