@@ -87,19 +87,6 @@ public:
 
   ArrayRef<InputFileOrBuffer> getInputs() const { return Inputs; }
 
-  void transformInputs(
-      llvm::function_ref<InputFileOrBuffer(const InputFileOrBuffer &input)>
-          fn) {
-    for (auto i : indices(getInputs())) {
-      auto &prev = Inputs[i];
-      auto next = fn(prev);
-      Inputs[i] = next;
-      if (prev.getIsPrimary() && !prev.getFile().empty())
-        PrimaryFiles.erase(prev.getFile());
-      if (next.getIsPrimary() && !next.getFile().empty())
-        PrimaryFiles.insert(std::make_pair(next.getFile(), i));
-    }
-  }
 
   // Input filename readers
   std::vector<std::string> getInputFilenames() const {

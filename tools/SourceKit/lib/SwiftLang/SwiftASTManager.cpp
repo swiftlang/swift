@@ -391,29 +391,32 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
   }
 }
 
-static bool resolveSymbolicLinksInInputs(FrontendInputs &inputs,
-                                         StringRef UnresolvedPrimaryFile,
-                                         std::string &Error) {
+static FrontendInputs &&
+resolveSymbolicLinksInInputs(FrontendInputs &inputs,
+                             StringRef UnresolvedPrimaryFile,
+                             std::string &Error) {
   unsigned primaryCount = 0;
   std::string PrimaryFile =
       SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
-  inputs.transformInputs(
-      [&](const InputFileOrBuffer &input) -> InputFileOrBuffer {
-        StringRef newFilename =
-            SwiftLangSupport::resolvePathSymlinks(input.getFile());
-        bool newIsPrimary =
-            input.getIsPrimary() ||
-            (!PrimaryFile.empty() && newFilename == PrimaryFile);
-        if (newIsPrimary) {
-          ++primaryCount;
-        }
-        assert(primaryCount < 2 && "cannot handle multiple primaries");
-        return InputFileOrBuffer(newFilename, input.getBuffer(), newIsPrimary);
-      });
+  FrontendInputs replacementInputs;
+  for (const InputFileOrBuffer &input : inputs.getInputs()) {
+    StringRef newFilename =
+        SwiftLangSupport::resolvePathSymlinks(input.getFile());
+    bool newIsPrimary = input.getIsPrimary() ||
+                        (!PrimaryFile.empty() && newFilename == PrimaryFile);
+    if (newIsPrimary) {
+      ++primaryCount;
+    }
+    assert(primaryCount < 2 && "cannot handle multiple primaries");
+    replacementInputs.addInput(InputFileOrBuffer::createFile(
+        newFilename, newIsPrimary, input.getBuffer()));
+    )
+  }
   if (PrimaryFile.empty() || primaryCount == 1)
-    return false;
+    return std::move(replacementInputs);
+
   llvm::SmallString<64> Err;
   llvm::raw_svector_ostream OS(Err);
   OS << "'" << PrimaryFile << "' is not part of the input files";
@@ -435,8 +438,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-  if (resolveSymbolicLinksInInputs(Invocation.getFrontendOptions().Inputs,
-                                   UnresolvedPrimaryFile, Error))
+  Invocation.getFrontendOptions().setInputs(resolveSymbolicLinksInInputs(
+      Invocation.getFrontendOptions().Inputs, UnresolvedPrimaryFile, Error));
+  if (!Error.empty())
     return true;
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
