@@ -74,8 +74,8 @@ void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
-  setupLLVMArguments();
-  setupDiagnosticOptions();
+  setUpLLVMArguments();
+  setUpDiagnosticOptions();
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
@@ -92,7 +92,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
                                Invocation.getSearchPathOptions(), SourceMgr,
                                Diagnostics));
 
-  if (setupModuleLoaders())
+  if (setUpModuleLoaders())
     return true;
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
@@ -105,7 +105,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   return setupInputs(codeCompletionBufferID);
 }
 
-void CompilerInstance::setupLLVMArguments() {
+void CompilerInstance::setUpLLVMArguments() {
   // Honor -Xllvm.
   if (!Invocation.getFrontendOptions().LLVMArgs.empty()) {
     llvm::SmallVector<const char *, 4> Args;
@@ -118,7 +118,7 @@ void CompilerInstance::setupLLVMArguments() {
   }
 }
 
-void CompilerInstance::setupDiagnosticOptions() {
+void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
@@ -129,8 +129,7 @@ void CompilerInstance::setupDiagnosticOptions() {
     Diagnostics.setWarningsAsErrors(true);
   }
 }
-
-bool CompilerInstance::setupModuleLoaders() {
+bool CompilerInstance::setUpModuleLoaders() {
   if (Invocation.getFrontendOptions().EnableSourceImport) {
     bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
     bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
@@ -178,20 +177,10 @@ Optional<unsigned> CompilerInstance::setupCodeCompletionBuffer() {
 bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
-  for (unsigned i = 0,
-                e = Invocation.getFrontendOptions().Inputs.inputBufferCount();
-       i != e; ++i) {
-    setupForBufferAt(i);
-  }
-
-  for (unsigned i = 0,
-                e = Invocation.getFrontendOptions().Inputs.inputFilenameCount();
-       i != e; ++i) {
-    bool hasError = setupForFileAt(i);
-    if (hasError) {
+  for (const InputFileOrBuffer &input :
+       Invocation.getFrontendOptions().Inputs.getInputs())
+    if (setupForInput(input))
       return true;
-    }
-  }
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue())
@@ -204,13 +193,18 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   return false;
 }
 
-void CompilerInstance::setupForBufferAt(unsigned i) {
-  // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-  auto *inputBuffer =
-      Invocation.getFrontendOptions().Inputs.getInputBuffers()[i];
+bool CompilerInstance::setupForInput(const InputFileOrBuffer &input) {
+  if (llvm::MemoryBuffer *inputBuffer = input.getBuffer()) {
+    setupForBuffer(inputBuffer, input.getIsPrimary());
+    return false;
+  }
+  return setUpForFile(input.getFile(), input.getIsPrimary());
+}
+void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer,
+                                      bool isPrimary) {
   auto copy =
       std::unique_ptr<llvm::MemoryBuffer>(llvm::MemoryBuffer::getMemBufferCopy(
-          inputBuffer->getBuffer(), inputBuffer->getBufferIdentifier()));
+          buffer->getBuffer(), buffer->getBufferIdentifier()));
   if (serialization::isSerializedAST(copy->getBuffer())) {
     PartialModules.push_back({std::move(copy), nullptr});
   } else {
@@ -220,18 +214,14 @@ void CompilerInstance::setupForBufferAt(unsigned i) {
     if (isInSILMode())
       MainBufferID = bufferID;
 
-    const Optional<SelectedInput> &primaryInput =
-        Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
-
-    if (primaryInput && primaryInput->isBuffer() && primaryInput->Index == i)
+    if (isPrimary)
       PrimaryBufferID = bufferID;
   }
 }
 
-bool CompilerInstance::setupForFileAt(unsigned i) {
-  auto &fileName =
-      Invocation.getFrontendOptions().Inputs.getInputFilenames()[i];
-
+bool CompilerInstance::setUpForFile(StringRef fileName, bool isPrimary) {
+  if (fileName.empty())
+    return false;
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using namespace llvm::sys::path;
@@ -240,7 +230,7 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
     if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
       MainBufferID = existingBufferID.getValue();
 
-    if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+    if (isPrimary)
       PrimaryBufferID = existingBufferID.getValue();
 
     return false; // replaced by a memory buffer.
@@ -272,7 +262,6 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
          moduleDocOrErr ? std::move(moduleDocOrErr.get()) : nullptr});
     return false;
   }
-
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
   unsigned bufferID =
       SourceMgr.addNewSourceBuffer(std::move(inputFileOrErr.get()));
@@ -282,7 +271,7 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
   if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
     MainBufferID = bufferID;
 
-  if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+  if (isPrimary)
     PrimaryBufferID = bufferID;
 
   return false;
@@ -476,7 +465,7 @@ void CompilerInstance::createREPLFile(
   auto *SingleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
       Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*SingleInputFile);
+  MainModule->addFile(*SingleInputFile); // xxxdmu
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
 
@@ -501,7 +490,7 @@ void CompilerInstance::addMainFileToModule(
   auto *MainFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), MainBufferID,
       implicitImports.kind, Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*MainFile);
+  MainModule->addFile(*MainFile); // xxxdmu
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 
   if (MainBufferID == PrimaryBufferID)
@@ -579,7 +568,7 @@ void CompilerInstance::parseLibraryFile(
   auto *NextInput = new (*Context) SourceFile(
       *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind,
       Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*NextInput);
+  MainModule->addFile(*NextInput); // xxxdmu
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   auto *DelayedCB = SecondaryDelayedCB;
@@ -757,7 +746,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     auto *MainFile = new (*Context)
         SourceFile(*MainModule, Invocation.getSourceFileKind(), MainBufferID,
                    implicitModuleImportKind, KeepSyntaxInfo);
-    MainModule->addFile(*MainFile);
+    MainModule->addFile(*MainFile); // xxxdmu
 
     if (MainBufferID == PrimaryBufferID)
       setPrimarySourceFile(MainFile);
@@ -773,7 +762,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     auto *NextInput = new (*Context)
         SourceFile(*MainModule, SourceFileKind::Library, BufferID,
                    implicitModuleImportKind, KeepSyntaxInfo);
-    MainModule->addFile(*NextInput);
+    MainModule->addFile(*NextInput); // xxxdmu
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
 

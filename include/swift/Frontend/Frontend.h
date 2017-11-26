@@ -245,20 +245,6 @@ public:
     return FrontendOpts.ModuleName;
   }
 
-  void addInputFilename(StringRef Filename) {
-    FrontendOpts.Inputs.addInputFilename(Filename);
-  }
-
-  /// Does not take ownership of \p Buf.
-  void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    FrontendOpts.Inputs.addInputBuffer(Buf);
-  }
-
-  void setPrimaryInput(SelectedInput pi) {
-    FrontendOpts.Inputs.setPrimaryInput(pi);
-  }
-
-  void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
 
   StringRef getOutputFilename() const {
     return FrontendOpts.getSingleOutputFilename();
@@ -310,7 +296,7 @@ public:
   /// Return value includes the buffer so caller can keep it alive.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   setUpInputForSILTool(StringRef InputFilename, StringRef ModuleNameArg,
-                       bool alwaysSetModuleToMain,
+                       bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
@@ -438,15 +424,16 @@ public:
   bool setup(const CompilerInvocation &Invocation);
 
 private:
-  void setupLLVMArguments();
-  void setupDiagnosticOptions();
-  bool setupModuleLoaders();
+  void setUpLLVMArguments();
+  void setUpDiagnosticOptions();
+  bool setUpModuleLoaders();
   Optional<unsigned> setupCodeCompletionBuffer();
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() { return Invocation.isInputSwift(); }
   bool isInSILMode() { return Invocation.isInputSIL(); }
-  void setupForBufferAt(unsigned i);
-  bool setupForFileAt(unsigned i);
+  bool setupForInput(const InputFileOrBuffer &input);
+  void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
+  bool setUpForFile(StringRef file, bool isPrimary);
 
 public:
   /// Parses and type-checks all input files.

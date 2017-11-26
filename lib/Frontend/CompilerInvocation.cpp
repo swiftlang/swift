@@ -114,17 +114,9 @@ class ArgsToFrontendInputsConverter {
 
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
 
-  llvm::StringMap<unsigned> FileIndices;
-  std::vector<StringRef> PrimaryFiles;
+  std::set<StringRef> PrimaryFilesToAdd;
 
   StringRef filelistPath() { return FilelistPathArg->getValue(); }
-
-  void addPrimary(StringRef file) { PrimaryFiles.push_back(file); }
-
-  void addInput(StringRef file) {
-    FileIndices.insert({file, Inputs.inputFilenameCount()});
-    Inputs.addInputFilename(file);
-  }
 
   bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
     return FilelistPathArg != nullptr;
@@ -139,13 +131,22 @@ class ArgsToFrontendInputsConverter {
   void addFile(StringRef file, Whence whence) {
     switch (whence) {
     case Whence::PrimaryFromCommandLine:
-      addPrimary(file);
-      if (!arePrimariesOnCommandLineAlsoAppearingInFilelist())
-        addInput(file);
+      if (arePrimariesOnCommandLineAlsoAppearingInFilelist())
+        PrimaryFilesToAdd.insert(file);
+      else
+        Inputs.addPrimaryInputFile(file);
       break;
+
     case Whence::SecondaryFromCommandLine:
+      Inputs.addInputFile(file);
+      break;
+
     case Whence::SecondaryFromFileList:
-      addInput(file);
+      if (PrimaryFilesToAdd.count(file)) {
+        Inputs.addPrimaryInputFile(file);
+        PrimaryFilesToAdd.erase(file);
+      } else
+        Inputs.addInputFile(file);
       break;
     }
   }
@@ -162,7 +163,7 @@ public:
     getFilesFromCommandLine();
     if (getFilesFromFilelist())
       return true;
-    return setPrimaryFiles();
+    return checkForUnusedPrimaries();
   }
 
 private:
@@ -206,21 +207,17 @@ private:
     return false;
   }
 
-  bool setPrimaryFiles() {
-    for (StringRef primaryFile : PrimaryFiles) {
-      const auto iterator = FileIndices.find(primaryFile);
+  bool checkForUnusedPrimaries() {
+    bool hadError = false;
+    for (StringRef primaryFile : PrimaryFilesToAdd) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
-      if (iterator == FileIndices.end()) {
-        assert(FilelistPathArg != nullptr &&
-               "Missing primary with no filelist");
-        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
-                       primaryFile, filelistPath());
-        return true;
-      }
-      Inputs.addPrimaryInputFilename(iterator->second);
+      assert(FilelistPathArg != nullptr && "Missing primary with no filelist");
+      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
+                     primaryFile, filelistPath());
+      hadError = true;
     }
-    return false;
+    return hadError;
   }
 };
 class FrontendArgsToOptionsConverter {
@@ -666,7 +663,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
       !llvm::sys::fs::is_directory((*outputFilenames)[0]);
   std::string nameToStem = isOutputAUniqueOrdinaryFile
                                ? (*outputFilenames)[0]
-                               : Opts.Inputs.getFilenameOfFirstInput();
+                               : Opts.Inputs.getFilenameOfFirstInput().str();
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
 }
@@ -761,9 +758,7 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
 std::string FrontendArgsToOptionsConverter::computeBaseNameOfOutput() const {
   std::string nameToStem;
   if (Opts.Inputs.haveAPrimaryInputFile()) {
-    assert(Opts.Inputs.haveUniquePrimaryInput() &&
-           "Cannot handle multiple primaries yet");
-    nameToStem = Opts.Inputs.primaryInputFilenameIfAny();
+    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInputFilename();
   } else if (auto UserSpecifiedModuleName =
                  Args.getLastArg(options::OPT_module_name)) {
     nameToStem = std::string(UserSpecifiedModuleName->getValue());
@@ -1665,11 +1660,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
+  StringRef primaryFile =
+      FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename();
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const Optional<StringRef> filename =
-                 FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename()) {
-    Opts.MainInputFilename = filename.getValue();
+  } else if (!primaryFile.empty()) {
+    Opts.MainInputFilename = primaryFile;
   } else if (FrontendOpts.Inputs.haveUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
@@ -1903,7 +1899,7 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInvocation::setUpInputForSILTool(
     StringRef InputFilename, StringRef ModuleNameArg,
-    bool alwaysSetModuleToMain,
+    bool alwaysSetModuleToMain, bool bePrimary,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -1914,7 +1910,9 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  addInputBuffer(FileBufOrErr.get().get());
+  getFrontendOptions().Inputs.addInput(
+      InputFileOrBuffer(InputFilename == "-" ? StringRef() : InputFilename,
+                        FileBufOrErr.get().get(), bePrimary));
 
   auto result = serialization::validateSerializedAST(
       FileBufOrErr.get()->getBuffer(), &extendedInfo);
