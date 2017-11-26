@@ -118,7 +118,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
     llvm::MemoryBuffer::getMemBufferCopy(InputText, getInputFilename());
 
   CompilerInvocation Invocation { StartInvocation };
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
   Invocation.getLangOptions().EffectiveLanguageVersion = SwiftLanguageVersion;
   auto &LLVMArgs = Invocation.getFrontendOptions().LLVMArgs;
   auto aarch64_use_tbi = std::find(LLVMArgs.begin(), LLVMArgs.end(),
@@ -144,23 +144,13 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
 
   const auto &OrigFrontendOpts = StartInvocation.getFrontendOptions();
 
-  auto InputBuffers = OrigFrontendOpts.Inputs.getInputBuffers();
-  auto InputFilenames = OrigFrontendOpts.Inputs.getInputFilenames();
-
-  for (const auto &Buffer : InputBuffers) {
-    Invocation.addInputBuffer(Buffer);
+  assert(OrigFrontendOpts.Inputs.havePrimaryInputs() &&
+         "Migration must have a primary");
+  for (const auto &input : OrigFrontendOpts.Inputs.getInputs()) {
+    Invocation.getFrontendOptions().Inputs.addInput(InputFile::create(
+        input.getFile(), input.getIsPrimary(),
+        input.getIsPrimary() ? InputBuffer.get() : input.getBuffer()));
   }
-
-  for (const auto &Filename : InputFilenames) {
-    Invocation.addInputFilename(Filename);
-  }
-
-  const unsigned PrimaryIndex =
-      Invocation.getFrontendOptions().Inputs.getInputBuffers().size();
-
-  Invocation.addInputBuffer(InputBuffer.get());
-  Invocation.getFrontendOptions().Inputs.setPrimaryInput(
-      {PrimaryIndex, SelectedInput::InputKind::Buffer});
 
   auto Instance = llvm::make_unique<swift::CompilerInstance>();
   if (Instance->setup(Invocation)) {
@@ -447,8 +437,8 @@ const MigratorOptions &Migrator::getMigratorOptions() const {
 }
 
 const StringRef Migrator::getInputFilename() const {
-  auto PrimaryInput = StartInvocation.getFrontendOptions()
-                          .Inputs.getRequiredUniquePrimaryInput();
-  return StartInvocation.getFrontendOptions()
-      .Inputs.getInputFilenames()[PrimaryInput.Index];
+  auto &PrimaryInput = StartInvocation.getFrontendOptions()
+                           .Inputs.getRequiredUniquePrimaryInput();
+  assert(!PrimaryInput.getFile().empty());
+  return PrimaryInput.getFile();
 }
