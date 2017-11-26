@@ -87,8 +87,6 @@ public:
 
   ArrayRef<InputFileOrBuffer> getInputs() const { return Inputs; }
 
-  // std::vector<InputFileOrBuffer> &getMalleableInputs() { return Inputs; }
-
   void transformInputs(
       llvm::function_ref<InputFileOrBuffer(const InputFileOrBuffer &input)>
           fn) {
@@ -232,7 +230,9 @@ public:
   }
 
   bool isFilePrimary(StringRef file) {
-    return PrimaryFiles.find(file) != PrimaryFiles.end();
+    StringRef correctedName = file.equals("<stdin>") ? "-" : file;
+    auto iterator = PrimaryFiles.find(correctedName);
+    return iterator != PrimaryFiles.end() && Inputs[iterator->second].getIsPrimary();
   }
 
   void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
