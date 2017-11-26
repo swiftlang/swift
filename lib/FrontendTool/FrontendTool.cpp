@@ -781,9 +781,12 @@ static bool performCompile(CompilerInstance &Instance,
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
         // Help, Jordan! Or Erik!
-        auto Filename = opts.Inputs.getRequiredUniquePrimaryInputFilename();
-        assert(false && "Do I trust the index???");
-        // PrimaryFile = Instance.getMainModule()->getFiles()[Index];
+        //        auto Filename =
+        //        opts.Inputs.getRequiredUniquePrimaryInputFilename();
+        //        assert(false && "Do I trust the index???");
+        PrimaryFile =
+            Instance.getMainModule()
+                ->getFiles()[opts.Inputs.getRequiredUniquePrimaryInputIndex()];
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),

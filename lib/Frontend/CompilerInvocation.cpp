@@ -148,6 +148,10 @@ class ArgsToFrontendInputsConverter {
       Inputs.addInput(InputFileOrBuffer::createFile(file, isPrimary));
     } else if (isPrimary)
       Inputs.bePrimaryAt(iterator->second);
+    else {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_duplicate_input_file_on_command_line, file);
+    }
   }
 
   void addFile(StringRef file, Whence whence) {
