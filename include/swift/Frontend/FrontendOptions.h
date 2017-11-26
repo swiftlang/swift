@@ -185,6 +185,7 @@ public:
     return input.getFile();
   }
   // FIXME: find a better way than trucking in indices!
+  // Awful hack!
   bool getRequiredUniquePrimaryInputIndex() const {
     assertMustNotBeMoreThanOnePrimaryInput();
     for (auto i : indices(Inputs))
