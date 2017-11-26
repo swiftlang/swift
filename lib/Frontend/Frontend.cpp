@@ -130,7 +130,7 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
 }
 bool CompilerInstance::setUpModuleLoaders() {
-  if (Invocation.getFrontendOptions().EnableSourceImport) {
+  if (hasSourceImport()) {
     bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
     bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
     Context->addModuleLoader(SourceLoader::create(*Context,
@@ -460,12 +460,9 @@ void CompilerInstance::getImplicitlyImportedModules(
   }
 }
 
-void CompilerInstance::createREPLFile(
-    const ImplicitImports &implicitImports) const {
-  auto *SingleInputFile = new (*Context) SourceFile(
-      *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
-      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*SingleInputFile); // xxxdmu
+void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) {
+  auto *SingleInputFile = createSourceFileForMainModule(
+      Invocation.getSourceFileKind(), implicitImports.kind, None);
   addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
 }
 
@@ -487,14 +484,9 @@ void CompilerInstance::addMainFileToModule(
   if (Kind == InputFileKind::IFK_Swift)
     SourceMgr.setHashbangBufferID(MainBufferID);
 
-  auto *MainFile = new (*Context) SourceFile(
-      *MainModule, Invocation.getSourceFileKind(), MainBufferID,
-      implicitImports.kind, Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*MainFile); // xxxdmu
+  auto *MainFile = createSourceFileForMainModule(
+      Invocation.getSourceFileKind(), implicitImports.kind, MainBufferID);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
-
-  if (MainBufferID == PrimaryBufferID)
-    setPrimarySourceFile(MainFile);
 }
 
 void CompilerInstance::parseAndCheckTypes(
@@ -565,15 +557,12 @@ void CompilerInstance::parseLibraryFile(
     DelayedParsingCallbacks *SecondaryDelayedCB) {
   SharedTimer timer("performSema-parseLibraryFile");
 
-  auto *NextInput = new (*Context) SourceFile(
-      *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind,
-      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*NextInput); // xxxdmu
+  auto *NextInput = createSourceFileForMainModule(
+      SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   auto *DelayedCB = SecondaryDelayedCB;
   if (BufferID == PrimaryBufferID) {
-    setPrimarySourceFile(NextInput);
     DelayedCB = PrimaryDelayedCB;
   }
   if (isWholeModuleCompilation())
@@ -724,32 +713,39 @@ void CompilerInstance::finishTypeChecking(
   forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeCheckingFile(SF); });
 }
 
+SourceFile *CompilerInstance::createSourceFileForMainModule(
+    SourceFileKind FileKind, SourceFile::ImplicitModuleImportKind ImportKind,
+    Optional<unsigned> BufferID) {
+  ModuleDecl *MainModule = getMainModule();
+  bool KeepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
+  SourceFile *InputFile = new (*Context)
+      SourceFile(*MainModule, FileKind, BufferID, ImportKind, KeepSyntaxInfo);
+  MainModule->addFile(*InputFile);
+
+  if (BufferID && *BufferID == PrimaryBufferID)
+    setPrimarySourceFile(InputFile);
+
+  return InputFile;
+}
+
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   const InputFileKind Kind = Invocation.getInputKind();
-  ModuleDecl *MainModule = getMainModule();
+  ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
-  bool KeepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
 
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
          "only supports parsing .swift files");
   (void)Kind;
 
-  auto implicitModuleImportKind = SourceFile::ImplicitModuleImportKind::None;
-
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
     assert(Kind == InputFileKind::IFK_Swift);
     SourceMgr.setHashbangBufferID(MainBufferID);
-
-    auto *MainFile = new (*Context)
-        SourceFile(*MainModule, Invocation.getSourceFileKind(), MainBufferID,
-                   implicitModuleImportKind, KeepSyntaxInfo);
-    MainModule->addFile(*MainFile); // xxxdmu
-
-    if (MainBufferID == PrimaryBufferID)
-      setPrimarySourceFile(MainFile);
+    createSourceFileForMainModule(Invocation.getSourceFileKind(),
+                                  SourceFile::ImplicitModuleImportKind::None,
+                                  MainBufferID);
   }
 
   PersistentParserState PersistentState;
@@ -759,12 +755,9 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
     if (BufferID == MainBufferID)
       continue;
 
-    auto *NextInput = new (*Context)
-        SourceFile(*MainModule, SourceFileKind::Library, BufferID,
-                   implicitModuleImportKind, KeepSyntaxInfo);
-    MainModule->addFile(*NextInput); // xxxdmu
-    if (BufferID == PrimaryBufferID)
-      setPrimarySourceFile(NextInput);
+    SourceFile *NextInput = createSourceFileForMainModule(
+        SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
+        BufferID);
 
     bool Done;
     do {

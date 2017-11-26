@@ -445,6 +445,13 @@ public:
   ///
   void performParseOnly(bool EvaluateConditionals = false);
 
+private:
+  SourceFile *
+  createSourceFileForMainModule(SourceFileKind FileKind,
+                                SourceFile::ImplicitModuleImportKind ImportKind,
+                                Optional<unsigned> BufferID);
+
+public:
   /// Frees up the ASTContext and SILModule objects that this instance is
   /// holding on.
   void freeContextAndSIL();
@@ -469,7 +476,7 @@ public: // for static functions in Frontend.cpp
   };
 
 private:
-  void createREPLFile(const ImplicitImports &implicitImports) const;
+  void createREPLFile(const ImplicitImports &implicitImports);
   std::unique_ptr<DelayedParsingCallbacks>
   computeDelayedParsingCallback(bool isPrimary);
 

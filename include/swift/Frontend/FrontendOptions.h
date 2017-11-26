@@ -68,6 +68,7 @@ public:
   StringRef getFile() const { return Filename; }
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
+  void bePrimary() { IsPrimary = true; }
 };
 
 /// Information about all the inputs to the frontend.
@@ -80,6 +81,8 @@ public:
   // Readers:
 
   ArrayRef<InputFileOrBuffer> getInputs() const { return Inputs; }
+
+  std::vector<InputFileOrBuffer> &getMalleableInputs() { return Inputs; }
 
   void transformInputs(
       llvm::function_ref<InputFileOrBuffer(const InputFileOrBuffer &input)>
@@ -98,6 +101,8 @@ public:
     }
     return filenames;
   }
+
+  unsigned inputCount() const { return getInputs().size(); }
 
   bool haveInputFilenames() const {
     for (const auto &input : getInputs())
@@ -121,6 +126,8 @@ public:
     assert(!f.empty());
     return f;
   }
+
+  void bePrimaryAt(unsigned index) { Inputs[index].bePrimary(); }
 
   bool isReadingFromStdin() const {
     return haveUniqueInputFilename() && getFilenameOfFirstInput() == "-";
