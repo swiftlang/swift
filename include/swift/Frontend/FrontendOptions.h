@@ -86,8 +86,6 @@ public:
   // Readers:
 
   ArrayRef<InputFileOrBuffer> getInputs() const { return Inputs; }
-  
-
 
   // Input filename readers
   std::vector<std::string> getInputFilenames() const {

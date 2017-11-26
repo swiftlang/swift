@@ -438,7 +438,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     return true;
   }
   Invocation.getFrontendOptions().Inputs = resolveSymbolicLinksInInputs(
-                                                                        Invocation.getFrontendOptions().Inputs, UnresolvedPrimaryFile, Error);
+      Invocation.getFrontendOptions().Inputs, UnresolvedPrimaryFile, Error);
   if (!Error.empty())
     return true;
 
