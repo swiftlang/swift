@@ -171,14 +171,14 @@ struct SwiftError : SwiftErrorHeader {
 /// copied (or taken if \c isTake is true) into the newly-allocated error box.
 /// If value is null, the box's contents will be left uninitialized, and
 /// \c isTake should be false.
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_API
 BoxPair::Return swift_allocError(const Metadata *type,
                                  const WitnessTable *errorConformance,
                                  OpaqueValue *value, bool isTake);
   
 /// Deallocate an error object whose contained object has already been
 /// destroyed.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_API
 void swift_deallocError(SwiftError *error, const Metadata *type);
 
 struct ErrorValueResult {
@@ -194,31 +194,32 @@ struct ErrorValueResult {
 /// temporary buffer. The implementation may write a reference to itself to
 /// that buffer if the error object is a toll-free-bridged NSError instead of
 /// a native Swift error, in which case the object itself is the "boxed" value.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_API
 void swift_getErrorValue(const SwiftError *errorObject,
                          void **scratch,
                          ErrorValueResult *out);
 
 /// Retain and release SwiftError boxes.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_API
 SwiftError *swift_errorRetain(SwiftError *object);
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_API
 void swift_errorRelease(SwiftError *object);
-SWIFT_RUNTIME_EXPORT
-void swift_errorInMain(SwiftError *object);
-SWIFT_RUNTIME_EXPORT
+
+/// Breakpoint hook for debuggers.
+SWIFT_RUNTIME_STDLIB_API
 void swift_willThrow(SwiftError *object);
 
-SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NORETURN
+/// Halt in response to an error.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
+void swift_errorInMain(SwiftError *object);
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
 void swift_unexpectedError(SwiftError *object);
 
 #if SWIFT_OBJC_INTEROP
 
 /// Initialize an Error box to make it usable as an NSError instance.
-SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT
-id swift_bridgeErrorToNSError(SwiftError *errorObject);
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+id _swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject);
 
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
 /// implementation using the _ObjectiveCBridgeableErrorType protocol.
@@ -238,10 +239,10 @@ const Metadata *getNSErrorMetadata();
 
 #endif
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_SPI
 const size_t _swift_lldb_offsetof_SwiftError_typeMetadata;
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_SPI
 const size_t _swift_lldb_sizeof_SwiftError;
 
 } // namespace swift

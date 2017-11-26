@@ -981,6 +981,9 @@ namespace {
       llvm_unreachable("should not be asking for metadata of a lowered SIL "
                        "function type--SILGen should have used the AST type");
     }
+    llvm::Value *visitSILTokenType(CanSILTokenType type) {
+      llvm_unreachable("should not be asking for metadata of a SILToken type");
+    }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
       return emitArchetypeTypeMetadataRef(IGF, type);
@@ -1385,7 +1388,7 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
     cacheVariable = cast<llvm::GlobalVariable>(
         IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
 
-    if (IGM.getOptions().OptimizeForSize)
+    if (IGM.getOptions().optimizeForSize())
       accessor->addFnAttr(llvm::Attribute::NoInline);
   }
 
@@ -1429,7 +1432,7 @@ static llvm::Function *getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   if (!shouldDefine || !accessor->empty())
     return accessor;
 
-  if (IGM.getOptions().OptimizeForSize)
+  if (IGM.getOptions().optimizeForSize())
     accessor->addFnAttr(llvm::Attribute::NoInline);
 
   emitLazyCacheAccessFunction(IGM, accessor, /*cacheVariable=*/nullptr,
@@ -3352,6 +3355,16 @@ namespace {
         }
       }
     }
+    
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      for (unsigned i = 0,
+                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
+           i < e; ++i) {
+        // Emit placeholder values for some number of stored properties we
+        // know exist but aren't able to reference directly.
+        B.addInt(IGM.SizeTy, 0);
+      }
+    }
 
     void addMethod(SILDeclRef fn) {
       // Find the vtable entry.
@@ -3383,8 +3396,9 @@ namespace {
       B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
     }
 
-    void addPlaceholder(MissingMemberDecl *) {
-      llvm_unreachable("cannot generate metadata with placeholders in it");
+    void addPlaceholder(MissingMemberDecl *m) {
+      assert(m->getNumberOfVTableEntries() == 0
+             && "cannot generate metadata with placeholders in it");
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
@@ -4040,8 +4054,7 @@ irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                 llvm::Value *metadata) {
   // FIXME: The below checks should capture this property already, but
   // resilient class metadata layout is not fully implemented yet.
-  auto expansion = IGF.IGM.getResilienceExpansionForLayout(theClass);
-  if (IGF.IGM.isResilient(theClass, expansion)) {
+  if (theClass->getParentModule() != IGF.IGM.getSwiftModule()) {
     return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
   }
 

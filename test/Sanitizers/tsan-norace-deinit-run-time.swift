@@ -13,7 +13,7 @@ public class TestDeallocObject : NSObject {
     v = 1
   }
 
-  @_semantics("optimize.sil.never")
+  @_optimize(none)
   func unoptimize(_ input : Int) -> Int {
     return input
   }

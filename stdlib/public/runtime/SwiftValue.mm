@@ -316,7 +316,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     return NO;
   }
 
-  return swift_stdlib_Hashable_isEqual_indirect(
+  return _swift_stdlib_Hashable_isEqual_indirect(
       getSwiftValuePayload(self,
                            getSwiftValuePayloadAlignMask(selfHeader->type)),
       getSwiftValuePayload(other,
@@ -330,7 +330,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
   if (!hashableConformance) {
     return (NSUInteger)self;
   }
-  return swift_stdlib_Hashable_hashValue_indirect(
+  return _swift_stdlib_Hashable_hashValue_indirect(
       getSwiftValuePayload(self,
                            getSwiftValuePayloadAlignMask(selfHeader->type)),
       selfHeader->type, hashableConformance);

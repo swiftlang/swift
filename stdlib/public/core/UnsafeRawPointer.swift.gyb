@@ -99,7 +99,7 @@
 /// offset by that number of bytes. The following example allocates four bytes
 /// of memory and stores `0xFF` in all four bytes:
 ///
-///     let bytesPointer = UnsafeMutableRawPointer.allocate(bytes: 4, alignedTo: 1)
+///     let bytesPointer = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 1)
 ///     bytesPointer.storeBytes(of: 0xFFFF_FFFF, as: UInt32.self)
 ///
 ///     // Load a value from the memory referenced by 'bytesPointer'
@@ -115,7 +115,7 @@
 ///
 /// Always remember to deallocate any memory that you allocate yourself.
 ///
-///     bytesPointer.deallocate(bytes: 4, alignedTo: 1)
+///     bytesPointer.deallocate()
 ///
 /// Implicit Casting and Bridging
 /// =============================
@@ -426,6 +426,15 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 %  end # !mutable
 
 %  if mutable:
+
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "allocate(byteCount:alignment:)")
+  @_inlineable
+  public static func allocate(
+    bytes size: Int, alignedTo alignment: Int
+  ) -> UnsafeMutableRawPointer {
+    return UnsafeMutableRawPointer.allocate(byteCount: size, alignment: alignment)
+  }
+
   /// Allocates uninitialized memory with the specified size and alignment.
   ///
   /// You are in charge of managing the allocated memory. Be sure to deallocate
@@ -437,33 +446,32 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// `UnsafeMutablePointer.allocate(capacity:)` static method instead.
   ///
   /// - Parameters:
-  ///   - size: The number of bytes to allocate. `size` must not be negative.
-  ///   - alignedTo: The alignment of the new region of allocated memory, in
+  ///   - byteCount: The number of bytes to allocate. `byteCount` must not be negative.
+  ///   - alignment: The alignment of the new region of allocated memory, in
   ///     bytes.
   /// - Returns: A pointer to a newly allocated region of memory. The memory is
   ///   allocated, but not initialized.
   @_inlineable
   public static func allocate(
-    bytes size: Int, alignedTo: Int
+    byteCount: Int, alignment: Int
   ) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.allocRaw(
-        size._builtinWordValue, alignedTo._builtinWordValue))
+        byteCount._builtinWordValue, alignment._builtinWordValue))
   }
 %  end # mutable
 
-  /// Deallocates memory referenced by the pointer with the specified size and
-  /// alignment.
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
+  public func deallocate(bytes _: Int, alignedTo _: Int) { 
+    self.deallocate()
+  }
+
+  /// Deallocates the previously allocated memory block referenced by this pointer.
   ///
   /// The memory to be deallocated must be uninitialized or initialized to a
   /// trivial type.
-  ///
-  /// - Parameters:
-  ///   - size: The number of bytes to deallocate.
-  ///   - alignedTo: The alignment of the region to be deallocated, in bytes.
   @_inlineable
-  public func deallocate(bytes size: Int, alignedTo: Int) {
-    Builtin.deallocRaw(
-      _rawValue, size._builtinWordValue, alignedTo._builtinWordValue)
+  public func deallocate() {
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
   }
 
   /// Binds the memory to the specified type and returns a typed pointer to the
@@ -530,6 +538,16 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
 %  if mutable:
+
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "initializeMemory(as:repeating:count:)")
+  @discardableResult
+  public func initializeMemory<T>(
+    as type: T.Type, at offset: Int = 0, count: Int = 1, to repeatedValue: T
+  ) -> UnsafeMutablePointer<T> { 
+    return (self + offset * MemoryLayout<T>.stride).initializeMemory(
+      as: type, repeating: repeatedValue, count: count)
+  }
+  
   /// Initializes the memory referenced by this pointer with the given value,
   /// binds the memory to the value's type, and returns a typed pointer to the
   /// initialized memory.
@@ -539,49 +557,42 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// accessing `T`.
   ///
   /// The following example allocates enough raw memory to hold four instances
-  /// of `Int8`, and then uses the `initializeMemory(as:at:count:to:)` method
+  /// of `Int8`, and then uses the `initializeMemory(as:repeating:count:)` method
   /// to initialize the allocated memory.
   ///
   ///     let count = 4
   ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: count * MemoryLayout<Int8>.stride,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///             byteCount: count * MemoryLayout<Int8>.stride,
+  ///             alignment: MemoryLayout<Int8>.alignment)
   ///     let int8Pointer = myBytes.initializeMemory(
-  ///             as: Int8.self, count: count, value: 0)
+  ///             as: Int8.self, repeating: 0, count: count)
   ///
   ///     // After using 'int8Pointer':
-  ///     int8Pointer.deallocate(count)
+  ///     int8Pointer.deallocate()
   ///
   /// After calling this method on a raw pointer `p`, the region starting at
-  /// `p + index * MemoryLayout<T>.stride` and continuing up to
-  /// `p + (index + count) * MemoryLayout<T>.stride` is bound to type `T` and
-  /// initialized. If `T` is a nontrivial type, you must eventually deinitialize
-  /// or move from the values in this region to avoid leaks.
+  /// `self` and continuing up to `p + count * MemoryLayout<T>.stride` is bound 
+  /// to type `T` and initialized. If `T` is a nontrivial type, you must 
+  /// eventually deinitialize or move from the values in this region to avoid leaks.
   ///
   /// - Parameters:
   ///   - type: The type to bind this memory to.
-  ///   - index: The offset from this pointer to the region of memory to be
-  ///     initialized with `value`, in the stride of type `T`. `index` must
-  ///     not be negative. The default is zero.
+  ///   - repeatedValue: The instance to copy into memory.
   ///   - count: The number of copies of `value` to copy into memory. `count`
-  ///     must not be negative. The default is `1`.
-  ///   - value: The instance to copy into memory.
-  /// - Returns: A typed pointer to the memory referenced by this raw pointer,
-  ///   offset by `index * MemoryLayout<T>.stride` bytes.
+  ///     must not be negative. 
+  /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   @_inlineable
   @discardableResult
-  public func initializeMemory<T>(as type: T.Type, at index: Int = 0,
-    count: Int = 1, to value: T
+  public func initializeMemory<T>(
+    as type: T.Type, repeating repeatedValue: T, count: Int
   ) -> UnsafeMutablePointer<T> {
-    _debugPrecondition(index >= 0,
-      "UnsafeMutableRawPointer.initializeMemory: negative index")
     _debugPrecondition(count >= 0,
       "UnsafeMutableRawPointer.initializeMemory: negative count")
 
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
-    var nextPtr = self + index &* MemoryLayout<T>.stride
+    var nextPtr = self
     for _ in 0..<count {
-      Builtin.initialize(value, nextPtr._rawValue)
+      Builtin.initialize(repeatedValue, nextPtr._rawValue)
       nextPtr += MemoryLayout<T>.stride
     }
     return UnsafeMutablePointer(_rawValue)
@@ -702,8 +713,10 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ) -> UnsafeMutablePointer<C.Element> {
     // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
     // Initialize and bind each element of the container.
-    for (index, element) in source.enumerated() {
-      self.initializeMemory(as: C.Element.self, at: index, to: element)
+    var ptr = self
+    for element in source {
+      ptr.initializeMemory(as: C.Element.self, repeating: element, count: 1)
+      ptr += MemoryLayout<C.Element>.stride
     }
     return UnsafeMutablePointer(_rawValue)
   }
@@ -852,29 +865,34 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     }
   }
 
+  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "copyMemory(from:byteCount:)")
+  public func copyBytes(from source: UnsafeRawPointer, count: Int) {
+    copyMemory(from: source, byteCount: count)
+  }
+  
   /// Copies the specified number of bytes from the given raw pointer's memory
   /// into this pointer's memory.
   ///
-  /// If the `count` bytes of memory referenced by this pointer are bound to a
-  /// type `T`, then `T` must be a trivial type, this pointer and `source`
-  /// must be properly aligned for accessing `T`, and `count` must be a
+  /// If the `byteCount` bytes of memory referenced by this pointer are bound to 
+  /// a type `T`, then `T` must be a trivial type, this pointer and `source`
+  /// must be properly aligned for accessing `T`, and `byteCount` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// After calling `copyBytes(from:count:)`, the `count` bytes of memory
+  /// After calling `copyMemory(from:byteCount:)`, the `byteCount` bytes of memory
   /// referenced by this pointer are initialized to raw bytes. If the memory
   /// is bound to type `T`, then it contains values of type `T`.
   ///
   /// - Parameters:
   ///   - source: A pointer to the memory to copy bytes from. The memory in the
-  ///     region `source..<(source + count)` must be initialized to a trivial
+  ///     region `source..<(source + byteCount)` must be initialized to a trivial
   ///     type.
-  ///   - count: The number of bytes to copy. `count` must not be negative.
+  ///   - byteCount: The number of bytes to copy. `byteCount` must not be negative.
   @_inlineable
-  public func copyBytes(from source: UnsafeRawPointer, count: Int) {
+  public func copyMemory(from source: UnsafeRawPointer, byteCount: Int) {
     _debugPrecondition(
-      count >= 0, "UnsafeMutableRawPointer.copyBytes with negative count")
+      byteCount >= 0, "UnsafeMutableRawPointer.copyMemory with negative count")
 
-    _memmove(dest: self, src: source, size: UInt(count))
+    _memmove(dest: self, src: source, size: UInt(byteCount))
   }
 %  end # mutable
 

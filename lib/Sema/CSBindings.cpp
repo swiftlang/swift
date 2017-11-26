@@ -517,8 +517,10 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       for (auto proto : literalProtocols) {
         do {
           // If the type conforms to this protocol, we're covered.
-          if (tc.conformsToProtocol(testType, proto, DC,
-                                    ConformanceCheckFlags::InExpression)) {
+          if (tc.conformsToProtocol(
+                      testType, proto, DC,
+                      (ConformanceCheckFlags::InExpression|
+                       ConformanceCheckFlags::SkipConditionalRequirements))) {
             coveredLiteralProtocols.insert(proto);
             break;
           }

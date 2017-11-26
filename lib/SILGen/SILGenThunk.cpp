@@ -357,8 +357,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 }
 
 SILFunction *SILGenModule::
-getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
-                              CanSILFunctionType thunkType,
+getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
                               CanSILFunctionType fromType,
                               CanSILFunctionType toType,
                               IsSerialized_t Serialized) {
@@ -370,12 +369,10 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
 
   // Mangle the reabstraction thunk.
   // Substitute context parameters out of the "from" and "to" types.
-  auto fromInterfaceType
-      = GenericEnvironment::mapTypeOutOfContext(genericEnv, fromType)
-              ->getCanonicalType();
-  auto toInterfaceType
-      = GenericEnvironment::mapTypeOutOfContext(genericEnv, toType)
-              ->getCanonicalType();
+  auto fromInterfaceType = fromType->mapTypeOutOfContext()
+    ->getCanonicalType();
+  auto toInterfaceType = toType->mapTypeOutOfContext()
+    ->getCanonicalType();
 
   Mangle::ASTMangler NewMangler;
   std::string name = NewMangler.mangleReabstractionThunkHelper(thunkType,

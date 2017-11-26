@@ -135,57 +135,84 @@ public:
     }
   }
 
-  void assignWithCopy(IRGenFunction &IGF, Address dest,
-                      Address src, SILType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
+    if (isOutlined || T.hasOpenedExistential()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
 
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().assignWithCopy(IGF, destField, srcField,
-                                         field.getType(IGF.IGM, T));
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().assignWithCopy(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
+      }
+    } else {
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
+          &typeToMetadataVec);
     }
   }
 
-  void assignWithTake(IRGenFunction &IGF, Address dest,
-                      Address src, SILType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
+    if (isOutlined || T.hasOpenedExistential()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
 
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().assignWithTake(IGF, destField, srcField,
-                                         field.getType(IGF.IGM, T));
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().assignWithTake(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
+      }
+    } else {
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
+          &typeToMetadataVec);
     }
   }
 
-  void initializeWithCopy(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
     // If we're POD, use the generic routine.
     if (this->isPOD(ResilienceExpansion::Maximal) &&
         isa<LoadableTypeInfo>(this)) {
-      return cast<LoadableTypeInfo>(this)->
-               LoadableTypeInfo::initializeWithCopy(IGF, dest, src, T);
+      return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
+          IGF, dest, src, T, isOutlined);
     }
 
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty())
-        continue;
+    if (isOutlined || T.hasOpenedExistential()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
 
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().initializeWithCopy(IGF, destField, srcField,
-                                             field.getType(IGF.IGM, T));
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().initializeWithCopy(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
+      }
+    } else {
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
+          &typeToMetadataVec);
     }
   }
-  
-  void initializeWithTake(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
+
+  void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
       IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
@@ -193,25 +220,67 @@ public:
                  std::min(dest.getAlignment(), src.getAlignment()).getValue());
       return;
     }
-    
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
-      
-      Address destField = field.projectAddress(IGF, dest, offsets);
-      Address srcField = field.projectAddress(IGF, src, offsets);
-      field.getTypeInfo().initializeWithTake(IGF, destField, srcField,
-                                             field.getType(IGF.IGM, T));
+
+    if (isOutlined || T.hasOpenedExistential()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isEmpty())
+          continue;
+
+        Address destField = field.projectAddress(IGF, dest, offsets);
+        Address srcField = field.projectAddress(IGF, src, offsets);
+        field.getTypeInfo().initializeWithTake(
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
+      }
+    } else {
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToOutlinedCopyAddr(
+          IGF, *this, dest, src, T,
+          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
+          &typeToMetadataVec);
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
-    for (auto &field : getFields()) {
-      if (field.isPOD()) continue;
+  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+               bool isOutlined) const override {
+    if (isOutlined || T.hasOpenedExistential()) {
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      for (auto &field : getFields()) {
+        if (field.isPOD())
+          continue;
 
-      field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr, offsets),
-                                  field.getType(IGF.IGM, T));
+        field.getTypeInfo().destroy(IGF,
+                                    field.projectAddress(IGF, addr, offsets),
+                                    field.getType(IGF.IGM, T), isOutlined);
+      }
+    } else {
+      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, addr, T,
+                                            &typeToMetadataVec);
+    }
+  }
+
+  void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
+      SILType T) const override {
+    auto canType = T.getSwiftRValueType();
+    // get the size before insertions
+    auto SZ = typeToMetadataVec.size();
+    for (auto &field : getFields()) {
+      if (field.isEmpty())
+        continue;
+      auto fType = field.getType(IGF.IGM, T);
+      field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
+                                                   fType);
+    }
+    if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
+        typeToMetadataVec.size() != SZ) {
+      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+      assert(metadata && "Expected Type Metadata Ref");
+      typeToMetadataVec.insert(std::make_pair(canType, metadata));
     }
   }
 };
@@ -363,17 +432,17 @@ private:
     }
   }
 
-
-  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF,
-                                         Explosion &in,
-                                         Address addr) const>
-  void forAllFields(IRGenFunction &IGF, Explosion &in, Address addr) const {
+  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF, Explosion &in,
+                                         Address addr, bool isOutlined) const>
+  void forAllFields(IRGenFunction &IGF, Explosion &in, Address addr,
+                    bool isOutlined) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
       Address fieldAddr = field.projectAddress(IGF, addr, offsets);
-      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr);
+      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr,
+                                                        isOutlined);
     }
   }
 
@@ -389,14 +458,15 @@ public:
                   Explosion &out) const override {
     forAllFields<&LoadableTypeInfo::loadAsTake>(IGF, addr, out);
   }
-  
-  void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
-    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr);
+
+  void assign(IRGenFunction &IGF, Explosion &e, Address addr,
+              bool isOutlined) const override {
+    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr, isOutlined);
   }
 
-  void initialize(IRGenFunction &IGF, Explosion &e,
-                  Address addr) const override {
-    forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr);
+  void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                  bool isOutlined) const override {
+    forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr, isOutlined);
   }
 
   unsigned getExplosionSize() const override {

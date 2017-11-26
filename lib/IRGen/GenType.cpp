@@ -55,21 +55,21 @@ TypeConverter::Types_t::getCacheFor(TypeBase *t) {
   return t->hasTypeParameter() ? DependentCache : IndependentCache;
 }
 
-void TypeInfo:: assign(IRGenFunction &IGF, Address dest, Address src,
-                       IsTake_t isTake, SILType T) const {
+void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
+                      IsTake_t isTake, SILType T, bool isOutlined) const {
   if (isTake) {
-    assignWithTake(IGF, dest, src, T);
+    assignWithTake(IGF, dest, src, T, isOutlined);
   } else {
-    assignWithCopy(IGF, dest, src, T);
+    assignWithCopy(IGF, dest, src, T, isOutlined);
   }
 }
 
 void TypeInfo::initialize(IRGenFunction &IGF, Address dest, Address src,
-                          IsTake_t isTake, SILType T) const {
+                          IsTake_t isTake, SILType T, bool isOutlined) const {
   if (isTake) {
-    initializeWithTake(IGF, dest, src, T);
+    initializeWithTake(IGF, dest, src, T, isOutlined);
   } else {
-    initializeWithCopy(IGF, dest, src, T);
+    initializeWithCopy(IGF, dest, src, T, isOutlined);
   }
 }
 
@@ -125,10 +125,9 @@ TypeInfo::nativeParameterValueSchema(IRGenModule &IGM) const {
 /// Copy a value from one object to a new object, directly taking
 /// responsibility for anything it might have.  This is like C++
 /// move-initialization, except the old object will not be destroyed.
-void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
-                                       Address destAddr,
-                                       Address srcAddr,
-                                       SILType T) const {
+void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                                       Address srcAddr, SILType T,
+                                       bool isOutlined) const {
   assert(isBitwiseTakable(ResilienceExpansion::Maximal)
         && "non-bitwise-takable type must override default initializeWithTake");
   
@@ -139,7 +138,7 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
     auto &loadableTI = cast<LoadableTypeInfo>(*this);
     Explosion copy;
     loadableTI.loadAsTake(IGF, srcAddr, copy);
-    loadableTI.initialize(IGF, copy, destAddr);
+    loadableTI.initialize(IGF, copy, destAddr, isOutlined);
     return;
   }
 
@@ -149,20 +148,19 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
 
 /// Copy a value from one object to a new object.  This is just the
 /// default implementation.
-void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
-                                          Address destAddr,
-                                          Address srcAddr,
-                                          SILType T) const {
+void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                                          Address srcAddr, SILType T,
+                                          bool isOutlined) const {
   // Use memcpy if that's legal.
   if (isPOD(ResilienceExpansion::Maximal)) {
-    return initializeWithTake(IGF, destAddr, srcAddr, T);
+    return initializeWithTake(IGF, destAddr, srcAddr, T, isOutlined);
   }
 
   // Otherwise explode and re-implode.
-  if (IGF.isInOutlinedFunction()) {
+  if (isOutlined) {
     Explosion copy;
     loadAsCopy(IGF, srcAddr, copy);
-    initialize(IGF, copy, destAddr);
+    initialize(IGF, copy, destAddr, true);
   } else {
     IGF.IGM.generateCallToOutlinedCopyAddr(
         IGF, *this, destAddr, srcAddr, T,
@@ -797,16 +795,17 @@ namespace {
                     Explosion &e) const override {}
     void loadAsTake(IRGenFunction &IGF, Address addr,
                     Explosion &e) const override {}
-    void assign(IRGenFunction &IGF, Explosion &e,
-                Address addr) const override {}
-    void initialize(IRGenFunction &IGF, Explosion &e,
-                    Address addr) const override {}
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr,
+                bool isOutlined) const override {}
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                    bool isOutlined) const override {}
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest, Atomicity atomicity) const override {}
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity) const override {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {}
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {}
     void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
                              Explosion &src, unsigned offset) const override {}
     void unpackFromEnumPayload(IRGenFunction &IGF,
@@ -908,14 +907,14 @@ namespace {
       addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       explosion.add(IGF.Builder.CreateLoad(addr));
     }
-    
-    void assign(IRGenFunction &IGF, Explosion &explosion,
-                Address addr) const override {
-      initialize(IGF, explosion, addr);
+
+    void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
+                bool isOutlined) const override {
+      initialize(IGF, explosion, addr, isOutlined);
     }
-    
-    void initialize(IRGenFunction &IGF, Explosion &explosion,
-                    Address addr) const override {
+
+    void initialize(IRGenFunction &IGF, Explosion &explosion, Address addr,
+                    bool isOutlined) const override {
       addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       IGF.Builder.CreateStore(explosion.claimNext(), addr);
     }
@@ -939,7 +938,8 @@ namespace {
       explosion.claimNext();
     }
 
-    void destroy(IRGenFunction &IGF, Address address, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
       /* nop */
     }
     
@@ -979,28 +979,30 @@ namespace {
       : IndirectTypeInfo(storage, size, std::move(spareBits), align,
                          IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, SILType T) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address dest,
-                        Address src, SILType T) const override {
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
-    void destroy(IRGenFunction &IGF, Address address,
-                 SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
   };
@@ -1358,7 +1360,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
 
   // Map the archetype out of its own generic environment and into the
   // canonical generic environment.
-  auto interfaceType = genericEnv->mapTypeOutOfContext(t);
+  auto interfaceType = t->getInterfaceType();
   auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
                     ->castTo<ArchetypeType>();
   assert(isExemplarArchetype(exemplar));
@@ -1636,6 +1638,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertBlockStorageType(cast<SILBlockStorageType>(ty));
   case TypeKind::SILBox:
     return convertBoxType(cast<SILBoxType>(ty));
+  case TypeKind::SILToken:
+    llvm_unreachable("should not be asking for representation of a SILToken");
   }
   }
   llvm_unreachable("bad type kind");

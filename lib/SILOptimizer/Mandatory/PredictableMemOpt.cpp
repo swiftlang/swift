@@ -519,8 +519,10 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   // case.
   ArrayRef<SILInstruction *> InsertPts = Val.getInsertionPoints();
   if (InsertPts.size() == 1) {
-    SavedInsertionPointRAII SavedInsertPt(B, InsertPts[0]);
-    SILValue EltVal = nonDestructivelyExtractSubElement(Val, B, Loc);
+    // Use the scope and location of the store at the insertion point.
+    SILBuilderWithScope Builder(InsertPts[0]);
+    SILLocation Loc = InsertPts[0]->getLoc();
+    SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
     assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
     return EltVal;
   }
@@ -530,8 +532,10 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   SILSSAUpdater Updater;
   Updater.Initialize(LoadTy);
   for (auto *I : Val.getInsertionPoints()) {
-    SavedInsertionPointRAII SavedInsertPt(B, I);
-    SILValue EltVal = nonDestructivelyExtractSubElement(Val, B, Loc);
+    // Use the scope and location of the store at the insertion point.
+    SILBuilderWithScope Builder(I);
+    SILLocation Loc = I->getLoc();
+    SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
     Updater.AddAvailableValue(I->getParent(), EltVal);
   }
 
@@ -542,62 +546,70 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
 }
 
 //===----------------------------------------------------------------------===//
-//                          Allocation Optimization
+//                          Available Value Dataflow
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-/// This performs load promotion and deletes synthesized allocations if all
-/// loads can be removed.
-class AllocOptimize {
-
-  SILModule &Module;
-
-  /// This is either an alloc_box or alloc_stack instruction.
+/// Given a piece of memory, the memory's uses, and destroys perform a single
+/// round of optimistic dataflow switching to intersection when a back edge is
+/// encountered.
+class AvailableValueDataflowContext {
+  /// The base memory we are performing dataflow upon.
   AllocationInst *TheMemory;
 
-  /// This is the SILType of the memory object.
-  SILType MemoryType;
-
-  /// The number of primitive subelements across all elements of this memory
-  /// value.
+  /// The number of sub elements of our memory.
   unsigned NumMemorySubElements;
 
-  SmallVectorImpl<DIMemoryUse> &Uses;
-  SmallVectorImpl<SILInstruction *> &Releases;
+  /// The set of uses that we are tracking. This is only here so we can update
+  /// when exploding copy_addr. It would be great if we did not have to store
+  /// this.
+  llvm::SmallVectorImpl<DIMemoryUse> &Uses;
 
+  /// The set of blocks with local definitions.
+  ///
+  /// We use this to determine if we should visit a block or look at a block's
+  /// predecessors during dataflow.
   llvm::SmallPtrSet<SILBasicBlock *, 32> HasLocalDefinition;
 
   /// This is a map of uses that are not loads (i.e., they are Stores,
   /// InOutUses, and Escapes), to their entry in Uses.
   llvm::SmallDenseMap<SILInstruction *, unsigned, 16> NonLoadUses;
 
-  /// Does this value escape anywhere in the function.
+  /// Does this value escape anywhere in the function. We use this very
+  /// conservatively.
   bool HasAnyEscape = false;
 
 public:
-  AllocOptimize(AllocationInst *TheMemory, SmallVectorImpl<DIMemoryUse> &Uses,
-                SmallVectorImpl<SILInstruction *> &Releases);
+  AvailableValueDataflowContext(AllocationInst *TheMemory,
+                                unsigned NumMemorySubElements,
+                                llvm::SmallVectorImpl<DIMemoryUse> &Uses);
 
-  bool doIt();
+  /// Try to compute available values for "TheMemory" at the instruction \p
+  /// StartingFrom. We only compute the values for set bits in \p
+  /// RequiredElts. We return the vailable values in \p Result. If any available
+  /// values were found, return true. Otherwise, return false.
+  bool computeAvailableValues(SILInstruction *StartingFrom,
+                              unsigned FirstEltOffset,
+                              unsigned NumLoadSubElements,
+                              llvm::SmallBitVector &RequiredElts,
+                              SmallVectorImpl<AvailableValue> &Result);
+
+  /// Return true if the box has escaped at the specified instruction.  We are
+  /// not
+  /// allowed to do load promotion in an escape region.
+  bool hasEscapedAt(SILInstruction *I);
+
+  /// Explode a copy_addr, updating the Uses at the same time.
+  void explodeCopyAddr(CopyAddrInst *CAI);
 
 private:
-  bool promoteLoad(SILInstruction *Inst);
-  void promoteDestroyAddr(DestroyAddrInst *DAI,
-                          MutableArrayRef<AvailableValue> Values);
-  bool
-  canPromoteDestroyAddr(DestroyAddrInst *DAI,
-                        llvm::SmallVectorImpl<AvailableValue> &AvailableValues);
+  SILModule &getModule() const { return TheMemory->getModule(); }
 
-  // Load promotion.
-  bool hasEscapedAt(SILInstruction *I);
   void updateAvailableValues(SILInstruction *Inst,
                              llvm::SmallBitVector &RequiredElts,
                              SmallVectorImpl<AvailableValue> &Result,
                              llvm::SmallBitVector &ConflictingValues);
-  void computeAvailableValues(SILInstruction *StartingFrom,
-                              llvm::SmallBitVector &RequiredElts,
-                              SmallVectorImpl<AvailableValue> &Result);
   void computeAvailableValuesFrom(
       SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
       llvm::SmallBitVector &RequiredElts,
@@ -605,45 +617,26 @@ private:
       llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallBitVector, 32>
           &VisitedBlocks,
       llvm::SmallBitVector &ConflictingValues);
-
-  void explodeCopyAddr(CopyAddrInst *CAI);
-
-  bool tryToRemoveDeadAllocation();
 };
 
 } // end anonymous namespace
 
-
-AllocOptimize::AllocOptimize(AllocationInst *TheMemory,
-                             SmallVectorImpl<DIMemoryUse> &Uses,
-                             SmallVectorImpl<SILInstruction*> &Releases)
-: Module(TheMemory->getModule()), TheMemory(TheMemory), Uses(Uses),
-  Releases(Releases) {
-  
-  // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory)) {
-    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
-           && "optimizing multi-field boxes not implemented");
-    MemoryType = ABI->getBoxType()->getFieldType(ABI->getModule(), 0);
-  } else {
-    assert(isa<AllocStackInst>(TheMemory));
-    MemoryType = cast<AllocStackInst>(TheMemory)->getElementType();
-  }
-  
-  NumMemorySubElements = getNumSubElements(MemoryType, Module);
-  
+AvailableValueDataflowContext::AvailableValueDataflowContext(
+    AllocationInst *InputTheMemory, unsigned NumMemorySubElements,
+    SmallVectorImpl<DIMemoryUse> &InputUses)
+    : TheMemory(InputTheMemory), NumMemorySubElements(NumMemorySubElements),
+      Uses(InputUses) {
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
-  for (unsigned ui = 0, e = Uses.size(); ui != e; ++ui) {
+  for (unsigned ui : indices(Uses)) {
     auto &Use = Uses[ui];
     assert(Use.Inst && "No instruction identified?");
-    
+
     // Keep track of all the uses that aren't loads.
     if (Use.Kind == DIUseKind::Load)
       continue;
-    
+
     NonLoadUses[Use.Inst] = ui;
-    
     HasLocalDefinition.insert(Use.Inst->getParent());
     
     if (Use.Kind == DIUseKind::Escape) {
@@ -659,35 +652,18 @@ AllocOptimize::AllocOptimize(AllocationInst *TheMemory,
   HasLocalDefinition.insert(TheMemory->getParent());
 }
 
-
-/// hasEscapedAt - Return true if the box has escaped at the specified
-/// instruction.  We are not allowed to do load promotion in an escape region.
-bool AllocOptimize::hasEscapedAt(SILInstruction *I) {
-  // FIXME: This is not an aggressive implementation.  :)
-  
-  // TODO: At some point, we should special case closures that just *read* from
-  // the escaped value (by looking at the body of the closure).  They should not
-  // prevent load promotion, and will allow promoting values like X in regions
-  // dominated by "... && X != 0".
-  return HasAnyEscape;
-}
-
-
-/// The specified instruction is a non-load access of the element being
-/// promoted.  See if it provides a value or refines the demanded element mask
-/// used for load promotion.
-void AllocOptimize::updateAvailableValues(
+void AvailableValueDataflowContext::updateAvailableValues(
     SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
     SmallVectorImpl<AvailableValue> &Result,
     llvm::SmallBitVector &ConflictingValues) {
-
-  // Handle store and assign.
+  // Handle store.
   if (auto *SI = dyn_cast<StoreInst>(Inst)) {
     unsigned StartSubElt = computeSubelement(SI->getDest(), TheMemory);
     assert(StartSubElt != ~0U && "Store within enum projection not handled");
     SILType ValTy = SI->getSrc()->getType();
 
-    for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
+    for (unsigned i = 0, e = getNumSubElements(ValTy, getModule()); i != e;
+         ++i) {
       // If this element is not required, don't fill it in.
       if (!RequiredElts[StartSubElt+i]) continue;
       
@@ -719,12 +695,13 @@ void AllocOptimize::updateAvailableValues(
   // to see if any loaded subelements are being used, and if so, explode the
   // copy_addr to its individual pieces.
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-    unsigned StartSubElt = computeSubelement(Inst->getOperand(1), TheMemory);
+    unsigned StartSubElt = computeSubelement(CAI->getDest(), TheMemory);
     assert(StartSubElt != ~0U && "Store within enum projection not handled");
-    SILType ValTy = Inst->getOperand(1)->getType();
-    
+    SILType ValTy = CAI->getDest()->getType();
+
     bool AnyRequired = false;
-    for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
+    for (unsigned i = 0, e = getNumSubElements(ValTy, getModule()); i != e;
+         ++i) {
       // If this element is not required, don't fill it in.
       AnyRequired = RequiredElts[StartSubElt+i];
       if (AnyRequired) break;
@@ -737,7 +714,7 @@ void AllocOptimize::updateAvailableValues(
     
     // If the copyaddr is of a non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
-    if (CAI->getOperand(0)->getType().isLoadable(Module)) {
+    if (CAI->getSrc()->getType().isLoadable(getModule())) {
       // Otherwise, some part of the copy_addr's value is demanded by a load, so
       // we need to explode it to its component pieces.  This only expands one
       // level of the copyaddr.
@@ -748,11 +725,9 @@ void AllocOptimize::updateAvailableValues(
       return;
     }
   }
-  
-  
-  
+
   // TODO: inout apply's should only clobber pieces passed in.
-  
+
   // Otherwise, this is some unknown instruction, conservatively assume that all
   // values are clobbered.
   RequiredElts.clear();
@@ -760,16 +735,9 @@ void AllocOptimize::updateAvailableValues(
   return;
 }
 
-
-/// Try to find available values of a set of subelements of the current value,
-/// starting right before the specified instruction.
-///
-/// The bitvector indicates which subelements we're interested in, and result
-/// captures the available value (plus an indicator of which subelement of that
-/// value is needed).
-///
-void AllocOptimize::computeAvailableValues(
-    SILInstruction *StartingFrom, llvm::SmallBitVector &RequiredElts,
+bool AvailableValueDataflowContext::computeAvailableValues(
+    SILInstruction *StartingFrom, unsigned FirstEltOffset,
+    unsigned NumLoadSubElements, llvm::SmallBitVector &RequiredElts,
     SmallVectorImpl<AvailableValue> &Result) {
   llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> VisitedBlocks;
   llvm::SmallBitVector ConflictingValues(Result.size());
@@ -777,18 +745,44 @@ void AllocOptimize::computeAvailableValues(
   computeAvailableValuesFrom(StartingFrom->getIterator(),
                              StartingFrom->getParent(), RequiredElts, Result,
                              VisitedBlocks, ConflictingValues);
+  // If there are no values available at this load point, then we fail to
+  // promote this load and there is nothing to do.
+  llvm::SmallBitVector AvailableValueIsPresent(NumMemorySubElements);
 
-  // If we have any conflicting values, explicitly mask them out of the result,
-  // so we don't pick one arbitrary available value.
-  if (!ConflictingValues.none())
-    for (unsigned i = 0, e = Result.size(); i != e; ++i)
-      if (ConflictingValues[i])
-        Result[i] = {};
+  for (unsigned i :
+       range(FirstEltOffset, FirstEltOffset + NumLoadSubElements)) {
+    AvailableValueIsPresent[i] = Result[i].getValue();
+  }
 
-  return;
+  // If we do not have any values available, bail.
+  if (AvailableValueIsPresent.none())
+    return false;
+
+  // Otherwise, if we have any conflicting values, explicitly mask them out of
+  // the result, so we don't pick one arbitrary available value.
+  if (ConflictingValues.none()) {
+    return true;
+  }
+
+  // At this point, we know that we have /some/ conflicting values and some
+  // available values.
+  if (AvailableValueIsPresent.reset(ConflictingValues).none())
+    return false;
+
+  // Otherwise, mask out the available values and return true. We have at least
+  // 1 available value.
+  int NextIter = ConflictingValues.find_first();
+  while (NextIter != -1) {
+    assert(NextIter >= 0 && "Int can not be represented?!");
+    unsigned Iter = NextIter;
+    Result[Iter] = {};
+    NextIter = ConflictingValues.find_next(Iter);
+  }
+
+  return true;
 }
 
-void AllocOptimize::computeAvailableValuesFrom(
+void AvailableValueDataflowContext::computeAvailableValuesFrom(
     SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
     llvm::SmallBitVector &RequiredElts, SmallVectorImpl<AvailableValue> &Result,
     llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallBitVector, 32>
@@ -862,6 +856,187 @@ void AllocOptimize::computeAvailableValuesFrom(
   }
 }
 
+/// Explode a copy_addr instruction of a loadable type into lower level
+/// operations like loads, stores, retains, releases, retain_value, etc.
+void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
+  DEBUG(llvm::dbgs() << "  -- Exploding copy_addr: " << *CAI << "\n");
+
+  SILType ValTy = CAI->getDest()->getType().getObjectType();
+  auto &TL = getModule().getTypeLowering(ValTy);
+
+  // Keep track of the new instructions emitted.
+  SmallVector<SILInstruction *, 4> NewInsts;
+  SILBuilder B(CAI, &NewInsts);
+  B.setCurrentDebugScope(CAI->getDebugScope());
+
+  // Use type lowering to lower the copyaddr into a load sequence + store
+  // sequence appropriate for the type.
+  SILValue StoredValue =
+      TL.emitLoadOfCopy(B, CAI->getLoc(), CAI->getSrc(), CAI->isTakeOfSrc());
+
+  TL.emitStoreOfCopy(B, CAI->getLoc(), StoredValue, CAI->getDest(),
+                     CAI->isInitializationOfDest());
+
+  // Update our internal state for this being gone.
+  NonLoadUses.erase(CAI);
+
+  // Remove the copy_addr from Uses.  A single copy_addr can appear multiple
+  // times if the source and dest are to elements within a single aggregate, but
+  // we only want to pick up the CopyAddrKind from the store.
+  DIMemoryUse LoadUse, StoreUse;
+  for (auto &Use : Uses) {
+    if (Use.Inst != CAI)
+      continue;
+
+    if (Use.Kind == DIUseKind::Load) {
+      assert(LoadUse.isInvalid());
+      LoadUse = Use;
+    } else {
+      assert(StoreUse.isInvalid());
+      StoreUse = Use;
+    }
+
+    Use.Inst = nullptr;
+
+    // Keep scanning in case the copy_addr appears multiple times.
+  }
+
+  assert((LoadUse.isValid() || StoreUse.isValid()) &&
+         "we should have a load or a store, possibly both");
+  assert(StoreUse.isInvalid() || StoreUse.Kind == Assign ||
+         StoreUse.Kind == PartialStore || StoreUse.Kind == Initialization);
+
+  // Now that we've emitted a bunch of instructions, including a load and store
+  // but also including other stuff, update the internal state of
+  // LifetimeChecker to reflect them.
+
+  // Update the instructions that touch the memory.  NewInst can grow as this
+  // iterates, so we can't use a foreach loop.
+  for (auto *NewInst : NewInsts) {
+    switch (NewInst->getKind()) {
+    default:
+      NewInst->dump();
+      llvm_unreachable("Unknown instruction generated by copy_addr lowering");
+
+    case SILInstructionKind::StoreInst:
+      // If it is a store to the memory object (as oppose to a store to
+      // something else), track it as an access.
+      if (StoreUse.isValid()) {
+        StoreUse.Inst = NewInst;
+        NonLoadUses[NewInst] = Uses.size();
+        Uses.push_back(StoreUse);
+      }
+      continue;
+
+    case SILInstructionKind::LoadInst:
+      // If it is a load from the memory object (as oppose to a load from
+      // something else), track it as an access.  We need to explicitly check to
+      // see if the load accesses "TheMemory" because it could either be a load
+      // for the copy_addr source, or it could be a load corresponding to the
+      // "assign" operation on the destination of the copyaddr.
+      if (LoadUse.isValid() &&
+          getAccessPathRoot(NewInst->getOperand(0)) == TheMemory) {
+        LoadUse.Inst = NewInst;
+        Uses.push_back(LoadUse);
+      }
+      continue;
+
+    case SILInstructionKind::RetainValueInst:
+    case SILInstructionKind::StrongRetainInst:
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::UnownedRetainInst:
+    case SILInstructionKind::UnownedReleaseInst:
+    case SILInstructionKind::ReleaseValueInst: // Destroy overwritten value
+      // These are ignored.
+      continue;
+    }
+  }
+
+  // Next, remove the copy_addr itself.
+  CAI->eraseFromParent();
+}
+
+bool AvailableValueDataflowContext::hasEscapedAt(SILInstruction *I) {
+  // Return true if the box has escaped at the specified instruction.  We are
+  // not allowed to do load promotion in an escape region.
+
+  // FIXME: This is not an aggressive implementation.  :)
+
+  // TODO: At some point, we should special case closures that just *read* from
+  // the escaped value (by looking at the body of the closure).  They should not
+  // prevent load promotion, and will allow promoting values like X in regions
+  // dominated by "... && X != 0".
+  return HasAnyEscape;
+}
+
+//===----------------------------------------------------------------------===//
+//                          Allocation Optimization
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// This performs load promotion and deletes synthesized allocations if all
+/// loads can be removed.
+class AllocOptimize {
+
+  SILModule &Module;
+
+  /// This is either an alloc_box or alloc_stack instruction.
+  AllocationInst *TheMemory;
+
+  /// This is the SILType of the memory object.
+  SILType MemoryType;
+
+  /// The number of primitive subelements across all elements of this memory
+  /// value.
+  unsigned NumMemorySubElements;
+
+  SmallVectorImpl<DIMemoryUse> &Uses;
+  SmallVectorImpl<SILInstruction *> &Releases;
+
+  /// A structure that we use to compute our available values.
+  AvailableValueDataflowContext DataflowContext;
+
+public:
+  AllocOptimize(AllocationInst *TheMemory, SmallVectorImpl<DIMemoryUse> &Uses,
+                SmallVectorImpl<SILInstruction *> &Releases);
+
+  bool doIt();
+
+private:
+  bool promoteLoad(SILInstruction *Inst);
+  void promoteDestroyAddr(DestroyAddrInst *DAI,
+                          MutableArrayRef<AvailableValue> Values);
+  bool
+  canPromoteDestroyAddr(DestroyAddrInst *DAI,
+                        llvm::SmallVectorImpl<AvailableValue> &AvailableValues);
+
+  bool tryToRemoveDeadAllocation();
+};
+
+} // end anonymous namespace
+
+static SILType getMemoryType(AllocationInst *TheMemory) {
+  // Compute the type of the memory object.
+  if (auto *ABI = dyn_cast<AllocBoxInst>(TheMemory)) {
+    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
+           "optimizing multi-field boxes not implemented");
+    return ABI->getBoxType()->getFieldType(ABI->getModule(), 0);
+  } else {
+    assert(isa<AllocStackInst>(TheMemory));
+    return cast<AllocStackInst>(TheMemory)->getElementType();
+  }
+}
+
+AllocOptimize::AllocOptimize(AllocationInst *InputMemory,
+                             SmallVectorImpl<DIMemoryUse> &InputUses,
+                             SmallVectorImpl<SILInstruction *> &InputReleases)
+    : Module(InputMemory->getModule()), TheMemory(InputMemory),
+      MemoryType(getMemoryType(TheMemory)),
+      NumMemorySubElements(getNumSubElements(MemoryType, Module)),
+      Uses(InputUses), Releases(InputReleases),
+      DataflowContext(TheMemory, NumMemorySubElements, Uses) {}
+
 /// If we are able to optimize \p Inst, return the source address that
 /// instruction is loading from. If we can not optimize \p Inst, then just
 /// return an empty SILValue.
@@ -899,7 +1074,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
 
   // If the box has escaped at this instruction, we can't safely promote the
   // load.
-  if (hasEscapedAt(Inst))
+  if (DataflowContext.hasEscapedAt(Inst))
     return false;
 
   SILType LoadTy = SrcAddr->getType().getObjectType();
@@ -925,35 +1100,24 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   
   // Find out if we have any available values.  If no bits are demanded, we
   // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements != 0) {
-    computeAvailableValues(Inst, RequiredElts, AvailableValues);
-    
-    // If there are no values available at this load point, then we fail to
-    // promote this load and there is nothing to do.
-    bool AnyAvailable = false;
-    for (unsigned i = FirstElt, e = i+NumLoadSubElements; i != e; ++i)
-      if (AvailableValues[i].getValue()) {
-        AnyAvailable = true;
-        break;
-      }
-    
-    if (!AnyAvailable)
-      return false;
-  }
-  
+  if (NumLoadSubElements != 0 &&
+      !DataflowContext.computeAvailableValues(
+          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
+    return false;
+
   // Ok, we have some available values.  If we have a copy_addr, explode it now,
   // exposing the load operation within it.  Subsequent optimization passes will
   // see the load and propagate the available values into it.
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-    explodeCopyAddr(CAI);
-    
+    DataflowContext.explodeCopyAddr(CAI);
+
     // This is removing the copy_addr, but explodeCopyAddr takes care of
     // removing the instruction from Uses for us, so we return false.
     return false;
   }
   
   // Aggregate together all of the subelements into something that has the same
-  // type as the load did, and emit smaller) loads for any subelements that were
+  // type as the load did, and emit smaller loads for any subelements that were
   // not available.
   auto *Load = cast<LoadInst>(Inst);
   AvailableValueAggregator Agg(Load, AvailableValues, Uses);
@@ -987,7 +1151,7 @@ bool AllocOptimize::canPromoteDestroyAddr(
   
   // If the box has escaped at this instruction, we can't safely promote the
   // load.
-  if (hasEscapedAt(DAI))
+  if (DataflowContext.hasEscapedAt(DAI))
     return false;
   
   // Compute the access path down to the field so we can determine precise
@@ -1005,13 +1169,12 @@ bool AllocOptimize::canPromoteDestroyAddr(
   if (NumLoadSubElements == 0)
     return true;
 
+  // Compute our available values. If we do not have any available values,
+  // return false. We have nothing further to do.
   llvm::SmallVector<AvailableValue, 8> TmpList;
   TmpList.resize(NumMemorySubElements);
-  computeAvailableValues(DAI, RequiredElts, TmpList);
-
-  // If some value is not available at this load point, then we fail.
-  if (llvm::any_of(range(FirstElt, FirstElt + NumLoadSubElements),
-                   [&](unsigned i) -> bool { return !TmpList[i]; }))
+  if (!DataflowContext.computeAvailableValues(DAI, FirstElt, NumLoadSubElements,
+                                              RequiredElts, TmpList))
     return false;
 
   // Now that we have our final list, move the temporary lists contents into
@@ -1049,105 +1212,6 @@ void AllocOptimize::promoteDestroyAddr(
 
   SILBuilderWithScope(DAI).emitDestroyValueOperation(DAI->getLoc(), NewVal);
   DAI->eraseFromParent();
-}
-
-/// Explode a copy_addr instruction of a loadable type into lower level
-/// operations like loads, stores, retains, releases, retain_value, etc.
-void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
-  DEBUG(llvm::dbgs() << "  -- Exploding copy_addr: " << *CAI << "\n");
-  
-  SILType ValTy = CAI->getDest()->getType().getObjectType();
-  auto &TL = Module.getTypeLowering(ValTy);
-  
-  // Keep track of the new instructions emitted.
-  SmallVector<SILInstruction*, 4> NewInsts;
-  SILBuilder B(CAI, &NewInsts);
-  B.setCurrentDebugScope(CAI->getDebugScope());
-  
-  // Use type lowering to lower the copyaddr into a load sequence + store
-  // sequence appropriate for the type.
-  SILValue StoredValue = TL.emitLoadOfCopy(B, CAI->getLoc(), CAI->getSrc(),
-                                           CAI->isTakeOfSrc());
-  
-  TL.emitStoreOfCopy(B, CAI->getLoc(), StoredValue, CAI->getDest(),
-                     CAI->isInitializationOfDest());
-
-  // Update our internal state for this being gone.
-  NonLoadUses.erase(CAI);
-  
-  // Remove the copy_addr from Uses.  A single copy_addr can appear multiple
-  // times if the source and dest are to elements within a single aggregate, but
-  // we only want to pick up the CopyAddrKind from the store.
-  DIMemoryUse LoadUse, StoreUse;
-  for (auto &Use : Uses) {
-    if (Use.Inst != CAI) continue;
-    
-    if (Use.Kind == DIUseKind::Load) {
-      assert(LoadUse.isInvalid());
-      LoadUse = Use;
-    } else {
-      assert(StoreUse.isInvalid());
-      StoreUse = Use;
-    }
-    
-    Use.Inst = nullptr;
-    
-    // Keep scanning in case the copy_addr appears multiple times.
-  }
-  
-  assert((LoadUse.isValid() || StoreUse.isValid()) &&
-         "we should have a load or a store, possibly both");
-  assert(StoreUse.isInvalid() || StoreUse.Kind == Assign ||
-         StoreUse.Kind == PartialStore || StoreUse.Kind == Initialization);
-  
-  // Now that we've emitted a bunch of instructions, including a load and store
-  // but also including other stuff, update the internal state of
-  // LifetimeChecker to reflect them.
-  
-  // Update the instructions that touch the memory.  NewInst can grow as this
-  // iterates, so we can't use a foreach loop.
-  for (auto *NewInst : NewInsts) {
-    switch (NewInst->getKind()) {
-    default:
-      NewInst->dump();
-      llvm_unreachable("Unknown instruction generated by copy_addr lowering");
-      
-    case SILInstructionKind::StoreInst:
-      // If it is a store to the memory object (as oppose to a store to
-      // something else), track it as an access.
-      if (StoreUse.isValid()) {
-        StoreUse.Inst = NewInst;
-        NonLoadUses[NewInst] = Uses.size();
-        Uses.push_back(StoreUse);
-      }
-      continue;
-      
-    case SILInstructionKind::LoadInst:
-      // If it is a load from the memory object (as oppose to a load from
-      // something else), track it as an access.  We need to explicitly check to
-      // see if the load accesses "TheMemory" because it could either be a load
-      // for the copy_addr source, or it could be a load corresponding to the
-      // "assign" operation on the destination of the copyaddr.
-      if (LoadUse.isValid() &&
-          getAccessPathRoot(NewInst->getOperand(0)) == TheMemory) {
-        LoadUse.Inst = NewInst;
-        Uses.push_back(LoadUse);
-      }
-      continue;
-      
-    case SILInstructionKind::RetainValueInst:
-    case SILInstructionKind::StrongRetainInst:
-    case SILInstructionKind::StrongReleaseInst:
-    case SILInstructionKind::UnownedRetainInst:
-    case SILInstructionKind::UnownedReleaseInst:
-    case SILInstructionKind::ReleaseValueInst:   // Destroy overwritten value
-      // These are ignored.
-      continue;
-    }
-  }
-
-  // Next, remove the copy_addr itself.
-  CAI->eraseFromParent();
 }
 
 /// tryToRemoveDeadAllocation - If the allocation is an autogenerated allocation

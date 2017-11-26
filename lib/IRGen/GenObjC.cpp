@@ -143,7 +143,7 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // If we're emitting optimized code, record the string in the module
   // and let the late ARC pass insert it, but don't generate any calls
   // right now.
-  if (IRGen.Opts.Optimize) {
+  if (IRGen.Opts.shouldOptimize()) {
     llvm::NamedMDNode *metadata =
       Module.getOrInsertNamedMetadata(
                             "clang.arc.retainAutoreleasedReturnValueMarker");
@@ -187,6 +187,17 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
 
   auto call = IGF.Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
+
+  const llvm::Triple &triple = IGF.IGM.Context.LangOpts.Target;
+  if (triple.getArch() == llvm::Triple::x86_64) {
+    // Don't tail call objc_retainAutoreleasedReturnValue. This blocks the
+    // autoreleased return optimization.
+    // callq  0x01ec08 ; symbol stub for: objc_msgSend
+    // movq   %rax, %rdi
+    // popq   %rbp  ;<== Blocks the handshake from objc_autoreleaseReturnValue
+    // jmp    0x01ec20 ; symbol stub for: objc_retainAutoreleasedReturnValue
+    call->setTailCallKind(llvm::CallInst::TCK_NoTail);
+  }
 
   llvm::Value *result = call;
   if (isa<llvm::PointerType>(valueType)) {
@@ -897,9 +908,9 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   CallEmission emission(subIGF,
                         getObjCMethodCallee(subIGF, method, self,
                           CalleeInfo(origMethodType, origMethodType, {})));
-  
-  emission.setArgs(translatedParams);
-  
+
+  emission.setArgs(translatedParams, false);
+
   // Cleanup that always has to occur after the function call.
   auto cleanup = [&]{
     // Lifetime-extend 'self' by sending it to the autorelease pool if need be.
@@ -916,17 +927,18 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   if (indirectedDirectResult) {
     Address addr =
       indirectedResultTI->getAddressForPointer(indirectedDirectResult);
-    emission.emitToMemory(addr, *indirectedResultTI);
+    emission.emitToMemory(addr, *indirectedResultTI, false);
     cleanup();
     subIGF.Builder.CreateRetVoid();
   } else {
     Explosion result;
-    emission.emitToExplosion(result);
+    emission.emitToExplosion(result, false);
     cleanup();
     auto &callee = emission.getCallee();
     auto resultType =
         callee.getOrigFunctionType()->getDirectFormalResultsType();
-    subIGF.emitScalarReturn(resultType, result, true /*isSwiftCCReturn*/);
+    subIGF.emitScalarReturn(resultType, result, true /*isSwiftCCReturn*/,
+                            false);
   }
   
   return fwd;
@@ -960,8 +972,8 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
   Explosion selfParams;
   selfParams.add(self);
-  fieldLayout.getType().initializeFromParams(IGF, selfParams,
-                                             fieldAddr, fieldType);
+  fieldLayout.getType().initializeFromParams(IGF, selfParams, fieldAddr,
+                                             fieldType, false);
 
   // Create the forwarding stub.
   llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,

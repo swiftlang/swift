@@ -14,7 +14,10 @@
 #include <dispatch/dispatch.h>
 #include <os/base.h>
 #include <os/log.h>
+#include <locale.h>
+#if !defined(__linux__)
 #include <xlocale.h>
+#endif
 #include "os_trace_blob.h"
 
 OS_NOINLINE

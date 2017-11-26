@@ -166,9 +166,9 @@ std::string LinkEntity::mangleAsString() const {
       //   entity ::= declaration                     // other declaration
     case Kind::Function:
       // As a special case, functions can have manually mangled names.
-      if (auto AsmA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>()) {
-        return AsmA->Name;
-      }
+      if (auto AsmA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
+        if (!AsmA->Name.empty())
+          return AsmA->Name;
 
       // Otherwise, fall through into the 'other decl' case.
       LLVM_FALLTHROUGH;

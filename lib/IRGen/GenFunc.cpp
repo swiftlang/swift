@@ -268,8 +268,8 @@ namespace {
       e.add(IGF.Builder.CreateLoad(dataAddr));
     }
 
-    void assign(IRGenFunction &IGF, Explosion &e,
-                Address address) const override {
+    void assign(IRGenFunction &IGF, Explosion &e, Address address,
+                bool isOutlined) const override {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
@@ -282,8 +282,8 @@ namespace {
         IGF.emitNativeStrongAssign(context, dataAddr);
     }
 
-    void initialize(IRGenFunction &IGF, Explosion &e,
-                    Address address) const override {
+    void initialize(IRGenFunction &IGF, Explosion &e, Address address,
+                    bool isOutlined) const override {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
@@ -376,7 +376,8 @@ namespace {
       llvm_unreachable("unowned references to functions are not supported");
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
       if (!isPOD(ResilienceExpansion::Maximal))
         IGF.emitNativeStrongRelease(data, IGF.getDefaultAtomicity());
@@ -486,16 +487,17 @@ namespace {
     // TODO
     // The frontend will currently never emit copy_addr or destroy_addr for
     // block storage.
-    
-    void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, SILType T) const override {
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
     }
-    void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                            Address src, SILType T) const override {
+    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                            SILType T, bool isOutlined) const override {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
     }
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       IGF.unimplemented(SourceLoc(), "destroying @block_storage");
     }
   };
@@ -875,7 +877,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       // Map back from the explosion scheme to the native calling convention for
       // the call.
       Explosion nativeApplyArg = nativeSchemaOrigParam.mapIntoNative(
-          subIGF.IGM, subIGF, nonNativeApplyArg, origParamSILType);
+          subIGF.IGM, subIGF, nonNativeApplyArg, origParamSILType, false);
       assert(nonNativeApplyArg.empty());
       nativeApplyArg.transferInto(args, nativeApplyArg.size());
     }
@@ -1089,7 +1091,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         needsAllocas = true;
         auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, false, "arg.temp");
         auto addressPointer = stackAddr.getAddress().getAddress();
-        fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr, fieldTy);
+        fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
+                                   fieldTy, false);
         param.add(addressPointer);
         
         // Remember to deallocate later.
@@ -1149,7 +1152,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
             origParamI + 1 == origType->getParameters().size());
         needsAllocas |= addNativeArgument(
             subIGF, origParam, origParamInfo,
-            isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args);
+            isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args, false);
         ++origParamI;
       } else {
         args.add(param.claimAll());
@@ -1279,7 +1282,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       cast<LoadableTypeInfo>(outResultTI)
           .loadAsTake(subIGF, resultValueAddr, loadedResult);
       Explosion nativeResult = nativeResultSchema.mapIntoNative(
-          IGM, subIGF, loadedResult, outConv.getSILResultType());
+          IGM, subIGF, loadedResult, outConv.getSILResultType(), false);
       outResultTI.deallocateStack(subIGF, resultValueAddr,
                                   outConv.getSILResultType());
       if (nativeResult.size() == 1)
@@ -1310,17 +1313,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
 /// Emit a partial application thunk for a function pointer applied to a partial
 /// set of argument values.
-void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
-                                           SILFunction &SILFn,
-                                           const FunctionPointer &fn,
-                                           llvm::Value *fnContext,
-                                           Explosion &args,
-                                           ArrayRef<SILParameterInfo> params,
-                                           SubstitutionList subs,
-                                           CanSILFunctionType origType,
-                                           CanSILFunctionType substType,
-                                           CanSILFunctionType outType,
-                                           Explosion &out) {
+void irgen::emitFunctionPartialApplication(
+    IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fn,
+    llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
+    SubstitutionList subs, CanSILFunctionType origType,
+    CanSILFunctionType substType, CanSILFunctionType outType, Explosion &out,
+    bool isOutlined) {
   // If we have a single Swift-refcounted context value, we can adopt it
   // directly as our closure context without creating a box and thunk.
   enum HasSingleSwiftRefcountedContext { Maybe, Yes, No, Thunkable }
@@ -1558,7 +1556,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
         auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
-        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy);
+        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
+                                                 isOutlined);
         break;
       }
       // Take direct value arguments and inout pointers by value.
@@ -1568,7 +1567,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
         cast<LoadableTypeInfo>(fieldLayout.getType())
-          .initialize(IGF, args, fieldAddr);
+            .initialize(IGF, args, fieldAddr, isOutlined);
         break;
       }
     }
@@ -1624,8 +1623,8 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
   auto srcCapture = blockTL.projectCapture(IGF, src);
   auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
   captureTL.initializeWithCopy(IGF, destCapture, srcCapture,
-                               blockTy->getCaptureAddressType());
-  
+                               blockTy->getCaptureAddressType(), false);
+
   IGF.Builder.CreateRetVoid();
   
   return func;
@@ -1658,7 +1657,8 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   auto storage = Address(params.claimNext(), blockTL.getFixedAlignment());
   auto capture = blockTL.projectCapture(IGF, storage);
   auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
-  captureTL.destroy(IGF, capture, blockTy->getCaptureAddressType());
+  captureTL.destroy(IGF, capture, blockTy->getCaptureAddressType(),
+                    false /*block storage code path: never outlined*/);
   IGF.Builder.CreateRetVoid();
   
   return func;

@@ -1247,3 +1247,65 @@ class Derived : Base {
     super.init()
   }
 }
+
+// This test makes sure that we properly error (but don't crash) when calling a
+// subclass method as an argument to a super.init.
+class MethodTestParent {
+  init(i: Int) {}
+}
+
+class MethodTestChild : MethodTestParent {
+  init() {
+    super.init(i: getInt()) // expected-error {{'self' used in method call 'getInt' before 'super.init' call}}
+  }
+
+  init(val: ()) {
+    // Currently we squelch the inner error of using self in method call for 'getInt2'
+    super.init(i: getInt2(x: self)) // expected-error {{'self' used in method call 'getInt2' before 'super.init' call}}
+  }
+
+  func getInt() -> Int {
+    return 0
+  }
+
+  func getInt2(x: MethodTestChild) -> Int {
+    return 0
+  }
+}
+
+// This test makes sure that if we cast self to a protocol (implicitly or not), we properly error.
+protocol ProtocolCastTestProtocol : class {
+}
+
+class ProtocolCastTestParent {
+  init(foo f: ProtocolCastTestProtocol) {
+  }
+
+  init(foo2 f: Any) {
+  }
+}
+
+class ProtocolCastTestChild : ProtocolCastTestParent, ProtocolCastTestProtocol {
+  private let value: Int
+
+  init(value1 v: Int) {
+    value = v
+    super.init(foo: self) // expected-error {{'self' used before 'super.init' call}}
+  }
+
+  init(value2 v: Int) {
+    value = v
+    super.init(foo: self as ProtocolCastTestProtocol) // expected-error {{'self' used before 'super.init' call}}
+  }
+
+  init(value3 v: Int) {
+    value = v
+    super.init(foo2: self) // expected-error {{'self' used before 'super.init' call}}
+  }
+
+  init(value4 v: Int) {
+    value = v
+    super.init(foo2: self as Any) // expected-error {{'self' used before 'super.init' call}}
+  }
+}
+

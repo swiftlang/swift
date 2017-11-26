@@ -458,8 +458,12 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     unsigned HasLazyConformances : 1;
+
+    /// Whether we have already validated all members of the type that
+    /// affect layout.
+    unsigned HasValidatedLayout : 1;
   };
-  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 3 };
+  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 4 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -613,8 +617,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned : NumDeclBits;
 
     unsigned NumberOfVTableEntries : 2;
+    unsigned NumberOfFieldOffsetVectorEntries : 1;
   };
-  enum { NumMissingMemberDeclBits = NumDeclBits + 2 };
+  enum { NumMissingMemberDeclBits = NumDeclBits + 3 };
   static_assert(NumMissingMemberDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1291,8 +1296,7 @@ public:
     return Requirements.slice(0, FirstTrailingWhereArg);
   }
 
-  /// Retrieve only those requirements that are written within the brackets,
-  /// which does not include any requirements written in a trailing where
+  /// Retrieve only those requirements written in a trailing where
   /// clause.
   ArrayRef<RequirementRepr> getTrailingRequirements() const {
     return Requirements.slice(FirstTrailingWhereArg);
@@ -2221,6 +2225,10 @@ public:
   getFormalAccessScope(const DeclContext *useDC = nullptr,
                        bool respectVersionedAttr = false) const;
 
+
+  /// Copy the formal access level and @_versioned attribute from source.
+  void copyFormalAccessAndVersionedAttrFrom(ValueDecl *source);
+
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
   ///
@@ -2817,6 +2825,7 @@ protected:
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     NominalTypeDeclBits.HasLazyConformances = false;
+    NominalTypeDeclBits.HasValidatedLayout = false;
   }
 
   friend class ProtocolType;
@@ -2859,11 +2868,23 @@ public:
     return NominalTypeDeclBits.AddedImplicitInitializers;
   }
 
-  /// Note that we have attempted to
+  /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     NominalTypeDeclBits.AddedImplicitInitializers = true;
   }
-              
+
+  /// Determine whether we have already validated any members
+  /// which affect layout.
+  bool hasValidatedLayout() const {
+    return NominalTypeDeclBits.HasValidatedLayout;
+  }
+
+  /// Note that we have attempted to validate any members
+  /// which affect layout.
+  void setHasValidatedLayout() {
+    NominalTypeDeclBits.HasValidatedLayout = true;
+  }
+
   /// Compute the type of this nominal type.
   void computeType();
 
@@ -2965,6 +2986,26 @@ public:
   StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const {
     return StoredPropertyRange(getMembers(),
                                ToStoredProperty(skipInaccessible));
+  }
+
+private:
+  /// Predicate used to filter StoredPropertyRange.
+  struct ToStoredPropertyOrMissingMemberPlaceholder {
+    Optional<Decl *> operator()(Decl *decl) const;
+  };
+
+public:
+  /// A range for iterating the stored member variables of a structure.
+  using StoredPropertyOrMissingMemberPlaceholderRange
+    = OptionalTransformRange<DeclRange,
+                             ToStoredPropertyOrMissingMemberPlaceholder>;
+  
+  /// Return a collection of the stored member variables of this type, along
+  /// with placeholders for unimportable stored properties.
+  StoredPropertyOrMissingMemberPlaceholderRange
+  getStoredPropertiesAndMissingMemberPlaceholders() const {
+    return StoredPropertyOrMissingMemberPlaceholderRange(getMembers(),
+                             ToStoredPropertyOrMissingMemberPlaceholder());
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -3385,7 +3426,7 @@ public:
 
   /// Synthesize implicit, trivial destructor, add it to this ClassDecl
   /// and return it.
-  DestructorDecl *addImplicitDestructor();
+  void addImplicitDestructor();
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
@@ -6285,10 +6326,16 @@ public:
 class MissingMemberDecl : public Decl {
   DeclName Name;
 
-  MissingMemberDecl(DeclContext *DC, DeclName name, unsigned vtableEntries)
+  MissingMemberDecl(DeclContext *DC, DeclName name,
+                    unsigned vtableEntries,
+                    unsigned fieldOffsetVectorEntries)
       : Decl(DeclKind::MissingMember, DC), Name(name) {
     MissingMemberDeclBits.NumberOfVTableEntries = vtableEntries;
     assert(getNumberOfVTableEntries() == vtableEntries && "not enough bits");
+    MissingMemberDeclBits.NumberOfFieldOffsetVectorEntries =
+      fieldOffsetVectorEntries;
+    assert(getNumberOfFieldOffsetVectorEntries() == fieldOffsetVectorEntries
+           && "not enough bits");
     setImplicit();
   }
 public:
@@ -6296,7 +6343,7 @@ public:
   forMethod(ASTContext &ctx, DeclContext *DC, DeclName name,
             bool hasNormalVTableEntry) {
     assert(!name || name.isCompoundName());
-    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry);
+    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry, 0);
   }
 
   static MissingMemberDecl *
@@ -6304,7 +6351,12 @@ public:
                  bool hasNormalVTableEntry,
                  bool hasAllocatingVTableEntry) {
     unsigned entries = hasNormalVTableEntry + hasAllocatingVTableEntry;
-    return new (ctx) MissingMemberDecl(DC, name, entries);
+    return new (ctx) MissingMemberDecl(DC, name, entries, 0);
+  }
+  
+  static MissingMemberDecl *
+  forStoredProperty(ASTContext &ctx, DeclContext *DC, DeclName name) {
+    return new (ctx) MissingMemberDecl(DC, name, 0, 1);
   }
 
   DeclName getFullName() const {
@@ -6313,6 +6365,10 @@ public:
 
   unsigned getNumberOfVTableEntries() const {
     return MissingMemberDeclBits.NumberOfVTableEntries;
+  }
+
+  unsigned getNumberOfFieldOffsetVectorEntries() const {
+    return MissingMemberDeclBits.NumberOfFieldOffsetVectorEntries;
   }
 
   SourceLoc getLoc() const {
@@ -6344,6 +6400,21 @@ NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
     if (!var->isStatic() && var->hasStorage() &&
         (!skipUserInaccessible || var->isUserAccessible()))
       return var;
+  }
+
+  return None;
+}
+
+inline Optional<Decl *>
+NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
+::operator()(Decl *decl) const {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    if (!var->isStatic() && var->hasStorage())
+      return var;
+  }
+  if (auto missing = dyn_cast<MissingMemberDecl>(decl)) {
+    if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+      return missing;
   }
 
   return None;

@@ -96,7 +96,7 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
 
 protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
-    : Kind(kind), ConformingType(conformingType) { }
+    : Kind(kind), ConformingType(conformingType) {}
 
 public:
   /// Determine the kind of protocol conformance.
@@ -371,7 +371,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// by the ASTContext's LazyResolver, which is really a Sema instance.
   LazyConformanceLoader *Loader = nullptr;
   uint64_t LoaderContextData;
-
   friend class ASTContext;
 
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
@@ -380,6 +379,8 @@ class NormalProtocolConformance : public ProtocolConformance,
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
   {
+    assert(!conformingType->hasArchetype() &&
+           "ProtocolConformances should store interface types");
     differenceAndStoreConditionalRequirements();
   }
 
@@ -391,6 +392,8 @@ class NormalProtocolConformance : public ProtocolConformance,
       ProtocolAndState(protocol, state), Loc(loc),
       ContextAndInvalid(behaviorStorage, false)
   {
+    assert(!conformingType->hasArchetype() &&
+           "ProtocolConformances should store interface types");
     differenceAndStoreConditionalRequirements();
   }
 

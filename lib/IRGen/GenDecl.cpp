@@ -73,7 +73,7 @@ using namespace irgen;
 bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
   // When compiling with -Onone keep all metadata for the debugger. Even if it
   // is not used by the program itself.
-  if (!Opts.Optimize)
+  if (!Opts.shouldOptimize())
     return false;
 
   switch (Nominal->getKind()) {
@@ -1329,7 +1329,7 @@ static std::tuple<llvm::GlobalValue::LinkageTypes,
                   llvm::GlobalValue::VisibilityTypes,
                   llvm::GlobalValue::DLLStorageClassTypes>
 getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
-             bool isSILOnly, ForDefinition_t isDefinition,
+             ForDefinition_t isDefinition,
              bool isWeakImported) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   std::make_tuple(llvm::GlobalValue::LINKAGE##Linkage,                         \
@@ -1352,19 +1352,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   switch (linkage) {
   case SILLinkage::Public:
-    // Don't code-gen transparent functions. Internal linkage will enable llvm
-    // to delete transparent functions except they are referenced from somewhere
-    // (i.e. the function pointer is taken).
-    //
-    // In case we are generating multiple LLVM modules, we still have to use
-    // ExternalLinkage so that modules can cross-reference transparent
-    // functions.
-    //
-    // TODO: In non-whole-module-opt the generated swiftmodules are "linked" and
-    // this strips all serialized transparent functions. So we have to code-gen
-    // transparent functions in non-whole-module-opt.
-    if (isSILOnly && !info.HasMultipleIGMs && info.IsWholeModule)
-      return RESULT(Internal, Default, Default);
     return std::make_tuple(llvm::GlobalValue::ExternalLinkage,
                            PublicDefinitionVisibility, ExportedStorage);
 
@@ -1389,9 +1376,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   case SILLinkage::PublicExternal: {
     if (isDefinition) {
-      // Transparent function are not available externally.
-      if (isSILOnly)
-        return RESULT(LinkOnceODR, Hidden, Default);
       return std::make_tuple(llvm::GlobalValue::AvailableExternallyLinkage,
                              llvm::GlobalValue::DefaultVisibility,
                              ExportedStorage);
@@ -1426,7 +1410,6 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   UniversalLinkageInfo linkInfo(IGM);
   auto linkage =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   entity.isSILOnly(),
                    ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
   global->setVisibility(std::get<1>(linkage));
@@ -1458,7 +1441,6 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
       getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
-                   entity.isSILOnly(),
                    isDefinition, entity.isWeakImported(swiftModule));
 
   result.ForDefinition = isDefinition;
@@ -1469,14 +1451,13 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        StringRef name,
                        SILLinkage linkage,
-                       bool isSILOnly,
                        ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
 
   result.Name += name;
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-    getIRLinkage(linkInfo, linkage, isSILOnly,
+    getIRLinkage(linkInfo, linkage,
                  isDefinition, isWeakImported);
   result.ForDefinition = isDefinition;
   return result;
@@ -1490,7 +1471,8 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 llvm::Function *irgen::createFunction(IRGenModule &IGM,
                                       LinkInfo &linkInfo,
                                       const Signature &signature,
-                                      llvm::Function *insertBefore) {
+                                      llvm::Function *insertBefore,
+                                      OptimizationMode FuncOptMode) {
   auto name = linkInfo.getName();
 
   llvm::Function *existing = IGM.Module.getFunction(name);
@@ -1519,7 +1501,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
  }
 
   llvm::AttrBuilder initialAttrs;
-  IGM.constructInitialFnAttributes(initialAttrs);
+  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
   // Merge initialAttrs with attrs.
   auto updatedAttrs =
     signature.getAttributes().addAttributes(IGM.getLLVMContext(),
@@ -1901,7 +1883,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::ReadOnly);
   }
-  fn = createFunction(*this, link, signature, insertBefore);
+  fn = createFunction(*this, link, signature, insertBefore,
+                      f->getOptimizationMode());
 
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {
@@ -3523,7 +3506,6 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3547,7 +3529,6 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
   return getOrCreateHelperFunction(
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address addr(&*it++, loadableTI->getFixedAlignment());
         Explosion loaded;
@@ -3560,11 +3541,75 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI, Type t,
 
 void IRGenModule::generateCallToOutlinedCopyAddr(
     IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
-    SILType T, const OutlinedCopyAddrFunction MethodToCall) {
+    SILType T, const OutlinedCopyAddrFunction MethodToCall,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
+  llvm::SmallVector<llvm::Value *, 4> argsVec;
+  argsVec.push_back(src.getAddress());
+  argsVec.push_back(dest.getAddress());
+  if (typeToMetadataVec) {
+    for (auto &typeDataPair : *typeToMetadataVec) {
+      auto *metadata = typeDataPair.second;
+      assert(metadata && metadata->getType() == IGF.IGM.TypeMetadataPtrTy &&
+             "Expeceted TypeMetadataPtrTy");
+      argsVec.push_back(metadata);
+    }
+  }
   llvm::Type *llvmType = dest->getType();
-  auto *outlinedF = (this->*MethodToCall)(objectTI, llvmType, T);
-  llvm::Value *args[] = {src.getAddress(), dest.getAddress()};
-  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, args);
+  auto *outlinedF =
+      (this->*MethodToCall)(objectTI, llvmType, T, typeToMetadataVec);
+  llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
+  assert(fn && "Expected llvm::Function");
+  fn->setLinkage(llvm::GlobalValue::InternalLinkage);
+  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
+  call->setCallingConv(DefaultCC);
+}
+
+void IRGenModule::generateCallToOutlinedDestroy(
+    IRGenFunction &IGF, const TypeInfo &objectTI, Address addr, SILType T,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
+  IRGenMangler mangler;
+  CanType canType = T.getSwiftRValueType();
+  std::string funcName = mangler.mangleOutlinedDestroyFunction(canType, this);
+
+  llvm::SmallVector<llvm::Type *, 4> argsTysVec;
+  llvm::SmallVector<llvm::Value *, 4> argsVec;
+  llvm::Type *llvmType = addr.getType();
+  argsTysVec.push_back(llvmType);
+  argsVec.push_back(addr.getAddress());
+  if (typeToMetadataVec) {
+    for (auto &typeDataPair : *typeToMetadataVec) {
+      auto *metadata = typeDataPair.second;
+      assert(metadata && metadata->getType() == IGF.IGM.TypeMetadataPtrTy &&
+             "Expeceted TypeMetadataPtrTy");
+      argsTysVec.push_back(metadata->getType());
+      argsVec.push_back(metadata);
+    }
+  }
+
+  auto *outlinedF = getOrCreateHelperFunction(
+      funcName, llvmType, argsTysVec,
+      [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address addr(&*it++, objectTI.getBestKnownAlignment());
+        if (typeToMetadataVec) {
+          for (auto &typeDataPair : *typeToMetadataVec) {
+            llvm::Value *arg = &*it++;
+            CanType abstractType = typeDataPair.first;
+            getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
+          }
+        }
+        objectTI.destroy(IGF, addr, T, true);
+        IGF.Builder.CreateRet(addr.getAddress());
+      },
+      true /*setIsNoInline*/);
+
+  if (T.hasArchetype()) {
+    llvm::Function *fn = dyn_cast<llvm::Function>(outlinedF);
+    assert(fn && "Expected llvm::Function");
+    fn->setLinkage(llvm::GlobalValue::InternalLinkage);
+  }
+
+  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
   call->setCallingConv(DefaultCC);
 }
 
@@ -3573,15 +3618,30 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
     std::string funcName,
     llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
                             Address dest, Address src, SILType T)>
-        Generate) {
-  llvm::Type *argTys[] = {llvmType, llvmType};
+        Generate,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
+  llvm::SmallVector<llvm::Type *, 4> argsTysVec;
+  argsTysVec.push_back(llvmType);
+  argsTysVec.push_back(llvmType);
+  if (typeToMetadataVec) {
+    for (auto &typeDataPair : *typeToMetadataVec) {
+      auto *metadata = typeDataPair.second;
+      argsTysVec.push_back(metadata->getType());
+    }
+  }
   return getOrCreateHelperFunction(
-      funcName, llvmType, argTys,
+      funcName, llvmType, argsTysVec,
       [&](IRGenFunction &IGF) {
-        IGF.setInOutlinedFunction();
         auto it = IGF.CurFn->arg_begin();
         Address src(&*it++, objectTI.getBestKnownAlignment());
         Address dest(&*it++, objectTI.getBestKnownAlignment());
+        if (typeToMetadataVec) {
+          for (auto &typeDataPair : *typeToMetadataVec) {
+            llvm::Value *arg = &*it++;
+            CanType abstractType = typeDataPair.first;
+            getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
+          }
+        }
         Generate(objectTI, IGF, dest, src, addrTy);
         IGF.Builder.CreateRet(dest.getAddress());
       },
@@ -3589,55 +3649,77 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
-  CanType canType = addrTy.getObjectType().getSwiftRValueType();
+  CanType canType = addrTy.getSwiftRValueType();
   std::string funcName =
-      mangler.mangleOutlinedInitializeWithTakeFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.initializeWithTake(IGF, dest, src, T);
+      mangler.mangleOutlinedInitializeWithTakeFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.initializeWithTake(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
   std::string funcName =
-      mangler.mangleOutlinedInitializeWithCopyFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.initializeWithCopy(IGF, dest, src, T);
+      mangler.mangleOutlinedInitializeWithCopyFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.initializeWithCopy(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
-  std::string funcName = mangler.mangleOutlinedAssignWithTakeFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.assignWithTake(IGF, dest, src, T);
+  std::string funcName =
+      mangler.mangleOutlinedAssignWithTakeFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.assignWithTake(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }
 
 llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy) {
+    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
+    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
   IRGenMangler mangler;
   CanType canType = addrTy.getObjectType().getSwiftRValueType();
-  std::string funcName = mangler.mangleOutlinedAssignWithCopyFunction(canType);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) {
-    objectTI.assignWithCopy(IGF, dest, src, T);
+  std::string funcName =
+      mangler.mangleOutlinedAssignWithCopyFunction(canType, this);
+  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
+                    Address src, SILType T) {
+    objectTI.assignWithCopy(IGF, dest, src, T, true);
   };
-  return getOrCreateOutlinedCopyAddrHelperFunction(objectTI, llvmType, addrTy,
-                                                   funcName, GenFunc);
+  return getOrCreateOutlinedCopyAddrHelperFunction(
+      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
+}
+
+// IRGen is only multi-threaded during LLVM part
+// We don't need to be thread safe even
+// We are working on the primary module *before* LLVM
+unsigned IRGenModule::getCanTypeID(const CanType type) {
+  if (this != IRGen.getPrimaryIGM()) {
+    return IRGen.getPrimaryIGM()->getCanTypeID(type);
+  }
+  auto it = typeToUniqueID.find(type.getPointer());
+  if (it != typeToUniqueID.end()) {
+    return it->second;
+  }
+  ++currUniqueID;
+  typeToUniqueID[type.getPointer()] = currUniqueID;
+  return currUniqueID;
 }

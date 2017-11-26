@@ -389,6 +389,7 @@ static ConstructorDecl *
 makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                             EnumDecl *enumDecl) {
   ASTContext &C = Impl.SwiftContext;
+  auto rawTy = enumDecl->getRawType();
   auto enumTy = enumDecl->getDeclaredInterfaceType();
   auto metaTy = MetatypeType::get(enumTy);
   
@@ -398,7 +399,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
-                                 enumDecl->getRawType(),
+                                 rawTy,
                                  enumDecl);
   param->setInterfaceType(enumDecl->getRawType());
   param->setValidationStarted();
@@ -429,20 +430,39 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
     return ctorDecl;
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  selfRef->setType(LValueType::get(selfDecl->getType()->getInOutObjectType()));
+  selfRef->propagateLValueAccessKind(AccessKind::Write);
+
   auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
                                       /*implicit*/ true);
+  paramRef->setType(param->getType());
+
   auto reinterpretCast
-    = cast<FuncDecl>(getBuiltinValueDecl(C,C.getIdentifier("reinterpretCast")));
+    = getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast"));
+  ConcreteDeclRef concreteDeclRef(C, reinterpretCast,
+                                  { Substitution(rawTy, {}),
+                                    Substitution(enumTy, {}) });
   auto reinterpretCastRef
-    = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
+    = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  reinterpretCastRef->setType(FunctionType::get({rawTy}, enumTy));
+
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { paramRef }, { Identifier() });
+  reinterpreted->setType(enumTy);
+
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
                                    /*implicit*/ true);
-  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assign), SourceLoc(),
+  assign->setType(TupleType::getEmpty(C));
+
+  auto result = TupleExpr::createEmpty(C, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  auto ret = new (C) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  auto body = BraceStmt::create(C, SourceLoc(), {assign, ret}, SourceLoc(),
                                 /*implicit*/ true);
   
   ctorDecl->setBody(body);
+  ctorDecl->setBodyTypeCheckedIfPresent();
   
   C.addExternalDecl(ctorDecl);
   
@@ -461,7 +481,10 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                                         EnumDecl *enumDecl,
                                         VarDecl *rawValueDecl) {
   ASTContext &C = Impl.SwiftContext;
-  
+
+  auto rawTy = enumDecl->getRawType();
+  auto enumTy = enumDecl->getDeclaredType();
+
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), enumDecl);
   
   ParameterList *params[] = {
@@ -475,11 +498,10 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
-                     TypeLoc::withoutLoc(enumDecl->getRawType()), enumDecl);
+                     TypeLoc::withoutLoc(rawTy), enumDecl);
   getterDecl->setImplicit();
 
-  auto type = ParameterList::getFullInterfaceType(enumDecl->getRawType(),
-                                                  params, C);
+  auto type = ParameterList::getFullInterfaceType(rawTy, params, C);
 
   getterDecl->setInterfaceType(type);
   getterDecl->setValidationStarted();
@@ -494,33 +516,46 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
     return getterDecl;
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  selfRef->setType(selfDecl->getType());
+
   auto reinterpretCast
-    = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+    = getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast"));
+  ConcreteDeclRef concreteDeclRef(C, reinterpretCast,
+                                  { Substitution(enumTy, {}),
+                                    Substitution(rawTy, {}) });
   auto reinterpretCastRef
-    = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
+    = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  reinterpretCastRef->setType(FunctionType::get({enumTy}, rawTy));
+
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { selfRef }, { Identifier() });
+  reinterpreted->setType(rawTy);
+
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   
   getterDecl->setBody(body);
+  getterDecl->setBodyTypeCheckedIfPresent();
   C.addExternalDecl(getterDecl);
   return getterDecl;
 }
 
-// Build the rawValue getter for a bridged, swift_newtype'd type.
+// Build the rawValue getter for a struct type.
+//
 //   struct SomeType: RawRepresentable {
 //     private var _rawValue: ObjCType
 //     var rawValue: SwiftType {
 //       return _rawValue as SwiftType
 //     }
 //   }
-static FuncDecl *makeNewtypeBridgedRawValueGetter(
+static FuncDecl *makeStructRawValueGetter(
                    ClangImporter::Implementation &Impl,
                    StructDecl *structDecl,
                    VarDecl *computedVar,
                    VarDecl *storedVar) {
+  assert(storedVar->hasStorage());
+
   ASTContext &C = Impl.SwiftContext;
   
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), structDecl);
@@ -530,7 +565,8 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
     ParameterList::createEmpty(C)
   };
 
-  auto computedType = computedVar->getType();
+  auto computedType = computedVar->getInterfaceType();
+  auto storedType = storedVar->getInterfaceType();
 
   auto getterDecl =
     FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
@@ -549,22 +585,37 @@ static FuncDecl *makeNewtypeBridgedRawValueGetter(
 
   getterDecl->setAccess(AccessLevel::Public);
 
-  computedVar->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
-                            SourceLoc());
-
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
     return getterDecl;
 
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  selfRef->setType(selfDecl->getType());
+
   auto storedRef = new (C) MemberRefExpr(selfRef, SourceLoc(), storedVar,
-                                         DeclNameLoc(), /*Implicit=*/true);
-  auto coerce = new (C) CoerceExpr(storedRef, {}, {nullptr, computedType});
-  auto ret = new (C) ReturnStmt(SourceLoc(), coerce);
+                                         DeclNameLoc(), /*Implicit=*/true,
+                                         AccessSemantics::DirectToStorage);
+  storedRef->setType(storedType);
+
+  Expr *result = storedRef;
+
+  if (!computedType->isEqual(storedType)) {
+    auto bridge = new (C) BridgeFromObjCExpr(storedRef, computedType);
+    bridge->setType(computedType);
+
+    auto coerce = new (C) CoerceExpr(bridge, {}, {nullptr, computedType});
+    coerce->setType(computedType);
+
+    result = coerce;
+  }
+
+  auto ret = new (C) ReturnStmt(SourceLoc(), result);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   
   getterDecl->setBody(body);
+  getterDecl->setBodyTypeCheckedIfPresent();
+
   C.addExternalDecl(getterDecl);
   return getterDecl;
 }
@@ -1067,7 +1118,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
       /*GenericParams=*/nullptr, structDecl);
 
   // Set the constructor's type.
-  auto selfType = structDecl->getDeclaredTypeInContext();
+  auto selfType = structDecl->getDeclaredInterfaceType();
   auto selfMetatype = MetatypeType::get(selfType);
   auto emptyTy = TupleType::getEmpty(context);
   auto fnTy = FunctionType::get(emptyTy, selfType);
@@ -1082,30 +1133,47 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   // Mark the constructor transparent so that we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
 
+  if (Impl.hasFinishedTypeChecking())
+    return constructor;
+
   // Use a builtin to produce a zero initializer, and assign it to self.
-  constructor->setBodySynthesizer([](AbstractFunctionDecl *constructor) {
-    ASTContext &context = constructor->getASTContext();
 
-    // Construct the left-hand reference to self.
-    Expr *lhs = new (context) DeclRefExpr(constructor->getImplicitSelfDecl(),
-                                          DeclNameLoc(), /*Implicit=*/true);
+  // Construct the left-hand reference to self.
+  Expr *lhs = new (context) DeclRefExpr(selfDecl,
+                                        DeclNameLoc(), /*Implicit=*/true);
+  lhs->setType(LValueType::get(selfType));
+  lhs->propagateLValueAccessKind(AccessKind::Write);
 
-    // Construct the right-hand call to Builtin.zeroInitializer.
-    Identifier zeroInitID = context.getIdentifier("zeroInitializer");
-    auto zeroInitializerFunc =
-        cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
-    auto zeroInitializerRef =
-        new (context) DeclRefExpr(zeroInitializerFunc, DeclNameLoc(),
-                                  /*implicit*/ true);
-    auto call = CallExpr::createImplicit(context, zeroInitializerRef, {}, {});
+  auto emptyTuple = TupleType::getEmpty(context);
 
-    auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
-                                           /*implicit*/ true);
+  // Construct the right-hand call to Builtin.zeroInitializer.
+  Identifier zeroInitID = context.getIdentifier("zeroInitializer");
+  auto zeroInitializerFunc = getBuiltinValueDecl(context, zeroInitID);
+  ConcreteDeclRef concreteDeclRef(context, zeroInitializerFunc,
+                                  { Substitution(selfType, {}) });
+  auto zeroInitializerRef =
+    new (context) DeclRefExpr(concreteDeclRef, DeclNameLoc(),
+                              /*implicit*/ true);
+  zeroInitializerRef->setType(FunctionType::get(emptyTuple, selfType));
 
-    // Create the function body.
-    auto body = BraceStmt::create(context, SourceLoc(), {assign}, SourceLoc());
-    constructor->setBody(body);
-  });
+  auto call = CallExpr::createImplicit(context, zeroInitializerRef, {}, {});
+  call->setType(selfType);
+
+  auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
+                                         /*implicit*/ true);
+  assign->setType(emptyTuple);
+
+  auto result = TupleExpr::createEmpty(context, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  result->setType(emptyTuple);
+
+  auto ret = new (context) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  // Create the function body.
+  auto body = BraceStmt::create(context, SourceLoc(), {assign, ret},
+                                SourceLoc());
+  constructor->setBody(body);
+  constructor->setBodyTypeCheckedIfPresent();
 
   // Add this as an external definition.
   Impl.registerExternalDecl(constructor);
@@ -1200,24 +1268,45 @@ createValueConstructor(ClangImporter::Implementation &Impl,
         // Construct left-hand side.
         Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
                                               /*Implicit=*/true);
+        lhs->setType(LValueType::get(selfDecl->getType()->getInOutObjectType()));
+
+        auto semantics = (var->hasStorage()
+                          ? AccessSemantics::DirectToStorage
+                          : AccessSemantics::Ordinary);
+
         lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, DeclNameLoc(),
-                                          /*Implicit=*/true);
+                                          /*Implicit=*/true,
+                                          semantics);
+        lhs->setType(LValueType::get(var->getType()));
+        lhs->propagateLValueAccessKind(AccessKind::Write);
 
         // Construct right-hand side.
         auto rhs = new (context) DeclRefExpr(valueParameters[paramPos],
                                              DeclNameLoc(),
                                              /*Implicit=*/true);
+        rhs->setType(valueParameters[paramPos]->getType());
 
         // Add assignment.
-        stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
-                                                 /*Implicit=*/true));
+        auto assign = new (context) AssignExpr(lhs, SourceLoc(), rhs,
+                                               /*Implicit=*/true);
+        assign->setType(TupleType::getEmpty(context));
+
+        stmts.push_back(assign);
         paramPos++;
       }
     }
 
+    auto result = TupleExpr::createEmpty(context, SourceLoc(), SourceLoc(),
+                                         /*Implicit=*/true);
+    result->setType(TupleType::getEmpty(context));
+
+    auto ret = new (context) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+    stmts.push_back(ret);
+
     // Create the function body.
     auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
     constructor->setBody(body);
+    constructor->setBodyTypeCheckedIfPresent();
   }
 
   // Add this as an external definition.
@@ -1288,6 +1377,13 @@ static void makeStructRawValued(
       AccessLevel::Public,
       setterAccess);
 
+  // Create the getter for the computed value variable.
+  auto varGetter = makeStructRawValueGetter(
+      Impl, structDecl, var, var);
+
+  var->addTrivialAccessors(varGetter, nullptr, nullptr);
+  assert(var->hasStorage());
+
   structDecl->setHasDelayedMembers();
 
   // Create constructors to initialize that value from a value of the
@@ -1303,6 +1399,7 @@ static void makeStructRawValued(
                              /*wantBody=*/!Impl.hasFinishedTypeChecking()));
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
+  structDecl->addMember(varGetter);
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
 }
@@ -1320,24 +1417,50 @@ static ConstructorDecl *createRawValueBridgingConstructor(
   if (wantBody) {
     auto selfDecl = init->getParameterList(0)->get(0);
 
+    auto storedType = storedRawValue->getInterfaceType();
+
     // Construct left-hand side.
     Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                       /*Implicit=*/true);
+    lhs->setType(LValueType::get(selfDecl->getType()->getInOutObjectType()));
+
     lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
-                                  DeclNameLoc(), /*Implicit=*/true);
+                                  DeclNameLoc(), /*Implicit=*/true,
+                                  AccessSemantics::DirectToStorage);
+    lhs->setType(LValueType::get(storedType));
+    lhs->propagateLValueAccessKind(AccessKind::Write);
 
     // Construct right-hand side.
     // FIXME: get the parameter from the init, and plug it in here.
-    auto rhs = new (ctx) CoerceExpr(
-        new (ctx) DeclRefExpr(init->getParameterList(1)->get(0), DeclNameLoc(),
-                              /*Implicit=*/true),
-        {}, {nullptr, storedRawValue->getType()});
+    auto *paramDecl = init->getParameterList(1)->get(0);
+    auto *paramRef = new (ctx) DeclRefExpr(
+        paramDecl, DeclNameLoc(), /*Implicit=*/true);
+    paramRef->setType(paramDecl->getType());
+
+    Expr *rhs = paramRef;
+    if (!storedRawValue->getInterfaceType()->isEqual(paramDecl->getType())) {
+      auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
+      bridge->setType(storedType);
+
+      auto coerce = new (ctx) CoerceExpr(bridge, SourceLoc(),
+                                         {nullptr, storedType});
+      coerce->setType(storedType);
+
+      rhs = coerce;
+    }
 
     // Add assignment.
     auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
                                        /*Implicit=*/true);
-    auto body = BraceStmt::create(ctx, SourceLoc(), {assign}, SourceLoc());
+    assign->setType(TupleType::getEmpty(ctx));
+
+    auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                         /*Implicit=*/true);
+    auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+    auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
     init->setBody(body);
+    init->setBodyTypeCheckedIfPresent();
   }
 
   return init;
@@ -1389,8 +1512,10 @@ static void makeStructRawValuedWithBridge(
   computedVar->setValidationStarted();
 
   // Create the getter for the computed value variable.
-  auto computedVarGetter = makeNewtypeBridgedRawValueGetter(
+  auto computedVarGetter = makeStructRawValueGetter(
       Impl, structDecl, computedVar, storedVar);
+  computedVar->makeComputed(SourceLoc(), computedVarGetter, nullptr, nullptr,
+                            SourceLoc());
 
   // Create a pattern binding to describe the variable.
   Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
@@ -4254,7 +4379,7 @@ namespace {
         result->setCheckedInheritanceClause();
         result->setAddedImplicitInitializers(); // suppress all initializers
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
-        Impl.registerExternalDecl(result);
+        result->addImplicitDestructor();
         return result;
       };
 
@@ -4274,7 +4399,6 @@ namespace {
         auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
                                       nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
-        result->addImplicitDestructor();
         return result;
       }
 
@@ -4359,7 +4483,6 @@ namespace {
         markMissingSwiftDecl(result);
       if (decl->getAttr<clang::ObjCRuntimeVisibleAttr>()) {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
-        result->addImplicitDestructor();
       }
 
       // If this Objective-C class has a supertype, import it.
@@ -4392,7 +4515,6 @@ namespace {
       if (decl->getName() == "OS_object" ||
           decl->getName() == "OS_os_log") {
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
-        result->addImplicitDestructor();
       }
 
       // If the superclass is runtime-only, our class is also. This only
@@ -4420,9 +4542,7 @@ namespace {
 #include "InferredAttributes.def"
 
       result->setMemberLoader(&Impl, 0);
-
-      // Pass the class to the type checker to create an implicit destructor.
-      Impl.registerExternalDecl(result);
+      result->addImplicitDestructor();
 
       return result;
     }
@@ -6410,7 +6530,7 @@ void SwiftDeclConverter::addObjCProtocolConformances(
   for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
     // FIXME: Build a superclass conformance if the superclass
     // conforms.
-    auto conformance = ctx.getConformance(dc->getDeclaredTypeInContext(),
+    auto conformance = ctx.getConformance(dc->getDeclaredInterfaceType(),
                                           protocols[i], SourceLoc(), dc,
                                           ProtocolConformanceState::Incomplete);
     conformance->setLazyLoader(&Impl, /*context*/0);

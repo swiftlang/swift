@@ -32,9 +32,13 @@ namespace {
 
 /// Returns true if a function should be SIL serialized or emitted by IRGen.
 static bool shouldBeSerializedOrEmitted(SILFunction *F) {
+  // global initializers are always emitted into the defining module and
+  // their bodies are never SIL serialized.
+  if (F->isGlobalInit())
+    return true;
+
   // public_external functions are never SIL serialized or emitted by IRGen.
-  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()) &&
-      !F->isTransparent())
+  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()))
     return false;
 
   // [serialized] functions should always be SIL serialized.
@@ -118,6 +122,10 @@ protected:
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
+      return true;
+
+    // Functions that may be used externally cannot be removed.
+    if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()))
       return true;
 
     // If function is marked as "keep-as-public", don't remove it.

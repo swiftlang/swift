@@ -328,7 +328,9 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
+    if (!PAI->hasCalleeGuaranteedContext())
+      Builder.createStrongRelease(AI.getLoc(), PAI,
+                                  Builder.getDefaultAtomicity());
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
@@ -487,13 +489,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
-    } else if (SILType::canRefCast(OldOpType, NewOpType, AI.getModule())) {
-      auto URC = Builder.createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
+    } else if (OldOpType.getSwiftRValueType() != NewOpType.getSwiftRValueType()) {
+      auto URC = Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
-      assert((!OldOpType.isHeapObjectReferenceType()
-              && !NewOpType.isHeapObjectReferenceType()) &&
-             "ref argument types should map to refs.");
       Args.push_back(Op);
     }
   }

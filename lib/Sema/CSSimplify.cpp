@@ -18,6 +18,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/Support/Compiler.h"
@@ -2581,6 +2582,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Unsolved;
   }
 
+  /// Record the given conformance as the result, adding any conditional
+  /// requirements if necessary.
+  auto recordConformance = [&](ProtocolConformanceRef conformance) {
+    // Record the conformance.
+    CheckedConformances.push_back({getConstraintLocator(locator), conformance});
+
+    // This conformance may be conditional, in which case we need to consider
+    // those requirements as constraints too.
+    if (conformance.isConcrete()) {
+      unsigned index = 0;
+      for (const auto &req : conformance.getConditionalRequirements()) {
+        addConstraint(
+          req,
+          locator.withPathElement(
+            LocatorPathElt::getConditionalRequirementComponent(index++)));
+      }
+    }
+
+    return SolutionKind::Solved;
+  };
+
   // For purposes of argument type matching, existential types don't need to
   // conform -- they only need to contain the protocol, so check that
   // separately.
@@ -2589,30 +2611,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (auto conformance =
           TC.containsProtocol(type, protocol, DC,
                               ConformanceCheckFlags::InExpression)) {
-      CheckedConformances.push_back({getConstraintLocator(locator),
-                                     *conformance});
-      return SolutionKind::Solved;
+      return recordConformance(*conformance);
     }
     break;
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
     // Check whether this type conforms to the protocol.
     if (auto conformance =
-          TC.conformsToProtocol(type, protocol, DC,
-                                ConformanceCheckFlags::InExpression)) {
-      CheckedConformances.push_back({getConstraintLocator(locator),
-                                     *conformance});
-
-      // This conformance may be conditional, in which case we need to consider
-      // those requirements as constraints too.
-      //
-      // FIXME: this doesn't seem to be right; the requirements are sometimes
-      // phrased in terms of the type's generic parameters, not type variables
-      // in this context.
-      for (auto req : conformance->getConditionalRequirements()) {
-        addConstraint(req, locator);
-      }
-      return SolutionKind::Solved;
+          TC.conformsToProtocol(
+                      type, protocol, DC,
+                      (ConformanceCheckFlags::InExpression|
+                       ConformanceCheckFlags::SkipConditionalRequirements))) {
+      return recordConformance(*conformance);
     }
     break;
   }
@@ -4034,22 +4044,28 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
-    auto rootMatches = matchTypes(kpRootTy, rootTy,
-                                  ConstraintKind::Equal,
-                                  subflags, locator);
-    switch (rootMatches) {
-    case SolutionKind::Error:
-      return SolutionKind::Error;
-    case SolutionKind::Solved:
-      break;
-    case SolutionKind::Unsolved:
-      llvm_unreachable("should have generated constraints");
-    }
+
+    auto matchRoot = [&](ConstraintKind kind) -> bool {
+      auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
+                                    subflags, locator);
+      switch (rootMatches) {
+      case SolutionKind::Error:
+        return false;
+      case SolutionKind::Solved:
+        return true;
+      case SolutionKind::Unsolved:
+        llvm_unreachable("should have generated constraints");
+      }
+    };
 
     if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any`.
       auto resultTy = ProtocolCompositionType::get(getASTContext(), {},
                                                   /*explicit AnyObject*/ false);
+
+      if (!matchRoot(ConstraintKind::Conversion))
+        return SolutionKind::Error;
+
       return matchTypes(resultTy, valueTy,
                         ConstraintKind::Bind, subflags, locator);
     }
@@ -4060,6 +4076,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
     /// Solve for an rvalue base.
     auto solveRValue = [&]() -> ConstraintSystem::SolutionKind {
+      // An rvalue base can be converted to a supertype.
       return matchTypes(kpValueTy, valueTy,
                         ConstraintKind::Bind, subflags, locator);
     };
@@ -4076,14 +4093,20 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return matchTypes(LValueType::get(kpValueTy), valueTy,
                         ConstraintKind::Bind, subflags, locator);
     };
-
   
     if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
       // Read-only keypath.
+      if (!matchRoot(ConstraintKind::Conversion))
+        return SolutionKind::Error;
+
       return solveRValue();
     }
     if (bgt->getDecl() == getASTContext().getWritableKeyPathDecl()) {
       // Writable keypath. The result can be an lvalue if the root was.
+      // We can't convert the base without giving up lvalue-ness, though.
+      if (!matchRoot(ConstraintKind::Equal))
+        return SolutionKind::Error;
+
       if (rootTy->is<LValueType>())
         return solveLValue();
       if (rootTy->isTypeVariableOrMember())
@@ -4092,6 +4115,9 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return solveRValue();
     }
     if (bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+      if (!matchRoot(ConstraintKind::Conversion))
+        return SolutionKind::Error;
+
       // Reference-writable keypath. The result can always be an lvalue.
       return solveLValue();
     }

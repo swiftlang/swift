@@ -394,6 +394,9 @@ void NormalProtocolConformance::setSignatureConformances(
   unsigned idx = 0;
   for (const auto &req : getProtocol()->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
+      assert(!conformances[idx].isConcrete() ||
+             !conformances[idx].getConcrete()->getType()->hasArchetype() &&
+             "Should have interface types here");
       assert(idx < conformances.size());
       assert(conformances[idx].getRequirement() ==
                req.getSecondType()->castTo<ProtocolType>()->getDecl());
@@ -467,7 +470,9 @@ NormalProtocolConformance::populateSignatureConformances() {
       assert(!requirementSignature.empty() && "Too many conformances?");
       assert(conformance.getRequirement() ==
                requirementSignature.front().getSecondType()->castTo<ProtocolType>()->getDecl());
-
+      assert((!conformance.isConcrete() ||
+              !conformance.getConcrete()->getType()->hasArchetype()) &&
+             "signature conformances must use interface types");
       // Add this conformance to the known signature conformances.
       requirementSignature = requirementSignature.drop_front();
       new (&buffer[self->SignatureConformances.size()])
@@ -538,7 +543,8 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   return false;
 }
 
-std::pair<Type, TypeDecl *>
+using TypeWitnessAndDecl = std::pair<Type, TypeDecl *>;
+TypeWitnessAndDecl
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                  LazyResolver *resolver,
                                                  SubstOptions options) const {
@@ -557,7 +563,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
     if (options.getTentativeTypeWitness) {
      if (Type witnessType =
            Type(options.getTentativeTypeWitness(this, assocType)))
-        return { witnessType, nullptr };
+       return { witnessType, nullptr };
     }
 
     // Otherwise, we fail; this is the only case in which we can return a
@@ -582,6 +588,7 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
          "associated type in wrong protocol");
   assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
+  assert(!type->hasArchetype() && "type witnesses must be interface types");
   TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
 }
 
@@ -602,20 +609,19 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
   auto type = assocType->getCanonicalType();
   auto proto = getRequirement();
 
-#if false
   // Fast path for generic parameters.
   if (isa<GenericTypeParamType>(type)) {
     assert(type->isEqual(proto->getSelfInterfaceType()) &&
            "type parameter in protocol was not Self");
-    return getType();
+    return conformingType;
   }
 
   // Fast path for dependent member types on 'Self' of our associated types.
   auto memberType = cast<DependentMemberType>(type);
   if (memberType.getBase()->isEqual(proto->getProtocolSelfType()) &&
-      memberType->getAssocType()->getProtocol() == proto)
-    return getTypeWitness(memberType->getAssocType(), nullptr);
-#endif
+      memberType->getAssocType()->getProtocol() == proto &&
+      isConcrete())
+    return getConcrete()->getTypeWitness(memberType->getAssocType(), resolver);
 
   // General case: consult the substitution map.
   auto substMap =
@@ -736,15 +742,23 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
 {
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
 
-  // Substitute the conditional requirements so that they're phrased in terms of
-  // the specialized types, not the conformance-declaring decl's types.
-  auto subMap = getSubstitutionMap();
-  SmallVector<Requirement, 4> newReqs;
-  for (auto oldReq : GenericConformance->getConditionalRequirements()) {
-    newReqs.push_back(*oldReq.subst(subMap));
+  if (!GenericConformance->getConditionalRequirements().empty()) {
+    // Substitute the conditional requirements so that they're phrased in
+    // terms of the specialized types, not the conformance-declaring decl's
+    // types.
+    auto nominal = GenericConformance->getType()->getAnyNominal();
+    auto subMap =
+      getType()->getContextSubstitutionMap(nominal->getModuleContext(),
+                                           nominal);
+
+    SmallVector<Requirement, 4> newReqs;
+    for (auto oldReq : GenericConformance->getConditionalRequirements()) {
+      if (auto newReq = oldReq.subst(subMap))
+        newReqs.push_back(*newReq);
+    }
+    auto &ctxt = getProtocol()->getASTContext();
+    ConditionalRequirements = ctxt.AllocateCopy(newReqs);
   }
-  auto &ctxt = getProtocol()->getASTContext();
-  ConditionalRequirements = ctxt.AllocateCopy(newReqs);
 }
 
 SubstitutionMap SpecializedProtocolConformance::getSubstitutionMap() const {
@@ -800,7 +814,7 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
     return {Type(), nullptr};
 
   // Apply the substitution we computed above
-  auto specializedType = genericWitness.subst(getSubstitutionMap(), options);
+  auto specializedType = genericWitness.subst(substitutionMap, options);
   if (!specializedType) {
     if (isTentativeWitness())
       return { Type(), nullptr };
@@ -943,10 +957,8 @@ ProtocolConformance::subst(Type substType,
              && "substitution mapped to different nominal?!");
 
       SubstitutionMap subMap;
-      if (getGenericSignature()) {
-        auto *genericEnv = getGenericEnvironment();
-        subMap = genericEnv->getSubstitutionMap(subs, conformances);
-      }
+      if (auto *genericSig = getGenericSignature())
+        subMap = genericSig->getSubstitutionMap(subs, conformances);
 
       return substType->getASTContext()
         .getSpecializedConformance(substType,
@@ -964,7 +976,14 @@ ProtocolConformance::subst(Type substType,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(substType, subs, conformances);
+      // Follow the substituted type up the superclass chain until we reach
+      // the underlying class type.
+      auto targetClass =
+        inheritedConformance->getType()->getClassOrBoundGenericClass();
+      auto superclassType = substType->getSuperclassForDecl(targetClass);
+
+      // Substitute into the superclass.
+      newBase = inheritedConformance->subst(superclassType, subs, conformances);
     } else {
       newBase = inheritedConformance;
     }

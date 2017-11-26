@@ -219,15 +219,15 @@ class ReabstractDefaultArgument<T> {
 
 // CHECK-LABEL: sil hidden @_T017default_arguments32testDefaultArgumentReabstractionyyF
 // function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
-// CHECK: [[FN:%.*]] = function_ref @_T017default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: function_ref reabstraction thunk helper from @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
-// CHECK-NEXT: [[THUNK:%.*]] = function_ref @_T0S2iSbIxiid_S2iSbIxyyd_TR : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: [[FN:%.*]] = partial_apply [[THUNK]]([[RESULT]]) : $@convention(thin) (Int, Int, @owned @noescape @callee_owned (@in Int, @in Int) -> Bool) -> Bool
+// CHECK: [[FN:%.*]] = function_ref @_T017default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_guaranteed (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @noescape @callee_guaranteed (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK-NEXT: function_ref reabstraction thunk helper from @callee_guaranteed (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
+// CHECK-NEXT: [[THUNK:%.*]] = function_ref @_T0S2iSbIgiid_S2iSbIgyyd_TR : $@convention(thin) (Int, Int, @guaranteed @noescape @callee_guaranteed (@in Int, @in Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT]]) : $@convention(thin) (Int, Int, @guaranteed @noescape @callee_guaranteed (@in Int, @in Int) -> Bool) -> Bool
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_function [[FN]]
-// function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
-// CHECK: [[THUNK:%.*]] = function_ref @_T0S2iSbIxyyd_S2iSbIxiid_TR : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: [[FN:%.*]] = partial_apply [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in Int, @in Int, @owned @noescape @callee_owned (Int, Int) -> Bool) -> Bool
+// function_ref reabstraction thunk helper from @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
+// CHECK: [[THUNK:%.*]] = function_ref @_T0S2iSbIgyyd_S2iSbIgiid_TR : $@convention(thin) (@in Int, @in Int, @guaranteed @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in Int, @in Int, @guaranteed @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_function [[FN]]
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @_T017default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT: apply [[INITFN]]<Int>([[CONV_FN]], 

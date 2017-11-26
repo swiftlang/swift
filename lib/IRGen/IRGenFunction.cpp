@@ -32,11 +32,12 @@ using namespace swift;
 using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
+                             OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
-      CurFn(Fn), DbgScope(DbgScope), inOutlinedFunction(false) {
+      OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {
 
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
@@ -58,6 +59,13 @@ IRGenFunction::~IRGenFunction() {
 
   // Tear down any side-table data structures.
   if (LocalTypeData) destroyLocalTypeData();
+}
+
+OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
+  if (OptMode != OptimizationMode::NotSet)
+    return OptMode;
+
+  return IGM.getOptions().OptMode;
 }
 
 ModuleDecl *IRGenFunction::getSwiftModule() const {
@@ -421,11 +429,4 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   auto offsetValue = offset.getAsValue(*this);
   auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
   return Address(slotPtr, objectAlignment);
-}
-
-bool IRGenFunction::isInOutlinedFunction() { return inOutlinedFunction; }
-
-void IRGenFunction::setInOutlinedFunction() {
-  assert(!isInOutlinedFunction() && "Expected inOutlinedFunction to be false");
-  inOutlinedFunction = true;
 }

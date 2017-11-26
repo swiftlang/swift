@@ -231,8 +231,8 @@ struct _ForkJoinMutex {
     if pthread_mutex_destroy(_mutex) != 0 {
       fatalError("pthread_mutex_init")
     }
-    _mutex.deinitialize()
-    _mutex.deallocate(capacity: 1)
+    _mutex.deinitialize(count: 1)
+    _mutex.deallocate()
   }
 
   func withLock<Result>(_ body: () -> Result) -> Result {
@@ -261,8 +261,8 @@ struct _ForkJoinCond {
     if pthread_cond_destroy(_cond) != 0 {
       fatalError("pthread_cond_destroy")
     }
-    _cond.deinitialize()
-    _cond.deallocate(capacity: 1)
+    _cond.deinitialize(count: 1)
+    _cond.deallocate()
   }
 
   func signal() {
@@ -1448,4 +1448,3 @@ http://habrahabr.ru/post/255659/
 */
 
 runAllTests()
-

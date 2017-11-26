@@ -14,13 +14,13 @@
 // REQUIRES: asserts
 
 // CHECK_NESTED-LABEL: Statistics
-// CHECK_NESTED: 9 Serialization - # of decls deserialized
+// CHECK_NESTED: 6 Serialization - # of decls deserialized
 // outer struct, initializer + self param,
 // inner struct, initializer + self param,
 // extension, func + self param
 
 // CHECK_NON_NESTED-LABEL: Statistics
-// CHECK_NON_NESTED: 6 Serialization - # of decls deserialized
+// CHECK_NON_NESTED: 4 Serialization - # of decls deserialized
 // struct, initializer + self param, extension, func + self param
 
 import def_xref_extensions

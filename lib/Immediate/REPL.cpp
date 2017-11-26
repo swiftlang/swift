@@ -966,7 +966,7 @@ public:
     EE = builder.create();
 
     IRGenOpts.OutputFilenames.clear();
-    IRGenOpts.Optimize = false;
+    IRGenOpts.OptMode = OptimizationMode::NoOptimization;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::None;

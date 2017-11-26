@@ -474,6 +474,9 @@ ERROR(unsupported_keypath_tuple_element_reference,none,
       "key path cannot reference tuple elements", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
+ERROR(expr_smart_keypath_application_type_mismatch,none,
+      "key path of type %0 cannot be applied to a base of type %1",
+      (Type, Type))
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
@@ -1024,12 +1027,10 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(transparent_stored_property,none,
-      "@_transparent cannot be applied to stored properties", ())
 ERROR(transparent_in_protocols_not_supported,none,
-      "@_transparent is not supported on declarations within protocols", ())
+      "'@_transparent' attribute is not supported on declarations within protocols", ())
 ERROR(transparent_in_classes_not_supported,none,
-      "@_transparent is not supported on declarations within classes", ())
+      "'@_transparent' attribute is not supported on declarations within classes", ())
 
 ERROR(invalid_iboutlet,none,
       "only instance properties can be declared @IBOutlet", ())
@@ -1123,7 +1124,7 @@ ERROR(access_control_open_bad_decl,none,
 ERROR(invalid_decl_attribute_simple,none,
       "attribute cannot be applied to declaration", ())
 ERROR(invalid_decl_attribute,none,
-      "%0 cannot be applied to this declaration", (DeclAttribute))
+      "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(invalid_decl_modifier,none,
       "%0 modifier cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,none,
@@ -3104,20 +3105,31 @@ ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
 
 WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated", ())
+        "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use an explicit type followed by '!'", ())
 
 WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
         "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
 
-ERROR(implicitly_unwrapped_optional_spelling_error,none,
-        "the spelling 'ImplicitlyUnwrappedOptional' in unsupported; use an explicit type followed by '!'", ())
+WARNING(implicitly_unwrapped_optional_spelling_decay_to_optional,none,
+        "'ImplicitlyUnwrappedOptional' is not allowed here; interpreting this as 'Optional' instead", ())
 
-ERROR(implicitly_unwrapped_optional_spelling_error_with_fixit,none,
+WARNING(implicitly_unwrapped_optional_in_illegal_position_decay_to_optional,none,
+        "'!' is not allowed here; interpreting this as '?' instead", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use an explicit type followed by '!'", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_error_with_bang_fixit,none,
         "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use '!' after the type name", ())
 
-ERROR(iuo_in_illegal_position,none,
-      "implicitly unwrapped optionals are only allowed at top level and as "
-      "function results", ())
+ERROR(implicitly_unwrapped_optional_spelling_error_with_optional_fixit,none,
+        "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use 'Optional' instead", ())
+
+ERROR(implicitly_unwrapped_optional_spelling_in_illegal_position,none,
+        "'ImplicitlyUnwrappedOptional' is not allowed here; perhaps 'Optional' was intended?", ())
+
+ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
+        "'!' is not allowed here; perhaps '?' was intended?", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,
@@ -3705,8 +3717,8 @@ ERROR(class_designated_init_inlineable_resilient,none,
       "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
-ERROR(inlineable_stored_property,
-      none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+ERROR(attribute_invalid_on_stored_property,
+      none, "'@%0' attribute cannot be applied to stored properties", (StringRef))
 
 ERROR(inlineable_dynamic_not_supported,
       none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())

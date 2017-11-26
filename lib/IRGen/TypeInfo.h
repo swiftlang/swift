@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace llvm {
   class Constant;
@@ -269,41 +270,43 @@ public:
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.
-  virtual void destroyStack(IRGenFunction &IGF, StackAddress addr,
-                            SILType T) const = 0;
+  virtual void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                            bool isOutlined) const = 0;
 
   /// Copy or take a value out of one address and into another, destroying
   /// old value in the destination.  Equivalent to either assignWithCopy
   /// or assignWithTake depending on the value of isTake.
   void assign(IRGenFunction &IGF, Address dest, Address src, IsTake_t isTake,
-              SILType T) const;
+              SILType T, bool isOutlined) const;
 
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
-  virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
 
   /// Move a value out of an object and into another, destroying the
   /// old value there and leaving the source object in an invalid state.
-  virtual void assignWithTake(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
 
   /// Copy-initialize or take-initialize an uninitialized object
   /// with the value from a different object.  Equivalent to either
   /// initializeWithCopy or initializeWithTake depending on the value
   /// of isTake.
   void initialize(IRGenFunction &IGF, Address dest, Address src,
-                  IsTake_t isTake, SILType T) const;
+                  IsTake_t isTake, SILType T, bool isOutlined) const;
 
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that
   /// the old object is actually no longer permitted to be destroyed.
   virtual void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                                  Address srcAddr, SILType T) const = 0;
+                                  Address srcAddr, SILType T,
+                                  bool isOutlined) const = 0;
 
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                                  Address srcAddr, SILType T) const = 0;
+                                  Address srcAddr, SILType T,
+                                  bool isOutlined) const = 0;
 
   /// Perform a copy-initialization from the given fixed-size buffer
   /// into an uninitialized fixed-size buffer, allocating the buffer if
@@ -338,10 +341,12 @@ public:
 
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                    Address src, SILType T) const = 0;
+                                    Address src, SILType T,
+                                    bool isOutlined) const = 0;
 
   /// Destroy an object of this type in memory.
-  virtual void destroy(IRGenFunction &IGF, Address address, SILType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
+                       bool isOutlined) const = 0;
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single object pointer?
@@ -476,6 +481,13 @@ public:
   virtual void assignArrayWithTake(IRGenFunction &IGF, Address dest,
                                    Address src, llvm::Value *count,
                                    SILType T) const;
+
+  /// Outlining helper function: recursively traverse the SILType:
+  /// When encountering an Archetype - add it to a type-metadata vec.
+  virtual void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
+      SILType T) const;
 
   /// Get the native (abi) convention for a return value of this type.
   const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;

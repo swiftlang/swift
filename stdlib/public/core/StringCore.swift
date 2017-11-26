@@ -718,8 +718,8 @@ extension _StringCore : RangeReplaceableCollection {
       let tailStart = rangeStart + (replacedCount &<< elementShift)
 
       if growth > 0 {
-        (tailStart + (growth &<< elementShift)).copyBytes(
-          from: tailStart, count: tailCount &<< elementShift)
+        (tailStart + (growth &<< elementShift)).copyMemory(
+          from: tailStart, byteCount: tailCount &<< elementShift)
       }
 
       if _fastPath(elementWidth == 1) {
@@ -738,8 +738,8 @@ extension _StringCore : RangeReplaceableCollection {
       }
 
       if growth < 0 {
-        (tailStart + (growth &<< elementShift)).copyBytes(
-          from: tailStart, count: tailCount &<< elementShift)
+        (tailStart + (growth &<< elementShift)).copyMemory(
+          from: tailStart, byteCount: tailCount &<< elementShift)
       }
     }
     else {

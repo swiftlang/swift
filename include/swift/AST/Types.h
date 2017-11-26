@@ -123,7 +123,7 @@ public:
   };
 
 private:
-  unsigned Bits : BitWidth;
+  unsigned Bits;
 
 public:
   RecursiveTypeProperties() : Bits(0) {}
@@ -289,9 +289,9 @@ protected:
 
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    unsigned ExtInfo : 16;
+    unsigned ExtInfo : 7;
   };
-  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 16 };
+  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct ArchetypeTypeBitfields {
@@ -316,12 +316,12 @@ protected:
 
   struct SILFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
-    unsigned ExtInfo : 16;
+    unsigned ExtInfo : 6;
     unsigned CalleeConvention : 3;
     unsigned HasErrorResult : 1;
     unsigned CoroutineKind : 2;
   };
-  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 16 + 6 };
+  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 12 };
   static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
 
   struct AnyMetatypeTypeBitfields {
@@ -376,6 +376,7 @@ protected:
 
   void setRecursiveProperties(RecursiveTypeProperties properties) {
     TypeBaseBits.Properties = properties.getBits();
+    assert(TypeBaseBits.Properties == properties.getBits() && "Bits dropped!");
   }
 
 public:
@@ -523,6 +524,9 @@ public:
   /// Erase DynamicSelfType from the given type by replacing it with its
   /// underlying type.
   Type eraseDynamicSelfType();
+
+  /// Map a contextual type to an interface type.
+  Type mapTypeOutOfContext();
 
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
@@ -2388,21 +2392,22 @@ public:
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // Feel free to rearrange or add bits, but if you go over 15,
-    // you'll need to adjust both the Bits field below and
-    // BaseType::AnyFunctionTypeBits.
+    // NOTE: If bits are added or removed, then TypeBase::AnyFunctionTypeBits
+    // must be updated to match.
 
     //   |representation|isAutoClosure|noEscape|throws|
     //   |    0 .. 3    |      4      |    5   |   6  |
     //
-    enum : uint16_t { RepresentationMask     = 0x00F };
-    enum : uint16_t { AutoClosureMask        = 0x010 };
-    enum : uint16_t { NoEscapeMask           = 0x020 };
-    enum : uint16_t { ThrowsMask             = 0x040 };
+    enum : unsigned {
+      RepresentationMask     = 0x0F,
+      AutoClosureMask        = 0x10,
+      NoEscapeMask           = 0x20,
+      ThrowsMask             = 0x40,
+    };
 
-    uint16_t Bits;
+    unsigned Bits;
 
-    ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
+    ExtInfo(unsigned Bits) : Bits(Bits) {}
 
     friend class AnyFunctionType;
     
@@ -2534,6 +2539,7 @@ protected:
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
     NumParams(NumParams) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
+    assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
   }
 
 public:
@@ -3243,20 +3249,21 @@ public:
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // Feel free to rearrange or add bits, but if you go over 15,
-    // you'll need to adjust both the Bits field below and
-    // TypeBase::AnyFunctionTypeBits.
+    // NOTE: If bits are added or removed, then TypeBase::SILFunctionTypeBits
+    // must be updated to match.
 
     //   |representation|pseudogeneric| noescape |
     //   |    0 .. 3    |      4      |     5    |
     //
-    enum : uint16_t { RepresentationMask = 0x00F };
-    enum : uint16_t { PseudogenericMask  = 0x010 };
-    enum : uint16_t { NoEscapeMask       = 0x020 };
+    enum : unsigned {
+      RepresentationMask = 0x0F,
+      PseudogenericMask  = 0x10,
+      NoEscapeMask       = 0x20,
+    };
 
-    uint16_t Bits;
+    unsigned Bits;
 
-    ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
+    ExtInfo(unsigned Bits) : Bits(Bits) {}
 
     friend class SILFunctionType;
     
@@ -3797,7 +3804,23 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBlockStorageType, Type)
-  
+
+/// A singleton 'token' type, which establishes a formal dependency
+/// between two SIL nodes.  A token 'value' cannot be abstracted in
+/// SIL: it cannot be returned, yielded, or passed as a function or
+/// block argument.
+class SILTokenType final : public TypeBase {
+  friend class ASTContext;
+  SILTokenType(const ASTContext &C)
+    : TypeBase(TypeKind::SILToken, &C, RecursiveTypeProperties()) {}
+public:
+  // The singleton instance of this type is ASTContext::TheSILTokenType.
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SILToken;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILTokenType, Type)
 
 /// A type with a special syntax that is always sugar for a library type.
 ///

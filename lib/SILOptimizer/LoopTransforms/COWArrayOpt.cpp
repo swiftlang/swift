@@ -2316,8 +2316,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     auto *Fn = getFunction();
 
     // Don't hoist array property calls at Osize.
-    auto OptMode = Fn->getModule().getOptions().Optimization;
-    if (OptMode == SILOptions::SILOptMode::OptimizeForSize)
+    if (Fn->optimizeForSize())
       return;
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();

@@ -3,7 +3,7 @@
 protocol P {}
 
 extension P {
-  @_semantics("optimize.sil.never") func method1() {}
+  @_optimize(none) func method1() {}
 
   @inline(__always) func method2() { method1() }
 }

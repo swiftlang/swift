@@ -300,15 +300,12 @@ public:
           EndLoc = FD->getParameterLists().back()->getSourceRange().End;
         }
 
-        if (EndLoc.isValid()) {
-          BraceStmt *NNB = prependLoggerCall(NB, {StartLoc, EndLoc});
-          if (NNB != B) {
-            FD->setBody(NNB);
-          }
-        } else {
-          if (NB != B) {
-            FD->setBody(NB);
-          }
+        if (EndLoc.isValid())
+          NB = prependLoggerCall(NB, {StartLoc, EndLoc});
+
+        if (NB != B) {
+          FD->setBody(NB);
+          TypeChecker(Context).checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -675,12 +672,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
           if (FD->getBody()) {
             ASTContext &ctx = FD->getASTContext();
             Instrumenter I(ctx, FD, TmpNameIndex);
-            Decl *NewDecl = I.transformDecl(FD);
-            if (AbstractFunctionDecl *NFD =
-                    dyn_cast<AbstractFunctionDecl>(NewDecl)) {
-              TypeChecker TC(ctx);
-              TC.checkFunctionErrorHandling(NFD);
-            }
+            I.transformDecl(FD);
             return false;
           }
         }

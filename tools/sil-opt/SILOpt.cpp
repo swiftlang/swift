@@ -311,7 +311,7 @@ int main(int argc, char **argv) {
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
-    SILOpts.Optimization = SILOptions::SILOptMode::Optimize;
+    SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
@@ -342,33 +342,13 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Load the input file.
+  serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
+      Invocation.setUpInputForSILTool(InputFilename, ModuleName, false,
+                                      extendedInfo);
   if (!FileBufOrErr) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
-  }
-
-  // If it looks like we have an AST, set the source file kind to SIL and the
-  // name of the module to the file's name.
-  Invocation.addInputBuffer(FileBufOrErr.get().get());
-
-  serialization::ExtendedValidationInfo extendedInfo;
-  auto result = serialization::validateSerializedAST(
-      FileBufOrErr.get()->getBuffer(), &extendedInfo);
-  bool HasSerializedAST = result.status == serialization::Status::Valid;
-
-  if (HasSerializedAST) {
-    const StringRef Stem = ModuleName.size() ?
-                             StringRef(ModuleName) :
-                             llvm::sys::path::stem(InputFilename);
-    Invocation.setModuleName(Stem);
-    Invocation.setInputKind(InputFileKind::IFK_Swift_Library);
-  } else {
-    const StringRef Name = ModuleName.size() ? StringRef(ModuleName) : "main";
-    Invocation.setModuleName(Name);
-    Invocation.setInputKind(InputFileKind::IFK_SIL);
   }
 
   CompilerInstance CI;
@@ -391,7 +371,7 @@ int main(int argc, char **argv) {
 
   // Load the SIL if we have a module. We have to do this after SILParse
   // creating the unfortunate double if statement.
-  if (HasSerializedAST) {
+  if (Invocation.hasSerializedAST()) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
     CI.setSILModule(SILModule::createEmptyModule(

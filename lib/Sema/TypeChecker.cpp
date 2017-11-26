@@ -65,11 +65,10 @@ TypeChecker::~TypeChecker() {
 
 void TypeChecker::handleExternalDecl(Decl *decl) {
   if (auto SD = dyn_cast<StructDecl>(decl)) {
-    addImplicitConstructors(SD);
     addImplicitStructConformances(SD);
   }
   if (auto CD = dyn_cast<ClassDecl>(decl)) {
-    addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
   }
   if (auto ED = dyn_cast<EnumDecl>(decl)) {
     addImplicitEnumConformances(ED);
@@ -261,13 +260,11 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   return *boolType;
 }
 
-namespace swift {
-
 /// Clone the given generic parameters in the given list. We don't need any
 /// of the requirements, because they will be inferred.
-GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                     DeclContext *dc,
-                                     GenericParamList *fromParams) {
+static GenericParamList *cloneGenericParams(ASTContext &ctx,
+                                            DeclContext *dc,
+                                            GenericParamList *fromParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
@@ -292,12 +289,6 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 
   return toParams;
 }
-} // namespace swift
-
-// FIXME: total hack
-GenericParamList *createProtocolGenericParams(ASTContext &ctx,
-                                              ProtocolDecl *proto,
-                                              DeclContext *dc);
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
@@ -370,7 +361,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
-  if (extendedNominal->isGenericContext()) {
+  if (extendedNominal->getGenericParamsOfContext() ||
+      isa<ProtocolDecl>(extendedNominal)) {
     if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       // For a protocol extension, build the generic parameter list.
       ED->setGenericParams(proto->createGenericParams(ED));
@@ -385,7 +377,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedNominal->isGenericContext()) {
+    if (!(extendedNominal->getGenericParamsOfContext() ||
+          isa<ProtocolDecl>(extendedNominal))) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
@@ -456,6 +449,16 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       llvm_unreachable("Unhandled external definition kind");
     }
 
+    // Complete any protocol requirement signatures that were delayed
+    // because the protocol was validated via validateDeclForNameLookup().
+    while (!TC.DelayedRequirementSignatures.empty()) {
+      auto decl = TC.DelayedRequirementSignatures.pop_back_val();
+      if (decl->isInvalid() || TC.Context.hadError())
+        continue;
+
+      TC.validateDecl(decl);
+    }
+
     // Validate any referenced declarations for SIL's purposes.
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
@@ -479,6 +482,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            !TC.DeclsToFinalize.empty() ||
+           !TC.DelayedRequirementSignatures.empty() ||
            !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.

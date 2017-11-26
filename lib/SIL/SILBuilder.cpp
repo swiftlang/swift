@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Expr.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/AST/Expr.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILGlobalVariable.h"
 
 using namespace swift;
@@ -458,4 +459,53 @@ ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
       "type");
   return insert(new (getModule()) ValueMetatypeInst(getSILDebugLocation(Loc),
                                                       MetatypeTy, Base));
+}
+
+// TODO: This should really be an operation on type lowering.
+void SILBuilder::emitShallowDestructureValueOperation(
+    SILLocation Loc, SILValue V, llvm::SmallVectorImpl<SILValue> &Results) {
+  // Once destructure is allowed everywhere, remove the projection code.
+
+  // If we do not have a tuple or a struct, add to our results list and return.
+  SILType Ty = V->getType();
+  if (!(Ty.is<TupleType>() || Ty.getStructOrBoundGenericStruct())) {
+    Results.emplace_back(V);
+    return;
+  }
+
+  // Otherwise, we want to destructure add the destructure and return.
+  if (getFunction().hasQualifiedOwnership()) {
+    auto *DI = emitDestructureValueOperation(Loc, V);
+    copy(DI->getResults(), std::back_inserter(Results));
+    return;
+  }
+
+  // In non qualified ownership SIL, drop back to using projection code.
+  llvm::SmallVector<Projection, 16> Projections;
+  Projection::getFirstLevelProjections(V->getType(), getModule(), Projections);
+  transform(Projections, std::back_inserter(Results),
+            [&](const Projection &P) -> SILValue {
+              return P.createObjectProjection(*this, Loc, V).get();
+            });
+}
+
+// TODO: Can we put this on type lowering? It would take a little bit of work
+// since we would need to be able to handle aggregate trivial types which is not
+// represented today in TypeLowering.
+void SILBuilder::emitShallowDestructureAddressOperation(
+    SILLocation Loc, SILValue V, llvm::SmallVectorImpl<SILValue> &Results) {
+
+  // If we do not have a tuple or a struct, add to our results list.
+  SILType Ty = V->getType();
+  if (!(Ty.is<TupleType>() || Ty.getStructOrBoundGenericStruct())) {
+    Results.emplace_back(V);
+    return;
+  }
+
+  llvm::SmallVector<Projection, 16> Projections;
+  Projection::getFirstLevelProjections(V->getType(), getModule(), Projections);
+  transform(Projections, std::back_inserter(Results),
+            [&](const Projection &P) -> SILValue {
+              return P.createAddressProjection(*this, Loc, V).get();
+            });
 }

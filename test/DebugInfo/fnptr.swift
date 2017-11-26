@@ -12,7 +12,7 @@ func barz(_ i: Float, _ j: Float) -> Int64 { return 0; }
 func main() -> Int64 {
     // CHECK-DAG: !DILocalVariable(name: "bar_fnptr",{{.*}} line: [[@LINE+3]],{{.*}} type: ![[BARPT:[0-9]+]]
     // AST-DAG: !DILocalVariable(name: "bar_fnptr",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[BAR_T:[0-9]+]]
-    // AST-DAG: ![[BAR_T]] = !DICompositeType({{.*}}, identifier: "_T0Iex_D")
+    // AST-DAG: ![[BAR_T]] = !DICompositeType({{.*}}, identifier: "_T0Ieg_D")
     var bar_fnptr = bar
     // CHECK-DAG: ![[BARPT]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}} elements: ![[BARMEMBERS:[0-9]+]]
     // CHECK-DAG: ![[BARMEMBERS]] = !{![[BARMEMBER:.*]], {{.*}}}
@@ -25,7 +25,7 @@ func main() -> Int64 {
 
     // CHECK-DAG: !DILocalVariable(name: "baz_fnptr",{{.*}} type: ![[BAZPT:[0-9]+]]
     // AST-DAG: !DILocalVariable(name: "baz_fnptr",{{.*}} type: ![[BAZ_T:[0-9]+]]
-    // AST-DAG: ![[BAZ_T]] = !DICompositeType({{.*}}, identifier: "_T0Sfs5Int64VIexyd_D")
+    // AST-DAG: ![[BAZ_T]] = !DICompositeType({{.*}}, identifier: "_T0Sfs5Int64VIegyd_D")
     // CHECK-DAG: ![[BAZPT]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}} elements: ![[BAZMEMBERS:[0-9]+]]
     // CHECK-DAG: ![[BAZMEMBERS]] = !{![[BAZMEMBER:.*]], {{.*}}}
     // CHECK-DAG: ![[BAZMEMBER]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[BAZPTR:[0-9]+]]
@@ -39,7 +39,7 @@ func main() -> Int64 {
 
     // CHECK-DAG: !DILocalVariable(name: "barz_fnptr",{{.*}} type: ![[BARZPT:[0-9]+]]
     // AST_DAG: !DILocalVariable(name: "barz_fnptr",{{.*}} type: ![[BARZ_T:[0-9]+]]
-    // AST-DAG: ![[BARZ_T:[0-9]+]] = !DICompositeType({{.*}}, identifier: "_T0S2fs5Int64VIexyyd_D")
+    // AST-DAG: ![[BARZ_T:[0-9]+]] = !DICompositeType({{.*}}, identifier: "_T0S2fs5Int64VIegyyd_D")
     // CHECK-DAG: ![[BARZPT]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} elements: ![[BARZMEMBERS:[0-9]+]]
     // CHECK-DAG: ![[BARZMEMBERS]] = !{![[BARZMEMBER:.*]], {{.*}}}
     // CHECK-DAG: ![[BARZMEMBER]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[BARZPTR:[0-9]+]]

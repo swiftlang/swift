@@ -763,13 +763,11 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  assign [[ARG1]] to [[WRITE]] : $*Int
 // CHECK-NEXT:  end_access [[WRITE]]
-// CHECK-NEXT:  [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : ${ var Int }
 // SEMANTIC ARC TODO: Another case where we need to put the mark_function_escape on a new projection after a copy.
 // CHECK-NEXT:  mark_function_escape [[ARG2_PB]]
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @owned { var Int }) -> ()
-// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2_COPY]]) : $@convention(thin) (Int, @owned { var Int }) -> ()
-// CHECK-NEXT:  destroy_value [[ARG2]] : ${ var Int }
+// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
 // CHECK-NEXT:  %{{.*}} = tuple ()
 // CHECK-NEXT:  return %{{.*}} : $()
 // CHECK-NEXT:} // end sil function '_T010properties32propertyWithDidSetTakingOldValue{{[_0-9a-zA-Z]*}}'

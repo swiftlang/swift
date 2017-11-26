@@ -259,7 +259,7 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
     if (sourceType == targetType) {
       return sourceType;
     }
-    sourceType = _swift_getSuperclass(sourceType);
+    sourceType = sourceType->SuperClass;
   } while (sourceType);
   
   return nullptr;
@@ -628,14 +628,14 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   }
 }
 
-// @_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorIndirect")
-// public func _stdlib_getErrorEmbeddedNSErrorIndirect<T : Error>(
-///    _ x: UnsafePointer<T>) -> AnyObject?
-SWIFT_CC(swift)
-extern "C" id swift_stdlib_getErrorEmbeddedNSErrorIndirect(
-                const OpaqueValue *error,
-                const Metadata *T,
-                const WitnessTable *Error);
+// internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
+//   _ x: UnsafePointer<T>) -> AnyObject?
+#define getErrorEmbeddedNSErrorIndirect \
+  MANGLE_SYM(s32_getErrorEmbeddedNSErrorIndirectyXlSgSPyxGs0B0RzlF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+id getErrorEmbeddedNSErrorIndirect(const OpaqueValue *error,
+                                   const Metadata *T,
+                                   const WitnessTable *Error);
 
 #endif
 
@@ -943,10 +943,9 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 #if SWIFT_OBJC_INTEROP
     // Check whether there is an embedded NSError. If so, use that for our Error
     // representation.
-    if (auto embedded =
-          swift_stdlib_getErrorEmbeddedNSErrorIndirect(srcDynamicValue,
-                                                       srcDynamicType,
-                                                       errorWitness)) {
+    if (auto embedded = getErrorEmbeddedNSErrorIndirect(srcDynamicValue,
+                                                        srcDynamicType,
+                                                        errorWitness)) {
       *destBoxAddr = reinterpret_cast<SwiftError*>(embedded);
       maybeDeallocateSource(true);
       return true;
@@ -1969,9 +1968,8 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const WitnessTable *srcErrorWitness,
                                     DynamicCastFlags flags) {
   // Check whether there is an embedded NSError.
-  if (auto embedded =
-          swift_stdlib_getErrorEmbeddedNSErrorIndirect(src, srcType,
-                                                       srcErrorWitness)) {
+  if (auto embedded = getErrorEmbeddedNSErrorIndirect(src, srcType,
+                                                      srcErrorWitness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       srcType->vw_destroy(src);
 
@@ -1980,7 +1978,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return swift_bridgeErrorToNSError((SwiftError*)errorBox.first);
+  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.first);
 }
 
 #endif
@@ -2133,22 +2131,29 @@ extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
 /// Nominal type descriptor for Swift.Set.
 extern "C" const NominalTypeDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Array<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Array<TargetValue>>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_arrayDownCastIndirect(OpaqueValue *destination,
                                   OpaqueValue *source,
                                   const Metadata *sourceValueType,
                                   const Metadata *targetValueType);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Array<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Array<TargetValue>>
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
                                              OpaqueValue *source,
                                              const Metadata *sourceValueType,
                                              const Metadata *targetValueType);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _setDownCastIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Set<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Set<TargetValue>>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setDownCastIndirect(OpaqueValue *destination,
                                 OpaqueValue *source,
                                 const Metadata *sourceValueType,
@@ -2156,8 +2161,11 @@ void _swift_setDownCastIndirect(OpaqueValue *destination,
                                 const void *sourceValueHashable,
                                 const void *targetValueHashable);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Set<SourceValue>>,
+//   _ target: UnsafeMutablePointer<Set<TargetValue>>
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool _swift_setDownCastConditionalIndirect(OpaqueValue *destination,
                                        OpaqueValue *source,
                                        const Metadata *sourceValueType,
@@ -2165,8 +2173,11 @@ bool _swift_setDownCastConditionalIndirect(OpaqueValue *destination,
                                        const void *sourceValueHashable,
                                        const void *targetValueHashable);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
+//                                           TargetKey, TargetValue>(
+//   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+//   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_dictionaryDownCastIndirect(OpaqueValue *destination,
                                        OpaqueValue *source,
                                        const Metadata *sourceKeyType,
@@ -2176,8 +2187,12 @@ void _swift_dictionaryDownCastIndirect(OpaqueValue *destination,
                                        const void *sourceKeyHashable,
                                        const void *targetKeyHashable);
 
-SWIFT_CC(swift)
-extern "C"
+// internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
+//                                                      TargetKey, TargetValue>(
+//   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
+//   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
                                         OpaqueValue *source,
                                         const Metadata *sourceKeyType,

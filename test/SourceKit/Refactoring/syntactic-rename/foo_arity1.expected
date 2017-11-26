@@ -22,3 +22,5 @@ source.edit.kind.active:
   26:27-26:28 "first"
 source.edit.kind.string:
   26:33-26:36 "bar"
+source.edit.kind.string:
+  26:43-26:46 "bar"

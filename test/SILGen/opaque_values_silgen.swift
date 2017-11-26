@@ -75,10 +75,10 @@ func s010_hasVarArg(_ args: Any...) {}
 // CHECK:   [[RETVAL:%.*]] = enum $AddressOnlyEnum, #AddressOnlyEnum.mere!enumelt.1, [[ARG0]] : $EmptyP
 // CHECK:   return [[RETVAL]] : $AddressOnlyEnum
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmF'
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmFTc : $@convention(thin) (@thin AddressOnlyEnum.Type) -> @owned @callee_owned (@in EmptyP) -> @out AddressOnlyEnum {
+// CHECK-LABEL: sil shared [transparent] [thunk] @_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmFTc : $@convention(thin) (@thin AddressOnlyEnum.Type) -> @owned @callee_guaranteed (@in EmptyP) -> @out AddressOnlyEnum {
 // CHECK: bb0([[ARG:%.*]] : $@thin AddressOnlyEnum.Type):
 // CHECK:   [[RETVAL:%.*]] = partial_apply {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @thin AddressOnlyEnum.Type) -> @out AddressOnlyEnum
-// CHECK:   return [[RETVAL]] : $@callee_owned (@in EmptyP) -> @out AddressOnlyEnum
+// CHECK:   return [[RETVAL]] : $@callee_guaranteed (@in EmptyP) -> @out AddressOnlyEnum
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmFTc'
 enum AddressOnlyEnum {
   case nought
@@ -90,13 +90,8 @@ enum AddressOnlyEnum {
 // ---
 // CHECK-LABEL: sil private @_T020opaque_values_silgen16OpaqueTupleClassC8inAndOutx_xtx_xt1x_tFAA0dF0CADxxAE_tFTV : $@convention(method) <U> (@in (U, U), @guaranteed OpaqueTupleClass<U>) -> @out (U, U) {
 // CHECK: bb0([[ARG0:%.*]] : $(U, U), [[ARG1:%.*]] : $OpaqueTupleClass<U>):
-// CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]] : $(U, U)
-// CHECK:   [[TELEM0:%.*]] = tuple_extract [[BORROWED_ARG0]] : $(U, U), 0
-// CHECK:   [[COPY0:%.*]] = copy_value [[TELEM0]] : $U
-// CHECK:   [[TELEM1:%.*]] = tuple_extract [[BORROWED_ARG0]] : $(U, U), 1
-// CHECK:   [[COPY1:%.*]] = copy_value [[TELEM1]] : $U
-// CHECK:   end_borrow [[BORROWED_ARG0]]
-// CHECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[COPY0]], [[COPY1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
+// CHECK:   ([[TELEM0:%.*]], [[TELEM1:%.*]]) = destructure_tuple [[ARG0]] : $(U, U)
+// CHECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[TELEM0]], [[TELEM1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
 // CHECK:   [[BORROWED_CALL:%.*]] = begin_borrow [[APPLY]]
 // CHECK:   [[BORROWED_CALL_EXT0:%.*]] = tuple_extract [[BORROWED_CALL]] : $(U, U), 0
 // CHECK:   [[RETVAL0:%.*]] = copy_value [[BORROWED_CALL_EXT0]] : $U
@@ -109,45 +104,44 @@ enum AddressOnlyEnum {
 
 // Test vtables - StillOpaqueClass
 // ---
-// CHECK-LABEL: sil private @_T020opaque_values_silgen16StillOpaqueClassC24variantOptionalityTuplesx_xm_xxcttx_xm_xxcttSg1x_tFAA0eF0CAdEx_xm_xxcttAF_tFTV : $@convention(method) <T> (@in T, @thick T.Type, @owned @callee_owned (@in T) -> @out T, @guaranteed StillOpaqueClass<T>) -> @out Optional<(T, (@thick T.Type, @callee_owned (@in T) -> @out T))> {
-// CHECK: bb0([[ARG0:%.*]] : $T, [[ARG1:%.*]] : $@thick T.Type, [[ARG2:%.*]] : $@callee_owned (@in T) -> @out T, [[ARG3:%.*]] : $StillOpaqueClass<T>):
-// CHECK:   [[TELEM0:%.*]] = tuple ([[ARG1]] : $@thick T.Type, [[ARG2]] : $@callee_owned (@in T) -> @out T)
-// CHECK:   [[TELEM1:%.*]] = tuple ([[ARG0]] : $T, [[TELEM0]] : $(@thick T.Type, @callee_owned (@in T) -> @out T))
-// CHECK:   [[ENUMOPT0:%.*]] = enum $Optional<(T, (@thick T.Type, @callee_owned (@in T) -> @out T))>, #Optional.some!enumelt.1, [[TELEM1]] : $(T, (@thick T.Type, @callee_owned (@in T) -> @out T))
-// CHECK:   [[APPLY:%.*]] = apply {{.*}}<T>([[ENUMOPT0]], [[ARG3]]) : $@convention(method) <τ_0_0> (@in Optional<(τ_0_0, (@thick τ_0_0.Type, @callee_owned (@in τ_0_0) -> @out τ_0_0))>, @guaranteed StillOpaqueClass<τ_0_0>) -> (@out τ_0_0, @thick τ_0_0.Type, @owned @callee_owned (@in τ_0_0) -> @out τ_0_0)
+// CHECK-LABEL: sil private @_T020opaque_values_silgen16StillOpaqueClassC24variantOptionalityTuplesx_xm_xxcttx_xm_xxcttSg1x_tFAA0eF0CAdEx_xm_xxcttAF_tFTV : $@convention(method) <T> (@in T, @thick T.Type, @owned @callee_guaranteed (@in T) -> @out T, @guaranteed StillOpaqueClass<T>) -> @out Optional<(T, (@thick T.Type, @callee_guaranteed (@in T) -> @out T))> {
+// CHECK: bb0([[ARG0:%.*]] : $T, [[ARG1:%.*]] : $@thick T.Type, [[ARG2:%.*]] : $@callee_guaranteed (@in T) -> @out T, [[ARG3:%.*]] : $StillOpaqueClass<T>):
+// CHECK:   [[TELEM0:%.*]] = tuple ([[ARG1]] : $@thick T.Type, [[ARG2]] : $@callee_guaranteed (@in T) -> @out T)
+// CHECK:   [[TELEM1:%.*]] = tuple ([[ARG0]] : $T, [[TELEM0]] : $(@thick T.Type, @callee_guaranteed (@in T) -> @out T))
+// CHECK:   [[ENUMOPT0:%.*]] = enum $Optional<(T, (@thick T.Type, @callee_guaranteed (@in T) -> @out T))>, #Optional.some!enumelt.1, [[TELEM1]] : $(T, (@thick T.Type, @callee_guaranteed (@in T) -> @out T))
+// CHECK:   [[APPLY:%.*]] = apply {{.*}}<T>([[ENUMOPT0]], [[ARG3]]) : $@convention(method) <τ_0_0> (@in Optional<(τ_0_0, (@thick τ_0_0.Type, @callee_guaranteed (@in τ_0_0) -> @out τ_0_0))>, @guaranteed StillOpaqueClass<τ_0_0>) -> (@out τ_0_0, @thick τ_0_0.Type, @owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0)
 // CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[APPLY]]
-// CHECK:   [[BORROWED_T_EXT0:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_owned (@in T) -> @out T), 0
+// CHECK:   [[BORROWED_T_EXT0:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_guaranteed (@in T) -> @out T), 0
 // CHECK:   [[RETVAL0:%.*]] = copy_value [[BORROWED_T_EXT0]]
-// CHECK:   [[BORROWED_T_EXT1:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_owned (@in T) -> @out T), 1
-// CHECK:   [[BORROWED_T_EXT2:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_owned (@in T) -> @out T), 2
+// CHECK:   [[BORROWED_T_EXT1:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_guaranteed (@in T) -> @out T), 1
+// CHECK:   [[BORROWED_T_EXT2:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_guaranteed (@in T) -> @out T), 2
 // CHECK:   [[RETVAL1:%.*]] = copy_value [[BORROWED_T_EXT2]]
 // CHECK:   end_borrow [[BORROWED_T]]
-// CHECK:   [[RETTUPLE0:%.*]] = tuple ([[BORROWED_T_EXT1]] : $@thick T.Type, [[RETVAL1]] : $@callee_owned (@in T) -> @out T)
-// CHECK:   [[RETTUPLE1:%.*]] = tuple ([[RETVAL0]] : $T, [[RETTUPLE0]] : $(@thick T.Type, @callee_owned (@in T) -> @out T))
-// CHECK:   [[RETVAL:%.*]] = enum $Optional<(T, (@thick T.Type, @callee_owned (@in T) -> @out T))>, #Optional.some!enumelt.1, [[RETTUPLE1]] : $(T, (@thick T.Type, @callee_owned (@in T) -> @out T))
+// CHECK:   [[RETTUPLE0:%.*]] = tuple ([[BORROWED_T_EXT1]] : $@thick T.Type, [[RETVAL1]] : $@callee_guaranteed (@in T) -> @out T)
+// CHECK:   [[RETTUPLE1:%.*]] = tuple ([[RETVAL0]] : $T, [[RETTUPLE0]] : $(@thick T.Type, @callee_guaranteed (@in T) -> @out T))
+// CHECK:   [[RETVAL:%.*]] = enum $Optional<(T, (@thick T.Type, @callee_guaranteed (@in T) -> @out T))>, #Optional.some!enumelt.1, [[RETTUPLE1]] : $(T, (@thick T.Type, @callee_guaranteed (@in T) -> @out T))
 // CHECK:   return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen16StillOpaqueClassC24variantOptionalityTuplesx_xm_xxcttx_xm_xxcttSg1x_tFAA0eF0CAdEx_xm_xxcttAF_tFTV'
 
 
 // part of s280_convExistTrivial: conversion between existential types - reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIexid_AA2P2_pAaE_pIexir_TR : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2 {
-// CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIegid_AA2P2_pAaE_pIegir_TR : $@convention(thin) (@in P2, @guaranteed @callee_guaranteed (@in P) -> TrivialStruct) -> @out P2 {
+// CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_guaranteed (@in P) -> TrivialStruct):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]] : $P2
 // CHECK:   [[OPENED_ARG:%.*]] = open_existential_value [[BORROWED_ARG]] : $P2 to $@opened({{.*}}) P2
 // CHECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
 // CHECK:   [[INIT_P:%.*]] = init_existential_value [[COPIED_VAL]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
-// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[INIT_P]]) : $@callee_owned (@in P) -> TrivialStruct
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[INIT_P]]) : $@callee_guaranteed (@in P) -> TrivialStruct
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG0]] : $P2, $P2
 // CHECK:   destroy_value [[ARG0]]
 // CHECK:   return [[RETVAL]] : $P2
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pAA13TrivialStructVIexid_AA2P2_pAaE_pIexir_TR'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pAA13TrivialStructVIegid_AA2P2_pAaE_pIegir_TR'
 
 // part of s290_convOptExistTriv: conversion between existential types - reabstraction thunk - optionals case
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pSgAA13TrivialStructVIexid_AESgAA2P2_pIexyr_TR : $@convention(thin) (Optional<TrivialStruct>, @owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> @out P2 {
-// CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : $@callee_owned (@in Optional<P>) -> TrivialStruct):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pSgAA13TrivialStructVIegid_AESgAA2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in Optional<P>) -> TrivialStruct) -> @out P2 {
+// CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : $@callee_guaranteed (@in Optional<P>) -> TrivialStruct):
 // CHECK:   switch_enum [[ARG0]] : $Optional<TrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK:   [[ONONE:%.*]] = enum $Optional<P>, #Optional.none!enumelt
@@ -157,10 +151,10 @@ enum AddressOnlyEnum {
 // CHECK:   [[ENUM_S:%.*]] = enum $Optional<P>, #Optional.some!enumelt.1, [[INIT_S]] : $P
 // CHECK:   br bb3([[ENUM_S]] : $Optional<P>)
 // CHECK: bb3([[OPT_S:%.*]] : $Optional<P>):
-// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[OPT_S]]) : $@callee_owned (@in Optional<P>) -> TrivialStruct
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[OPT_S]]) : $@callee_guaranteed (@in Optional<P>) -> TrivialStruct
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
 // CHECK:   return [[RETVAL]] : $P2
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pSgAA13TrivialStructVIexid_AESgAA2P2_pIexyr_TR'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pSgAA13TrivialStructVIegid_AESgAA2P2_pIegyr_TR'
 
 // Test array initialization - we are still (somewhat) using addresses
 // ---
@@ -509,10 +503,10 @@ func s220_____openExistBox(_ x: Error) -> String {
 // CHECK: bb0([[ARG:%.*]] : $Any):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   checked_cast_value_br [[COPY__ARG]] : $Any to $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int), bb2, bb1
-// CHECK: bb2([[THUNK_PARAM:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
-// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
-// CHECK:   partial_apply [[THUNK_REF]]([[THUNK_PARAM]])
+// CHECK:   checked_cast_value_br [[COPY__ARG]] : $Any to $@callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int), bb2, bb1
+// CHECK: bb2([[THUNK_PARAM:%.*]] : $@callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
+// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @guaranteed @callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
+// CHECK:   partial_apply [callee_guaranteed] [[THUNK_REF]]([[THUNK_PARAM]])
 // CHECK: bb6:
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s230______condFromAnyyypF'
@@ -566,7 +560,7 @@ func s250_________testBoxT() {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s260_______AOnly_enumyAA17AddressOnlyStructVF : $@convention(thin) (AddressOnlyStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : $AddressOnlyStruct):
 // CHECK:   [[MTYPE1:%.*]] = metatype $@thin AddressOnlyEnum.Type
-// CHECK:   [[APPLY1:%.*]] =  apply {{.*}}([[MTYPE1]]) : $@convention(thin) (@thin AddressOnlyEnum.Type) -> @owned @callee_owned (@in EmptyP) -> @out AddressOnlyEnum
+// CHECK:   [[APPLY1:%.*]] =  apply {{.*}}([[MTYPE1]]) : $@convention(thin) (@thin AddressOnlyEnum.Type) -> @owned @callee_guaranteed (@in EmptyP) -> @out AddressOnlyEnum
 // CHECK:   destroy_value [[APPLY1]]
 // CHECK:   [[MTYPE2:%.*]] = metatype $@thin AddressOnlyEnum.Type
 // CHECK:   [[ENUM1:%.*]] = enum $AddressOnlyEnum, #AddressOnlyEnum.nought!enumelt
@@ -590,35 +584,29 @@ func s260_______AOnly_enum(_ s: AddressOnlyStruct) {
 
 // Tests InjectOptional for opaque value types + conversion of opaque structs
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s270_convOptAnyStructyAA0gH0VADSgcF : $@convention(thin) (@owned @callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct) -> () {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct):
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s270_convOptAnyStructyAA0gH0VADSgcF : $@convention(thin) (@owned @callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in Optional<AnyStruct>, @owned @callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct>
-// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (@in Optional<AnyStruct>) -> @out Optional<AnyStruct>
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct, $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct
-// CHECK:   [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[COPY_ARG2:%.*]] = copy_value [[BORROWED_ARG2]]
-// CHECK:   [[PAPPLY2:%.*]] = partial_apply %{{.*}}([[COPY_ARG2]]) : $@convention(thin) (@in Optional<AnyStruct>, @owned @callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct>
-// CHECK:   destroy_value [[PAPPLY2]] : $@callee_owned (@in Optional<AnyStruct>) -> @out Optional<AnyStruct>
-// CHECK:   end_borrow [[BORROWED_ARG2]] from [[ARG]] : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct, $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct
-// CHECK:   destroy_value [[ARG]] : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct>
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out Optional<AnyStruct>
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct, $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
+// CHECK:   destroy_value [[ARG]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s270_convOptAnyStructyAA0gH0VADSgcF'
 func s270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
   let _: (AnyStruct?) -> AnyStruct? = a1
-  let _: (AnyStruct!) -> AnyStruct? = a1
 }
 
 // Tests conversion between existential types
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s280_convExistTrivialyAA0G6StructVAA1P_pcF : $@convention(thin) (@owned @callee_owned (@in P) -> TrivialStruct) -> () {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s280_convExistTrivialyAA0G6StructVAA1P_pcF : $@convention(thin) (@owned @callee_guaranteed (@in P) -> TrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed (@in P) -> TrivialStruct):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2
-// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (@in P2) -> @out P2
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in P) -> TrivialStruct
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in P2, @guaranteed @callee_guaranteed (@in P) -> TrivialStruct) -> @out P2
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (@in P2) -> @out P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_guaranteed (@in P) -> TrivialStruct
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s280_convExistTrivialyAA0G6StructVAA1P_pcF'
@@ -628,13 +616,13 @@ func s280_convExistTrivial(_ s: @escaping (P) -> TrivialStruct) {
 
 // Tests conversion between existential types - optionals case
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s290_convOptExistTrivyAA13TrivialStructVAA1P_pSgcF : $@convention(thin) (@owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> () {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in Optional<P>) -> TrivialStruct):
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s290_convOptExistTrivyAA13TrivialStructVAA1P_pSgcF : $@convention(thin) (@owned @callee_guaranteed (@in Optional<P>) -> TrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed (@in Optional<P>) -> TrivialStruct):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Optional<TrivialStruct>, @owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> @out P2
-// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (Optional<TrivialStruct>) -> @out P2
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in Optional<P>) -> TrivialStruct, $@callee_owned (@in Optional<P>) -> TrivialStruct
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in Optional<P>) -> TrivialStruct) -> @out P2
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (Optional<TrivialStruct>) -> @out P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_guaranteed (@in Optional<P>) -> TrivialStruct, $@callee_guaranteed (@in Optional<P>) -> TrivialStruct
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s290_convOptExistTrivyAA13TrivialStructVAA1P_pSgcF'
@@ -644,13 +632,13 @@ func s290_convOptExistTriv(_ s: @escaping (P?) -> TrivialStruct) {
 
 // Tests corner-case: reabstraction of an empty tuple to any
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s300__convETupleToAnyyyycF : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> ()):
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s300__convETupleToAnyyyycF : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> ()):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> @out Any
-// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned () -> @out Any
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned () -> (), $@callee_owned () -> ()
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed () -> @out Any
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_guaranteed () -> (), $@callee_guaranteed () -> ()
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s300__convETupleToAnyyyycF'
@@ -660,13 +648,13 @@ func s300__convETupleToAny(_ t: @escaping () -> ()) {
 
 // Tests corner-case: reabstraction of a non-empty tuple to any
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s310__convIntTupleAnyySi_SitycF : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> () {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> (Int, Int)):
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s310__convIntTupleAnyySi_SitycF : $@convention(thin) (@owned @callee_guaranteed () -> (Int, Int)) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> (Int, Int)):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Any
-// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned () -> @out Any
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned () -> (Int, Int), $@callee_owned () -> (Int, Int)
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Int, Int)) -> @out Any
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed () -> @out Any
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_guaranteed () -> (Int, Int), $@callee_guaranteed () -> (Int, Int)
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s310__convIntTupleAnyySi_SitycF'
@@ -676,13 +664,13 @@ func s310__convIntTupleAny(_ t: @escaping () -> (Int, Int)) {
 
 // Tests translating and imploding into Any under opaque value mode
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s320__transImplodeAnyyyypcF : $@convention(thin) (@owned @callee_owned (@in Any) -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in Any) -> ()):
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s320__transImplodeAnyyyypcF : $@convention(thin) (@owned @callee_guaranteed (@in Any) -> ()) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed (@in Any) -> ()):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Int, Int, @owned @callee_owned (@in Any) -> ()) -> ()
-// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (Int, Int) -> ()
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in Any) -> (), $@callee_owned (@in Any) -> ()
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in Any) -> ()) -> ()
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (Int, Int) -> ()
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_guaranteed (@in Any) -> (), $@callee_guaranteed (@in Any) -> ()
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s320__transImplodeAnyyyypcF'
@@ -692,12 +680,9 @@ func s320__transImplodeAny(_ t: @escaping (Any) -> ()) {
 
 // Tests support for address only let closures under opaque value mode - they are not by-address anymore
 // ---
-// CHECK-LABEL: sil private @_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_ : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK-LABEL: sil private @_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_ : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : $T):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]] : $T
-// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]] : $T
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $T
-// CHECK:   destroy_value [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]] : $T
 // CHECK:   return [[COPY_ARG]] : $T
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_'
 func s330___addrLetClosure<T>(_ x:T) -> T {
@@ -713,9 +698,9 @@ func s330___addrLetClosure<T>(_ x:T) -> T {
 // CHECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
 // CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $EmptyP
 // CHECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*EmptyP
-// CHECK:   [[COPY_BOX:%.*]] = copy_value [[ALLOC_OF_BOX]] : ${ var EmptyP }
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [[ALLOC_OF_BOX]] : ${ var EmptyP }
 // CHECK:   mark_function_escape [[PROJ_BOX]] : $*EmptyP
-// CHECK:   apply %{{.*}}([[COPY_BOX]]) : $@convention(thin) (@owned { var EmptyP }) -> ()
+// CHECK:   apply %{{.*}}([[BORROW_BOX]]) : $@convention(thin) (@guaranteed { var EmptyP }) -> ()
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s340_______captureBoxyyF'
 func s340_______captureBox() {
@@ -826,8 +811,8 @@ func s380___contextualInit(_ a : Int?) {
 
 // Tests opaque call result types
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s390___addrCallResultyxycSglF : $@convention(thin) <T> (@owned Optional<@callee_owned () -> @out T>) -> () {
-// CHECK: bb0([[ARG:%.*]] : $Optional<@callee_owned () -> @out T>):
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s390___addrCallResultyxycSglF : $@convention(thin) <T> (@owned Optional<@callee_guaranteed () -> @out T>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Optional<@callee_guaranteed () -> @out T>):
 // CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
 // CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -855,8 +840,8 @@ func s390___addrCallResult<T>(_ f: (() -> T)?) {
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[OPEN_ARG:%.*]] = open_existential_value [[BORROWED_ARG]] : $Clonable
 // CHECK:   [[COPY_OPAQUE:%.*]] = copy_value [[OPEN_ARG]]
-// CHECK:   [[APPLY_OPAQUE:%.*]] = apply %{{.*}}<@opened({{.*}}) Clonable>([[COPY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@in τ_0_0) -> @owned @callee_owned () -> @out Optional<τ_0_0>
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}<@opened({{.*}}) Clonable>([[APPLY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable>
+// CHECK:   [[APPLY_OPAQUE:%.*]] = apply %{{.*}}<@opened({{.*}}) Clonable>([[COPY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@in τ_0_0) -> @owned @callee_guaranteed () -> @out Optional<τ_0_0>
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<@opened({{.*}}) Clonable>([[APPLY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out Optional<τ_0_0>) -> @out Optional<Clonable>
 // CHECK:   end_borrow [[BORROWED_ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
@@ -902,25 +887,16 @@ func s420__globalLvalueGet(_ i : Int) -> Int {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s430_callUnreachableFyx1t_tlF : $@convention(thin) <T> (@in T) -> () {
 // CHECK: bb0([[ARG:%.*]] : $T):
 // CHECK:   [[APPLY_T:%.*]] = apply %{{.*}}<((T) -> (), T)>() : $@convention(thin) <τ_0_0> () -> @out Optional<(Int, τ_0_0)>
-// CHECK:   switch_enum [[APPLY_T]] : $Optional<(Int, (@callee_owned (@in T) -> @out (), T))>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
-// CHECK: bb2([[ENUMARG:%.*]] : $(Int, (@callee_owned (@in T) -> @out (), T))):
-// CHECK:   [[BORROWED_ENUMARG:%.*]] = begin_borrow [[ENUMARG]] : $(Int, (@callee_owned (@in T) -> @out (), T))
-// CHECK:   [[TELEM0:%.*]] = tuple_extract [[BORROWED_ENUMARG]] : $(Int, (@callee_owned (@in T) -> @out (), T)), 0
-// CHECK:   [[TELEM1:%.*]] = tuple_extract [[BORROWED_ENUMARG]] : $(Int, (@callee_owned (@in T) -> @out (), T)), 1
-// CHECK:   [[COPY1:%.*]] = copy_value [[TELEM1]] : $(@callee_owned (@in T) -> @out (), T)
-// CHECK:   end_borrow [[BORROWED_ENUMARG]]
-// CHECK:   [[BORROWED_COPY1:%.*]] = begin_borrow [[COPY1]] : $(@callee_owned (@in T) -> @out (), T)
-// CHECK:   [[TELEM1P0:%.*]] = tuple_extract [[BORROWED_COPY1]] : $(@callee_owned (@in T) -> @out (), T), 0
-// CHECK:   [[COPY1P0:%.*]] = copy_value [[TELEM1P0]] : $@callee_owned (@in T) -> @out ()
-// CHECK:   [[TELEM1P1:%.*]] = tuple_extract [[BORROWED_COPY1]] : $(@callee_owned (@in T) -> @out (), T), 1
-// CHECK:   [[COPY1P1:%.*]] = copy_value [[TELEM1P1]] : $T
-// CHECK:   end_borrow [[BORROWED_COPY1]]
-// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}<T>([[COPY1P0]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out ()) -> ()
-// CHECK:   [[NEWT0:%.*]] = tuple ([[PAPPLY]] : $@callee_owned (@in T) -> (), [[COPY1P1]] : $T)
-// CHECK:   [[NEWT1:%.*]] = tuple ([[TELEM0]] : $Int, [[NEWT0]] : $(@callee_owned (@in T) -> (), T))
-// CHECK:   [[NEWENUM:%.*]] = enum $Optional<(Int, (@callee_owned (@in T) -> (), T))>, #Optional.some!enumelt.1, [[NEWT1]] : $(Int, (@callee_owned (@in T) -> (), T))
-// CHECK:   br bb3([[NEWENUM]] : $Optional<(Int, (@callee_owned (@in T) -> (), T))>)
-// CHECK: bb3([[ENUMIN:%.*]] : $Optional<(Int, (@callee_owned (@in T) -> (), T))>):
+// CHECK:   switch_enum [[APPLY_T]] : $Optional<(Int, (@callee_guaranteed (@in T) -> @out (), T))>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb2([[ENUMARG:%.*]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))):
+// CHECK:   ([[TELEM0:%.*]], [[TELEM1:%.*]]) = destructure_tuple [[ENUMARG]] : $(Int, (@callee_guaranteed (@in T) -> @out (), T))
+// CHECK:   ([[TELEM10:%.*]], [[TELEM11:%.*]]) = destructure_tuple [[TELEM1]] : $(@callee_guaranteed (@in T) -> @out (), T)
+// CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<T>([[TELEM10]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out ()) -> ()
+// CHECK:   [[NEWT0:%.*]] = tuple ([[PAPPLY]] : $@callee_guaranteed (@in T) -> (), [[TELEM11]] : $T)
+// CHECK:   [[NEWT1:%.*]] = tuple ([[TELEM0]] : $Int, [[NEWT0]] : $(@callee_guaranteed (@in T) -> (), T))
+// CHECK:   [[NEWENUM:%.*]] = enum $Optional<(Int, (@callee_guaranteed (@in T) -> (), T))>, #Optional.some!enumelt.1, [[NEWT1]] : $(Int, (@callee_guaranteed (@in T) -> (), T))
+// CHECK:   br bb3([[NEWENUM]] : $Optional<(Int, (@callee_guaranteed (@in T) -> (), T))>)
+// CHECK: bb3([[ENUMIN:%.*]] : $Optional<(Int, (@callee_guaranteed (@in T) -> (), T))>):
 // CHECK:   destroy_value [[ENUMIN]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s430_callUnreachableFyx1t_tlF'
@@ -1092,12 +1068,8 @@ public protocol FooP {
 // ---
 // CHECK-LABEL: sil private [transparent] [thunk] @_T020opaque_values_silgen21s510_______OpaqueSelfVyxGAA4FooPA2aEP3fooxyFTW : $@convention(witness_method: FooP) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0> {
 // CHECK: bb0(%0 : $s510_______OpaqueSelf<τ_0_0>):
-// CHECK:   [[COPY:%.*]] = copy_value %0 : $s510_______OpaqueSelf<τ_0_0>
 // CHECK:   [[FN:%.*]] = function_ref @_T020opaque_values_silgen21s510_______OpaqueSelfV3fooACyxGyF : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
-// CHECK:   [[RESULT:%.*]] = apply [[FN]]<τ_0_0>([[BORROW]]) : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
-// CHECK:   end_borrow [[BORROW]] from [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
-// CHECK:   destroy_value [[COPY]] : $s510_______OpaqueSelf<τ_0_0>
+// CHECK:   [[RESULT:%.*]] = apply [[FN]]<τ_0_0>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed s510_______OpaqueSelf<τ_0_0>) -> @out s510_______OpaqueSelf<τ_0_0>
 // CHECK:   return [[RESULT]] : $s510_______OpaqueSelf<τ_0_0>
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s510_______OpaqueSelfVyxGAA4FooPA2aEP3fooxyFTW'
 struct s510_______OpaqueSelf<Base> : FooP {
@@ -1114,10 +1086,10 @@ struct s510_______OpaqueSelf<Base> : FooP {
 // CHECK: bb0([[ARG0:%.*]] : $Any, [[ARG1:%.*]] : $T):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]]
 // CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   checked_cast_value_br [[COPY__ARG]] : $Any to $@callee_owned (@in (Int, T)) -> @out (Int, T), bb2, bb1
-// CHECK: bb2([[THUNK_PARAM:%.*]] : $@callee_owned (@in (Int, T)) -> @out (Int, T)):
-// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0> (Int, @in τ_0_0, @owned @callee_owned (@in (Int, τ_0_0)) -> @out (Int, τ_0_0)) -> (Int, @out τ_0_0)
-// CHECK:   partial_apply [[THUNK_REF]]<T>([[THUNK_PARAM]])
+// CHECK:   checked_cast_value_br [[COPY__ARG]] : $Any to $@callee_guaranteed (@in (Int, T)) -> @out (Int, T), bb2, bb1
+// CHECK: bb2([[THUNK_PARAM:%.*]] : $@callee_guaranteed (@in (Int, T)) -> @out (Int, T)):
+// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0> (Int, @in τ_0_0, @guaranteed @callee_guaranteed (@in (Int, τ_0_0)) -> @out (Int, τ_0_0)) -> (Int, @out τ_0_0)
+// CHECK:   partial_apply [callee_guaranteed] [[THUNK_REF]]<T>([[THUNK_PARAM]])
 // CHECK: bb6:
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF'
@@ -1161,34 +1133,34 @@ public func s020_______assignToVar() {
 
 // s270_convOptAnyStruct continued Test: reabstraction thunk helper
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen9AnyStructVSgACIexir_A2DIexir_TR : $@convention(thin) (@in Optional<AnyStruct>, @owned @callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
-// CHECK: bb0([[ARG0:%.*]] : $Optional<AnyStruct>, [[ARG1:%.*]] : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct):
-// CHECK:   [[APPLYARG:%.*]] = apply [[ARG1]]([[ARG0]]) : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen9AnyStructVSgACIegir_A2DIegir_TR : $@convention(thin) (@in Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
+// CHECK: bb0([[ARG0:%.*]] : $Optional<AnyStruct>, [[ARG1:%.*]] : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct):
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG1]]([[ARG0]]) : $@callee_guaranteed (@in Optional<AnyStruct>) -> @out AnyStruct
 // CHECK:   [[RETVAL:%.*]] = enum $Optional<AnyStruct>, #Optional.some!enumelt.1, [[APPLYARG]] : $AnyStruct
 // CHECK:   return [[RETVAL]] : $Optional<AnyStruct>
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen9AnyStructVSgACIexir_A2DIexir_TR'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen9AnyStructVSgACIegir_A2DIegir_TR'
 
 // s300__convETupleToAny continued Test: reabstraction of () to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Iex_ypIexr_TR : $@convention(thin) (@owned @callee_owned () -> ()) -> @out Any {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> ()):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Ieg_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> ()):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $()
-// CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> ()
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_guaranteed () -> ()
 // CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*()
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[LOAD_EXIST]] : $(), $(), $Any
 // CHECK:   return [[RETVAL]] : $Any
-// CHECK-LABEL: } // end sil function '_T0Iex_ypIexr_TR'
+// CHECK-LABEL: } // end sil function '_T0Ieg_ypIegr_TR'
 
 // s310_convIntTupleAny continued Test: reabstraction of non-empty tuple to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIexdd_ypIexr_TR : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Any {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> (Int, Int)):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIegdd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Int, Int)) -> @out Any {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> (Int, Int)):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)
 // CHECK:   [[TADDR0:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 0
 // CHECK:   [[TADDR1:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 1
-// CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> (Int, Int)
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_guaranteed () -> (Int, Int)
 // CHECK:   [[TEXTRACT0:%.*]] = tuple_extract [[APPLYARG]] : $(Int, Int), 0
 // CHECK:   [[TEXTRACT1:%.*]] = tuple_extract [[APPLYARG]] : $(Int, Int), 1
 // CHECK:   store [[TEXTRACT0]] to [trivial] [[TADDR0]] : $*Int
@@ -1197,15 +1169,15 @@ public func s020_______assignToVar() {
 // CHECK:   [[RETVAL:%.*]] = init_existential_value [[LOAD_EXIST]] : $(Int, Int), $(Int, Int), $Any
 // CHECK:   dealloc_stack [[ASTACK]] : $*Any
 // CHECK:   return [[RETVAL]] : $Any
-// CHECK-LABEL: } // end sil function '_T0S2iIexdd_ypIexr_TR'
+// CHECK-LABEL: } // end sil function '_T0S2iIegdd_ypIegr_TR'
 
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
-// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @guaranteed @callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
 // CHECK:   [[TUPLE_TO_APPLY0:%.*]] = tuple ([[ARG2]] : $Int, [[ARG3]] : $Int)
 // CHECK:   [[TUPLE_TO_APPLY1:%.*]] = tuple ([[ARG1]] : $Int, [[TUPLE_TO_APPLY0]] : $(Int, Int))
 // CHECK:   [[TUPLE_TO_APPLY2:%.*]] = tuple ([[ARG0]] : $Int, [[TUPLE_TO_APPLY1]] : $(Int, (Int, Int)), [[ARG4]] : $Int)
-// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG5]]([[TUPLE_TO_APPLY2]]) : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)
+// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG5]]([[TUPLE_TO_APPLY2]]) : $@callee_guaranteed (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)
 // CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_APPLY]] : $(Int, (Int, (Int, Int)), Int), 0
 // CHECK:   [[TUPLE_EXTRACT1:%.*]] = tuple_extract [[TUPLE_APPLY]] : $(Int, (Int, (Int, Int)), Int), 1
 // CHECK:   [[RET_VAL1:%.*]] = tuple_extract [[TUPLE_EXTRACT1]] : $(Int, (Int, Int)), 0
@@ -1217,10 +1189,10 @@ public func s020_______assignToVar() {
 // CHECK:   return [[RET_VAL_TUPLE]] : $(Int, Int, Int, Int, Int)
 // CHECK-LABEL: } // end sil function '{{.*}}'
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) <T> (Int, @in T, @owned @callee_owned (@in (Int, T)) -> @out (Int, T)) -> (Int, @out T) {
-// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T, [[ARG2:%.*]] : $@callee_owned (@in (Int, T)) -> @out (Int, T)):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) <T> (Int, @in T, @guaranteed @callee_guaranteed (@in (Int, T)) -> @out (Int, T)) -> (Int, @out T) {
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T, [[ARG2:%.*]] : $@callee_guaranteed (@in (Int, T)) -> @out (Int, T)):
 // CHECK:   [[TUPLE_TO_APPLY:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
-// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG2]]([[TUPLE_TO_APPLY]]) : $@callee_owned (@in (Int, T)) -> @out (Int, T)
+// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG2]]([[TUPLE_TO_APPLY]]) : $@callee_guaranteed (@in (Int, T)) -> @out (Int, T)
 // CHECK:   [[TUPLE_BORROW:%.*]] = begin_borrow [[TUPLE_APPLY]] : $(Int, T)
 // CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 0
 // CHECK:   [[TUPLE_EXTRACT:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 1
@@ -1275,9 +1247,9 @@ extension Dictionary {
 
 // s400______maybeCloneP continued Test: reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xSgIexr_20opaque_values_silgen8Clonable_pSgIexr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable> {
-// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> @out Optional<τ_0_0>):
-// CHECK:   [[APPLY_ARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> @out Optional<τ_0_0>
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xSgIegr_20opaque_values_silgen8Clonable_pSgIegr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out Optional<τ_0_0>) -> @out Optional<Clonable> {
+// CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> @out Optional<τ_0_0>):
+// CHECK:   [[APPLY_ARG:%.*]] = apply [[ARG]]() : $@callee_guaranteed () -> @out Optional<τ_0_0>
 // CHECK:   switch_enum [[APPLY_ARG]] : $Optional<τ_0_0>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK:   [[ONONE:%.*]] = enum $Optional<Clonable>, #Optional.none!enumelt
@@ -1288,12 +1260,12 @@ extension Dictionary {
 // CHECK:   br bb3([[OSOME]] : $Optional<Clonable>)
 // CHECK: bb3([[RETVAL:%.*]] : $Optional<Clonable>):
 // CHECK:   return [[RETVAL]] : $Optional<Clonable>
-// CHECK-LABEL: } // end sil function '_T0xSgIexr_20opaque_values_silgen8Clonable_pSgIexr_AbCRzlTR'
+// CHECK-LABEL: } // end sil function '_T0xSgIegr_20opaque_values_silgen8Clonable_pSgIegr_AbCRzlTR'
 
 // s320__transImplodeAny continued Test: reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIexi_S2iIexyy_TR : $@convention(thin) (Int, Int, @owned @callee_owned (@in Any) -> ()) -> () {
-// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@callee_owned (@in Any) -> ()):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIegi_S2iIegyy_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in Any) -> ()) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@callee_guaranteed (@in Any) -> ()):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)
 // CHECK:   [[TADDR0:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 0
@@ -1302,7 +1274,7 @@ extension Dictionary {
 // CHECK:   store [[ARG1]] to [trivial] [[TADDR1]] : $*Int
 // CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*(Int, Int)
 // CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[LOAD_EXIST]] : $(Int, Int), $(Int, Int), $Any
-// CHECK:   [[APPLYARG:%.*]] = apply [[ARG2]]([[INIT_OPAQUE]]) : $@callee_owned (@in Any) -> ()
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG2]]([[INIT_OPAQUE]]) : $@callee_guaranteed (@in Any) -> ()
 // CHECK:   dealloc_stack [[ASTACK]] : $*Any
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '_T0ypIexi_S2iIexyy_TR'
+// CHECK-LABEL: } // end sil function '_T0ypIegi_S2iIegyy_TR'

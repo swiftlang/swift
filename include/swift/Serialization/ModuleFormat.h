@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 382; // Last change: SIL_WITNESS_CONDITIONAL_CONFORMANCE
+const uint16_t VERSION_MINOR = 389; // Last change: don't serialize 'self'
 
 using DeclIDField = BCFixed<31>;
 
@@ -819,7 +819,8 @@ namespace decls_block {
     TypeIDField, // interface type (no longer used)
     BCFixed<1>,  // implicit flag
     GenericEnvironmentIDField, // generic environment
-    AccessLevelField // access level
+    AccessLevelField, // access level
+    BCArray<TypeIDField> // dependency types
     // Trailed by generic parameters (if any).
   >;
 
@@ -976,7 +977,6 @@ namespace decls_block {
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
-    BCVBR<5>,     // number of parameter patterns
     GenericEnvironmentIDField, // generic environment
     TypeIDField,  // interface type
     DeclIDField,  // operator decl
@@ -1399,6 +1399,11 @@ namespace decls_block {
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
     BCFixed<2>  // inline value
+  >;
+
+  using OptimizeDeclAttrLayout = BCRecordLayout<
+    Optimize_DECL_ATTR,
+    BCFixed<2>  // optimize value
   >;
 
   // Encodes a VersionTuple:

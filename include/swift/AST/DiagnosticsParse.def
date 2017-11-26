@@ -1365,10 +1365,10 @@ ERROR(opened_attribute_id_value,none,
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
-// inline
-ERROR(inline_attribute_expect_option,none,
-      "expected '%0' option such as 'never'", (StringRef))
-ERROR(inline_attribute_unknown_option,none,
+// inline, optimize
+ERROR(optimization_attribute_expect_option,none,
+      "expected '%0' option such as '%1'", (StringRef, StringRef))
+ERROR(optimization_attribute_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
 // effects

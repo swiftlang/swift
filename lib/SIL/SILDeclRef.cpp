@@ -484,6 +484,12 @@ FuncDecl *SILDeclRef::getFuncDecl() const {
   return dyn_cast<FuncDecl>(getDecl());
 }
 
+bool SILDeclRef::isSetter() const {
+  if (!hasFuncDecl())
+    return false;
+  return getFuncDecl()->isSetter();
+}
+
 AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
   return dyn_cast<AbstractFunctionDecl>(getDecl());
 }
@@ -701,7 +707,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()
+      if (!NameA->Name.empty() &&
+          !isForeignToNativeThunk() && !isNativeToForeignThunk()
           && !isCurried) {
         return NameA->Name;
       }

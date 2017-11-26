@@ -5,9 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class a
-class a<a{{}class a<a{var f=a
-& ManagedBuffer
-protocol a
+// RUN: not %target-swift-frontend %s -emit-ir
+func a
+class a<b}let d=a?as?CVarArg
+& a

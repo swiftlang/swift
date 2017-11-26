@@ -21,11 +21,11 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Refactoring.h"
 // This is included only for createLazyResolver(). Move to different header ?
@@ -677,12 +677,12 @@ public:
       return true;
 
     case SyntaxNodeKind::Keyword:
+    case SyntaxNodeKind::Identifier:
       if (Node.Range.getStart() == LastArgLoc ||
           Node.Range.getStart() == LastParamLoc)
         return true;
       break;
 
-    case SyntaxNodeKind::Identifier:
     case SyntaxNodeKind::DollarIdent:
     case SyntaxNodeKind::Integer:
     case SyntaxNodeKind::Floating:
@@ -1041,10 +1041,11 @@ public:
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               Optional<AccessKind> AccKind,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
   }
 
   bool isLocal(Decl *D) const {

@@ -954,7 +954,8 @@ public:
   /// Generate SIL for the given expression, storing the final result into the
   /// specified Initialization buffer(s). This avoids an allocation and copy if
   /// the result would be allocated into temporary memory normally.
-  void emitExprInto(Expr *E, Initialization *I);
+  /// The location defaults to \c E.
+  void emitExprInto(Expr *E, Initialization *I, Optional<SILLocation> L = None);
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
@@ -1632,8 +1633,7 @@ public:
   /// Used for emitting SILArguments of bare functions, such as thunks and
   /// open-coded materializeForSet.
   void collectThunkParams(SILLocation loc,
-                          SmallVectorImpl<ManagedValue> &params,
-                          bool allowPlusZero);
+                          SmallVectorImpl<ManagedValue> &params);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

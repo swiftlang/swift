@@ -4,7 +4,7 @@ var escapeHatch: Any = 0
 
 // CHECK-LABEL: sil hidden @_T025without_actually_escaping9letEscapeyycyyc1f_tF
 func letEscape(f: () -> ()) -> () -> () {
-  // CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_owned () -> ()):
+  // CHECK: bb0([[ARG:%.*]] : @owned $@noescape @callee_guaranteed () -> ()):
   // TODO: Use a canary wrapper instead of just copying the nonescaping value
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[ESCAPABLE_COPY:%.*]] = copy_value [[BORROWED_ARG]]

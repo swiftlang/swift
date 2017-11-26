@@ -416,10 +416,15 @@ void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
 
 } // end anonymous namespace
 
-ConstraintSystem::SolverState::SolverState(ConstraintSystem &cs) : CS(cs) {
+ConstraintSystem::SolverState::SolverState(Expr *const expr,
+                                           ConstraintSystem &cs)
+    : CS(cs) {
   assert(!CS.solverState &&
          "Constraint system should not already have solver state!");
   CS.solverState = this;
+
+  if (expr)
+    ExprWeights = expr->getDepthMap();
 
   ++NumSolutionAttempts;
   SolutionAttempt = NumSolutionAttempts;
@@ -774,7 +779,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
 Optional<Solution>
 ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
   SmallVector<Solution, 4> solutions;
-  if (solve(solutions, allowFreeTypeVariables) ||
+  if (solve(nullptr, solutions, allowFreeTypeVariables) ||
       solutions.size() != 1)
     return Optional<Solution>();
 
@@ -864,7 +869,7 @@ bool ConstraintSystem::Candidate::solve(
   // Try to solve the system and record all available solutions.
   llvm::SmallVector<Solution, 2> solutions;
   {
-    SolverState state(cs);
+    SolverState state(E, cs);
 
     // Use solveRec() instead of solve() in here, because solve()
     // would try to deduce the best solution, which we don't
@@ -1366,7 +1371,7 @@ ConstraintSystem::solve(Expr *&expr,
   }
 
   // Try to solve the constraint system using computed suggestions.
-  solve(solutions, allowFreeTypeVariables);
+  solve(expr, solutions, allowFreeTypeVariables);
 
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
@@ -1381,10 +1386,11 @@ ConstraintSystem::solve(Expr *&expr,
   return unsolved ? SolutionKind::Unsolved : SolutionKind::Solved;
 }
 
-bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
+bool ConstraintSystem::solve(Expr *const expr,
+                             SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   // Set up solver state.
-  SolverState state(*this);
+  SolverState state(expr, *this);
 
   // Simplify any constraints left active after constraint generation
   // and optimization. Return if the resulting system has no
@@ -1404,7 +1410,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // a single best solution to use, if not explicitly disabled
   // by constraint system options.
   if (!retainAllSolutions())
-    filterSolutions(solutions);
+    filterSolutions(solutions, state.ExprWeights);
 
   // We fail if there is no solution.
   return solutions.empty();
@@ -1621,7 +1627,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     // If there's a single best solution, keep only that one.
     // Otherwise, the set of solutions will at least have been minimized.
     if (!retainAllSolutions())
-      filterSolutions(solutions, /*minimize=*/true);
+      filterSolutions(solutions, solverState->ExprWeights, /*minimize=*/true);
   }
 
   // Produce all combinations of partial solutions.
@@ -1852,6 +1858,50 @@ bool ConstraintSystem::solveSimplified(
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
+  // Check if selected disjunction has a representative
+  // this might happen when there are multiple binary operators
+  // chained together. If so, disable choices which differ
+  // from currently selected representative.
+  auto pruneOverloadSet = [&](Constraint *disjunction) -> bool {
+    auto *choice = disjunction->getNestedConstraints().front();
+    auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
+    if (!typeVar)
+      return false;
+
+    auto *repr = typeVar->getImpl().getRepresentative(nullptr);
+    if (!repr || repr == typeVar)
+      return false;
+
+    bool isPruned = false;
+    for (auto resolved = resolvedOverloadSets; resolved;
+         resolved = resolved->Previous) {
+      if (!resolved->BoundType->isEqual(repr))
+        continue;
+
+      auto &representative = resolved->Choice;
+      if (!representative.isDecl())
+        return false;
+
+      // Disable all of the overload choices which are different from
+      // the one which is currently picked for representative.
+      for (auto *constraint : disjunction->getNestedConstraints()) {
+        auto choice = constraint->getOverloadChoice();
+        if (!choice.isDecl())
+          continue;
+
+        if (choice.getDecl() != representative.getDecl()) {
+          constraint->setDisabled();
+          isPruned = true;
+        }
+      }
+      break;
+    }
+
+    return isPruned;
+  };
+
+  bool hasDisabledChoices = pruneOverloadSet(disjunction);
+
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
   Optional<Score> bestNonGenericScore;
 
@@ -1929,6 +1979,14 @@ bool ConstraintSystem::solveSimplified(
   // Put the disjunction constraint back in its place.
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
+
+  if (hasDisabledChoices) {
+    // Re-enable previously disabled overload choices.
+    for (auto *choice : disjunction->getNestedConstraints()) {
+      if (choice->isDisabled())
+        choice->setEnabled();
+    }
+  }
 
   // If we are exiting due to an expression that is too complex, do
   // not allow our caller to continue as if we have been successful.

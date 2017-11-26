@@ -389,7 +389,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
-      (unsigned)F.getInlineStrategy(), (unsigned)F.getEffectsKind(),
+      (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
+      (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(), FnID,
       genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
@@ -827,6 +828,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
     break;
   }
+  case SILInstructionKind::BeginApplyInst: {
+    // Format: attributes such as transparent and number of substitutions,
+    // the callee's substituted and unsubstituted types, a value for
+    // the callee and a list of values for the arguments. Each value in the list
+    // is represented with 2 IDs: ValueID and ValueResultNumber. The record
+    // is followed by the substitution list.
+    const BeginApplyInst *AI = cast<BeginApplyInst>(&SI);
+    SmallVector<ValueID, 4> Args;
+    for (auto Arg: AI->getArguments()) {
+      Args.push_back(addValueRef(Arg));
+    }
+    SILInstApplyLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstApplyLayout::Code],
+        AI->isNonThrowing() ? SIL_NON_THROWING_BEGIN_APPLY : SIL_BEGIN_APPLY,
+        AI->getSubstitutions().size(),
+        S.addTypeRef(AI->getCallee()->getType().getSwiftRValueType()),
+        S.addTypeRef(AI->getSubstCalleeType()),
+        addValueRef(AI->getCallee()),
+        Args);
+    S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
+    break;
+  }
   case SILInstructionKind::TryApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for
@@ -1101,6 +1124,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::ThrowInst: {

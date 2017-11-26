@@ -2016,7 +2016,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (CS.solve(viable, FreeTypeVariableBinding::UnresolvedType))
+  if (CS.solve(expr, viable, FreeTypeVariableBinding::UnresolvedType))
     return true;
 
   auto &solution = viable[0];
@@ -2060,7 +2060,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if ((cs.solve(viable) || viable.size() != 1) &&
+  if ((cs.solve(expr, viable) || viable.size() != 1) &&
       cs.salvage(viable, expr)) {
     return true;
   }
@@ -2647,7 +2647,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          Context.getIdentifier("$match"),
                                          rhsType,
                                          DC);
-  matchVar->setInterfaceType(DC->mapTypeOutOfContext(rhsType));
+  matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();
   EP->setMatchVar(matchVar);
@@ -2762,7 +2762,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   if (openArchetypes) {
     assert(!unwrappedIUO && "FIXME");
     SmallVector<Solution, 4> solutions;
-    return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
+    return !cs.solve(nullptr, solutions, FreeTypeVariableBinding::Allow);
   }
 
   if (auto solution = cs.solveSingle()) {
@@ -2943,7 +2943,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if ((cs.solve(viable) || viable.size() != 1) &&
+  if ((cs.solve(expr, viable) || viable.size() != 1) &&
       cs.salvage(viable, expr)) {
     return true;
   }
@@ -2999,10 +2999,15 @@ void Solution::dump(raw_ostream &out) const {
 
   out << "Type variables:\n";
   for (auto binding : typeBindings) {
+    auto &typeVar = binding.first->getImpl();
     out.indent(2);
-    binding.first->getImpl().print(out);
+    typeVar.print(out);
     out << " as ";
     binding.second.print(out);
+    if (auto *locator = typeVar.getLocator()) {
+      out << " @ ";
+      locator->dump(&ctx.SourceMgr, out);
+    }
     out << "\n";
   }
 

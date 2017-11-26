@@ -458,6 +458,14 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
     }  
   }
 
+  // Cannot extend a bound generic type.
+  if (options.contains(TR_ExtensionBinding)) {
+    diagnose(loc, diag::extension_specialization,
+             genericDecl->getName())
+      .highlight(generic->getSourceRange());
+    return ErrorType::get(Context);
+  }
+
   // FIXME: More principled handling of circularity.
   if (!genericDecl->hasValidSignature()) {
     diagnose(loc, diag::recursive_type_reference,
@@ -591,7 +599,9 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic signature.
   if (!hasTypeParameterOrVariable) {
     auto result =
-      checkGenericArguments(dc, loc, noteLoc, unboundType, genericSig,
+      checkGenericArguments(dc, loc, noteLoc, unboundType,
+                            genericSig->getGenericParams(),
+                            genericSig->getRequirements(),
                             QueryTypeSubstitutionMap{subs},
                             LookUpConformance(*this, dc),
                             unsatisfiedDependency);
@@ -676,22 +686,26 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             UnsatisfiedDependency *unsatisfiedDependency) {
   assert(fromDC && "No declaration context for type resolution?");
 
-  // If we have a callback to report dependencies, do so.
-  if (unsatisfiedDependency) {
-    if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
-      return nullptr;
-  } else {
-    // Validate the declaration.
-    TC.validateDeclForNameLookup(typeDecl);
-  }
+  // Don't validate nominal type declarations during extension binding.
+  if (!options.contains(TR_ExtensionBinding) ||
+      !isa<NominalTypeDecl>(typeDecl)) {
+    // If we have a callback to report dependencies, do so.
+    if (unsatisfiedDependency) {
+      if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
+        return nullptr;
+    } else {
+      // Validate the declaration.
+      TC.validateDeclForNameLookup(typeDecl);
+    }
 
-  // If we didn't bail out with an unsatisfiedDependency,
-  // and were not able to validate recursively, bail out.
-  if (!typeDecl->hasInterfaceType()) {
-    TC.diagnose(loc, diag::recursive_type_reference,
-                typeDecl->getDescriptiveKind(), typeDecl->getName());
-    TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
-    return ErrorType::get(TC.Context);
+    // If we didn't bail out with an unsatisfiedDependency,
+    // and were not able to validate recursively, bail out.
+    if (!typeDecl->hasInterfaceType()) {
+      TC.diagnose(loc, diag::recursive_type_reference,
+                  typeDecl->getDescriptiveKind(), typeDecl->getName());
+      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
+      return ErrorType::get(TC.Context);
+    }
   }
 
   // Resolve the type declaration to a specific type. How this occurs
@@ -1114,11 +1128,21 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                                 comp->getIdLoc() })))
     return Type();
 
+  auto id = comp->getIdentifier();
+
+  // If we're compiling for Swift version < 5 and we have a mention of
+  // ImplicitlyUnwrappedOptional where it is not allowed, treat it as
+  // if it was spelled Optional.
+  if (id == TC.Context.Id_ImplicitlyUnwrappedOptional
+      && !options.contains(TR_AllowIUO)
+      && !TC.Context.isSwiftVersionAtLeast(5))
+    id = TC.Context.Id_Optional;
+
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TR_KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
   auto globals = TC.lookupUnqualifiedType(lookupDC,
-                                          comp->getIdentifier(),
+                                          id,
                                           comp->getIdLoc(),
                                           lookupOptions);
 
@@ -1181,10 +1205,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return ErrorType::get(TC.Context);
   }
 
-  // Emit a warning about directly spelling
-  // ImplicitlyUnwrappedOptional rather than using a trailing '!'.
-  auto *IUODecl = TC.Context.getImplicitlyUnwrappedOptionalDecl();
-  if (currentDecl == IUODecl) {
+  // Emit diagnostics related to ImplicitlyUnwrappedOptional.
+  if (comp->getIdentifier() == TC.Context.Id_ImplicitlyUnwrappedOptional) {
     if (options.contains(TR_AllowIUO)) {
       if (isa<GenericIdentTypeRepr>(comp)) {
         auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
@@ -1195,7 +1217,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
         // For Swift 5 and later, spelling the full name is an error.
         if (TC.Context.isSwiftVersionAtLeast(5))
-          diag = diag::implicitly_unwrapped_optional_spelling_error_with_fixit;
+          diag = diag::
+              implicitly_unwrapped_optional_spelling_error_with_bang_fixit;
 
         TC.diagnose(comp->getStartLoc(), diag)
           .fixItRemoveChars(
@@ -1214,13 +1237,18 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
         TC.diagnose(comp->getStartLoc(), diag);
       }
-    } else if (TC.Context.isSwiftVersionAtLeast(5)) {
-      if (isa<GenericIdentTypeRepr>(comp)) {
-        auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
-        assert(genericTyR->getGenericArgs().size() == 1);
-        auto *genericArgTyR = genericTyR->getGenericArgs()[0];
+    } else if (isa<GenericIdentTypeRepr>(comp)) {
+      Diagnostic diag =
+          diag::implicitly_unwrapped_optional_spelling_decay_to_optional;
 
-        TC.diagnose(comp->getStartLoc(), diag::iuo_in_illegal_position)
+      if (TC.Context.isSwiftVersionAtLeast(5))
+        diag = diag::implicitly_unwrapped_optional_spelling_in_illegal_position;
+
+      auto *genericTyR = cast<GenericIdentTypeRepr>(comp);
+      assert(genericTyR->getGenericArgs().size() == 1);
+      auto *genericArgTyR = genericTyR->getGenericArgs()[0];
+
+      TC.diagnose(comp->getStartLoc(), diag)
           .fixItRemoveChars(
               genericTyR->getStartLoc(),
               genericTyR->getAngleBrackets().Start.getAdvancedLoc(1))
@@ -1228,13 +1256,17 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           .fixItRemoveChars(
               genericTyR->getAngleBrackets().End,
               genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
-      } else {
-        TC.diagnose(comp->getStartLoc(), diag::iuo_in_illegal_position);
-      }
     } else {
-      // Pre-Swift-5 warning for spelling ImplicitlyUnwrappedOptional
-      // in places we shouldn't even allow it.
-      TC.diagnose(comp->getStartLoc(), diag::implicitly_unwrapped_optional_spelling_deprecated);
+      Diagnostic diag =
+          diag::implicitly_unwrapped_optional_spelling_decay_to_optional;
+
+      if (TC.Context.isSwiftVersionAtLeast(5))
+        diag = diag::
+            implicitly_unwrapped_optional_spelling_error_with_optional_fixit;
+
+      SourceRange R = SourceRange(comp->getIdLoc());
+
+      TC.diagnose(comp->getStartLoc(), diag).fixItReplace(R, "Optional");
     }
   }
 
@@ -1565,65 +1597,6 @@ Type TypeChecker::resolveIdentifierType(
   return result;
 }
 
-/// Returns true if any illegal IUOs were found. If inference of IUO type is
-/// disabled, IUOs may only be specified in the following positions:
-///  * outermost type
-///  * function param
-///  * function return type
-static bool checkForIllegalIUOs(TypeChecker &TC, TypeRepr *Repr,
-                                TypeResolutionOptions Options) {
-  class IllegalIUOWalker : public ASTWalker {
-    TypeChecker &TC;
-    SmallVector<bool, 4> IUOsAllowed;
-    bool FoundIllegalIUO = false;
-
-  public:
-    IllegalIUOWalker(TypeChecker &TC, bool IsGenericParameter)
-      : TC(TC)
-      , IUOsAllowed{!IsGenericParameter} {}
-
-    bool walkToTypeReprPre(TypeRepr *T) override {
-      bool iuoAllowedHere = IUOsAllowed.back();
-
-      // Raise a diagnostic if we run into a prohibited IUO.
-      if (!iuoAllowedHere) {
-        if (auto *iuoTypeRepr =
-            dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(T)) {
-          TC.diagnose(iuoTypeRepr->getStartLoc(), diag::iuo_in_illegal_position)
-            .fixItReplace(iuoTypeRepr->getExclamationLoc(), "?");
-          FoundIllegalIUO = true;
-        }
-      }
-
-      bool childIUOsAllowed = false;
-      if (iuoAllowedHere) {
-        if (auto *tupleTypeRepr = dyn_cast<TupleTypeRepr>(T)) {
-          if (tupleTypeRepr->isParenType()) {
-            childIUOsAllowed = true;
-          }
-        } else if (isa<FunctionTypeRepr>(T)) {
-          childIUOsAllowed = true;
-        } else if (isa<AttributedTypeRepr>(T) || isa<InOutTypeRepr>(T)) {
-          childIUOsAllowed = true;
-        }
-      }
-      IUOsAllowed.push_back(childIUOsAllowed);
-      return true;
-    }
-
-    bool walkToTypeReprPost(TypeRepr *T) override {
-      IUOsAllowed.pop_back();
-      return true;
-    }
-
-    bool getFoundIllegalIUO() const { return FoundIllegalIUO; }
-  };
-
-  IllegalIUOWalker Walker(TC, Options.contains(TR_GenericSignature));
-  Repr->walk(Walker);
-  return Walker.getFoundIllegalIUO();
-}
-
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
                                GenericTypeResolver *resolver,
@@ -1640,13 +1613,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
   if (Loc.getType().isNull()) {
-    // Swift version < 5? Use the old "illegal IUO" check for
-    // backwards compatibiliy.
-    if (!Context.isSwiftVersionAtLeast(5)) {
-      // Raise error if we parse an IUO type in an illegal position.
-      checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
-    }
-
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
     if (!type) {
@@ -2334,8 +2300,8 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
-    inputTy = genericEnv->mapTypeOutOfContext(inputTy);
-    outputTy = genericEnv->mapTypeOutOfContext(outputTy);
+    inputTy = inputTy->mapTypeOutOfContext();
+    outputTy = outputTy->mapTypeOutOfContext();
     return GenericFunctionType::get(genericEnv->getGenericSignature(),
                                     inputTy, outputTy, extInfo);
   }
@@ -2394,7 +2360,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
     
     for (auto &field : fields) {
-      auto transTy = genericEnv->mapTypeOutOfContext(field.getLoweredType());
+      auto transTy = field.getLoweredType()->mapTypeOutOfContext();
       field = {transTy->getCanonicalType(), field.isMutable()};
     }
   }
@@ -2535,24 +2501,24 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
-      auto transParamType = genericEnv->mapTypeOutOfContext(
-          param.getType())->getCanonicalType();
+      auto transParamType = param.getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
     for (auto &yield : yields) {
-      auto transYieldType = genericEnv->mapTypeOutOfContext(
-          yield.getType())->getCanonicalType();
+      auto transYieldType = yield.getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
       interfaceYields.push_back(yield.getWithType(transYieldType));
     }
     for (auto &result : results) {
-      auto transResultType = genericEnv->mapTypeOutOfContext(
-          result.getType())->getCanonicalType();
+      auto transResultType = result.getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
       interfaceResults.push_back(result.getWithType(transResultType));
     }
 
     if (errorResult) {
-      auto transErrorResultType = genericEnv->mapTypeOutOfContext(
-          errorResult->getType())->getCanonicalType();
+      auto transErrorResultType = errorResult->getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }
@@ -2876,13 +2842,15 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
+  if (!options.contains(TR_AllowIUO)) {
+    Diagnostic diag = diag::
+        implicitly_unwrapped_optional_in_illegal_position_decay_to_optional;
 
-  // Swift version >= 5? Use the newer check for IUOs appearing in
-  // illegal positions.
-  if (TC.Context.isSwiftVersionAtLeast(5) && !options.contains(TR_AllowIUO)) {
-    TC.diagnose(repr->getStartLoc(), diag::iuo_in_illegal_position)
-      .fixItReplace(repr->getExclamationLoc(), "?");
-    return ErrorType::get(Context);
+    if (TC.Context.isSwiftVersionAtLeast(5))
+      diag = diag::implicitly_unwrapped_optional_in_illegal_position;
+
+    TC.diagnose(repr->getStartLoc(), diag)
+        .fixItReplace(repr->getExclamationLoc(), "?");
   }
 
   auto elementOptions = withoutContext(options, true);
@@ -2893,8 +2861,14 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   Type baseTy = resolveType(repr->getBase(), elementOptions);
   if (!baseTy || baseTy->hasError()) return baseTy;
 
-  auto uncheckedOptionalTy =
-    TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
+  Type uncheckedOptionalTy;
+  if (!options.contains(TR_AllowIUO))
+    // Treat IUOs in illegal positions as optionals.
+    uncheckedOptionalTy = TC.getOptionalType(repr->getExclamationLoc(), baseTy);
+  else
+    uncheckedOptionalTy = TC.getImplicitlyUnwrappedOptionalType(
+        repr->getExclamationLoc(), baseTy);
+
   if (!uncheckedOptionalTy)
     return ErrorType::get(Context);
 
@@ -2912,7 +2886,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   auto elementOptions = options;
   if (repr->isParenType()) {
     // We also want to disallow IUO within even a paren.
-    elementOptions -= TR_AllowIUO;
+    // FIXME: Until we remove the IUO type from the type system, we
+    // need to continue to parse IUOs in SIL tests so that we can
+    // match the types we generate from the importer.
+    if (!options.contains(TR_SILMode))
+      elementOptions -= TR_AllowIUO;
 
     // If we have a single ParenType, don't clear the context bits; we
     // still want to parse the type contained therein as if it were in

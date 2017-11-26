@@ -2184,6 +2184,19 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   llvm_unreachable("unknown access level");
 }
 
+void ValueDecl::copyFormalAccessAndVersionedAttrFrom(ValueDecl *source) {
+  if (!hasAccess()) {
+    setAccess(source->getFormalAccess());
+  }
+
+  // Inherit the @_versioned attribute.
+  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto &ctx = getASTContext();
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    getAttrs().add(clonedAttr);
+  }
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -2490,7 +2503,7 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
   if (underlying->hasArchetype() && isGenericContext())
-    underlying = mapTypeOutOfContext(underlying);
+    underlying = underlying->mapTypeOutOfContext();
   UnderlyingTy.setType(underlying);
 
   // FIXME -- if we already have an interface type, we're changing the
@@ -2689,9 +2702,9 @@ DestructorDecl *ClassDecl::getDestructor() {
   return cast<DestructorDecl>(results.front());
 }
 
-DestructorDecl *ClassDecl::addImplicitDestructor() {
+void ClassDecl::addImplicitDestructor() {
   if (hasDestructor() || isInvalid())
-    return nullptr;
+    return;
 
   auto *selfDecl = ParamDecl::createSelf(getLoc(), this);
 
@@ -2699,12 +2712,36 @@ DestructorDecl *ClassDecl::addImplicitDestructor() {
   auto *DD = new (ctx) DestructorDecl(getLoc(), selfDecl, this);
 
   DD->setImplicit();
+  DD->setValidationStarted();
 
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
   addMember(DD);
   setHasDestructor();
-  return DD;
+
+  // Propagate access control and versioned-ness.
+  DD->copyFormalAccessAndVersionedAttrFrom(this);
+
+  // Wire up generic environment of DD.
+  DD->setGenericEnvironment(getGenericEnvironmentOfContext());
+
+  // Mark DD as ObjC, as all dtors are.
+  DD->setIsObjC(true);
+  recordObjCMethod(DD);
+
+  // Assign DD the interface type (Self) -> () -> ()
+  ArrayRef<AnyFunctionType::Param> noParams;
+  AnyFunctionType::ExtInfo info;
+  Type selfTy = selfDecl->getInterfaceType();
+  Type voidTy = TupleType::getEmpty(ctx);
+  Type funcTy = FunctionType::get(noParams, voidTy, info);
+  if (auto *sig = DD->getGenericSignature()) {
+    DD->setInterfaceType(
+      GenericFunctionType::get(sig, {selfTy}, funcTy, info));
+  } else {
+    DD->setInterfaceType(
+      FunctionType::get({selfTy}, funcTy, info));
+  }
 }
 
 
@@ -3936,7 +3973,12 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 }
 
 Type VarDecl::getType() const {
-  assert(!typeInContext.isNull() && "no contextual type set yet");
+  if (!typeInContext) {
+    const_cast<VarDecl *>(this)->typeInContext =
+      getDeclContext()->mapTypeIntoContext(
+        getInterfaceType())->getInOutObjectType();
+  }
+
   // FIXME(Remove InOutType): This grossness will go away when Sema is weaned
   // off of InOutType.  Until then we should respect our parameter flags and
   // return the type it expects.
@@ -4329,22 +4371,20 @@ ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
 ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = DC->getSelfTypeInContext();
   auto selfInterfaceType = DC->getSelfInterfaceType();
   auto specifier = VarDecl::Specifier::Owned;
-  assert(selfType && selfInterfaceType);
+  assert(selfInterfaceType);
 
   if (isStaticMethod) {
-    selfType = MetatypeType::get(selfType);
     selfInterfaceType = MetatypeType::get(selfInterfaceType);
   }
-    
+
   if (isInOut) {
     specifier = VarDecl::Specifier::InOut;
   }
 
   auto *selfDecl = new (C) ParamDecl(specifier, SourceLoc(),SourceLoc(),
-                                     Identifier(), loc, C.Id_self, selfType,DC);
+                                     Identifier(), loc, C.Id_self, Type(), DC);
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);
   selfDecl->setValidationStarted();
@@ -5148,7 +5188,7 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto inputTy = getArgumentTypeLoc().getType()) {
-    resultTy = FunctionType::get(ED->mapTypeOutOfContext(inputTy), resultTy);
+    resultTy = FunctionType::get(inputTy->mapTypeOutOfContext(), resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())

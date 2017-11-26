@@ -23,7 +23,7 @@ let s = "a foo is here"
 #selector(AStruct.foo(a:))
 #selector(AStruct.foo())
 #selector(AStruct.foo)
-let y = "before foo \(foo(a:1)) foo after"
+let y = "before foo \(foo(a:1)) foo after foo"
 
 func bar(a/* a comment */: Int, b c: Int, _: Int, _ d: Int) {}
 bar(a: 1, b: 2, 3, 4)
@@ -81,6 +81,17 @@ struct MultiPaneLayout<A: Layer, B: Layer>: Layer where A.Content == B.Content{
   typealias Content = Int
 }
 
+protocol P {}
+struct S {
+    subscript<K: P>(key: K) -> Int {
+        return 0
+    }
+}
+protocol Q {}
+func genfoo<T: P, U, V where U: P>(x: T, y: U, z: V, a: P) -> P where V: P {
+  fatalError()
+}
+
 // RUN: rm -rf %t.result && mkdir -p %t.result
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
 // RUN: diff -u %S/syntactic-rename/x.expected %t.result/x.expected
@@ -103,6 +114,8 @@ struct MultiPaneLayout<A: Layer, B: Layer>: Layer where A.Content == B.Content{
 // RUN: diff -u %S/syntactic-rename/rename-memberwise.expected %t.result/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.result/rename-layer.expected
 // RUN: diff -u %S/syntactic-rename/rename-layer.expected %t.result/rename-layer.expected
+// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 3 >> %t.result/rename-P.expected
+// RUN: diff -u %S/syntactic-rename/rename-P.expected %t.result/rename-P.expected
 
 // RUN: rm -rf %t.ranges && mkdir -p %t.ranges
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/x.in.json %s >> %t.ranges/x.expected
@@ -123,3 +136,5 @@ struct MultiPaneLayout<A: Layer, B: Layer>: Layer where A.Content == B.Content{
 // RUN: diff -u %S/find-rename-ranges/rename-memberwise.expected %t.ranges/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.ranges/rename-layer.expected
 // RUN: diff -u %S/find-rename-ranges/rename-layer.expected %t.ranges/rename-layer.expected
+// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 3 >> %t.ranges/rename-P.expected
+// RUN: diff -u %S/find-rename-ranges/rename-P.expected %t.ranges/rename-P.expected

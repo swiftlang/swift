@@ -625,7 +625,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   ASTContext &ctx = getContext();
   DeclContext *dc = getDeclContext(contextID);
-  Type conformingType = dc->getDeclaredTypeInContext();
+  Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
@@ -1277,9 +1277,18 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     DeclBaseName name = getDeclBaseName(IID);
     pathTrace.addValue(name);
 
-    Type filterTy = getType(TID);
-    if (!isType)
+    Type filterTy;
+    if (!isType) {
+      auto maybeType = getTypeChecked(TID);
+      if (!maybeType) {
+        // FIXME: Don't throw away the inner error's information.
+        llvm::consumeError(maybeType.takeError());
+        return llvm::make_error<XRefError>("couldn't decode type",
+                                           pathTrace, name);
+      }
+      filterTy = maybeType.get();
       pathTrace.addType(filterTy);
+    }
 
     baseModule->lookupQualified(ModuleType::get(baseModule), name,
                                 NL_QualifiedDefault | NL_KnownNoDependency,
@@ -1482,9 +1491,18 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
 
       pathTrace.addValue(memberName);
 
-      Type filterTy = getType(TID);
-      if (!isType)
+      Type filterTy;
+      if (!isType) {
+        auto maybeType = getTypeChecked(TID);
+        if (!maybeType) {
+          // FIXME: Don't throw away the inner error's information.
+          llvm::consumeError(maybeType.takeError());
+          return llvm::make_error<XRefError>("couldn't decode type",
+                                             pathTrace, memberName);
+        }
+        filterTy = maybeType.get();
         pathTrace.addType(filterTy);
+      }
 
       if (values.size() != 1) {
         return llvm::make_error<XRefError>("multiple matching base values",
@@ -2318,6 +2336,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         break;
       }
 
+      case decls_block::Optimize_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::OptimizeDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) OptimizeAttr((OptimizationMode)kind);
+        break;
+      }
+
       case decls_block::Effects_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::EffectsDeclAttrLayout::readRecord(scratch,
@@ -2488,11 +2514,22 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     bool isImplicit;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
+    ArrayRef<uint64_t> dependencyIDs;
 
     decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
                                              underlyingTypeID, interfaceTypeID,
                                              isImplicit, genericEnvID,
-                                             rawAccessLevel);
+                                             rawAccessLevel, dependencyIDs);
+
+    Identifier name = getIdentifier(nameID);
+
+    for (TypeID dependencyID : dependencyIDs) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
 
@@ -2500,8 +2537,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(),
-                                           getIdentifier(nameID),
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(), name,
                                            SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
@@ -2752,12 +2788,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       return nullptr;
     }
 
-    auto *bodyParams0 = readParameterList();
-    bodyParams0->get(0)->setImplicit();  // self is implicit.
-    
-    auto *bodyParams1 = readParameterList();
-    assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
-    ctor->setParameterLists(bodyParams0->get(0), bodyParams1);
+    bool mutating = parent->getDeclaredInterfaceType()->hasReferenceSemantics();
+    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parent,
+                                           /*static*/ false,
+                                           /*mutating*/ mutating);
+    selfDecl->setImplicit();
+
+    auto *bodyParams = readParameterList();
+    assert(bodyParams && "missing parameters for constructor");
+    ctor->setParameterLists(selfDecl, bodyParams);
 
     auto interfaceType = getType(interfaceID);
     ctor->setInterfaceType(interfaceType);
@@ -2836,8 +2875,30 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     for (TypeID dependencyID : dependencyIDs) {
       auto dependency = getTypeChecked(dependencyID);
       if (!dependency) {
+        // Stored properties in classes still impact class object layout because
+        // their offset is computed and stored in the field offset vector.
+        DeclDeserializationError::Flags flags;
+        
+        if (!isStatic) {
+          switch ((StorageKind)storageKind) {
+          case StorageKind::Stored:
+          case StorageKind::StoredWithObservers:
+          case StorageKind::StoredWithTrivialAccessors:
+            flags |= DeclDeserializationError::Flag::NeedsFieldOffsetVectorEntry;
+            break;
+            
+          case StorageKind::Addressed:
+          case StorageKind::AddressedWithObservers:
+          case StorageKind::AddressedWithTrivialAccessors:
+          case StorageKind::Computed:
+          case StorageKind::ComputedWithMutableAddress:
+          case StorageKind::InheritedWithObservers:
+            break;
+          }
+        }
+        
         return llvm::make_error<TypeError>(
-            name, takeErrorInfo(dependency.takeError()));
+            name, takeErrorInfo(dependency.takeError()), flags);
       }
     }
 
@@ -2930,7 +2991,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawAddressorKind, rawMutModifier;
     bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
-    unsigned numParamPatterns, numNameComponentsBiased;
+    unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
     DeclID associatedDeclID;
@@ -2944,7 +3005,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
                                         isStatic, rawStaticSpelling, isObjC,
                                         rawMutModifier, hasDynamicSelf,
                                         hasForcedStaticDispatch, throws,
-                                        numParamPatterns, genericEnvID,
+                                        genericEnvID,
                                         interfaceTypeID,
                                         associatedDeclID, overriddenID,
                                         accessorStorageDeclID,
@@ -3016,6 +3077,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    auto numParamPatterns = DC->isTypeContext() ? 2 : 1;
     auto fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
@@ -3067,13 +3129,16 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     fn->setInterfaceType(interfaceType);
 
     SmallVector<ParameterList*, 2> paramLists;
-    for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
-      paramLists.push_back(readParameterList());
+    if (DC->isTypeContext()) {
+      auto *selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
+                                             fn->isStatic(),
+                                             fn->isMutating());
+      selfDecl->setImplicit();
+      paramLists.push_back(ParameterList::create(ctx, selfDecl));
+    }
 
-    // If the first parameter list is (self), mark it implicit.
-    if (numParamPatterns && DC->isTypeContext())
-      paramLists[0]->get(0)->setImplicit();
-    
+    paramLists.push_back(readParameterList());
+
     fn->setDeserializedSignature(paramLists, TypeLoc());
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
@@ -3722,11 +3787,11 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    auto *selfParams = readParameterList();
-    selfParams->get(0)->setImplicit();  // self is implicit.
-
-    assert(selfParams && "Didn't get self pattern?");
-    dtor->setSelfDecl(selfParams->get(0));
+    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
+                                           /*static*/ false,
+                                           /*mutating*/ false);
+    selfDecl->setImplicit();
+    dtor->setSelfDecl(selfDecl);
 
     auto interfaceType = getType(interfaceID);
     dtor->setInterfaceType(interfaceType);
@@ -4654,6 +4719,9 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
     } else if (error.needsVTableEntry()) {
       suppliedMissingMember = MissingMemberDecl::forMethod(
           context, containingClass, error.getName(), error.needsVTableEntry());
+    } else if (error.needsFieldOffsetVectorEntry()) {
+      suppliedMissingMember = MissingMemberDecl::forStoredProperty(
+          context, containingClass, error.getName());
     }
     // FIXME: Handle other kinds of missing members: properties,
     // subscripts, and methods that don't need vtable entries.

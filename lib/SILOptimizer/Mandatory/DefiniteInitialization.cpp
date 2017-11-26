@@ -890,11 +890,13 @@ void LifetimeChecker::handleLoadUse(unsigned UseID) {
         continue;
 
       unsigned OperandNumber = OEAUse->getOperandNumber();
-      if (OperandNumber < 1 || OperandNumber > AI->getNumCallArguments())
+      auto OptArgumentNumber =
+        AI->getArgumentIndexForOperandIndex(OperandNumber);
+      if (!OptArgumentNumber)
         // Not used as a call argument
         continue;
 
-      unsigned ArgumentNumber = OperandNumber - 1;
+      unsigned ArgumentNumber = *OptArgumentNumber;
 
       CanSILFunctionType calleeType = AI->getSubstCalleeType();
       SILParameterInfo parameterInfo = calleeType->getParameters()[ArgumentNumber];

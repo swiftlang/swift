@@ -66,6 +66,10 @@ public:
   IRGenModule &IGM;
   IRBuilder Builder;
 
+  /// If != OptimizationMode::NotSet, the optimization mode specified with an
+  /// function attribute.
+  OptimizationMode OptMode;
+
   llvm::Function *CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
@@ -73,6 +77,7 @@ public:
   const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
                 Optional<SILLocation> DbgLoc = None);
   ~IRGenFunction();
@@ -85,7 +90,7 @@ public:
 public:
   Explosion collectParameters();
   void emitScalarReturn(SILType resultTy, Explosion &scalars,
-                        bool isSwiftCCReturn);
+                        bool isSwiftCCReturn, bool isOutlined);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -111,6 +116,16 @@ private:
 
 //--- Helper methods -----------------------------------------------------------
 public:
+
+  /// Returns the optimization mode for the function. If no mode is set for the
+  /// function, returns the global mode, i.e. the mode in IRGenOptions.
+  OptimizationMode getEffectiveOptimizationMode() const;
+
+  /// Returns true if this function should be optimized for size.
+  bool optimizeForSize() const {
+    return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
+  }
+
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name);
   Address createAlloca(llvm::Type *ty, llvm::Value *ArraySize, Alignment align,
@@ -555,12 +570,6 @@ public:
   llvm::Value *getLocalSelfMetadata();
   void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
 
-public:
-  //--- Outlined Function Support -------------------------------------------
-public:
-  bool isInOutlinedFunction();
-  void setInOutlinedFunction();
-
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -577,10 +586,6 @@ private:
   llvm::Value *LocalSelf = nullptr;
   
   LocalSelfKind SelfKind;
-
-  /// Flag indiacting wherever we are in the middle of creating
-  /// an outlined address type function
-  bool inOutlinedFunction;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

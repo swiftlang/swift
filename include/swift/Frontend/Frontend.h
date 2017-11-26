@@ -287,14 +287,6 @@ public:
     return CodeCompletionFactory;
   }
 
-  void setDelayedFunctionBodyParsing(bool Val) {
-    FrontendOpts.DelayedFunctionBodyParsing = Val;
-  }
-
-  bool isDelayedFunctionBodyParsing() const {
-    return FrontendOpts.DelayedFunctionBodyParsing;
-  }
-
   /// Retrieve a module hash string that is suitable for uniquely
   /// identifying the conditions under which the module was built, for use
   /// in generating a cached PCH file for the bridging header.
@@ -308,6 +300,17 @@ public:
       return SourceFile::ImplicitModuleImportKind::Builtin;
     }
     return SourceFile::ImplicitModuleImportKind::Stdlib;
+  }
+
+  /// Performs input setup common to these tools:
+  /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
+  /// Return value includes the buffer so caller can keep it alive.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
+  setUpInputForSILTool(StringRef InputFilename, StringRef ModuleNameArg,
+                       bool alwaysSetModuleToMain,
+                       serialization::ExtendedValidationInfo &extendedInfo);
+  bool hasSerializedAST() {
+    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
   }
 };
 
@@ -467,7 +470,8 @@ public: // for static functions in Frontend.cpp
 
 private:
   void createREPLFile(const ImplicitImports &implicitImports) const;
-  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
+  std::unique_ptr<DelayedParsingCallbacks>
+  computeDelayedParsingCallback(bool isPrimary);
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
@@ -476,13 +480,15 @@ private:
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
                         PersistentParserState &PersistentState,
-                        DelayedParsingCallbacks *DelayedParseCB);
+                        DelayedParsingCallbacks *PrimaryDelayedCB,
+                        DelayedParsingCallbacks *SecondaryDelayedCB);
 
   /// Return true if had load error
   bool
   parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
                                      PersistentParserState &PersistentState,
-                                     DelayedParsingCallbacks *DelayedParseCB);
+                                     DelayedParsingCallbacks *PrimaryDelayedCB,
+                                     DelayedParsingCallbacks *SecondaryDelayedCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
@@ -491,7 +497,6 @@ private:
   void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
                                  DelayedParsingCallbacks *DelayedParseCB,
                                  OptionSet<TypeCheckingFlags> TypeCheckOptions);
-  void performTypeCheckingAndDelayedParsing();
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 };

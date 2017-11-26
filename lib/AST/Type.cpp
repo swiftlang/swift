@@ -220,6 +220,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::TypeVariable:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
+  case TypeKind::SILToken:
   case TypeKind::UnownedStorage:
   case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:
@@ -1157,6 +1158,7 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
+  case TypeKind::SILToken:
     llvm_unreachable("SIL-only types are always canonical!");
 
   case TypeKind::Function: {
@@ -1276,6 +1278,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
+  case TypeKind::SILToken:
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::ProtocolComposition:
@@ -1494,6 +1497,7 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::SILFunction:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
+  case TypeKind::SILToken:
   case TypeKind::GenericFunction: {
     // Polymorphic function types should never be explicitly spelled.
     return false;
@@ -3011,8 +3015,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     if (!conformance) return failed();
     if (!conformance->isConcrete()) return failed();
-    assert(conformance->getConditionalRequirements().empty() &&
-           "unhandled conditional requirements");
 
     // Retrieve the type witness.
     auto witness =
@@ -3332,17 +3334,22 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
 
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
   Type t(this);
+
+  if (!t->getAnyNominal()) {
+    if (auto archetype = t->getAs<ArchetypeType>()) {
+      t = archetype->getSuperclass();
+    } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
+      t = dynamicSelfTy->getSelfType();
+    } else if (auto compositionTy = t->getAs<ProtocolCompositionType>()) {
+      t = compositionTy->getExistentialLayout().superclass;
+    }
+  }
+
   while (t) {
     // If we have a class-constrained archetype or class-constrained
     // existential, get the underlying superclass constraint.
     auto *nominalDecl = t->getAnyNominal();
-    if (!nominalDecl) {
-      assert(t->is<ArchetypeType>() || t->isExistentialType() &&
-             "expected a class, archetype or existential");
-      t = t->getSuperclass();
-      assert(t && "archetype or existential is not class constrained");
-      continue;
-    }
+    assert(nominalDecl && "expected nominal type here");
     assert(isa<ClassDecl>(nominalDecl) && "expected a class here");
 
     if (nominalDecl == baseClass)
@@ -3359,7 +3366,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(dc->isTypeContext());
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() && !baseTy->is<AnyMetatypeType>());
+  assert(!baseTy->hasLValueType() &&
+         !baseTy->is<AnyMetatypeType>() &&
+         !baseTy->is<ErrorType>());
 
   // The resulting set of substitutions. Always use this to ensure we
   // don't miss out on NRVO anywhere.
@@ -3624,6 +3633,7 @@ case TypeKind::Id:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
   case TypeKind::GenericTypeParam:
+  case TypeKind::SILToken:
     return *this;
 
   case TypeKind::Enum:
@@ -4209,6 +4219,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::TypeVariable:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
+  case TypeKind::SILToken:
   case TypeKind::UnownedStorage:
   case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:

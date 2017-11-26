@@ -48,7 +48,6 @@ add_swift_library(swiftAST STATIC
   SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
-  SourceEntityWalker.cpp
   Substitution.cpp
   SubstitutionList.cpp
   SubstitutionMap.cpp

@@ -36,7 +36,7 @@ func main(_ x: Int64) -> Void
 // CHECK: call {{.*}} @swift_rt_swift_release {{.*}}
 // CHECK: bitcast
 // CHECK: llvm.lifetime.end
-// CHECK: call {{.*}} @swift_rt_swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
+// CHECK: call {{.*}}llvm.lifetime.end{{.*}}, !dbg ![[CLOSURE_END:.*]]
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
 // CHECK: ![[CLOSURE_END]] = !DILocation(line: [[@LINE+1]],
         }

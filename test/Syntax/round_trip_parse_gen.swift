@@ -10,7 +10,7 @@ class C {
   func bar3(a: Int) -> Int { return 1 }
   func bar4(_ a: Int) -> Int { return 1 }
   func foo() {
-    var a = /*comment*/"abc"/*comment*/
+    var a = /*comment*/"ab\(x)c"/*comment*/
     var b = /*comment*/+2/*comment*/
     bar(1)
     bar(+10)
@@ -32,5 +32,12 @@ class C {
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
+  }
+  func boolAnd() -> Bool { return true && false }
+  func boolOr() -> Bool { return true || false }
+
+  func foo2() {
+    _ = true ? 1 : 0
+    _ = (true ? 1 : 0) ? (true ? 1 : 0) : (true ? 1 : 0)
   }
 }

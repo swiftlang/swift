@@ -17,7 +17,7 @@ import StdlibCollectionUnittest
 // Tests
 
 func allocateForRawBuffer(count: Int) -> UnsafeMutableRawPointer {
-  return UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: 1)
+  return UnsafeMutableRawPointer.allocate(byteCount: count, alignment: 1)
 }
 func allocateForBuffer<T>(count: Int) -> UnsafeMutablePointer<T> {
   return UnsafeMutablePointer<T>.allocate(capacity: count)
@@ -25,12 +25,12 @@ func allocateForBuffer<T>(count: Int) -> UnsafeMutablePointer<T> {
 func deallocateForRawBuffer(
   _ memory: UnsafeMutableRawPointer, count: Int
 ) {
-  memory.deallocate(bytes: count, alignedTo: 1)
+  memory.deallocate()
 }
 func deallocateForBuffer<T>(
   _ memory: UnsafeMutablePointer<T>, count: Int
 ) {
-  memory.deallocate(capacity: count)
+  memory.deallocate()
 }
 
 // Initialize memory with arbitrary equatable, comparable values.
@@ -74,7 +74,8 @@ ${SelfName}TestSuite.test("AssociatedTypes") {
 }
 
 ${SelfName}TestSuite.test("rebasing") {
-  let rawbuffer = UnsafeMutableRawBufferPointer.allocate(count: 4 * MemoryLayout<Int>.stride)
+  let rawbuffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 4 * MemoryLayout<Int>.stride, alignment: MemoryLayout<UInt>.alignment)
   defer { rawbuffer.deallocate() }
 
   rawbuffer.copyBytes(from: [0, 1, 2, 3])
@@ -136,7 +137,7 @@ func checkWithExpectedBuffer(checkBuffers: (${SelfType}, ${SelfType}) -> Void) {
     count: elementCount)
 
 %   if IsRaw:
-    expectedBuffer.copyBytes(from: buffer)
+    expectedBuffer.copyMemory(from: UnsafeRawBufferPointer(buffer))
 %   else:
     _ = expectedBuffer.initialize(from: buffer)
 %   end
@@ -168,7 +169,7 @@ ${SelfName}TestSuite.test("nilBaseAddress") {
 
 ${SelfName}TestSuite.test("nonNilButEmpty") {
   let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
-  defer { emptyAllocated.deallocate(capacity: 0) }
+  defer { emptyAllocated.deallocate() }
 
   let emptyBuffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: 0)
   expectEqual(emptyAllocated, emptyBuffer.baseAddress)
@@ -184,9 +185,9 @@ ${SelfName}TestSuite.test("nonNilButEmpty") {
 %   if IsRaw:
 ${SelfName}TestSuite.test("nonNilNonEmpty") {
   let count = 4
-  let allocated = UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: 1)
-  defer { allocated.deallocate(bytes: count, alignedTo: 1) }
-  let uint8Ptr = allocated.initializeMemory(as: UInt8.self, count: count, to: 1)
+  let allocated = UnsafeMutableRawPointer.allocate(byteCount: count, alignment: 1)
+  defer { allocated.deallocate() }
+  let uint8Ptr = allocated.initializeMemory(as: UInt8.self, repeating: 1, count: count)
   uint8Ptr[count - 1] = 2
 
   let buffer = ${SelfType}(start: ${PointerType}(allocated), count: count - 1)
@@ -213,8 +214,8 @@ ${SelfName}TestSuite.test("nonNilNonEmpty") {
 ${SelfName}TestSuite.test("nonNilNonEmpty") {
   let count = 4
   let allocated = UnsafeMutablePointer<Float>.allocate(capacity: count)
-  defer { allocated.deallocate(capacity: count) }
-  allocated.initialize(to: 1.0, count: count)
+  defer { allocated.deallocate() }
+  allocated.initialize(repeating: 1.0, count: count)
   allocated[count - 1] = 2.0
 
   let buffer = ${SelfType}(start: ${PointerType}(allocated), count: count - 1)
@@ -247,7 +248,7 @@ ${SelfName}TestSuite.test("badCount")
   expectCrashLater()
 
   let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
-  defer { emptyAllocated.deallocate(capacity: 0) }
+  defer { emptyAllocated.deallocate() }
 
   let buffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: -1)
   _ = buffer
@@ -267,9 +268,9 @@ ${SelfName}TestSuite.test("badNilCount")
 
 UnsafeMutableRawBufferPointerTestSuite.test("changeElementViaBuffer") {
   let count = 4
-  let allocated = UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: 1)
-  defer { allocated.deallocate(bytes: count, alignedTo: 1) }
-  let uint8Ptr = allocated.initializeMemory(as: UInt8.self, count: count, to: 1)
+  let allocated = UnsafeMutableRawPointer.allocate(byteCount: count, alignment: 1)
+  defer { allocated.deallocate() }
+  let uint8Ptr = allocated.initializeMemory(as: UInt8.self, repeating: 1, count: count)
   uint8Ptr[count-1] = UInt8.max
 
   var buffer = UnsafeMutableRawBufferPointer(start: allocated, count: count - 1)
@@ -298,8 +299,8 @@ UnsafeMutableRawBufferPointerTestSuite.test("changeElementViaBuffer") {
 UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   let count = 4
   let allocated = UnsafeMutablePointer<Float>.allocate(capacity: count)
-  defer { allocated.deallocate(capacity: count) }
-  allocated.initialize(to: 1.0, count: count)
+  defer { allocated.deallocate() }
+  allocated.initialize(repeating: 1.0, count: count)
   allocated[count-1] = -1.0
 
   var buffer = UnsafeMutableBufferPointer(start: allocated, count: count - 1)
@@ -343,7 +344,7 @@ extension SubscriptTest {
     -> ${SelfType}
   {
     for i in Self.start..<Self.end {
-      memory.initializeMemory(as: UInt8.self, at: i, to: numericCast(i))
+      (memory + i * MemoryLayout<UInt8>.stride).initializeMemory(as: UInt8.self, repeating: numericCast(i), count: 1)
     }
     return ${SelfType}(start: memory, count: Self.elementCount)
   }
@@ -489,8 +490,8 @@ struct SubscriptSetTest : SubscriptTest {
   ) -> UnsafeMutableRawBufferPointer.SubSequence
   {
     for (i, value) in replacementValues.enumerated() {
-      memory.initializeMemory(
-        as: UInt8.self, at: i, to: numericCast(value.value))
+      (memory + i * MemoryLayout<UInt8>.stride).initializeMemory(
+        as: UInt8.self, repeating: numericCast(value.value), count: 1)
     }
     let buffer = UnsafeMutableRawBufferPointer(
       start: memory, count: replacementValues.count)
@@ -756,6 +757,7 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
   defer { deallocateFor${Raw}Buffer(
       sliceMemory, count: replacementValues.count) }
 
+  // This produces a spurious compiler warning, someone take a look lol?
   var buffer = SubscriptSetTest.create${SelfName}(from: memory)
 
 %     if IsRaw:

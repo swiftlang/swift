@@ -194,6 +194,7 @@ NODE(OutlinedInitializeWithTake)
 NODE(OutlinedInitializeWithCopy)
 NODE(OutlinedAssignWithTake)
 NODE(OutlinedAssignWithCopy)
+NODE(OutlinedDestroy)
 NODE(OutlinedVariable)
 NODE(AssocTypePath)
 #undef CONTEXT_NODE

@@ -130,7 +130,7 @@ int main(int argc_, const char **argv_) {
       llvm::sys::path::parent_path(getExecutablePath(argv[0])));
     llvm::sys::path::append(SubcommandPath, SubcommandName);
 
-    // If we didn't find the tool there, search for it.let the OS search for it.
+    // If we didn't find the tool there, let the OS search for it.
     if (!llvm::sys::fs::exists(SubcommandPath)) {
       // Search for the program and use the path if found. If there was an
       // error, ignore it and just let the exec fail.

@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/libBasic.%target-dylib-extension) %S/../Inputs/conditional_conformance_basic_conformances.swift -module-name Basic -emit-module -emit-module-path %t/Basic.swiftmodule
 // RUN: %target-build-swift-dylib(%t/libWithAssoc.%target-dylib-extension) %S/../Inputs/conditional_conformance_with_assoc.swift -module-name WithAssoc -emit-module -emit-module-path %t/WithAssoc.swiftmodule
-// FIXME: currently fails due to incorrect modeling of type parameters in inherited conformances.
-// %target-build-swift-dylib(%t/libSubclass.%target-dylib-extension) %S/../Inputs/conditional_conformance_subclass.swift -module-name Subclass -emit-module -emit-module-path %t/Subclass.swiftmodule
-// RUN: %target-build-swift -I%t -L%t -lBasic -lWithAssoc %s -o %t/conditional_conformances_modules -Xlinker -rpath -Xlinker %t
+// RUN: %target-build-swift-dylib(%t/libSubclass.%target-dylib-extension) %S/../Inputs/conditional_conformance_subclass.swift -module-name Subclass -emit-module -emit-module-path %t/Subclass.swiftmodule
+// RUN: %target-build-swift -I%t -L%t -lBasic -lWithAssoc -lSubclass %s -o %t/conditional_conformances_modules -Xlinker -rpath -Xlinker %t
 // RUN: %target-run %t/conditional_conformances_modules %t/libBasic.%target-dylib-extension %t/libWithAssoc.%target-dylib-extension
 
 // REQUIRES: executable_test
@@ -12,8 +11,7 @@
 
 import Basic
 import WithAssoc
-// FIXME: see above
-// import Subclass
+import Subclass
 
 
 public func basic_single_generic<T: Basic.P2>(_: T.Type) {
@@ -52,8 +50,6 @@ public func with_assoc_concrete_concrete() {
   WithAssoc.takes_p1(WithAssoc.Double<WithAssoc.IsAlsoP2, WithAssoc.IsP3>.self)
 }
 
-/*
-FIXME: see above
 public func subclass_subclassgeneric_generic<T: Subclass.P2>(_: T.Type) {
   Subclass.takes_p1(Subclass.SubclassGeneric<T>.self)
 }
@@ -66,7 +62,6 @@ public func subclass_subclassconcrete() {
 public func subclass_subclassgenericconcrete() {
   Subclass.takes_p1(Subclass.SubclassGenericConcrete.self)
 }
-*/
 
 
 basic_single_generic(Basic.IsP2.self)
@@ -82,10 +77,7 @@ with_assoc_concrete_generic(WithAssoc.IsP3.self)
 with_assoc_concrete_concrete()
 
 
-/*
-FIXME: see above
 subclass_subclassgeneric_generic(Subclass.IsP2.self)
 subclass_subclassgeneric_concrete()
 subclass_subclassconcrete()
 subclass_subclassgenericconcrete()
-*/

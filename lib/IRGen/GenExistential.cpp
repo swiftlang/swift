@@ -290,8 +290,8 @@ public:
     return getLayout().projectWitnessTable(IGF, obj, index);
   }
 
-  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const override {
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
 
     auto objPtrTy = dest.getAddress()->getType();
 
@@ -317,10 +317,9 @@ public:
     return metadata;
   }
 
-  void initializeWithCopy(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
-    if (IGF.isInOutlinedFunction()) {
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
+    if (isOutlined) {
       llvm::Value *metadata = copyType(IGF, dest, src);
 
       auto layout = getLayout();
@@ -339,10 +338,9 @@ public:
     }
   }
 
-  void initializeWithTake(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
-    if (IGF.isInOutlinedFunction()) {
+  void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
+    if (isOutlined) {
       llvm::Value *metadata = copyType(IGF, dest, src);
 
       auto layout = getLayout();
@@ -361,8 +359,8 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
-
+  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+               bool isOutlined) const override {
     // Use copy-on-write existentials?
     auto fn = getDestroyBoxedOpaqueExistentialBufferFunction(
         IGF.IGM, getLayout(), addr.getAddress()->getType());
@@ -408,9 +406,9 @@ public:
                           existential.getAddress()->getName() + ".weakref");
   }
 
-  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const override {
-    if (IGF.isInOutlinedFunction()) {
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
+    if (isOutlined) {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, src);
       asDerived().emitValueAssignWithCopy(IGF, destValue, srcValue);
@@ -422,10 +420,9 @@ public:
     }
   }
 
-  void initializeWithCopy(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
-    if (IGF.isInOutlinedFunction()) {
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
+    if (isOutlined) {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, src);
       asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
@@ -437,10 +434,9 @@ public:
     }
   }
 
-  void assignWithTake(IRGenFunction &IGF,
-                      Address dest, Address src,
-                      SILType T) const override {
-    if (IGF.isInOutlinedFunction()) {
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
+    if (isOutlined) {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, src);
       asDerived().emitValueAssignWithTake(IGF, destValue, srcValue);
@@ -452,10 +448,9 @@ public:
     }
   }
 
-  void initializeWithTake(IRGenFunction &IGF,
-                          Address dest, Address src,
-                          SILType T) const override {
-    if (IGF.isInOutlinedFunction()) {
+  void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
+    if (isOutlined) {
       Address destValue = projectValue(IGF, dest);
       Address srcValue = projectValue(IGF, src);
       asDerived().emitValueInitializeWithTake(IGF, destValue, srcValue);
@@ -467,10 +462,14 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address existential,
-               SILType T) const override {
-    Address valueAddr = projectValue(IGF, existential);
-    asDerived().emitValueDestroy(IGF, valueAddr);
+  void destroy(IRGenFunction &IGF, Address existential, SILType T,
+               bool isOutlined) const override {
+    if (isOutlined) {
+      Address valueAddr = projectValue(IGF, existential);
+      asDerived().emitValueDestroy(IGF, valueAddr);
+    } else {
+      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, existential, T);
+    }
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them
@@ -811,8 +810,8 @@ public:
     asDerived().emitLoadOfTables(IGF, address, e);
   }
 
-  void assign(IRGenFunction &IGF, Explosion &e,
-              Address address) const override {
+  void assign(IRGenFunction &IGF, Explosion &e, Address address,
+              bool isOutlined) const override {
     // Assign the value.
     Address instanceAddr = asDerived().projectValue(IGF, address);
     llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
@@ -823,8 +822,8 @@ public:
     asDerived().emitStoreOfTables(IGF, e, address);
   }
 
-  void initialize(IRGenFunction &IGF, Explosion &e,
-                  Address address) const override {
+  void initialize(IRGenFunction &IGF, Explosion &e, Address address,
+                  bool isOutlined) const override {
     // Store the instance pointer.
     IGF.Builder.CreateStore(e.claimNext(),
                             asDerived().projectValue(IGF, address));
@@ -864,7 +863,9 @@ public:
     (void)src.claim(getNumStoredProtocols());
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+               bool isOutlined) const override {
+    // Small type (scalar) do not create outlined function
     llvm::Value *value = asDerived().loadValue(IGF, addr);
     asDerived().emitValueRelease(IGF, value, IGF.getDefaultAtomicity());
   }
@@ -2038,7 +2039,8 @@ static llvm::Constant *getAllocateBoxedOpaqueExistentialBufferFunction(
 
 Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
     IRGenFunction &IGF, SILType existentialType, SILType valueType,
-    Address existentialContainer, GenericEnvironment *genericEnv) {
+    Address existentialContainer, GenericEnvironment *genericEnv,
+    bool isOutlined) {
 
   // Project to the existential buffer in the existential container.
   auto &existentialTI =
@@ -2060,7 +2062,8 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
     }
     // Otherwise, allocate a box with enough storage.
     Address addr = emitAllocateExistentialBoxInBuffer(
-        IGF, valueType, existentialBuffer, genericEnv, "exist.box.addr");
+        IGF, valueType, existentialBuffer, genericEnv, "exist.box.addr",
+        isOutlined);
     return addr;
   }
   /// Call a function to handle the non-fixed case.

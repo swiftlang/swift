@@ -184,6 +184,14 @@ public:
   /// been added.
   explicit RValue(CanType type);
 
+  /// Return true if the rvalue was null-initialized. The intention is so one
+  /// can trampoline RValue results using if statements, i.e.:
+  ///
+  /// if (RValue rv = foo()) {
+  ///   return rv;
+  /// }
+  operator bool() const & { return isComplete() || isInContext(); }
+
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.
   bool isComplete() const & { return elementsToBeAdded == 0; }
@@ -339,6 +347,10 @@ public:
   
   /// Emit an equivalent value with independent ownership.
   RValue copy(SILGenFunction &SGF, SILLocation loc) const &;
+
+  /// If this RValue is a +0 value, copy the RValue and return. Otherwise,
+  /// return std::move(*this);
+  RValue ensurePlusOne(SILGenFunction &SGF, SILLocation loc) &&;
 
   /// Borrow all subvalues of the rvalue.
   RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;

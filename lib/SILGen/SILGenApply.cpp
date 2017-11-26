@@ -907,7 +907,7 @@ public:
 
     // Enum case constructor references are open-coded.
     if (auto *eed = dyn_cast<EnumElementDecl>(e->getDecl())) {
-      setCallee(Callee::forEnumElement(SGF, SILDeclRef(e->getDecl()), subs, e));
+      setCallee(Callee::forEnumElement(SGF, SILDeclRef(eed), subs, e));
       return;
     }
 
@@ -1101,7 +1101,8 @@ public:
         }
         auto loweredResultTy = SGF.getLoweredLoadableType(resultTy);
         if (loweredResultTy != selfValue.getType()) {
-          selfValue = SGF.B.createUpcast(ice, selfValue, loweredResultTy);
+          selfValue = SGF.emitManagedRValueWithCleanup(
+              SGF.B.createUpcast(ice, selfValue.forward(SGF), loweredResultTy));
         }
 
         selfArg = ice->getSubExpr();
@@ -4100,8 +4101,8 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   SILValue partialApply =
       SGF.B.createPartialApply(loc, superMethod.getValue(), partialApplyTy,
                                subs, {upcastedSelf.forward(SGF)}, closureTy);
-  firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(),
-                                  ManagedValue::forUnmanaged(partialApply));
+  ManagedValue pa = SGF.emitManagedRValueWithCleanup(partialApply);
+  firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
   return firstLevelResult;
 }
 
@@ -4158,13 +4159,13 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
                               firstLevelResult.foreignSelf, uncurriedArgs,
                               uncurriedLoc, formalApplyType);
 
-  // Emit the uncurried call.
+  // If we have a late emitter, just delegate to that emitter and return.
   if (specializedEmitter.isLateEmitter()) {
     auto emitter = specializedEmitter.getLateEmitter();
+    ManagedValue mv = emitter(SGF, *uncurriedLoc, callee.getSubstitutions(),
+                              uncurriedArgs, uncurriedContext);
     firstLevelResult.value =
-        RValue(SGF, *uncurriedLoc, formalApplyType.getResult(),
-               emitter(SGF, uncurriedLoc.getValue(), callee.getSubstitutions(),
-                       uncurriedArgs, uncurriedContext));
+        RValue(SGF, *uncurriedLoc, formalApplyType.getResult(), mv);
     return firstLevelResult;
   }
 
@@ -4805,7 +4806,6 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   // base isn't a temporary.  We aren't allowed to pass aliased
   // memory to 'in', and we have pass at +1.
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_In_Guaranteed:
     // TODO: We shouldn't be able to get an lvalue here, but the AST
     // sometimes produces an inout base for non-mutating accessors.
@@ -4819,6 +4819,10 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
     return true;
+
+  // Should not show up here.
+  case ParameterConvention::Indirect_In_Constant:
+    break;
   }
   llvm_unreachable("bad convention");
 }
@@ -5383,10 +5387,11 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
         loweredMethodTy, ValueOwnershipKind::Owned);
 
     // Create the result value.
+    Scope applyScope(Cleanups, CleanupLocation(e));
     ManagedValue result =
       emitDynamicPartialApply(*this, e, memberArg, operand,
                               foreignMethodTy, methodTy);
-    Scope applyScope(Cleanups, CleanupLocation(e));
+
     RValue resultRV;
     if (isa<VarDecl>(e->getMember().getDecl())) {
       resultRV = emitMonomorphicApply(e, result, {},
@@ -5477,13 +5482,13 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     SILValue memberArg = hasMemberBB->createPHIArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
     // Emit the application of 'self'.
+    Scope applyScope(Cleanups, CleanupLocation(e));
     ManagedValue result = emitDynamicPartialApply(*this, e, memberArg, base,
                                                   foreignMethodTy, methodTy);
     // Emit the index.
     llvm::SmallVector<ManagedValue, 2> indexArgs;
     std::move(index).getAll(indexArgs);
     
-    Scope applyScope(Cleanups, CleanupLocation(e));
     auto resultRV = emitMonomorphicApply(e, result, indexArgs,
                                          foreignMethodTy.getResult(), valueTy,
                                          ApplyOptions::DoesNotThrow,

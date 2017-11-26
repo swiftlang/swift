@@ -4844,7 +4844,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     AFD = dyn_cast<AbstractFunctionDecl>(candidate);
   }
 
-  if (!AFD || !AFD->isGeneric() || !AFD->hasInterfaceType())
+  if (!AFD || !AFD->getGenericSignature() || !AFD->hasInterfaceType())
     return false;
 
   auto env = AFD->getGenericEnvironment();
@@ -4975,8 +4975,10 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
       TC.diagnose(Candidate, note, first, second,
                   rawFirstType, rawSecondType,
-                  genericSig->gatherGenericParamBindingsText(
-                                 {rawFirstType, rawSecondType}, Substitutions));
+                  TypeChecker::gatherGenericParamBindingsText(
+                    {rawFirstType, rawSecondType},
+                    genericSig->getGenericParams(),
+                    Substitutions));
 
       ParentConditionalConformance::diagnoseConformanceStack(
           TC.Diags, Candidate->getLoc(), parents);
@@ -4992,7 +4994,9 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
   auto result = TC.checkGenericArguments(
       dc, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
-      env->getGenericSignature(), substitutionFn,
+      env->getGenericSignature()->getGenericParams(),
+      env->getGenericSignature()->getRequirements(),
+      substitutionFn,
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
@@ -8410,7 +8414,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
   {
     // Set up solver state.
-    SolverState state(*this);
+    SolverState state(expr, *this);
     state.recordFixes = true;
 
     // Solve the system.
@@ -8418,7 +8422,8 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.
-    if (auto best = findBestSolution(viable, /*minimize=*/true)) {
+    if (auto best = findBestSolution(viable, state.ExprWeights,
+                                     /*minimize=*/true)) {
       if (*best != 0)
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());

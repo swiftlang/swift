@@ -449,7 +449,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // the only time we get an interface type here is with invalid
     // circular cases. That should be diagnosed elsewhere.
     if (inheritedTy->hasArchetype() && !isa<GenericTypeParamDecl>(decl))
-      inheritedTy = DC->mapTypeOutOfContext(inheritedTy);
+      inheritedTy = inheritedTy->mapTypeOutOfContext();
 
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
@@ -3200,8 +3200,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   auto dc = decl->getDeclContext();
   auto behaviorSelf = conformance->getType();
-  auto behaviorInterfaceSelf =
-    conformance->getDeclContext()->mapTypeOutOfContext(behaviorSelf);
+  auto behaviorInterfaceSelf = behaviorSelf->mapTypeOutOfContext();
   auto behaviorProto = conformance->getProtocol();
   auto behaviorProtoTy = behaviorProto->getDeclaredType();
   
@@ -4638,7 +4637,7 @@ public:
     if (!IsFirstPass)
       TC.addImplicitConstructors(CD);
 
-    TC.addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
 
     if (!IsFirstPass && !CD->isInvalid())
       TC.checkConformancesInContext(CD, CD);
@@ -6381,6 +6380,7 @@ public:
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(Inline)
+    UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Inlineable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(FixedLayout)
@@ -6905,6 +6905,9 @@ public:
       if (auto extendedTy = ED->getExtendedType()) {
         if (auto nominal = extendedTy->getAnyNominal()) {
           TC.validateDecl(nominal);
+          if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+            TC.requestNominalLayout(classDecl);
+
           // Check the raw values of an enum, since we might synthesize
           // RawRepresentable while checking conformances on this extension.
           if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
@@ -7212,13 +7215,7 @@ public:
            && "Decl parsing must prevent destructors outside of types!");
 
     TC.checkDeclAttributesEarly(DD);
-    if (!DD->hasAccess()) {
-      DD->setAccess(enclosingClass->getFormalAccess());
-    }
-
-    if (enclosingClass->getAttrs().hasAttribute<VersionedAttr>()) {
-      DD->getAttrs().add(new (TC.Context) VersionedAttr(/*implicit=*/true));
-    }
+    DD->copyFormalAccessAndVersionedAttrFrom(enclosingClass);
 
     configureImplicitSelf(TC, DD);
 
@@ -7613,7 +7610,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       markAsObjC(*this, proto, isObjC);
     }
 
-    DeclsToFinalize.insert(proto);
+    // FIXME: IRGen likes to emit @objc protocol descriptors even if the
+    // protocol comes from a different module or translation unit.
+    //
+    // It would be nice if it didn't have to do that, then we could remove
+    // this case.
+    if (proto->isObjC())
+      requestNominalLayout(proto);
+
     break;
   }
 
@@ -7799,8 +7803,17 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       validateDeclForNameLookup(ATD);
     }
 
-    // Make sure the protocol is fully validated by the end of Sema.
-    DeclsToFinalize.insert(proto);
+    // Compute the requirement signature later to avoid circularity.
+    DelayedRequirementSignatures.insert(proto);
+
+    // FIXME: IRGen likes to emit @objc protocol descriptors even if the
+    // protocol comes from a different module or translation unit.
+    //
+    // It would be nice if it didn't have to do that, then we could remove
+    // this case.
+    if (proto->isObjC())
+      requestNominalLayout(proto);
+
     break;
   }
   case DeclKind::AssociatedType: {
@@ -7890,10 +7903,14 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
   return false;
 }
 
-void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
-  // FIXME: Check a flag in the class...
-  if (isa<SourceFile>(classDecl->getModuleScopeContext()))
-    DeclsToFinalize.insert(classDecl);
+void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
+  if (nominalDecl->hasValidatedLayout())
+    return;
+
+  nominalDecl->setHasValidatedLayout();
+
+  if (isa<SourceFile>(nominalDecl->getModuleScopeContext()))
+    DeclsToFinalize.insert(nominalDecl);
 }
 
 void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
@@ -7901,7 +7918,7 @@ void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
   if (superclassTy) {
     auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
     if (superclassDecl)
-      requestClassLayout(superclassDecl);
+      requestNominalLayout(superclassDecl);
   }
 }
 
@@ -7958,7 +7975,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   // class, you shouldn't have to know what the vtable layout is.
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
     TC.addImplicitConstructors(CD);
-    TC.addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
   }
 
   // validateDeclForNameLookup will not trigger an immediate full
@@ -8065,10 +8082,9 @@ static Type formExtensionInterfaceType(Type type,
   if (auto unbound = type->getAs<UnboundGenericType>()) {
     parentType = unbound->getParent();
     nominal = cast<NominalTypeDecl>(unbound->getDecl());
-  } else if (auto bound = type->getAs<BoundGenericType>()) {
-    parentType = bound->getParent();
-    nominal = bound->getDecl();
   } else {
+    if (type->is<ProtocolCompositionType>())
+      type = type->getCanonicalType();
     auto nominalType = type->castTo<NominalType>();
     parentType = nominalType->getParent();
     nominal = nominalType->getDecl();
@@ -8085,11 +8101,8 @@ static Type formExtensionInterfaceType(Type type,
 
   // If we don't have generic parameters at this level, just build the result.
   if (!nominal->getGenericParams() || isa<ProtocolDecl>(nominal)) {
-    Type resultType = NominalType::get(nominal, parentType,
-                                       nominal->getASTContext());
-
-    // If the parent was unchanged, return the original pointer.
-    return resultType->isEqual(type) ? type : resultType;
+    return NominalType::get(nominal, parentType,
+                            nominal->getASTContext());
   }
 
   // Form the bound generic type with the type parameters provided.
@@ -8098,8 +8111,7 @@ static Type formExtensionInterfaceType(Type type,
     genericArgs.push_back(gp->getDeclaredInterfaceType());
   }
 
-  Type resultType = BoundGenericType::get(nominal, parentType, genericArgs);
-  return resultType->isEqual(type) ? type : resultType;
+  return BoundGenericType::get(nominal, parentType, genericArgs);
 }
 
 /// Visit the given generic parameter lists from the outermost to the innermost,
@@ -8160,15 +8172,6 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   return { env, extContextType };
 }
 
-// FIXME: In TypeChecker.cpp; only needed because LLDB creates
-// extensions of typealiases to unbound generic types, which is
-// ill-formed but convenient.
-namespace swift {
-GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                     DeclContext *dc,
-                                     GenericParamList *fromParams);
-} // namespace swift
-
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // If we're currently validating, or have already validated this extension,
   // there's nothing more to do now.
@@ -8193,59 +8196,24 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // Validate the nominal type declaration being extended.
   auto nominal = extendedType->getAnyNominal();
   validateDecl(nominal);
-  if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-    requestClassLayout(classDecl);
 
-  if (extendedType->hasUnboundGenericType()) {
+  if (nominal->getGenericParamsOfContext()) {
     auto genericParams = ext->getGenericParams();
-
-    // The debugger synthesizes typealiases of unbound generic types
-    // to produce its extensions, which subverts bindExtensionDecl's
-    // ability to create the generic parameter lists. Create the list now.
-    if (!genericParams && Context.LangOpts.DebuggerSupport) {
-      genericParams = cloneGenericParams(Context, ext,
-                                         nominal->getGenericParams());
-      ext->setGenericParams(genericParams);
-    }
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
     GenericEnvironment *env;
     std::tie(env, extendedType) = checkExtensionGenericParams(
-        *this, ext, ext->getExtendedType(), ext->getGenericParams());
+        *this, ext, ext->getExtendedType(),
+        genericParams);
 
     ext->getExtendedTypeLoc().setType(extendedType);
     ext->setGenericEnvironment(env);
-    return;
-  }
-  
-  // If we're extending a protocol, check the generic parameters.
-  //
-  // Canonicalize the type to work around the fact that getAs<> cannot
-  // "look through" protocol<X, Y> where X and Y both desugar to the same
-  // thing.
-  //
-  // FIXME: Probably the above comes up elsewhere, perhaps getAs<>()
-  // should be fixed.
-  if (auto proto = extendedType->getCanonicalType()->getAs<ProtocolType>()) {
-    GenericEnvironment *env;
-    std::tie(env, extendedType) =
-        checkExtensionGenericParams(*this, ext, proto, ext->getGenericParams());
-
-    ext->getExtendedTypeLoc().setType(extendedType);
-    ext->setGenericEnvironment(env);
-    return;
-  }
-
-  // If the nominal type has a generic signature that we didn't otherwise
-  // handle yet, use it directly.
-  if (auto genericSig = nominal->getGenericSignature()) {
-    auto genericEnv = genericSig->createGenericEnvironment();
-    ext->setGenericEnvironment(genericEnv);
     return;
   }
 
   assert(extendedType->is<NominalType>());
+  assert(!nominal->isGenericContext());
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
@@ -8856,9 +8824,11 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
   // complete.
   auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
     auto targetType = target->getDeclaredInterfaceType();
-    if (auto ref = conformsToProtocol(targetType, protocol, target,
-                                      ConformanceCheckFlags::Used,
-                                      SourceLoc())) {
+    if (auto ref = conformsToProtocol(
+                        targetType, protocol, target,
+                        (ConformanceCheckFlags::Used|
+                         ConformanceCheckFlags::SkipConditionalRequirements),
+                         SourceLoc())) {
       if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
         if (conformance->isIncomplete()) {
           // Check conformance, forcing synthesis.

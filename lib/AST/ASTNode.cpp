@@ -76,16 +76,6 @@ void ASTNode::walk(ASTWalker &Walker) {
   else
     llvm_unreachable("unsupported AST node");
 }
-void ASTNode::walk(SourceEntityWalker &Walker) {
-  if (auto *E = this->dyn_cast<Expr*>())
-    Walker.walk(E);
-  else if (auto *S = this->dyn_cast<Stmt*>())
-    Walker.walk(S);
-  else if (auto *D = this->dyn_cast<Decl*>())
-    Walker.walk(D);
-  else
-    llvm_unreachable("unsupported AST node");
-}
 
 #define FUNC(T)                                                               \
 bool ASTNode::is##T(T##Kind Kind) const {                                     \

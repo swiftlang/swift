@@ -120,7 +120,7 @@ class B<T> {
     self.ptr = ptr
   }
   deinit {
-    ptr.deinitialize()
+    ptr.deinitialize(count: 1)
   }
 }
 

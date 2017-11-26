@@ -347,8 +347,9 @@ namespace {
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address addr, SILType T) const override {
-      ClangRecordTypeInfo::initialize(IGF, params, addr);
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      ClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -396,8 +397,9 @@ namespace {
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                              Address addr, SILType T) const override {
-      LoadableStructTypeInfo::initialize(IGF, params, addr);
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      LoadableStructTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;

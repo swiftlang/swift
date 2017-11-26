@@ -471,12 +471,10 @@ namespace {
           if (!baseTy->is<ArchetypeType>() && !baseTy->isAnyExistentialType()) {
             auto &tc = cs.getTypeChecker();
             auto conformance =
-              tc.conformsToProtocol(baseTy, proto, cs.DC,
-                                    (ConformanceCheckFlags::InExpression|
-                                         ConformanceCheckFlags::Used));
-            assert((!conformance ||
-                    conformance->getConditionalRequirements().empty()) &&
-                   "unhandled conditional conformance");
+              tc.conformsToProtocol(
+                        baseTy, proto, cs.DC,
+                        (ConformanceCheckFlags::InExpression|
+                         ConformanceCheckFlags::Used));
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
                         conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
@@ -849,7 +847,9 @@ namespace {
       // Class members might be virtually dispatched, so we need to know
       // the full layout of the class.
       if (auto *classDecl = dyn_cast<ClassDecl>(member->getDeclContext()))
-        tc.requestClassLayout(classDecl);
+        tc.requestNominalLayout(classDecl);
+      if (auto *protocolDecl = dyn_cast<ProtocolDecl>(member->getDeclContext()))
+        tc.requestNominalLayout(protocolDecl);
 
       auto refTy = solution.simplifyType(openedFullType);
 
@@ -1318,23 +1318,29 @@ namespace {
       
       // Apply a key path if we have one.
       if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
+        auto applicationTy = simplifyType(selected->openedType)
+          ->castTo<FunctionType>();
+                
         index = cs.coerceToRValue(index);
         // The index argument should be (keyPath: KeyPath<Root, Value>).
         // Dig the key path expression out of the argument tuple.
         auto indexKP = cast<TupleExpr>(index)->getElement(0);
-        auto keyPathTTy = cs.getType(indexKP);
-
+        auto keyPathExprTy = cs.getType(indexKP);
+        auto keyPathTy = applicationTy->getInput()->castTo<TupleType>()
+          ->getElementType(0);
+        
         // Check for the KeyPath being an IUO
-        if (auto pathTy = cs.lookThroughImplicitlyUnwrappedOptionalType(keyPathTTy)) {
-          keyPathTTy = pathTy;
-          indexKP = coerceImplicitlyUnwrappedOptionalToValue(indexKP, keyPathTTy, locator);
+        if (auto pathTy = cs.lookThroughImplicitlyUnwrappedOptionalType(keyPathExprTy)) {
+          keyPathExprTy = pathTy;
+          indexKP = coerceImplicitlyUnwrappedOptionalToValue(
+            indexKP, keyPathExprTy, locator);
         }
 
         Type valueTy;
         Type baseTy;
         bool resultIsLValue;
         
-        if (auto nom = keyPathTTy->getAs<NominalType>()) {
+        if (auto nom = keyPathTy->getAs<NominalType>()) {
           // AnyKeyPath is <T> rvalue T -> rvalue Any?
           if (nom->getDecl() == cs.getASTContext().getAnyKeyPathDecl()) {
             valueTy = ProtocolCompositionType::get(cs.getASTContext(), {},
@@ -1343,12 +1349,25 @@ namespace {
             resultIsLValue = false;
             base = cs.coerceToRValue(base);
             baseTy = cs.getType(base);
+            // We don't really want to attempt AnyKeyPath application
+            // if we know a more specific key path type is being applied.
+            if (!keyPathTy->isEqual(keyPathExprTy)) {
+              cs.TC.diagnose(base->getLoc(),
+                             diag::expr_smart_keypath_application_type_mismatch,
+                             keyPathExprTy,
+                             baseTy)
+                .highlight(index->getSourceRange());
+            }
           } else {
             llvm_unreachable("unknown key path class!");
           }
         } else {
-          auto keyPathBGT = keyPathTTy->castTo<BoundGenericType>();
+          auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
           baseTy = keyPathBGT->getGenericArgs()[0];
+          
+          // Coerce the base to the key path's expected base type.
+          if (!baseTy->isEqual(cs.getType(base)->getRValueType()))
+            base = coerceToType(base, baseTy, locator);
 
           if (keyPathBGT->getDecl()
                 == cs.getASTContext().getPartialKeyPathDecl()) {
@@ -1376,12 +1395,6 @@ namespace {
             } else {
               llvm_unreachable("unknown key path class!");
             }
-          }
-
-          // Coerce the base if its anticipated type doesn't match - say we're
-          // applying a keypath with an existential base to a concrete base.
-          if (baseTy->isExistentialType() && !cs.getType(base)->isExistentialType()) {
-            base = coerceToType(base, baseTy, locator);
           }
         }
         if (resultIsLValue)
@@ -2249,8 +2262,6 @@ namespace {
         tc.conformsToProtocol(conformingType, proto, cs.DC,
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "object literal type conforms to protocol");
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
                                                 ctx);
@@ -2701,8 +2712,6 @@ namespace {
         tc.conformsToProtocol(arrayTy, arrayProto, cs.DC,
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "Type does not conform to protocol?");
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       // Call the witness that builds the array literal.
       // FIXME: callWitness() may end up re-doing some work we already did
@@ -2784,9 +2793,6 @@ namespace {
                               ConformanceCheckFlags::InExpression);
       if (!conformance)
         return nullptr;
-
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       // Call the witness that builds the dictionary literal.
       // FIXME: callWitness() may end up re-doing some work we already did
@@ -4283,8 +4289,9 @@ namespace {
         for (auto indexType : indexTypes) {
           auto conformance =
             cs.TC.conformsToProtocol(indexType.getType(), hashable,
-                                     cs.DC, ConformanceCheckFlags::Used
-                                          |ConformanceCheckFlags::InExpression);
+                                     cs.DC,
+                                     (ConformanceCheckFlags::Used|
+                                      ConformanceCheckFlags::InExpression));
           if (!conformance) {
             cs.TC.diagnose(component.getIndexExpr()->getLoc(),
                            diag::expr_keypath_subscript_index_not_hashable,
@@ -5985,9 +5992,40 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  toTuple->getElementForScalarInit(), locator);
     }
 
-    case ConversionRestrictionKind::DeepEquality:
-      assert(toType->hasUnresolvedType() && "Should have handled this above");
-      break;
+    case ConversionRestrictionKind::DeepEquality: {
+      if (toType->hasUnresolvedType())
+        break;
+
+      // HACK: Fix problem related to Swift 3 mode (with assertions),
+      // since Swift 3 mode allows passing arguments with extra parens
+      // to parameters which don't expect them, it should be supported
+      // by "deep equality" type - Optional<T> e.g.
+      // ```swift
+      // func foo(_: (() -> Void)?) {}
+      // func bar() -> ((()) -> Void)? { return nil }
+      // foo(bar) // This expression should compile in Swift 3 mode
+      // ```
+      if (tc.getLangOpts().isSwiftVersion3()) {
+        auto obj1 = fromType->getAnyOptionalObjectType();
+        auto obj2 = toType->getAnyOptionalObjectType();
+
+        if (obj1 && obj2) {
+          auto *fn1 = obj1->getAs<AnyFunctionType>();
+          auto *fn2 = obj2->getAs<AnyFunctionType>();
+
+          if (fn1 && fn2) {
+            auto *params1 = fn1->getInput()->getAs<TupleType>();
+            auto *params2 = fn2->getInput()->getAs<TupleType>();
+
+            // This handles situations like argument: (()), parameter: ().
+            if (params1 && params2 && params1->isEqual(params2))
+              break;
+          }
+        }
+      }
+
+      llvm_unreachable("Should be handled above");
+    }
 
     case ConversionRestrictionKind::Superclass:
       return coerceSuperclass(expr, toType, locator);
@@ -6079,12 +6117,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Find the conformance of the source type to Hashable.
       auto hashable = tc.Context.getProtocol(KnownProtocolKind::Hashable);
       auto conformance =
-        tc.conformsToProtocol(cs.getType(expr), hashable, cs.DC,
-                              (ConformanceCheckFlags::InExpression |
-                               ConformanceCheckFlags::Used));
+        tc.conformsToProtocol(
+                        cs.getType(expr), hashable, cs.DC,
+                        (ConformanceCheckFlags::InExpression |
+                         ConformanceCheckFlags::Used));
       assert(conformance && "must conform to Hashable");
-      assert(conformance->getConditionalRequirements().empty() &&
-             "unhandled conditional conformance");
 
       return cs.cacheType(
           new (tc.Context) AnyHashableErasureExpr(expr, toType, *conformance));
@@ -6513,10 +6550,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   Optional<ProtocolConformanceRef> builtinConformance;
   if (builtinProtocol &&
       (builtinConformance =
-         tc.conformsToProtocol(type, builtinProtocol, cs.DC,
-                               ConformanceCheckFlags::InExpression))) {
-    assert(builtinConformance->getConditionalRequirements().empty() &&
-           "conditional conformance to builtins not handled");
+         tc.conformsToProtocol(
+                      type, builtinProtocol, cs.DC,
+                      (ConformanceCheckFlags::InExpression)))) {
 
     // Find the builtin argument type we'll use.
     Type argType;
@@ -6667,8 +6703,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       (builtinConformance =
          tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                ConformanceCheckFlags::InExpression))) {
-    assert(builtinConformance->getConditionalRequirements().empty() &&
-           "conditional conformance to builtins not handled");
+
     // Find the witness that we'll use to initialize the type via a builtin
     // literal.
     auto witness = findNamedWitnessImpl<AbstractFunctionDecl>(
@@ -7859,7 +7894,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   cs.cacheExprTypes(call);
 
   // If the system failed to produce a solution, post any available diagnostics.
-  if (cs.solve(solutions) || solutions.size() != 1) {
+  if (cs.solve(call, solutions) || solutions.size() != 1) {
     cs.salvage(solutions, base);
     return nullptr;
   }

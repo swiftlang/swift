@@ -669,6 +669,13 @@ enum class ConformanceCheckFlags {
   /// FIXME: This deals with some oddities with the
   /// _ObjectiveCBridgeable conformances.
   SuppressDependencyTracking = 0x04,
+  /// Whether to skip the check for any conditional conformances.
+  ///
+  /// When set, the caller takes responsibility for any
+  /// conditional requirements required for the conformance to be
+  /// correctly used. Otherwise (the default), all of the conditional
+  /// requirements will be checked.
+  SkipConditionalRequirements = 0x08,
 };
 
 /// Options that control protocol conformance checking.
@@ -715,6 +722,11 @@ public:
   /// we can hand them off to SILGen etc.
   llvm::SetVector<ValueDecl *> DeclsToFinalize;
 
+  /// The list of protocols that need their requirement signatures computed,
+  /// because they were first validated by validateDeclForNameLookup(),
+  /// which skips this step.
+  llvm::SetVector<ProtocolDecl *> DelayedRequirementSignatures;
+
   /// The list of types whose circularity checks were delayed.
   SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
@@ -740,12 +752,6 @@ public:
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
-
-  /// Describes an attempt to capture a local function.
-  struct LocalFunctionCapture {
-    FuncDecl *LocalFunction;
-    SourceLoc CaptureLoc;
-  };
 
   /// Local functions that have been captured before their definitions.
   ///
@@ -1074,7 +1080,7 @@ public:
 
   /// Request that the given class needs to have all members validated
   /// after everything in the translation unit has been processed.
-  void requestClassLayout(ClassDecl *classDecl);
+  void requestNominalLayout(NominalTypeDecl *nominalDecl);
 
   /// Request that the superclass of the given class, if any, needs to have
   /// all members validated after everything in the translation unit has
@@ -1462,6 +1468,24 @@ public:
                             GenericTypeResolver *resolver,
                             GenericSignatureBuilder *builder = nullptr);
 
+  /// Create a text string that describes the bindings of generic parameters
+  /// that are relevant to the given set of types, e.g.,
+  /// "[with T = Bar, U = Wibble]".
+  ///
+  /// \param types The types that will be scanned for generic type parameters,
+  /// which will be used in the resulting type.
+  ///
+  /// \param genericParams The generic parameters to use to resugar any
+  /// generic parameters that occur within the types.
+  ///
+  /// \param substitutions The generic parameter -> generic argument
+  /// substitutions that will have been applied to these types.
+  /// These are used to produce the "parameter = argument" bindings in the test.
+  static std::string
+  gatherGenericParamBindingsText(ArrayRef<Type> types,
+                                 ArrayRef<GenericTypeParamType *> genericParams,
+                                 TypeSubstitutionFn substitutions);
+
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
@@ -1469,7 +1493,9 @@ public:
   /// \param loc The location at which any diagnostics should be emitted.
   /// \param noteLoc The location at which any notes will be printed.
   /// \param owner The type that owns the generic signature.
-  /// \param genericSig The actual generic signature.
+  /// \param genericParams The generic parameters being substituted.
+  /// \param requirements The requirements against which the generic arguments
+  /// should be checked.
   /// \param substitutions Substitutions from interface types of the signature.
   /// \param unsatisfiedDependency Optional callback for reporting unsatisfied
   /// dependencies.
@@ -1479,7 +1505,9 @@ public:
   /// notify callers about diagnosed errors.
   RequirementCheckResult checkGenericArguments(
       DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-      GenericSignature *genericSig, TypeSubstitutionFn substitutions,
+      ArrayRef<GenericTypeParamType *> genericParams,
+      ArrayRef<Requirement> requirements,
+      TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
       UnsatisfiedDependency *unsatisfiedDependency,
       ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
@@ -1516,10 +1544,6 @@ public:
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);
-
-  /// \brief Add an implicitly-defined destructor, if there is no
-  /// user-provided destructor.
-  void addImplicitDestructor(ClassDecl *CD);
 
   /// \brief Add the RawOptionSet (todo:, Equatable, and Hashable) methods to an
   /// imported NS_OPTIONS struct.

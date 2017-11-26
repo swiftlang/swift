@@ -171,5 +171,25 @@ EXPR_NODES = [
     Node('StringLiteralExpr', kind='Expr',
          children=[
              Child("StringLiteral", kind='StringLiteralToken')
-         ])
+         ]),
+
+    # true or false
+    Node('BooleanLiteralExpr', kind='Expr',
+         children=[
+             Child("BooleanLiteral", kind='Token',
+                   token_choices=[
+                       'TrueToken',
+                       'FalseToken',
+                   ])
+         ]),
+
+    # a ? 1 : 0
+    Node('TernaryExpr', kind='Expr',
+         children=[
+             Child("ConditionExpression", kind='Expr'),
+             Child("QuestionMark", kind='InfixQuestionMarkToken'),
+             Child("FirstChoice", kind='Expr'),
+             Child("ColonMark", kind='ColonToken'),
+             Child("SecondChoice", kind='Expr')
+         ]),
 ]

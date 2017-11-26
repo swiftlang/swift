@@ -148,24 +148,17 @@ static SwiftObject *_allocHelper(Class cls) {
 }
 
 NSString *swift::convertStringToNSString(String *swiftString) {
+  // public func _convertStringToNSString(_ string: String) -> NSString
   typedef SWIFT_CC(swift) NSString *ConversionFn(void *sx, void *sy, void *sz);
+  auto convertStringToNSString = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<ConversionFn*>(dlsym(RTLD_DEFAULT,
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_convertStringToNSStringSo0E0CSSF)))));
 
-  // Cached lookup of swift_convertStringToNSString, which is in Foundation.
-  static std::atomic<ConversionFn *> TheConvertStringToNSString(nullptr);
-  auto convertStringToNSString =
-    TheConvertStringToNSString.load(std::memory_order_relaxed);
-  if (!convertStringToNSString) {
-    convertStringToNSString = (ConversionFn *)(uintptr_t)
-      dlsym(RTLD_DEFAULT, "swift_convertStringToNSString");
-    // If Foundation hasn't loaded yet, fall back to returning the static string
-    // "SwiftObject". The likelihood of someone invoking -description without
-    // ObjC interop is low.
-    if (!convertStringToNSString)
-      return @"SwiftObject";
-
-    TheConvertStringToNSString.store(convertStringToNSString,
-                                     std::memory_order_relaxed);
-  }
+  // If Foundation hasn't loaded yet, fall back to returning the static string
+  // "SwiftObject". The likelihood of someone invoking -description without
+  // ObjC interop is low.
+  if (!convertStringToNSString)
+    return @"SwiftObject";
 
   return convertStringToNSString(swiftString->x,
                                  swiftString->y,
@@ -205,15 +198,14 @@ static NSString *_getClassDescription(Class cls) {
   return _swift_getObjCClassOfAllocated(self);
 }
 + (Class)superclass {
-  return class_const_cast(_swift_getSuperclass((const ClassMetadata*) self));
+  return (Class)((const ClassMetadata*) self)->SuperClass;
 }
 - (Class)superclass {
-  return
-    class_const_cast(_swift_getSuperclass(_swift_getClassOfAllocated(self)));
+  return (Class)_swift_getClassOfAllocated(self)->SuperClass;
 }
 
 + (BOOL)isMemberOfClass:(Class)cls {
-  return cls ==  _swift_getObjCClassOfAllocated(self);
+  return cls == _swift_getObjCClassOfAllocated(self);
 }
 
 - (BOOL)isMemberOfClass:(Class)cls {
@@ -300,7 +292,7 @@ static NSString *_getClassDescription(Class cls) {
 
 - (BOOL)isKindOfClass:(Class)someClass {
   for (auto cls = _swift_getClassOfAllocated(self); cls != nullptr;
-       cls = _swift_getSuperclass(cls))
+       cls = cls->SuperClass)
     if (cls == (const ClassMetadata*) someClass)
       return YES;
 
@@ -309,7 +301,7 @@ static NSString *_getClassDescription(Class cls) {
 
 + (BOOL)isSubclassOfClass:(Class)someClass {
   for (auto cls = (const ClassMetadata*) self; cls != nullptr;
-       cls = _swift_getSuperclass(cls))
+       cls = cls->SuperClass)
     if (cls == (const ClassMetadata*) someClass)
       return YES;
 

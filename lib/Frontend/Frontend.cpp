@@ -257,14 +257,14 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   if (Invocation.getImplicitModuleImportKind() !=
       SourceFile::ImplicitModuleImportKind::Stdlib)
     return false;
-  SILOptions::SILOptMode optimization = Invocation.getSILOptions().Optimization;
-  if (optimization <= SILOptions::SILOptMode::None &&
-      shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
+  if (Invocation.getSILOptions().shouldOptimize())
+    return false;
+
+  if (shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
           Invocation.getFrontendOptions().RequestedAction)) {
     return true;
   }
-  return optimization == SILOptions::SILOptMode::None &&
-         Invocation.getFrontendOptions().isCreatingSIL();
+  return Invocation.getFrontendOptions().isCreatingSIL();
 }
 
 void CompilerInstance::performSema() {
@@ -397,11 +397,11 @@ void CompilerInstance::createREPLFile(
 }
 
 std::unique_ptr<DelayedParsingCallbacks>
-CompilerInstance::computeDelayedParsingCallback() {
+CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
   if (Invocation.isCodeCompletion())
     return llvm::make_unique<CodeCompleteDelayedCallbacks>(
         SourceMgr.getCodeCompletionLoc());
-  if (Invocation.isDelayedFunctionBodyParsing())
+  if (!isPrimary)
     return llvm::make_unique<AlwaysDelayedCallbacks>();
   return nullptr;
 }
@@ -427,13 +427,22 @@ void CompilerInstance::addMainFileToModule(
 void CompilerInstance::parseAndCheckTypes(
     const ImplicitImports &implicitImports) {
   SharedTimer timer("performSema-parseAndCheckTypes");
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
-      computeDelayedParsingCallback()};
+  // Delayed parsing callback for the primary file, or all files
+  // in non-WMO mode.
+  std::unique_ptr<DelayedParsingCallbacks> PrimaryDelayedCB{
+      computeDelayedParsingCallback(true)};
+
+  // Delayed parsing callback for non-primary files. Not used in
+  // WMO mode.
+  std::unique_ptr<DelayedParsingCallbacks> SecondaryDelayedCB{
+      computeDelayedParsingCallback(false)};
 
   PersistentParserState PersistentState;
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
-      implicitImports, PersistentState, DelayedCB.get());
+      implicitImports, PersistentState,
+      PrimaryDelayedCB.get(),
+      SecondaryDelayedCB.get());
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
     // diagnostic, so that ASTContext is marked as erroneous.  In this case
@@ -446,12 +455,12 @@ void CompilerInstance::parseAndCheckTypes(
 
   OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
 
-    // Type-check main file after parsing all other files so that
-    // it can use declarations from other files.
-    // In addition, the main file has parsing and type-checking
-    // interwined.
+  // Type-check main file after parsing all other files so that
+  // it can use declarations from other files.
+  // In addition, the main file has parsing and type-checking
+  // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFile(PersistentState, DelayedCB.get(),
+    parseAndTypeCheckMainFile(PersistentState, PrimaryDelayedCB.get(),
                               TypeCheckOptions);
   }
 
@@ -469,7 +478,7 @@ void CompilerInstance::parseAndCheckTypes(
   if (auto *stdlib = Context->getStdlibModule())
     Context->recordKnownProtocols(stdlib);
 
-  if (DelayedCB.get()) {
+  if (Invocation.isCodeCompletion()) {
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
   }
@@ -479,7 +488,8 @@ void CompilerInstance::parseAndCheckTypes(
 void CompilerInstance::parseLibraryFile(
     unsigned BufferID, const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
-    DelayedParsingCallbacks *DelayedParseCB) {
+    DelayedParsingCallbacks *PrimaryDelayedCB,
+    DelayedParsingCallbacks *SecondaryDelayedCB) {
   SharedTimer timer("performSema-parseLibraryFile");
 
   auto *NextInput = new (*Context) SourceFile(
@@ -488,8 +498,13 @@ void CompilerInstance::parseLibraryFile(
   MainModule->addFile(*NextInput);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  if (BufferID == PrimaryBufferID)
+  auto *DelayedCB = SecondaryDelayedCB;
+  if (BufferID == PrimaryBufferID) {
     setPrimarySourceFile(NextInput);
+    DelayedCB = PrimaryDelayedCB;
+  }
+  if (isWholeModuleCompilation())
+    DelayedCB = PrimaryDelayedCB;
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
@@ -501,7 +516,7 @@ void CompilerInstance::parseLibraryFile(
     // Parser may stop at some erroneous constructions like #else, #endif
     // or '}' in some cases, continue parsing until we are done
     parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr, &PersistentState,
-                        DelayedParseCB);
+                        DelayedCB);
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
@@ -530,7 +545,8 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
-    DelayedParsingCallbacks *DelayedParseCB) {
+    DelayedParsingCallbacks *PrimaryDelayedCB,
+    DelayedParsingCallbacks *SecondaryDelayedCB) {
   SharedTimer timer("performSema-parsePartialModulesAndLibraryFiles");
   bool hadLoadError = false;
   // Parse all the partial modules first.
@@ -545,7 +561,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID != MainBufferID) {
       parseLibraryFile(BufferID, implicitImports, PersistentState,
-                       DelayedParseCB);
+                       PrimaryDelayedCB, SecondaryDelayedCB);
     }
   }
   return hadLoadError;

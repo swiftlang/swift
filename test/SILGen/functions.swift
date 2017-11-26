@@ -327,7 +327,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // SIL-level "thin" function values need to be able to convert to
   // "thick" function values when stored, returned, or passed as arguments.
 
-  // CHECK: [[FBOX:%[0-9]+]] = alloc_box ${ var @callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 }
+  // CHECK: [[FBOX:%[0-9]+]] = alloc_box ${ var @callee_guaranteed (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 }
   // CHECK: [[FADDR:%.*]] = project_box [[FBOX]]
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
@@ -339,7 +339,10 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
   // CHECK: [[J:%[0-9]+]] = load [trivial] [[READJ]]
-  // CHECK: apply [[F]]([[I]], [[J]])
+  // CHECK: [[BORROW:%.*]] =  begin_borrow [[F]]
+  // CHECK: apply [[BORROW]]([[I]], [[J]])
+  // CHECK: end_borrow [[BORROW]]
+  // CHECK: destroy_value [[F]]
   f(i, j)
 
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T09functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
@@ -366,15 +369,15 @@ func calls(_ i:Int, j:Int, k:Int) {
 }
 
 // -- Curried entry points
-// CHECK-LABEL: sil shared [thunk] @_T09functions10SomeStructV6method{{[_0-9a-zA-Z]*}}FTc : $@convention(thin) (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
+// CHECK-LABEL: sil shared [thunk] @_T09functions10SomeStructV6method{{[_0-9a-zA-Z]*}}FTc : $@convention(thin) (@inout SomeStruct) -> @owned @callee_guaranteed (Builtin.Int64) -> () {
 // CHECK:   [[UNCURRIED:%.*]] = function_ref @_T09functions10SomeStructV6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> (){{.*}} // user: %2
-// CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]
+// CHECK:   [[CURRIED:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]
 // CHECK:   return [[CURRIED]]
 
-// CHECK-LABEL: sil shared [thunk] @_T09functions9SomeClassC6method{{[_0-9a-zA-Z]*}}FTc : $@convention(thin) (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
+// CHECK-LABEL: sil shared [thunk] @_T09functions9SomeClassC6method{{[_0-9a-zA-Z]*}}FTc : $@convention(thin) (@owned SomeClass) -> @owned @callee_guaranteed (Builtin.Int64) -> ()
 // CHECK: bb0(%0 : @owned $SomeClass):
 // CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : (SomeClass) -> (Builtin.Int64) -> ()
-// CHECK:   %2 = partial_apply %1(%0)
+// CHECK:   %2 = partial_apply [callee_guaranteed] %1(%0)
 // CHECK:   return %2
 
 func return_func() -> (_ x: Builtin.Int64, _ y: Builtin.Int64) -> Builtin.Int64 {
@@ -389,9 +392,9 @@ func standalone_generic<T>(_ x: T, y: T) -> T { return x }
 // CHECK-LABEL: sil hidden @_T09functions14return_genericBi64_Bi64__Bi64_tcyF
 func return_generic() -> (_ x:Builtin.Int64, _ y:Builtin.Int64) -> Builtin.Int64 {
   // CHECK: [[GEN:%.*]] = function_ref @_T09functions18standalone_generic{{[_0-9a-zA-Z]*}}F : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
-  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Builtin.Int64>()
-  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in Builtin.Int64, @in Builtin.Int64) -> @out Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
+  // CHECK: [[SPEC:%.*]] = partial_apply [callee_guaranteed] [[GEN]]<Builtin.Int64>()
+  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in Builtin.Int64, @in Builtin.Int64) -> @out Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[T0:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic
 }
@@ -400,9 +403,9 @@ func return_generic() -> (_ x:Builtin.Int64, _ y:Builtin.Int64) -> Builtin.Int64
 func return_generic_tuple()
 -> (_ x: (Builtin.Int64, Builtin.Int64), _ y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
   // CHECK: [[GEN:%.*]] = function_ref @_T09functions18standalone_generic{{[_0-9a-zA-Z]*}}F  : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
-  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<(Builtin.Int64, Builtin.Int64)>()
-  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> @out (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64)
-  // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
+  // CHECK: [[SPEC:%.*]] = partial_apply [callee_guaranteed] [[GEN]]<(Builtin.Int64, Builtin.Int64)>()
+  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> @out (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64)
+  // CHECK: [[T0:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic
 }
@@ -412,7 +415,7 @@ func testNoReturnAttr() -> Never {}
 // CHECK-LABEL: sil hidden @_T09functions20testNoReturnAttrPoly{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in T) -> Never
 func testNoReturnAttrPoly<T>(_ x: T) -> Never {}
 
-// CHECK-LABEL: sil hidden @_T09functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned @noescape @callee_owned () -> Never) -> ()
+// CHECK-LABEL: sil hidden @_T09functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Never) -> ()
 func testNoReturnAttrParam(_ fptr: () -> Never) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] @_T09functions15testTransparent{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
@@ -452,6 +455,37 @@ struct AlwaysInlinedMember : AlwaysInline {
   func alwaysInlined() {}
 }
 
+// CHECK-LABEL: sil hidden [Onone] @_T09functions10onone_funcyyF : $@convention(thin) () -> ()
+@_optimize(none)
+func onone_func() {}
+
+// CHECK-LABEL: sil hidden [Ospeed] @_T09functions11ospeed_funcyyF : $@convention(thin) () -> ()
+@_optimize(speed)
+func ospeed_func() {}
+
+// CHECK-LABEL: sil hidden [Osize] @_T09functions10osize_funcyyF : $@convention(thin) () -> ()
+@_optimize(size)
+func osize_func() {}
+
+struct OptmodeTestStruct {
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructV3fooyyF :
+  @_optimize(speed)
+  func foo() { }
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructVACycfC :
+  @_optimize(speed)
+  init() { }
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructV1xBi64_vg :
+  @_optimize(speed)
+  var x: Int { return getInt() }
+
+  // CHECK-LABEL: sil hidden [Ospeed] @_T09functions17OptmodeTestStructVBi64_Bi64_cig :
+  @_optimize(speed)
+  subscript(l: Int) -> Int { return getInt() }
+}
+
 // CHECK-LABEL: sil hidden [_semantics "foo"] @_T09functions9semanticsyyF : $@convention(thin) () -> ()
 @_semantics("foo")
 func semantics() {}
@@ -470,7 +504,7 @@ final class r17828355Class {
 // CHECK: bb0(%0 : @owned $r17828355Class):
 // CHECK-NEXT: // function_ref functions.r17828355Class.method(Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @_T09functions14r17828355ClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
-// CHECK-NEXT:  partial_apply %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
+// CHECK-NEXT:  partial_apply [callee_guaranteed] %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  return
 
 
@@ -492,12 +526,12 @@ func testNoescape() {
 // CHECK-LABEL: functions.testNoescape() -> ()
 // CHECK-NEXT: sil hidden @_T09functions12testNoescapeyyF : $@convention(thin) () -> ()
 // CHECK: function_ref closure #1 () -> () in functions.testNoescape() -> ()
-// CHECK-NEXT: function_ref @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> ()
+// CHECK-NEXT: function_ref @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@guaranteed { var Int }) -> ()
 
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
 // CHECK: closure #1 () -> () in functions.testNoescape() -> ()
-// CHECK-NEXT: sil private @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
+// CHECK-NEXT: sil private @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 
 
@@ -517,10 +551,10 @@ func testNoescape2() {
 // CHECK-LABEL: sil hidden @_T09functions13testNoescape2yyF : $@convention(thin) () -> () {
 
 // CHECK: // closure #1 () -> () in functions.testNoescape2() -> ()
-// CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
+// CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
-// CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_yycfU_ : $@convention(thin) (@owned { var Int }) -> () {
+// CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 enum PartialApplyEnumPayload<T, U> {
   case Left(T)
@@ -540,10 +574,10 @@ func partialApplyEnumCases(_ x: S, y: C) {
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T09functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @_T09functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T09functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @_T09functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]

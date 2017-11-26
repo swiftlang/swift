@@ -79,8 +79,7 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
   // When type checking functions, the CompleteGenericTypeResolver sets
   // the interface type.
   if (!decl->hasInterfaceType())
-    decl->setInterfaceType(GenericEnvironment::mapTypeOutOfContext(
-        GenericEnv, type));
+    decl->setInterfaceType(type->mapTypeOutOfContext());
 }
 
 Type ProtocolRequirementTypeResolver::mapTypeIntoContext(Type type) {
@@ -353,6 +352,48 @@ void TypeChecker::validateRequirements(
         isErrorResult(builder->addRequirement(&req, dc->getParentModule())))
       req.setInvalid();
   }
+}
+
+std::string
+TypeChecker::gatherGenericParamBindingsText(
+                                ArrayRef<Type> types,
+                                ArrayRef<GenericTypeParamType *> genericParams,
+                                TypeSubstitutionFn substitutions) {
+  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
+  for (auto type : types) {
+    type.visit([&](Type type) {
+      if (auto gp = type->getAs<GenericTypeParamType>()) {
+        knownGenericParams.insert(
+            gp->getCanonicalType()->castTo<GenericTypeParamType>());
+      }
+    });
+  }
+
+  if (knownGenericParams.empty())
+    return "";
+
+  SmallString<128> result;
+  for (auto gp : genericParams) {
+    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    if (!knownGenericParams.count(canonGP))
+      continue;
+
+    if (result.empty())
+      result += " [with ";
+    else
+      result += ", ";
+    result += gp->getName().str();
+    result += " = ";
+
+    auto type = substitutions(canonGP);
+    if (!type)
+      return "";
+
+    result += type.getString();
+  }
+
+  result += "]";
+  return result.str().str();
 }
 
 void
@@ -1217,7 +1258,9 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
 RequirementCheckResult TypeChecker::checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-    GenericSignature *genericSig, TypeSubstitutionFn substitutions,
+    ArrayRef<GenericTypeParamType *> genericParams,
+    ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
     UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
@@ -1225,13 +1268,16 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     SubstOptions options) {
   bool valid = true;
 
+  // We handle any conditional requirements ourselves.
+  conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
+
   struct RequirementSet {
     ArrayRef<Requirement> Requirements;
     SmallVector<ParentConditionalConformance, 4> Parents;
   };
 
   SmallVector<RequirementSet, 8> pendingReqs;
-  pendingReqs.push_back({genericSig->getRequirements(), {}});
+  pendingReqs.push_back({requirements, {}});
 
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
@@ -1353,9 +1399,15 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       if (loc.isValid()) {
         // FIXME: Poor source-location information.
         diagnose(loc, diagnostic, owner, firstType, secondType);
+
+        std::string genericParamBindingsText;
+        if (!genericParams.empty()) {
+          genericParamBindingsText =
+            gatherGenericParamBindingsText(
+              {rawFirstType, rawSecondType}, genericParams, substitutions);
+        }
         diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
-                 genericSig->gatherGenericParamBindingsText(
-                     {rawFirstType, rawSecondType}, substitutions));
+                 genericParamBindingsText);
 
         ParentConditionalConformance::diagnoseConformanceStack(Diags, noteLoc,
                                                                current.Parents);

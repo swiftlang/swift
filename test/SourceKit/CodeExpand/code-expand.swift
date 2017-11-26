@@ -88,3 +88,6 @@ if true {
 // CHECK-NEXT: <#code#>
 }
 }
+
+foo(.foo(<#T##block: () -> Void##() -> Void#>))
+// CHECK: foo(.foo({

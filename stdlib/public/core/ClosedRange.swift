@@ -16,10 +16,7 @@
 @_versioned
 internal enum _ClosedRangeIndexRepresentation<Bound>
   where
-  // FIXME(ABI)#176 (Type checker)
-  // WORKAROUND rdar://25214598 - should be Bound : Strideable
-  Bound : _Strideable & Comparable,
-  Bound.Stride : BinaryInteger {
+  Bound : Strideable, Bound.Stride : BinaryInteger {
   case pastEnd
   case inRange(Bound)
 }
@@ -30,13 +27,10 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
 @_fixed_layout
 public struct ClosedRangeIndex<Bound>
   where
-  // FIXME(ABI)#176 (Type checker)
-  // WORKAROUND rdar://25214598 - should be Bound : Strideable
   // swift-3-indexing-model: should conform to _Strideable, otherwise
   // CountableClosedRange is not interchangeable with CountableRange in all
   // contexts.
-  Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
+  Bound : Strideable, Bound.Stride : SignedInteger {
   /// Creates the "past the end" position.
   @_inlineable
   @_versioned
@@ -91,43 +85,6 @@ extension ClosedRangeIndex : Comparable {
   }
 }
 
-// FIXME(ABI)#175 (Type checker)
-// WORKAROUND: needed because of rdar://25584401
-/// An iterator over the elements of a `CountableClosedRange` instance.
-@_fixed_layout
-public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
-  where
-  // FIXME(ABI)#176 (Type checker)
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
-
-  @_inlineable
-  @_versioned
-  internal init(_range r: CountableClosedRange<Bound>) {
-    _nextResult = r.lowerBound
-    _upperBound = r.upperBound
-  }
-
-  @_inlineable
-  public func makeIterator() -> ClosedRangeIterator {
-    return self
-  }
-
-  @_inlineable
-  public mutating func next() -> Bound? {
-    let r = _nextResult
-    if let x = r {
-      _nextResult = x == _upperBound ? nil : x.advanced(by: 1)
-    }
-    return r
-  }
-  @_versioned
-  internal var _nextResult: Bound?
-  @_versioned
-  internal let _upperBound: Bound
-}
-
 /// A closed range that forms a collection of consecutive values.
 ///
 /// You create a `CountableClosedRange` instance by using the closed range
@@ -177,10 +134,7 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
 @_fixed_layout
 public struct CountableClosedRange<Bound> : RandomAccessCollection
   where
-  // FIXME(ABI)#176 (Type checker)
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
+  Bound : Strideable, Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -198,17 +152,6 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   public typealias Index = ClosedRangeIndex<Bound>
 
   public typealias IndexDistance = Bound.Stride
-
-  // FIXME(ABI)#175 (Type checker)
-  // WORKAROUND: needed because of rdar://25584401
-  public typealias Iterator = ClosedRangeIterator<Bound>
-
-  // FIXME(ABI)#175 (Type checker)
-  // WORKAROUND: needed because of rdar://25584401
-  @_inlineable
-  public func makeIterator() -> ClosedRangeIterator<Bound> {
-    return ClosedRangeIterator(_range: self)
-  }
 
   /// The position of the first element in the range.
   @_inlineable
@@ -311,16 +254,6 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
     return RandomAccessSlice(base: self, bounds: bounds)
   }
 
-  // FIXME(ABI)#175 (Type checker)
-  @_inlineable
-  public // WORKAROUND: needed because of rdar://25584401
-  var indices: DefaultRandomAccessIndices<CountableClosedRange<Bound>> {
-    return DefaultRandomAccessIndices(
-      _elements: self,
-      startIndex: self.startIndex,
-      endIndex: self.endIndex)
-  }
-
   /// Creates an instance with the given bounds.
   ///
   /// Because this initializer does not perform any checks, it should be used
@@ -347,6 +280,21 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   @_inlineable
   public var isEmpty: Bool {
     return false
+  }
+
+  /// Returns a Boolean value indicating whether the given element is contained
+  /// within the range.
+  ///
+  /// A `CountableClosedRange` instance contains both its lower and upper bound.
+  /// `element` is contained in the range if it is between the two bounds or
+  /// equal to either bound.
+  ///
+  /// - Parameter element: The element to check for containment.
+  /// - Returns: `true` if `element` is contained in the range; otherwise,
+  ///   `false`.
+  @_inlineable
+  public func contains(_ element: Bound) -> Bool {
+    return element >= self.lowerBound && element <= self.upperBound
   }
 }
 
@@ -421,57 +369,61 @@ public struct ClosedRange<
   }
 }
 
-/// Returns a closed range that contains both of its bounds.
-///
-/// Use the closed range operator (`...`) to create a closed range of any type
-/// that conforms to the `Comparable` protocol. This example creates a
-/// `ClosedRange<Character>` from "a" up to, and including, "z".
-///
-///     let lowercase = "a"..."z"
-///     print(lowercase.contains("z"))
-///     // Prints "true"
-///
-/// - Parameters:
-///   - minimum: The lower bound for the range.
-///   - maximum: The upper bound for the range.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func ... <Bound>(minimum: Bound, maximum: Bound)
-  -> ClosedRange<Bound> {
-  _precondition(
-    minimum <= maximum, "Can't form Range with upperBound < lowerBound")
-  return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
+extension Comparable {  
+  /// Returns a closed range that contains both of its bounds.
+  ///
+  /// Use the closed range operator (`...`) to create a closed range of any type
+  /// that conforms to the `Comparable` protocol. This example creates a
+  /// `ClosedRange<Character>` from "a" up to, and including, "z".
+  ///
+  ///     let lowercase = "a"..."z"
+  ///     print(lowercase.contains("z"))
+  ///     // Prints "true"
+  ///
+  /// - Parameters:
+  ///   - minimum: The lower bound for the range.
+  ///   - maximum: The upper bound for the range.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func ... (minimum: Self, maximum: Self)
+    -> ClosedRange<Self> {
+    _precondition(
+      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
+    return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
+  }
 }
 
-/// Returns a countable closed range that contains both of its bounds.
-///
-/// Use the closed range operator (`...`) to create a closed range of any type
-/// that conforms to the `Strideable` protocol with an associated signed
-/// integer `Stride` type, such as any of the standard library's integer
-/// types. This example creates a `CountableClosedRange<Int>` from zero up to,
-/// and including, nine.
-///
-///     let singleDigits = 0...9
-///     print(singleDigits.contains(9))
-///     // Prints "true"
-///
-/// You can use sequence or collection methods on the `singleDigits` range.
-///
-///     print(singleDigits.count)
-///     // Prints "10"
-///     print(singleDigits.last)
-///     // Prints "9"
-///
-/// - Parameters:
-///   - minimum: The lower bound for the range.
-///   - maximum: The upper bound for the range.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func ... <Bound>(
-  minimum: Bound, maximum: Bound
-) -> CountableClosedRange<Bound> {
-  // FIXME: swift-3-indexing-model: tests for traps.
-  _precondition(
-    minimum <= maximum, "Can't form Range with upperBound < lowerBound")
-  return CountableClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
+extension Strideable where Stride: SignedInteger {  
+  /// Returns a countable closed range that contains both of its bounds.
+  ///
+  /// Use the closed range operator (`...`) to create a closed range of any type
+  /// that conforms to the `Strideable` protocol with an associated signed
+  /// integer `Stride` type, such as any of the standard library's integer
+  /// types. This example creates a `CountableClosedRange<Int>` from zero up to,
+  /// and including, nine.
+  ///
+  ///     let singleDigits = 0...9
+  ///     print(singleDigits.contains(9))
+  ///     // Prints "true"
+  ///
+  /// You can use sequence or collection methods on the `singleDigits` range.
+  ///
+  ///     print(singleDigits.count)
+  ///     // Prints "10"
+  ///     print(singleDigits.last)
+  ///     // Prints "9"
+  ///
+  /// - Parameters:
+  ///   - minimum: The lower bound for the range.
+  ///   - maximum: The upper bound for the range.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func ... (
+    minimum: Self, maximum: Self
+  ) -> CountableClosedRange<Self> {
+    // FIXME: swift-3-indexing-model: tests for traps.
+    _precondition(
+      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
+    return CountableClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
+  }
 }

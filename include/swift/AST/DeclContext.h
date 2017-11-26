@@ -323,9 +323,6 @@ public:
   /// Map an interface type to a contextual type within this context.
   Type mapTypeIntoContext(Type type) const;
 
-  /// Map a type within this context to an interface type.
-  Type mapTypeOutOfContext(Type type) const;
-
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();

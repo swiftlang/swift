@@ -121,8 +121,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   }
 
   // Handle the CPU and its preferences.
-  if (auto arg = inputArgs.getLastArg(options::OPT_target_cpu))
-    arg->render(inputArgs, arguments);
+  inputArgs.AddLastArg(arguments, options::OPT_target_cpu);
 
   if (!OI.SDKPath.empty()) {
     arguments.push_back("-sdk");
@@ -168,6 +167,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments,
                        options::OPT_solver_shrink_unsolved_threshold);
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
+  inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
+  inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -636,6 +637,9 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     llvm_unreachable("invalid mode for backend job");
   }
 
+  // Add flags implied by -embed-bitcode.
+  Arguments.push_back("-embed-bitcode");
+
   // -embed-bitcode only supports a restricted set of flags.
   Arguments.push_back("-target");
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
@@ -647,8 +651,11 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   }
 
   // Handle the CPU and its preferences.
-  if (auto arg = context.Args.getLastArg(options::OPT_target_cpu))
-    arg->render(context.Args, Arguments);
+  context.Args.AddLastArg(Arguments, options::OPT_target_cpu);
+
+  // Enable optimizations, but disable all LLVM-IR-level transformations.
+  context.Args.AddLastArg(Arguments, options::OPT_O_Group);
+  Arguments.push_back("-disable-llvm-optzns");
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
@@ -662,11 +669,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
       Arguments.push_back(FileName.c_str());
     }
   }
-
-  // Add flags implied by -embed-bitcode.
-  Arguments.push_back("-embed-bitcode");
-  // Disable all llvm IR level optimizations.
-  Arguments.push_back("-disable-llvm-optzns");
 
   return {SWIFT_EXECUTABLE_NAME, Arguments};
 }

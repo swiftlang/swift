@@ -160,20 +160,6 @@ public:
   /// array of the generic parameters for the innermost generic type.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
 
-  /// Create a text string that describes the bindings of generic parameters
-  /// that are relevant to the given set of types, e.g.,
-  /// "[with T = Bar, U = Wibble]".
-  ///
-  /// \param types The types that will be scanned for generic type parameters,
-  /// which will be used in the resulting type.
-  ///
-  /// \param substitutions The generic parameter -> generic argument
-  /// substitutions that will have been applied to these types.
-  /// These are used to produce the "parameter = argument" bindings in the test.
-  std::string
-  gatherGenericParamBindingsText(ArrayRef<Type> types,
-                                 TypeSubstitutionFn substitutions) const;
-
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();

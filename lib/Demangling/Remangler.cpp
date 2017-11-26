@@ -579,6 +579,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'o';
   } else if (text == "Builtin.RawPointer") {
     Buffer << 'p';
+  } else if (text == "Builtin.SILToken") {
+    Buffer << 't';
   } else if (text == "Builtin.Word") {
     Buffer << 'w';
   } else if (stripPrefix(text, "Builtin.Int")) {
@@ -1753,23 +1755,33 @@ void Remangler::mangleOutlinedRelease(Node *node) {
 }
 
 void Remangler::mangleOutlinedInitializeWithTake(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wb";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedInitializeWithCopy(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wc";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedAssignWithTake(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wd";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wf";
+  mangleChildNode(node, 1);
+}
+
+void Remangler::mangleOutlinedDestroy(Node *node) {
+  mangleChildNode(node, 0);
+  Buffer << "Wh";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedVariable(Node *node) {

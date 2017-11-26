@@ -274,8 +274,9 @@ public:
     }
   }
 
-  void addPlaceholder(MissingMemberDecl *) {
-    llvm_unreachable("Should not be emitting class with missing members");
+  void addPlaceholder(MissingMemberDecl *m) {
+    assert(m->getNumberOfVTableEntries() == 0
+           && "Should not be emitting class with missing members");
   }
 };
 

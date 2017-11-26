@@ -731,6 +731,28 @@ void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
   createStoreBorrow(loc, value, address);
 }
 
+ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,
+                                                    ManagedValue mv,
+                                                    SILType destType) {
+  CleanupCloner cloner(*this, mv);
+  SILValue result = createBridgeObjectToRef(loc, mv.forward(SGF), destType);
+  return cloner.clone(result);
+}
+
+BranchInst *SILGenBuilder::createBranch(SILLocation loc,
+                                        SILBasicBlock *targetBlock,
+                                        ArrayRef<ManagedValue> args) {
+  llvm::SmallVector<SILValue, 8> newArgs;
+  transform(args, std::back_inserter(newArgs),
+            [&](ManagedValue mv) -> SILValue { return mv.forward(SGF); });
+  return createBranch(loc, targetBlock, newArgs);
+}
+
+ReturnInst *SILGenBuilder::createReturn(SILLocation loc,
+                                        ManagedValue returnValue) {
+  return createReturn(loc, returnValue.forward(SGF));
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//

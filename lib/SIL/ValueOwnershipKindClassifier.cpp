@@ -262,6 +262,11 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
   return Result->getOwnershipKind();
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginApplyResult(
+    BeginApplyResult *Result) {
+  return Result->getOwnershipKind();
+}
+
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
     SILFunctionArgument *Arg) {
   return Arg->getOwnershipKind();

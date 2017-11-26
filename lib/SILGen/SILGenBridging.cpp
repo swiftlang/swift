@@ -127,6 +127,16 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy.substGenericArgs(SGF.SGM.M, typeSubMap);
 
+  // We might have to re-abstract the 'self' value if it is an
+  // Optional.
+  AbstractionPattern origSelfType(witness->getInterfaceType());
+  origSelfType = origSelfType.getFunctionInputType();
+
+  swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
+                                        origSelfType,
+                                        swiftValueType,
+                                        SGFContext());
+
   // The witness may be more abstract than the concrete value we're bridging,
   // for instance, if the value is a concrete instantiation of a generic type.
   //
@@ -303,7 +313,6 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
     return ManagedValue::forLValue(value);
 
   case ParameterConvention::Indirect_In_Guaranteed:
-  case ParameterConvention::Indirect_In_Constant:
     if (valueTL.isLoadable()) {
       return SGF.emitLoad(loc, value, valueTL, SGFContext(), IsNotTake);
     } else {
@@ -317,8 +326,9 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
       return SGF.emitManagedRValueWithCleanup(value, valueTL);
     }
 
+  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_InoutAliasable:
-    llvm_unreachable("unexpected inout_aliasable argument");
+    llvm_unreachable("unexpected convention");
   }
   llvm_unreachable("bad convention");
 }
@@ -345,6 +355,12 @@ expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
   return results;
 }
 
+static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
+                                              CanAnyFunctionType blockType) {
+  return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
+                                         blockType, blockType->getExtInfo());
+}
+
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
                                        SILLocation loc,
                                        CanAnyFunctionType formalFuncType,
@@ -358,10 +374,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   SILFunctionConventions funcConv(funcTy, SGF.SGM.M);
 
   // Make sure we lower the component types of the formal block type.
-  formalBlockType =
-    SGF.SGM.Types.getBridgedFunctionType(AbstractionPattern(formalBlockType),
-                                         formalBlockType,
-                                         formalBlockType->getExtInfo());
+  formalBlockType = getBridgedBlockType(SGF.SGM, formalBlockType);
 
   // Set up the indirect result.
   SILType blockResultTy = blockTy->getAllResultsType();
@@ -494,9 +507,9 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(loweredFuncTy)->getCanonicalType());
+    loweredFuncTy->mapTypeOutOfContext()->getCanonicalType());
   auto blockInterfaceTy = cast<SILFunctionType>(
-    F.mapTypeOutOfContext(loweredBlockTy)->getCanonicalType());
+    loweredBlockTy->mapTypeOutOfContext()->getCanonicalType());
 
   assert(!blockInterfaceTy->isCoroutine());
 
@@ -544,8 +557,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   // Create the invoke function. Borrow the mangling scheme from reabstraction
   // thunks, which is what we are in spirit.
-  auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
-                                                 invokeTy,
+  auto thunk = SGM.getOrCreateReabstractionThunk(invokeTy,
                                                  loweredFuncTy,
                                                  loweredBlockTy,
                                                  F.isSerialized());
@@ -754,6 +766,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   // Collect the native arguments, which should all be +1.
   Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
+  // Make sure we lower the component types of the formal block type.
+  formalBlockTy = getBridgedBlockType(SGF.SGM, formalBlockTy);
+
   assert(blockTy->getNumParameters() == funcTy->getNumParameters()
          && "block and function types don't match");
 
@@ -795,7 +810,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   // Add the block argument.
   SILValue blockV =
       entry->createFunctionArgument(SILType::getPrimitiveObjectType(blockTy));
-  ManagedValue block = SGF.emitManagedRValueWithCleanup(blockV);
+  ManagedValue block = SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
+                           ? ManagedValue::forUnmanaged(blockV)
+                           : SGF.emitManagedRValueWithCleanup(blockV);
 
   CanType formalResultType = formalFuncTy.getResult();
 
@@ -857,8 +874,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
                                 inputSubstType, outputSubstType,
                                 genericEnv, interfaceSubs);
 
-  auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
-                                                 thunkTy,
+  auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
                                                  loweredFuncTy,
                                                  F.isSerialized());
@@ -1616,14 +1632,16 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
           param = ManagedValue::forLValue(paramValue);
           break;
         case ParameterConvention::Indirect_In:
-        case ParameterConvention::Indirect_In_Constant:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
-        case ParameterConvention::Indirect_In_Guaranteed:
+        case ParameterConvention::Indirect_In_Guaranteed: {
           auto tmp = emitTemporaryAllocation(fd, paramValue->getType());
           B.createCopyAddr(fd, paramValue, tmp, IsNotTake, IsInitialization);
           param = emitManagedRValueWithCleanup(tmp);
           break;
+        }
+        case ParameterConvention::Indirect_In_Constant:
+          llvm_unreachable("unsupported convention");
         }
 
         maybeAddForeignErrorArg();

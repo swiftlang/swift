@@ -236,8 +236,9 @@ public:
 };
 
 
-SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
-  Mod(M), StageName(Stage) {
+SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
+                               bool isMandatoryPipeline) :
+  Mod(M), StageName(Stage), isMandatoryPipeline(isMandatoryPipeline) {
   
 #define ANALYSIS(NAME) \
   Analysis.push_back(create##NAME##Analysis(Mod));
@@ -250,14 +251,15 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
 }
 
 SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                               llvm::StringRef Stage)
-    : SILPassManager(M, Stage) {
+                               llvm::StringRef Stage, bool isMandatoryPipeline)
+    : SILPassManager(M, Stage, isMandatoryPipeline) {
   this->IRMod = IRMod;
 }
 
 bool SILPassManager::continueTransforming() {
-  return Mod->getStage() == SILStage::Raw ||
-         NumPassesRun < SILNumOptPassesToRun;
+  if (isMandatoryPipeline)
+    return true;
+  return NumPassesRun < SILNumOptPassesToRun;
 }
 
 bool SILPassManager::analysesUnlocked() {
@@ -389,7 +391,7 @@ runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms) {
 
     // Only include functions that are definitions, and which have not
     // been intentionally excluded from optimization.
-    if (F.isDefinition() && F.shouldOptimize())
+    if (F.isDefinition() && (isMandatoryPipeline || F.shouldOptimize()))
       FunctionWorklist.push_back(*I);
   }
 
@@ -554,8 +556,8 @@ SILPassManager::~SILPassManager() {
 
 void SILPassManager::addFunctionToWorklist(SILFunction *F,
                                            SILFunction *DerivedFrom) {
-  assert(F && F->isDefinition() && F->shouldOptimize() &&
-         "Expected optimizable function definition!");
+  assert(F && F->isDefinition() && (isMandatoryPipeline || F->shouldOptimize())
+         && "Expected optimizable function definition!");
 
   constexpr int MaxDeriveLevels = 10;
 
