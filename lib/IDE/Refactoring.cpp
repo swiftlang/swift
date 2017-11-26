@@ -1004,6 +1004,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   auto InputBuffer = llvm::MemoryBuffer::getMemBufferCopy(SourceText,"<extract>");
 
   CompilerInvocation Invocation{};
+
+  // FIXME: eliminate unnamed primary inputs someday
   Invocation.getFrontendOptions().Inputs.addPrimaryInputBuffer(
       InputBuffer.get());
   Invocation.getFrontendOptions().ModuleName = "extract";

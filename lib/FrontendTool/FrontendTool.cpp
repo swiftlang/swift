@@ -780,13 +780,15 @@ static bool performCompile(CompilerInstance &Instance,
     if (opts.Inputs.haveAPrimaryInputFile()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
-        // Help, Jordan! Or Erik!
-        //        auto Filename =
-        //        opts.Inputs.getRequiredUniquePrimaryInputFilename();
-        //        assert(false && "Do I trust the index???");
-        PrimaryFile =
-            Instance.getMainModule()
-                ->getFiles()[opts.Inputs.getRequiredUniquePrimaryInputIndex()];
+        for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
+          if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
+            if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
+                    SASTF->getFilename())) {
+              assert(!PrimaryFile && "Can only handle one primary so far");
+              PrimaryFile = fileUnit;
+            }
+          }
+        }
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),

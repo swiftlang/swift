@@ -68,7 +68,10 @@ public:
   StringRef getFile() const { return Filename; }
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
-  void bePrimary() { IsPrimary = true; }
+
+  InputFileOrBuffer asPrimary() {
+    return InputFileOrBuffer(Filename, Buffer, true);
+  }
 };
 
 /// Information about all the inputs to the frontend.
@@ -76,19 +79,27 @@ class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFileOrBuffer> Inputs;
+  typedef llvm::StringMap<unsigned> InputFileMap;
+  InputFileMap PrimaryFiles;
 
 public:
   // Readers:
 
   ArrayRef<InputFileOrBuffer> getInputs() const { return Inputs; }
 
-  std::vector<InputFileOrBuffer> &getMalleableInputs() { return Inputs; }
+  // std::vector<InputFileOrBuffer> &getMalleableInputs() { return Inputs; }
 
   void transformInputs(
       llvm::function_ref<InputFileOrBuffer(const InputFileOrBuffer &input)>
           fn) {
     for (auto i : indices(getInputs())) {
-      Inputs[i] = fn(Inputs[i]);
+      auto &prev = Inputs[i];
+      auto next = fn(prev);
+      Inputs[i] = next;
+      if (prev.getIsPrimary() && !prev.getFile().empty())
+        PrimaryFiles.erase(prev.getFile());
+      if (next.getIsPrimary() && !next.getFile().empty())
+        PrimaryFiles.insert(std::make_pair(next.getFile(), i));
     }
   }
 
@@ -127,7 +138,13 @@ public:
     return f;
   }
 
-  void bePrimaryAt(unsigned index) { Inputs[index].bePrimary(); }
+  void bePrimaryAt(unsigned index) {
+    if (Inputs[index].getIsPrimary())
+      return;
+    Inputs[index] = Inputs[index].asPrimary();
+    if (!Inputs[index].getFile().empty())
+      PrimaryFiles.insert(std::make_pair(Inputs[index].getFile(), index));
+  }
 
   bool isReadingFromStdin() const {
     return haveUniqueInputFilename() && getFilenameOfFirstInput() == "-";
@@ -184,15 +201,6 @@ public:
     assert(!input.getFile().empty());
     return input.getFile();
   }
-  // FIXME: find a better way than trucking in indices!
-  // Awful hack!
-  bool getRequiredUniquePrimaryInputIndex() const {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    for (auto i : indices(Inputs))
-      if (Inputs[i].getIsPrimary())
-        return i;
-    assert(false && "Must be a primary input to get here");
-  }
 
   bool haveAPrimaryInputFile() const {
     const auto *input = getOptionalUniquePrimaryInput();
@@ -222,14 +230,26 @@ public:
   void addInputBuffer(llvm::MemoryBuffer *buffer) {
     addInput(InputFileOrBuffer::createBuffer(buffer, false));
   }
+
+  bool isFilePrimary(StringRef file) {
+    return PrimaryFiles.find(file) != PrimaryFiles.end();
+  }
+
   void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
     Inputs[index].setBuffer(buffer);
   }
   void addPrimaryInputBuffer(llvm::MemoryBuffer *buffer) {
     addInput(InputFileOrBuffer::createBuffer(buffer, true));
   }
-  void addInput(const InputFileOrBuffer &input) { Inputs.push_back(input); }
-  void clearInputs() { Inputs.clear(); }
+  void addInput(const InputFileOrBuffer &input) {
+    if (!input.getFile().empty() && input.getIsPrimary())
+      PrimaryFiles.insert(std::make_pair(input.getFile(), Inputs.size()));
+    Inputs.push_back(input);
+  }
+  void clearInputs() {
+    Inputs.clear();
+    PrimaryFiles.clear();
+  }
 };
 
 /// Options for controlling the behavior of the frontend.
