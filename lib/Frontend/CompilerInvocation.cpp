@@ -223,16 +223,14 @@ private:
     return false;
   }
 };
-    class FrontendArgsToOptionsConverter {
-    private:
-        DiagnosticEngine &Diags;
-        const llvm::opt::ArgList &Args;
-        FrontendOptions &Opts;
-        
-        llvm::Optional<const std::vector<std::string>>
-        cachedOutputFilenamesFromCommandLineOrFilelist;
-        
+class FrontendArgsToOptionsConverter {
+private:
+  DiagnosticEngine &Diags;
+  const llvm::opt::ArgList &Args;
+  FrontendOptions &Opts;
 
+  llvm::Optional<const std::vector<std::string>>
+      cachedOutputFilenamesFromCommandLineOrFilelist;
 
   // This is a separate function so that it shows up in stack traces.
   LLVM_ATTRIBUTE_NOINLINE
