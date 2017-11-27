@@ -46,10 +46,10 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   // If we have one primary input and it's a filename with extension "sil",
   // treat the input as SIL.
   unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
-  if (silPrimaryCount == primaryInputCount())
-    return true;
   if (silPrimaryCount == 0)
     return false;
+  if (silPrimaryCount == primaryInputCount())
+    return true;
   assert(false && "Either all primaries or none must end with .sil");
 }
 
