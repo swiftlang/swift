@@ -14,7 +14,6 @@ import android.adb.commands
 from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
-
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 
@@ -990,7 +989,8 @@ iterations with -O",
         action=arguments.action.enable)
     parser.add_argument(
         "--enable-tsan-runtime",
-        help="enable Thread Sanitizer on the swift runtime")
+        help="enable Thread Sanitizer on the swift runtime",
+        action=arguments.action.enable)
     parser.add_argument(
         "--enable-lsan",
         help="enable Leak Sanitizer for swift tools",
