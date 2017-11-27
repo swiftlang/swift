@@ -262,7 +262,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
             isa<AbstractFunctionDecl>(lookupDC) ||
             isa<SubscriptDecl>(lookupDC)) &&
            "not a proper generic parameter context?");
-    options = TR_GenericSignature;
+    options = TypeResolutionFlags::GenericSignature;
   }    
 
   // First, add the generic parameters to the generic signature builder.
@@ -513,9 +513,9 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      TypeResolutionOptions options = TR_AllowIUO;
+      TypeResolutionOptions options = TypeResolutionFlags::AllowIUO;
       if (fn->hasDynamicSelf())
-        options |= TR_DynamicSelfResult;
+        options |= TypeResolutionFlags::DynamicSelfResult;
 
       if (tc.validateType(fn->getBodyResultTypeLoc(), fn, options, &resolver)) {
         badType = true;
@@ -973,7 +973,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
 
   // Check the element type.
   badType |= tc.validateType(subscript->getElementTypeLoc(), subscript,
-                             TR_AllowIUO, &resolver);
+                             TypeResolutionFlags::AllowIUO, &resolver);
 
   // Infer requirements from it.
   if (genericParams && builder) {
@@ -988,9 +988,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
 
   // Check the indices.
   auto params = subscript->getIndices();
-
-  TypeResolutionOptions options;
-  options |= TR_SubscriptParameters;
+  TypeResolutionOptions options = TypeResolutionFlags::SubscriptParameters;
 
   badType |= tc.typeCheckParameterList(params, subscript,
                                        options,
