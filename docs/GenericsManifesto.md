@@ -691,7 +691,7 @@ The generics system doesn't seem like a good candidate for a reduction in scope;
 
 ### Associated type inference
 
-*This feature has been rejected in [SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md).*
+*[SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md), a proposal to remove this feature, was rejected.*
 
 Associated type inference is the process by which we infer the type bindings for associated types from other requirements. For example:
 

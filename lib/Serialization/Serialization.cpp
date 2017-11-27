@@ -2570,6 +2570,15 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
   });
 }
 
+static void
+collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
+                                   const Requirement &req,
+                                   const ModuleDecl *excluding) {
+  collectDependenciesFromType(seen, req.getFirstType(), excluding);
+  if (req.getKind() != RequirementKind::Layout)
+    collectDependenciesFromType(seen, req.getSecondType(), excluding);
+}
+
 static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
   llvm::SmallSetVector<Type, 4> result;
   collectDependenciesFromType(result, ty, /*excluding*/nullptr);
@@ -2831,17 +2840,17 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
 
-    SmallVector<TypeID, 2> dependencies;
-    for (Type dep : collectDependenciesFromType(underlying->getCanonicalType()))
-      dependencies.push_back(addTypeRef(dep));
-
+    llvm::SmallSetVector<Type, 4> dependencies;
+    collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
+                                /*excluding*/nullptr);
     for (Requirement req : typeAlias->getGenericRequirements()) {
-      for (Type dep : collectDependenciesFromType(req.getFirstType()))
-        dependencies.push_back(addTypeRef(dep));
-      if (req.getKind() != RequirementKind::Layout)
-        for (Type dep : collectDependenciesFromType(req.getSecondType()))
-          dependencies.push_back(addTypeRef(dep));
+      collectDependenciesFromRequirement(dependencies, req,
+                                         /*excluding*/nullptr);
     }
+
+    SmallVector<TypeID, 4> dependencyIDs;
+    for (Type dep : dependencies)
+      dependencyIDs.push_back(addTypeRef(dep));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(typeAlias->getFormalAccess());
@@ -2856,7 +2865,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addGenericEnvironmentRef(
                                              typeAlias->getGenericEnvironment()),
                                 rawAccessLevel,
-                                dependencies);
+                                dependencyIDs);
     writeGenericParams(typeAlias->getGenericParams());
     break;
   }
@@ -2954,6 +2963,10 @@ void Serializer::writeDecl(const Decl *D) {
       collectDependenciesFromType(dependencyTypes,
                                   nextElt->getArgumentInterfaceType(),
                                   /*excluding*/theEnum->getParentModule());
+    }
+    for (Requirement req : theEnum->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencyTypes, req,
+                                         /*excluding*/nullptr);
     }
     for (Type ty : dependencyTypes)
       inheritedAndDependencyTypes.push_back(addTypeRef(ty));
