@@ -1090,9 +1090,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
 
   EditorDiagConsumer DiagConsumer;
   CI.addDiagnosticConsumer(&DiagConsumer);
-  fprintf(stderr, "DOCSUPPORT %s\n",
-          InputBuf->getBufferIdentifier().str().c_str());
-  assert(false && "check ID");
   Invocation.getFrontendOptions().Inputs.addInput(InputFileOrBuffer::createFile(
       InputBuf->getBufferIdentifier(), false, InputBuf));
   if (CI.setup(Invocation))
@@ -1366,9 +1363,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     return nullptr;
   }
   Invocation.setInputKind(InputFileKind::IFK_Swift);
-  fprintf(stderr, "DOCSUPPORT2 %s\n",
-          InputBuf->getBufferIdentifier().str().c_str());
-  assert(false && "check ID2");
   Invocation.getFrontendOptions().Inputs.addInput(InputFileOrBuffer::createFile(
       InputBuf->getBufferIdentifier(), false, InputBuf));
 
