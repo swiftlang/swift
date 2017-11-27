@@ -105,6 +105,14 @@ public:
     return getSourceLocs()[FirstArgumentLabelIndex + index];
   }
 
+  SourceLoc getStartLoc() const {
+    return getBaseNameLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return NumArgumentLabels == 0 ? getBaseNameLoc() : getRParenLoc();
+  }
+  
   /// Retrieve the complete source range for this declaration name.
   SourceRange getSourceRange() const {
     if (NumArgumentLabels == 0) return getBaseNameLoc();
