@@ -120,8 +120,6 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
 }
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${array_type}" == "ArraySlice" },
-                 reason: "rdar://33358110"))
   .code {
   var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
