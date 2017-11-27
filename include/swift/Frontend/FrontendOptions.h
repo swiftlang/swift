@@ -200,6 +200,8 @@ public:
            Inputs[iterator->second].getIsPrimary();
   }
 
+  unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
+
   void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
     Inputs[index].setBuffer(buffer);
   }

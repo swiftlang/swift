@@ -45,11 +45,23 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   }
   // If we have one primary input and it's a filename with extension "sil",
   // treat the input as SIL.
-  StringRef filename = getOptionalUniquePrimaryInputFilename();
-  if (!filename.empty()) {
-    return llvm::sys::path::extension(filename).endswith(SIL_EXTENSION);
+  unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
+  if (silPrimaryCount == primaryInputCount())
+    return true;
+  if (silPrimaryCount == 0)
+    return false;
+  assert(false && "Either all primaries or none must end with .sil");
+}
+
+unsigned
+FrontendInputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
+  unsigned N = 0;
+  for (const auto &iter : PrimaryInputs) {
+    StringRef filename = Inputs[iter.second].getFile();
+    if (llvm::sys::path::extension(filename).endswith(suffix))
+      ++N;
   }
-  return false;
+  return N;
 }
 
 bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
