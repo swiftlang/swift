@@ -145,7 +145,7 @@ class ArgsToFrontendInputsConverter {
     if (iterator == IndicesOfFilesAlreadyAdded.end()) {
       IndicesOfFilesAlreadyAdded.insert(
           std::make_pair(file, Inputs.inputCount()));
-      Inputs.addInput(InputFileOrBuffer::createFile(file, isPrimary));
+      Inputs.addInput(InputFile::create(file, isPrimary));
     } else if (isPrimary)
       Inputs.bePrimaryAt(iterator->second);
     else {
@@ -666,7 +666,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
     return false;
   }
   // In order to pass Driver/options.swift test must leave ModuleName empty
-  if (!Opts.Inputs.haveInputFilenames()) {
+  if (!Opts.Inputs.haveInputs()) {
     Opts.ModuleName = StringRef();
     // Jordan thinks this is a bug that should not happen, & asked me to report
     // back if it does. It does happen in, for example,
@@ -780,8 +780,8 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
 
 std::string FrontendArgsToOptionsConverter::computeBaseNameOfOutput() const {
   std::string nameToStem;
-  if (Opts.Inputs.haveAPrimaryInputFile()) {
-    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInputFilename();
+  if (Opts.Inputs.havePrimaryInputs()) {
+    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().getFile();
   } else if (auto UserSpecifiedModuleName =
                  Args.getLastArg(options::OPT_module_name)) {
     nameToStem = std::string(UserSpecifiedModuleName->getValue());
@@ -1933,8 +1933,8 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  getFrontendOptions().Inputs.addInput(InputFileOrBuffer::createFile(
-      InputFilename, bePrimary, FileBufOrErr.get().get()));
+  getFrontendOptions().Inputs.addInput(
+      InputFile::create(InputFilename, bePrimary, FileBufOrErr.get().get()));
 
   auto result = serialization::validateSerializedAST(
       FileBufOrErr.get()->getBuffer(), &extendedInfo);

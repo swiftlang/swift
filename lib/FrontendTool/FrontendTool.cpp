@@ -777,7 +777,7 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
-    if (opts.Inputs.haveAPrimaryInputFile()) {
+    if (opts.Inputs.havePrimaryInputs()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
         for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {

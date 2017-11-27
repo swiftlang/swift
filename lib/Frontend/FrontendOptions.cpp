@@ -56,7 +56,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
-    if (haveInputFilenames()) {
+    if (haveInputs()) {
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
@@ -72,7 +72,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
     assertMustNotBeMoreThanOnePrimaryInput();
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
-    for (const InputFileOrBuffer &input : getInputs()) {
+    for (const InputFile &input : getInputs()) {
       if (!input.getIsPrimary() && !input.getFile().empty() &&
           !llvm::sys::path::extension(input.getFile())
                .endswith(SIB_EXTENSION)) {
@@ -83,7 +83,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
     }
     return false;
   }
-  if (!isNoneRequested && !haveInputFilenames()) {
+  if (!isNoneRequested && !haveInputs()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
     return true;
   }

@@ -355,7 +355,7 @@ static void setModuleName(CompilerInvocation &Invocation) {
 
   StringRef Filename = Invocation.getOutputFilename();
   if (Filename.empty()) {
-    if (!Invocation.getFrontendOptions().Inputs.haveInputFilenames()) {
+    if (!Invocation.getFrontendOptions().Inputs.haveInputs()) {
       Invocation.setModuleName("__main__");
       return;
     }
@@ -401,7 +401,7 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputs replacementInputs;
-  for (const InputFileOrBuffer &input : inputs.getInputs()) {
+  for (const InputFile &input : inputs.getInputs()) {
     std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.getFile());
     bool newIsPrimary = input.getIsPrimary() ||
@@ -410,8 +410,8 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
       ++primaryCount;
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
-    replacementInputs.addInput(InputFileOrBuffer::createFile(
-        newFilename, newIsPrimary, input.getBuffer()));
+    replacementInputs.addInput(
+        InputFile::create(newFilename, newIsPrimary, input.getBuffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {

@@ -235,7 +235,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().Inputs.addInput(
-      InputFileOrBuffer::createFile("<module-interface>", false, Buf.get()));
+      InputFile::create("<module-interface>", false, Buf.get()));
   if (CI.setup(Invocation))
     return true;
   CI.performParseOnly();

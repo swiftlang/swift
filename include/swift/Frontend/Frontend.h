@@ -431,7 +431,7 @@ private:
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() { return Invocation.isInputSwift(); }
   bool isInSILMode() { return Invocation.isInputSIL(); }
-  bool setupForInput(const InputFileOrBuffer &input);
+  bool setupForInput(const InputFile &input);
   void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
   bool setUpForFile(StringRef file, bool isPrimary);
 
