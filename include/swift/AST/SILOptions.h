@@ -112,10 +112,6 @@ public:
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
-  
-  /// Emit captures and function contexts using +0 caller-guaranteed ARC
-  /// conventions.
-  bool EnableGuaranteedClosureContexts = true;
 
   /// Emit normal function arguments using the +0 guaranteed convention.
   bool EnableGuaranteedNormalArguments = false;

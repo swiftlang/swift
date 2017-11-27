@@ -1302,8 +1302,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
 
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
-  Opts.EnableGuaranteedClosureContexts |=
-    Args.hasArg(OPT_enable_guaranteed_closure_contexts);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
