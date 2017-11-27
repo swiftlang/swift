@@ -112,13 +112,13 @@ public:
 
   unsigned inputCount() const { return getInputs().size(); }
 
-  bool haveInputs() const { return !Inputs.empty(); }
+  bool hasInputs() const { return !Inputs.empty(); }
   unsigned inputFilenameCount() const { return Inputs.size(); }
 
-  bool haveUniqueInputFilename() const { return inputFilenameCount() == 1; }
+  bool hasUniqueInputFilename() const { return inputFilenameCount() == 1; }
 
   const StringRef getFilenameOfFirstInput() const {
-    assert(haveInputs());
+    assert(hasInputs());
     const InputFile &inp = getInputs()[0];
     StringRef f = inp.getFile();
     assert(!f.empty());
@@ -134,7 +134,7 @@ public:
   }
 
   bool isReadingFromStdin() const {
-    return haveUniqueInputFilename() && getFilenameOfFirstInput() == "-";
+    return hasUniqueInputFilename() && getFilenameOfFirstInput() == "-";
   }
 
   // If we have exactly one input filename, and its extension is "bc" or "ll",
@@ -154,11 +154,11 @@ public:
 
   // Primary count readers:
 
-  bool haveUniquePrimaryInput() const { return primaryInputCount() == 1; }
+  bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
 
-  bool havePrimaryInputs() const { return primaryInputCount() > 0; }
+  bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
-  bool isWholeModule() const { return !havePrimaryInputs(); }
+  bool isWholeModule() const { return !hasPrimaryInputs(); }
 
   // Count-dependend readers:
 
@@ -252,7 +252,7 @@ public:
     return getSingleOutputFilename() == "-";
   }
   bool isOutputFileDirectory() const;
-  bool haveNamedOutputFile() const {
+  bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
 
@@ -510,7 +510,7 @@ public:
 
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift &&
-           Inputs.haveUniqueInputFilename();
+           Inputs.hasUniqueInputFilename();
   }
 
 private:
