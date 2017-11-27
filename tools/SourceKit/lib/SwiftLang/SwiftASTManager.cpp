@@ -783,7 +783,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
       }
     }
     if (FoundSnapshot)
-      break;
+      continue;
 
     auto Content = MgrImpl.getFileContent(File, Error);
     if (!Content.Buffer) {
