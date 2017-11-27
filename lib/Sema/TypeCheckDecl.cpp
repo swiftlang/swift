@@ -297,27 +297,27 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= (TR_GenericSignature |
-                TR_InheritanceClause |
-                TR_AllowUnavailableProtocol);
+    options |= TypeResolutionFlags::GenericSignature;
+    options |= TypeResolutionFlags::InheritanceClause;
+    options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= (TR_GenericSignature |
-                TR_InheritanceClause |
-                TR_AllowUnavailableProtocol);
+    options |= TypeResolutionFlags::GenericSignature;
+    options |= TypeResolutionFlags::InheritanceClause;
+    options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
     // signature of the enclosing entity.
     DC = decl->getDeclContext();
     if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
       DC = nominal;
-      options |= TR_GenericSignature;
+      options |= TypeResolutionFlags::GenericSignature;
     } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       DC = ext;
-      options |= TR_GenericSignature;
+      options |= TypeResolutionFlags::GenericSignature;
     } else if (auto func = dyn_cast<AbstractFunctionDecl>(DC)) {
       DC = func;
-      options |= TR_GenericSignature;
+      options |= TypeResolutionFlags::GenericSignature;
     } else if (!DC->isModuleScopeContext()) {
       // Skip the generic parameter's context entirely.
       DC = DC->getParent();
@@ -1117,13 +1117,13 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // In particular, it's /not/ correct to check the PBD's DeclContext because
   // top-level variables in a script file are accessible from other files,
   // even though the PBD is inside a TopLevelCodeDecl.
-  TypeResolutionOptions options = TR_InExpression;
+  TypeResolutionOptions options = TypeResolutionFlags::InExpression;
 
-  options |= TR_AllowIUO;
+  options |= TypeResolutionFlags::AllowIUO;
   if (binding->getInit(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
-    options |= TR_AllowUnspecifiedTypes;
-    options |= TR_AllowUnboundGenerics;
+    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
   if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     setBoundVarsTypeError(pattern, tc.Context);
@@ -4284,10 +4284,10 @@ public:
     GenericTypeToArchetypeResolver resolver(SD);
 
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), SD,
-                                     TR_AllowIUO,
+                                     TypeResolutionFlags::AllowIUO,
                                      &resolver);
     TypeResolutionOptions options;
-    options |= TR_SubscriptParameters;
+    options |= TypeResolutionFlags::SubscriptParameters;
 
     isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
                                            options,
@@ -4863,9 +4863,9 @@ public:
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
-      TypeResolutionOptions options = TR_AllowIUO;
+      TypeResolutionOptions options = TypeResolutionFlags::AllowIUO;
       if (FD->hasDynamicSelf())
-        options |= TR_DynamicSelfResult;
+        options |= TypeResolutionFlags::DynamicSelfResult;
 
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD, options,
                           &resolver)) {
@@ -6830,7 +6830,7 @@ public:
       
       if (!EED->getArgumentTypeLoc().isNull()) {
         if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
-                            TR_EnumCase)) {
+                            TypeResolutionFlags::EnumCase)) {
           EED->setInterfaceType(ErrorType::get(TC.Context));
           EED->setInvalid();
           return;
@@ -7357,9 +7357,9 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
 
 /// Validate the underlying type of the given typealias.
 static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
-  TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
+  TypeResolutionOptions options = TypeResolutionFlags::TypeAliasUnderlyingType;
   if (typeAlias->getFormalAccess() <= AccessLevel::FilePrivate)
-    options |= TR_KnownNonCascadingDependency;
+    options |= TypeResolutionFlags::KnownNonCascadingDependency;
 
   if (typeAlias->getDeclContext()->isModuleScopeContext() &&
       typeAlias->getGenericParams() == nullptr) {
@@ -7842,7 +7842,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
 
         validateAccessControl(typealias);
         if (typealias->getFormalAccess() <= AccessLevel::FilePrivate)
-          options |= TR_KnownNonCascadingDependency;
+          options |= TypeResolutionFlags::KnownNonCascadingDependency;
 
         if (validateType(typealias->getUnderlyingTypeLoc(),
                          typealias, options, &resolver)) {

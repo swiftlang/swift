@@ -37,9 +37,9 @@ decomposeInheritedClauseDecl(
     inheritanceClause = typeDecl->getInherited();
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
-      options |= (TR_GenericSignature |
-                  TR_InheritanceClause |
-                  TR_AllowUnavailableProtocol);
+      options |= TypeResolutionFlags::GenericSignature;
+      options |= TypeResolutionFlags::InheritanceClause;
+      options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
 
@@ -48,13 +48,13 @@ decomposeInheritedClauseDecl(
         // signature of the enclosing entity.
         if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
           dc = nominal;
-          options |= TR_GenericSignature;
+          options |= TypeResolutionFlags::GenericSignature;
         } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
           dc = ext;
-          options |= TR_GenericSignature;
+          options |= TypeResolutionFlags::GenericSignature;
         } else if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
           dc = func;
-          options |= TR_GenericSignature;
+          options |= TypeResolutionFlags::GenericSignature;
         } else if (!dc->isModuleScopeContext()) {
           // Skip the generic parameter's context entirely.
           dc = dc->getParent();
@@ -65,9 +65,9 @@ decomposeInheritedClauseDecl(
     auto ext = decl.get<ExtensionDecl *>();
     inheritanceClause = ext->getInherited();
     dc = ext;
-    options |= (TR_GenericSignature |
-                TR_InheritanceClause |
-                TR_AllowUnavailableProtocol);
+    options |= TypeResolutionFlags::GenericSignature;
+    options |= TypeResolutionFlags::InheritanceClause;
+    options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
   return std::make_tuple(options, dc, inheritanceClause);
@@ -340,9 +340,10 @@ void IterativeTypeChecker::processResolveTypeDecl(
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
         typeAliasDecl->getGenericParams() == nullptr) {
-      TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
+      TypeResolutionOptions options =
+                                   TypeResolutionFlags::TypeAliasUnderlyingType;
       if (typeAliasDecl->getFormalAccess() <= AccessLevel::FilePrivate)
-        options |= TR_KnownNonCascadingDependency;
+        options |= TypeResolutionFlags::KnownNonCascadingDependency;
 
       // Note: recursion into old type checker is okay when passing in an
       // unsatisfied-dependency callback.

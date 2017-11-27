@@ -306,8 +306,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Validate the representation.
   // FIXME: Perform some kind of "shallow" validation here?
   TypeResolutionOptions options;
-  options |= TR_AllowUnboundGenerics;
-  options |= TR_ExtensionBinding;
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+  options |= TypeResolutionFlags::ExtensionBinding;
   if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
     ED->setInvalid();
     return;
@@ -710,13 +710,13 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   TypeResolutionOptions options;
 
   // Fine to have unbound generic types.
-  options |= TR_AllowUnboundGenerics;
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (isSILMode) {
-    options |= TR_SILMode;
-    options |= TR_AllowIUO;
+    options |= TypeResolutionFlags::SILMode;
+    options |= TypeResolutionFlags::AllowIUO;
   }
   if (isSILType)
-    options |= TR_SILType;
+    options |= TypeResolutionFlags::SILType;
 
   GenericTypeToArchetypeResolver contextResolver(GenericEnv);
 
