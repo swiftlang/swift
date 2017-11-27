@@ -2803,9 +2803,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
       extInfo = extInfo.withIsPseudogeneric();
 
   // Add the function type as the parameter.
-  auto contextConvention = SGM.M.getOptions().EnableGuaranteedClosureContexts
-                               ? ParameterConvention::Direct_Guaranteed
-                               : DefaultThickCalleeConvention;
+  auto contextConvention = ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
   params.append(expectedType->getParameters().begin(),
                 expectedType->getParameters().end());
