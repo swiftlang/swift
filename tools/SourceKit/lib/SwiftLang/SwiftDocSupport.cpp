@@ -775,7 +775,8 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
-  Invocation.getFrontendOptions().Inputs.addInputBuffer(Buf.get());
+  Invocation.getFrontendOptions().Inputs.addInput(
+      InputFileOrBuffer::createFile("<module-interface>", false, Buf.get()));
   if (CI.setup(Invocation))
     return true;
   CI.performParseOnly();
@@ -1089,8 +1090,11 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
 
   EditorDiagConsumer DiagConsumer;
   CI.addDiagnosticConsumer(&DiagConsumer);
-
-  Invocation.getFrontendOptions().Inputs.addInputBuffer(InputBuf);
+  fprintf(stderr, "DOCSUPPORT %s\n",
+          InputBuf->getBufferIdentifier().str().c_str());
+  assert(false && "check ID");
+  Invocation.getFrontendOptions().Inputs.addInput(InputFileOrBuffer::createFile(
+      InputBuf->getBufferIdentifier(), false, InputBuf));
   if (CI.setup(Invocation))
     return true;
   DiagConsumer.setInputBufferIDs(CI.getInputBufferIDs());
@@ -1362,7 +1366,11 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     return nullptr;
   }
   Invocation.setInputKind(InputFileKind::IFK_Swift);
-  Invocation.getFrontendOptions().Inputs.addInputBuffer(InputBuf);
+  fprintf(stderr, "DOCSUPPORT2 %s\n",
+          InputBuf->getBufferIdentifier().str().c_str());
+  assert(false && "check ID2");
+  Invocation.getFrontendOptions().Inputs.addInput(InputFileOrBuffer::createFile(
+      InputBuf->getBufferIdentifier(), false, InputBuf));
 
   if (ParseCI.setup(Invocation)) {
     Error = "Compiler invocation set up failed";

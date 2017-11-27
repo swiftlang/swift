@@ -1005,9 +1005,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   CompilerInvocation Invocation{};
 
-  // FIXME: eliminate unnamed primary inputs someday
-  Invocation.getFrontendOptions().Inputs.addPrimaryInputBuffer(
-      InputBuffer.get());
+  Invocation.getFrontendOptions().Inputs.addInput(
+      InputFileOrBuffer::createFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
 
   auto Instance = llvm::make_unique<swift::CompilerInstance>();
