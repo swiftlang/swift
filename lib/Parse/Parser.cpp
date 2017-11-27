@@ -513,16 +513,17 @@ Parser::ParserPosition Parser::getParserPositionAfterFirstCharacter(Token T) {
   return ParserPosition(NewState, Loc);
 }
 
-SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
+SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind) {
   // Consumes one-character token (like '?', '<', '>' or '!') and returns
   // its location.
 
   // Current token can be either one-character token we want to consume...
   if (Tok.getLength() == 1) {
+    Tok.setKind(Kind);
     return consumeToken();
   }
 
-  markSplitToken(tok::oper_binary_unspaced, Tok.getText().substr(0, 1));
+  markSplitToken(Kind, Tok.getText().substr(0, 1));
 
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
@@ -542,12 +543,12 @@ void Parser::markSplitToken(tok Kind, StringRef Txt) {
 
 SourceLoc Parser::consumeStartingLess() {
   assert(startsWithLess(Tok) && "Token does not start with '<'");
-  return consumeStartingCharacterOfCurrentToken();
+  return consumeStartingCharacterOfCurrentToken(tok::l_angle);
 }
 
 SourceLoc Parser::consumeStartingGreater() {
   assert(startsWithGreater(Tok) && "Token does not start with '>'");
-  return consumeStartingCharacterOfCurrentToken();
+  return consumeStartingCharacterOfCurrentToken(tok::r_angle);
 }
 
 void Parser::skipSingle() {

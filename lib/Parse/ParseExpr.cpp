@@ -576,7 +576,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     // operator token, and a single one at that (which means
     // peekToken().is(tok::identifier) is incorrect: it is true for .?.foo).
     auto position = getParserPosition();
-    auto dotLoc = consumeStartingCharacterOfCurrentToken();
+    auto dotLoc = consumeStartingCharacterOfCurrentToken(tok::period);
     if (Tok.is(tok::identifier))
       backtrackToPosition(position);
 
@@ -1747,7 +1747,8 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     // as such.
     if (isCollectionLiteralStartingWithLSquareLit()) {
       // Split the token into two.
-      SourceLoc LSquareLoc = consumeStartingCharacterOfCurrentToken();
+      SourceLoc LSquareLoc =
+          consumeStartingCharacterOfCurrentToken(tok::l_square);
       // Consume the '[' token.
       Result = parseExprCollection(LSquareLoc);
       break;

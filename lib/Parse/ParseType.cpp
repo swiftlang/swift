@@ -1082,13 +1082,13 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
 
 SourceLoc Parser::consumeOptionalToken() {
   assert(isOptionalToken(Tok) && "not a '?' token?!");
-  return consumeStartingCharacterOfCurrentToken();
+  return consumeStartingCharacterOfCurrentToken(tok::question_postfix);
 }
 
 SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
   assert(isImplicitlyUnwrappedOptionalToken(Tok) && "not a '!' token?!");
   // If the text of the token is just '!', grab the next token.
-  return consumeStartingCharacterOfCurrentToken();
+  return consumeStartingCharacterOfCurrentToken(tok::exclaim_postfix);
 }
 
 /// Parse a single optional suffix, given that we are looking at the
