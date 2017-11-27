@@ -77,6 +77,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case OpenedGeneric:
     case KeyPathComponent:
     case ConditionalRequirement:
+    case TypeParameterRequirement:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -242,6 +243,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ConditionalRequirement:
       out << "conditional requirement #" << llvm::utostr(elt.getValue());
+      break;
+
+    case TypeParameterRequirement:
+      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
       break;
     }
   }
