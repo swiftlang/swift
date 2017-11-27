@@ -849,9 +849,9 @@ struct MemberLookupResult {
     UR_Inaccessible,
   };
   
-  /// This is a list of considered, but rejected, candidates, along with a
+  /// This is a list of considered (but rejected) candidates, along with a
   /// reason for their rejection.
-  SmallVector<std::pair<ValueDecl*, UnviableReason>, 4> UnviableCandidates;
+  SmallVector<std::pair<OverloadChoice, UnviableReason>, 4> UnviableCandidates;
 
 
   /// Mark this as being an already-diagnosed error and return itself.
@@ -864,8 +864,8 @@ struct MemberLookupResult {
     ViableCandidates.push_back(candidate);
   }
   
-  void addUnviable(ValueDecl *VD, UnviableReason reason) {
-    UnviableCandidates.push_back({VD, reason});
+  void addUnviable(OverloadChoice candidate, UnviableReason reason) {
+    UnviableCandidates.push_back({candidate, reason});
   }
   
   OverloadChoice *getFavoredChoice() {
