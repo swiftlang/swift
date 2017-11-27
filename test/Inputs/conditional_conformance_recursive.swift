@@ -14,6 +14,15 @@ extension Wrapper: P2 where T: P2 {
   typealias B = T.A
 }
 
+protocol P3: P2 where A: P3 { }
+
+extension Wrapper: P3 where T: P3 { }
+
+// instantiation function for Wrapper<T>: P3
+// CHECK-LABEL: define internal void @_T033conditional_conformance_recursive7WrapperVyxGAA2P3A2aERzrlWI
+// CHECK-NOT: ret
+// CHECK: call i8** @_T033conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrlWa
+
 // associated type metadata accessor for B in Wrapper<T>: P2
 // CHECK-LABEL: define internal %swift.type* @_T033conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrl1BWt
 // CHECK:   [[T_TO_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** [[WRAPPER_T_TO_P2:%.*]], i32 -1
