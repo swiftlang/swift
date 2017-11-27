@@ -83,6 +83,19 @@ class FrontendInputs {
   InputFileMap PrimaryFiles;
 
 public:
+  FrontendInputs() = default;
+
+  FrontendInputs(const FrontendInputs &other) {
+    for (InputFileOrBuffer input : other.getInputs())
+      addInput(input);
+  }
+  FrontendInputs &operator=(const FrontendInputs &other) {
+    clearInputs();
+    for (InputFileOrBuffer input : other.getInputs())
+      addInput(input);
+    return *this;
+  }
+
   // Readers:
 
   ArrayRef<InputFileOrBuffer> getInputs() const { return Inputs; }

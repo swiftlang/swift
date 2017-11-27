@@ -402,10 +402,10 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
   // clang's FileManager ?
   FrontendInputs replacementInputs;
   for (const InputFileOrBuffer &input : inputs.getInputs()) {
-    StringRef newFilename =
+    std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.getFile());
     bool newIsPrimary = input.getIsPrimary() ||
-                        (!PrimaryFile.empty() && newFilename == PrimaryFile);
+                        (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
       ++primaryCount;
     }
