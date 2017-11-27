@@ -1431,7 +1431,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   ValueDecl *member = nullptr;
   for (auto cand : result.UnviableCandidates) {
     if (member == nullptr)
-      member = cand.first;
+      member = cand.first.getDecl();
     sameProblem &= cand.second == firstProblem;
   }
   
@@ -1537,12 +1537,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     }
         
     case MemberLookupResult::UR_Inaccessible: {
-      auto decl = result.UnviableCandidates[0].first;
+      auto decl = result.UnviableCandidates[0].first.getDecl();
       // FIXME: What if the unviable candidates have different levels of access?
       diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
                decl->getFormalAccess());
       for (auto cand : result.UnviableCandidates)
-        diagnose(cand.first, diag::decl_declared_here, memberName);
+        diagnose(cand.first.getDecl(), diag::decl_declared_here, memberName);
         
       return;
     }
@@ -4810,7 +4810,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
   SmallVector<OverloadChoice, 2> choices;
   for (auto &unviable : results.UnviableCandidates)
-    choices.push_back(OverloadChoice(baseType, unviable.first,
+    choices.push_back(OverloadChoice(baseType, unviable.first.getDecl(),
                                      UDE->getFunctionRefKind()));
 
   CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
