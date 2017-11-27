@@ -21,6 +21,10 @@ def triple : Separate<["-"], "triple">, Alias<target>;
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   HelpText<"Print diagnostics in color">;
 
+def delayed_function_body_parsing :
+  Flag<["-"], "delayed-function-body-parsing">,
+  HelpText<"Delay function body parsing until the end of all files">;
+
 def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
 

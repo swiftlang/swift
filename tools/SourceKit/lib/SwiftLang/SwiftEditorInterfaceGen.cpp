@@ -228,13 +228,13 @@ public:
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::IFK_Swift);
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
-  Invocation.addInputBuffer(Buf.get());
+  Invocation.getFrontendOptions().Inputs.addInputBuffer(Buf.get());
   if (CI.setup(Invocation))
     return true;
   CI.performParseOnly();
@@ -401,7 +401,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   // Display diagnostics to stderr.
   CI.addDiagnosticConsumer(&IFaceGenCtx->Impl.DiagConsumer);
 
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
   if (CI.setup(Invocation)) {
     ErrMsg = "Error during invocation setup";
     return nullptr;
