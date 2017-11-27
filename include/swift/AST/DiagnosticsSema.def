@@ -1368,6 +1368,9 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
+ERROR(type_invalid_conformance_dmlp,none,
+      "type %0 does not conform to `DynamicMemberLookupProtocol`; "
+      "subscript(dynamicMember:) should take a single string parameter", (Type))
 
 ERROR(protocol_does_not_conform_objc,none,
       "using %0 as a concrete type conforming to protocol %1 is not supported",

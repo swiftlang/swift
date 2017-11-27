@@ -528,8 +528,9 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
-        // Skip key path applications, since we don't want them to noise up
-        // unrelated subscript diagnostics.
+      case OverloadChoiceKind::DynamicMemberLookup:
+        // Skip key path applications and dynamic member lookups, since we don't
+        // want them to noise up unrelated subscript diagnostics.
         break;
 
       case OverloadChoiceKind::BaseType:
