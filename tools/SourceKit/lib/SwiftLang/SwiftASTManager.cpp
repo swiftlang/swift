@@ -391,7 +391,7 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
   }
 }
 
-static FrontendInputs &&
+static FrontendInputs
 resolveSymbolicLinksInInputs(FrontendInputs &inputs,
                              StringRef UnresolvedPrimaryFile,
                              std::string &Error) {
@@ -413,14 +413,16 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
     replacementInputs.addInput(InputFileOrBuffer::createFile(
         newFilename, newIsPrimary, input.getBuffer()));
   }
-  if (PrimaryFile.empty() || primaryCount == 1)
-    return std::move(replacementInputs);
+
+  if (PrimaryFile.empty() || primaryCount == 1) {
+    return replacementInputs;
+  }
 
   llvm::SmallString<64> Err;
   llvm::raw_svector_ostream OS(Err);
   OS << "'" << PrimaryFile << "' is not part of the input files";
   Error = OS.str();
-  return std::move(replacementInputs);
+  return replacementInputs;
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,

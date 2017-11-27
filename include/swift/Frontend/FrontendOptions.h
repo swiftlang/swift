@@ -89,6 +89,10 @@ public:
     for (InputFileOrBuffer input : other.getInputs())
       addInput(input);
   }
+  FrontendInputs(FrontendInputs &&other) {
+    Inputs = std::move(other.Inputs);
+    PrimaryFiles = std::move(other.PrimaryFiles);
+  }
   FrontendInputs &operator=(const FrontendInputs &other) {
     clearInputs();
     for (InputFileOrBuffer input : other.getInputs())
