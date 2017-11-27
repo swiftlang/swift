@@ -632,6 +632,13 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
                                  loweredBridgedTy.castTo<SILFunctionType>());
   }
 
+  // Erase IUO at this point, because there aren't any conformances for
+  // IUO anymore.  Note that the value representation stays the same
+  // because SIL erases the difference.
+  if (auto obj = nativeType->getImplicitlyUnwrappedOptionalObjectType()) {
+    nativeType = OptionalType::get(obj)->getCanonicalType();
+  }
+
   // If the native type conforms to _ObjectiveCBridgeable, use its
   // _bridgeToObjectiveC witness.
   if (auto conformance =
