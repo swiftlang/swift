@@ -73,6 +73,12 @@ namespace irgen {
                                              llvm::Value *wtable,
                                              AssociatedType associatedType);
 
+  // Return the offset one should do on a witness table pointer to retrieve the
+  // `index`th piece of private data.
+  inline int privateWitnessTableIndexToTableOffset(unsigned index) {
+    return -1 - (int)index;
+  }
+
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
   void expandPolymorphicSignature(IRGenModule &IGM,

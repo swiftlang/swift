@@ -472,6 +472,13 @@ public:
   void bindLocalTypeDataFromTypeMetadata(CanType type, IsExact_t isExact,
                                          llvm::Value *metadata);
 
+  /// Given the witness table parameter, bind local type data for
+  /// the witness table itself and any conditional requirements.
+  void bindLocalTypeDataFromSelfWitnessTable(
+                const ProtocolConformance *conformance,
+                llvm::Value *selfTable,
+                llvm::function_ref<CanType (CanType)> mapTypeIntoContext);
+
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);
     DominanceResolver = resolver;

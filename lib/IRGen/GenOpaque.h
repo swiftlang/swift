@@ -29,6 +29,7 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   enum class ValueWitness : unsigned;
+  class StackAddress;
   class WitnessIndex;
 
   /// Return the size of a fixed buffer.
