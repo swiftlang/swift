@@ -58,6 +58,18 @@ EXPR_NODES = [
              Child('Wildcard', kind='WildcardToken'),
          ]),
 
+    # An = expression.
+    Node('AssignmentExpr', kind='Expr',
+         children=[
+             Child('AssignToken', kind='EqualToken'),
+         ]),
+
+    # A flat list of expressions before sequence folding, e.g. 1 + 2 + 3.
+    Node('SequenceExpr', kind='Expr',
+         children=[
+             Child('Elements', kind='ExprList'),
+         ]),
+
     # A #line expression.
     Node('PoundLineExpr', kind='Expr',
          children=[
@@ -92,6 +104,12 @@ EXPR_NODES = [
              Child('OperatorToken', kind='PrefixOperatorToken',
                    is_optional=True),
              Child('PostfixExpression', kind='Expr'),
+         ]),
+
+    # An operator like + or -.
+    Node('BinaryOperatorExpr', kind='Expr',
+         children=[
+             Child('OperatorToken', kind='BinaryOperatorToken'),
          ]),
 
     # A floating-point literal

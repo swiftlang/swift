@@ -121,14 +121,16 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     createNodeInPlace(Kind, HasSign ? 2 : 1);
     break;
   }
-
   case SyntaxKind::TernaryExpr: {
     auto Pair = SyntaxFactory::countChildren(Kind);
     assert(Pair.first == Pair.second);
     createNodeInPlace(Kind, Pair.first);
     break;
   }
-
+  case SyntaxKind::ExprList: {
+    createNodeInPlace(Kind, Parts.size());
+    break;
+  }
   default:
     llvm_unreachable("Unrecognized node kind.");
   }
