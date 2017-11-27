@@ -100,13 +100,17 @@ class SyntaxParsingContext {
   // If false, context does nothing.
   bool Enabled;
 
+  /// Create a syntax node using the tail \c N elements of collected parts and
+  /// replace those parts with the single result.
+  void createNodeInPlace(SyntaxKind Kind, size_t N);
+
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
-      : Parent(CtxtHolder), CtxtHolder(CtxtHolder), 
+      : Parent(CtxtHolder), CtxtHolder(CtxtHolder),
         Enabled(Parent->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
@@ -160,10 +164,6 @@ public:
     assert(Parts.back()->Kind == SyntaxKind::Token);
     return make<TokenSyntax>(popBack());
   }
-
-  /// Create a syntax node using the tail \c N elements of collected parts and
-  /// replace those parts with the single result.
-  void createNodeInPlace(SyntaxKind Kind, size_t N);
 
   /// Create a node using the tail of the collected parts. The number of parts
   /// is automatically determined from \c Kind. Node: limited number of \c Kind
