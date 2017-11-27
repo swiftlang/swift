@@ -150,7 +150,7 @@ class ArgsToFrontendInputsConverter {
       Inputs.bePrimaryAt(iterator->second);
     else {
       Diags.diagnose(SourceLoc(),
-                     diag::error_duplicate_input_file_on_command_line, file);
+                     diag::error_appears_more_than_once_on_command_line, file);
     }
   }
 
@@ -175,9 +175,9 @@ class ArgsToFrontendInputsConverter {
   }
 
 public:
-  ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
-                                FrontendInputs &Inputs)
-      : Diags(Diags), Args(Args), Inputs(Inputs),
+  ArgsToFrontendInputsConverter(DiagnosticEngine &diags, const ArgList &args,
+                                FrontendInputs &inputs)
+      : Diags(diags), Args(args), Inputs(inputs),
         FilelistPathArg(Args.getLastArg(options::OPT_filelist)) {}
 
   bool convert() {
@@ -243,6 +243,7 @@ private:
     return hadError;
   }
 };
+
 class FrontendArgsToOptionsConverter {
 private:
   DiagnosticEngine &Diags;
@@ -274,7 +275,7 @@ private:
   void computeHelpOptions();
   void computeDumpScopeMapLocations();
   FrontendOptions::ActionType determineRequestedAction() const;
-  bool setupForSILOrLLVM();
+  bool setUpForSILOrLLVM();
   bool computeModuleName();
   bool computeFallbackModuleName();
   bool computeOutputFilenames();
@@ -295,10 +296,10 @@ private:
   readOutputFileList(const StringRef filelistPath) const;
 
 public:
-  FrontendArgsToOptionsConverter(DiagnosticEngine &Diags,
-                                 const llvm::opt::ArgList &Args,
-                                 FrontendOptions &Opts)
-      : Diags(Diags), Args(Args), Opts(Opts) {}
+  FrontendArgsToOptionsConverter(DiagnosticEngine &diags,
+                                 const llvm::opt::ArgList &args,
+                                 FrontendOptions &opts)
+      : Diags(diags), Args(args), Opts(opts) {}
 
   bool convert();
 };
@@ -323,8 +324,6 @@ bool FrontendArgsToOptionsConverter::convert() {
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
-  Opts.DelayedFunctionBodyParsing |=
-      Args.hasArg(OPT_delayed_function_body_parsing);
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
@@ -363,7 +362,7 @@ bool FrontendArgsToOptionsConverter::convert() {
     return true;
   }
 
-  if (setupForSILOrLLVM())
+  if (setUpForSILOrLLVM())
     return true;
 
   if (computeModuleName())
@@ -592,14 +591,14 @@ FrontendArgsToOptionsConverter::determineRequestedAction() const {
   llvm_unreachable("Unhandled mode option");
 }
 
-bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
+bool FrontendArgsToOptionsConverter::setUpForSILOrLLVM() {
   using namespace options;
-  bool TreatAsSIL =
+  bool treatAsSIL =
       Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
-  bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
+  bool treateAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
 
   if (Opts.Inputs.verifyInputs(
-          Diags, TreatAsSIL,
+          Diags, treatAsSIL,
           Opts.RequestedAction == FrontendOptions::ActionType::REPL,
           Opts.RequestedAction == FrontendOptions::ActionType::NoneAction)) {
     return true;
@@ -614,9 +613,9 @@ bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
     }
   }
 
-  if (TreatAsSIL)
+  if (treatAsSIL)
     Opts.InputKind = InputFileKind::IFK_SIL;
-  else if (TreatAsLLVM)
+  else if (treateAsLLVM)
     Opts.InputKind = InputFileKind::IFK_LLVM_IR;
   else if (Args.hasArg(OPT_parse_as_library))
     Opts.InputKind = InputFileKind::IFK_Swift_Library;
@@ -746,11 +745,11 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
     }
     return false;
   }
-  llvm::SmallString<128> Path(baseName);
-  StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
+  llvm::SmallString<128> path(baseName);
+  StringRef suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
       Opts.RequestedAction);
-  llvm::sys::path::replace_extension(Path, Suffix);
-  Opts.OutputFilenames.push_back(Path.str());
+  llvm::sys::path::replace_extension(path, suffix);
+  Opts.OutputFilenames.push_back(path.str());
   return false;
 }
 
@@ -769,12 +768,12 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
                    outputDir);
     return true;
   }
-  llvm::SmallString<128> Path(outputDir);
-  llvm::sys::path::append(Path, baseName);
-  StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
+  llvm::SmallString<128> path(outputDir);
+  llvm::sys::path::append(path, baseName);
+  StringRef suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
       Opts.RequestedAction);
-  llvm::sys::path::replace_extension(Path, Suffix);
-  Opts.OutputFilenames.push_back(Path.str());
+  llvm::sys::path::replace_extension(path, suffix);
+  Opts.OutputFilenames.push_back(path.str());
   return false;
 }
 
@@ -815,9 +814,9 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
         if (!output.empty())
           return;
 
-        llvm::SmallString<128> Path(Opts.originalPath());
-        llvm::sys::path::replace_extension(Path, extension);
-        output = Path.str();
+        llvm::SmallString<128> path(Opts.originalPath());
+        llvm::sys::path::replace_extension(path, extension);
+        output = path.str();
       };
 
   determineOutputFilename(Opts.DependenciesFilePath, OPT_emit_dependencies,
@@ -841,18 +840,18 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
     Opts.FixitsOutputPath = A->getValue();
   }
 
-  bool IsSIB = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB ||
+  bool isSIB = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB ||
                Opts.RequestedAction == FrontendOptions::ActionType::EmitSIBGen;
   bool canUseMainOutputForModule =
       Opts.RequestedAction == FrontendOptions::ActionType::MergeModules ||
       Opts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
-      IsSIB;
-  auto ext = IsSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
+      isSIB;
+  auto ext = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
   auto sibOpt = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB
                     ? OPT_emit_sib
                     : OPT_emit_sibgen;
   determineOutputFilename(Opts.ModuleOutputPath,
-                          IsSIB ? sibOpt : OPT_emit_module,
+                          isSIB ? sibOpt : OPT_emit_module,
                           OPT_emit_module_path, ext, canUseMainOutputForModule);
 
   determineOutputFilename(Opts.ModuleDocOutputPath, OPT_emit_module_doc,
@@ -941,9 +940,9 @@ FrontendArgsToOptionsConverter::readOutputFileList(
   return outputFiles;
 }
 
-static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
-                              DiagnosticEngine &Diags) {
-  return FrontendArgsToOptionsConverter(Diags, Args, Opts).convert();
+static bool ParseFrontendArgs(FrontendOptions &opts, ArgList &args,
+                              DiagnosticEngine &diags) {
+  return FrontendArgsToOptionsConverter(diags, args, opts).convert();
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
@@ -1921,37 +1920,37 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInvocation::setUpInputForSILTool(
-    StringRef InputFilename, StringRef ModuleNameArg,
+    StringRef inputFilename, StringRef moduleNameArg,
     bool alwaysSetModuleToMain, bool bePrimary,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
-  if (!FileBufOrErr) {
-    return FileBufOrErr;
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(inputFilename);
+  if (!fileBufOrErr) {
+    return fileBufOrErr;
   }
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
   getFrontendOptions().Inputs.addInput(
-      InputFile::create(InputFilename, bePrimary, FileBufOrErr.get().get()));
+      InputFile::create(inputFilename, bePrimary, fileBufOrErr.get().get()));
 
   auto result = serialization::validateSerializedAST(
-      FileBufOrErr.get()->getBuffer(), &extendedInfo);
+      fileBufOrErr.get()->getBuffer(), &extendedInfo);
   bool HasSerializedAST = result.status == serialization::Status::Valid;
 
   if (HasSerializedAST) {
-    const StringRef Stem = !ModuleNameArg.empty()
-                               ? ModuleNameArg
-                               : llvm::sys::path::stem(InputFilename);
+    const StringRef Stem = !moduleNameArg.empty()
+                               ? moduleNameArg
+                               : llvm::sys::path::stem(inputFilename);
     setModuleName(Stem);
     setInputKind(InputFileKind::IFK_Swift_Library);
   } else {
-    const StringRef Name = (alwaysSetModuleToMain || ModuleNameArg.empty())
+    const StringRef Name = (alwaysSetModuleToMain || moduleNameArg.empty())
                                ? "main"
-                               : ModuleNameArg;
+                               : moduleNameArg;
     setModuleName(Name);
     setInputKind(InputFileKind::IFK_SIL);
   }
-  return FileBufOrErr;
+  return fileBufOrErr;
 }

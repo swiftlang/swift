@@ -43,7 +43,9 @@ class InputFile {
 
   /// Does not take ownership of \p buffer. Does take ownership of a string.
   InputFile(StringRef name, llvm::MemoryBuffer *buffer, bool isPrimary)
-      : Filename(name), Buffer(buffer), IsPrimary(isPrimary) {}
+      : Filename(name), Buffer(buffer), IsPrimary(isPrimary) {
+    assert(!name.empty() && "All input files should have names");
+  }
 
 public:
   InputFile(const InputFile &other)
@@ -54,9 +56,9 @@ public:
 
   InputFile &operator=(const InputFile &) = default;
 
-  static InputFile create(StringRef Filename, bool isPrimary,
-                          llvm::MemoryBuffer *Buffer = nullptr) {
-    return InputFile(Filename, Buffer, isPrimary);
+  static InputFile create(StringRef filename, bool isPrimary,
+                          llvm::MemoryBuffer *buffer = nullptr) {
+    return InputFile(filename, buffer, isPrimary);
   }
 
   bool getIsPrimary() const { return IsPrimary; }
@@ -399,10 +401,6 @@ public:
 
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
-
-  /// Indicates whether function body parsing should be delayed
-  /// until the end of all files.
-  bool DelayedFunctionBodyParsing = false;
 
   /// If true, serialization encodes an extra lookup table for use in module-
   /// merging when emitting partial modules (the per-file modules in a non-WMO

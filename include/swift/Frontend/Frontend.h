@@ -295,7 +295,7 @@ public:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  setUpInputForSILTool(StringRef InputFilename, StringRef ModuleNameArg,
+  setUpInputForSILTool(StringRef inputFilename, StringRef moduleNameArg,
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
@@ -428,11 +428,11 @@ private:
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   Optional<unsigned> setupCodeCompletionBuffer();
-  bool setupInputs(Optional<unsigned> codeCompletionBufferID);
+  bool setUpInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() { return Invocation.isInputSwift(); }
   bool isInSILMode() { return Invocation.isInputSIL(); }
-  bool setupForInput(const InputFile &input);
-  void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
+  bool setUpForInput(const InputFile &input);
+  void setUpForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
   bool setUpForFile(StringRef file, bool isPrimary);
 
 public:
@@ -447,9 +447,9 @@ public:
 
 private:
   SourceFile *
-  createSourceFileForMainModule(SourceFileKind FileKind,
-                                SourceFile::ImplicitModuleImportKind ImportKind,
-                                Optional<unsigned> BufferID);
+  createSourceFileForMainModule(SourceFileKind fileKind,
+                                SourceFile::ImplicitModuleImportKind importKind,
+                                Optional<unsigned> bufferID);
 
 public:
   /// Frees up the ASTContext and SILModule objects that this instance is

@@ -157,7 +157,7 @@ ERROR(error_primary_file_not_found,none,
 ERROR(error_cannot_have_input_files_with_file_list,none,
 "cannot have input files with file list", ())
 
-ERROR(error_duplicate_input_file_on_command_line,none,
+ERROR(error_appears_more_than_once_on_command_line,none,
 "input file '%0' appears more than once on command line", (StringRef))
 
 ERROR(repl_must_be_initialized,none,

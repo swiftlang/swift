@@ -393,11 +393,11 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
 
 static FrontendInputs
 resolveSymbolicLinksInInputs(FrontendInputs &inputs,
-                             StringRef UnresolvedPrimaryFile,
-                             std::string &Error) {
+                             StringRef unresolvedPrimaryFile,
+                             std::string &error) {
   unsigned primaryCount = 0;
-  std::string PrimaryFile =
-      SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
+  std::string primaryFile =
+      SwiftLangSupport::resolvePathSymlinks(unresolvedPrimaryFile);
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputs replacementInputs;
@@ -405,7 +405,7 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
     std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.getFile());
     bool newIsPrimary = input.getIsPrimary() ||
-                        (!PrimaryFile.empty() && PrimaryFile == newFilename);
+                        (!primaryFile.empty() && primaryFile == newFilename);
     if (newIsPrimary) {
       ++primaryCount;
     }
@@ -414,14 +414,14 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
         InputFile::create(newFilename, newIsPrimary, input.getBuffer()));
   }
 
-  if (PrimaryFile.empty() || primaryCount == 1) {
+  if (primaryFile.empty() || primaryCount == 1) {
     return replacementInputs;
   }
 
   llvm::SmallString<64> Err;
   llvm::raw_svector_ostream OS(Err);
-  OS << "'" << PrimaryFile << "' is not part of the input files";
-  Error = OS.str();
+  OS << "'" << primaryFile << "' is not part of the input files";
+  error = OS.str();
   return replacementInputs;
 }
 
@@ -683,8 +683,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().Inputs.getInputs()) {
     StringRef File = input.getFile();
-    if (File.empty())
-      continue;
+    assert(!File.empty() && "All inputs should have names");
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {

@@ -102,7 +102,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
 
-  return setupInputs(codeCompletionBufferID);
+  return setUpInputs(codeCompletionBufferID);
 }
 
 void CompilerInstance::setUpLLVMArguments() {
@@ -174,12 +174,12 @@ Optional<unsigned> CompilerInstance::setupCodeCompletionBuffer() {
   return codeCompletionBufferID;
 }
 
-bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
+bool CompilerInstance::setUpInputs(Optional<unsigned> codeCompletionBufferID) {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (const InputFile &input :
        Invocation.getFrontendOptions().Inputs.getInputs())
-    if (setupForInput(input))
+    if (setUpForInput(input))
       return true;
 
   // Set the primary file to the code-completion point if one exists.
@@ -193,14 +193,14 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   return false;
 }
 
-bool CompilerInstance::setupForInput(const InputFile &input) {
+bool CompilerInstance::setUpForInput(const InputFile &input) {
   if (llvm::MemoryBuffer *inputBuffer = input.getBuffer()) {
-    setupForBuffer(inputBuffer, input.getIsPrimary());
+    setUpForBuffer(inputBuffer, input.getIsPrimary());
     return false;
   }
   return setUpForFile(input.getFile(), input.getIsPrimary());
 }
-void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer,
+void CompilerInstance::setUpForBuffer(llvm::MemoryBuffer *buffer,
                                       bool isPrimary) {
   auto copy =
       std::unique_ptr<llvm::MemoryBuffer>(llvm::MemoryBuffer::getMemBufferCopy(
@@ -714,18 +714,18 @@ void CompilerInstance::finishTypeChecking(
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
-    SourceFileKind FileKind, SourceFile::ImplicitModuleImportKind ImportKind,
-    Optional<unsigned> BufferID) {
-  ModuleDecl *MainModule = getMainModule();
-  bool KeepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
-  SourceFile *InputFile = new (*Context)
-      SourceFile(*MainModule, FileKind, BufferID, ImportKind, KeepSyntaxInfo);
-  MainModule->addFile(*InputFile);
+    SourceFileKind fileKind, SourceFile::ImplicitModuleImportKind importKind,
+    Optional<unsigned> bufferID) {
+  ModuleDecl *mainModule = getMainModule();
+  bool keepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
+  SourceFile *inputFile = new (*Context)
+      SourceFile(*mainModule, fileKind, bufferID, importKind, keepSyntaxInfo);
+  mainModule->addFile(*inputFile);
 
-  if (BufferID && *BufferID == PrimaryBufferID)
-    setPrimarySourceFile(InputFile);
+  if (bufferID && *bufferID == PrimaryBufferID)
+    setPrimarySourceFile(inputFile);
 
-  return InputFile;
+  return inputFile;
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
