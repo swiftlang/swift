@@ -1682,11 +1682,17 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
   }
 
-  case tok::l_paren:
+  case tok::l_paren: {
+    // Build a tuple expression syntax node.
+    // AST differentiates paren and tuple expression where the former allows
+    // only one element without label. However, libSyntax tree doesn't have this
+    // differentiation. A tuple expression node in libSyntax can have a single
+    // element without label.
+    SyntaxParsingContext TupleContext(SyntaxContext, SyntaxKind::TupleExpr);
     Result = parseExprList(tok::l_paren, tok::r_paren,
-                           SyntaxKind::FunctionCallArgumentList);
+                           SyntaxKind::TupleElementList);
     break;
-
+  }
   case tok::l_square:
     Result = parseExprCollection();
     break;
