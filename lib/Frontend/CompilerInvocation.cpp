@@ -84,6 +84,20 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
 
+
+// This is a separate function so that it shows up in stack traces.
+LLVM_ATTRIBUTE_NOINLINE
+static void debugFailWithAssertion() {
+  // This assertion should always fail, per the user's request, and should
+  // not be converted to llvm_unreachable.
+  assert(0 && "This is an assertion!");
+}
+
+// This is a separate function so that it shows up in stack traces.
+LLVM_ATTRIBUTE_NOINLINE
+static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
+
+
 namespace swift {
 
 /// Implement argument semantics in a way that will make it easier to have
@@ -92,9 +106,13 @@ namespace swift {
 ///
 /// Semantics today:
 /// If input files are on command line, primary files on command line are also
-/// input files; they are not repeated without -primary-file. If input files are
-/// in a file list, the primary files on the command line are repeated in the
-/// file list. Thus, if there are any primary files, it is illegal to have both
+/// input files; they are may or may not be repeated on the command line with a
+/// -primary-file prefix. For example in the test:
+/// SourceKit/CursorInfo/Inputs/rdar_18677108-2-a.swift, the arguments are
+/// essentially: b.swift a.swift -primary a.swift. (A redundant primary can only
+/// come *after* the bare filename in the argument list.) If input files are in
+/// a file list, the primary files on the command line are repeated in the file
+/// list. Thus, if there are any primary files, it is illegal to have both
 /// (non-primary) input files and a file list. Finally, the order of input files
 /// must match the order given on the command line or the file list.
 ///
@@ -114,17 +132,13 @@ class ArgsToFrontendInputsConverter {
 
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
 
-  llvm::StringMap<unsigned> FileIndices;
-  std::vector<StringRef> PrimaryFiles;
+  std::set<StringRef> PrimaryFilesToExpectInFilelist;
 
   StringRef filelistPath() { return FilelistPathArg->getValue(); }
 
-  void addPrimary(StringRef file) { PrimaryFiles.push_back(file); }
-
-  void addInput(StringRef file) {
-    FileIndices.insert({file, Inputs.inputFilenameCount()});
-    Inputs.addInputFilename(file);
-  }
+  llvm::StringMap<unsigned> IndicesOfFilesAlreadyAdded; // Sigh, some tests
+                                                        // duplicate files on
+                                                        // command line.
 
   bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
     return FilelistPathArg != nullptr;
@@ -136,16 +150,40 @@ class ArgsToFrontendInputsConverter {
     SecondaryFromFileList
   };
 
+  void addFileFromCommandLine(StringRef file, bool isPrimary) {
+    if (isPrimary && arePrimariesOnCommandLineAlsoAppearingInFilelist()) {
+      PrimaryFilesToExpectInFilelist.insert(file);
+      return;
+    }
+    const auto iterator = IndicesOfFilesAlreadyAdded.find(file);
+    if (iterator == IndicesOfFilesAlreadyAdded.end()) {
+      IndicesOfFilesAlreadyAdded.insert(
+          std::make_pair(file, Inputs.inputCount()));
+      Inputs.addInput(InputFile::create(file, isPrimary));
+    } else if (isPrimary)
+      Inputs.bePrimaryAt(iterator->second);
+    else {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_duplicate_input_file_on_command_line, file);
+    }
+  }
+
   void addFile(StringRef file, Whence whence) {
     switch (whence) {
     case Whence::PrimaryFromCommandLine:
-      addPrimary(file);
-      if (!arePrimariesOnCommandLineAlsoAppearingInFilelist())
-        addInput(file);
+      addFileFromCommandLine(file, true);
       break;
+
     case Whence::SecondaryFromCommandLine:
+      addFileFromCommandLine(file, false);
+      break;
+
     case Whence::SecondaryFromFileList:
-      addInput(file);
+      if (PrimaryFilesToExpectInFilelist.count(file)) {
+        Inputs.addPrimaryInputFile(file);
+        PrimaryFilesToExpectInFilelist.erase(file);
+      } else
+        Inputs.addInputFile(file);
       break;
     }
   }
@@ -162,7 +200,7 @@ public:
     getFilesFromCommandLine();
     if (getFilesFromFilelist())
       return true;
-    return setPrimaryFiles();
+    return checkForUnusedPrimaries();
   }
 
 private:
@@ -206,42 +244,184 @@ private:
     return false;
   }
 
-  bool setPrimaryFiles() {
-    for (StringRef primaryFile : PrimaryFiles) {
-      const auto iterator = FileIndices.find(primaryFile);
+  bool checkForUnusedPrimaries() {
+    bool hadError = false;
+    for (StringRef primaryFile : PrimaryFilesToExpectInFilelist) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
-      if (iterator == FileIndices.end()) {
-        assert(FilelistPathArg != nullptr &&
-               "Missing primary with no filelist");
-        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
-                       primaryFile, filelistPath());
-        return true;
-      }
-      Inputs.addPrimaryInputFilename(iterator->second);
+      assert(FilelistPathArg != nullptr && "Missing primary with no filelist");
+      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
+                     primaryFile, filelistPath());
+      hadError = true;
     }
-    return false;
+    return hadError;
   }
+};
+class FrontendArgsToOptionsConverter {
+private:
+  DiagnosticEngine &Diags;
+  const llvm::opt::ArgList &Args;
+  FrontendOptions &Opts;
+
+  Optional<const std::vector<std::string>>
+      cachedOutputFilenamesFromCommandLineOrFilelist;
+
+  void handleDebugCrashGroupArguments();
+  
+  void computeDebugTimeOptions();
+  bool computeFallbackModuleName();
+  bool computeModuleName();
+  bool computeOutputFilenames();
+  void computeDumpScopeMapLocations();
+  void computeHelpOptions();
+  void computeImplicitImportModuleNames();
+  void computeImportObjCHeaderOptions();
+  void computeLLVMArgs();
+  void computePlaygroundOptions();
+  void computePrintStatsOptions();
+  void computeTBDOptions();
+  
+  
+  void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
+                                  unsigned &valueToSet);
+  
+  FrontendOptions::ActionType determineRequestedAction() const;
+  
+  bool setUpForSILOrLLVM();
+  
+  
+  /// Determine the correct output filename when none was specified.
+  ///
+  /// Such an absence should only occur when invoking the frontend
+  /// without the driver,
+  /// because the driver will always pass -o with an appropriate filename
+  /// if output is required for the requested action.
+  bool deriveOutputFilenameFromInputFile();
+  
+  /// Determine the correct output filename when a directory was specified.
+  ///
+  /// Such a specification should only occur when invoking the frontend
+  /// directly, because the driver will always pass -o with an appropriate filename
+  /// if output is required for the requested action.
+  bool deriveOutputFilenameForDirectory(StringRef outputDir);
+  
+  std::string determineBaseNameOfOutput() const;
+
+  void deriveOutputFilenameFromParts(StringRef dir, StringRef base);
+
+  void determineSupplementaryOutputFilenames();
+  
+  /// Returns the output filenames on the command line or in the output
+  /// filelist. If there
+  /// were neither -o's nor an output filelist, returns an empty vector.
+  const std::vector<std::string> &
+  getOutputFilenamesFromCommandLineOrFilelist();
+  
+  bool checkForUnusedOutputPaths() const;
+  
+  std::vector<std::string>
+  readOutputFileList(StringRef filelistPath) const;
+
+
+public:
+  FrontendArgsToOptionsConverter(DiagnosticEngine &Diags,
+                                 const llvm::opt::ArgList &Args,
+                                 FrontendOptions &Opts)
+      : Diags(Diags), Args(Args), Opts(Opts) {}
+
+  bool convert();
 };
 } // namespace swift
 
-// This is a separate function so that it shows up in stack traces.
-LLVM_ATTRIBUTE_NOINLINE
-static void debugFailWithAssertion() {
-  // This assertion should always fail, per the user's request, and should
-  // not be converted to llvm_unreachable.
-  assert(0 && "This is an assertion!");
+bool FrontendArgsToOptionsConverter::convert() {
+  using namespace options;
+
+  handleDebugCrashGroupArguments();
+
+  if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
+    Opts.DumpAPIPath = A->getValue();
+  }
+  if (const Arg *A = Args.getLastArg(OPT_group_info_path)) {
+    Opts.GroupInfoPath = A->getValue();
+  }
+  if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
+    Opts.IndexStorePath = A->getValue();
+  }
+  Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
+
+  Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
+  Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
+
+  Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
+  Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
+
+  computePrintStatsOptions();
+  computeDebugTimeOptions();
+  computeTBDOptions();
+
+  setUnsignedIntegerArgument(OPT_warn_long_function_bodies, 10,
+                             Opts.WarnLongFunctionBodies);
+  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking, 10,
+                             Opts.WarnLongExpressionTypeChecking);
+  setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
+                             Opts.SolverExpressionTimeThreshold);
+
+  computePlaygroundOptions();
+
+  // This can be enabled independently of the playground transform.
+  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
+
+  computeHelpOptions();
+  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
+    return true;
+
+  Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
+
+  if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
+    Opts.VerifyGenericSignaturesInModule = A->getValue();
+  }
+
+  computeDumpScopeMapLocations();
+  Opts.RequestedAction = determineRequestedAction();
+
+  if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
+      Opts.Inputs.hasPrimaryInputs()) {
+    Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
+    return true;
+  }
+
+  if (setUpForSILOrLLVM())
+    return true;
+
+  if (computeModuleName())
+    return true;
+
+  if (computeOutputFilenames())
+    return true;
+  determineSupplementaryOutputFilenames();
+
+  if (checkForUnusedOutputPaths())
+    return true;
+
+  if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
+    Opts.ModuleLinkName = A->getValue();
+  }
+
+  Opts.AlwaysSerializeDebuggingOptions |=
+      Args.hasArg(OPT_serialize_debugging_options);
+  Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
+  Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
+  Opts.EnableSerializationNestedTypeLookupTable &=
+      !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
+
+  computeImportObjCHeaderOptions();
+  computeImplicitImportModuleNames();
+  computeLLVMArgs();
+
+  return false;
 }
 
-// This is a separate function so that it shows up in stack traces.
-LLVM_ATTRIBUTE_NOINLINE
-static void debugFailWithCrash() {
-  LLVM_BUILTIN_TRAP;
-}
-
-
-static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
-                              DiagnosticEngine &Diags) {
+void FrontendArgsToOptionsConverter::handleDebugCrashGroupArguments() {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
@@ -260,36 +440,23 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown debug_crash_Group option!");
     }
   }
+}
 
-  if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
-    Opts.DumpAPIPath = A->getValue();
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_group_info_path)) {
-    Opts.GroupInfoPath = A->getValue();
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
-    Opts.IndexStorePath = A->getValue();
-  }
-  Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
-
-  Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
-  Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
-
-  Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
-  Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
-
+void FrontendArgsToOptionsConverter::computePrintStatsOptions() {
+  using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
 #if defined(NDEBUG) && !defined(LLVM_ENABLE_STATS)
   if (Opts.PrintStats || Opts.PrintClangStats)
     Diags.diagnose(SourceLoc(), diag::stats_disabled);
 #endif
+}
 
+void FrontendArgsToOptionsConverter::computeDebugTimeOptions() {
+  using namespace options;
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressionTypeChecking |=
-    Args.hasArg(OPT_debug_time_expression_type_checking);
+      Args.hasArg(OPT_debug_time_expression_type_checking);
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
   if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
     Opts.StatsOutputDir = A->getValue();
@@ -297,7 +464,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Opts.TraceStats = true;
     }
   }
+}
 
+void FrontendArgsToOptionsConverter::computeTBDOptions() {
+  using namespace options;
   if (const Arg *A = Args.getLastArg(OPT_validate_tbd_against_ir_EQ)) {
     using Mode = FrontendOptions::TBDValidationMode;
     StringRef value = A->getValue();
@@ -312,50 +482,35 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                      A->getOption().getPrefixedName(), value);
     }
   }
-
   if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
     Opts.TBDInstallName = A->getValue();
   }
+}
 
-  if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
+void FrontendArgsToOptionsConverter::setUnsignedIntegerArgument(
+    options::ID optionID, unsigned max, unsigned &valueToSet) {
+  if (const Arg *A = Args.getLastArg(optionID)) {
     unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
+    if (StringRef(A->getValue()).getAsInteger(max, attempt)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     } else {
-      Opts.WarnLongFunctionBodies = attempt;
+      valueToSet = attempt;
     }
   }
+}
 
-  if (const Arg *A = Args.getLastArg(OPT_warn_long_expression_type_checking)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    } else {
-      Opts.WarnLongExpressionTypeChecking = attempt;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_expression_time_threshold_EQ)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-    } else {
-      Opts.SolverExpressionTimeThreshold = attempt;
-    }
-  }
-
+void FrontendArgsToOptionsConverter::computePlaygroundOptions() {
+  using namespace options;
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
     Opts.PlaygroundTransform = false;
   Opts.PlaygroundHighPerformance |=
-    Args.hasArg(OPT_playground_high_performance);
+      Args.hasArg(OPT_playground_high_performance);
+}
 
-  // This can be enabled independently of the playground transform.
-  Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
-
+void FrontendArgsToOptionsConverter::computeHelpOptions() {
+  using namespace options;
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
       Opts.PrintHelp = true;
@@ -365,115 +520,109 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown help option parsed");
     }
   }
+}
 
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
-    return true;
+void FrontendArgsToOptionsConverter::computeDumpScopeMapLocations() {
+  using namespace options;
+  const Arg *A = Args.getLastArg(OPT_modes_Group);
+  if (!A || !A->getOption().matches(OPT_dump_scope_maps))
+    return;
+  StringRef value = A->getValue();
+  if (value == "expanded") {
+    // Note: fully expanded the scope map.
+    return;
+  }
+  // Parse a comma-separated list of line:column for lookups to
+  // perform (and dump the result of).
+  SmallVector<StringRef, 4> locations;
+  value.split(locations, ',');
 
-  Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
-
-  if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
-    Opts.VerifyGenericSignaturesInModule = A->getValue();
+  bool invalid = false;
+  for (auto location : locations) {
+    auto lineColumnStr = location.split(':');
+    unsigned line, column;
+    if (lineColumnStr.first.getAsInteger(10, line) ||
+        lineColumnStr.second.getAsInteger(10, column)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_source_location_str,
+                     location);
+      invalid = true;
+      continue;
+    }
+    Opts.DumpScopeMapLocations.push_back({line, column});
   }
 
-  // Determine what the user has asked the frontend to do.
-  FrontendOptions::ActionType &Action = Opts.RequestedAction;
-  if (const Arg *A = Args.getLastArg(OPT_modes_Group)) {
-    Option Opt = A->getOption();
-    if (Opt.matches(OPT_emit_object)) {
-      Action = FrontendOptions::ActionType::EmitObject;
-    } else if (Opt.matches(OPT_emit_assembly)) {
-      Action = FrontendOptions::ActionType::EmitAssembly;
-    } else if (Opt.matches(OPT_emit_ir)) {
-      Action = FrontendOptions::ActionType::EmitIR;
-    } else if (Opt.matches(OPT_emit_bc)) {
-      Action = FrontendOptions::ActionType::EmitBC;
-    } else if (Opt.matches(OPT_emit_sil)) {
-      Action = FrontendOptions::ActionType::EmitSIL;
-    } else if (Opt.matches(OPT_emit_silgen)) {
-      Action = FrontendOptions::ActionType::EmitSILGen;
-    } else if (Opt.matches(OPT_emit_sib)) {
-      Action = FrontendOptions::ActionType::EmitSIB;
-    } else if (Opt.matches(OPT_emit_sibgen)) {
-      Action = FrontendOptions::ActionType::EmitSIBGen;
-    } else if (Opt.matches(OPT_emit_pch)) {
-      Action = FrontendOptions::ActionType::EmitPCH;
-    } else if (Opt.matches(OPT_emit_imported_modules)) {
-      Action = FrontendOptions::ActionType::EmitImportedModules;
-    } else if (Opt.matches(OPT_parse)) {
-      Action = FrontendOptions::ActionType::Parse;
-    } else if (Opt.matches(OPT_typecheck)) {
-      Action = FrontendOptions::ActionType::Typecheck;
-    } else if (Opt.matches(OPT_dump_parse)) {
-      Action = FrontendOptions::ActionType::DumpParse;
-    } else if (Opt.matches(OPT_dump_ast)) {
-      Action = FrontendOptions::ActionType::DumpAST;
-    } else if (Opt.matches(OPT_emit_syntax)) {
-      Action = FrontendOptions::ActionType::EmitSyntax;
-    } else if (Opt.matches(OPT_merge_modules)) {
-      Action = FrontendOptions::ActionType::MergeModules;
-    } else if (Opt.matches(OPT_dump_scope_maps)) {
-      Action = FrontendOptions::ActionType::DumpScopeMaps;
+  if (!invalid && Opts.DumpScopeMapLocations.empty())
+    Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
+}
 
-      StringRef value = A->getValue();
-      if (value == "expanded") {
-        // Note: fully expanded the scope map.
-      } else {
-        // Parse a comma-separated list of line:column for lookups to
-        // perform (and dump the result of).
-        SmallVector<StringRef, 4> locations;
-        value.split(locations, ',');
-
-        bool invalid = false;
-        for (auto location : locations) {
-          auto lineColumnStr = location.split(':');
-          unsigned line, column;
-          if (lineColumnStr.first.getAsInteger(10, line) ||
-              lineColumnStr.second.getAsInteger(10, column)) {
-            Diags.diagnose(SourceLoc(), diag::error_invalid_source_location_str,
-                           location);
-            invalid = true;
-            continue;
-          }
-
-          Opts.DumpScopeMapLocations.push_back({line, column});
-        }
-
-        if (!invalid && Opts.DumpScopeMapLocations.empty())
-          Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
-      }
-    } else if (Opt.matches(OPT_dump_type_refinement_contexts)) {
-      Action = FrontendOptions::ActionType::DumpTypeRefinementContexts;
-    } else if (Opt.matches(OPT_dump_interface_hash)) {
-      Action = FrontendOptions::ActionType::DumpInterfaceHash;
-    } else if (Opt.matches(OPT_print_ast)) {
-      Action = FrontendOptions::ActionType::PrintAST;
-    } else if (Opt.matches(OPT_repl) ||
-               Opt.matches(OPT_deprecated_integrated_repl)) {
-      Action = FrontendOptions::ActionType::REPL;
-    } else if (Opt.matches(OPT_interpret)) {
-      Action = FrontendOptions::ActionType::Immediate;
-    } else {
-      llvm_unreachable("Unhandled mode option");
-    }
-  } else {
+FrontendOptions::ActionType
+FrontendArgsToOptionsConverter::determineRequestedAction() const {
+  using namespace options;
+  const Arg *A = Args.getLastArg(OPT_modes_Group);
+  if (!A) {
     // We don't have a mode, so determine a default.
     if (Args.hasArg(OPT_emit_module, OPT_emit_module_path)) {
       // We've been told to emit a module, but have no other mode indicators.
       // As a result, put the frontend into EmitModuleOnly mode.
       // (Setting up module output will be handled below.)
-      Action = FrontendOptions::ActionType::EmitModuleOnly;
+      return FrontendOptions::ActionType::EmitModuleOnly;
     }
+    return FrontendOptions::ActionType::NoneAction;
   }
+  Option Opt = A->getOption();
+  if (Opt.matches(OPT_emit_object))
+    return FrontendOptions::ActionType::EmitObject;
+  if (Opt.matches(OPT_emit_assembly))
+    return FrontendOptions::ActionType::EmitAssembly;
+  if (Opt.matches(OPT_emit_ir))
+    return FrontendOptions::ActionType::EmitIR;
+  if (Opt.matches(OPT_emit_bc))
+    return FrontendOptions::ActionType::EmitBC;
+  if (Opt.matches(OPT_emit_sil))
+    return FrontendOptions::ActionType::EmitSIL;
+  if (Opt.matches(OPT_emit_silgen))
+    return FrontendOptions::ActionType::EmitSILGen;
+  if (Opt.matches(OPT_emit_sib))
+    return FrontendOptions::ActionType::EmitSIB;
+  if (Opt.matches(OPT_emit_sibgen))
+    return FrontendOptions::ActionType::EmitSIBGen;
+  if (Opt.matches(OPT_emit_pch))
+    return FrontendOptions::ActionType::EmitPCH;
+  if (Opt.matches(OPT_emit_imported_modules))
+    return FrontendOptions::ActionType::EmitImportedModules;
+  if (Opt.matches(OPT_parse))
+    return FrontendOptions::ActionType::Parse;
+  if (Opt.matches(OPT_typecheck))
+    return FrontendOptions::ActionType::Typecheck;
+  if (Opt.matches(OPT_dump_parse))
+    return FrontendOptions::ActionType::DumpParse;
+  if (Opt.matches(OPT_dump_ast))
+    return FrontendOptions::ActionType::DumpAST;
+  if (Opt.matches(OPT_emit_syntax))
+    return FrontendOptions::ActionType::EmitSyntax;
+  if (Opt.matches(OPT_merge_modules))
+    return FrontendOptions::ActionType::MergeModules;
+  if (Opt.matches(OPT_dump_scope_maps))
+    return FrontendOptions::ActionType::DumpScopeMaps;
+  if (Opt.matches(OPT_dump_type_refinement_contexts))
+    return FrontendOptions::ActionType::DumpTypeRefinementContexts;
+  if (Opt.matches(OPT_dump_interface_hash))
+    return FrontendOptions::ActionType::DumpInterfaceHash;
+  if (Opt.matches(OPT_print_ast))
+    return FrontendOptions::ActionType::PrintAST;
 
-  if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
-      Opts.Inputs.havePrimaryInputs()) {
-    Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
-    return true;
-  }
+  if (Opt.matches(OPT_repl) || Opt.matches(OPT_deprecated_integrated_repl))
+    return FrontendOptions::ActionType::REPL;
+  if (Opt.matches(OPT_interpret))
+    return FrontendOptions::ActionType::Immediate;
 
+  llvm_unreachable("Unhandled mode option");
+}
+
+bool FrontendArgsToOptionsConverter::setUpForSILOrLLVM() {
+  using namespace options;
   bool TreatAsSIL =
       Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
-
   bool TreatAsLLVM = Opts.Inputs.shouldTreatAsLLVM();
 
   if (Opts.Inputs.verifyInputs(
@@ -482,7 +631,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
           Opts.RequestedAction == FrontendOptions::ActionType::NoneAction)) {
     return true;
   }
-
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate) {
     Opts.ImmediateArgv.push_back(
         Opts.Inputs.getFilenameOfFirstInput()); // argv[0]
@@ -499,184 +647,205 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.InputKind = InputFileKind::IFK_LLVM_IR;
   else if (Args.hasArg(OPT_parse_as_library))
     Opts.InputKind = InputFileKind::IFK_Swift_Library;
-  else if (Action == FrontendOptions::ActionType::REPL)
+  else if (Opts.RequestedAction == FrontendOptions::ActionType::REPL)
     Opts.InputKind = InputFileKind::IFK_Swift_REPL;
   else
     Opts.InputKind = InputFileKind::IFK_Swift;
 
-  Opts.setOutputFileList(Diags, Args);
+  return false;
+}
 
-  Opts.setModuleName(Diags, Args);
+bool FrontendArgsToOptionsConverter::computeModuleName() {
+  const Arg *A = Args.getLastArg(options::OPT_module_name);
+  if (A) {
+    Opts.ModuleName = A->getValue();
+  } else if (Opts.ModuleName.empty()) {
+    // The user did not specify a module name, so determine a default fallback
+    // based on other options.
 
-  if (Opts.OutputFilenames.empty() ||
-      llvm::sys::fs::is_directory(Opts.getSingleOutputFilename())) {
-    // No output filename was specified, or an output directory was specified.
-    // Determine the correct output filename.
-
-    // Note: this should typically only be used when invoking the frontend
-    // directly, as the driver will always pass -o with an appropriate filename
-    // if output is required for the requested action.
-
-    StringRef Suffix;
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::ActionType::NoneAction:
-      break;
-
-    case FrontendOptions::ActionType::Parse:
-    case FrontendOptions::ActionType::Typecheck:
-    case FrontendOptions::ActionType::DumpParse:
-    case FrontendOptions::ActionType::DumpInterfaceHash:
-    case FrontendOptions::ActionType::DumpAST:
-    case FrontendOptions::ActionType::EmitSyntax:
-    case FrontendOptions::ActionType::PrintAST:
-    case FrontendOptions::ActionType::DumpScopeMaps:
-    case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-      // Textual modes.
-      Opts.setOutputFilenameToStdout();
-      break;
-
-    case FrontendOptions::ActionType::EmitPCH:
-      Suffix = PCH_EXTENSION;
-      break;
-
-    case FrontendOptions::ActionType::EmitSILGen:
-    case FrontendOptions::ActionType::EmitSIL: {
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = SIL_EXTENSION;
-      break;
-    }
-
-    case FrontendOptions::ActionType::EmitSIBGen:
-    case FrontendOptions::ActionType::EmitSIB:
-      Suffix = SIB_EXTENSION;
-      break;
-
-    case FrontendOptions::ActionType::MergeModules:
-    case FrontendOptions::ActionType::EmitModuleOnly:
-      Suffix = SERIALIZED_MODULE_EXTENSION;
-      break;
-
-    case FrontendOptions::ActionType::Immediate:
-    case FrontendOptions::ActionType::REPL:
-      // These modes have no frontend-generated output.
-      Opts.OutputFilenames.clear();
-      break;
-
-    case FrontendOptions::ActionType::EmitAssembly: {
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = "s";
-      break;
-    }
-
-    case FrontendOptions::ActionType::EmitIR: {
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = "ll";
-      break;
-    }
-
-    case FrontendOptions::ActionType::EmitBC: {
-      Suffix = "bc";
-      break;
-    }
-
-    case FrontendOptions::ActionType::EmitObject:
-      Suffix = "o";
-      break;
-
-    case FrontendOptions::ActionType::EmitImportedModules:
-      if (Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else
-        Suffix = "importedmodules";
-      break;
-    }
-
-    if (!Suffix.empty()) {
-      // We need to deduce a file name.
-
-      // First, if we're reading from stdin and we don't have a directory,
-      // output to stdout.
-      if (Opts.Inputs.isReadingFromStdin() && Opts.OutputFilenames.empty())
-        Opts.setOutputFilenameToStdout();
-      else {
-        // We have a suffix, so determine an appropriate name.
-        StringRef BaseName =
-            Opts.Inputs.baseNameOfOutput(Args, Opts.ModuleName);
-        llvm::SmallString<128> Path(Opts.getSingleOutputFilename());
-        llvm::sys::path::append(Path, BaseName);
-        llvm::sys::path::replace_extension(Path, Suffix);
-
-        Opts.setSingleOutputFilename(Path.str());
-      }
-    }
-
-    if (Opts.OutputFilenames.empty()) {
-      if (Opts.RequestedAction != FrontendOptions::ActionType::REPL &&
-          Opts.RequestedAction != FrontendOptions::ActionType::Immediate &&
-          Opts.RequestedAction != FrontendOptions::ActionType::NoneAction) {
-        Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
-        return true;
-      }
-    } else if (Opts.isOutputFileDirectory()) {
-      Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
-                     Opts.getSingleOutputFilename());
+    // Note: this code path will only be taken when running the frontend
+    // directly; the driver should always pass -module-name when invoking the
+    // frontend.
+    if (computeFallbackModuleName())
       return true;
-    }
   }
 
-  auto determineOutputFilename = [&](std::string &output,
-                                     OptSpecifier optWithoutPath,
-                                     OptSpecifier optWithPath,
-                                     const char *extension,
-                                     bool useMainOutput) {
-    if (const Arg *A = Args.getLastArg(optWithPath)) {
-      Args.ClaimAllArgs(optWithoutPath);
-      output = A->getValue();
-      return;
+  if (Lexer::isIdentifier(Opts.ModuleName) &&
+      (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
+    return false;
+  }
+  if (!FrontendOptions::doesActionHaveOutput(Opts.RequestedAction) ||
+      Opts.isCompilingExactlyOneSwiftFile()) {
+    Opts.ModuleName = "main";
+    return false;
+  }
+  auto DID = (Opts.ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
+                                              : diag::error_bad_module_name;
+  Diags.diagnose(SourceLoc(), DID, Opts.ModuleName, A == nullptr);
+  Opts.ModuleName = "__bad__";
+  return false; // Must continue to run to pass test:
+                // multifile.protocol-conformance.swift
+}
+
+bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
+  if (Opts.RequestedAction == FrontendOptions::ActionType::REPL) {
+    // Default to a module named "REPL" if we're in REPL mode.
+    Opts.ModuleName = "REPL";
+    return false;
+  }
+  // In order to pass some tests, must leave ModuleName empty.
+  if (!Opts.Inputs.hasInputs()) {
+    Opts.ModuleName = StringRef();
+    // FIXME: This is a bug that should not happen, but does in tests.
+    // The compiler should bail out earlier, where "no frontend action was
+    // selected".
+    return false;
+  }
+  const std::vector<std::string> &outputFilenames =
+      getOutputFilenamesFromCommandLineOrFilelist();
+
+  bool isOutputAUniqueOrdinaryFile =
+      outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
+      !llvm::sys::fs::is_directory(outputFilenames[0]);
+  std::string nameToStem = isOutputAUniqueOrdinaryFile
+                               ? outputFilenames[0]
+                               : Opts.Inputs.getFilenameOfFirstInput().str();
+  Opts.ModuleName = llvm::sys::path::stem(nameToStem);
+  return false;
+}
+
+bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
+  assert(
+      FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
+      !FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction));
+
+  const std::vector<std::string>
+      &outputFilenamesFromCommandLineOrFilelist =
+          getOutputFilenamesFromCommandLineOrFilelist();
+  
+  if (outputFilenamesFromCommandLineOrFilelist.size() > 1) {
+    // WMO, threaded with N files (also someday batch mode).
+    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+    return false;
+  }
+
+   if (outputFilenamesFromCommandLineOrFilelist.empty()) {
+    // When the Frontend is invoked without going through the driver
+    // (e.g. for testing), it is convenient to derive output filenames from input.
+    return deriveOutputFilenameFromInputFile();
+  }
+
+  StringRef outputFilename = outputFilenamesFromCommandLineOrFilelist[0];
+  if (!llvm::sys::fs::is_directory(outputFilename)) {
+    // Could be -primary-file (1), or -wmo (non-threaded w/ N (input) files)
+    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+    return false;
+  }
+  // Only used for testing & when invoking frontend directly.
+  return deriveOutputFilenameForDirectory(outputFilename);
+}
+
+
+bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
+  if (Opts.Inputs.isReadingFromStdin() ||
+      FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction)) {
+    Opts.setOutputFilenameToStdout();
+    return false;
+  }
+  std::string baseName = determineBaseNameOfOutput();
+  if (baseName.empty()) {
+    if (Opts.RequestedAction != FrontendOptions::ActionType::REPL &&
+        Opts.RequestedAction != FrontendOptions::ActionType::Immediate &&
+        Opts.RequestedAction != FrontendOptions::ActionType::NoneAction) {
+      Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
+      return true;
     }
+    return false;
+  }
+  deriveOutputFilenameFromParts("", baseName);
+  return false;
+}
 
-    if (!Args.hasArg(optWithoutPath))
-      return;
 
-    if (useMainOutput && !Opts.OutputFilenames.empty()) {
-      output = Opts.getSingleOutputFilename();
-      return;
-    }
+bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
+    StringRef outputDir) {
 
-    if (!output.empty())
-      return;
+  std::string baseName = determineBaseNameOfOutput();
+  if (baseName.empty()) {
+    Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
+                   outputDir);
+    return true;
+  }
+  deriveOutputFilenameFromParts(outputDir, baseName);
+  return false;
+}
 
-    llvm::SmallString<128> Path(Opts.originalPath());
-    llvm::sys::path::replace_extension(Path, extension);
-    output = Path.str();
-  };
+void FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
+    StringRef dir, StringRef base) {
+  assert(!base.empty());
+  llvm::SmallString<128> path(dir);
+  llvm::sys::path::append(path, base);
+  StringRef suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
+      Opts.RequestedAction);
+  llvm::sys::path::replace_extension(path, suffix);
+  Opts.OutputFilenames.push_back(path.str());
+}
 
-  determineOutputFilename(Opts.DependenciesFilePath,
-                          OPT_emit_dependencies,
-                          OPT_emit_dependencies_path,
-                          "d", false);
-  determineOutputFilename(Opts.ReferenceDependenciesFilePath,
-                          OPT_emit_reference_dependencies,
-                          OPT_emit_reference_dependencies_path,
-                          "swiftdeps", false);
+std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
+  std::string nameToStem;
+  if (Opts.Inputs.hasPrimaryInputs()) {
+    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().getFile();
+  } else if (auto UserSpecifiedModuleName =
+                 Args.getLastArg(options::OPT_module_name)) {
+    nameToStem = UserSpecifiedModuleName->getValue();
+  } else if (Opts.Inputs.inputFilenameCount() == 1) {
+    nameToStem = Opts.Inputs.getFilenameOfFirstInput();
+  } else
+    nameToStem = "";
+
+  return llvm::sys::path::stem(nameToStem).str();
+}
+
+void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
+  using namespace options;
+  auto determineOutputFilename =
+      [&](std::string &output, OptSpecifier optWithoutPath,
+          OptSpecifier optWithPath, const char *extension, bool useMainOutput) {
+        if (const Arg *A = Args.getLastArg(optWithPath)) {
+          Args.ClaimAllArgs(optWithoutPath);
+          output = A->getValue();
+          return;
+        }
+
+        if (!Args.hasArg(optWithoutPath))
+          return;
+
+        if (useMainOutput && !Opts.OutputFilenames.empty()) {
+          output = Opts.getSingleOutputFilename();
+          return;
+        }
+
+        if (!output.empty())
+          return;
+
+        llvm::SmallString<128> Path(Opts.originalPath());
+        llvm::sys::path::replace_extension(Path, extension);
+        output = Path.str();
+      };
+
+  determineOutputFilename(Opts.DependenciesFilePath, OPT_emit_dependencies,
+                          OPT_emit_dependencies_path, "d", false);
+  determineOutputFilename(
+      Opts.ReferenceDependenciesFilePath, OPT_emit_reference_dependencies,
+      OPT_emit_reference_dependencies_path, "swiftdeps", false);
   determineOutputFilename(Opts.SerializedDiagnosticsPath,
                           OPT_serialize_diagnostics,
-                          OPT_serialize_diagnostics_path,
-                          "dia", false);
-  determineOutputFilename(Opts.ObjCHeaderOutputPath,
-                          OPT_emit_objc_header,
-                          OPT_emit_objc_header_path,
-                          "h", false);
-  determineOutputFilename(Opts.LoadedModuleTracePath,
-                          OPT_emit_loaded_module_trace,
-                          OPT_emit_loaded_module_trace_path,
-                          "trace.json", false);
+                          OPT_serialize_diagnostics_path, "dia", false);
+  determineOutputFilename(Opts.ObjCHeaderOutputPath, OPT_emit_objc_header,
+                          OPT_emit_objc_header_path, "h", false);
+  determineOutputFilename(
+      Opts.LoadedModuleTracePath, OPT_emit_loaded_module_trace,
+      OPT_emit_loaded_module_trace_path, "trace.json", false);
 
   determineOutputFilename(Opts.TBDPath, OPT_emit_tbd, OPT_emit_tbd_path, "tbd",
                           false);
@@ -697,175 +866,97 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                     : OPT_emit_sibgen;
   determineOutputFilename(Opts.ModuleOutputPath,
                           IsSIB ? sibOpt : OPT_emit_module,
-                          OPT_emit_module_path,
-                          ext,
-                          canUseMainOutputForModule);
+                          OPT_emit_module_path, ext, canUseMainOutputForModule);
 
-  determineOutputFilename(Opts.ModuleDocOutputPath,
-                          OPT_emit_module_doc,
+  determineOutputFilename(Opts.ModuleDocOutputPath, OPT_emit_module_doc,
                           OPT_emit_module_doc_path,
-                          SERIALIZED_MODULE_DOC_EXTENSION,
-                          false);
+                          SERIALIZED_MODULE_DOC_EXTENSION, false);
+}
 
-  if (!Opts.DependenciesFilePath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::ActionType::NoneAction:
-    case FrontendOptions::ActionType::DumpParse:
-    case FrontendOptions::ActionType::DumpInterfaceHash:
-    case FrontendOptions::ActionType::DumpAST:
-    case FrontendOptions::ActionType::EmitSyntax:
-    case FrontendOptions::ActionType::PrintAST:
-    case FrontendOptions::ActionType::DumpScopeMaps:
-    case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-    case FrontendOptions::ActionType::Immediate:
-    case FrontendOptions::ActionType::REPL:
-      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
-      return true;
-    case FrontendOptions::ActionType::Parse:
-    case FrontendOptions::ActionType::Typecheck:
-    case FrontendOptions::ActionType::MergeModules:
-    case FrontendOptions::ActionType::EmitModuleOnly:
-    case FrontendOptions::ActionType::EmitPCH:
-    case FrontendOptions::ActionType::EmitSILGen:
-    case FrontendOptions::ActionType::EmitSIL:
-    case FrontendOptions::ActionType::EmitSIBGen:
-    case FrontendOptions::ActionType::EmitSIB:
-    case FrontendOptions::ActionType::EmitIR:
-    case FrontendOptions::ActionType::EmitBC:
-    case FrontendOptions::ActionType::EmitAssembly:
-    case FrontendOptions::ActionType::EmitObject:
-    case FrontendOptions::ActionType::EmitImportedModules:
-      break;
-    }
+bool FrontendArgsToOptionsConverter::checkForUnusedOutputPaths() const {
+  if (Opts.hasUnusedDependenciesFilePath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
+    return true;
   }
-
-  if (!Opts.ObjCHeaderOutputPath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::ActionType::NoneAction:
-    case FrontendOptions::ActionType::DumpParse:
-    case FrontendOptions::ActionType::DumpInterfaceHash:
-    case FrontendOptions::ActionType::DumpAST:
-    case FrontendOptions::ActionType::EmitSyntax:
-    case FrontendOptions::ActionType::PrintAST:
-    case FrontendOptions::ActionType::EmitPCH:
-    case FrontendOptions::ActionType::DumpScopeMaps:
-    case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-    case FrontendOptions::ActionType::Immediate:
-    case FrontendOptions::ActionType::REPL:
-      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
-      return true;
-    case FrontendOptions::ActionType::Parse:
-    case FrontendOptions::ActionType::Typecheck:
-    case FrontendOptions::ActionType::MergeModules:
-    case FrontendOptions::ActionType::EmitModuleOnly:
-    case FrontendOptions::ActionType::EmitSILGen:
-    case FrontendOptions::ActionType::EmitSIL:
-    case FrontendOptions::ActionType::EmitSIBGen:
-    case FrontendOptions::ActionType::EmitSIB:
-    case FrontendOptions::ActionType::EmitIR:
-    case FrontendOptions::ActionType::EmitBC:
-    case FrontendOptions::ActionType::EmitAssembly:
-    case FrontendOptions::ActionType::EmitObject:
-    case FrontendOptions::ActionType::EmitImportedModules:
-      break;
-    }
+  if (Opts.hasUnusedObjCHeaderOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
+    return true;
   }
-
-  if (!Opts.LoadedModuleTracePath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::ActionType::NoneAction:
-    case FrontendOptions::ActionType::Parse:
-    case FrontendOptions::ActionType::DumpParse:
-    case FrontendOptions::ActionType::DumpInterfaceHash:
-    case FrontendOptions::ActionType::DumpAST:
-    case FrontendOptions::ActionType::EmitSyntax:
-    case FrontendOptions::ActionType::PrintAST:
-    case FrontendOptions::ActionType::DumpScopeMaps:
-    case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-    case FrontendOptions::ActionType::Immediate:
-    case FrontendOptions::ActionType::REPL:
-      Diags.diagnose(SourceLoc(),
-                     diag::error_mode_cannot_emit_loaded_module_trace);
-      return true;
-    case FrontendOptions::ActionType::Typecheck:
-    case FrontendOptions::ActionType::MergeModules:
-    case FrontendOptions::ActionType::EmitModuleOnly:
-    case FrontendOptions::ActionType::EmitPCH:
-    case FrontendOptions::ActionType::EmitSILGen:
-    case FrontendOptions::ActionType::EmitSIL:
-    case FrontendOptions::ActionType::EmitSIBGen:
-    case FrontendOptions::ActionType::EmitSIB:
-    case FrontendOptions::ActionType::EmitIR:
-    case FrontendOptions::ActionType::EmitBC:
-    case FrontendOptions::ActionType::EmitAssembly:
-    case FrontendOptions::ActionType::EmitObject:
-    case FrontendOptions::ActionType::EmitImportedModules:
-      break;
-    }
+  if (Opts.hasUnusedLoadedModuleTracePath()) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_mode_cannot_emit_loaded_module_trace);
+    return true;
   }
-
-  if (!Opts.ModuleOutputPath.empty() ||
-      !Opts.ModuleDocOutputPath.empty()) {
-    switch (Opts.RequestedAction) {
-    case FrontendOptions::ActionType::NoneAction:
-    case FrontendOptions::ActionType::Parse:
-    case FrontendOptions::ActionType::Typecheck:
-    case FrontendOptions::ActionType::DumpParse:
-    case FrontendOptions::ActionType::DumpInterfaceHash:
-    case FrontendOptions::ActionType::DumpAST:
-    case FrontendOptions::ActionType::EmitSyntax:
-    case FrontendOptions::ActionType::PrintAST:
-    case FrontendOptions::ActionType::EmitPCH:
-    case FrontendOptions::ActionType::DumpScopeMaps:
-    case FrontendOptions::ActionType::DumpTypeRefinementContexts:
-    case FrontendOptions::ActionType::EmitSILGen:
-    case FrontendOptions::ActionType::Immediate:
-    case FrontendOptions::ActionType::REPL:
-      if (!Opts.ModuleOutputPath.empty())
-        Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
-      else
-        Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
-      return true;
-    case FrontendOptions::ActionType::MergeModules:
-    case FrontendOptions::ActionType::EmitModuleOnly:
-    case FrontendOptions::ActionType::EmitSIL:
-    case FrontendOptions::ActionType::EmitSIBGen:
-    case FrontendOptions::ActionType::EmitSIB:
-    case FrontendOptions::ActionType::EmitIR:
-    case FrontendOptions::ActionType::EmitBC:
-    case FrontendOptions::ActionType::EmitAssembly:
-    case FrontendOptions::ActionType::EmitObject:
-    case FrontendOptions::ActionType::EmitImportedModules:
-      break;
-    }
+  if (Opts.hasUnusedModuleOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
+    return true;
   }
-
-  if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
-    Opts.ModuleLinkName = A->getValue();
+  if (Opts.hasUnusedModuleDocOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
+    return true;
   }
+  return false;
+}
 
-  Opts.AlwaysSerializeDebuggingOptions |=
-      Args.hasArg(OPT_serialize_debugging_options);
-  Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
-  Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-  Opts.EnableSerializationNestedTypeLookupTable &=
-      !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
-
+void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
+  using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.havePrimaryInputs() && !Opts.ModuleOutputPath.empty();
+        !Opts.Inputs.hasPrimaryInputs() && !Opts.ModuleOutputPath.empty();
   }
-
+}
+void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
+  using namespace options;
   for (const Arg *A : Args.filtered(OPT_import_module)) {
     Opts.ImplicitImportModuleNames.push_back(A->getValue());
   }
-
+}
+void FrontendArgsToOptionsConverter::computeLLVMArgs() {
+  using namespace options;
   for (const Arg *A : Args.filtered(OPT_Xllvm)) {
     Opts.LLVMArgs.push_back(A->getValue());
   }
+}
 
-  return false;
+const std::vector<std::string> &
+FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
+  if (cachedOutputFilenamesFromCommandLineOrFilelist) {
+    return *cachedOutputFilenamesFromCommandLineOrFilelist;
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
+    assert(!Args.hasArg(options::OPT_o) &&
+           "don't use -o with -output-filelist");
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
+        readOutputFileList(A->getValue()));
+  } else {
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
+        Args.getAllArgValues(options::OPT_o));
+  }
+  return *cachedOutputFilenamesFromCommandLineOrFilelist;
+}
+
+/// Try to read an output file list file.
+std::vector<std::string>
+FrontendArgsToOptionsConverter::readOutputFileList(
+    const StringRef filelistPath) const {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(filelistPath);
+  if (!buffer) {
+    Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
+                   buffer.getError().message());
+  }
+  std::vector<std::string> outputFiles;
+  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
+    outputFiles.push_back(line.str());
+  }
+  return outputFiles;
+}
+
+static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
+                              DiagnosticEngine &Diags) {
+  return FrontendArgsToOptionsConverter(Diags, Args, Opts).convert();
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
@@ -1104,7 +1195,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     TargetArg = A->getValue();
   }
 #if __APPLE__
-  else if (FrontendOpts.actionIsImmediate()) {
+  else if (FrontendOptions::isActionImmediate(FrontendOpts.RequestedAction)) {
     clang::VersionTuple currentOSVersion = inferAppleHostOSVersion();
     if (currentOSVersion.getMajor() != 0) {
       llvm::Triple::OSType currentOS = Target.getOS();
@@ -1605,12 +1696,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
+  StringRef primaryFile =
+      FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename();
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const Optional<StringRef> filename =
-                 FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename()) {
-    Opts.MainInputFilename = filename.getValue();
-  } else if (FrontendOpts.Inputs.haveUniqueInputFilename()) {
+  } else if (!primaryFile.empty()) {
+    Opts.MainInputFilename = primaryFile;
+  } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
   Opts.OutputFilenames = FrontendOpts.OutputFilenames;
@@ -1842,36 +1934,37 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInvocation::setUpInputForSILTool(
-    StringRef InputFilename, StringRef ModuleNameArg,
-    bool alwaysSetModuleToMain,
+    StringRef inputFilename, StringRef moduleNameArg,
+    bool alwaysSetModuleToMain, bool bePrimary,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
-  if (!FileBufOrErr) {
-    return FileBufOrErr;
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(inputFilename);
+  if (!fileBufOrErr) {
+    return fileBufOrErr;
   }
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  addInputBuffer(FileBufOrErr.get().get());
+  getFrontendOptions().Inputs.addInput(
+      InputFile::create(inputFilename, bePrimary, fileBufOrErr.get().get()));
 
   auto result = serialization::validateSerializedAST(
-      FileBufOrErr.get()->getBuffer(), &extendedInfo);
-  bool HasSerializedAST = result.status == serialization::Status::Valid;
+      fileBufOrErr.get()->getBuffer(), &extendedInfo);
+  bool hasSerializedAST = result.status == serialization::Status::Valid;
 
-  if (HasSerializedAST) {
-    const StringRef Stem = !ModuleNameArg.empty()
-                               ? ModuleNameArg
-                               : llvm::sys::path::stem(InputFilename);
-    setModuleName(Stem);
+  if (hasSerializedAST) {
+    const StringRef stem = !moduleNameArg.empty()
+                               ? moduleNameArg
+                               : llvm::sys::path::stem(inputFilename);
+    setModuleName(stem);
     setInputKind(InputFileKind::IFK_Swift_Library);
   } else {
-    const StringRef Name = (alwaysSetModuleToMain || ModuleNameArg.empty())
+    const StringRef name = (alwaysSetModuleToMain || moduleNameArg.empty())
                                ? "main"
-                               : ModuleNameArg;
-    setModuleName(Name);
+                               : moduleNameArg;
+    setModuleName(name);
     setInputKind(InputFileKind::IFK_SIL);
   }
-  return FileBufOrErr;
+  return fileBufOrErr;
 }
