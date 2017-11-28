@@ -398,9 +398,9 @@ def create_argument_parser():
         action=arguments.action.enable,
         help='enable Thread Sanitizer for swift tools')
     parser.add_argument(
-        "--enable-tsan-runtime",
-        help="enable Thread Sanitizer on the swift runtime",
-        action=arguments.action.enable)
+        '--enable-tsan-runtime',
+        action=arguments.action.enable,
+        help='enable Thread Sanitizer on the swift runtime')
     parser.add_argument(
         '--enable-lsan',
         action=arguments.action.enable,
