@@ -270,41 +270,33 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
   return emitPreconditionOptionalHasValue(loc, src);
 }
 
-ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
-                                                    ManagedValue addrOrValue,
-                                                    const TypeLowering &optTL,
-                                                    SGFContext C) {
+ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(
+    SILLocation loc, ManagedValue addrOrValue, const TypeLowering &optTL,
+    SGFContext C) {
   SILType origPayloadTy =
     addrOrValue.getType().getAnyOptionalObjectType();
 
   auto someDecl = getASTContext().getOptionalSomeDecl();
- 
-  ManagedValue payload;
 
-  // Take the payload from the optional.  Cheat a bit in the +0
-  // case--UncheckedTakeEnumData will never actually invalidate an Optional enum
-  // value.
-  SILValue payloadVal;
+  // Take the payload from the optional.
   if (!addrOrValue.getType().isAddress()) {
-    payloadVal = B.createUncheckedEnumData(loc, addrOrValue.forward(*this),
-                                           someDecl);
-  } else {
-    payloadVal =
-      B.createUncheckedTakeEnumDataAddr(loc, addrOrValue.forward(*this),
-                                        someDecl, origPayloadTy);
-  
-    if (optTL.isLoadable())
-      payloadVal =
-          optTL.emitLoad(B, loc, payloadVal, LoadOwnershipQualifier::Take);
+    return B.createUncheckedEnumData(loc, addrOrValue, someDecl);
   }
 
-  // Produce a correctly managed value.
-  if (addrOrValue.hasCleanup())
-    payload = emitManagedRValueWithCleanup(payloadVal);
-  else
-    payload = ManagedValue::forUnmanaged(payloadVal);
-  
-  return payload;
+  // Cheat a bit in the +0 case--UncheckedTakeEnumData will never actually
+  // invalidate an Optional enum value. This is specific to optionals.
+  ManagedValue payload = B.createUncheckedTakeEnumDataAddr(
+      loc, addrOrValue, someDecl, origPayloadTy);
+  if (!optTL.isLoadable())
+    return payload;
+
+  // If we do not have a cleanup on our address, use a load_borrow.
+  if (!payload.hasCleanup()) {
+    return B.createLoadBorrow(loc, payload);
+  }
+
+  // Otherwise, perform a load take.
+  return B.createLoadTake(loc, payload);
 }
 
 ManagedValue
