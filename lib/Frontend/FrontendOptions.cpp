@@ -102,9 +102,8 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
   return false;
 }
 
-
-bool FrontendOptions::actionHasOutput() const {
-  switch (RequestedAction) {
+bool FrontendOptions::doesActionHaveOutput(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::Typecheck:
@@ -137,8 +136,8 @@ bool FrontendOptions::actionHasOutput() const {
   llvm_unreachable("Unknown ActionType");
 }
 
-bool FrontendOptions::actionIsImmediate() const {
-  switch (RequestedAction) {
+bool FrontendOptions::isActionImmediate(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::Typecheck:

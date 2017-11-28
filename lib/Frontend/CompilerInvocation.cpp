@@ -672,7 +672,8 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
       (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
     return false;
   }
-  if (!Opts.actionHasOutput() || Opts.isCompilingExactlyOneSwiftFile()) {
+  if (!FrontendOptions::doesActionHaveOutput(Opts.RequestedAction) ||
+      Opts.isCompilingExactlyOneSwiftFile()) {
     Opts.ModuleName = "main";
     return false;
   }
@@ -1190,7 +1191,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     TargetArg = A->getValue();
   }
 #if __APPLE__
-  else if (FrontendOpts.actionIsImmediate()) {
+  else if (FrontendOptions::isActionImmediate(FrontendOpts.RequestedAction)) {
     clang::VersionTuple currentOSVersion = inferAppleHostOSVersion();
     if (currentOSVersion.getMajor() != 0) {
       llvm::Triple::OSType currentOS = Target.getOS();

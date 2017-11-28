@@ -490,11 +490,11 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
-  /// Indicates whether the RequestedAction has output.
-  bool actionHasOutput() const;
+  /// Indicates whether the action has output.
+  static bool doesActionHaveOutput(ActionType);
 
-  /// Indicates whether the RequestedAction will immediately run code.
-  bool actionIsImmediate() const;
+  /// Indicates whether the action will immediately run code.
+  static bool isActionImmediate(ActionType);
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

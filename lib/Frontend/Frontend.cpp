@@ -131,7 +131,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
 }
 bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
-    bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
+    bool immediate = FrontendOptions::isActionImmediate(
+        Invocation.getFrontendOptions().RequestedAction);
     bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
@@ -595,7 +596,7 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   if (options.DebugTimeFunctionBodies) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
   }
-  if (options.actionIsImmediate()) {
+  if (FrontendOptions::isActionImmediate(options.RequestedAction)) {
     TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
   }
   if (options.DebugTimeExpressionTypeChecking) {
