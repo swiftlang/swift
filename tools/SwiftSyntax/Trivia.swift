@@ -252,6 +252,8 @@ public struct Trivia: Codable {
 
 /// Conformance for Trivia to the Collection protocol.
 extension Trivia: Collection {
+  public typealias Element = TriviaPiece
+
   public var startIndex: Int {
     return pieces.startIndex
   }
