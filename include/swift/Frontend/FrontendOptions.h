@@ -33,28 +33,30 @@ enum class InputFileKind {
   IFK_SIL,
   IFK_LLVM_IR
 };
-
+  
 // Inputs may be files, buffers, or buffers substituting for files.
 class InputFile {
   /// Empty if no name
   std::string Filename;
-  llvm::MemoryBuffer *Buffer;
   bool IsPrimary;
+  llvm::MemoryBuffer *Buffer;
 
 public:
   /// Does not take ownership of \p buffer. Does take ownership of (copy) a
   /// string.
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), Buffer(buffer), IsPrimary(isPrimary) {}
-
+      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {}
+  
   bool getIsPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *getBuffer() const { return Buffer; }
   StringRef getFile() const { return Filename; }
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
-
-  InputFile asPrimary() { return InputFile(Filename, true, Buffer); }
+  
+private:
+  friend class FrontendInputs;
+  void bePrimary() { IsPrimary = true; }
 };
 
 /// Information about all the inputs to the frontend.
@@ -87,7 +89,6 @@ public:
 
   ArrayRef<InputFile> getInputs() const { return Inputs; }
 
-  // Input filename readers
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
     for (auto &input : getInputs()) {
@@ -110,14 +111,6 @@ public:
     StringRef f = inp.getFile();
     assert(!f.empty());
     return f;
-  }
-
-  void bePrimaryAt(unsigned index) {
-    if (Inputs[index].getIsPrimary())
-      return;
-    Inputs[index] = Inputs[index].asPrimary();
-    if (!Inputs[index].getFile().empty())
-      PrimaryInputs.insert(std::make_pair(Inputs[index].getFile(), index));
   }
 
   bool isReadingFromStdin() const {
@@ -165,14 +158,25 @@ public:
     const auto *input = getOptionalUniquePrimaryInput();
     return input == nullptr ? StringRef() : input->getFile();
   }
+  
+  bool isFilePrimary(StringRef file) {
+    StringRef correctedName = file.equals("<stdin>") ? "-" : file;
+    auto iterator = PrimaryInputs.find(correctedName);
+    return iterator != PrimaryInputs.end() &&
+    Inputs[iterator->second].getIsPrimary();
+  }
+  
+  unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
 
-public:
   // Multi-facet readers
+  
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
+  
+  // Writers
 
   void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
     addInput(InputFile(file, false, buffer));
@@ -182,18 +186,19 @@ public:
     addInput(InputFile(file.str(), true, buffer));
   }
 
-  bool isFilePrimary(StringRef file) {
-    StringRef correctedName = file.equals("<stdin>") ? "-" : file;
-    auto iterator = PrimaryInputs.find(correctedName);
-    return iterator != PrimaryInputs.end() &&
-           Inputs[iterator->second].getIsPrimary();
-  }
-
-  unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
-
   void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
     Inputs[index].setBuffer(buffer);
   }
+  
+  
+  void bePrimaryAt(unsigned index) {
+    if (Inputs[index].getIsPrimary())
+      return;
+    Inputs[index].bePrimary();
+    if (!Inputs[index].getFile().empty())
+      PrimaryInputs.insert(std::make_pair(Inputs[index].getFile(), index));
+  }
+
 
   void addInput(const InputFile &input) {
     if (!input.getFile().empty() && input.getIsPrimary())
