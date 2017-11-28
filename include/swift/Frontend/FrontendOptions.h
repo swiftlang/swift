@@ -50,10 +50,6 @@ public:
       : Filename(other.Filename), Buffer(other.Buffer),
         IsPrimary(other.IsPrimary) {}
 
-  InputFile(InputFile &&) = default;
-
-  InputFile &operator=(const InputFile &) = default;
-
   static InputFile create(StringRef Filename, bool isPrimary,
                           llvm::MemoryBuffer *Buffer = nullptr) {
     return InputFile(Filename, Buffer, isPrimary);
