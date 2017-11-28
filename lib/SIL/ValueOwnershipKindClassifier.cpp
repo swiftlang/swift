@@ -367,9 +367,6 @@ struct ValueOwnershipKindBuiltinVisitor
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, Take)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, TryPin)
-// This returns a value at +1 that is destroyed strictly /after/ the
-// UnsafeGuaranteedEnd. This provides the guarantee that we want.
-CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, And)
@@ -538,6 +535,18 @@ UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(InsertElement)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT
+
+ValueOwnershipKind
+ValueOwnershipKindBuiltinVisitor::visitUnsafeGuaranteed(BuiltinInst *BI,
+                                                        StringRef Attr) {
+  assert(!BI->getType().isTrivial(BI->getModule()) &&
+         "Only non trivial types can have non trivial ownership");
+  auto Kind = BI->getArguments()[0].getOwnershipKind();
+  assert((Kind == ValueOwnershipKind::Owned ||
+          Kind == ValueOwnershipKind::Guaranteed) &&
+         "Invalid ownership kind for unsafe guaranteed?!");
+  return Kind;
+}
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
