@@ -364,6 +364,17 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   return cs.solveSingle().hasValue();
 }
 
+/// Retrieve the adjusted parameter type for overloading purposes.
+static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
+  if (auto funcTy = param.getType()->getAs<FunctionType>()) {
+    if (funcTy->isAutoClosure()) {
+      return funcTy->getResult();
+    }
+  }
+
+  return param.getType();
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -615,9 +626,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             fewerEffectiveParameters = true;
           }
 
+          Type paramType1 = getAdjustedParamType(param1);
+          Type paramType2 = getAdjustedParamType(param2);
+
           // Check whether the first parameter is a subtype of the second.
           cs.addConstraint(ConstraintKind::Subtype,
-                           param1.getType(), param2.getType(), locator);
+                           paramType1, paramType2, locator);
           return true;
         };
 
