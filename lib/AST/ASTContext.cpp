@@ -3869,7 +3869,11 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
 
   SILFunctionTypeBits.HasErrorResult = errorResult.hasValue();
   SILFunctionTypeBits.ExtInfo = ext.Bits;
+  // The use of both assert() and static_assert() below is intentional.
   assert(SILFunctionTypeBits.ExtInfo == ext.Bits && "Bits were dropped!");
+  static_assert(ExtInfo::NumMaskBits ==
+                SILFunctionTypeBitfields::NumExtInfoBits,
+                "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   SILFunctionTypeBits.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
