@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -80,7 +80,7 @@ func testNonNullMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.fetchNonnullString() as NSString)
@@ -92,7 +92,7 @@ func testNonNullMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb3:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb4([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb4([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
@@ -110,22 +110,29 @@ func testForcedMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.fetchNullproneString() as NSString)
 
+  //   This is not a force.
+  //   TODO: we could do it more efficiently than this, though
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole12useAnyObjectyyXlF
-  // CHECK-NEXT: [[SELF:%.*]] = begin_borrow %0
+  // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK-NEXT: switch_enum [[RESULT]]
-  // CHECK:    bb3:
-  // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb4([[RESULT:%.*]] : @owned $NSString):
-  // CHECK-NEXT: [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
+  // CHECK:    bb3([[RESULT:%.*]] : $NSString):
+  // CHECK:      function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
+  // CHECK:    bb4:
+  // CHECK:      enum $Optional<String>, #Optional.none
+  // CHECK:    bb5([[OPTSTRING:%.*]] : $Optional<String>):
+  // CHECK:      [[BRIDGE:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
+  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<String>
+  // CHECK-NEXT: store [[OPTSTRING]] to [init] [[TEMP]] : $*Optional<String>
+  // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE]]<String>([[TEMP]])
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
+  // CHECK-NEXT: dealloc_stack [[TEMP]]
   useAnyObject(dummy.fetchNullproneString() as AnyObject)
 
   // CHECK:      return
@@ -198,7 +205,7 @@ func testNonNullPropertyValue(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.nonnullStringProperty as NSString)
@@ -210,7 +217,7 @@ func testNonNullPropertyValue(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb3:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb4([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb4([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
@@ -228,22 +235,30 @@ func testForcedPropertyValue(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb2([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK-NEXT: end_borrow [[SELF]] from %0
   useNS(dummy.nullproneStringProperty as NSString)
 
+  //   This is not a force.
+  //   TODO: we could do it more efficiently than this, though
   // CHECK:      [[USE:%.*]] = function_ref @_T022objc_bridging_peephole12useAnyObjectyyXlF
-  // CHECK-NEXT: [[SELF:%.*]] = begin_borrow %0
+  // CHECK:      [[SELF:%.*]] = begin_borrow %0
   // CHECK-NEXT: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK-NEXT: switch_enum [[RESULT]]
-  // CHECK:    bb3:
-  // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart_Bw01_E6LengthBi1_01_E7IsASCIIBw5_linetF
-  // CHECK:    bb4([[RESULT:%.*]] : @owned $NSString):
-  // CHECK-NEXT: [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
+  // CHECK:    bb3([[RESULT:%.*]] : $NSString):
+  // CHECK:      function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
+  // CHECK:    bb4:
+  // CHECK:      enum $Optional<String>, #Optional.none
+  // CHECK:    bb5([[OPTSTRING:%.*]] : $Optional<String>):
+  // CHECK:      [[BRIDGE:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
+  // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Optional<String>
+  // CHECK-NEXT: store [[OPTSTRING]] to [init] [[TEMP]] : $*Optional<String>
+  // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE]]<String>([[TEMP]])
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
-  // CHECK-NEXT: end_borrow [[SELF]] from %0
+  // CHECK-NEXT: dealloc_stack [[TEMP]]
+  // CHECK-NEXT: destroy_value [[OPTSTRING]]
   useAnyObject(dummy.nullproneStringProperty as AnyObject)
 
   // CHECK:      return
@@ -275,7 +290,7 @@ func testNonnullSubscriptGet(object: NonnullSubscript, index: AnyObject) {
   // CHECK-NEXT: destroy_value [[INDEX]] : $AnyObject
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart
-  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK:      end_borrow [[SELF]] from %0
   useNS(object[index] as NSString)
@@ -321,7 +336,7 @@ func testNullproneSubscriptGet(object: NullproneSubscript, index: AnyObject) {
   // CHECK-NEXT: destroy_value [[INDEX]] : $AnyObject
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:      function_ref @_T0s30_diagnoseUnexpectedNilOptionalyBp14_filenameStart
-  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : @owned $NSString):
+  // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : $NSString):
   // CHECK-NEXT: apply [[USE]]([[RESULT]])
   // CHECK:      end_borrow [[SELF]] from %0
   useNS(object[index] as NSString)
@@ -627,3 +642,14 @@ protocol P {
 func foo(p: P) {
   DummyClass().takeNullableString(p.title)
 }
+
+// rdar://35402853
+//   Make sure that we don't peephole AnyObject? -> Any? -> AnyObject naively.
+// CHECK: sil hidden @_T022objc_bridging_peephole017testOptionalToNonE6BridgeyyF
+func testOptionalToNonOptionalBridge() {
+  // CHECK: apply {{.*}}() : $@convention(c) () -> @autoreleased Optional<AnyObject>
+  // CHECK: function_ref @_T0s018_bridgeAnyObjectToB0ypyXlSgF :
+  // CHECK: [[T0:%.*]] = function_ref @_T0Sq19_bridgeToObjectiveCyXlyF
+  // CHECK: apply [[T0]]<Any>
+  useAnyObject(returnNullableId() as AnyObject)
+} // CHECK: end sil function '_T022objc_bridging_peephole017testOptionalToNonE6BridgeyyF'

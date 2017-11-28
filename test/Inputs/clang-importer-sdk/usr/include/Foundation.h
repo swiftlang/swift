@@ -1143,3 +1143,5 @@ void install_global_event_handler(__nullable event_handler handler);
          forKeyPath: (NSString*) keyPath
          context: (void*) options;
 @end
+
+__nullable id returnNullableId(void);
