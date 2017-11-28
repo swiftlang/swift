@@ -485,9 +485,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
     }
     init->getManagedAddress().forward(SGF);
     resultVal = SGF.B.createTuple(loc, {});
-
-  // Otherwise, return the result at +1.
   } else {
+    // Otherwise, return the result at +1.
     resultVal = result.forward(SGF);
   }
 
@@ -838,9 +837,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
       init->finishInitialization(SGF);
     }
     init->getManagedAddress().forward(SGF);
-    r = SGF.B.createTuple(loc, fnConv.getSILResultType(), {});
+    r = SGF.B.createTuple(loc, fnConv.getSILResultType(), ArrayRef<SILValue>());
 
-  // Otherwise, return the result at +1.
+    // Otherwise, return the result at +1.
   } else {
     r = result.forward(SGF);
   }
