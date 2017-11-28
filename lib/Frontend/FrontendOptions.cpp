@@ -28,7 +28,7 @@ using namespace swift;
 using namespace llvm::opt;
 
 bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (haveUniqueInputFilename()) {
+  if (hasUniqueInputFilename()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
            llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
@@ -37,7 +37,7 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
 }
 
 bool FrontendInputs::shouldTreatAsSIL() const {
-  if (haveUniqueInputFilename()) {
+  if (hasUniqueInputFilename()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
     StringRef Input(getFilenameOfFirstInput());
@@ -68,15 +68,15 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
-    if (haveInputs()) {
-      Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
+    if (hasInputs()) {
+      diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
     return false;
   }
-  if (TreatAsSIL) {
-    if (!havePrimaryInputs()) {
-      if (haveUniqueInputFilename())
+  if (treatAsSIL) {
+    if (!hasPrimaryInputs()) {
+      if (hasUniqueInputFilename())
         return false;
       Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
@@ -95,8 +95,8 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
     }
     return false;
   }
-  if (!isNoneRequested && !haveInputs()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
+  if (!isNoneRequested && !hasInputs()) {
+    diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
     return true;
   }
   return false;
@@ -190,7 +190,7 @@ void FrontendOptions::forAllOutputPaths(
 
 
 StringRef FrontendOptions::originalPath() const {
-  if (haveNamedOutputFile())
+  if (hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
 
@@ -202,7 +202,7 @@ StringRef FrontendOptions::originalPath() const {
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {
-  return haveNamedOutputFile() &&
+  return hasNamedOutputFile() &&
          llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
