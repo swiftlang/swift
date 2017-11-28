@@ -2,9 +2,6 @@
 
 // REQUIRES: executable_test
 
-// Test fails in optimized mode. rdar://35492657
-// REQUIRES: swift_test_mode_optimize_none
-
 // Smoke test to see that various conditional conformances correctly execute
 
 protocol P1 {
