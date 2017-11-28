@@ -55,7 +55,7 @@ set(SWIFTLIB_ESSENTIAL
   Equatable.swift
   ErrorType.swift
   Existential.swift
-  Filter.swift.gyb
+  Filter.swift
   FixedArray.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb

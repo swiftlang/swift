@@ -129,7 +129,7 @@ extension LazyCollectionProtocol
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapBidirectionalCollection<
-    LazyFilterBidirectionalCollection<
+    LazyFilterCollection<
       LazyMapBidirectionalCollection<Elements, ElementOfResult?>>,
     ElementOfResult
   > {
