@@ -433,6 +433,9 @@ static bool isLegalSILType(CanType type) {
   // L-values and inouts are not legal.
   if (!type->isMaterializable()) return false;
 
+  // Unbound generic types are not legal.
+  if (type->hasUnboundGenericType()) return false;
+
   // Function types must be lowered.
   if (isa<AnyFunctionType>(type)) return false;
 
