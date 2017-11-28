@@ -528,3 +528,16 @@ do {
     _ = { baz($0) }(construct_generic { d }) // Ok
   }
 }
+
+// rdar://problem/35541153 - Generic parameter inference bug
+
+func rdar35541153() {
+  func foo<U: Equatable, V: Equatable, C: Collection>(_ c: C) where C.Element == (U, V) {}
+  func bar<K: Equatable, V, C: Collection>(_ c: C, _ k: K, _ v: V) where C.Element == (K, V) {}
+
+  let x: [(a: Int, b: Int)] = []
+  let y: [(k: String, v: Int)] = []
+
+  foo(x) // Ok
+  bar(y, "ultimate question", 42) // Ok
+}

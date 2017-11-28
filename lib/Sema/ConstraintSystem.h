@@ -1998,6 +1998,9 @@ public:
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
 
+  /// Determine if the type in question is one of the known collection types.
+  static bool isCollectionType(Type t);
+
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
 
@@ -2552,6 +2555,9 @@ private:
     /// The kind of bindings permitted.
     AllowedBindingKind Kind;
 
+    /// The kind of the constraint this binding came from.
+    ConstraintKind BindingSource;
+
     /// The defaulted protocol associated with this binding.
     Optional<ProtocolDecl *> DefaultedProtocol;
 
@@ -2560,9 +2566,11 @@ private:
     ConstraintLocator *DefaultableBinding = nullptr;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
+                     ConstraintKind bindingSource,
                      Optional<ProtocolDecl *> defaultedProtocol = None,
                      ConstraintLocator *defaultableBinding = nullptr)
-        : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
+        : BindingType(type), Kind(kind), BindingSource(bindingSource),
+          DefaultedProtocol(defaultedProtocol),
           DefaultableBinding(defaultableBinding) {}
 
     bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
