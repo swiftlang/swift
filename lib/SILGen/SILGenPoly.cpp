@@ -2915,7 +2915,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   SingleValueInstruction *thunkedFn =
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
-                             subs, fn.forward(SGF),
+                             subs, fn.ensurePlusOne(SGF, loc).forward(SGF),
                              SILType::getPrimitiveObjectType(expectedType));
   if (expectedType->isNoEscape()) {
     thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
