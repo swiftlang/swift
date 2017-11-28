@@ -266,20 +266,29 @@ private:
   Optional<const std::vector<std::string>>
       cachedOutputFilenamesFromCommandLineOrFilelist;
 
-  void computeDebugCrashGroup();
+  void handleDebugCrashGroupArguments();
+  
   void computeDebugTimeOptions();
+  bool computeFallbackModuleName();
+  bool computeModuleName();
+  bool computeOutputFilenames();
+  void computeDumpScopeMapLocations();
+  void computeHelpOptions();
+  void computeImplicitImportModuleNames();
+  void computeImportObjCHeaderOptions();
+  void computeLLVMArgs();
+  void computePlaygroundOptions();
   void computePrintStatsOptions();
   void computeTBDOptions();
+  
+  
   void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
                                   unsigned &valueToSet);
-  void computePlaygroundOptions();
-  void computeHelpOptions();
-  void computeDumpScopeMapLocations();
+  
   FrontendOptions::ActionType determineRequestedAction() const;
-  bool setupForSILOrLLVM();
-  bool computeModuleName();
-  bool computeFallbackModuleName();
-  bool computeOutputFilenames();
+  
+  bool setUpForSILOrLLVM();
+  
   
   /// Determine the correct output filename when none was specified.
   ///
@@ -294,19 +303,23 @@ private:
   /// Such a specification should only occur when invoking the frontend
   /// directly, because the driver will always pass -o with an appropriate filename
   /// if output is required for the requested action.
-  bool deriveOutputFilenameForDirectory(llvm::StringRef outputDir);
-  std::string computeBaseNameOfOutput() const;
+  bool deriveOutputFilenameForDirectory(StringRef outputDir);
+  
+  std::string determineBaseNameOfOutput() const;
+  
   void determineSupplementaryOutputFilenames();
+  
   /// Returns the output filenames on the command line or in the output
-  /// filelist. If there was an error (reading the list) returns None. If there
+  /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
   const std::vector<std::string> &
   getOutputFilenamesFromCommandLineOrFilelist();
+  
   bool checkForUnusedOutputPaths() const;
-  void computeImportObjCHeaderOptions();
-  void computeImplicitImportModuleNames();
-  void computeLLVMArgs();
-  std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
+  
+  std::vector<std::string>
+  readOutputFileList(StringRef filelistPath) const;
+
 
 public:
   FrontendArgsToOptionsConverter(DiagnosticEngine &Diags,
@@ -321,7 +334,7 @@ public:
 bool FrontendArgsToOptionsConverter::convert() {
   using namespace options;
 
-  computeDebugCrashGroup();
+  handleDebugCrashGroupArguments();
 
   if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
     Opts.DumpAPIPath = A->getValue();
@@ -406,7 +419,7 @@ bool FrontendArgsToOptionsConverter::convert() {
   return false;
 }
 
-void FrontendArgsToOptionsConverter::computeDebugCrashGroup() {
+void FrontendArgsToOptionsConverter::handleDebugCrashGroupArguments() {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
@@ -736,7 +749,7 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
     Opts.setOutputFilenameToStdout();
     return false;
   }
-  std::string baseName = computeBaseNameOfOutput();
+  std::string baseName = determineBaseNameOfOutput();
   if (baseName.empty()) {
     if (Opts.RequestedAction != FrontendOptions::ActionType::REPL &&
         Opts.RequestedAction != FrontendOptions::ActionType::Immediate &&
@@ -758,7 +771,7 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
 bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
     StringRef outputDir) {
 
-  std::string baseName = computeBaseNameOfOutput();
+  std::string baseName = determineBaseNameOfOutput();
   if (baseName.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
                    outputDir);
@@ -773,7 +786,7 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
   return false;
 }
 
-std::string FrontendArgsToOptionsConverter::computeBaseNameOfOutput() const {
+std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
   std::string nameToStem;
   if (Opts.Inputs.havePrimaryInputs()) {
     nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().getFile();
