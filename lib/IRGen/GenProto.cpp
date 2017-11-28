@@ -1552,7 +1552,7 @@ getOrCreateWitnessTableAccessFunction(IRGenModule &IGM, CanType type,
   // function.
   auto rootConformance = conformance->getRootNormalConformance();
   if (rootConformance->witnessTableAccessorRequiresArguments()) {
-    return getWitnessTableLazyAccessFunction(IGM, rootConformance, type);
+    return getWitnessTableLazyAccessFunction(IGM, conformance, type);
   } else {
     return IGM.getAddrOfWitnessTableAccessFunction(rootConformance,
                                                    NotForDefinition);
