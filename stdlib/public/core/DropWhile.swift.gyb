@@ -140,6 +140,12 @@ public struct LazyDropWhileIndex<Base : Collection> : Comparable {
   }
 }
 
+extension LazyDropWhileIndex : Hashable where Base.Index : Hashable {
+  public var hashValue: Int {
+    return base.hashValue
+  }
+}
+
 % for Traversal in ['Forward', 'Bidirectional']:
 %   Collection = collectionForTraversal(Traversal)
 %   Self = "LazyDropWhile" + Collection

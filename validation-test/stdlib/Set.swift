@@ -331,6 +331,13 @@ SetTestSuite.test("sizeof") {
 #endif
 }
 
+SetTestSuite.test("Index.Hashable") {
+  let s: Set = [1, 2, 3, 4, 5]
+  let t = Set(s.indices)
+  expectEqual(s.count, t.count)
+  expectTrue(t.contains(s.startIndex))
+}
+
 SetTestSuite.test("COW.Smoke") {
   var s1 = Set<TestKeyTy>(minimumCapacity: 10)
   for i in [1010, 2020, 3030]{ s1.insert(TestKeyTy(i)) }

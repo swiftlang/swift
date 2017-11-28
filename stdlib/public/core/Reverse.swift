@@ -149,6 +149,12 @@ public struct ReversedIndex<Base : Collection> : Comparable {
   }
 }
 
+extension ReversedIndex : Hashable where Base.Index : Hashable {
+  public var hashValue: Int {
+    return base.hashValue
+  }
+}
+
 /// A collection that presents the elements of its base collection
 /// in reverse order.
 ///
@@ -346,6 +352,12 @@ public struct ReversedRandomAccessIndex<
   ) -> Bool {
     // Note ReversedRandomAccessIndex has inverted logic compared to base Base.Index
     return lhs.base > rhs.base
+  }
+}
+
+extension ReversedRandomAccessIndex : Hashable where Base.Index : Hashable {
+  public var hashValue: Int {
+    return base.hashValue
   }
 }
 

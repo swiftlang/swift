@@ -85,6 +85,17 @@ extension ClosedRangeIndex : Comparable {
   }
 }
 
+extension ClosedRangeIndex : Hashable where Bound : Hashable {
+  public var hashValue: Int {
+    switch _value {
+    case .inRange(let value):
+      return value.hashValue
+    case .pastEnd:
+      return .max
+    }
+  }
+}
+
 /// A closed range that forms a collection of consecutive values.
 ///
 /// You create a `CountableClosedRange` instance by using the closed range
