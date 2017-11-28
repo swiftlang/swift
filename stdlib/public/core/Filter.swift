@@ -1,4 +1,4 @@
-//===--- Filter.swift.gyb -------------------------------------*- swift -*-===//
+//===--- Filter.swift -----------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,12 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-%{
-from gyb_stdlib_support import (
-    collectionForTraversal
-)
-}%
 
 /// An iterator over the elements traversed by some base iterator that also
 /// satisfy a given predicate.
@@ -122,14 +116,6 @@ public struct LazyFilterSequence<Base : Sequence>
 @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use Base.Index")
 public typealias LazyFilterIndex<Base : Collection> = Base.Index
 
-// FIXME(ABI)#27 (Conditional Conformance): `LazyFilter*Collection` types should be
-// collapsed into one `LazyFilterCollection` using conditional conformances.
-// Maybe even combined with `LazyFilterSequence`.
-// rdar://problem/17144340
-
-% for Traversal in ['Forward', 'Bidirectional']:
-%   Self = "LazyFilter" + collectionForTraversal(Traversal)
-
 /// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
@@ -140,16 +126,16 @@ public typealias LazyFilterIndex<Base : Collection> = Base.Index
 ///   general operations on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct ${Self}<
-  Base : ${collectionForTraversal(Traversal)}
-> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)}
-{
+public struct LazyFilterCollection<
+  Base : Collection
+> : LazyCollectionProtocol, Collection {
 
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Base.Index
+  public typealias Element = Base.Element
 
 
   /// Creates an instance containing the elements of `base` that
@@ -221,26 +207,6 @@ public struct ${Self}<
     i = index
   }
 
-%   if Traversal == 'Bidirectional':
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(before i: Index) -> Index {
-    var i = i
-    formIndex(before: &i)
-    return i
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func formIndex(before i: inout Index) {
-    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
-    var index = i
-    _precondition(index != _base.startIndex, "Can't retreat before startIndex")
-    repeat {
-      _base.formIndex(before: &index)
-    } while !_predicate(_base[index])
-    i = index
-  }
-%   end
-
   /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
@@ -250,7 +216,7 @@ public struct ${Self}<
     return _base[position]
   }
 
-  public typealias SubSequence = ${Self}<Base.SubSequence>
+  public typealias SubSequence = LazyFilterCollection<Base.SubSequence>
 
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> SubSequence {
@@ -290,7 +256,27 @@ public struct ${Self}<
   internal let _predicate: (Base.Element) -> Bool
 }
 
-% end
+extension LazyFilterCollection : BidirectionalCollection
+  where Base : BidirectionalCollection {
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func index(before i: Index) -> Index {
+    var i = i
+    formIndex(before: &i)
+    return i
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func formIndex(before i: inout Index) {
+    // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
+    var index = i
+    _precondition(index != _base.startIndex, "Can't retreat before startIndex")
+    repeat {
+      _base.formIndex(before: &index)
+    } while !_predicate(_base[index])
+    i = index
+  }
+}
 
 extension LazySequenceProtocol {
   /// Returns the elements of `self` that satisfy `isIncluded`.
@@ -303,20 +289,11 @@ extension LazySequenceProtocol {
   public func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
-    return LazyFilterSequence(
-      _base: self.elements, isIncluded)
+    return LazyFilterSequence(_base: self.elements, isIncluded)
   }
 }
 
-% for Traversal in ['Forward', 'Bidirectional']:
-
-extension LazyCollectionProtocol
-%   if Traversal != 'Forward':
-  where
-  Self : ${collectionForTraversal(Traversal)},
-  Elements : ${collectionForTraversal(Traversal)}
-%   end
-{
+extension LazyCollectionProtocol {
   /// Returns the elements of `self` that satisfy `predicate`.
   ///
   /// - Note: The elements of the result are computed on-demand, as
@@ -326,14 +303,10 @@ extension LazyCollectionProtocol
   @_inlineable // FIXME(sil-serialize-all)
   public func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
-  ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {
-    return LazyFilter${collectionForTraversal(Traversal)}(
-      _base: self.elements, isIncluded)
+  ) -> LazyFilterCollection<Self.Elements> {
+    return LazyFilterCollection(_base: self.elements, isIncluded)
   }
 }
 
-% end
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
+@available(*, deprecated, renamed: "LazyFilterCollection")
+public typealias LazyFilterBidirectionalCollection<T> = LazyFilterCollection<T> where T : BidirectionalCollection

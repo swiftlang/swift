@@ -312,7 +312,7 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public func reversed() -> LazyBidirectionalCollection<
+  public func reversed() -> LazyCollection<
     ReversedCollection<Elements>
   > {
     return ReversedCollection(_base: elements).lazy
