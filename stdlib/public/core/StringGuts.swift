@@ -28,6 +28,7 @@ struct _StringGuts {
   @_inlineable
   public
   var _object: _BuiltinBridgeObject {
+    @inline(__always)
     get { return _storage.0 }
     set { _storage.0 = newValue }
   }
@@ -47,11 +48,71 @@ struct _StringGuts {
   }
 
   @_inlineable
+  @inline(__always)
   public
   init(_ object: _BuiltinBridgeObject, _ otherBits: UInt) {
     self._storage.0 = object
     self._storage.1 = otherBits
   }
+}
+
+//
+// Work around ARC
+//
+@inline(never)
+@_versioned
+internal
+func _unmanagedContiguousImpl(
+  bridgeObjectBits: UInt, otherBits: UInt
+) -> UnsafeString? {
+  // TODO: This is super ugly and redundant. Organize and tidy up alongside
+  // Builtin.swift and _StringGuts local vars.
+
+  let isSingleByte = bridgeObjectBits & _twoByteCodeUnitBit == 0
+  let unflaggedBObject = (bridgeObjectBits & ~_twoByteCodeUnitBit)
+
+  // is already an unsafe string
+  if (unflaggedBObject & _objCTaggedPointerBits != 0) && (unflaggedBObject & _smallBit == 0) {
+    let ptr = UnsafeMutableRawPointer(
+      bitPattern: _bridgeObject(toTagPayload: Builtin.reinterpretCast(unflaggedBObject))
+    )._unsafelyUnwrappedUnchecked
+    let count = Int(bitPattern: otherBits)
+    _sanityCheck(count >= 0)
+    return UnsafeString(
+      baseAddress: ptr, count: count, isSingleByte: isSingleByte)
+  }
+
+  // is native
+  if unflaggedBObject & (_objCTaggedPointerBits | _objectPointerIsObjCBit) == 0 {
+    let ptr = _StringBuffer(_StringBuffer._Storage(
+      _nativeObject: _nativeObject(
+        fromBridge: Builtin.reinterpretCast(unflaggedBObject)))
+    ).start
+    let count = Int(bitPattern: otherBits)
+    _sanityCheck(count >= 0)
+    return UnsafeString(
+      baseAddress: ptr, count: count, isSingleByte: isSingleByte)
+  }
+
+  // non tagged cocoa
+  if _isNonTaggedObjCPointer(Builtin.reinterpretCast(unflaggedBObject)) {
+    if _slowPath(otherBits == 0) {
+      return nil
+    }
+    let count = _stdlib_binary_CFStringGetLength(
+      _bridgeObject(toNonTaggedObjC: Builtin.reinterpretCast(unflaggedBObject)))
+    _sanityCheck(count >= 0)
+    let ptr = UnsafeMutableRawPointer(
+      bitPattern: otherBits
+    )._unsafelyUnwrappedUnchecked
+    return UnsafeString(
+      baseAddress: ptr,
+      count: count,
+      isSingleByte: isSingleByte
+    )
+  }
+
+  return nil
 }
 
 //
@@ -1416,22 +1477,31 @@ extension _StringGuts {
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
   // the return value.
   @_versioned
+  @_inlineable
   internal
   var _unmanagedContiguous: UnsafeString? {
-    if _isUnsafe {
-      return _asUnsafe
+    @inline(__always)
+    get {
+      let unsafe = _unmanagedContiguousImpl(
+        bridgeObjectBits: Builtin.reinterpretCast(self._storage.0),
+        otherBits: self._storage.1)
+      return unsafe
     }
-    if _isNative {
-      return produceUnsafeFromNative()
-    }
-    if _isNonTaggedCocoa {
-      // Check for an opaque cocoa string
-      if self._otherBits == 0 {
-        return nil
-      }
-      return produceUnsafeFromCocoa()
-    }
-    return nil
+
+    // if _isUnsafe {
+    //   return _asUnsafe
+    // }
+    // if _isNative {
+    //   return produceUnsafeFromNative()
+    // }
+    // if _isNonTaggedCocoa {
+    //   // Check for an opaque cocoa string
+    //   if self._otherBits == 0 {
+    //     return nil
+    //   }
+    //   return produceUnsafeFromCocoa()
+    // }
+    // return nil
   }
 
   @_versioned
