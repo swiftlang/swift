@@ -4872,8 +4872,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal mutating func ensureNativeBuffer() {
-    if _fastPath(guaranteedNative) { return }
 #if _runtime(_ObjC)
+    if _fastPath(guaranteedNative) { return }
     if case .cocoa(let cocoaBuffer) = self {
       migrateDataToNativeBuffer(cocoaBuffer)
     }
