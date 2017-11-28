@@ -19,7 +19,7 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     Literal.print(OS);
     ASSERT_EQ(OS.str().str(), "-100");
-    ASSERT_EQ(Literal.getKind(), SyntaxKind::IntegerLiteralExpr);
+    ASSERT_EQ(Literal.getKind(), SyntaxKind::PrefixOperatorExpr);
   }
   {
     auto LiteralToken = SyntaxFactory::makeIntegerLiteral("1_000", {}, {});
