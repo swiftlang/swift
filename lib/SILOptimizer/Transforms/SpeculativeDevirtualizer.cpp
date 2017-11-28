@@ -454,14 +454,14 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
           << CD->getName() << " and subclass " << S->getName() << "\n");
 
-    CanType CanClassType = S->getDeclaredType()->getCanonicalType();
-    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
-    if (!ClassType.getClassOrBoundGenericClass()) {
-      // This subclass cannot be handled. This happens e.g. if it is
-      // a generic class.
+    // FIXME: Add support for generic subclasses.
+    if (S->isGenericContext()) {
       NotHandledSubsNum++;
       continue;
     }
+
+    CanType CanClassType = S->getDeclaredInterfaceType()->getCanonicalType();
+    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
 
     auto ClassOrMetatypeType = ClassType;
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
