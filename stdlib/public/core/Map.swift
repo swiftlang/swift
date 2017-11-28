@@ -80,10 +80,14 @@ extension LazyMapSequence: LazySequenceProtocol {
     return Iterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
-  /// Returns a value less than or equal to the number of elements in
-  /// `self`, **nondestructively**.
+  /// A value less than or equal to the number of elements in the sequence,
+  /// calculated nondestructively.
   ///
-  /// - Complexity: O(*n*)
+  /// The default implementation returns 0. If you provide your own
+  /// implementation, make sure to compute the value nondestructively.
+  ///
+  /// - Complexity: O(1), except if the sequence also conforms to `Collection`.
+  ///   In this case, see the documentation of `Collection.underestimatedCount`.
   @_inlineable
   public var underestimatedCount: Int {
     return _base.underestimatedCount
@@ -122,6 +126,11 @@ extension LazyMapCollection: Sequence {
     return Iterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
+  /// A value less than or equal to the number of elements in the collection.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
   @_inlineable
   public var underestimatedCount: Int {
     return _base.underestimatedCount
@@ -204,6 +213,11 @@ extension LazyMapCollection: LazyCollectionProtocol {
 extension LazyMapCollection : BidirectionalCollection
   where Base : BidirectionalCollection {
 
+  /// A value less than or equal to the number of elements in the collection.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
   @_inlineable
   public func index(before i: Index) -> Index { return _base.index(before: i) }
 
