@@ -39,5 +39,9 @@ class C {
   func foo2() {
     _ = true ? 1 : 0
     _ = (true ? 1 : 0) ? (true ? 1 : 0) : (true ? 1 : 0)
+    _ = (1, 2)
+    _ = (first: 1, second: 2)
+    _ = (1)
+    _ = (first: 1)
   }
 }

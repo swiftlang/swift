@@ -841,6 +841,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
     return SyntaxKind::ArrayElement;
   case SyntaxKind::DictionaryElementList:
     return SyntaxKind::DictionaryElement;
+  case SyntaxKind::TupleElementList:
+    return SyntaxKind::TupleElement;
   default:
     return SyntaxKind::Unknown;
   }
