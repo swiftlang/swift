@@ -58,3 +58,5 @@ class C {
 
 typealias A = Any
 typealias B = (Array<Array<Any>>.Element)
+typealias C = [Int]
+typealias D = [Int: String]

@@ -34,6 +34,23 @@ TYPE_NODES = [
                    is_optional=True),
          ]),
 
+    # array-type -> '[' type ']'
+    Node('ArrayType', kind='Type',
+         children=[
+             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
+             Child('ElementType', kind='Type'),
+             Child('RightSquareBracket', kind='RightSquareBracketToken'),
+         ]),
+
+    # dictionary-type -> '[' type ':' type ']'
+    Node('DictionaryType', kind='Type',
+         children=[
+             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
+             Child('KeyType', kind='Type'),
+             Child('Colon', kind='ColonToken'),
+             Child('ValueType', kind='Type'),
+             Child('RightSquareBracket', kind='RightSquareBracketToken'),
+         ]),
 
     # metatype-type -> type '.' 'Type'
     #                | type '.' 'Protocol
@@ -46,16 +63,6 @@ TYPE_NODES = [
                        'Type',
                        'Protocol',
                    ]),
-         ]),
-
-    # dictionary-type -> '[' type ':' type ']'
-    Node('DictionaryType', kind='Type',
-         children=[
-             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
-             Child('KeyType', kind='Type'),
-             Child('Colon', kind='ColonToken'),
-             Child('ValueType', kind='Type'),
-             Child('RightSquareBracket', kind='RightSquareBracketToken'),
          ]),
 
     # throwing-specifier -> 'throws' | 'rethrows'
@@ -97,14 +104,6 @@ TYPE_NODES = [
              Child('TypeAnnotation', kind='TypeAnnotation'),
              Child('Comma', kind='CommaToken',
                    is_optional=True),
-         ]),
-
-    # array-type -> '[' type ']'
-    Node('ArrayType', kind='Type',
-         children=[
-             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
-             Child('ElementType', kind='Type'),
-             Child('RightSquareBracket', kind='RightSquareBracketToken'),
          ]),
 
     # type-annotation -> attribute-list 'inout'? type

@@ -215,9 +215,13 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult<TypeRepr>();
-  case tok::l_square:
-    ty = parseTypeCollection();
+  case tok::l_square: {
+    auto Result = parseTypeCollection();
+    if (Result.hasSyntax())
+      SyntaxContext->addSyntax(Result.getSyntax());
+    ty = Result.getASTResult();
     break;
+  }
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
       ty = parseOldStyleProtocolComposition();
@@ -1051,7 +1055,8 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   return makeParserResult(ATR);
 }
 
-ParserResult<TypeRepr> Parser::parseTypeCollection() {
+SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
+  ParserStatus Status;
   // Parse the leading '['.
   assert(Tok.is(tok::l_square));
   Parser::StructureMarkerRAII parsingCollection(*this, Tok);
@@ -1059,6 +1064,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
 
   // Parse the element type.
   ParserResult<TypeRepr> firstTy = parseType(diag::expected_element_type);
+  Status |= firstTy;
 
   // If there is a ':', this is a dictionary type.
   SourceLoc colonLoc;
@@ -1068,36 +1074,57 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
 
     // Parse the second type.
     secondTy = parseType(diag::expected_dictionary_value_type);
+    Status |= secondTy;
   }
 
   // Parse the closing ']'.
   SourceLoc rsquareLoc;
-  parseMatchingToken(tok::r_square, rsquareLoc,
-                     colonLoc.isValid()
-                       ? diag::expected_rbracket_dictionary_type
-                       : diag::expected_rbracket_array_type, 
-                     lsquareLoc);
+  if (parseMatchingToken(tok::r_square, rsquareLoc,
+                         colonLoc.isValid()
+                             ? diag::expected_rbracket_dictionary_type
+                             : diag::expected_rbracket_array_type,
+                         lsquareLoc))
+    Status.setIsParseError();
 
-  if (firstTy.hasCodeCompletion() || secondTy.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
+  if (Status.hasCodeCompletion())
+    return Status;
 
   // If we couldn't parse anything for one of the types, propagate the error.
-  if (firstTy.isNull() || (colonLoc.isValid() && secondTy.isNull()))
+  if (Status.isError())
     return makeParserError();
 
-  // Form the dictionary type.
+  TypeRepr *TyR;
+  llvm::Optional<TypeSyntax> SyntaxNode;
+
   SourceRange brackets(lsquareLoc, rsquareLoc);
-  if (colonLoc.isValid())
-    return makeParserResult(ParserStatus(firstTy) | ParserStatus(secondTy),
-                            new (Context) DictionaryTypeRepr(firstTy.get(),
-                                                             secondTy.get(),
-                                                             colonLoc,
-                                                             brackets));
+  if (colonLoc.isValid()) {
+    // Form the dictionary type.
+    TyR = new (Context)
+        DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
+    if (SyntaxContext->isEnabled()) {
+      DictionaryTypeSyntaxBuilder Builder;
+      Builder
+        .useRightSquareBracket(SyntaxContext->popToken())
+        .useValueType(SyntaxContext->popIf<TypeSyntax>().getValue())
+        .useColon(SyntaxContext->popToken())
+        .useKeyType(SyntaxContext->popIf<TypeSyntax>().getValue())
+        .useLeftSquareBracket(SyntaxContext->popToken());
+      SyntaxNode.emplace(Builder.build());
+    }
+  } else {
+    // Form the array type.
+    TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
+    if (SyntaxContext->isEnabled()) {
+      ArrayTypeSyntaxBuilder Builder;
+      Builder
+        .useRightSquareBracket(SyntaxContext->popToken())
+        .useElementType(SyntaxContext->popIf<TypeSyntax>().getValue())
+        .useLeftSquareBracket(SyntaxContext->popToken());
+      SyntaxNode.emplace(Builder.build());
+    }
+  }
     
-  // Form the array type.
-  return makeParserResult(firstTy,
-                          new (Context) ArrayTypeRepr(firstTy.get(),
-                                                      brackets));
+  return makeSyntaxResult(Status, SyntaxNode, TyR);
 }
 
 bool Parser::isOptionalToken(const Token &T) const {

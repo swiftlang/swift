@@ -24,6 +24,8 @@ template <typename Syntax, typename AST> class SyntaxParserResult {
 public:
   SyntaxParserResult(std::nullptr_t = nullptr)
       : SyntaxNode(None), ASTResult(nullptr) {}
+  SyntaxParserResult(ParserStatus Status)
+      : SyntaxNode(None), ASTResult(Status) {}
   SyntaxParserResult(llvm::Optional<Syntax> SyntaxNode, AST *ASTNode)
       : SyntaxNode(SyntaxNode), ASTResult(ASTNode) {}
   SyntaxParserResult(ParserStatus Status, llvm::Optional<Syntax> SyntaxNode,

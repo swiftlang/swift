@@ -963,7 +963,7 @@ public:
   ///   type-simple:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
-  ParserResult<TypeRepr> parseTypeCollection();
+  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeCollection();
   ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
 
   ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
