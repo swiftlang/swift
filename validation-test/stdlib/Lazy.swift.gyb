@@ -1167,11 +1167,11 @@ tests.test("LazyFilterCollection/AssociatedTypes") {
 
 tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
   typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
-  typealias Subject = LazyFilterBidirectionalCollection<Base>
+  typealias Subject = LazyFilterCollection<Base>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
-    subSequenceType: LazyFilterBidirectionalCollection<Base.SubSequence>.self,
+    subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
     indexType: LazyFilterIndex<Base>.self,
     indicesType: DefaultBidirectionalIndices<Subject>.self)
 }
@@ -1196,7 +1196,7 @@ tests.test("lazy.filter/TypeInference") {
     var filtered = MinimalBidirectionalCollection(elements: baseArray)
       .lazy.filter { _ in true }
     expectType(
-      LazyFilterBidirectionalCollection<
+      LazyFilterCollection<
         MinimalBidirectionalCollection<OpaqueValue<Int>>
       >.self,
       &filtered)
@@ -1205,7 +1205,7 @@ tests.test("lazy.filter/TypeInference") {
     var filtered = MinimalRandomAccessCollection(elements: baseArray)
       .lazy.filter { _ in true }
     expectType(
-      LazyFilterBidirectionalCollection<
+      LazyFilterCollection<
         MinimalRandomAccessCollection<OpaqueValue<Int>>
       >.self,
       &filtered)
