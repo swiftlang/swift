@@ -269,6 +269,12 @@ class BuildScriptInvocation(object):
             args.stdlib_deployment_targets = [
                 target.name for target in stdlib_targets]
 
+        # Additional stdlib targets if we want to still build the default
+        # deployment targets as well.
+        if args.extra_stdlib_deployment_targets is not None:
+            args.stdlib_deployment_targets += \
+                args.extra_stdlib_deployment_targets
+
         # SwiftPM and XCTest have a dependency on Foundation.
         # On OS X, Foundation is built automatically using xcodebuild.
         # On Linux, we must ensure that it is built manually.

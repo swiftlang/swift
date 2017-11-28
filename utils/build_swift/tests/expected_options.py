@@ -119,6 +119,7 @@ EXPECTED_DEFAULTS = {
     'enable_ubsan': False,
     'export_compile_commands': False,
     'extra_cmake_options': [],
+    'extra_stdlib_deployment_targets': None,
     'extra_swift_args': [],
     'force_optimized_typechecker': False,
     'foundation_build_variant': 'Debug',
@@ -510,6 +511,7 @@ EXPECTED_OPTIONS = [
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
     AppendOption('--stdlib-deployment-targets'),
+    AppendOption('--extra-stdlib-deployment-targets'),
     AppendOption('--test-paths'),
 
     UnsupportedOption('--build-jobs'),
