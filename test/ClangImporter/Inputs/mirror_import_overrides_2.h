@@ -21,3 +21,14 @@
 
 @interface Widget : NSObject<D>
 @end
+
+@protocol ClassAndInstance
++ (void)doClassAndInstanceThing __attribute__((swift_name("doClassAndInstanceThing()")));
+- (void)doClassAndInstanceThing __attribute__((swift_name("doClassAndInstanceThing()")));
+
+@property (class, readonly, nonnull) id classAndInstanceProp;
+@property (readonly, nonnull) id classAndInstanceProp;
+@end
+
+@interface Widget (ClassAndInstance) <ClassAndInstance>
+@end
