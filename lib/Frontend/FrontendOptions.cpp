@@ -413,9 +413,8 @@ bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
-      // Comment from Jordan: Some of these don't actually produce output
-      // but for now stay consistent with the status quo.
-      
+    // FIXME: Some of these don't actually produce output
+    // but for now stay consistent with the status quo.
   case ActionType::NoneAction:
   case ActionType::EmitPCH:
   case ActionType::EmitSIBGen:

@@ -287,7 +287,6 @@ private:
   /// without the driver,
   /// because the driver will always pass -o with an appropriate filename
   /// if output is required for the requested action.
-
   bool deriveOutputFilenameFromInputFile();
   
   /// Determine the correct output filename when a directory was specified.
@@ -303,12 +302,11 @@ private:
   /// were neither -o's nor an output filelist, returns an empty vector.
   const std::vector<std::string> &
   getOutputFilenamesFromCommandLineOrFilelist();
-  bool hasAnUnusedOutputPath() const;
+  bool checkForUnusedOutputPaths() const;
   void computeImportObjCHeaderOptions();
   void computeImplicitImportModuleNames();
   void computeLLVMArgs();
-  std::vector<std::string>
-  readOutputFileList(const StringRef filelistPath) const;
+  std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
 
 public:
   FrontendArgsToOptionsConverter(DiagnosticEngine &Diags,
@@ -682,10 +680,9 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   // In order to pass some tests, must leave ModuleName empty.
   if (!Opts.Inputs.haveInputs()) {
     Opts.ModuleName = StringRef();
-    // Jordan thinks this is a bug that should not happen, & asked me to report
-    // back if it does. It does happen in at least one test.
-    //
-    // Jordan suggests a future fix: bailing out earlier, where "no frontend action was selected".
+    // FIXME: This is a bug that should not happen, but does in tests.
+    // The compiler should bail out earlier, where "no frontend action was
+    // selected".
     return false;
   }
   const std::vector<std::string> &outputFilenames =
@@ -904,10 +901,10 @@ void FrontendArgsToOptionsConverter::computeLLVMArgs() {
   }
 }
 
-const Optional<const std::vector<std::string>> &
+const std::vector<std::string> &
 FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   if (cachedOutputFilenamesFromCommandLineOrFilelist) {
-    return cachedOutputFilenamesFromCommandLineOrFilelist;
+    return *cachedOutputFilenamesFromCommandLineOrFilelist;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
@@ -919,7 +916,7 @@ FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
     cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
         Args.getAllArgValues(options::OPT_o));
   }
-  return cachedOutputFilenamesFromCommandLineOrFilelist;
+  return *cachedOutputFilenamesFromCommandLineOrFilelist;
 }
 
 /// Try to read an output file list file.
@@ -1935,20 +1932,20 @@ CompilerInvocation::setUpInputForSILTool(
       InputFile::create(InputFilename, bePrimary, FileBufOrErr.get().get()));
 
   auto result = serialization::validateSerializedAST(
-      FileBufOrErr.get()->getBuffer(), &extendedInfo);
-  bool HasSerializedAST = result.status == serialization::Status::Valid;
+      fileBufOrErr.get()->getBuffer(), &extendedInfo);
+  bool hasSerializedAST = result.status == serialization::Status::Valid;
 
-  if (HasSerializedAST) {
-    const StringRef Stem = !ModuleNameArg.empty()
-                               ? ModuleNameArg
-                               : llvm::sys::path::stem(InputFilename);
-    setModuleName(Stem);
+  if (hasSerializedAST) {
+    const StringRef stem = !moduleNameArg.empty()
+                               ? moduleNameArg
+                               : llvm::sys::path::stem(inputFilename);
+    setModuleName(stem);
     setInputKind(InputFileKind::IFK_Swift_Library);
   } else {
-    const StringRef Name = (alwaysSetModuleToMain || ModuleNameArg.empty())
+    const StringRef name = (alwaysSetModuleToMain || moduleNameArg.empty())
                                ? "main"
-                               : ModuleNameArg;
-    setModuleName(Name);
+                               : moduleNameArg;
+    setModuleName(name);
     setInputKind(InputFileKind::IFK_SIL);
   }
   return FileBufOrErr;
