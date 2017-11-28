@@ -1,9 +1,3 @@
-if(APPLE)
-  set(AppleHostVersionDetection AppleHostVersionDetection.mm)
-else()
-  set(AppleHostVersionDetection)
-endif()
-
 add_swift_library(swiftFrontend STATIC
   CompilerInvocation.cpp
   DiagnosticVerifier.cpp
@@ -11,7 +5,6 @@ add_swift_library(swiftFrontend STATIC
   FrontendOptions.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
-  ${AppleHostVersionDetection}
   DEPENDS SwiftOptions
   LINK_LIBRARIES
     swiftSIL
