@@ -83,10 +83,10 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
 /// \p ClassType type of the instance
 /// \p CD  static class of the instance whose method is being invoked
 /// \p CHA class hierarchy analysis
-bool isEffectivelyFinalMethod(FullApplySite AI,
-                              SILType ClassType,
-                              ClassDecl *CD,
-                              ClassHierarchyAnalysis *CHA) {
+static bool isEffectivelyFinalMethod(FullApplySite AI,
+                                     SILType ClassType,
+                                     ClassDecl *CD,
+                                     ClassHierarchyAnalysis *CHA) {
   if (CD && CD->isFinal())
     return true;
 
