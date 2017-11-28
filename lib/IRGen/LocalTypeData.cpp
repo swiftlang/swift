@@ -18,6 +18,7 @@
 #include "LocalTypeData.h"
 #include "Fulfillment.h"
 #include "GenMeta.h"
+#include "GenOpaque.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -248,6 +249,33 @@ void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
 
   getOrCreateLocalTypeData()
     .addAbstractForTypeMetadata(*this, type, isExact, metadata);
+}
+
+void IRGenFunction::bindLocalTypeDataFromSelfWitnessTable(
+                const ProtocolConformance *conformance,
+                llvm::Value *selfTable,
+                llvm::function_ref<CanType (CanType)> getTypeInContext) {
+  SILWitnessTable::enumerateWitnessTableConditionalConformances(
+      conformance,
+      [&](unsigned index, CanType type, ProtocolDecl *proto) {
+        auto archetype = getTypeInContext(type);
+        if (isa<ArchetypeType>(archetype)) {
+          WitnessIndex wIndex(privateWitnessTableIndexToTableOffset(index),
+                              /*prefix*/ false);
+
+          auto table =
+              emitInvariantLoadOfOpaqueWitness(*this, selfTable, wIndex);
+          table = Builder.CreateBitCast(table, IGM.WitnessTablePtrTy);
+          setProtocolWitnessTableName(IGM, table, archetype, proto);
+
+          setUnscopedLocalTypeData(
+              archetype,
+              LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
+              table);
+        }
+
+        return /*finished?*/ false;
+      });
 }
 
 void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,

@@ -31,6 +31,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -73,10 +74,6 @@
 
 using namespace swift;
 using namespace irgen;
-
-// Return the offset one should do on a witness table pointer to retrieve the
-// `index`th piece of private data.
-static int privateIndexToTableOffset(unsigned index) { return -1 - (int)index; }
 
 namespace {
 
@@ -574,30 +571,12 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       }
 
       if (conformance.isConcrete()) {
-        // Now bind all the conditional witness tables that can be pulled out of
-        // the self witness table.
-        SILWitnessTable::enumerateWitnessTableConditionalConformances(
-            conformance.getConcrete(),
-            [&](unsigned index, CanType type, ProtocolDecl *proto) {
-              auto archetype = getTypeInContext(type);
-              if (isa<ArchetypeType>(archetype)) {
-                WitnessIndex wIndex(privateIndexToTableOffset(index),
-                                    /*prefix*/ false);
-
-                auto table =
-                    emitInvariantLoadOfOpaqueWitness(IGF, selfTable, wIndex);
-                table =
-                    IGF.Builder.CreateBitCast(table, IGF.IGM.WitnessTablePtrTy);
-                setProtocolWitnessTableName(IGF.IGM, table, archetype, proto);
-
-                IGF.setUnscopedLocalTypeData(
-                    archetype,
-                    LocalTypeDataKind::forAbstractProtocolWitnessTable(proto),
-                    table);
-              }
-
-              return /*finished?*/ false;
-            });
+        IGF.bindLocalTypeDataFromSelfWitnessTable(
+                                          conformance.getConcrete(),
+                                          selfTable,
+                                          [this](CanType type) {
+                                            return getTypeInContext(type);
+                                          });
       }
       return;
     }
@@ -1017,7 +996,7 @@ public:
 };
 
 static std::pair<llvm::Value *, llvm::Value *>
-emitConditionalConformancesBuffer(IRGenFunction &IGF,
+emitConditionalConformancesBuffer(IRGenFunction &IGF, CanType conformingType,
                                   const ProtocolConformance *conformance) {
   // Pointers to the witness tables, in the right order, which will be included
   // in the buffer that gets passed to the witness table accessor.
@@ -1025,6 +1004,30 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF,
 
   auto subMap = conformance->getSubstitutions(IGF.IGM.getSwiftModule());
   auto rootConformance = conformance->getRootNormalConformance();
+
+  // Find the generic environment into which the witness table should be
+  // mapped.
+  // FIXME: Passing conformingType down for just this purpose feels like a
+  // hack.
+  if (conformingType->hasArchetype() &&
+      conformance->getType()->hasTypeParameter()) {
+    GenericEnvironment *conformingTypeEnv = nullptr;
+    conformingType.findIf([&](Type type) {
+      if (auto archetype = type->getAs<ArchetypeType>()) {
+        conformingTypeEnv = archetype->getGenericEnvironment();
+        return conformingTypeEnv != nullptr;
+      }
+
+      return false;
+    });
+
+    if (conformingTypeEnv) {
+      subMap = subMap.subst([&](SubstitutableType *dependentType) {
+            return conformingTypeEnv->mapTypeIntoContext(Type(dependentType));
+          },
+          LookUpConformanceInModule(IGF.getSwiftModule()));
+    }
+  }
 
   SILWitnessTable::enumerateWitnessTableConditionalConformances(
       rootConformance, [&](unsigned, CanType type, ProtocolDecl *proto) {
@@ -1078,7 +1081,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
     llvm::Value *conditionalTables, *numConditionalTables;
     std::tie(conditionalTables, numConditionalTables) =
-        emitConditionalConformancesBuffer(IGF, conformance);
+        emitConditionalConformancesBuffer(IGF, conformingType, conformance);
 
     call = IGF.Builder.CreateCall(
         accessor, {*srcMetadataCache, conditionalTables, numConditionalTables});
@@ -1414,7 +1417,8 @@ public:
                                         unsigned index) {
       assert(index < NextPrivateDataIndex);
       return IGF.Builder.CreateConstArrayGEP(
-          table, privateIndexToTableOffset(index), IGF.IGM.getPointerSize());
+          table, privateWitnessTableIndexToTableOffset(index),
+          IGF.IGM.getPointerSize());
     }
 
     const FulfillmentMap &getFulfillmentMap() {
@@ -1488,6 +1492,13 @@ getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               requirement.getSourceProtocol());
+  IGF.bindLocalTypeDataFromSelfWitnessTable(
+          &Conformance,
+          destTable.getAddress(),
+          [&](CanType type) {
+            return Conformance.getDeclContext()->mapTypeIntoContext(type)
+                     ->getCanonicalType();
+          });
 
   // If the associated type is directly fulfillable from the type,
   // we don't need a cache entry.
@@ -1541,7 +1552,7 @@ getOrCreateWitnessTableAccessFunction(IRGenModule &IGM, CanType type,
   // function.
   auto rootConformance = conformance->getRootNormalConformance();
   if (rootConformance->witnessTableAccessorRequiresArguments()) {
-    return getWitnessTableLazyAccessFunction(IGM, rootConformance, type);
+    return getWitnessTableLazyAccessFunction(IGM, conformance, type);
   } else {
     return IGM.getAddrOfWitnessTableAccessFunction(rootConformance,
                                                    NotForDefinition);
@@ -1601,6 +1612,13 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               Conformance.getProtocol());
+  IGF.bindLocalTypeDataFromSelfWitnessTable(
+          &Conformance,
+          destTable.getAddress(),
+          [&](CanType type) {
+            return Conformance.getDeclContext()->mapTypeIntoContext(type)
+                     ->getCanonicalType();
+          });
 
   ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
 
@@ -1894,6 +1912,33 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   // All good: now we can actually fill in the witness table.
   IGF.Builder.emitBlock(contBB);
 
+  /// Run through the conditional conformance witness tables, pulling them out
+  /// of the slice and putting them into the private data of the witness table.
+  for (auto idx : indices(ConditionalRequirementPrivateDataIndices)) {
+    Address conditionalTablePtr =
+        IGF.Builder.CreateConstArrayGEP(conditionalTables, idx, PointerSize);
+    Address slot = getAddressOfPrivateDataSlot(
+        IGF, wtable, ConditionalRequirementPrivateDataIndices[idx]);
+    auto conditionalTable = IGF.Builder.CreateLoad(conditionalTablePtr);
+    auto coercedSlot =
+        IGF.Builder.CreateElementBitCast(slot, conditionalTable->getType());
+    IGF.Builder.CreateStore(conditionalTable, coercedSlot);
+
+    // Register local type data for the conditional conformance witness table.
+    const auto &condConformance = SILConditionalConformances[idx];
+    CanType reqTypeInContext =
+      Conformance.getDeclContext()
+        ->mapTypeIntoContext(condConformance.Requirement)
+        ->getCanonicalType();
+    if (auto archetype = dyn_cast<ArchetypeType>(reqTypeInContext)) {
+      auto condProto = condConformance.Conformance.getRequirement();
+      IGF.setUnscopedLocalTypeData(
+             archetype,
+             LocalTypeDataKind::forAbstractProtocolWitnessTable(condProto),
+             conditionalTable);
+    }
+  }
+
   // Initialize all the specialized base conformances.
   for (auto &base : SpecializedBaseConformances) {
     // Ask the ConformanceInfo to emit the wtable.
@@ -1907,18 +1952,6 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
     IGF.Builder.CreateStore(baseWTable, slot);
   }
 
-  /// Run through the conditional conformance witness tables, pulling them out
-  /// of the slice and putting them into the private data of the witness table.
-  for (auto idx : indices(ConditionalRequirementPrivateDataIndices)) {
-    Address conditionalTablePtr =
-        IGF.Builder.CreateConstArrayGEP(conditionalTables, idx, PointerSize);
-    Address slot = getAddressOfPrivateDataSlot(
-        IGF, wtable, ConditionalRequirementPrivateDataIndices[idx]);
-    auto conditionalTable = IGF.Builder.CreateLoad(conditionalTablePtr);
-    auto coercedSlot =
-        IGF.Builder.CreateElementBitCast(slot, conditionalTable->getType());
-    IGF.Builder.CreateStore(conditionalTable, coercedSlot);
-  }
 
   IGF.Builder.CreateRetVoid();
 
@@ -2412,7 +2445,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
         LocalTypeDataKind::forAbstractProtocolWitnessTable(conformingProto);
 
     if (source) {
-      WitnessIndex index(privateIndexToTableOffset(reqtIndex),
+      WitnessIndex index(privateWitnessTableIndexToTableOffset(reqtIndex),
                          /*prefix*/ false);
 
       source = emitInvariantLoadOfOpaqueWitness(IGF, source, index);
