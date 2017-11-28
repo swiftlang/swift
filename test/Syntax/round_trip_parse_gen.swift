@@ -43,5 +43,15 @@ class C {
     _ = (first: 1, second: 2)
     _ = (1)
     _ = (first: 1)
+    if !true {
+      return
+    }
+  }
+
+  func foo3() {
+    _ = a.a.a
+    _ = a.b
+    _ = 1.a
+    (1 + 1).a.b.foo
   }
 }

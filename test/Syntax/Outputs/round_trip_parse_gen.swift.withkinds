@@ -5,19 +5,19 @@
 
 class C {
   func bar(_ a: Int) <CodeBlock>{}</CodeBlock>
-  func bar1(_ a: Float) -> Float <CodeBlock>{ <ReturnStmt>return <SequenceExpr><FloatLiteralExpr>-0.6 </FloatLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><FloatLiteralExpr>0.1 </FloatLiteralExpr><BinaryOperatorExpr>- </BinaryOperatorExpr><FloatLiteralExpr>0.3 </FloatLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock>
+  func bar1(_ a: Float) -> Float <CodeBlock>{ <ReturnStmt>return <SequenceExpr><PrefixOperatorExpr>-<FloatLiteralExpr>0.6 </FloatLiteralExpr></PrefixOperatorExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><FloatLiteralExpr>0.1 </FloatLiteralExpr><BinaryOperatorExpr>- </BinaryOperatorExpr><FloatLiteralExpr>0.3 </FloatLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock>
   func bar2(a: Int, b: Int, c:Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
   func bar3(a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
   func bar4(_ a: Int) -> Int <CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
   func foo() <CodeBlock>{
     var a = <StringLiteralExpr>/*comment*/"ab\(x)c"</StringLiteralExpr>/*comment*/
-    var b = <IntegerLiteralExpr>/*comment*/+2</IntegerLiteralExpr><IdentifierExpr>/*comment*/
+    var b = <PrefixOperatorExpr>/*comment*/+<IntegerLiteralExpr>2</IntegerLiteralExpr></PrefixOperatorExpr><IdentifierExpr>/*comment*/
     bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
-    bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>+10</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
-    bar</IdentifierExpr>(<FunctionCallArgument><IntegerLiteralExpr>-10</IntegerLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
-    bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>-1.1</FloatLiteralExpr></FunctionCallArgument>)<IdentifierExpr>
+    bar</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>+<IntegerLiteralExpr>10</IntegerLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)<IdentifierExpr>
+    bar</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>-<IntegerLiteralExpr>10</IntegerLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)<IdentifierExpr>
+    bar1</IdentifierExpr>(<FunctionCallArgument><PrefixOperatorExpr>-<FloatLiteralExpr>1.1</FloatLiteralExpr></PrefixOperatorExpr></FunctionCallArgument>)<IdentifierExpr>
     bar1</IdentifierExpr>(<FunctionCallArgument><FloatLiteralExpr>1.1</FloatLiteralExpr></FunctionCallArgument>)
-    var f = <FloatLiteralExpr>/*comments*/+0.1</FloatLiteralExpr><IdentifierExpr>/*comments*/
+    var f = <PrefixOperatorExpr>/*comments*/+<FloatLiteralExpr>0.1</FloatLiteralExpr></PrefixOperatorExpr><IdentifierExpr>/*comments*/
     foo</IdentifierExpr>()
   }</CodeBlock>
 
@@ -43,5 +43,15 @@ class C {
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement>first: <IntegerLiteralExpr>1</IntegerLiteralExpr>, </TupleElement><TupleElement>second: <IntegerLiteralExpr>2</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement><IntegerLiteralExpr>1</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><TupleExpr>(<TupleElement>first: <IntegerLiteralExpr>1</IntegerLiteralExpr></TupleElement>)</TupleExpr></SequenceExpr>
+    if <PrefixOperatorExpr>!<BooleanLiteralExpr>true </BooleanLiteralExpr></PrefixOperatorExpr><CodeBlock>{<ReturnStmt>
+      return<Expr></Expr></ReturnStmt>
+    }</CodeBlock>
+  }</CodeBlock>
+
+  func foo3() <CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.a</MemberAccessExpr>.a</MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.b</MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IntegerLiteralExpr>1</IntegerLiteralExpr>.a</MemberAccessExpr></SequenceExpr><MemberAccessExpr><MemberAccessExpr><MemberAccessExpr><TupleExpr>
+    (<TupleElement><SequenceExpr><IntegerLiteralExpr>1 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>1</IntegerLiteralExpr></SequenceExpr></TupleElement>)</TupleExpr>.a</MemberAccessExpr>.b</MemberAccessExpr>.foo</MemberAccessExpr>
   }</CodeBlock>
 }
