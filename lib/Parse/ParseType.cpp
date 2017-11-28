@@ -197,9 +197,13 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
-  case tok::identifier:
-    ty = parseTypeIdentifier();
+  case tok::identifier: {
+    auto Result = parseTypeIdentifier();
+    if (Result.hasSyntax())
+      SyntaxContext->addSyntax(Result.getSyntax());
+    ty = Result.getASTResult();
     break;
+  }
   case tok::l_paren:
     ty = parseTypeTupleBody();
     break;
@@ -534,23 +538,17 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
-  SyntaxParsingContext TypeParsingContext(SyntaxContext,
-                                          SyntaxContextKind::Type);
-
+SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
-      auto SynResult = parseAnyType();
-      if (SynResult.hasSyntax())
-        SyntaxContext->addSyntax(SynResult.getSyntax());
-      return makeParserResult(SynResult.getAST());
+      return parseAnyType();
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<IdentTypeRepr>();
+      return makeSyntaxCodeCompletionResult<TypeSyntax, IdentTypeRepr>();
     }
 
     diagnose(Tok, diag::expected_identifier_for_type);
@@ -649,8 +647,6 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
-  if (SyntaxContext->isEnabled() && SyntaxNode.hasValue())
-    SyntaxContext->addSyntax(*SyntaxNode);
 
   if (Status.hasCodeCompletion() && CodeCompletion) {
     if (Tok.isNot(tok::code_complete)) {
@@ -664,7 +660,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     consumeToken(tok::code_complete);
   }
 
-  return makeParserResult(Status, ITR);
+  return makeSyntaxResult(Status, SyntaxNode, ITR);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeSimpleOrComposition() {
@@ -759,7 +755,10 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   if (!IsEmpty) {
     do {
       // Parse the type-identifier.
-      ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
+      auto Result = parseTypeIdentifier();
+      if (Result.hasSyntax())
+        SyntaxContext->addSyntax(Result.getSyntax());
+      ParserResult<TypeRepr> Protocol = Result.getASTResult();
       Status |= Protocol;
       if (auto *ident =
             dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
