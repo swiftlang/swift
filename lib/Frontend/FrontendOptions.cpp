@@ -28,7 +28,7 @@ using namespace swift;
 using namespace llvm::opt;
 
 bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (haveUniqueInputFilename()) {
+  if (hasUniqueInputFilename()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
            llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
@@ -37,7 +37,7 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
 }
 
 bool FrontendInputs::shouldTreatAsSIL() const {
-  if (haveUniqueInputFilename()) {
+  if (hasUniqueInputFilename()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
     StringRef Input(getFilenameOfFirstInput());
@@ -53,36 +53,36 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   return false;
 }
 
-bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
-    if (haveInputFilenames()) {
-      Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
+    if (hasInputFilenames()) {
+      diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
-  } else if (TreatAsSIL && havePrimaryInputs()) {
+  } else if (treatAsSIL && hasPrimaryInputs()) {
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
     for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
       if (i == getOptionalUniquePrimaryInput()->Index)
         continue;
 
-      StringRef File(getInputFilenames()[i]);
-      if (!llvm::sys::path::extension(File).endswith(SIB_EXTENSION)) {
-        Diags.diagnose(SourceLoc(),
+      StringRef file(getInputFilenames()[i]);
+      if (!llvm::sys::path::extension(file).endswith(SIB_EXTENSION)) {
+        diags.diagnose(SourceLoc(),
                        diag::error_mode_requires_one_sil_multi_sib);
         return true;
       }
     }
-  } else if (TreatAsSIL) {
-    if (!haveUniqueInputFilename()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
+  } else if (treatAsSIL) {
+    if (!hasUniqueInputFilename()) {
+      diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
     }
   } else if (!isNoneRequested) {
-    if (!haveInputFilenames()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
+    if (!hasInputFilenames()) {
+      diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
     }
   }
@@ -184,7 +184,7 @@ void FrontendOptions::forAllOutputPaths(
 
 
 StringRef FrontendOptions::originalPath() const {
-  if (haveNamedOutputFile())
+  if (hasNamedOutputFile())
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
 
@@ -196,7 +196,7 @@ StringRef FrontendOptions::originalPath() const {
 }
 
 bool FrontendOptions::isOutputFileDirectory() const {
-  return haveNamedOutputFile() &&
+  return hasNamedOutputFile() &&
          llvm::sys::fs::is_directory(getSingleOutputFilename());
 }
 
@@ -406,6 +406,8 @@ bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
+    // FIXME: Some of these don't actually produce output
+    // but for now stay consistent with the status quo.
   case ActionType::NoneAction:
   case ActionType::EmitPCH:
   case ActionType::EmitSIBGen:
