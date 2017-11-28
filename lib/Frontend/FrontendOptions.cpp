@@ -57,7 +57,7 @@ unsigned
 FrontendInputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
   unsigned N = 0;
   for (const auto &iter : PrimaryInputs) {
-    StringRef filename = Inputs[iter.second].getFile();
+    StringRef filename = AllFiles[iter.second].getFile();
     if (llvm::sys::path::extension(filename).endswith(suffix))
       ++N;
   }
@@ -84,7 +84,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
     assertMustNotBeMoreThanOnePrimaryInput();
     // If we have the SIL as our primary input, we can waive the one file
     // requirement as long as all the other inputs are SIBs.
-    for (const InputFile &input : getInputs()) {
+    for (const InputFile &input : getAllFiles()) {
       if (!input.getIsPrimary() && !input.getFile().empty() &&
           !llvm::sys::path::extension(input.getFile())
                .endswith(SIB_EXTENSION)) {

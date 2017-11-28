@@ -63,7 +63,7 @@ private:
 class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
 
-  std::vector<InputFile> Inputs;
+  std::vector<InputFile> AllFiles;
   typedef llvm::StringMap<unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
 
@@ -71,43 +71,43 @@ public:
   FrontendInputs() = default;
 
   FrontendInputs(const FrontendInputs &other) {
-    for (InputFile input : other.getInputs())
+    for (InputFile input : other.getAllFiles())
       addInput(input);
   }
   FrontendInputs(FrontendInputs &&other) {
-    Inputs = std::move(other.Inputs);
+    AllFiles = std::move(other.AllFiles);
     PrimaryInputs = std::move(other.PrimaryInputs);
   }
   FrontendInputs &operator=(const FrontendInputs &other) {
     clearInputs();
-    for (InputFile input : other.getInputs())
+    for (InputFile input : other.getAllFiles())
       addInput(input);
     return *this;
   }
 
   // Readers:
 
-  ArrayRef<InputFile> getInputs() const { return Inputs; }
+  ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
 
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
-    for (auto &input : getInputs()) {
+    for (auto &input : getAllFiles()) {
       assert(!input.getFile().empty());
       filenames.push_back(input.getFile());
     }
     return filenames;
   }
 
-  unsigned inputCount() const { return getInputs().size(); }
+  unsigned inputCount() const { return getAllFiles().size(); }
 
-  bool hasInputs() const { return !Inputs.empty(); }
-  unsigned inputFilenameCount() const { return Inputs.size(); }
+  bool hasInputs() const { return !AllFiles.empty(); }
+  unsigned inputFilenameCount() const { return AllFiles.size(); }
 
   bool hasUniqueInputFilename() const { return inputFilenameCount() == 1; }
 
   const StringRef getFilenameOfFirstInput() const {
     assert(hasInputs());
-    const InputFile &inp = getInputs()[0];
+    const InputFile &inp = getAllFiles()[0];
     StringRef f = inp.getFile();
     assert(!f.empty());
     return f;
@@ -145,7 +145,7 @@ public:
   const InputFile *getOptionalUniquePrimaryInput() const {
     assertMustNotBeMoreThanOnePrimaryInput();
     const auto &b = PrimaryInputs.begin();
-    return b == PrimaryInputs.end() ? nullptr : &Inputs[b->second];
+    return b == PrimaryInputs.end() ? nullptr : &AllFiles[b->second];
   }
 
   const InputFile &getRequiredUniquePrimaryInput() const {
@@ -163,7 +163,7 @@ public:
     StringRef correctedName = file.equals("<stdin>") ? "-" : file;
     auto iterator = PrimaryInputs.find(correctedName);
     return iterator != PrimaryInputs.end() &&
-    Inputs[iterator->second].getIsPrimary();
+           AllFiles[iterator->second].getIsPrimary();
   }
   
   unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
@@ -187,26 +187,26 @@ public:
   }
 
   void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
-    Inputs[index].setBuffer(buffer);
+    AllFiles[index].setBuffer(buffer);
   }
   
   
   void bePrimaryAt(unsigned index) {
-    if (Inputs[index].getIsPrimary())
+    if (AllFiles[index].getIsPrimary())
       return;
-    Inputs[index].bePrimary();
-    if (!Inputs[index].getFile().empty())
-      PrimaryInputs.insert(std::make_pair(Inputs[index].getFile(), index));
+    AllFiles[index].bePrimary();
+    if (!AllFiles[index].getFile().empty())
+      PrimaryInputs.insert(std::make_pair(AllFiles[index].getFile(), index));
   }
 
 
   void addInput(const InputFile &input) {
     if (!input.getFile().empty() && input.getIsPrimary())
-      PrimaryInputs.insert(std::make_pair(input.getFile(), Inputs.size()));
-    Inputs.push_back(input);
+      PrimaryInputs.insert(std::make_pair(input.getFile(), AllFiles.size()));
+    AllFiles.push_back(input);
   }
   void clearInputs() {
-    Inputs.clear();
+    AllFiles.clear();
     PrimaryInputs.clear();
   }
 };

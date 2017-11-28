@@ -179,7 +179,7 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (const InputFile &input :
-       Invocation.getFrontendOptions().Inputs.getInputs())
+       Invocation.getFrontendOptions().Inputs.getAllFiles())
     if (setupForInput(input))
       return true;
 

@@ -401,7 +401,7 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputs replacementInputs;
-  for (const InputFile &input : inputs.getInputs()) {
+  for (const InputFile &input : inputs.getAllFiles()) {
     std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.getFile());
     bool newIsPrimary = input.getIsPrimary() ||
@@ -681,7 +681,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   InputStamps.reserve(
       Invok.Opts.Invok.getFrontendOptions().Inputs.inputFilenameCount());
   for (const auto &input :
-       Invok.Opts.Invok.getFrontendOptions().Inputs.getInputs()) {
+       Invok.Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
     StringRef File = input.getFile();
     if (File.empty())
       continue;
@@ -771,7 +771,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
 
   SmallVector<FileContent, 8> Contents;
-  for (const auto &input : Opts.Invok.getFrontendOptions().Inputs.getInputs()) {
+  for (const auto &input :
+       Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
     StringRef File = input.getFile();
     if (File.empty())
       continue;
