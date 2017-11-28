@@ -7,7 +7,12 @@ import Swift
 import Foundation
 import objc_generics
 
-extension GenericClass {
+public extension GenericClass {
   func method() {}
   class func classMethod() {}
+}
+
+public func takesFunction<T : AnyObject>(fn: @escaping (GenericClass<T>) -> ()) -> (GenericClass<T>) -> () {
+  let copy = fn
+  return copy
 }
