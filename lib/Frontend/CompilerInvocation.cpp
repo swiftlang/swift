@@ -288,7 +288,7 @@ private:
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
-  const std::vector<std::string> &getOutputFilenamesFromCommandLineOrFilelist();
+  ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
 
   bool checkForUnusedOutputPaths() const;
 
@@ -671,7 +671,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
     // selected".
     return false;
   }
-  const std::vector<std::string> &outputFilenames =
+  ArrayRef<std::string> outputFilenames =
       getOutputFilenamesFromCommandLineOrFilelist();
 
   bool isOutputAUniqueOrdinaryFile =
@@ -689,7 +689,7 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
       FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
       !FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction));
 
-  const std::vector<std::string> &outputFilenamesFromCommandLineOrFilelist =
+  ArrayRef<std::string> outputFilenamesFromCommandLineOrFilelist =
       getOutputFilenamesFromCommandLineOrFilelist();
 
   if (outputFilenamesFromCommandLineOrFilelist.size() > 1) {
@@ -887,7 +887,7 @@ void FrontendArgsToOptionsConverter::computeLLVMArgs() {
   }
 }
 
-const std::vector<std::string> &
+ArrayRef<std::string>
 FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   if (cachedOutputFilenamesFromCommandLineOrFilelist) {
     return *cachedOutputFilenamesFromCommandLineOrFilelist;

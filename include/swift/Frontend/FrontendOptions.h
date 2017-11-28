@@ -158,7 +158,7 @@ public:
                : Optional<StringRef>();
   }
 
-  bool isThereAPrimaryInputWithAFilenameAt(unsigned i) const {
+  bool isInputPrimary(unsigned i) const {
     assertMustNotBeMoreThanOnePrimaryInput();
     if (Optional<SelectedInput> primaryInput = getOptionalPrimaryInput())
       return primaryInput->isFilename() && primaryInput->Index == i;
