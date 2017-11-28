@@ -39,14 +39,7 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
-/// Compute all subclasses of a given class.
-///
-/// \p CHA class hierarchy analysis
-/// \p CD class declaration
-/// \p ClassType type of the instance
-/// \p M SILModule
-/// \p Subs a container to be used for storing the set of subclasses
-static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
+void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
                              ClassDecl *CD,
                              SILType ClassType,
                              SILModule &M,
