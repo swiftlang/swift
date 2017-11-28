@@ -182,7 +182,7 @@ public:
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
-  bool verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+  bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
   void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {

@@ -64,7 +64,7 @@ FrontendInputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
   return N;
 }
 
-bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
@@ -78,7 +78,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
     if (!hasPrimaryInputs()) {
       if (hasUniqueInputFilename())
         return false;
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
+      diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
     }
     assertMustNotBeMoreThanOnePrimaryInput();
@@ -88,7 +88,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
       if (!input.getIsPrimary() && !input.getFile().empty() &&
           !llvm::sys::path::extension(input.getFile())
                .endswith(SIB_EXTENSION)) {
-        Diags.diagnose(SourceLoc(),
+        diags.diagnose(SourceLoc(),
                        diag::error_mode_requires_one_sil_multi_sib);
         return true;
       }

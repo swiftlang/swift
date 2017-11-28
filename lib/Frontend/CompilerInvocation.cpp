@@ -390,7 +390,7 @@ bool FrontendArgsToOptionsConverter::convert() {
     return true;
   }
 
-  if (setupForSILOrLLVM())
+  if (setUpForSILOrLLVM())
     return true;
 
   if (computeModuleName())
@@ -619,7 +619,7 @@ FrontendArgsToOptionsConverter::determineRequestedAction() const {
   llvm_unreachable("Unhandled mode option");
 }
 
-bool FrontendArgsToOptionsConverter::setupForSILOrLLVM() {
+bool FrontendArgsToOptionsConverter::setUpForSILOrLLVM() {
   using namespace options;
   bool TreatAsSIL =
       Args.hasArg(OPT_parse_sil) || Opts.Inputs.shouldTreatAsSIL();
@@ -1934,20 +1934,20 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInvocation::setUpInputForSILTool(
-    StringRef InputFilename, StringRef ModuleNameArg,
+    StringRef inputFilename, StringRef moduleNameArg,
     bool alwaysSetModuleToMain, bool bePrimary,
     serialization::ExtendedValidationInfo &extendedInfo) {
   // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
-  if (!FileBufOrErr) {
-    return FileBufOrErr;
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(inputFilename);
+  if (!fileBufOrErr) {
+    return fileBufOrErr;
   }
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
   getFrontendOptions().Inputs.addInput(
-      InputFile::create(InputFilename, bePrimary, FileBufOrErr.get().get()));
+      InputFile::create(inputFilename, bePrimary, fileBufOrErr.get().get()));
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), &extendedInfo);
@@ -1966,5 +1966,5 @@ CompilerInvocation::setUpInputForSILTool(
     setModuleName(name);
     setInputKind(InputFileKind::IFK_SIL);
   }
-  return FileBufOrErr;
+  return fileBufOrErr;
 }
