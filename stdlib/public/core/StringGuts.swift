@@ -941,7 +941,7 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _asNative: NativeString {
     _sanityCheck(_isNative)
-    let count = Int(truncatingIfNeeded: _otherBits)
+    let count = Int(bitPattern: _otherBits)
     _sanityCheck(count >= 0)
     return NativeString(
       nativeObject: _nativeObject(fromBridge: _object),
@@ -961,7 +961,7 @@ extension _StringGuts {
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: s.nativeObject),
       isSingleByte: s.isSingleByte,
-      otherBits: UInt(truncatingIfNeeded: s.count))
+      otherBits: UInt(bitPattern: s.count))
   }
 
   @_versioned
@@ -971,7 +971,7 @@ extension _StringGuts {
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: buffer._nativeObject),
       isSingleByte: buffer.elementWidth == 1,
-      otherBits: UInt(truncatingIfNeeded: count))
+      otherBits: UInt(bitPattern: count))
   }
 
   //
@@ -1027,7 +1027,7 @@ extension _StringGuts {
     let pointer = UnsafeMutableRawPointer(
       bitPattern: self._untaggedUnflaggedBitPattern
     )._unsafelyUnwrappedUnchecked
-    let count = Int(truncatingIfNeeded: self._otherBits)
+    let count = Int(bitPattern: self._otherBits)
     _sanityCheck(count >= 0)
     return UnsafeString(
       baseAddress: pointer,
@@ -1407,7 +1407,7 @@ extension _StringGuts {
     var nativeBuffer = self._asNative.stringBuffer
     let otherByteCount = otherCount &<< nativeBuffer.elementShift
     nativeBuffer.usedEnd += otherByteCount
-    self._otherBits += UInt(truncatingIfNeeded: otherCount)
+    self._otherBits += UInt(bitPattern: otherCount)
 
     _sanityCheck(
       capBegin + otherByteCount == self._asNative.stringBuffer.usedEnd
@@ -1449,7 +1449,7 @@ extension _StringGuts {
     let ptr = _StringBuffer(_StringBuffer._Storage(
       _nativeObject: _nativeObject(fromBridge: _object))
     ).start
-    let count = Int(truncatingIfNeeded: self._otherBits)
+    let count = Int(bitPattern: self._otherBits)
     _sanityCheck(count >= 0)
     return UnsafeString(
       baseAddress: ptr,
@@ -1570,7 +1570,7 @@ extension _StringGuts {
     }
 
     _sanityCheck(Int(self._otherBits) >= 0)
-    return Int(truncatingIfNeeded: self._otherBits)
+    return Int(bitPattern: self._otherBits)
   }
 
   @_inlineable
@@ -1832,6 +1832,14 @@ extension StringProtocol {
     return result
   }
 }
+
+@inline(never)
+@_versioned
+internal
+func _compareOpaqueStrings(_ lhs: String, _ rhs: String) -> Int {
+  return lhs._compareString(rhs)
+}
+
 extension String : Equatable, Comparable {
   // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
   @_inlineable // FIXME(sil-serialize-all)
@@ -1845,7 +1853,7 @@ extension String : Equatable, Comparable {
     let lhsContigOpt = lhs._unmanagedContiguous
     let rhsContigOpt = rhs._unmanagedContiguous
     if _slowPath(lhsContigOpt == nil || rhsContigOpt == nil) {
-      return lhs._ephemeralString._compareString(rhs._ephemeralString) == 0
+      return _compareOpaqueStrings(lhs, rhs) == 0
     }
     let result = lhsContigOpt._unsafelyUnwrappedUnchecked.equal(
       to: rhsContigOpt._unsafelyUnwrappedUnchecked)
@@ -1906,7 +1914,19 @@ extension UnsafeString {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal func equal(to other: UnsafeString) -> Bool {
-    return compare(to: other) == 0
+    if self.isASCII && other.isASCII {
+      if self.count != other.count {
+        return false
+      }
+      if self.baseAddress == other.baseAddress {
+        return true
+      }
+      return _swift_stdlib_memcmp(
+        self.baseAddress, other.baseAddress,
+        Swift.min(self.count, other.count)
+      ) == 0
+    }
+    return _compareDeterministicUnicodeCollation(other) == 0
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -2229,7 +2249,7 @@ extension Character {
   init(_ unsafeStr: UnsafeString) {
     if _fastPath(unsafeStr.count <= 4) {
       let b = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(unsafeStr)
-      if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
+      if _fastPath(Int64(bitPattern: b._storage) >= 0) {
         _representation = .smallUTF16(
           Builtin.trunc_Int64_Int63(b._storage._value))
         return
