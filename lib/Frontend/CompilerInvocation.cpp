@@ -306,7 +306,9 @@ private:
   bool deriveOutputFilenameForDirectory(StringRef outputDir);
   
   std::string determineBaseNameOfOutput() const;
-  
+
+  void deriveOutputFilenameFromParts(StringRef dir, StringRef base);
+
   void determineSupplementaryOutputFilenames();
   
   /// Returns the output filenames on the command line or in the output
@@ -760,11 +762,7 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
     }
     return false;
   }
-  llvm::SmallString<128> Path(baseName);
-  StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
-      Opts.RequestedAction);
-  llvm::sys::path::replace_extension(Path, Suffix);
-  Opts.OutputFilenames.push_back(Path.str());
+  deriveOutputFilenameFromParts("", baseName);
   return false;
 }
 
@@ -778,13 +776,19 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
                    outputDir);
     return true;
   }
-  llvm::SmallString<128> Path(outputDir);
-  llvm::sys::path::append(Path, baseName);
-  StringRef Suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
-      Opts.RequestedAction);
-  llvm::sys::path::replace_extension(Path, Suffix);
-  Opts.OutputFilenames.push_back(Path.str());
+  deriveOutputFilenameFromParts(outputDir, baseName);
   return false;
+}
+
+void FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
+    StringRef dir, StringRef base) {
+  assert(!base.empty());
+  llvm::SmallString<128> path(dir);
+  llvm::sys::path::append(path, base);
+  StringRef suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
+      Opts.RequestedAction);
+  llvm::sys::path::replace_extension(path, suffix);
+  Opts.OutputFilenames.push_back(path.str());
 }
 
 std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
