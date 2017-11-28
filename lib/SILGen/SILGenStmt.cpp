@@ -798,11 +798,15 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-    Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+    // Create the initialization outside of the innerForScope so that the
+    // innerForScope doesn't clean it up.
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
-    SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
-    nextBufOrValue =
-        ManagedValue::forUnmanaged(nextInit->getManagedAddress().forward(SGF));
+    {
+      Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+      SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
+    }
+    nextBufOrValue = nextInit->getManagedAddress();
+
   } else {
     Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
     nextBufOrValue = innerForScope.popPreservingValue(
@@ -838,8 +842,6 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           // *NOTE* If we do not have an address only value, then inputValue is
           // *already properly unwrapped.
           if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-            inputValue =
-                SGF.emitManagedBufferWithCleanup(nextBufOrValue.getValue());
             inputValue = SGF.emitUncheckedGetOptionalValueFrom(
                 S, inputValue, optTL, SGFContext(initLoopVars.get()));
           }
