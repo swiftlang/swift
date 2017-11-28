@@ -133,8 +133,6 @@ namespace {
   /// nominal metadata reference.  The structure produced here is
   /// consumed by swift_getGenericMetadata() and must correspond to
   /// the fill operations that the compiler emits for the bound decl.
-  ///
-  /// FIXME: Rework to use GenericSignature instead of AllArchetypes
   struct GenericArguments {
     /// The values to use to initialize the arguments structure.
     SmallVector<llvm::Value *, 8> Values;
