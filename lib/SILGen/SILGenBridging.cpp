@@ -485,9 +485,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
     }
     init->getManagedAddress().forward(SGF);
     resultVal = SGF.B.createTuple(loc, {});
-
-  // Otherwise, return the result at +1.
   } else {
+    // Otherwise, return the result at +1.
     resultVal = result.forward(SGF);
   }
 
@@ -630,6 +629,13 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
           != AnyFunctionType::Representation::Block)
       return SGF.emitFuncToBlock(loc, v, nativeFTy, bridgedFTy,
                                  loweredBridgedTy.castTo<SILFunctionType>());
+  }
+
+  // Erase IUO at this point, because there aren't any conformances for
+  // IUO anymore.  Note that the value representation stays the same
+  // because SIL erases the difference.
+  if (auto obj = nativeType->getImplicitlyUnwrappedOptionalObjectType()) {
+    nativeType = OptionalType::get(obj)->getCanonicalType();
   }
 
   // If the native type conforms to _ObjectiveCBridgeable, use its
@@ -838,9 +844,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
       init->finishInitialization(SGF);
     }
     init->getManagedAddress().forward(SGF);
-    r = SGF.B.createTuple(loc, fnConv.getSILResultType(), {});
+    r = SGF.B.createTuple(loc, fnConv.getSILResultType(), ArrayRef<SILValue>());
 
-  // Otherwise, return the result at +1.
+    // Otherwise, return the result at +1.
   } else {
     r = result.forward(SGF);
   }

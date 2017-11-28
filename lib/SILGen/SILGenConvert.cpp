@@ -1272,6 +1272,23 @@ static bool isValueToAnyConversion(CanType from, CanType to) {
   return !from->isAnyClassReferenceType();
 }
 
+/// Check whether this conversion is Any??? to AnyObject???.  If the result
+/// type is less optional, it doesn't count.
+static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
+  while (auto fromObject = from.getAnyOptionalObjectType()) {
+    auto toObject = to.getAnyOptionalObjectType();
+    if (!toObject) return false;
+    from = fromObject;
+    to = toObject;
+  }
+
+  if (from->isAny()) {
+    assert(to->isAnyObject());
+    return true;
+  }
+  return false;
+}
+
 Optional<ConversionPeepholeHint>
 Lowering::canPeepholeConversions(SILGenFunction &SGF,
                                  const Conversion &outerConversion,
@@ -1332,8 +1349,7 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
 
       // Converting to Any doesn't do anything semantically special, so we
       // can apply the peephole unconditionally.
-      if (intermediateType->lookThroughAllAnyOptionalTypes()->isAny()) {
-        assert(resultType->lookThroughAllAnyOptionalTypes()->isAnyObject());
+      if (isMatchedAnyToAnyObjectConversion(intermediateType, resultType)) {
         if (loweredSourceTy == loweredResultTy) {
           return applyPeephole(ConversionPeepholeHint::Identity);
         } else if (isValueToAnyConversion(sourceType, intermediateType)) {
@@ -1375,7 +1391,8 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
       if (!forced &&
           innerConversion.getKind() == Conversion::BridgeResultFromObjC) {
         if (auto sourceValueType = sourceType.getAnyOptionalObjectType()) {
-          if (areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
+          if (!intermediateType.getAnyOptionalObjectType() &&
+              areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
             forced = true;
             return applyPeephole(ConversionPeepholeHint::Subtype);
           }

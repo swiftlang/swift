@@ -154,6 +154,9 @@ ERROR(error_primary_file_not_found,none,
       "primary file '%0' was not found in file list '%1'",
       (StringRef, StringRef))
 
+ERROR(error_cannot_have_input_files_with_file_list,none,
+"cannot have input files with file list", ())
+
 ERROR(repl_must_be_initialized,none,
       "variables currently must have an initial value when entered at the "
       "top level of the REPL", ())

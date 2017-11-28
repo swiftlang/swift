@@ -753,6 +753,43 @@ ReturnInst *SILGenBuilder::createReturn(SILLocation loc,
   return createReturn(loc, returnValue.forward(SGF));
 }
 
+ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
+                                        ArrayRef<ManagedValue> elements) {
+  // Handle the empty tuple case.
+  if (elements.empty()) {
+    SILValue result = createTuple(loc, type, ArrayRef<SILValue>());
+    return ManagedValue::forUnmanaged(result);
+  }
+
+  // We need to look for the first non-trivial value and use that as our cleanup
+  // cloner value.
+  auto iter = find_if(elements, [&](ManagedValue mv) -> bool {
+    return mv.getType().isTrivial(getModule());
+  });
+
+  llvm::SmallVector<SILValue, 8> forwardedValues;
+  // If we have all trivial values, then just create the tuple and return. No
+  // cleanups need to be cloned.
+  if (iter == elements.end()) {
+    transform(elements, std::back_inserter(forwardedValues),
+              [&](ManagedValue mv) -> SILValue {
+                return mv.forward(getSILGenFunction());
+              });
+    SILValue result = createTuple(loc, type, forwardedValues);
+    return ManagedValue::forUnmanaged(result);
+  }
+
+  // Otherwise, we use that values cloner. This is taking advantage of
+  // instructions that forward ownership requiring that all input values have
+  // the same ownership if they are non-trivial.
+  CleanupCloner cloner(*this, *iter);
+  transform(elements, std::back_inserter(forwardedValues),
+            [&](ManagedValue mv) -> SILValue {
+              return mv.forward(getSILGenFunction());
+            });
+  return cloner.clone(createTuple(loc, type, forwardedValues));
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//
