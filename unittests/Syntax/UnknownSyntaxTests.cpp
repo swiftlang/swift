@@ -32,7 +32,8 @@ FunctionCallExprSyntax getCannedFunctionCall() {
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto One = SyntaxFactory::makePrefixOperatorExpr(NoSign,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 
   auto Arg = SyntaxFactory::makeFunctionCallArgument(Label, Colon, One,

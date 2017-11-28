@@ -215,7 +215,8 @@ FunctionParameterSyntax getCannedFunctionParameter() {
 
   auto Sign = SyntaxFactory::makePrefixOperator("-", {}, {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(Sign, OneDigits);
+  auto One = SyntaxFactory::makePrefixOperatorExpr(Sign,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
 
   return SyntaxFactory::makeFunctionParameter(ExternalName, LocalName, Colon,
@@ -251,7 +252,8 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
 
   auto Sign = SyntaxFactory::makePrefixOperator("-", {}, {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(Sign, OneDigits);
+  auto One = SyntaxFactory::makePrefixOperatorExpr(Sign,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, {});
 
   auto Param = SyntaxFactory::makeFunctionParameter(ExternalName, LocalName,
@@ -297,7 +299,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
 
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits);
   auto Comma = SyntaxFactory::makeCommaToken({}, {});
 
   {
@@ -513,7 +515,7 @@ GenericParameterClauseSyntax getCannedGenericParams() {
 CodeBlockSyntax getCannedBody() {
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "-");
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits);
   auto ReturnKW =
     SyntaxFactory::makeReturnKeyword(Trivia::newlines(1) + Trivia::spaces(2),
                                      {});
