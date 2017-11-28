@@ -8,6 +8,8 @@
 // RUN: %target-swift-frontend -typecheck -I %t -enable-named-lazy-member-loading -stats-output-dir %t/stats-post %s
 // RUN: %utils/process-stats-dir.py --evaluate-delta 'NumDeclsDeserialized < -5' %t/stats-pre %t/stats-post
 
+// REQUIRES: rdar_35639403
+
 import NamedLazyMembers
 
 public func test(b: BaseStruct) {
