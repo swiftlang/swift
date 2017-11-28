@@ -437,34 +437,18 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
 ManagedValue SILGenBuilder::createUncheckedEnumData(SILLocation loc,
                                                     ManagedValue operand,
                                                     EnumElementDecl *element) {
-  if (operand.hasCleanup()) {
-    SILValue newValue =
-        SILBuilder::createUncheckedEnumData(loc, operand.forward(SGF), element);
-    return SGF.emitManagedRValueWithCleanup(newValue);
-  }
-
-  ManagedValue borrowedBase = operand.borrow(SGF, loc);
-  SILValue newValue = SILBuilder::createUncheckedEnumData(
-      loc, borrowedBase.getValue(), element);
-  return ManagedValue::forUnmanaged(newValue);
+  CleanupCloner cloner(*this, operand);
+  SILValue result = createUncheckedEnumData(loc, operand.forward(SGF), element);
+  return cloner.clone(result);
 }
 
 ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
     SILLocation loc, ManagedValue operand, EnumElementDecl *element,
     SILType ty) {
-  // First see if we have a cleanup. If we do, we are going to forward and emit
-  // a managed buffer with cleanup.
-  if (operand.hasCleanup()) {
-    return SGF.emitManagedBufferWithCleanup(
-        SILBuilder::createUncheckedTakeEnumDataAddr(loc, operand.forward(SGF),
-                                                    element, ty));
-  }
-
-  SILValue result = SILBuilder::createUncheckedTakeEnumDataAddr(
-      loc, operand.getUnmanagedValue(), element, ty);
-  if (operand.isLValue())
-    return ManagedValue::forLValue(result);
-  return ManagedValue::forUnmanaged(result);
+  CleanupCloner cloner(*this, operand);
+  SILValue result =
+      createUncheckedTakeEnumDataAddr(loc, operand.forward(SGF), element);
+  return cloner.clone(result);
 }
 
 ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v) {
