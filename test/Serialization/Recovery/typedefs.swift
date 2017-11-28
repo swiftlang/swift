@@ -29,11 +29,11 @@ func testSymbols() {
 
 // CHECK-IR-LABEL: define{{.*}} void @_T08typedefs18testVTableBuildingy3Lib4UserC4user_tF
 public func testVTableBuilding(user: User) {
-  // The important thing in this CHECK line is the "i64 28", which is the offset
+  // The important thing in this CHECK line is the "i64 30", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here
-  // changes, please check that offset 28 is still correct.
+  // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
+  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 30|i32 33}}
   _ = user.lastMethod()
 } // CHECK-IR: ret void
 
@@ -168,6 +168,18 @@ open class User {
   // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
   public required init(wrappedRequired: WrappedInt) {}
 
+  // CHECK: {{^}} init(wrappedRequiredInSub: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  public init(wrappedRequiredInSub: WrappedInt) {}
+
+  // CHECK: dynamic init(wrappedDynamic: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedDynamic:) */
+  @objc public dynamic init(wrappedDynamic: WrappedInt) {}
+
+  // CHECK: dynamic required init(wrappedRequiredDynamic: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredDynamic:) */
+  @objc public dynamic required init(wrappedRequiredDynamic: WrappedInt) {}
+
   public func lastMethod() {}
 }
 // CHECK: {{^}$}}
@@ -195,7 +207,9 @@ open class User {
 // 25 CHECK-VTABLE-NEXT: #User.init!initializer.1:
 // 26 CHECK-VTABLE-NEXT: #User.init!allocator.1:
 // 27 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 28 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 28 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 29 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 30 CHECK-VTABLE-NEXT: #User.lastMethod!1:
 // CHECK-VTABLE: }
 
 
@@ -264,6 +278,14 @@ open class UserSub : User {
   // CHECK: required init(wrappedRequired: WrappedInt?)
   // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
   public required init(wrappedRequired: WrappedInt?) { super.init() }
+
+  // CHECK: required init(wrappedRequiredInSub: WrappedInt?)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  public required override init(wrappedRequiredInSub: WrappedInt?) { super.init() }
+
+  // CHECK: required init(wrappedRequiredDynamic: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredDynamic:) */
+  public required init(wrappedRequiredDynamic: WrappedInt) { super.init() }
 }
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}
