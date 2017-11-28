@@ -2703,3 +2703,202 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   return { bridgingFnPattern, uncurried };
 }
+
+// TODO: We should compare generic signatures. Class and witness methods
+// allow variance in "self"-fulfilled parameters; other functions must
+// match exactly.
+// TODO: More sophisticated param and return ABI compatibility rules could
+// diverge.
+static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
+  // Address parameters are all ABI-compatible, though the referenced
+  // values may not be. Assume whoever's doing this knows what they're
+  // doing.
+  if (a.isAddress() && b.isAddress())
+    return true;
+
+  // Addresses aren't compatible with values.
+  // TODO: An exception for pointerish types?
+  if (a.isAddress() || b.isAddress())
+    return false;
+
+  // Tuples are ABI compatible if their elements are.
+  // TODO: Should destructure recursively.
+  SmallVector<CanType, 1> aElements, bElements;
+  if (auto tup = a.getAs<TupleType>()) {
+    auto types = tup.getElementTypes();
+    aElements.append(types.begin(), types.end());
+  } else {
+    aElements.push_back(a.getSwiftRValueType());
+  }
+  if (auto tup = b.getAs<TupleType>()) {
+    auto types = tup.getElementTypes();
+    bElements.append(types.begin(), types.end());
+  } else {
+    bElements.push_back(b.getSwiftRValueType());
+  }
+
+  if (aElements.size() != bElements.size())
+    return false;
+
+  for (unsigned i : indices(aElements)) {
+    auto aa = SILType::getPrimitiveObjectType(aElements[i]);
+    auto bb = SILType::getPrimitiveObjectType(bElements[i]);
+    // Equivalent types are always ABI-compatible.
+    if (aa == bb)
+      continue;
+
+    // FIXME: If one or both types are dependent, we can't accurately assess
+    // whether they're ABI-compatible without a generic context. We can
+    // do a better job here when dependent types are related to their
+    // generic signatures.
+    if (aa.hasTypeParameter() || bb.hasTypeParameter())
+      continue;
+
+    // Bridgeable object types are interchangeable.
+    if (aa.isBridgeableObjectType() && bb.isBridgeableObjectType())
+      continue;
+
+    // Optional and IUO are interchangeable if their elements are.
+    auto aObject = aa.getAnyOptionalObjectType();
+    auto bObject = bb.getAnyOptionalObjectType();
+    if (aObject && bObject && areABICompatibleParamsOrReturns(aObject, bObject))
+      continue;
+    // Optional objects are ABI-interchangeable with non-optionals;
+    // None is represented by a null pointer.
+    if (aObject && aObject.isBridgeableObjectType() &&
+        bb.isBridgeableObjectType())
+      continue;
+    if (bObject && bObject.isBridgeableObjectType() &&
+        aa.isBridgeableObjectType())
+      continue;
+
+    // Optional thick metatypes are ABI-interchangeable with non-optionals
+    // too.
+    if (aObject)
+      if (auto aObjMeta = aObject.getAs<MetatypeType>())
+        if (auto bMeta = bb.getAs<MetatypeType>())
+          if (aObjMeta->getRepresentation() == bMeta->getRepresentation() &&
+              bMeta->getRepresentation() != MetatypeRepresentation::Thin)
+            continue;
+    if (bObject)
+      if (auto aMeta = aa.getAs<MetatypeType>())
+        if (auto bObjMeta = bObject.getAs<MetatypeType>())
+          if (aMeta->getRepresentation() == bObjMeta->getRepresentation() &&
+              aMeta->getRepresentation() != MetatypeRepresentation::Thin)
+            continue;
+
+    // Function types are interchangeable if they're also ABI-compatible.
+    if (auto aFunc = aa.getAs<SILFunctionType>()) {
+      if (auto bFunc = bb.getAs<SILFunctionType>()) {
+        // *NOTE* We swallow the specific error here for now. We will still get
+        // that the function types are incompatible though, just not more
+        // specific information.
+        return aFunc->isABICompatibleWith(bFunc).isCompatible();
+      }
+    }
+
+    // Metatypes are interchangeable with metatypes with the same
+    // representation.
+    if (auto aMeta = aa.getAs<MetatypeType>()) {
+      if (auto bMeta = bb.getAs<MetatypeType>()) {
+        if (aMeta->getRepresentation() == bMeta->getRepresentation())
+          continue;
+      }
+    }
+    // Other types must match exactly.
+    return false;
+  }
+
+  return true;
+}
+
+namespace {
+using ABICompatibilityCheckResult =
+    SILFunctionType::ABICompatibilityCheckResult;
+} // end anonymous namespace
+
+ABICompatibilityCheckResult
+SILFunctionType::isABICompatibleWith(CanSILFunctionType other) const {
+  // The calling convention and function representation can't be changed.
+  if (getRepresentation() != other->getRepresentation())
+    return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
+
+  // Check the results.
+  if (getNumResults() != other->getNumResults())
+    return ABICompatibilityCheckResult::DifferentNumberOfResults;
+
+  for (unsigned i : indices(getResults())) {
+    auto result1 = getResults()[i];
+    auto result2 = other->getResults()[i];
+
+    if (result1.getConvention() != result2.getConvention())
+      return ABICompatibilityCheckResult::DifferentReturnValueConventions;
+
+    if (!areABICompatibleParamsOrReturns(result1.getSILStorageType(),
+                                         result2.getSILStorageType())) {
+      return ABICompatibilityCheckResult::ABIIncompatibleReturnValues;
+    }
+  }
+
+  // Our error result conventions are designed to be ABI compatible
+  // with functions lacking error results.  Just make sure that the
+  // actual conventions match up.
+  if (hasErrorResult() && other->hasErrorResult()) {
+    auto error1 = getErrorResult();
+    auto error2 = other->getErrorResult();
+    if (error1.getConvention() != error2.getConvention())
+      return ABICompatibilityCheckResult::DifferentErrorResultConventions;
+
+    if (!areABICompatibleParamsOrReturns(error1.getSILStorageType(),
+                                         error2.getSILStorageType()))
+      return ABICompatibilityCheckResult::ABIIncompatibleErrorResults;
+  }
+
+  // Check the parameters.
+  // TODO: Could allow known-empty types to be inserted or removed, but SIL
+  // doesn't know what empty types are yet.
+  if (getParameters().size() != other->getParameters().size())
+    return ABICompatibilityCheckResult::DifferentNumberOfParameters;
+
+  for (unsigned i : indices(getParameters())) {
+    auto param1 = getParameters()[i];
+    auto param2 = other->getParameters()[i];
+
+    if (param1.getConvention() != param2.getConvention())
+      return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
+    if (!areABICompatibleParamsOrReturns(param1.getSILStorageType(),
+                                         param2.getSILStorageType()))
+      return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};
+  }
+
+  return ABICompatibilityCheckResult::None;
+}
+
+StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
+  switch (kind) {
+  case innerty::None:
+    return "None";
+  case innerty::DifferentFunctionRepresentations:
+    return "Different function representations";
+  case innerty::DifferentNumberOfResults:
+    return "Different number of results";
+  case innerty::DifferentReturnValueConventions:
+    return "Different return value conventions";
+  case innerty::ABIIncompatibleReturnValues:
+    return "ABI incompatible return values";
+  case innerty::DifferentErrorResultConventions:
+    return "Different error result conventions";
+  case innerty::ABIIncompatibleErrorResults:
+    return "ABI incompatible error results";
+  case innerty::DifferentNumberOfParameters:
+    return "Different number of parameters";
+
+  // These two have to do with specific parameters, so keep the error message
+  // non-plural.
+  case innerty::DifferingParameterConvention:
+    return "Differing parameter convention";
+  case innerty::ABIIncompatibleParameterType:
+    return "ABI incompatible parameter type.";
+  }
+  llvm_unreachable("Covered switch isn't completely covered?!");
+}
