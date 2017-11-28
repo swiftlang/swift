@@ -45,93 +45,107 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   }
   // If we have one primary input and it's a filename with extension "sil",
   // treat the input as SIL.
-  if (const Optional<StringRef> filename =
-          getOptionalUniquePrimaryInputFilename()) {
-    return llvm::sys::path::extension(filename.getValue())
-        .endswith(SIL_EXTENSION);
+  unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
+  if (silPrimaryCount == 0)
+    return false;
+  if (silPrimaryCount == primaryInputCount())
+    return true;
+  assert(false && "Either all primaries or none must end with .sil");
+}
+
+unsigned
+FrontendInputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
+  unsigned N = 0;
+  for (const auto &iter : PrimaryInputs) {
+    StringRef filename = AllFiles[iter.second].getFile();
+    if (llvm::sys::path::extension(filename).endswith(suffix))
+      ++N;
   }
-  return false;
+  return N;
 }
 
 bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
-    if (hasInputFilenames()) {
+    if (hasInputs()) {
       diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
-  } else if (treatAsSIL && hasPrimaryInputs()) {
-    // If we have the SIL as our primary input, we can waive the one file
-    // requirement as long as all the other inputs are SIBs.
-    for (unsigned i = 0, e = inputFilenameCount(); i != e; ++i) {
-      if (i == getOptionalUniquePrimaryInput()->Index)
-        continue;
-
-      StringRef file(getInputFilenames()[i]);
-      if (!llvm::sys::path::extension(file).endswith(SIB_EXTENSION)) {
-        diags.diagnose(SourceLoc(),
-                       diag::error_mode_requires_one_sil_multi_sib);
+  }
+  else if (treatAsSIL) {
+    if (isWholeModule()) {
+      if (inputCount() != 1) {
+        diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
         return true;
       }
     }
-  } else if (treatAsSIL) {
-    if (!hasUniqueInputFilename()) {
-      diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
-      return true;
-    }
-  } else if (!isNoneRequested) {
-    if (!hasInputFilenames()) {
-      diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
+    else {
+      assertMustNotBeMoreThanOnePrimaryInput();
+      // If we have the SIL as our primary input, we can waive the one file
+      // requirement as long as all the other inputs are SIBs.
+      if (ensureThatAllNonPrimariesEndWithSIB())
+        return true;
+     }
+  }
+  else if (!isNoneRequested && !hasInputs()) {
+    diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
+    return true;
+  }
+  return false;
+}
+
+bool FrontendInputs::ensureThatAllNonPrimariesEndWithSIB() const {
+  for (const InputFile &input : getAllFiles()) {
+    assert(!input.getFile().empty() && "all files have (perhaps pseudo) names");
+    if (!input.getIsPrimary())
+      continue;
+    if (!llvm::sys::path::extension(input.getFile()).endswith(SIB_EXTENSION)) {
+      diags.diagnose(SourceLoc(),
+                     diag::error_mode_requires_one_sil_multi_sib);
       return true;
     }
   }
   return false;
 }
 
-void FrontendInputs::transformInputFilenames(
-    const llvm::function_ref<std::string(std::string)> &fn) {
-  for (auto &InputFile : InputFilenames) {
-    InputFile = fn(InputFile);
-  }
-}
-
 bool FrontendOptions::doesActionImplyMainModule(ActionType action) {
   switch (action) {
-  case ActionType::NoneAction:
-  case ActionType::Parse:
-  case ActionType::Typecheck:
-  case ActionType::DumpParse:
-  case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
-  case ActionType::DumpInterfaceHash:
-  case ActionType::PrintAST:
-  case ActionType::DumpScopeMaps:
-  case ActionType::DumpTypeRefinementContexts:
-    return true;
-  case ActionType::EmitPCH:
-  case ActionType::EmitSILGen:
-  case ActionType::EmitSIL:
-  case ActionType::EmitSIBGen:
-  case ActionType::EmitSIB:
-  case ActionType::EmitModuleOnly:
-  case ActionType::MergeModules:
-    return false;
-  case ActionType::Immediate:
-  case ActionType::REPL:
-    return true;
-  case ActionType::EmitAssembly:
-  case ActionType::EmitIR:
-  case ActionType::EmitBC:
-  case ActionType::EmitObject:
-  case ActionType::EmitImportedModules:
-    return false;
+    case ActionType::NoneAction:
+    case ActionType::Parse:
+    case ActionType::Typecheck:
+    case ActionType::DumpParse:
+    case ActionType::DumpAST:
+    case ActionType::EmitSyntax:
+    case ActionType::DumpInterfaceHash:
+    case ActionType::PrintAST:
+    case ActionType::DumpScopeMaps:
+    case ActionType::DumpTypeRefinementContexts:
+      return true;
+    case ActionType::EmitPCH:
+    case ActionType::EmitSILGen:
+    case ActionType::EmitSIL:
+    case ActionType::EmitSIBGen:
+    case ActionType::EmitSIB:
+    case ActionType::EmitModuleOnly:
+    case ActionType::MergeModules:
+      return false;
+    case ActionType::Immediate:
+    case ActionType::REPL:
+      return true;
+    case ActionType::EmitAssembly:
+    case ActionType::EmitIR:
+    case ActionType::EmitBC:
+    case ActionType::EmitObject:
+    case ActionType::EmitImportedModules:
+      return false;
   }
   llvm_unreachable("Unknown ActionType");
 }
 
-bool FrontendOptions::actionIsImmediate() const {
-  switch (RequestedAction) {
+
+bool FrontendOptions::isActionImmediate(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::Typecheck:
@@ -188,7 +202,7 @@ StringRef FrontendOptions::originalPath() const {
     // Put the serialized diagnostics file next to the output file.
     return getSingleOutputFilename();
 
-  StringRef fn = Inputs.primaryInputFilenameIfAny();
+  auto fn = Inputs.getOptionalUniquePrimaryInputFilename();
   // If we have a primary input, so use that as the basis for the name of the
   // serialized diagnostics file, otherwise fall back on the
   // module name.
@@ -406,65 +420,65 @@ bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
-  case ActionType::Parse:
-  case ActionType::Typecheck:
-  case ActionType::DumpParse:
-  case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
-  case ActionType::DumpInterfaceHash:
-  case ActionType::PrintAST:
-  case ActionType::DumpScopeMaps:
-  case ActionType::DumpTypeRefinementContexts:
-  case ActionType::EmitPCH:
-  case ActionType::EmitSILGen:
-  case ActionType::EmitSIL:
-  case ActionType::EmitSIBGen:
-  case ActionType::EmitSIB:
-  case ActionType::EmitModuleOnly:
-  case ActionType::EmitAssembly:
-  case ActionType::EmitIR:
-  case ActionType::EmitBC:
-  case ActionType::EmitObject:
-  case ActionType::EmitImportedModules:
-  case ActionType::MergeModules:
-    return true;
-
-  case ActionType::NoneAction:
-  case ActionType::Immediate:
-  case ActionType::REPL:
-    return false;
+    case ActionType::Parse:
+    case ActionType::Typecheck:
+    case ActionType::DumpParse:
+    case ActionType::DumpAST:
+    case ActionType::EmitSyntax:
+    case ActionType::DumpInterfaceHash:
+    case ActionType::PrintAST:
+    case ActionType::DumpScopeMaps:
+    case ActionType::DumpTypeRefinementContexts:
+    case ActionType::EmitPCH:
+    case ActionType::EmitSILGen:
+    case ActionType::EmitSIL:
+    case ActionType::EmitSIBGen:
+    case ActionType::EmitSIB:
+    case ActionType::EmitModuleOnly:
+    case ActionType::EmitAssembly:
+    case ActionType::EmitIR:
+    case ActionType::EmitBC:
+    case ActionType::EmitObject:
+    case ActionType::EmitImportedModules:
+    case ActionType::MergeModules:
+      return true;
+      
+    case ActionType::NoneAction:
+    case ActionType::Immediate:
+    case ActionType::REPL:
+      return false;
   }
   llvm_unreachable("Unknown ActionType");
 }
-
+    
 bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   switch (action) {
-  case ActionType::NoneAction:
-  case ActionType::EmitPCH:
-  case ActionType::EmitSIBGen:
-  case ActionType::EmitSIB:
-  case ActionType::MergeModules:
-  case ActionType::EmitModuleOnly:
-  case ActionType::EmitBC:
-  case ActionType::EmitObject:
-  case ActionType::Immediate:
-  case ActionType::REPL:
-    return false;
-
-  case ActionType::Parse:
-  case ActionType::Typecheck:
-  case ActionType::DumpParse:
-  case ActionType::DumpInterfaceHash:
-  case ActionType::DumpAST:
-  case ActionType::EmitSyntax:
-  case ActionType::PrintAST:
-  case ActionType::DumpScopeMaps:
-  case ActionType::DumpTypeRefinementContexts:
-  case ActionType::EmitImportedModules:
-  case ActionType::EmitSILGen:
-  case ActionType::EmitSIL:
-  case ActionType::EmitAssembly:
-  case ActionType::EmitIR:
-    return true;
+    case ActionType::NoneAction:
+    case ActionType::EmitPCH:
+    case ActionType::EmitSIBGen:
+    case ActionType::EmitSIB:
+    case ActionType::MergeModules:
+    case ActionType::EmitModuleOnly:
+    case ActionType::EmitBC:
+    case ActionType::EmitObject:
+    case ActionType::Immediate:
+    case ActionType::REPL:
+      return false;
+      
+    case ActionType::Parse:
+    case ActionType::Typecheck:
+    case ActionType::DumpParse:
+    case ActionType::DumpInterfaceHash:
+    case ActionType::DumpAST:
+    case ActionType::EmitSyntax:
+    case ActionType::PrintAST:
+    case ActionType::DumpScopeMaps:
+    case ActionType::DumpTypeRefinementContexts:
+    case ActionType::EmitImportedModules:
+    case ActionType::EmitSILGen:
+    case ActionType::EmitSIL:
+    case ActionType::EmitAssembly:
+    case ActionType::EmitIR:
+      return true;
   }
 }

@@ -66,16 +66,16 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   // the error.  However, pass though all other errors.
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-  llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
-  if (!ModuleDocOrErr &&
-      ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
-    return ModuleDocOrErr.getError();
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> moduleDocOrErr =
+      llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+  if (!moduleDocOrErr &&
+      moduleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
+    return moduleDocOrErr.getError();
   }
 
   *ModuleBuffer = std::move(ModuleOrErr.get());
-  if (ModuleDocOrErr)
-    *ModuleDocBuffer = std::move(ModuleDocOrErr.get());
+  if (moduleDocOrErr)
+    *ModuleDocBuffer = std::move(moduleDocOrErr.get());
 
   return std::error_code();
 }
