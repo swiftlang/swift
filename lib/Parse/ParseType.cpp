@@ -20,8 +20,10 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -390,6 +392,9 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
                                          bool IsSILFuncDecl) {
+  // Start a context for creating type syntax.
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
   // Parse attributes.
   VarDecl::Specifier specifier;
   SourceLoc specifierLoc;
@@ -481,21 +486,33 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                                    SourceLoc &LAngleLoc,
                                    SourceLoc &RAngleLoc) {
+  SyntaxParsingContext GenericArgumentsContext(
+      SyntaxContext, SyntaxKind::GenericArgumentClause);
+
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   LAngleLoc = consumeStartingLess();
 
-  do {
-    ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
-    if (Ty.isNull() || Ty.hasCodeCompletion()) {
-      // Skip until we hit the '>'.
-      RAngleLoc = skipUntilGreaterInTypeList();
-      return true;
-    }
+  {
+    SyntaxParsingContext ListContext(SyntaxContext,
+        SyntaxKind::GenericArgumentList);
 
-    Args.push_back(Ty.get());
-    // Parse the comma, if the list continues.
-  } while (consumeIf(tok::comma));
+    while (true) {
+      SyntaxParsingContext ElementContext(SyntaxContext,
+                                          SyntaxKind::GenericArgument);
+      ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
+      if (Ty.isNull() || Ty.hasCodeCompletion()) {
+        // Skip until we hit the '>'.
+        RAngleLoc = skipUntilGreaterInTypeList();
+        return true;
+      }
+
+      Args.push_back(Ty.get());
+      // Parse the comma, if the list continues.
+      if (!consumeIf(tok::comma))
+        break;
+    }
+  }
 
   if (!startsWithGreater(Tok)) {
     checkForInputIncomplete();
@@ -518,10 +535,16 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
 ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
+
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
-      return parseAnyType();
+      auto SynResult = parseAnyType();
+      if (SynResult.hasSyntax())
+        SyntaxContext->addSyntax(SynResult.getSyntax());
+      return makeParserResult(SynResult.getAST());
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeTypeSimpleBeginning();
@@ -542,6 +565,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 
   ParserStatus Status;
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
+  llvm::Optional<TypeSyntax> SyntaxNode;
   SourceLoc EndLoc;
   while (true) {
     SourceLoc Loc;
@@ -573,6 +597,26 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       else
         CompT = new (Context) SimpleIdentTypeRepr(Loc, Name);
       ComponentsR.push_back(CompT);
+
+      if (SyntaxContext->isEnabled()) {
+        if (SyntaxNode) {
+          MemberTypeIdentifierSyntaxBuilder Builder;
+          Builder.useBaseType(*SyntaxNode);
+          if (auto Args =
+                  SyntaxContext->popIf<GenericArgumentClauseSyntax>())
+            Builder.useGenericArgumentClause(*Args);
+          Builder.useName(SyntaxContext->popToken());
+          Builder.usePeriod(SyntaxContext->popToken());
+          SyntaxNode.emplace(Builder.build());
+        } else {
+          SimpleTypeIdentifierSyntaxBuilder Builder;
+          if (auto Args =
+                  SyntaxContext->popIf<GenericArgumentClauseSyntax>())
+            Builder.useGenericArgumentClause(*Args);
+          Builder.useName(SyntaxContext->popToken());
+          SyntaxNode.emplace(Builder.build());
+        }
+      }
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
@@ -605,6 +649,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
+  if (SyntaxContext->isEnabled() && SyntaxNode.hasValue())
+    SyntaxContext->addSyntax(*SyntaxNode);
 
   if (Status.hasCodeCompletion() && CodeCompletion) {
     if (Tok.isNot(tok::code_complete)) {
@@ -674,9 +720,18 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
 }
 
-ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
-  return makeParserResult(CompositionTypeRepr
-    ::createEmptyComposition(Context, consumeToken(tok::kw_Any)));
+SyntaxParserResult<TypeSyntax, CompositionTypeRepr>
+Parser::parseAnyType() {
+  auto Loc = consumeToken(tok::kw_Any);
+  auto TyR = CompositionTypeRepr::createEmptyComposition(Context, Loc);
+  llvm::Optional<TypeSyntax> SyntaxNode;
+
+  if (SyntaxContext->isEnabled()) {
+    auto builder = SimpleTypeIdentifierSyntaxBuilder();
+    builder.useName(SyntaxContext->popToken());
+    SyntaxNode.emplace(builder.build());
+  }
+  return makeSyntaxResult(SyntaxNode, TyR);
 }
 
 /// parseOldStyleProtocolComposition
@@ -689,6 +744,10 @@ ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
 ///     type-composition-list-deprecated ',' type-identifier
 ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
+
+  // Start a context for creating type syntax.
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
 
   SourceLoc ProtocolLoc = consumeToken();
   SourceLoc LAngleLoc = consumeStartingLess();

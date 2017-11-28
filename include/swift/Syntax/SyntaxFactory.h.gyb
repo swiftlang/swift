@@ -116,20 +116,20 @@ struct SyntaxFactory {
 
   /// Creates a TypeIdentifierSyntax with the provided name and leading/trailing
   /// trivia.
-  static TypeIdentifierSyntax makeTypeIdentifier(OwnedString TypeName,
+  static TypeSyntax makeTypeIdentifier(OwnedString TypeName,
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
 
   /// Creates a GenericParameterSyntax with no inheritance clause and an
   /// optional trailing comma.
-  static GenericParameterSyntax makeGenericParameter(TypeIdentifierSyntax Type,
+  static GenericParameterSyntax makeGenericParameter(TokenSyntax Name,
     llvm::Optional<TokenSyntax> TrailingComma);
 
   /// Creates a TypeIdentifierSyntax for the `Any` type.
-  static TypeIdentifierSyntax makeAnyTypeIdentifier(
+  static TypeSyntax makeAnyTypeIdentifier(
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
 
   /// Creates a TypeIdentifierSyntax for the `Self` type.
-  static TypeIdentifierSyntax makeSelfTypeIdentifier(
+  static TypeSyntax makeSelfTypeIdentifier(
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
 
   /// Creates a TokenSyntax for the `Type` identifier.

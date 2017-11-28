@@ -306,23 +306,23 @@ TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
 }
 
 GenericParameterSyntax
-SyntaxFactory::makeGenericParameter(TypeIdentifierSyntax Type,
+SyntaxFactory::makeGenericParameter(TokenSyntax Name,
   llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeGenericParameter(Type, None, None, TrailingComma);
+  return makeGenericParameter(Name, None, None, TrailingComma);
 }
 
-TypeIdentifierSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
+TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   auto identifier = makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia);
-  return makeTypeIdentifier(identifier, None, None, None);
+  return makeSimpleTypeIdentifier(identifier, None);
 }
 
-TypeIdentifierSyntax SyntaxFactory::makeAnyTypeIdentifier(
+TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia);
 }
 
-TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier(
+TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia);
 }

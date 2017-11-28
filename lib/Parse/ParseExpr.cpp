@@ -1559,8 +1559,8 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
     break;
 
   case tok::kw_Any: { // Any
-    ParserResult<TypeRepr> repr = parseAnyType();
-    auto expr = new (Context) TypeExpr(TypeLoc(repr.get()));
+    auto SynResult = parseAnyType();
+    auto expr = new (Context) TypeExpr(TypeLoc(SynResult.getAST()));
     Result = makeParserResult(expr);
     break;
   }

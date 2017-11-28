@@ -200,12 +200,11 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     Builder.useLeftParen(SyntaxFactory::makeLeftParenToken({}, {}));
     auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
     auto IntId = SyntaxFactory::makeIdentifier("Int", {}, {});
-    auto IntType = SyntaxFactory::makeTypeIdentifier(IntId, None, None, None);
+    auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(IntId, None);
     auto Int = SyntaxFactory::makeTupleTypeElement(IntType);
     auto IntWithComma = SyntaxFactory::makeTupleTypeElement(IntType, Comma);
     auto StringId = SyntaxFactory::makeIdentifier("String", {}, {});
-    auto StringType = SyntaxFactory::makeTypeIdentifier(StringId, None,
-                                                        None, None);
+    auto StringType = SyntaxFactory::makeSimpleTypeIdentifier(StringId, None);
     auto String = SyntaxFactory::makeTupleTypeElement(StringType, Comma);
     Builder.addTupleTypeElement(IntWithComma);
     Builder.addTupleTypeElement(String);
