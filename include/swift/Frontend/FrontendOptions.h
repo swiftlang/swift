@@ -84,17 +84,17 @@ public:
 
   // Input filename readers
   ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
-  bool haveInputFilenames() const { return !getInputFilenames().empty(); }
+  bool hasInputFilenames() const { return !getInputFilenames().empty(); }
   unsigned inputFilenameCount() const { return getInputFilenames().size(); }
 
-  bool haveUniqueInputFilename() const { return inputFilenameCount() == 1; }
+  bool hasUniqueInputFilename() const { return inputFilenameCount() == 1; }
   const std::string &getFilenameOfFirstInput() const {
-    assert(haveInputFilenames());
+    assert(hasInputFilenames());
     return getInputFilenames()[0];
   }
 
   bool isReadingFromStdin() const {
-    return haveUniqueInputFilename() && getFilenameOfFirstInput() == "-";
+    return hasUniqueInputFilename() && getFilenameOfFirstInput() == "-";
   }
 
   // If we have exactly one input filename, and its extension is "bc" or "ll",
@@ -123,32 +123,32 @@ public:
 
   // Primary count readers:
 
-  bool haveUniquePrimaryInput() const { return primaryInputCount() == 1; }
+  bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
 
-  bool havePrimaryInputs() const { return primaryInputCount() > 0; }
+  bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
-  bool isWholeModule() const { return !havePrimaryInputs(); }
+  bool isWholeModule() const { return !hasPrimaryInputs(); }
 
   // Count-dependend readers:
 
   Optional<SelectedInput> getOptionalPrimaryInput() const {
-    return havePrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
-                               : Optional<SelectedInput>();
+    return hasPrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
+                              : Optional<SelectedInput>();
   }
 
   SelectedInput getRequiredUniquePrimaryInput() const {
-    assert(haveUniquePrimaryInput());
+    assert(hasUniquePrimaryInput());
     return getPrimaryInputs()[0];
   }
 
   Optional<SelectedInput> getOptionalUniquePrimaryInput() const {
-    return haveUniquePrimaryInput()
+    return hasUniquePrimaryInput()
                ? Optional<SelectedInput>(getPrimaryInputs()[0])
                : Optional<SelectedInput>();
   }
 
-  bool haveAPrimaryInputFile() const {
-    return havePrimaryInputs() && getOptionalPrimaryInput()->isFilename();
+  bool hasAPrimaryInputFile() const {
+    return hasPrimaryInputs() && getOptionalPrimaryInput()->isFilename();
   }
 
   Optional<StringRef> getOptionalUniquePrimaryInputFilename() const {
@@ -158,7 +158,7 @@ public:
                : Optional<StringRef>();
   }
 
-  bool isPrimaryInputAFileAt(unsigned i) const {
+  bool isThereAPrimaryInputWithAFilenameAt(unsigned i) const {
     assertMustNotBeMoreThanOnePrimaryInput();
     if (Optional<SelectedInput> primaryInput = getOptionalPrimaryInput())
       return primaryInput->isFilename() && primaryInput->Index == i;
@@ -166,7 +166,7 @@ public:
   }
 
   Optional<unsigned> primaryInputFileIndex() const {
-    return haveAPrimaryInputFile()
+    return hasAPrimaryInputFile()
                ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
                : None;
   }
@@ -183,7 +183,7 @@ public:
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
-  bool verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+  bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
   // Input filename writers
@@ -274,7 +274,7 @@ public:
     return getSingleOutputFilename() == "-";
   }
   bool isOutputFileDirectory() const;
-  bool haveNamedOutputFile() const {
+  bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
 
@@ -424,10 +424,6 @@ public:
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
 
-  /// Indicates whether function body parsing should be delayed
-  /// until the end of all files.
-  bool DelayedFunctionBodyParsing = false;
-
   /// If true, serialization encodes an extra lookup table for use in module-
   /// merging when emitting partial modules (the per-file modules in a non-WMO
   /// build).
@@ -536,7 +532,7 @@ public:
 
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift &&
-           Inputs.haveUniqueInputFilename();
+           Inputs.hasUniqueInputFilename();
   }
 
 private:
