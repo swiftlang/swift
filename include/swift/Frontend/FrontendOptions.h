@@ -34,11 +34,11 @@ enum class InputFileKind {
   IFK_LLVM_IR
 };
   
-// Inputs may be files, buffers, or buffers substituting for files.
+// Inputs may include buffers that override contents, and eventually should always include a buffer.
 class InputFile {
-  /// Empty if no name
   std::string Filename;
   bool IsPrimary;
+  /// Null if the contents are not overridden.
   llvm::MemoryBuffer *Buffer;
 
 public:
