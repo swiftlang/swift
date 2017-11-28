@@ -202,9 +202,18 @@ foreach(SDK ${SWIFT_SDKS})
       list(APPEND test_dependencies "touch-covering-tests")
     endif()
 
-    set(validation_test_dependencies
+    is_darwin_based_sdk("${SDK}" IS_DARWIN)
+    if (IS_DARWIN)
+      # use lipo targets as dependencies
+      set(validation_test_dependencies
         "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
         "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+    else()
+      # use arch specific targets as dependencies on platforms without fat binaries
+      set(validation_test_dependencies
+        "swiftStdlibCollectionUnittest${VARIANT_SUFFIX}"
+        "swiftStdlibUnicodeUnittest${VARIANT_SUFFIX}")
+    endif()
 
     set(command_upload_stdlib)
     set(command_upload_swift_reflection_test)

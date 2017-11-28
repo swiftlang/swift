@@ -47,10 +47,19 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
-  SearchPathOpts.RuntimeLibraryPath = LibPath.str();
+  if (Triple.isOSDarwin()) {
+    // On Darwin the library search path is where we store fat binaries.
+    SearchPathOpts.RuntimeLibraryPath = LibPath.str();
+  }
 
   llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
+  if (!Triple.isOSDarwin()) {
+    // On platforms without fat binaries, we use the arch specific
+    // directory for searching for binaries. This is the same as the import
+    // path for modules.
+    SearchPathOpts.RuntimeLibraryPath = LibPath.str();
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
