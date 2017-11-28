@@ -680,8 +680,9 @@ RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
-  return B.createTuple(loc,
-               getLoweredType(TupleType::getEmpty(SGM.M.getASTContext())), {});
+  return B.createTuple(
+      loc, getLoweredType(TupleType::getEmpty(SGM.M.getASTContext())),
+      ArrayRef<SILValue>());
 }
 
 /// Emit the specified declaration as an address if possible,
