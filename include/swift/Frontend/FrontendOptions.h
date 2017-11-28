@@ -41,19 +41,12 @@ class InputFile {
   llvm::MemoryBuffer *Buffer;
   bool IsPrimary;
 
-  /// Does not take ownership of \p buffer. Does take ownership of a string.
-  InputFile(StringRef name, llvm::MemoryBuffer *buffer, bool isPrimary)
-      : Filename(name), Buffer(buffer), IsPrimary(isPrimary) {}
-
 public:
-  InputFile(const InputFile &other)
-      : Filename(other.Filename), Buffer(other.Buffer),
-        IsPrimary(other.IsPrimary) {}
-
-  static InputFile create(StringRef Filename, bool isPrimary,
-                          llvm::MemoryBuffer *Buffer = nullptr) {
-    return InputFile(Filename, Buffer, isPrimary);
-  }
+  /// Does not take ownership of \p buffer. Does take ownership of (copy) a
+  /// string.
+  InputFile(StringRef name, bool isPrimary,
+            llvm::MemoryBuffer *buffer = nullptr)
+      : Filename(name), Buffer(buffer), IsPrimary(isPrimary) {}
 
   bool getIsPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *getBuffer() const { return Buffer; }
@@ -61,7 +54,7 @@ public:
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
 
-  InputFile asPrimary() { return InputFile(Filename, Buffer, true); }
+  InputFile asPrimary() { return InputFile(Filename, true, Buffer); }
 };
 
 /// Information about all the inputs to the frontend.
@@ -182,11 +175,11 @@ public:
                     bool isREPLRequested, bool isNoneRequested) const;
 
   void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile::create(file, false, buffer));
+    addInput(InputFile(file, false, buffer));
   }
   void addPrimaryInputFile(StringRef file,
                            llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile::create(file.str(), true, buffer));
+    addInput(InputFile(file.str(), true, buffer));
   }
 
   bool isFilePrimary(StringRef file) {

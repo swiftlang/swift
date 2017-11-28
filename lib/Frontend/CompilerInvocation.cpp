@@ -159,7 +159,7 @@ class ArgsToFrontendInputsConverter {
     if (iterator == IndicesOfFilesAlreadyAdded.end()) {
       IndicesOfFilesAlreadyAdded.insert(
           std::make_pair(file, Inputs.inputCount()));
-      Inputs.addInput(InputFile::create(file, isPrimary));
+      Inputs.addInput(InputFile(file, isPrimary));
     } else if (isPrimary)
       Inputs.bePrimaryAt(iterator->second);
     else {
@@ -1947,7 +1947,7 @@ CompilerInvocation::setUpInputForSILTool(
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
   getFrontendOptions().Inputs.addInput(
-      InputFile::create(inputFilename, bePrimary, fileBufOrErr.get().get()));
+      InputFile(inputFilename, bePrimary, fileBufOrErr.get().get()));
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), &extendedInfo);

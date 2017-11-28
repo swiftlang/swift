@@ -411,7 +411,7 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
     replacementInputs.addInput(
-        InputFile::create(newFilename, newIsPrimary, input.getBuffer()));
+        InputFile(newFilename, newIsPrimary, input.getBuffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {

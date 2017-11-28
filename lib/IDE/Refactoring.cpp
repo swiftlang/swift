@@ -1006,7 +1006,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   CompilerInvocation Invocation{};
 
   Invocation.getFrontendOptions().Inputs.addInput(
-      InputFile::create("<extract>", true, InputBuffer.get()));
+      InputFile("<extract>", true, InputBuffer.get()));
   Invocation.getFrontendOptions().ModuleName = "extract";
 
   auto Instance = llvm::make_unique<swift::CompilerInstance>();
