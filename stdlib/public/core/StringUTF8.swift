@@ -119,6 +119,7 @@ extension String {
       self._legacyOffsets = (Int8(legacyOffsets.0), Int8(legacyOffsets.1))
     }
 
+    public typealias Element = UTF8.CodeUnit
     public typealias Index = String.Index
     public typealias IndexDistance = Int
 

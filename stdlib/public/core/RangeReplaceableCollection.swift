@@ -1,4 +1,4 @@
-//===--- RangeReplaceableCollection.swift.gyb -----------------*- swift -*-===//
+//===--- RangeReplaceableCollection.swift ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -70,11 +70,9 @@ public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 /// `replaceSubrange(_:with:)` with an empty collection for the `newElements` 
 /// parameter. You can override any of the protocol's required methods to 
 /// provide your own custom implementation.
-public protocol RangeReplaceableCollection : Collection
+public protocol RangeReplaceableCollection: Collection
+where SubSequence: RangeReplaceableCollection
 {
-  associatedtype SubSequence : RangeReplaceableCollection
-    = RangeReplaceableSlice<Self>
-
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Creates a new, empty collection.
@@ -366,8 +364,8 @@ public protocol RangeReplaceableCollection : Collection
 
 extension RangeReplaceableCollection {
   @_inlineable
-  public subscript(bounds: Range<Index>) -> RangeReplaceableSlice<Self> {
-    return RangeReplaceableSlice(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice<Self> {
+    return Slice(base: self, bounds: bounds)
   }
 
   /// Creates a new collection containing the specified number of a single,
@@ -654,40 +652,6 @@ extension RangeReplaceableCollection {
   @_inlineable
   public mutating func reserveCapacity(_ n: IndexDistance) {}
 }
-
-// Offer the most specific slice type available for each possible combination of
-// RangeReplaceable * (1 + Bidirectional + RandomAccess) * (1 + Mutable)
-// collections.
-
-% for capability in ['', 'Bidirectional', 'RandomAccess']:
-%   if capability:
-extension RangeReplaceableCollection where
-    Self.SubSequence == RangeReplaceable${capability}Slice<Self> {
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>)
-      -> RangeReplaceable${capability}Slice<Self> {
-    return RangeReplaceable${capability}Slice(base: self, bounds: bounds)
-  }
-}
-%   end
-
-extension RangeReplaceableCollection where
-  Self.SubSequence == MutableRangeReplaceable${capability}Slice<Self>
-{
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>)
-      -> MutableRangeReplaceable${capability}Slice<Self> {
-    get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableRangeReplaceable${capability}Slice(base: self,
-                                                       bounds: bounds)
-    }
-    set {
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
-    }
-  }
-}
-% end
 
 extension RangeReplaceableCollection where SubSequence == Self {
   /// Removes and returns the first element of the collection.

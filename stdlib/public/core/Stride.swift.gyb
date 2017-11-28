@@ -316,7 +316,7 @@ where ${Where} {
 
   // RandomAccessCollection conformance
   public typealias Index = Int
-  public typealias SubSequence = RandomAccessSlice<${Self}>
+  public typealias SubSequence = Slice<${Self}>
   public typealias Indices = CountableRange<Int>
 
   public var startIndex: Index { return 0 }
@@ -338,9 +338,9 @@ where ${Where} {
     return _indexToElement(position)
   }
 
-  public subscript(bounds: Range<Index>) -> RandomAccessSlice<${Self}> {
+  public subscript(bounds: Range<Index>) -> Slice<${Self}> {
     _failEarlyRangeCheck(bounds, bounds: startIndex ..< endIndex)
-    return RandomAccessSlice(base: self, bounds: bounds)
+    return Slice(base: self, bounds: bounds)
   }
 
   public func index(after i: Index) -> Index {
@@ -549,7 +549,7 @@ where ${Where} {
   // RandomAccessCollection conformance
   public typealias Index = ClosedRangeIndex<Int>
   public typealias IndexDistance = Int
-  public typealias SubSequence = RandomAccessSlice<${Self}>
+  public typealias SubSequence = Slice<${Self}>
 
   @_inlineable
   public var startIndex: Index { return ClosedRangeIndex(0) }
@@ -573,8 +573,8 @@ where ${Where} {
     return _start.advanced(by: offset)
   }
 
-  public subscript(bounds: Range<Index>) -> RandomAccessSlice<${Self}> {
-    return RandomAccessSlice(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice<${Self}> {
+    return Slice(base: self, bounds: bounds)
   }
 
   @_inlineable

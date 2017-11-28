@@ -103,6 +103,8 @@ public class SyntaxCollection<SyntaxElement: Syntax>: Syntax {
 
 /// Conformance for SyntaxCollection to the Collection protocol.
 extension SyntaxCollection: Collection {
+  public typealias Element = SyntaxElement
+
   public var startIndex: Int {
     return data.childCaches.startIndex
   }

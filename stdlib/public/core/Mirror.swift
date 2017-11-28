@@ -564,7 +564,8 @@ internal extension Mirror {
   @_versioned // FIXME(sil-serialize-all)
   internal struct LegacyChildren : RandomAccessCollection {
     internal typealias Indices = CountableRange<Int>
-    
+    internal typealias SubSequence = Slice<LegacyChildren>
+
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal init(_ oldMirror: _Mirror) {
@@ -870,6 +871,7 @@ public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
 /// interoperate with the rest of the standard library.
 extension DictionaryLiteral : RandomAccessCollection {
   public typealias Indices = CountableRange<Int>
+  public typealias SubSequence = Slice<DictionaryLiteral>
   
   /// The position of the first element in a nonempty collection.
   ///

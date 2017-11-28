@@ -166,6 +166,8 @@ extension ${vectype} : ExpressibleByArrayLiteral {
 }
 
 extension ${vectype} : Collection {
+  public typealias Element = ${scalar}
+
   @_transparent
   public var startIndex: Int { return 0 }
 

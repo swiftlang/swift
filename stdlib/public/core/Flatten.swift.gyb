@@ -354,8 +354,8 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
 
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>)
-    -> ${Slice}<${Collection}> {
-    return ${Slice}(base: self, bounds: bounds)
+    -> Slice<${Collection}> {
+    return Slice(base: self, bounds: bounds)
   }
 
   // To return any estimate of the number of elements, we have to start

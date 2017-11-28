@@ -65,15 +65,14 @@ public typealias MutableIndexable = MutableCollection
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection : Collection
+public protocol MutableCollection: Collection
+where SubSequence: MutableCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Index
-
-  associatedtype SubSequence : MutableCollection = MutableSlice<Self>
 
   /// Accesses the element at the specified position.
   ///
@@ -217,10 +216,10 @@ extension MutableCollection {
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
   @_inlineable
-  public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
+  public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableSlice(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
@@ -245,28 +244,4 @@ extension MutableCollection {
   }
 }
 
-extension MutableCollection where Self: BidirectionalCollection {
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> MutableBidirectionalSlice<Self> {
-    get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableBidirectionalSlice(base: self, bounds: bounds)
-    }
-    set {
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
-    }
-  }
-}
 
-extension MutableCollection where Self: RandomAccessCollection {
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Self> {
-    get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableRandomAccessSlice(base: self, bounds: bounds)
-    }
-    set {
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
-    }
-  }
-}

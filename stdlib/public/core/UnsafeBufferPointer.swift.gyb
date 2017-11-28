@@ -251,12 +251,12 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   @_inlineable
   public subscript(bounds: Range<Int>)
-    -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}BufferPointer<Element>>
+    -> Slice<Unsafe${Mutable}BufferPointer<Element>>
   {
     get {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
-      return ${Mutable}RandomAccessSlice(
+      return Slice(
         base: self, bounds: bounds)
     }
 %  if Mutable:
@@ -352,7 +352,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///
   /// - Parameter slice: The buffer slice to rebase.
   @_inlineable
-  public init(rebasing slice: RandomAccessSlice<UnsafeBufferPointer<Element>>) {
+  public init(rebasing slice: Slice<UnsafeBufferPointer<Element>>) {
     self.init(start: slice.base.baseAddress! + slice.startIndex,
       count: slice.count)
   }
@@ -381,7 +381,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   @_inlineable
   public init(
     rebasing slice:
-    MutableRandomAccessSlice<UnsafeMutableBufferPointer<Element>>
+    Slice<UnsafeMutableBufferPointer<Element>>
   ) {
     self.init(start: slice.base.baseAddress! + slice.startIndex,
       count: slice.count)

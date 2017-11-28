@@ -418,7 +418,7 @@ extension Unicode.Scalar {
 }
 
 extension Unicode.Scalar.UTF16View : RandomAccessCollection {
-
+  public typealias SubSequence = Slice<Unicode.Scalar.UTF16View>
   public typealias Indices = CountableRange<Int>
 
   /// The position of the first code unit.

@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension String : StringProtocol, RangeReplaceableCollection {  
+extension String : StringProtocol, RangeReplaceableCollection {
+  public typealias Element = Character
+  
   /// A type that represents the number of steps between two `String.Index`
   /// values, where one value is reachable from the other.
   ///
