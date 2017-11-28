@@ -220,6 +220,14 @@ extension ${Index} : Comparable {
   }
 }
 
+extension ${Index} : Hashable
+  where BaseElements.Index : Hashable, BaseElements.Element.Index : Hashable
+{
+  public var hashValue: Int {
+    return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
+  }
+}
+
 /// A flattened view of a base collection of collections.
 ///
 /// The elements of this view are a concatenation of the elements of

@@ -161,6 +161,17 @@ public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
   }
 }
 
+extension LazyPrefixWhileIndex : Hashable where Base.Index : Hashable {
+  public var hashValue: Int {
+    switch _value {
+    case .index(let value):
+      return value.hashValue
+    case .pastEnd:
+      return .max
+    }
+  }
+}
+
 % for Traversal in ['Forward', 'Bidirectional']:
 %   Collection = collectionForTraversal(Traversal)
 %   Self = "LazyPrefixWhile" + Collection
