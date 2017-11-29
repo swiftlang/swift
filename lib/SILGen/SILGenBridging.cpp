@@ -665,10 +665,11 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // The destination type should be AnyObject in this case.
   assert(bridgedType->isEqual(SGF.getASTContext().getAnyObjectType()));
 
-  // Blocks bridge to id with a cast.
+  // Blocks bridge to id with a cast under ObjCInterop.
   if (auto nativeFnType = dyn_cast<AnyFunctionType>(nativeType)) {
     if (nativeFnType->getRepresentation() ==
-          FunctionTypeRepresentation::Block) {
+          FunctionTypeRepresentation::Block &&
+        SGF.getASTContext().LangOpts.EnableObjCInterop) {
       return SGF.B.createBlockToAnyObject(loc, v, loweredBridgedTy);
     }
   }
