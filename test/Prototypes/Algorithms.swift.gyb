@@ -51,7 +51,7 @@ public protocol MutableCollectionAlgorithms : MutableCollection
 extension Array : MutableCollectionAlgorithms {  }
 extension ArraySlice : MutableCollectionAlgorithms {  }
 
-extension Slice : MutableCollectionAlgorithms {  }
+extension Slice : MutableCollectionAlgorithms where Base: MutableCollection { }
 
 /// In the stdlib, this would simply be MutableCollection
 extension MutableCollectionAlgorithms {
