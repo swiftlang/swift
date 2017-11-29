@@ -281,6 +281,11 @@ def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
 
+def enable_experimental_conditional_conformances : Flag<["-"],
+  "enable-experimental-conditional-conformances">,
+  Flags<[FrontendOption]>,
+HelpText<"Enable experimental implementation of SE-0143: Conditional Conformances">;
+
 def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Enable automatic generation of bridging PCH files">;

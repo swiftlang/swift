@@ -6966,6 +6966,20 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       }
     }
   }
+
+  // If conditional conformances are disabled, complain about any that
+  // occur.
+  if (!Context.LangOpts.EnableConditionalConformances) {
+    for (auto conformance : conformances) {
+      auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+      if (!normal) continue;
+
+      if (normal->getConditionalRequirements().empty()) continue;
+
+      diagnose(normal->getLoc(), diag::experimental_conditional_conformances,
+               normal->getType(), normal->getProtocol()->getDeclaredType());
+    }
+  }
 }
 
 llvm::TinyPtrVector<ValueDecl *>

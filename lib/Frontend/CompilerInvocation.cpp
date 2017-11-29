@@ -987,7 +987,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTargetOSChecking
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
-  
+
+  Opts.EnableConditionalConformances |=
+  Args.hasArg(OPT_enable_experimental_conditional_conformances);
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
