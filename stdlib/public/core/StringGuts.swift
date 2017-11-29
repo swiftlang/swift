@@ -25,6 +25,9 @@ struct _StringGuts {
   public // FIXME for testing only
   var _storage: (_BuiltinBridgeObject, UInt)
 
+  public // Testing
+  var count: Int
+
   @_inlineable
   public
   var _object: _BuiltinBridgeObject {
@@ -50,9 +53,11 @@ struct _StringGuts {
   @_inlineable
   @inline(__always)
   public
-  init(_ object: _BuiltinBridgeObject, _ otherBits: UInt) {
+  init(_ object: _BuiltinBridgeObject, _ otherBits: UInt, _ count: Int) {
     self._storage.0 = object
     self._storage.1 = otherBits
+    self.count = count
+    _invariantCheck()
   }
 }
 
@@ -62,36 +67,28 @@ struct _StringGuts {
 @inline(never)
 @_versioned
 internal
-func _unmanagedContiguousImpl(
+func _getPointer(
   bridgeObjectBits: UInt, otherBits: UInt
-) -> UnsafeString? {
+) -> UnsafeMutableRawPointer? {
   // TODO: This is super ugly and redundant. Organize and tidy up alongside
   // Builtin.swift and _StringGuts local vars.
 
-  let isSingleByte = bridgeObjectBits & _twoByteCodeUnitBit == 0
   let unflaggedBObject = (bridgeObjectBits & ~_twoByteCodeUnitBit)
 
   // is already an unsafe string
   if (unflaggedBObject & _objCTaggedPointerBits != 0) && (unflaggedBObject & _smallBit == 0) {
-    let ptr = UnsafeMutableRawPointer(
-      bitPattern: _bridgeObject(toTagPayload: Builtin.reinterpretCast(unflaggedBObject))
+    return UnsafeMutableRawPointer(
+      bitPattern: _bridgeObject(
+        toTagPayload: Builtin.reinterpretCast(unflaggedBObject))
     )._unsafelyUnwrappedUnchecked
-    let count = Int(bitPattern: otherBits)
-    _sanityCheck(count >= 0)
-    return UnsafeString(
-      baseAddress: ptr, count: count, isSingleByte: isSingleByte)
   }
 
   // is native
   if unflaggedBObject & (_objCTaggedPointerBits | _objectPointerIsObjCBit) == 0 {
-    let ptr = _StringBuffer(_StringBuffer._Storage(
+    return _StringBuffer(_StringBuffer._Storage(
       _nativeObject: _nativeObject(
         fromBridge: Builtin.reinterpretCast(unflaggedBObject)))
     ).start
-    let count = Int(bitPattern: otherBits)
-    _sanityCheck(count >= 0)
-    return UnsafeString(
-      baseAddress: ptr, count: count, isSingleByte: isSingleByte)
   }
 
   // non tagged cocoa
@@ -99,17 +96,9 @@ func _unmanagedContiguousImpl(
     if _slowPath(otherBits == 0) {
       return nil
     }
-    let count = _stdlib_binary_CFStringGetLength(
-      _bridgeObject(toNonTaggedObjC: Builtin.reinterpretCast(unflaggedBObject)))
-    _sanityCheck(count >= 0)
-    let ptr = UnsafeMutableRawPointer(
+    return UnsafeMutableRawPointer(
       bitPattern: otherBits
     )._unsafelyUnwrappedUnchecked
-    return UnsafeString(
-      baseAddress: ptr,
-      count: count,
-      isSingleByte: isSingleByte
-    )
   }
 
   return nil
@@ -173,15 +162,19 @@ extension _StringGuts {
   }
 
   @_versioned
+  @_inlineable
   var isSingleByte: Bool {
-    if _isSmallCocoa {
-      return false
-    }
-    _sanityCheck(_isNative || _isUnsafe || _isNonTaggedCocoa)
-    return (_objectBitPattern & _twoByteCodeUnitBit) == 0
+    @inline(__always)
+    get { return (_objectBitPattern & _twoByteCodeUnitBit) == 0 }
+    // if _isSmallCocoa {
+    //   return false
+    // }
+    // _sanityCheck(_isNative || _isUnsafe || _isNonTaggedCocoa)
+    // return (_objectBitPattern & _twoByteCodeUnitBit) == 0
   }
 
   @_versioned
+  @_inlineable
   var byteWidth: Int {
     return isSingleByte ? 1 : 2
   }
@@ -213,36 +206,42 @@ extension _StringGuts {
     get { return _isTaggedObject(_object) }
   }
 
+  @_versioned
+  @_inlineable
   var _untaggedUnflaggedBitPattern: UInt {
-    _sanityCheck(_isTagged)
-    return _bridgeObject(toTagPayload: _unflaggedObject)
+    @inline(__always)
+    get {
+      _sanityCheck(_isTagged)
+      return _bridgeObject(toTagPayload: _unflaggedObject)
+    }
   }
 
-  @_inlineable
-  public // @testable
-  var _owner: AnyObject? { // For testing only
-    if _isNative {
-      return _bridgeObject(toNative: _object)
-    } else if _isNonTaggedCocoa {
-      return _bridgeObject(toNonTaggedObjC: _object)
-    }
-    return nil
-  }
+  // @_inlineable
+  // public // @testable
+  // var _owner: AnyObject? { // For testing only
+  //   if _isNative {
+  //     return _bridgeObject(toNative: _object)
+  //   } else if _isNonTaggedCocoa {
+  //     return _bridgeObject(toNonTaggedObjC: _object)
+  //   }
+  //   return nil
+  // }
 
   @_inlineable
   @_versioned
   /*private*/ internal init(
     _unflagged object: _BuiltinBridgeObject,
     isSingleByte: Bool,
-    otherBits: UInt
+    otherBits: UInt,
+    count: Int
   ) {
-    self.init(object, otherBits)
+    var objectBits = _bitPattern(object)
+    _sanityCheck(objectBits & _twoByteCodeUnitBit == 0)
     if !isSingleByte {
-      self._objectBitPattern |= _twoByteCodeUnitBit
+      objectBits |= _twoByteCodeUnitBit
     }
-
-    _sanityCheck(_bitPattern(self._unflaggedObject) == _bitPattern(object))
-    _invariantCheck()
+    self.init(Builtin.reinterpretCast(objectBits), otherBits, count)
+    _fixLifetime(object)
   }
 
   /// Create the guts of an empty string.
@@ -260,7 +259,7 @@ extension _StringGuts {
     if let native = self._native {
       _sanityCheck(self.isSingleByte == native.isSingleByte)
       _sanityCheck(self.count == native.count)
-      _sanityCheck(UInt(self.count) == self._otherBits)
+      // _sanityCheck(UInt(self.count) == self._otherBits)
       _sanityCheck(self.capacity == native.capacity)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity >= self.count)
@@ -378,11 +377,13 @@ struct UnsafeString {
   internal var isSingleByte: Bool
 
   @_versioned
+  @_inlineable
   internal var sizeInBytes: Int {
     return count * byteWidth
   }
 
   @_versioned
+  @_inlineable
   internal var byteWidth: Int {
     return isSingleByte ? 1 : 2
   }
@@ -410,22 +411,26 @@ struct UnsafeString {
   }
 
   @_versioned
+  @_inlineable
   var utf16Start: UnsafePointer<UInt16> {
     _sanityCheck(!isSingleByte)
     return baseAddress.assumingMemoryBound(to: UInt16.self)
   }
   @_versioned
+  @_inlineable
   var utf16Buffer: UnsafeBufferPointer<UInt16> {
     _sanityCheck(!isSingleByte)
     return UnsafeBufferPointer(start: utf16Start, count: count)
   }
 
   @_versioned
+  @_inlineable
   var asciiStart: UnsafePointer<UInt8> {
     _sanityCheck(isSingleByte)
     return baseAddress.assumingMemoryBound(to: UInt8.self)
   }
   @_versioned
+  @_inlineable
   var asciiBuffer: UnsafeBufferPointer<UInt8> {
     _sanityCheck(isSingleByte)
     return UnsafeBufferPointer(start: asciiStart, count: count)
@@ -922,8 +927,12 @@ extension OpaqueCocoaString : RandomAccessCollection {
 //
 // Masks
 //
-/*fileprivate*/ internal var _smallStringMask: UInt {
-  return _tagBit | _smallBit
+/*fileprivate*/
+@_versioned
+@_inlineable
+internal var _smallStringMask: UInt {
+  // ALT NOTE: using the twoByte bit for all representations
+  return _tagBit | _smallBit | _twoByteCodeUnitBit
 }
 
 extension _StringGuts {
@@ -941,11 +950,12 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _asNative: NativeString {
     _sanityCheck(_isNative)
-    let count = Int(bitPattern: _otherBits)
+    // _sanityCheck(Int(bitPattern: self._otherBits) == self.count)
+    // let count = Int(bitPattern: _otherBits)
     _sanityCheck(count >= 0)
     return NativeString(
       nativeObject: _nativeObject(fromBridge: _object),
-      count: count)
+      count: self.count)
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
@@ -958,10 +968,12 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NativeString) {
     s._invariantCheck()
+    _sanityCheck(s.count >= 0)
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: s.nativeObject),
       isSingleByte: s.isSingleByte,
-      otherBits: UInt(bitPattern: s.count))
+      otherBits: 0, //UInt(bitPattern: s.count),
+      count: s.count)
   }
 
   @_versioned
@@ -971,7 +983,8 @@ extension _StringGuts {
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: buffer._nativeObject),
       isSingleByte: buffer.elementWidth == 1,
-      otherBits: UInt(bitPattern: count))
+      otherBits: 0, // UInt(bitPattern: count),
+      count: count)
   }
 
   //
@@ -1000,7 +1013,9 @@ extension _StringGuts {
     self.init(
       _unflagged: _bridgeObject(fromNonTaggedObjC: s.owner),
       isSingleByte: s.isSingleByte,
-      otherBits: UInt(bitPattern: s.start))
+      otherBits: UInt(bitPattern: s.start),
+      count: _stdlib_binary_CFStringGetLength(
+        Builtin.reinterpretCast(s.owner)))
   }
 
   //
@@ -1027,11 +1042,12 @@ extension _StringGuts {
     let pointer = UnsafeMutableRawPointer(
       bitPattern: self._untaggedUnflaggedBitPattern
     )._unsafelyUnwrappedUnchecked
-    let count = Int(bitPattern: self._otherBits)
-    _sanityCheck(count >= 0)
+    // let count = Int(bitPattern: self._otherBits)
+    // _sanityCheck(count >= 0)
+    // _sanityCheck(count == self.count)
     return UnsafeString(
       baseAddress: pointer,
-      count: count,
+      count: self.count,
       isSingleByte: self.isSingleByte)
   }
 
@@ -1040,10 +1056,12 @@ extension _StringGuts {
   init(_ s: UnsafeString) {
     // Tag it, flag it, and go
     let object = _bridgeObject(taggingPayload: UInt(bitPattern: s.baseAddress))
+    _sanityCheck(s.count >= 0)
     self.init(
       _unflagged: object,
       isSingleByte: s.isSingleByte,
-      otherBits: UInt(s.count))
+      otherBits: 0, //UInt(bitPattern: s.count),
+      count: s.count)
   }
 
   @inline(__always)
@@ -1053,7 +1071,9 @@ extension _StringGuts {
     _sanityCheck(codeUnitCount >= 0)
     self.init(
       _bridgeObject(taggingPayload: UInt(bitPattern: ptr)),
-      UInt(bitPattern: codeUnitCount))
+      UInt(bitPattern: codeUnitCount),
+      codeUnitCount)
+    _invariantCheck()
   }
 
   //
@@ -1076,7 +1096,11 @@ extension _StringGuts {
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: SmallCocoaString) {
-    self.init(_bridgeObject(fromTagged: _smallStringMask), s.taggedPointer)
+    self.init(
+      _bridgeObject(fromTagged: _smallStringMask),
+      s.taggedPointer,
+      _stdlib_binary_CFStringGetLength(
+        Builtin.reinterpretCast(s.taggedPointer)))
   }
 
   //
@@ -1407,8 +1431,8 @@ extension _StringGuts {
     var nativeBuffer = self._asNative.stringBuffer
     let otherByteCount = otherCount &<< nativeBuffer.elementShift
     nativeBuffer.usedEnd += otherByteCount
-    self._otherBits += UInt(bitPattern: otherCount)
 
+    self.count += otherCount
     _sanityCheck(
       capBegin + otherByteCount == self._asNative.stringBuffer.usedEnd
       && capEnd == self._asNative.stringBuffer.capacityEnd)
@@ -1449,11 +1473,11 @@ extension _StringGuts {
     let ptr = _StringBuffer(_StringBuffer._Storage(
       _nativeObject: _nativeObject(fromBridge: _object))
     ).start
-    let count = Int(bitPattern: self._otherBits)
+    // let count = Int(bitPattern: self._otherBits)
     _sanityCheck(count >= 0)
     return UnsafeString(
       baseAddress: ptr,
-      count: count,
+      count: self.count,
       isSingleByte: self.isSingleByte
     )
   }
@@ -1482,10 +1506,17 @@ extension _StringGuts {
   var _unmanagedContiguous: UnsafeString? {
     @inline(__always)
     get {
-      let unsafe = _unmanagedContiguousImpl(
+      let ptr = _getPointer(
         bridgeObjectBits: Builtin.reinterpretCast(self._storage.0),
-        otherBits: self._storage.1)
-      return unsafe
+        otherBits: self._otherBits)
+      if _slowPath(ptr == nil) {
+        return nil
+      }
+      return UnsafeString(
+        baseAddress: ptr._unsafelyUnwrappedUnchecked,
+        count: self.count,
+        isSingleByte: self.isSingleByte
+      )
     }
 
     // if _isUnsafe {
@@ -1556,22 +1587,19 @@ extension _StringGuts {
   internal
   var endIndex: Int { return count }
 
-  @_versioned
-  @_inlineable
-  internal
-  var count: Int {
-    if _isSmallCocoa {
-      return _stdlib_binary_CFStringGetLength(
-        Builtin.reinterpretCast(self._otherBits))
-    }
-    if _isNonTaggedCocoa {
-      return _stdlib_binary_CFStringGetLength(
-        _bridgeObject(toNonTaggedObjC: _object))
-    }
-
-    _sanityCheck(Int(self._otherBits) >= 0)
-    return Int(bitPattern: self._otherBits)
-  }
+  // var count: Int {
+  //   if _isSmallCocoa {
+  //     return _stdlib_binary_CFStringGetLength(
+  //       Builtin.reinterpretCast(self._otherBits))
+  //   }
+  //   if _isNonTaggedCocoa {
+  //     return _stdlib_binary_CFStringGetLength(
+  //       _bridgeObject(toNonTaggedObjC: _object))
+  //   }
+  //
+  //   _sanityCheck(Int(self._otherBits) >= 0)
+  //   return Int(bitPattern: self._otherBits)
+  // }
 
   @_inlineable
   public // @testable
