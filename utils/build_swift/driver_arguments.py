@@ -241,6 +241,7 @@ def create_argument_parser():
     mutually_exclusive_group = builder.mutually_exclusive_group
 
     # Prepare DSL actions
+    append = builder.actions.append
     store = builder.actions.store
     store_path = builder.actions.store_path
 
@@ -559,34 +560,31 @@ def create_argument_parser():
         action=arguments.action.unavailable)
 
     # -------------------------------------------------------------------------
-    targets_group = parser.add_argument_group(
-        title='Host and cross-compilation targets')
-    targets_group.add_argument(
-        '--host-target',
-        default=StdlibDeploymentTarget.host_target().name,
-        help='The host target. LLVM, Clang, and Swift will be built for this '
-             'target. The built LLVM and Clang will be used to compile Swift '
-             'for the cross-compilation targets.')
-    targets_group.add_argument(
-        '--cross-compile-hosts',
-        action=arguments.action.concat,
-        type=arguments.type.shell_split,
-        default=[],
-        help='A space separated list of targets to cross-compile host Swift '
-             'tools for. Can be used multiple times.')
-    targets_group.add_argument(
-        '--stdlib-deployment-targets',
-        action=arguments.action.concat,
-        type=arguments.type.shell_split,
-        default=None,
-        help='list of targets to compile or cross-compile the Swift standard '
-             'library for. %(default)s by default.')
-    targets_group.add_argument(
-        '--build-stdlib-deployment-targets',
-        type=arguments.type.shell_split,
-        default=['all'],
-        help='A space-separated list that filters which of the configured '
-             'targets to build the Swift standard library for, or "all".')
+    in_group('Host and cross-compilation targets')
+
+    option('--host-target', store,
+           default=StdlibDeploymentTarget.host_target().name,
+           help='The host target. LLVM, Clang, and Swift will be built for '
+                'this target. The built LLVM and Clang will be used to '
+                'compile Swift for the cross-compilation targets.')
+
+    option('--cross-compile-hosts', append,
+           type=argparse.ShellSplitType(),
+           default=[],
+           help='A space separated list of targets to cross-compile host '
+                'Swift tools for. Can be used multiple times.')
+
+    option('--stdlib-deployment-targets', append,
+           type=argparse.ShellSplitType(),
+           default=None,
+           help='list of targets to compile or cross-compile the Swift '
+                'standard library for. %(default)s by default.')
+
+    option('--build-stdlib-deployment-targets', store,
+           type=argparse.ShellSplitType(),
+           default=['all'],
+           help='A space-separated list that filters which of the configured '
+                'targets to build the Swift standard library for, or "all".')
 
     # -------------------------------------------------------------------------
     projects_group = parser.add_argument_group(
