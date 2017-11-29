@@ -60,3 +60,5 @@ typealias A = Any
 typealias B = (Array<Array<Any>>.Element)
 typealias C = [Int]
 typealias D = [Int: String]
+typealias E = Int?.Protocol
+typealias F = [Int]!.Type

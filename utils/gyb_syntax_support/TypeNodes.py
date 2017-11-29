@@ -65,6 +65,20 @@ TYPE_NODES = [
                    ]),
          ]),
 
+    # optional-type -> type '?'
+    Node('OptionalType', kind='Type',
+         children=[
+             Child('WrappedType', kind='Type'),
+             Child('QuestionMark', kind='PostfixQuestionMarkToken'),
+         ]),
+
+    # implicitly-unwrapped-optional-type -> type '!'
+    Node('ImplicitlyUnwrappedOptionalType', kind='Type',
+         children=[
+             Child('WrappedType', kind='Type'),
+             Child('ExclamationMark', kind='ExclamationMarkToken'),
+         ]),
+
     # throwing-specifier -> 'throws' | 'rethrows'
     # function-type -> attribute-list '(' function-type-argument-list ')'
     #   throwing-specifier? '->'? type?
@@ -124,13 +138,6 @@ TYPE_NODES = [
     Node('TupleTypeElementList', kind='SyntaxCollection',
          element='TupleTypeElement'),
 
-    # implicitly-unwrapped-optional-type -> type '!'
-    Node('ImplicitlyUnwrappedOptionalType', kind='Type',
-         children=[
-             Child('ValueType', kind='Type'),
-             Child('ExclamationMark', kind='ExclamationMarkToken'),
-         ]),
-
     # protocol-composition-element -> type-identifier '&'
     Node('ProtocolCompositionElement', kind='Syntax',
          children=[
@@ -174,13 +181,6 @@ TYPE_NODES = [
              Child('TypeAnnotation', kind='TypeAnnotation'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
-         ]),
-
-    # optional-type -> type '?'
-    Node('OptionalType', kind='Type',
-         children=[
-             Child('ValueType', kind='Type'),
-             Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
     # function-type-argument-list -> function-type-argument
