@@ -13,7 +13,7 @@ SymbolicReferenceExprSyntax getCannedSymbolicRef() {
   // First, make a symbolic reference to an 'Array<Int>'
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto IntArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder

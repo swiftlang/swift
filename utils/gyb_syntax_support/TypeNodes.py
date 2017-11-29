@@ -2,6 +2,39 @@ from Child import Child
 from Node import Node  # noqa: I201
 
 TYPE_NODES = [
+    # simple-type-identifier -> identifier generic-argument-clause?
+    Node('SimpleTypeIdentifier', kind='Type',
+         children=[
+             Child('Name', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'CapitalSelfToken',
+                       'AnyToken',
+                   ]),
+             Child('GenericArgumentClause', kind='GenericArgumentClause',
+                   is_optional=True),
+         ]),
+
+    # member-type-identifier -> type '.' identifier generic-argument-clause?
+    Node('MemberTypeIdentifier', kind='Type',
+         children=[
+             Child('BaseType', kind='Type'),
+             Child('Period', kind='Token',
+                   token_choices=[
+                       'PeriodToken',
+                       'PrefixPeriodToken',
+                   ]),
+             Child('Name', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'CapitalSelfToken',
+                       'AnyToken',
+                   ]),
+             Child('GenericArgumentClause', kind='GenericArgumentClause',
+                   is_optional=True),
+         ]),
+
+
     # metatype-type -> type '.' 'Type'
     #                | type '.' 'Protocol
     Node('MetatypeType', kind='Type',
@@ -102,7 +135,7 @@ TYPE_NODES = [
     # protocol-composition-element -> type-identifier '&'
     Node('ProtocolCompositionElement', kind='Syntax',
          children=[
-             Child('ProtocolType', kind='TypeIdentifier'),
+             Child('ProtocolType', kind='Type'),
              Child('Ampersand', kind='AmpersandToken',
                    is_optional=True),
          ]),
@@ -149,19 +182,6 @@ TYPE_NODES = [
          children=[
              Child('ValueType', kind='Type'),
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
-         ]),
-
-    # type-identifier -> identifier generic-argument-clause? '.'?
-    #   type-identifier?
-    Node('TypeIdentifier', kind='Type',
-         children=[
-             Child('TypeName', kind='IdentifierToken'),
-             Child('GenericArgumentClause', kind='GenericArgumentClause',
-                   is_optional=True),
-             Child('Period', kind='PeriodToken',
-                   is_optional=True),
-             Child('TypeIdentifier', kind='TypeIdentifier',
-                   is_optional=True),
          ]),
 
     # function-type-argument-list -> function-type-argument

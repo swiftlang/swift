@@ -20,8 +20,10 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -195,9 +197,13 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
-  case tok::identifier:
-    ty = parseTypeIdentifier();
+  case tok::identifier: {
+    auto Result = parseTypeIdentifier();
+    if (Result.hasSyntax())
+      SyntaxContext->addSyntax(Result.getSyntax());
+    ty = Result.getASTResult();
     break;
+  }
   case tok::l_paren:
     ty = parseTypeTupleBody();
     break;
@@ -381,6 +387,9 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
                                          bool IsSILFuncDecl) {
+  // Start a context for creating type syntax.
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
   // Parse attributes.
   VarDecl::Specifier specifier;
   SourceLoc specifierLoc;
@@ -472,21 +481,33 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                                    SourceLoc &LAngleLoc,
                                    SourceLoc &RAngleLoc) {
+  SyntaxParsingContext GenericArgumentsContext(
+      SyntaxContext, SyntaxKind::GenericArgumentClause);
+
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   LAngleLoc = consumeStartingLess();
 
-  do {
-    ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
-    if (Ty.isNull() || Ty.hasCodeCompletion()) {
-      // Skip until we hit the '>'.
-      RAngleLoc = skipUntilGreaterInTypeList();
-      return true;
-    }
+  {
+    SyntaxParsingContext ListContext(SyntaxContext,
+        SyntaxKind::GenericArgumentList);
 
-    Args.push_back(Ty.get());
-    // Parse the comma, if the list continues.
-  } while (consumeIf(tok::comma));
+    while (true) {
+      SyntaxParsingContext ElementContext(SyntaxContext,
+                                          SyntaxKind::GenericArgument);
+      ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
+      if (Ty.isNull() || Ty.hasCodeCompletion()) {
+        // Skip until we hit the '>'.
+        RAngleLoc = skipUntilGreaterInTypeList();
+        return true;
+      }
+
+      Args.push_back(Ty.get());
+      // Parse the comma, if the list continues.
+      if (!consumeIf(tok::comma))
+        break;
+    }
+  }
 
   if (!startsWithGreater(Tok)) {
     checkForInputIncomplete();
@@ -508,7 +529,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
+SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
@@ -518,7 +539,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
         CodeCompletion->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<IdentTypeRepr>();
+      return makeSyntaxCodeCompletionResult<TypeSyntax, IdentTypeRepr>();
     }
 
     diagnose(Tok, diag::expected_identifier_for_type);
@@ -533,6 +554,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 
   ParserStatus Status;
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
+  llvm::Optional<TypeSyntax> SyntaxNode;
   SourceLoc EndLoc;
   while (true) {
     SourceLoc Loc;
@@ -564,6 +586,26 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       else
         CompT = new (Context) SimpleIdentTypeRepr(Loc, Name);
       ComponentsR.push_back(CompT);
+
+      if (SyntaxContext->isEnabled()) {
+        if (SyntaxNode) {
+          MemberTypeIdentifierSyntaxBuilder Builder;
+          Builder.useBaseType(*SyntaxNode);
+          if (auto Args =
+                  SyntaxContext->popIf<GenericArgumentClauseSyntax>())
+            Builder.useGenericArgumentClause(*Args);
+          Builder.useName(SyntaxContext->popToken());
+          Builder.usePeriod(SyntaxContext->popToken());
+          SyntaxNode.emplace(Builder.build());
+        } else {
+          SimpleTypeIdentifierSyntaxBuilder Builder;
+          if (auto Args =
+                  SyntaxContext->popIf<GenericArgumentClauseSyntax>())
+            Builder.useGenericArgumentClause(*Args);
+          Builder.useName(SyntaxContext->popToken());
+          SyntaxNode.emplace(Builder.build());
+        }
+      }
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
@@ -609,7 +651,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     consumeToken(tok::code_complete);
   }
 
-  return makeParserResult(Status, ITR);
+  return makeSyntaxResult(Status, SyntaxNode, ITR);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeSimpleOrComposition() {
@@ -665,9 +707,18 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
 }
 
-ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
-  return makeParserResult(CompositionTypeRepr
-    ::createEmptyComposition(Context, consumeToken(tok::kw_Any)));
+SyntaxParserResult<TypeSyntax, CompositionTypeRepr>
+Parser::parseAnyType() {
+  auto Loc = consumeToken(tok::kw_Any);
+  auto TyR = CompositionTypeRepr::createEmptyComposition(Context, Loc);
+  llvm::Optional<TypeSyntax> SyntaxNode;
+
+  if (SyntaxContext->isEnabled()) {
+    auto builder = SimpleTypeIdentifierSyntaxBuilder();
+    builder.useName(SyntaxContext->popToken());
+    SyntaxNode.emplace(builder.build());
+  }
+  return makeSyntaxResult(SyntaxNode, TyR);
 }
 
 /// parseOldStyleProtocolComposition
@@ -681,6 +732,10 @@ ParserResult<CompositionTypeRepr> Parser::parseAnyType() {
 ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
 
+  // Start a context for creating type syntax.
+  SyntaxParsingContext TypeParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Type);
+
   SourceLoc ProtocolLoc = consumeToken();
   SourceLoc LAngleLoc = consumeStartingLess();
 
@@ -691,7 +746,10 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
   if (!IsEmpty) {
     do {
       // Parse the type-identifier.
-      ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
+      auto Result = parseTypeIdentifier();
+      if (Result.hasSyntax())
+        SyntaxContext->addSyntax(Result.getSyntax());
+      ParserResult<TypeRepr> Protocol = Result.getASTResult();
       Status |= Protocol;
       if (auto *ident =
             dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
@@ -1073,13 +1131,13 @@ bool Parser::isImplicitlyUnwrappedOptionalToken(const Token &T) const {
 
 SourceLoc Parser::consumeOptionalToken() {
   assert(isOptionalToken(Tok) && "not a '?' token?!");
-  return consumeStartingCharacterOfCurrentToken();
+  return consumeStartingCharacterOfCurrentToken(tok::question_postfix);
 }
 
 SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
   assert(isImplicitlyUnwrappedOptionalToken(Tok) && "not a '!' token?!");
   // If the text of the token is just '!', grab the next token.
-  return consumeStartingCharacterOfCurrentToken();
+  return consumeStartingCharacterOfCurrentToken(tok::exclaim_postfix);
 }
 
 /// Parse a single optional suffix, given that we are looking at the
