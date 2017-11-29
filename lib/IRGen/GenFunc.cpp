@@ -1000,12 +1000,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     auto argConvention = conventions[nextCapturedField++];
     switch (argConvention) {
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Direct_Owned:
       if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed:
-    case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Direct_Guaranteed:
       dependsOnContextLifetime = true;
       if (outType->getCalleeConvention() ==
@@ -1084,7 +1084,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       
       Explosion param;
       switch (fieldConvention) {
-      case ParameterConvention::Indirect_In: {
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Constant: {
         // The +1 argument is passed indirectly, so we need to copy into a
         // temporary.
         needsAllocas = true;
@@ -1101,7 +1102,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         break;
       }
       case ParameterConvention::Indirect_In_Guaranteed:
-      case ParameterConvention::Indirect_In_Constant:
         // The argument is +0, so we can use the address of the param in
         // the context directly.
         param.add(fieldAddr.getAddress());
