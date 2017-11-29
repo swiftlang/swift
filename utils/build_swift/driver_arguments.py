@@ -240,15 +240,9 @@ def create_argument_parser():
     in_group = builder.in_group
     mutually_exclusive_group = builder.mutually_exclusive_group
 
-    append = builder.actions.append
+    # Prepare DSL actions
     store = builder.actions.store
-    store_int = builder.actions.store_int
     store_path = builder.actions.store_path
-    store_true = builder.actions.store_true
-    store_false = builder.actions.store_false
-    toggle_true = builder.actions.toggle_true
-    toggle_false = builder.actions.toggle_false
-    unsupported = builder.actions.unsupported
 
     # -------------------------------------------------------------------------
     # Top-level options
