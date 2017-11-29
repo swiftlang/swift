@@ -723,6 +723,18 @@ ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,
   return cloner.clone(result);
 }
 
+ManagedValue SILGenBuilder::createBlockToAnyObject(SILLocation loc,
+                                                   ManagedValue v,
+                                                   SILType destType) {
+  assert(destType.isAnyObject());
+  assert(v.getType().is<SILFunctionType>());
+  assert(v.getType().castTo<SILFunctionType>()->getRepresentation() ==
+           SILFunctionTypeRepresentation::Block);
+
+  // For now, we don't have a better instruction than this.
+  return createUncheckedRefCast(loc, v, destType);
+}
+
 BranchInst *SILGenBuilder::createBranch(SILLocation loc,
                                         SILBasicBlock *targetBlock,
                                         ArrayRef<ManagedValue> args) {

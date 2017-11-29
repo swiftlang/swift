@@ -1142,3 +1142,4 @@ void install_global_event_handler(_Nullable event_handler handler);
 @end
 
 __nullable id returnNullableId(void);
+void takeNullableId(__nullable id);

@@ -665,6 +665,14 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // The destination type should be AnyObject in this case.
   assert(bridgedType->isEqual(SGF.getASTContext().getAnyObjectType()));
 
+  // Blocks bridge to id with a cast.
+  if (auto nativeFnType = dyn_cast<AnyFunctionType>(nativeType)) {
+    if (nativeFnType->getRepresentation() ==
+          FunctionTypeRepresentation::Block) {
+      return SGF.B.createBlockToAnyObject(loc, v, loweredBridgedTy);
+    }
+  }
+
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
