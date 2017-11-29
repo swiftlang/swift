@@ -1640,7 +1640,8 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
           .createWitnessMethod(
               getOpLocation(Inst->getLoc()),
               newLookupType, conformance,
-              Inst->getMember(), Inst->getType()));
+              Inst->getMember(), Inst->getType(),
+              Inst->isVolatile()));
 }
 
 template<typename ImplClass>

@@ -1985,7 +1985,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ExistentialOperand = getLocalValue(ValID3, ExistentialOperandTy);
     }
     ResultVal = Builder.createWitnessMethod(
-        Loc, Ty, Conformance, DRef, OperandTy);
+        Loc, Ty, Conformance, DRef, OperandTy, Attr);
     break;
   }
   case SILInstructionKind::DynamicMethodBranchInst: {
