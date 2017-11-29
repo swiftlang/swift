@@ -807,6 +807,8 @@ namespace {
 
     bool visitWitnessMethodInst(const WitnessMethodInst *RHS) {
       auto *X = cast<WitnessMethodInst>(LHS);
+      if (X->isVolatile() != RHS->isVolatile())
+        return false;
       if (X->getMember() != RHS->getMember())
         return false;
       if (X->getLookupType() != RHS->getLookupType())

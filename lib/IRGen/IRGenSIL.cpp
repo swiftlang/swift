@@ -5024,6 +5024,13 @@ IRGenSILFunction::visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i) {
 }
 
 void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
+  // For Objective-C classes we need to arrange for a msgSend
+  // to happen when the method is called.
+  if (i->getMember().isForeign) {
+    setLoweredObjCMethod(i, i->getMember());
+    return;
+  }
+
   CanType baseTy = i->getLookupType();
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
