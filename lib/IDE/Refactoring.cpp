@@ -118,8 +118,7 @@ public:
     size_t Index = 0;
     for (const auto &LabelRange : LabelRanges) {
       assert(LabelRange.isValid());
-
-      if (!labelRangeMatches(LabelRange, OldLabels[Index]))
+      if (!labelRangeMatches(LabelRange, RangeType, OldLabels[Index]))
         return true;
       splitAndRenameLabel(LabelRange, RangeType, Index++);
     }
@@ -135,7 +134,9 @@ private:
     case LabelRangeType::CallArg:
       return splitAndRenameCallArg(Range, NameIndex);
     case LabelRangeType::Param:
-      return splitAndRenameParamLabel(Range, NameIndex);
+      return splitAndRenameParamLabel(Range, NameIndex, /*IsCollapsible=*/true);
+    case LabelRangeType::NoncollapsibleParam:
+      return splitAndRenameParamLabel(Range, NameIndex, /*IsCollapsible=*/false);
     case LabelRangeType::Selector:
       return doRenameLabel(
           Range, RefactoringRangeKind::SelectorArgumentLabel, NameIndex);
@@ -144,28 +145,47 @@ private:
     }
   }
 
-  void splitAndRenameParamLabel(CharSourceRange Range, size_t NameIndex) {
+  void splitAndRenameParamLabel(CharSourceRange Range, size_t NameIndex, bool IsCollapsible) {
     // Split parameter range foo([a b]: Int) into decl argument label [a] and
-    // parameter name [b].  If we have only foo([a]: Int), then we add an empty
-    // range for the local name.
+    // parameter name [b] or noncollapsible parameter name [b] if IsCollapsible
+    // is false (as for subscript decls). If we have only foo([a]: Int), then we
+    // add an empty range for the local name, or for the decl argument label if
+    // IsCollapsible is false.
     StringRef Content = Range.str();
     size_t ExternalNameEnd = Content.find_first_of(" \t\n\v\f\r/");
-    ExternalNameEnd =
-        ExternalNameEnd == StringRef::npos ? Content.size() : ExternalNameEnd;
 
-    CharSourceRange Ext{Range.getStart(), unsigned(ExternalNameEnd)};
-    doRenameLabel(Ext, RefactoringRangeKind::DeclArgumentLabel, NameIndex);
+    if (ExternalNameEnd == StringRef::npos) { // foo([a]: Int)
+      if (IsCollapsible) {
+        doRenameLabel(Range, RefactoringRangeKind::DeclArgumentLabel, NameIndex);
+        doRenameLabel(CharSourceRange{Range.getEnd(), 0},
+                      RefactoringRangeKind::ParameterName, NameIndex);
+      } else {
+        doRenameLabel(CharSourceRange{Range.getStart(), 0},
+                      RefactoringRangeKind::DeclArgumentLabel, NameIndex);
+        doRenameLabel(Range, RefactoringRangeKind::NoncollapsibleParameterName,
+                      NameIndex);
+      }
+    } else { // foo([a b]: Int)
+      CharSourceRange Ext{Range.getStart(), unsigned(ExternalNameEnd)};
 
-    size_t LocalNameStart = Content.find_last_of(" \t\n\v\f\r/");
-    LocalNameStart =
-        LocalNameStart == StringRef::npos ? ExternalNameEnd : LocalNameStart;
-    // Note: we consider the leading whitespace part of the parameter name since
-    // when the parameter is removed we want to remove the whitespace too.
-    // FIXME: handle comments foo(a /*...*/b: Int).
-    auto LocalLoc = Range.getStart().getAdvancedLocOrInvalid(LocalNameStart);
-    assert(LocalLoc.isValid());
-    CharSourceRange Local{LocalLoc, unsigned(Content.size() - LocalNameStart)};
-    doRenameLabel(Local, RefactoringRangeKind::ParameterName, NameIndex);
+      // Note: we consider the leading whitespace part of the parameter name
+      // if the parameter is collapsible, since if the parameter is collapsed
+      // into a matching argument label, we want to remove the whitespace too.
+      // FIXME: handle comments foo(a /*...*/b: Int).
+      size_t LocalNameStart = Content.find_last_of(" \t\n\v\f\r/");
+      assert(LocalNameStart != StringRef::npos);
+      if (!IsCollapsible)
+        ++LocalNameStart;
+      auto LocalLoc = Range.getStart().getAdvancedLocOrInvalid(LocalNameStart);
+      CharSourceRange Local{LocalLoc, unsigned(Content.size() - LocalNameStart)};
+
+      doRenameLabel(Ext, RefactoringRangeKind::DeclArgumentLabel, NameIndex);
+      if (IsCollapsible) {
+        doRenameLabel(Local, RefactoringRangeKind::ParameterName, NameIndex);
+      } else {
+        doRenameLabel(Local, RefactoringRangeKind::NoncollapsibleParameterName, NameIndex);
+      }
+    }
   }
 
   void splitAndRenameCallArg(CharSourceRange Range, size_t NameIndex) {
@@ -192,14 +212,24 @@ private:
     doRenameLabel(Rest, RefactoringRangeKind::CallArgumentColon, NameIndex);
   }
 
-  bool labelRangeMatches(CharSourceRange Range, StringRef Expected) {
+  bool labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType, StringRef Expected) {
     if (Range.getByteLength()) {
-      StringRef ExistingLabel = Lexer::getCharSourceRangeFromSourceRange(SM,
-        Range.getStart()).str();
-      if (!Expected.empty())
-        return Expected == ExistingLabel;
-      else
-        return ExistingLabel == "_";
+      CharSourceRange ExistingLabelRange =
+          Lexer::getCharSourceRangeFromSourceRange(SM, Range.getStart());
+      StringRef ExistingLabel = ExistingLabelRange.str();
+
+      switch (RangeType) {
+      case LabelRangeType::NoncollapsibleParam:
+        if (ExistingLabelRange == Range && Expected.empty()) // subscript([x]: Int)
+          return true;
+        LLVM_FALLTHROUGH;
+      case LabelRangeType::CallArg:
+      case LabelRangeType::Param:
+      case LabelRangeType::Selector:
+        return ExistingLabel == (Expected.empty() ? "_" : Expected);
+      case LabelRangeType::None:
+        llvm_unreachable("Unhandled label range type");
+      }
     }
     return Expected.empty();
   }
@@ -238,7 +268,7 @@ private:
       if (NameIndex >= OldNames.size())
         return true;
 
-      while (!labelRangeMatches(Label, OldNames[NameIndex])) {
+      while (!labelRangeMatches(Label, RangeType, OldNames[NameIndex])) {
         if (++NameIndex >= OldNames.size())
           return true;
       };
@@ -279,13 +309,16 @@ public:
 
     assert(Config.Usage != NameUsage::Call || Config.IsFunctionLike);
 
-    bool isKeywordBase = Old.base() == "init" || Old.base() == "subscript";
+    // FIXME: handle escaped keyword names `init`
+    bool IsSubscript = Old.base() == "subscript" && Config.IsFunctionLike;
+    bool IsInit = Old.base() == "init" && Config.IsFunctionLike;
+    bool IsKeywordBase = IsInit || IsSubscript;
 
-    if (!Config.IsFunctionLike || !isKeywordBase) {
+    if (!Config.IsFunctionLike || !IsKeywordBase) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::BaseName))
         return RegionType::Mismatch;
 
-    } else if (isKeywordBase && Config.Usage == NameUsage::Definition) {
+    } else if (IsKeywordBase && Config.Usage == NameUsage::Definition) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::KeywordBaseName))
         return RegionType::Mismatch;
     }
@@ -300,7 +333,7 @@ public:
         HandleLabels = true;
         break;
       case NameUsage::Reference:
-        HandleLabels = Resolved.LabelType == LabelRangeType::Selector;
+        HandleLabels = Resolved.LabelType == LabelRangeType::Selector || IsSubscript;
         break;
       case NameUsage::Unknown:
         HandleLabels = Resolved.LabelType != LabelRangeType::None;
@@ -315,7 +348,7 @@ public:
 
     if (HandleLabels) {
       bool isCallSite = Config.Usage != NameUsage::Definition &&
-                        Config.Usage != NameUsage::Reference &&
+                        (Config.Usage != NameUsage::Reference || IsSubscript) &&
                         Resolved.LabelType == LabelRangeType::CallArg;
 
       if (renameLabels(Resolved.LabelRanges, Resolved.LabelType, isCallSite))
@@ -395,6 +428,17 @@ private:
     return registerText(OldParam);
   }
 
+  StringRef getDeclArgumentLabelReplacement(StringRef OldLabelRange,
+                                            StringRef NewArgLabel) {
+      // OldLabelRange is subscript([]a: Int), foo([a]: Int) or foo([a] b: Int)
+      if (NewArgLabel.empty())
+        return OldLabelRange.empty() ? "" : "_";
+
+      if (OldLabelRange.empty())
+        return registerText((llvm::Twine(NewArgLabel) + " ").str());
+      return registerText(NewArgLabel);
+  }
+
   StringRef getReplacementText(StringRef LabelRange,
                                RefactoringRangeKind RangeKind,
                                StringRef OldLabel, StringRef NewLabel) {
@@ -407,9 +451,12 @@ private:
       return getCallArgCombinedReplacement(LabelRange, NewLabel);
     case RefactoringRangeKind::ParameterName:
       return getParamNameReplacement(LabelRange, OldLabel, NewLabel);
+    case RefactoringRangeKind::NoncollapsibleParameterName:
+      return LabelRange;
     case RefactoringRangeKind::DeclArgumentLabel:
+      return getDeclArgumentLabelReplacement(LabelRange, NewLabel);
     case RefactoringRangeKind::SelectorArgumentLabel:
-      return registerText(NewLabel.empty() ? "_" : NewLabel);
+      return NewLabel.empty() ? "_" : registerText(NewLabel);
     default:
       llvm_unreachable("label range type is none but there are labels");
     }
@@ -2404,6 +2451,8 @@ struct swift::ide::FindRenameRangesAnnotatingConsumer::Implementation {
         return "keywordBase";
       case RefactoringRangeKind::ParameterName:
         return "param";
+      case RefactoringRangeKind::NoncollapsibleParameterName:
+        return "noncollapsibleparam";
       case RefactoringRangeKind::DeclArgumentLabel:
         return "arglabel";
       case RefactoringRangeKind::CallArgumentLabel:

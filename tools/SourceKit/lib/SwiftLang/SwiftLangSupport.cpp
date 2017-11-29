@@ -482,6 +482,8 @@ getUIDForRefactoringRangeKind(ide::RefactoringRangeKind Kind) {
     return KindRenameRangeKeywordBase;
   case ide::RefactoringRangeKind::ParameterName:
     return KindRenameRangeParam;
+  case ide::RefactoringRangeKind::NoncollapsibleParameterName:
+    return KindRenameRangeNoncollapsibleParam;
   case ide::RefactoringRangeKind::DeclArgumentLabel:
     return KindRenameRangeDeclArgLabel;
   case ide::RefactoringRangeKind::CallArgumentLabel:
