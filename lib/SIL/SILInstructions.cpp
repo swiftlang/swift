@@ -1688,8 +1688,7 @@ WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                           ProtocolConformanceRef Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F,
-                          SILOpenedArchetypesState &OpenedArchetypes,
-                          bool Volatile) {
+                          SILOpenedArchetypesState &OpenedArchetypes) {
   assert(cast<ProtocolDecl>(Member.getDecl()->getDeclContext())
          == Conformance.getRequirement());
 
@@ -1704,7 +1703,7 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
 
   declareWitnessTable(Mod, Conformance);
   return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,
-                                          Ty, TypeDependentOperands, Volatile);
+                                          Ty, TypeDependentOperands);
 }
 
 ObjCMethodInst *

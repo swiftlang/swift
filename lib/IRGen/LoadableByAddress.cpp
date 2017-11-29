@@ -1997,7 +1997,6 @@ static void rewriteFunction(StructLoweringState &pass,
     }
     case SILInstructionKind::WitnessMethodInst: {
       auto *WMI = dyn_cast<WitnessMethodInst>(instr);
-      assert(!WMI->isVolatile());
       assert(WMI && "ValueKind is Witness Method but dyn_cast failed");
       newInstr = methodBuilder.createWitnessMethod(
           loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType);
