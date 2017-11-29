@@ -366,11 +366,6 @@ where SubSequence: RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
 extension RangeReplaceableCollection {
-  @_inlineable
-  public subscript(bounds: Range<Index>) -> Slice<Self> {
-    return Slice(base: self, bounds: bounds)
-  }
-
   /// Creates a new collection containing the specified number of a single,
   /// repeated value.
   ///
