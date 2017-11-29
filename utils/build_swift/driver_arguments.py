@@ -622,21 +622,17 @@ def create_argument_parser():
            help='build the Ninja tool')
 
     # -------------------------------------------------------------------------
-    extra_actions_group = parser.add_argument_group(
-        title='Extra actions to perform before or in addition to building')
-    extra_actions_group.add_argument(
-        '-c', '--clean',
-        action='store_true',
-        help='do a clean build')
-    extra_actions_group.add_argument(
-        '--export-compile-commands',
-        action=arguments.action.enable,
-        help='generate compilation databases in addition to building')
-    extra_actions_group.add_argument(
-        '--symbols-package',
-        metavar='PATH',
-        help='if provided, an archive of the symbols directory will be '
-             'generated at this path')
+    in_group('Extra actions to perform before or in addition to building')
+
+    option(['-c', '--clean'], store_true,
+           help='do a clean build')
+
+    option('--export-compile-commands', toggle_true,
+           help='generate compilation databases in addition to building')
+
+    option('--symbols-package', store_path,
+           help='if provided, an archive of the symbols directory will be '
+                'generated at this path')
 
     # -------------------------------------------------------------------------
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
