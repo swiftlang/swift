@@ -847,7 +847,7 @@ sil hidden [transparent] @protocolConstrained : $@convention(thin) <T where T : 
 bb0(%0 : $T):
   debug_value %0 : $T
   strong_retain %0 : $T
-  %3 = witness_method [volatile] $T, #Foo.foo!1.foreign : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  %3 = objc_method %0 : $T, #Foo.foo!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   %4 = apply %3<T>(%0) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   strong_release %0 : $T
   strong_release %0 : $T
@@ -863,7 +863,7 @@ bb0(%0 : $Foo):
   %2 = function_ref @protocolConstrained : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_retain %0 : $Foo
   // CHECK-NOT: apply
-  // CHECK: [[METHOD:%[a-zA-Z0-9]+]] = witness_method [volatile] $Foo, #Foo.foo!1.foreign : {{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  // CHECK: [[METHOD:%[a-zA-Z0-9]+]] = objc_method %0 : $Foo, #Foo.foo!1.foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   // CHECK: apply [[METHOD]]<Foo>(%0) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   %4 = apply %2<Foo>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_release %0 : $Foo
