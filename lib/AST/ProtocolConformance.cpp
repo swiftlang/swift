@@ -1020,8 +1020,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   ASTContext &ctx = getASTContext();
   auto resolver = ctx.getLazyResolver();
-  ConformanceTable = new (ctx) ConformanceLookupTable(ctx, mutableThis,
-                                                      resolver);
+  ConformanceTable = new (ctx) ConformanceLookupTable(ctx, resolver);
   ++NumConformanceLookupTables;
 
   // If this type declaration was not parsed from source code or introduced
