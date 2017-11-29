@@ -21,27 +21,35 @@ import SwiftShims
 @_fixed_layout
 public // FIXME
 struct _StringGuts {
-  // TODO 32-bit: Insert padding between fields
-  public // FIXME for testing only
-  var _storage: (_BuiltinBridgeObject, UInt)
+  // // TODO 32-bit: Insert padding between fields
+  // public // FIXME for testing only
+  // var _storage: (_BuiltinBridgeObject, UInt)
+
+  public // Testing
+  var _otherBits: UInt
 
   public // Testing
   var count: Int
+
+  public // Testing
+  var _owner: _BuiltinBridgeObject
 
   @_inlineable
   public
   var _object: _BuiltinBridgeObject {
     @inline(__always)
-    get { return _storage.0 }
-    set { _storage.0 = newValue }
+    get { return _owner }
+    set { _owner = newValue }
   }
-  @_inlineable
-  public
-  var _otherBits: UInt {
-    @inline(__always)
-    get { return _storage.1 }
-    set { _storage.1 = newValue }
-  }
+
+  // @_inlineable
+  // public
+  // var _otherBits: UInt {
+  //   @inline(__always)
+  //   get { return _storage.1 }
+  //   set { _storage.1 = newValue }
+  // }
+
   @_inlineable
   public
   var _objectBitPattern: UInt {
@@ -53,9 +61,12 @@ struct _StringGuts {
   @_inlineable
   @inline(__always)
   public
-  init(_ object: _BuiltinBridgeObject, _ otherBits: UInt, _ count: Int) {
-    self._storage.0 = object
-    self._storage.1 = otherBits
+  init(
+    object: _BuiltinBridgeObject,
+    otherBits: UInt,
+    count: Int) {
+    self._owner = object
+    self._otherBits = otherBits
     self.count = count
     _invariantCheck()
   }
@@ -240,7 +251,10 @@ extension _StringGuts {
     if !isSingleByte {
       objectBits |= _twoByteCodeUnitBit
     }
-    self.init(Builtin.reinterpretCast(objectBits), otherBits, count)
+    self.init(
+      object: Builtin.reinterpretCast(objectBits),
+      otherBits: otherBits,
+      count: count)
     _fixLifetime(object)
   }
 
@@ -1051,6 +1065,7 @@ extension _StringGuts {
       isSingleByte: self.isSingleByte)
   }
 
+  @inline(__always)
   @_inlineable
   @_versioned
   init(_ s: UnsafeString) {
@@ -1069,11 +1084,10 @@ extension _StringGuts {
   @_versioned
   init(_asciiPointer ptr: UnsafeRawPointer, codeUnitCount: Int) {
     _sanityCheck(codeUnitCount >= 0)
-    self.init(
-      _bridgeObject(taggingPayload: UInt(bitPattern: ptr)),
-      UInt(bitPattern: codeUnitCount),
-      codeUnitCount)
-    _invariantCheck()
+    self.init(UnsafeString(
+      baseAddress: ptr,
+      count: codeUnitCount,
+      isSingleByte: true))
   }
 
   //
@@ -1097,9 +1111,9 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: SmallCocoaString) {
     self.init(
-      _bridgeObject(fromTagged: _smallStringMask),
-      s.taggedPointer,
-      _stdlib_binary_CFStringGetLength(
+      object: _bridgeObject(fromTagged: _smallStringMask),
+      otherBits: s.taggedPointer,
+      count: _stdlib_binary_CFStringGetLength(
         Builtin.reinterpretCast(s.taggedPointer)))
   }
 
@@ -1194,6 +1208,7 @@ extension _StringGuts {
       fatalError("I AM ERROR")
     }
 
+    self._dump()
     fatalError("TODO: unreachable")
   }
 
@@ -1370,7 +1385,7 @@ extension _StringGuts {
     // `_isNative && _isUnique` always evaluates to false in debug builds,
     // because SILGen keeps the self reference in `_isNative` alive for the
     // duration of the expression.
-    return _isUnique(&_storage.0)
+    return _isUnique(&_owner)
   }
 
   // Convert ourselves (if needed) to a native string with the specified storage
@@ -1507,7 +1522,7 @@ extension _StringGuts {
     @inline(__always)
     get {
       let ptr = _getPointer(
-        bridgeObjectBits: Builtin.reinterpretCast(self._storage.0),
+        bridgeObjectBits: Builtin.reinterpretCast(self._owner),
         otherBits: self._otherBits)
       if _slowPath(ptr == nil) {
         return nil
