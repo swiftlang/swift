@@ -179,7 +179,8 @@ private:
   }
 
   void getFilesFromCommandLine() {
-    for (const Arg *A : Args.filtered(options::OPT_INPUT))
+    for (const Arg *A :
+         Args.filtered(options::OPT_INPUT, options::OPT_primary_file))
       addFile(A->getValue());
   }
 
