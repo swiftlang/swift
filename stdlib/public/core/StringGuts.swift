@@ -26,13 +26,16 @@ struct _StringGuts {
   // var _storage: (_BuiltinBridgeObject, UInt)
 
   public // Testing
-  var _otherBits: UInt
+  var pointer: UnsafeMutableRawPointer?
 
   public // Testing
   var count: Int
 
   public // Testing
   var _owner: _BuiltinBridgeObject
+
+  public // Testing
+  var taggedSmallCocoaStringBitPattern: UInt
 
   @_inlineable
   public
@@ -63,57 +66,75 @@ struct _StringGuts {
   public
   init(
     object: _BuiltinBridgeObject,
-    otherBits: UInt,
-    count: Int) {
+    pointer: UnsafeMutableRawPointer?,
+    count: Int,
+    taggedSmallCocoaStringBitPattern: UInt = 0) {
     self._owner = object
-    self._otherBits = otherBits
+    self.pointer = pointer
     self.count = count
+    self.taggedSmallCocoaStringBitPattern = taggedSmallCocoaStringBitPattern
     _invariantCheck()
   }
+
+  // @_inlineable
+  // @inline(__always)
+  // public
+  // init(
+  //   _ object: _BuiltinBridgeObject,
+  //   _ otherBits: UInt,
+  //   _ count: Int,
+  //   _ pointer: UnsafeRawPointer?
+  // ) {
+  //   self.init(
+  //     object,
+  //     otherBits,
+  //     count,
+  //     UnsafeMutableRawPointer(mutating: pointer))
+  // }
 }
 
-//
-// Work around ARC
-//
-@inline(never)
-@_versioned
-internal
-func _getPointer(
-  bridgeObjectBits: UInt, otherBits: UInt
-) -> UnsafeMutableRawPointer? {
-  // TODO: This is super ugly and redundant. Organize and tidy up alongside
-  // Builtin.swift and _StringGuts local vars.
+// //
+// // Work around ARC
+// //
+// @inline(never)
+// @_versioned
+// internal
+// func _getPointer(
+//   bridgeObjectBits: UInt, otherBits: UInt
+// ) -> UnsafeMutableRawPointer? {
+//   // TODO: This is super ugly and redundant. Organize and tidy up alongside
+//   // Builtin.swift and _StringGuts local vars.
 
-  let unflaggedBObject = (bridgeObjectBits & ~_twoByteCodeUnitBit)
+//   let unflaggedBObject = (bridgeObjectBits & ~_twoByteCodeUnitBit)
 
-  // is already an unsafe string
-  if (unflaggedBObject & _objCTaggedPointerBits != 0) && (unflaggedBObject & _smallBit == 0) {
-    return UnsafeMutableRawPointer(
-      bitPattern: _bridgeObject(
-        toTagPayload: Builtin.reinterpretCast(unflaggedBObject))
-    )._unsafelyUnwrappedUnchecked
-  }
+//   // is already an unsafe string
+//   if (unflaggedBObject & _objCTaggedPointerBits != 0) && (unflaggedBObject & _smallBit == 0) {
+//     return UnsafeMutableRawPointer(
+//       bitPattern: _bridgeObject(
+//         toTagPayload: Builtin.reinterpretCast(unflaggedBObject))
+//     )._unsafelyUnwrappedUnchecked
+//   }
 
-  // is native
-  if unflaggedBObject & (_objCTaggedPointerBits | _objectPointerIsObjCBit) == 0 {
-    return _StringBuffer(_StringBuffer._Storage(
-      _nativeObject: _nativeObject(
-        fromBridge: Builtin.reinterpretCast(unflaggedBObject)))
-    ).start
-  }
+//   // is native
+//   if unflaggedBObject & (_objCTaggedPointerBits | _objectPointerIsObjCBit) == 0 {
+//     return _StringBuffer(_StringBuffer._Storage(
+//       _nativeObject: _nativeObject(
+//         fromBridge: Builtin.reinterpretCast(unflaggedBObject)))
+//     ).start
+//   }
 
-  // non tagged cocoa
-  if _isNonTaggedObjCPointer(Builtin.reinterpretCast(unflaggedBObject)) {
-    if _slowPath(otherBits == 0) {
-      return nil
-    }
-    return UnsafeMutableRawPointer(
-      bitPattern: otherBits
-    )._unsafelyUnwrappedUnchecked
-  }
+//   // non tagged cocoa
+//   if _isNonTaggedObjCPointer(Builtin.reinterpretCast(unflaggedBObject)) {
+//     if _slowPath(otherBits == 0) {
+//       return nil
+//     }
+//     return UnsafeMutableRawPointer(
+//       bitPattern: otherBits
+//     )._unsafelyUnwrappedUnchecked
+//   }
 
-  return nil
-}
+//   return nil
+// }
 
 //
 // Discriminators
@@ -243,8 +264,8 @@ extension _StringGuts {
   /*private*/ internal init(
     _unflagged object: _BuiltinBridgeObject,
     isSingleByte: Bool,
-    otherBits: UInt,
-    count: Int
+    count: Int,
+    pointer: UnsafeMutableRawPointer?
   ) {
     var objectBits = _bitPattern(object)
     _sanityCheck(objectBits & _twoByteCodeUnitBit == 0)
@@ -253,7 +274,7 @@ extension _StringGuts {
     }
     self.init(
       object: Builtin.reinterpretCast(objectBits),
-      otherBits: otherBits,
+      pointer: pointer,
       count: count)
     _fixLifetime(object)
   }
@@ -271,6 +292,7 @@ extension _StringGuts {
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     if let native = self._native {
+      _sanityCheck(self.pointer != nil)
       _sanityCheck(self.isSingleByte == native.isSingleByte)
       _sanityCheck(self.count == native.count)
       // _sanityCheck(UInt(self.count) == self._otherBits)
@@ -278,19 +300,23 @@ extension _StringGuts {
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity >= self.count)
     } else if let unsafe = self._unsafeString {
+      _sanityCheck(self.pointer != nil)
       _sanityCheck(self.isSingleByte == unsafe.isSingleByte)
       _sanityCheck(self.count == unsafe.count)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
+      _sanityCheck(self.pointer == Builtin.reinterpretCast(unsafe.baseAddress))
     } else if let cocoa = self._cocoa {
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
       // Single-byte Cocoa strings must be contiguous
       _sanityCheck(!self.isSingleByte || cocoa.start != nil)
+      _sanityCheck(Builtin.reinterpretCast(cocoa.start) == self.pointer)
     } else if let _ = self._smallCocoa {
       _sanityCheck(!self.isSingleByte)
       _sanityCheck(self.count >= 0)
       _sanityCheck(self.capacity == 0)
+      _sanityCheck(self.pointer == nil)
     } else {
       fatalError("Unimplemented string form")
     }
@@ -986,8 +1012,8 @@ extension _StringGuts {
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: s.nativeObject),
       isSingleByte: s.isSingleByte,
-      otherBits: 0, //UInt(bitPattern: s.count),
-      count: s.count)
+      count: s.count,
+      pointer: s.baseAddress)
   }
 
   @_versioned
@@ -997,8 +1023,8 @@ extension _StringGuts {
     self.init(
       _unflagged: _bridgeObject(fromNativeObject: buffer._nativeObject),
       isSingleByte: buffer.elementWidth == 1,
-      otherBits: 0, // UInt(bitPattern: count),
-      count: count)
+      count: count,
+      pointer: buffer.start)
   }
 
   //
@@ -1018,18 +1044,24 @@ extension _StringGuts {
     return NonTaggedCocoaString(
       _bridgeObject(toNonTaggedObjC: _object),
       isSingleByte: self.isSingleByte,
-      start: UnsafeRawPointer(bitPattern: _otherBits))
+      start: pointer)
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: NonTaggedCocoaString) {
     _sanityCheck(!_isObjCTaggedPointer(s.owner))
+    var ptr: UnsafeMutableRawPointer?
+    if let immutPtr = s.start {
+      ptr = UnsafeMutableRawPointer(mutating: immutPtr)
+    } else {
+      ptr = nil
+    }
     self.init(
       _unflagged: _bridgeObject(fromNonTaggedObjC: s.owner),
       isSingleByte: s.isSingleByte,
-      otherBits: UInt(bitPattern: s.start),
       count: _stdlib_binary_CFStringGetLength(
-        Builtin.reinterpretCast(s.owner)))
+        Builtin.reinterpretCast(s.owner)),
+      pointer: ptr)
   }
 
   //
@@ -1052,15 +1084,16 @@ extension _StringGuts {
   internal
   var _asUnsafe: UnsafeString {
     _sanityCheck(_isUnsafe)
+    _sanityCheck(self.pointer != nil)
     // Unflag it, untag it, and go
-    let pointer = UnsafeMutableRawPointer(
-      bitPattern: self._untaggedUnflaggedBitPattern
-    )._unsafelyUnwrappedUnchecked
+    // let pointer = UnsafeMutableRawPointer(
+    //   bitPattern: self._untaggedUnflaggedBitPattern
+    // )._unsafelyUnwrappedUnchecked
     // let count = Int(bitPattern: self._otherBits)
     // _sanityCheck(count >= 0)
     // _sanityCheck(count == self.count)
     return UnsafeString(
-      baseAddress: pointer,
+      baseAddress: self.pointer._unsafelyUnwrappedUnchecked,
       count: self.count,
       isSingleByte: self.isSingleByte)
   }
@@ -1070,13 +1103,13 @@ extension _StringGuts {
   @_versioned
   init(_ s: UnsafeString) {
     // Tag it, flag it, and go
-    let object = _bridgeObject(taggingPayload: UInt(bitPattern: s.baseAddress))
+    let object = _bridgeObject(taggingPayload: 0)
     _sanityCheck(s.count >= 0)
     self.init(
       _unflagged: object,
       isSingleByte: s.isSingleByte,
-      otherBits: 0, //UInt(bitPattern: s.count),
-      count: s.count)
+      count: s.count,
+      pointer: UnsafeMutableRawPointer(mutating: s.baseAddress))
   }
 
   @inline(__always)
@@ -1105,16 +1138,17 @@ extension _StringGuts {
   /*fileprivate*/ internal // TODO: private in Swift 4
   var _smallCocoa: SmallCocoaString? {
     guard _isSmallCocoa else { return nil }
-    return SmallCocoaString(_otherBits)
+    return SmallCocoaString(self.taggedSmallCocoaStringBitPattern)
   }
 
   /*fileprivate*/ internal // TODO: private in Swift 4
   init(_ s: SmallCocoaString) {
     self.init(
       object: _bridgeObject(fromTagged: _smallStringMask),
-      otherBits: s.taggedPointer,
+      pointer: nil,
       count: _stdlib_binary_CFStringGetLength(
-        Builtin.reinterpretCast(s.taggedPointer)))
+        Builtin.reinterpretCast(s.taggedPointer)),
+      taggedSmallCocoaStringBitPattern: s.taggedPointer)
   }
 
   //
@@ -1208,7 +1242,6 @@ extension _StringGuts {
       fatalError("I AM ERROR")
     }
 
-    self._dump()
     fatalError("TODO: unreachable")
   }
 
@@ -1278,7 +1311,7 @@ extension _StringGuts {
     print("<", terminator: "")
     internalDumpHex(_objectBitPattern, newline: false)
     print(" ", terminator: "")
-    internalDumpHex(_otherBits, newline: false)
+    internalDumpHex(self.taggedSmallCocoaStringBitPattern, newline: false)
     if let native = self._native {
       print(" native ", terminator: "")
       internalDumpHex(native.nativeObject, newline: false)
@@ -1501,16 +1534,12 @@ extension _StringGuts {
   @_versioned
   internal
   func produceUnsafeFromCocoa() -> UnsafeString {
-    _sanityCheck(_isNonTaggedCocoa && self._otherBits != 0)
-    let count = _stdlib_binary_CFStringGetLength(
-      _bridgeObject(toNonTaggedObjC: _object))
-    let ptr = UnsafeMutableRawPointer(
-      bitPattern: _otherBits)._unsafelyUnwrappedUnchecked
+    _sanityCheck(_isNonTaggedCocoa && self.pointer != nil)
+    _sanityCheck(self.count >= 0)
     return UnsafeString(
-      baseAddress: ptr,
-      count: count,
-      isSingleByte: self.isSingleByte
-    )
+      baseAddress: self.pointer._unsafelyUnwrappedUnchecked,
+      count: self.count,
+      isSingleByte: self.isSingleByte)
   }
 
   // NOTE: Follow up calls to this with _fixLifetime(self) after the last use of
@@ -1521,14 +1550,15 @@ extension _StringGuts {
   var _unmanagedContiguous: UnsafeString? {
     @inline(__always)
     get {
-      let ptr = _getPointer(
-        bridgeObjectBits: Builtin.reinterpretCast(self._owner),
-        otherBits: self._otherBits)
-      if _slowPath(ptr == nil) {
+      // let ptr = _getPointer(
+      //   bridgeObjectBits: Builtin.reinterpretCast(self._storage.0),
+      //   otherBits: self._otherBits)
+      if _slowPath(self.pointer == nil) {
+        // self._dump()
         return nil
       }
       return UnsafeString(
-        baseAddress: ptr._unsafelyUnwrappedUnchecked,
+        baseAddress: self.pointer._unsafelyUnwrappedUnchecked,
         count: self.count,
         isSingleByte: self.isSingleByte
       )
@@ -2071,8 +2101,9 @@ extension _StringGuts {
   @inline(__always)
   @_inlineable
   public func _bitwiseEqualTo(_ other: _StringGuts) -> Bool {
-    return self._objectBitPattern == other._objectBitPattern
-      && self._otherBits == other._otherBits
+    return self.pointer == other.pointer && self.count == other.count
+    // return self._objectBitPattern == other._objectBitPattern
+    //   && self._otherBits == other._otherBits
   }
 }
 
