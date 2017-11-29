@@ -1,47 +1,37 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 
-import Foundation
+import StdlibUnittest
 
-enum E {
-    case a(String, Character, String)
+struct Large {
+  var a : LifetimeTracked = LifetimeTracked(0)
+  var b : LifetimeTracked = LifetimeTracked(0)
+  var c : LifetimeTracked = LifetimeTracked(0)
+  var d : LifetimeTracked = LifetimeTracked(0)
+  var e : LifetimeTracked = LifetimeTracked(0)
+  var f : LifetimeTracked = LifetimeTracked(0)
 }
 
 func doit( action: () -> ()) {
   action()
 }
 
-func foo(_ s: [String]) {
-    let bar = E.a(s[0], "a", "b")
+func foo(_ s: Large) {
     doit {
-      let _ = bar
+      let _ = s
     }
  }
 
-func getStrings() -> [String] {
-    let c = "f.f".components(separatedBy: ".")
-    return c
+var Tests = TestSuite("ClosureLeak")
+
+
+Tests.test("dontLeak") {
+  do {
+    let s = Large()
+    foo(s)
+  }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
-for _ in 0 ..< 2_000_000 {
-  autoreleasepool {
-    let c = getStrings()
-    foo(c)
-   }
-}
-
-var usage = rusage()
-getrusage(RUSAGE_SELF, &usage)
-
-// CHECK: success
-// CHECK-NOT: failure
-
-// We should not need 50MB for this.
-print(usage.ru_maxrss/(1024*1024))
-if usage.ru_maxrss > 50 * 1024 * 1024 {
-  print("failure - should not need 50MB!")
-} else {
-  print("success")
-}
+runAllTests()
