@@ -213,7 +213,8 @@ TEST(StmtSyntaxTests, ReturnStmtMakeAPIs) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
   auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
+  auto MinusOne = SyntaxFactory::makePrefixOperatorExpr(Minus,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
 
   {
     llvm::SmallString<48> Scratch;
@@ -234,7 +235,8 @@ TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
   auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
+  auto MinusOne = SyntaxFactory::makePrefixOperatorExpr(Minus,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne, None);
 
   ASSERT_EQ(ReturnKW.getRaw(), Return.getReturnKeyword().getRaw());
@@ -247,7 +249,8 @@ TEST(StmtSyntaxTests, ReturnStmtWithAPIs) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
   auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
+  auto MinusOne = SyntaxFactory::makePrefixOperatorExpr(Minus,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
 
   {
     llvm::SmallString<48> Scratch;
