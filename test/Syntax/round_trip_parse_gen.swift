@@ -55,3 +55,6 @@ class C {
     (1 + 1).a.b.foo
   }
 }
+
+typealias A = Any
+typealias B = (Array<Array<Any>>.Element)

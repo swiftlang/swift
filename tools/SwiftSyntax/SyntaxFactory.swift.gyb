@@ -137,30 +137,30 @@ public enum SyntaxFactory {
                                 type: type, comma: comma)
   }
 
-  public static func makeGenericParameter(type: TypeIdentifierSyntax,
+  public static func makeGenericParameter(name: TokenSyntax,
       trailingComma: TokenSyntax) -> GenericParameterSyntax {
-    return makeGenericParameter(typeIdentifier: type, colon: nil,
+    return makeGenericParameter(name: name, colon: nil,
                                 inheritedType: nil,
                                 trailingComma: trailingComma)
   }
 
-  public static func makeTypeIdentifier(_ typeName: String,
+  public static func makeTypeIdentifier(_ name: String,
     leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> TypeIdentifierSyntax {
-    let identifier = makeIdentifier(typeName, leadingTrivia: leadingTrivia, 
+    trailingTrivia: Trivia = []) -> TypeSyntax {
+    let identifier = makeIdentifier(name, leadingTrivia: leadingTrivia, 
                                     trailingTrivia: trailingTrivia)
-    return makeTypeIdentifier(typeName:identifier, genericArgumentClause: nil,
-                              period: nil, typeIdentifier: nil)
+    return makeSimpleTypeIdentifier(name: identifier,
+                                    genericArgumentClause: nil)
   }
 
   public static func makeAnyTypeIdentifier(leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> TypeIdentifierSyntax {
+    trailingTrivia: Trivia = []) -> TypeSyntax {
     return makeTypeIdentifier("Any", leadingTrivia: leadingTrivia, 
                               trailingTrivia: trailingTrivia)
   }
 
   public static func makeSelfTypeIdentifier(leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> TypeIdentifierSyntax {
+    trailingTrivia: Trivia = []) -> TypeSyntax {
     return makeTypeIdentifier("Self", leadingTrivia: leadingTrivia, 
                               trailingTrivia: trailingTrivia)
   }

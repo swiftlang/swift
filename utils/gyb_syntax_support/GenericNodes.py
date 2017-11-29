@@ -16,13 +16,13 @@ GENERIC_NODES = [
     # same-type-requirement -> type-identifier == type
     Node('SameTypeRequirement', kind='Syntax',
          children=[
-             Child('LeftTypeIdentifier', kind='TypeIdentifier'),
+             Child('LeftTypeIdentifier', kind='Type'),
              Child('EqualityToken', kind='Token',
                    token_choices=[
                        'SpacedBinaryOperatorToken',
                        'UnspacedBinaryOperatorToken',
                    ]),
-             Child('RightTypeIdentifier', kind='TypeIdentifier'),
+             Child('RightTypeIdentifier', kind='Type'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
@@ -35,7 +35,7 @@ GENERIC_NODES = [
     #                    | type-name : protocol-composition-type
     Node('GenericParameter', kind='Syntax',
          children=[
-             Child('TypeIdentifier', kind='TypeIdentifier'),
+             Child('Name', kind='IdentifierToken'),
              Child('Colon', kind='ColonToken',
                    is_optional=True),
              Child('InheritedType', kind='Type',
@@ -55,9 +55,9 @@ GENERIC_NODES = [
     # conformance-requirement -> type-identifier : type-identifier
     Node('ConformanceRequirement', kind='Syntax',
          children=[
-             Child('LeftTypeIdentifier', kind='TypeIdentifier'),
+             Child('LeftTypeIdentifier', kind='Type'),
              Child('Colon', kind='ColonToken'),
-             Child('RightTypeIdentifier', kind='TypeIdentifier'),
+             Child('RightTypeIdentifier', kind='Type'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),

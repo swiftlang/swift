@@ -62,7 +62,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
   {
     auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
     auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-    auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+    auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
     auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
     GenericArgumentClauseSyntaxBuilder ArgBuilder;
     ArgBuilder
@@ -92,7 +92,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
 TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder
@@ -129,7 +129,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
 TEST(ExprSyntaxTests, SymbolicReferenceExprWithAPIs) {
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder
