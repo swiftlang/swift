@@ -178,6 +178,22 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
   return lhs.rawValue != rhs.rawValue
 }
 
+/// Types type conform to this protocol have the behavior that member lookup -
+/// accessing `someval.member` will always succeed.  Failures to find normally
+/// declared members of `member` will be turned into subscript references using
+/// the `someval[dynamicMember: member]` member.
+///
+public protocol DynamicMemberLookupProtocol {
+  // Implementations of this protocol must have a subscript(dynamicMember:)
+  // implementation where the keyword type is some type that is
+  // ExpressibleByStringLiteral.  It can be get-only or get/set which defines
+  // the mutability of the resultant dynamic properties.
+
+  // subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
+  //   (dynamicMember name: KeywordType) -> LookupValue { get }
+}
+
+
 /// A type that can be initialized using the nil literal, `nil`.
 ///
 /// `nil` has a specific meaning in Swift---the absence of a value. Only the
