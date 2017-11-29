@@ -2090,8 +2090,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
     
     // Special implicit nominal conversions.
-    if (!type1->is<LValueType>() &&
-        kind >= ConstraintKind::Conversion) {
+    if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
       // Array -> Array.
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
         assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
