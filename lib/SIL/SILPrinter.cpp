@@ -1669,6 +1669,8 @@ public:
     PrintOptions QualifiedSILTypeOptions =
         PrintOptions::printQualifiedSILType();
     QualifiedSILTypeOptions.CurrentModule = WMI->getModule().getSwiftModule();
+    if (WMI->isVolatile())
+      *this << "[volatile] ";
     *this << "$" << WMI->getLookupType() << ", " << WMI->getMember() << " : ";
     WMI->getMember().getDecl()->getInterfaceType().print(
         PrintState.OS, QualifiedSILTypeOptions);

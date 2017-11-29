@@ -665,6 +665,14 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // The destination type should be AnyObject in this case.
   assert(bridgedType->isEqual(SGF.getASTContext().getAnyObjectType()));
 
+  // Blocks bridge to id with a cast.
+  if (auto nativeFnType = dyn_cast<AnyFunctionType>(nativeType)) {
+    if (nativeFnType->getRepresentation() ==
+          FunctionTypeRepresentation::Block) {
+      return SGF.B.createBlockToAnyObject(loc, v, loweredBridgedTy);
+    }
+  }
+
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
@@ -1489,17 +1497,31 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
                              const SILConstantInfo &foreignCI) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");
-  assert(foreign.isForeign);
 
-  // Produce an objc_method when thunking ObjC methods.
-  if (foreignCI.SILFnType->getRepresentation()
+  // Produce a witness_method when thunking ObjC protocol methods.
+  auto dc = foreign.getDecl()->getDeclContext();
+  if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
+    assert(subs.size() == 1);
+    auto thisType = subs[0].getReplacement()->getCanonicalType();
+    assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");
+    SILValue thisArg = args.back().getValue();
+
+    SILValue OpenedExistential;
+    if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
+      OpenedExistential = thisArg;
+    auto conformance = ProtocolConformanceRef(cast<ProtocolDecl>(dc));
+    return SGF.B.createWitnessMethod(loc, thisType, conformance, foreign,
+                                     foreignCI.getSILType(),
+                                     OpenedExistential);
+
+  // Produce a class_method when thunking imported ObjC methods.
+  } else if (foreignCI.SILFnType->getRepresentation()
         == SILFunctionTypeRepresentation::ObjCMethod) {
     SILValue thisArg = args.back().getValue();
 
     return SGF.B.createObjCMethod(loc, thisArg, foreign,
-                                  foreignCI.getSILType());
+                         SILType::getPrimitiveObjectType(foreignCI.SILFnType));
   }
-
   // Otherwise, emit a function_ref.
   return SGF.emitGlobalFunctionRef(loc, foreign);
 }

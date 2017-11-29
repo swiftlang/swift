@@ -302,6 +302,10 @@ public:
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
 
+  /// Convert a @convention(block) value to AnyObject.
+  ManagedValue createBlockToAnyObject(SILLocation loc, ManagedValue block,
+                                      SILType type);
+
   using SILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
   ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);

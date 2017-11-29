@@ -1261,7 +1261,14 @@ static bool isValueToAnyConversion(CanType from, CanType to) {
   }
 
   assert(to->isAny());
-  return !from->isAnyClassReferenceType();
+
+  // Types that we can easily transform into AnyObject:
+  //   - classes and class-bounded archetypes
+  //   - class existentials, even if not pure-@objc
+  //   - @convention(objc) metatypes
+  //   - @convention(block) functions
+  return !from->isAnyClassReferenceType() &&
+         !from->isBridgeableObjectType();
 }
 
 /// Check whether this conversion is Any??? to AnyObject???.  If the result
@@ -1275,7 +1282,7 @@ static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
   }
 
   if (from->isAny()) {
-    assert(to->isAnyObject());
+    assert(to->lookThroughAllAnyOptionalTypes()->isAnyObject());
     return true;
   }
   return false;

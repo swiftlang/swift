@@ -221,8 +221,12 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(subMap)->getCanonicalType();
       auto conformance = subMap.lookupConformance(origSelfType, protocol);
+      SILValue OpenedExistential;
+      if (substSelfType->isOpenedExistential())
+        OpenedExistential = selfArg;
       return SGF.B.createWitnessMethod(loc, substSelfType, *conformance, next,
-                                      constantInfo.getSILType());
+                                      constantInfo.getSILType(),
+                                      OpenedExistential);
     }
   }
 

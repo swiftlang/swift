@@ -418,10 +418,7 @@ public:
     case Kind::IndirectValue:
     case Kind::StandaloneFunction:
     case Kind::EnumElement:
-      return false;
     case Kind::WitnessMethod:
-      if (Constant.isForeign)
-        return true;
       return false;
     case Kind::ClassMethod:
     case Kind::SuperMethod:
@@ -551,17 +548,9 @@ public:
                             ->getRValueInstanceType()
                             ->getCanonicalType();
 
-      SILValue fn;
-
-      if (!constant->isForeign) {
-        fn = SGF.B.createWitnessMethod(
+      SILValue fn = SGF.B.createWitnessMethod(
           Loc, lookupType, ProtocolConformanceRef(proto), *constant,
-          constantInfo.getSILType());
-      } else {
-        fn = SGF.B.createObjCMethod(Loc, borrowedSelf->getValue(),
-                                    *constant, constantInfo.getSILType());
-      }
-
+          constantInfo.getSILType(), constant->isForeign);
       return ManagedValue::forUnmanaged(fn);
     }
     case Kind::DynamicMethod: {
