@@ -121,8 +121,6 @@ EXPR_NODES = [
     # +4e20
     Node('FloatLiteralExpr', kind='Expr',
          children=[
-             Child('Sign', kind='PrefixOperatorToken',
-                   is_optional=True),
              Child('FloatingDigits', kind='FloatingLiteralToken'),
          ]),
 
@@ -203,8 +201,6 @@ EXPR_NODES = [
     # +0x4f
     Node('IntegerLiteralExpr', kind='Expr',
          children=[
-             Child('Sign', kind='PrefixOperatorToken',
-                   is_optional=True),
              Child('Digits', kind='IntegerLiteralToken'),
          ]),
 
@@ -231,5 +227,13 @@ EXPR_NODES = [
              Child("FirstChoice", kind='Expr'),
              Child("ColonMark", kind='ColonToken'),
              Child("SecondChoice", kind='Expr')
+         ]),
+
+    # a.b
+    Node('MemberAccessExpr', kind='Expr',
+         children=[
+             Child("Base", kind='Expr'),
+             Child("Dot", kind='PeriodToken'),
+             Child("Name", kind='Token')
          ]),
 ]

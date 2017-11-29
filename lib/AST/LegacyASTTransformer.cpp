@@ -639,7 +639,7 @@ LegacyASTTransformer::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
   auto Digits = findTokenSyntax(tok::integer_literal, OwnedString(),
                                 SourceMgr, E->getDigitsLoc(),
                                 BufferID, Tokens);
-  return SyntaxFactory::makeIntegerLiteralExpr(Sign, Digits).Root;
+  return SyntaxFactory::makeIntegerLiteralExpr(Digits).Root;
 }
 
 RC<SyntaxData>
