@@ -726,6 +726,7 @@ ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,
 ManagedValue SILGenBuilder::createBlockToAnyObject(SILLocation loc,
                                                    ManagedValue v,
                                                    SILType destType) {
+  assert(SGF.getASTContext().LangOpts.EnableObjCInterop);
   assert(destType.isAnyObject());
   assert(v.getType().is<SILFunctionType>());
   assert(v.getType().castTo<SILFunctionType>()->getRepresentation() ==

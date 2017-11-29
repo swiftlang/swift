@@ -523,8 +523,9 @@ ManagedValue Transform::transform(ManagedValue v,
                                    SGF.getLoweredLoadableType(outputSubstType));
   }
 
-  // - block to AnyObject conversion
-  if (outputSubstType->isAnyObject()) {
+  // - block to AnyObject conversion (under ObjC interop)
+  if (outputSubstType->isAnyObject() &&
+      SGF.getASTContext().LangOpts.EnableObjCInterop) {
     if (auto inputFnType = dyn_cast<AnyFunctionType>(inputSubstType)) {
       if (inputFnType->getRepresentation() == FunctionTypeRepresentation::Block)
         return SGF.B.createBlockToAnyObject(Loc, v, loweredResultTy);
