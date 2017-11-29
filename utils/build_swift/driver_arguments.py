@@ -793,15 +793,12 @@ def create_argument_parser():
 
     option(['-e', '--eclipse'], store('cmake_generator'),
            const='Eclipse CDT4 - Ninja',
-           default=defaults.CMAKE_GENERATOR,
-           help="use CMake's Xcode generator (%(default)s by default)")
+           help="use CMake's Eclipse generator (%(default)s by default)")
     option(['-m', '--make'], store('cmake_generator'),
            const='Unix Makefiles',
-           default=defaults.CMAKE_GENERATOR,
            help="use CMake's Makefile generator (%(default)s by default)")
     option(['-x', '--xcode'], store('cmake_generator'),
            const='Xcode',
-           default=defaults.CMAKE_GENERATOR,
            help="use CMake's Xcode generator (%(default)s by default)")
 
     # -------------------------------------------------------------------------
