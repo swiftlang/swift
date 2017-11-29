@@ -83,7 +83,7 @@ struct InvocationOptions {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
-    assert(this->Invok.getFrontendOptions().Inputs.hasUniquePrimaryInput() &&
+    assert(this->Invok.getFrontendOptions().Inputs.haveUniquePrimaryInput() &&
            "Must have exactly one primary input for code completion, etc.");
   }
 
@@ -355,7 +355,7 @@ static void setModuleName(CompilerInvocation &Invocation) {
 
   StringRef Filename = Invocation.getOutputFilename();
   if (Filename.empty()) {
-    if (!Invocation.getFrontendOptions().Inputs.hasInputFilenames()) {
+    if (!Invocation.getFrontendOptions().Inputs.haveInputFilenames()) {
       Invocation.setModuleName("__main__");
       return;
     }
