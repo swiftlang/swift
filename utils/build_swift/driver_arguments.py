@@ -243,7 +243,9 @@ def create_argument_parser():
     # Prepare DSL actions
     append = builder.actions.append
     store = builder.actions.store
+    store_true = builder.actions.store_true
     store_path = builder.actions.store_path
+    toggle_true = builder.actions.toggle_true
 
     # -------------------------------------------------------------------------
     # Top-level options
@@ -587,57 +589,37 @@ def create_argument_parser():
                 'targets to build the Swift standard library for, or "all".')
 
     # -------------------------------------------------------------------------
-    projects_group = parser.add_argument_group(
-        title='Options to select projects')
-    projects_group.add_argument(
-        '-l', '--lldb',
-        action='store_true',
-        dest='build_lldb',
-        help='build LLDB')
-    projects_group.add_argument(
-        '-b', '--llbuild',
-        action='store_true',
-        dest='build_llbuild',
-        help='build llbuild')
-    projects_group.add_argument(
-        '-p', '--swiftpm',
-        action='store_true',
-        dest='build_swiftpm',
-        help='build swiftpm')
-    projects_group.add_argument(
-        '--xctest',
-        action=arguments.action.enable,
-        dest='build_xctest',
-        help='build xctest')
-    projects_group.add_argument(
-        '--foundation',
-        action=arguments.action.enable,
-        dest='build_foundation',
-        help='build foundation')
-    projects_group.add_argument(
-        '--libdispatch',
-        action=arguments.action.enable,
-        dest='build_libdispatch',
-        help='build libdispatch')
-    projects_group.add_argument(
-        '--libicu',
-        action=arguments.action.enable,
-        dest='build_libicu',
-        help='build libicu')
-    projects_group.add_argument(
-        '--playgroundlogger',
-        action='store_true',
-        dest='build_playgroundlogger',
-        help='build playgroundlogger')
-    projects_group.add_argument(
-        '--playgroundsupport',
-        action='store_true',
-        dest='build_playgroundsupport',
-        help='build PlaygroundSupport')
-    projects_group.add_argument(
-        '--build-ninja',
-        action=arguments.action.enable,
-        help='build the Ninja tool')
+    in_group('Options to select projects')
+
+    option(['-l', '--lldb'], store_true('build_lldb'),
+           help='build LLDB')
+
+    option(['-b', '--llbuild'], store_true('build_llbuild'),
+           help='build llbuild')
+
+    option(['-p', '--swiftpm'], store_true('build_swiftpm'),
+           help='build swiftpm')
+
+    option('--xctest', toggle_true('build_xctest'),
+           help='build xctest')
+
+    option('--foundation', toggle_true('build_foundation'),
+           help='build foundation')
+
+    option('--libdispatch', toggle_true('build_libdispatch'),
+           help='build libdispatch')
+
+    option('--libicu', toggle_true('build_libicu'),
+           help='build libicu')
+
+    option('--playgroundlogger', store_true('build_playgroundlogger'),
+           help='build playgroundlogger')
+
+    option('--playgroundsupport', store_true('build_playgroundsupport'),
+           help='build PlaygroundSupport')
+
+    option('--build-ninja', toggle_true,
+           help='build the Ninja tool')
 
     # -------------------------------------------------------------------------
     extra_actions_group = parser.add_argument_group(
