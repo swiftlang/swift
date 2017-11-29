@@ -10,6 +10,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
+// FIXME: rdar://35747485
+// REQUIRES: optimized_stdlib
+
 import UsingObjCStuff
 
 print("Let's go") // CHECK: Let's go
