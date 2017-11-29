@@ -550,7 +550,7 @@ static bool isVersionIfConfigCondition(Expr *Condition) {
 /// Get the identifier string from an \c Expr if it's an
 /// \c UnresolvedDeclRefExpr, otherwise the empty string.
 static StringRef getDeclRefStr(Expr *E) {
-  if (auto *UDRE = cast<UnresolvedDeclRefExpr>(E)) {
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
     return UDRE->getName().getBaseIdentifier().str();
   }
   return "";
