@@ -415,10 +415,10 @@ public:
   }
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
+  ///
+  /// To compare sugar, check for pointer equality of the underlying TypeBase *
+  /// values, obtained by calling getPointer().
   bool isEqual(Type Other);
-  
-  /// isSpelledLike - Return true if these two types share a sugared spelling.
-  bool isSpelledLike(Type Other);
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -3693,6 +3693,44 @@ public:
   }
 
   bool isNoReturnFunction(); // Defined in SILType.cpp
+
+  class ABICompatibilityCheckResult {
+    friend class SILFunctionType;
+
+    enum innerty {
+      None,
+      DifferentFunctionRepresentations,
+      DifferentNumberOfResults,
+      DifferentReturnValueConventions,
+      ABIIncompatibleReturnValues,
+      DifferentErrorResultConventions,
+      ABIIncompatibleErrorResults,
+      DifferentNumberOfParameters,
+      DifferingParameterConvention,
+      ABIIncompatibleParameterType,
+    } kind;
+    Optional<uintptr_t> payload;
+
+    ABICompatibilityCheckResult(innerty kind) : kind(kind) {}
+    ABICompatibilityCheckResult(innerty kind, uintptr_t payload)
+        : kind(kind), payload(payload) {}
+
+  public:
+    ABICompatibilityCheckResult() = delete;
+
+    bool isCompatible() const { return kind == innerty::None; }
+
+    bool hasPayload() const { return payload.hasValue(); }
+    uintptr_t getPayload() const { return payload.getValue(); }
+    StringRef getMessage() const;
+  };
+
+  /// Returns no-error if this SILFunctionType is ABI compatible with \p
+  /// other. Otherwise, it returns a true error with a message in
+  /// std::error_code. This is only meant to be used in assertions. When
+  /// assertions are disabled, this just returns true.
+  ABICompatibilityCheckResult
+  isABICompatibleWith(CanSILFunctionType other) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       SubstitutionList subs);
