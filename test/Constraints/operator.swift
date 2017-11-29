@@ -176,3 +176,21 @@ func + (lhs: B_28688585, rhs: B_28688585) -> B_28688585 {
 
 let var_28688585 = D_28688585(value: 1)
 _ = var_28688585 + var_28688585 + var_28688585 // Ok
+
+// rdar://problem/35740653 - Fix `LinkedExprAnalyzer` greedy operator linking
+
+struct S_35740653 {
+  var v: Double = 42
+
+  static func value(_ value: Double) -> S_35740653 {
+    return S_35740653(v: value)
+  }
+
+  static func / (lhs: S_35740653, rhs: S_35740653) -> Double {
+     return lhs.v / rhs.v
+  }
+}
+
+func rdar35740653(val: S_35740653) {
+  let _ = 0...Int(val / .value(1.0 / 42.0)) // Ok
+}

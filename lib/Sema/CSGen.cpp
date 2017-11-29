@@ -103,8 +103,7 @@ namespace {
     unsigned haveIntLiteral : 1;
     unsigned haveFloatLiteral : 1;
     unsigned haveStringLiteral : 1;
-    unsigned haveCollectionLiteral : 1;
-    
+
     llvm::SmallSet<TypeBase*, 16> collectedTypes;
 
     llvm::SmallVector<TypeVariableType *, 16> intLiteralTyvars;
@@ -121,12 +120,10 @@ namespace {
       haveIntLiteral = false;
       haveFloatLiteral = false;
       haveStringLiteral = false;
-      haveCollectionLiteral = false;
     }
 
-    bool haveLiteral() { 
-      return haveIntLiteral || haveFloatLiteral || haveStringLiteral ||
-             haveCollectionLiteral;
+    bool hasLiteral() {
+      return haveIntLiteral || haveFloatLiteral || haveStringLiteral;
     }
   };
 
@@ -231,7 +228,6 @@ namespace {
       }
 
       if (isa<CollectionExpr>(expr)) {
-        LTI.haveCollectionLiteral = true;
         return { true, expr };
       }
       
@@ -408,6 +404,11 @@ namespace {
       // argument types, we can directly simplify the associated constraint
       // graph.
       auto simplifyBinOpExprTyVars = [&]() {
+        // Don't attempt to do linking if there are
+        // literals intermingled with other inferred types.
+        if (lti.hasLiteral())
+          return;
+
         for (auto binExp1 : lti.binaryExprs) {
           for (auto binExp2 : lti.binaryExprs) {
             if (binExp1 == binExp2)
