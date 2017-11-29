@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -enable-experimental-conditional-conformances %s -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // Smoke test to see that various conditional conformances correctly execute
 

@@ -140,6 +140,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
                        options::OPT_warn_swift3_objc_inference_complete);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(
+                     arguments,
+                     options::OPT_enable_experimental_conditional_conformances);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
