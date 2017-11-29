@@ -658,57 +658,40 @@ def create_argument_parser():
                     '%(default)s)')
 
     # -------------------------------------------------------------------------
-    build_variant_override_group = parser.add_argument_group(
-        title='Override build variant for a specific project')
-    build_variant_override_group.add_argument(
-        '--debug-llvm',
-        action='store_const',
-        const='Debug',
-        dest='llvm_build_variant',
-        help='build the Debug variant of LLVM')
-    build_variant_override_group.add_argument(
-        '--debug-swift',
-        action='store_const',
-        const='Debug',
-        dest='swift_build_variant',
-        help='build the Debug variant of Swift host tools')
-    build_variant_override_group.add_argument(
-        '--debug-swift-stdlib',
-        action='store_const',
-        const='Debug',
-        dest='swift_stdlib_build_variant',
-        help='build the Debug variant of the Swift standard library and SDK '
-             'overlay')
-    build_variant_override_group.add_argument(
-        '--debug-lldb',
-        action='store_const',
-        const='Debug',
-        dest='lldb_build_variant',
-        help='build the Debug variant of LLDB')
-    build_variant_override_group.add_argument(
-        '--debug-cmark',
-        action='store_const',
-        const='Debug',
-        dest='cmark_build_variant',
-        help='build the Debug variant of CommonMark')
-    build_variant_override_group.add_argument(
-        '--debug-foundation',
-        action='store_const',
-        const='Debug',
-        dest='foundation_build_variant',
-        help='build the Debug variant of Foundation')
-    build_variant_override_group.add_argument(
-        '--debug-libdispatch',
-        action='store_const',
-        const='Debug',
-        dest='libdispatch_build_variant',
-        help='build the Debug variant of libdispatch')
-    build_variant_override_group.add_argument(
-        '--debug-libicu',
-        action='store_const',
-        const='Debug',
-        dest='libicu_build_variant',
-        help='build the Debug variant of libicu')
+    in_group('Override build variant for a specific project')
+
+    option('--debug-llvm', store('llvm_build_variant'),
+           const='Debug',
+           help='build the Debug variant of LLVM')
+
+    option('--debug-swift', store('swift_build_variant'),
+           const='Debug',
+           help='build the Debug variant of Swift host tools')
+
+    option('--debug-swift-stdlib', store('swift_stdlib_build_variant'),
+           const='Debug',
+           help='build the Debug variant of the Swift standard library and '
+                ' SDK overlay')
+
+    option('--debug-lldb', store('lldb_build_variant'),
+           const='Debug',
+           help='build the Debug variant of LLDB')
+
+    option('--debug-cmark', store('cmark_build_variant'),
+           const='Debug',
+           help='build the Debug variant of CommonMark')
+
+    option('--debug-foundation', store('foundation_build_variant'),
+           const='Debug',
+           help='build the Debug variant of Foundation')
+
+    option('--debug-libdispatch', store('libdispatch_build_variant'),
+           const='Debug',
+           help='build the Debug variant of libdispatch')
+
+    option('--debug-libicu', store('libicu_build_variant'),
+           const='Debug',
+           help='build the Debug variant of libicu')
 
     # -------------------------------------------------------------------------
     # Assertions group
