@@ -2,6 +2,7 @@
 // RUN: echo "public struct X {}; public var x = X()" | %target-swift-frontend -module-name import_builtin -parse-stdlib -emit-module -o %t -
 // RUN: echo "public func foo() -> Int { return false }" > %t/import_text.swift
 // RUN: echo "public func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
+// RUN: echo "infix operator <-->; public func <-->(l: Int, r: Int) -> Int { return 1 }" > %t/oper_func.swift
 // RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -enable-source-import -module-name main -verify -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for:
@@ -66,5 +67,8 @@ var _ : Int = foo()
 
 import français
 import func français.phoûx
+
+import func oper_func.<-->
+var _:Int  = 1 <--> 2
 
 import main // expected-warning {{file 'import.swift' is part of module 'main'; ignoring import}}
