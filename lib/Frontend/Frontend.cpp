@@ -272,6 +272,7 @@ void CompilerInstance::performSema() {
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
   if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
+    assert(!InputSourceCodeBufferIDs.empty());
     assert(InputSourceCodeBufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
     createSILModule();
@@ -740,7 +741,7 @@ bool CompilerInstance::setUpForFileAt(unsigned i) {
     if (SILMode || (MainMode && filename(File) == "main.swift"))
       MainBufferID = ExistingBufferID.getValue();
 
-    if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+    if (Invocation.getFrontendOptions().Inputs.isInputPrimary(i))
       PrimaryBufferID = ExistingBufferID.getValue();
 
     return false; // replaced by a memory buffer.
@@ -782,7 +783,7 @@ bool CompilerInstance::setUpForFileAt(unsigned i) {
   if (SILMode || (MainMode && filename(File) == "main.swift"))
     MainBufferID = BufferID;
 
-  if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+  if (Invocation.getFrontendOptions().Inputs.isInputPrimary(i))
     PrimaryBufferID = BufferID;
 
   return false;

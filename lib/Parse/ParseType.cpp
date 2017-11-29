@@ -209,15 +209,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult<TypeRepr>();
-  case tok::kw_super:
-  case tok::kw_self:
-    // These keywords don't start a decl or a statement, and thus should be
-    // safe to skip over.
-    diagnose(Tok, MessageID);
-    ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
-    consumeToken();
-    // FIXME: we could try to continue to parse.
-    return ty;
   case tok::l_square:
     ty = parseTypeCollection();
     break;

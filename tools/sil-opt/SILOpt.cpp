@@ -195,6 +195,12 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
+static llvm::cl::opt<bool>
+EnableExperimentalConditionalConformances(
+  "enable-experimental-conditional-conformances", llvm::cl::Hidden,
+  llvm::cl::init(false),
+  llvm::cl::desc("Enable experimental implementation of SE-0143: Conditional Conformances"));
+
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
 /// will emit a diagnostic.
@@ -298,7 +304,8 @@ int main(int argc, char **argv) {
     llvm::Triple(Target).isOSDarwin();
 
   Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
-
+  Invocation.getLangOptions().EnableConditionalConformances |=
+    EnableExperimentalConditionalConformances;
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
