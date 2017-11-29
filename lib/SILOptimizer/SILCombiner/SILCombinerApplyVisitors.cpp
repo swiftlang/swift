@@ -1050,8 +1050,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     auto *NewWMI = Builder.createWitnessMethod(WMI->getLoc(),
                                                 ConcreteType,
                                                 Conformance, WMI->getMember(),
-                                                WMI->getType(),
-                                                WMI->isVolatile());
+                                                WMI->getType());
     // Replace only uses of the witness_method in the apply that is going to
     // be changed.
     MutableArrayRef<Operand> Operands = AI.getInstruction()->getAllOperands();

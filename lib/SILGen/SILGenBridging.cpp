@@ -1489,31 +1489,17 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
                              const SILConstantInfo &foreignCI) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");
+  assert(foreign.isForeign);
 
-  // Produce a witness_method when thunking ObjC protocol methods.
-  auto dc = foreign.getDecl()->getDeclContext();
-  if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
-    assert(subs.size() == 1);
-    auto thisType = subs[0].getReplacement()->getCanonicalType();
-    assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");
-    SILValue thisArg = args.back().getValue();
-
-    SILValue OpenedExistential;
-    if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
-      OpenedExistential = thisArg;
-    auto conformance = ProtocolConformanceRef(cast<ProtocolDecl>(dc));
-    return SGF.B.createWitnessMethod(loc, thisType, conformance, foreign,
-                                     foreignCI.getSILType(),
-                                     OpenedExistential);
-
-  // Produce a class_method when thunking imported ObjC methods.
-  } else if (foreignCI.SILFnType->getRepresentation()
+  // Produce an objc_method when thunking ObjC methods.
+  if (foreignCI.SILFnType->getRepresentation()
         == SILFunctionTypeRepresentation::ObjCMethod) {
     SILValue thisArg = args.back().getValue();
 
     return SGF.B.createObjCMethod(loc, thisArg, foreign,
-                         SILType::getPrimitiveObjectType(foreignCI.SILFnType));
+                                  foreignCI.getSILType());
   }
+
   // Otherwise, emit a function_ref.
   return SGF.emitGlobalFunctionRef(loc, foreign);
 }

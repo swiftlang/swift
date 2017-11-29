@@ -2187,19 +2187,21 @@ public:
 
     auto methodSelfType = getMethodSelfType(methodType);
     auto operandType = OMI->getOperand()->getType();
+    auto operandInstanceType = operandType.getSwiftRValueType();
+    if (auto metatypeType = dyn_cast<MetatypeType>(operandInstanceType))
+      operandInstanceType = metatypeType.getInstanceType();
 
-    if (methodSelfType.isClassOrClassMetatype()) {
+    if (operandInstanceType.getClassOrBoundGenericClass()) {
       auto overrideTy = TC.getConstantOverrideType(member);
       requireSameType(
           OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of objc_method must match abstracted type of method");
-      require(operandType.isClassOrClassMetatype(),
-              "operand must be of a class type");
+      require(methodSelfType.isClassOrClassMetatype(),
+              "method self type must be of a class type");
     } else {
-      require(getDynamicMethodType(operandType, OMI->getMember())
-                .getSwiftRValueType()
-                ->isBindableTo(OMI->getType().getSwiftRValueType()),
-              "result must be of the method's type");
+      require(isa<ArchetypeType>(operandInstanceType) ||
+              operandInstanceType->isObjCExistentialType(),
+              "operand type must be an archetype or self-conforming existential");
       verifyOpenedArchetype(OMI, OMI->getType().getSwiftRValueType());
     }
 

@@ -5464,16 +5464,13 @@ class WitnessMethodInst final
   CanType LookupType;
   ProtocolConformanceRef Conformance;
   unsigned NumOperands;
-  bool Volatile;
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
-                    SILType Ty, ArrayRef<SILValue> TypeDependentOperands,
-                    bool Volatile = false)
+                    SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
       : InstructionBase(DebugLoc, Ty, Member),
         LookupType(LookupType), Conformance(Conformance),
-        NumOperands(TypeDependentOperands.size()),
-        Volatile(Volatile) {
+        NumOperands(TypeDependentOperands.size()) {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            TypeDependentOperands);
   }
@@ -5493,8 +5490,7 @@ class WitnessMethodInst final
   static WitnessMethodInst *
   create(SILDebugLocation DebugLoc, CanType LookupType,
          ProtocolConformanceRef Conformance, SILDeclRef Member, SILType Ty,
-         SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes,
-         bool Volatile = false);
+         SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
   ~WitnessMethodInst() {
@@ -5509,8 +5505,6 @@ public:
     return getMember().getDecl()->getDeclContext()
              ->getAsProtocolOrProtocolExtensionContext();
   }
-
-  bool isVolatile() const { return Volatile; }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
 
