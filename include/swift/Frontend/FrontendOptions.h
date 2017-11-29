@@ -53,10 +53,6 @@ public:
   StringRef getFile() const { return Filename; }
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
-  
-private:
-  friend class FrontendInputs;
-  void bePrimary() { IsPrimary = true; }
 };
 
 /// Information about all the inputs to the frontend.
@@ -189,16 +185,6 @@ public:
   void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
     AllFiles[index].setBuffer(buffer);
   }
-  
-  
-  void bePrimaryAt(unsigned index) {
-    if (AllFiles[index].getIsPrimary())
-      return;
-    AllFiles[index].bePrimary();
-    if (!AllFiles[index].getFile().empty())
-      PrimaryInputs.insert(std::make_pair(AllFiles[index].getFile(), index));
-  }
-
 
   void addInput(const InputFile &input) {
     if (!input.getFile().empty() && input.getIsPrimary())

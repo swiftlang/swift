@@ -132,61 +132,10 @@ class ArgsToFrontendInputsConverter {
 
   std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
 
-  std::set<StringRef> PrimaryFilesToExpectInFilelist;
-
   StringRef filelistPath() { return FilelistPathArg->getValue(); }
 
-  llvm::StringMap<unsigned> IndicesOfFilesAlreadyAdded; // Sigh, some tests
-                                                        // duplicate files on
-                                                        // command line.
-
-  bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
-    return FilelistPathArg != nullptr;
-  }
-
-  enum class Whence {
-    PrimaryFromCommandLine,
-    SecondaryFromCommandLine,
-    SecondaryFromFileList
-  };
-
-  void addFileFromCommandLine(StringRef file, bool isPrimary) {
-    if (isPrimary && arePrimariesOnCommandLineAlsoAppearingInFilelist()) {
-      PrimaryFilesToExpectInFilelist.insert(file);
-      return;
-    }
-    const auto iterator = IndicesOfFilesAlreadyAdded.find(file);
-    if (iterator == IndicesOfFilesAlreadyAdded.end()) {
-      IndicesOfFilesAlreadyAdded.insert(
-          std::make_pair(file, Inputs.inputCount()));
-      Inputs.addInput(InputFile(file, isPrimary));
-    } else if (isPrimary)
-      Inputs.bePrimaryAt(iterator->second);
-    else {
-      Diags.diagnose(SourceLoc(),
-                     diag::error_duplicate_input_file_on_command_line, file);
-    }
-  }
-
-  void addFile(StringRef file, Whence whence) {
-    switch (whence) {
-    case Whence::PrimaryFromCommandLine:
-      addFileFromCommandLine(file, true);
-      break;
-
-    case Whence::SecondaryFromCommandLine:
-      addFileFromCommandLine(file, false);
-      break;
-
-    case Whence::SecondaryFromFileList:
-      if (PrimaryFilesToExpectInFilelist.count(file)) {
-        Inputs.addPrimaryInputFile(file);
-        PrimaryFilesToExpectInFilelist.erase(file);
-      } else
-        Inputs.addInputFile(file);
-      break;
-    }
-  }
+  bool hadDuplicateFiles = false;
+  llvm::SetVector<StringRef> files;
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
@@ -200,7 +149,23 @@ public:
     getFilesFromCommandLine();
     if (getFilesFromFilelist())
       return true;
-    return checkForUnusedPrimaries();
+
+    std::set<StringRef> PrimaryFiles = getPrimaries();
+
+    for (auto file : files) {
+      bool isPrimary = PrimaryFiles.count(file) > 0;
+      Inputs.addInput(InputFile(file, isPrimary));
+      if (isPrimary)
+        PrimaryFiles.erase(file);
+    }
+    for (auto file : PrimaryFiles) {
+      // Catch "swiftc -frontend -c -filelist foo -primary-file
+      // some-file-not-in-foo".
+      assert(FilelistPathArg != nullptr && "Missing primary with no filelist");
+      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
+                     filelistPath());
+    }
+    return !PrimaryFiles.empty();
   }
 
 private:
@@ -212,22 +177,13 @@ private:
     }
     return false;
   }
+
   void getFilesFromCommandLine() {
-    for (const Arg *A :
-         Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-      StringRef file = A->getValue();
-      if (A->getOption().matches(options::OPT_INPUT))
-        addFile(file, Whence::SecondaryFromCommandLine);
-      else if (A->getOption().matches(options::OPT_primary_file))
-        addFile(file, Whence::PrimaryFromCommandLine);
-      else
-        llvm_unreachable("Unknown input-related argument!");
-    }
+    for (const Arg *A : Args.filtered(options::OPT_INPUT))
+      addFile(A->getValue());
   }
 
   bool getFilesFromFilelist() {
-    if (FilelistPathArg == nullptr)
-      return false;
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
         llvm::MemoryBuffer::getFile(filelistPath());
     if (!filelistBufferOrError) {
@@ -238,23 +194,26 @@ private:
     // Keep buffer alive because code passes around StringRefs.
     FilelistBuffer = std::move(*filelistBufferOrError);
     for (auto file : llvm::make_range(llvm::line_iterator(*FilelistBuffer),
-                                      llvm::line_iterator())) {
-      addFile(file, Whence::SecondaryFromFileList);
-    }
+                                      llvm::line_iterator()))
+      addFile(file);
     return false;
   }
 
-  bool checkForUnusedPrimaries() {
-    bool hadError = false;
-    for (StringRef primaryFile : PrimaryFilesToExpectInFilelist) {
-      // Catch "swiftc -frontend -c -filelist foo -primary-file
-      // some-file-not-in-foo".
-      assert(FilelistPathArg != nullptr && "Missing primary with no filelist");
-      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
-                     primaryFile, filelistPath());
-      hadError = true;
+  void addFile(StringRef file) {
+    if (files.count(file) == 0) {
+      files.insert(file);
+      return;
     }
-    return hadError;
+    Diags.diagnose(SourceLoc(), diag::error_duplicate_input_file, file);
+    hadDuplicateFiles = true;
+  }
+
+  std::set<StringRef> getPrimaries() const {
+    std::set<StringRef> PrimaryFiles;
+    // FIXME: better way?
+    for (const Arg *A : Args.filtered(options::OPT_primary_file))
+      PrimaryFiles.insert(A->getValue());
+    return PrimaryFiles;
   }
 };
 class FrontendArgsToOptionsConverter {
