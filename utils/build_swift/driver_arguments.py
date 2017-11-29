@@ -635,28 +635,27 @@ def create_argument_parser():
                 'generated at this path')
 
     # -------------------------------------------------------------------------
-    build_variant_group = parser.add_mutually_exclusive_group(required=False)
-    build_variant_group.add_argument(
-        '-d', '--debug',
-        action='store_const',
-        const='Debug',
-        dest='build_variant',
-        help='build the Debug variant of everything (LLVM, Clang, Swift host '
-             'tools, target Swift standard libraries, LLDB (if enabled) '
-             '(default)')
-    build_variant_group.add_argument(
-        '-r', '--release-debuginfo',
-        action='store_const',
-        const='RelWithDebInfo',
-        dest='build_variant',
-        help='build the RelWithDebInfo variant of everything (default is '
-             'Debug)')
-    build_variant_group.add_argument(
-        '-R', '--release',
-        action='store_const',
-        const='Release',
-        dest='build_variant',
-        help='build the Release variant of everything (default is Debug)')
+    in_group('Build variant')
+
+    with mutually_exclusive_group():
+
+        set_defaults(build_variant='Debug')
+
+        option(['-d', '--debug'], store('build_variant'),
+               const='Debug',
+               help='build the Debug variant of everything (LLVM, Clang, '
+                    'Swift host tools, target Swift standard libraries, LLDB) '
+                    '(default is %(default)s)')
+
+        option(['-r', '--release-debuginfo'], store('build_variant'),
+               const='RelWithDebInfo',
+               help='build the RelWithDebInfo variant of everything (default '
+                    'is %(default)s)')
+
+        option(['-R', '--release'], store('build_variant'),
+               const='Release',
+               help='build the Release variant of everything (default is '
+                    '%(default)s)')
 
     # -------------------------------------------------------------------------
     build_variant_override_group = parser.add_argument_group(
