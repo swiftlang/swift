@@ -3902,9 +3902,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
   case SILInstructionKind::WitnessMethodInst: {
-    bool IsVolatile = false;
-    if (parseSILOptional(IsVolatile, *this, "volatile"))
-      return true;
     CanType LookupTy;
     SILDeclRef Member;
     SILType MethodTy;
@@ -3945,7 +3942,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
-                                      MethodTy, IsVolatile);
+                                      MethodTy);
     break;
   }
   case SILInstructionKind::CopyAddrInst: {
