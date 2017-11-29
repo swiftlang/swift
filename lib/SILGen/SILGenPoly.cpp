@@ -523,6 +523,14 @@ ManagedValue Transform::transform(ManagedValue v,
                                    SGF.getLoweredLoadableType(outputSubstType));
   }
 
+  // - block to AnyObject conversion
+  if (outputSubstType->isAnyObject()) {
+    if (auto inputFnType = dyn_cast<AnyFunctionType>(inputSubstType)) {
+      if (inputFnType->getRepresentation() == FunctionTypeRepresentation::Block)
+        return SGF.B.createBlockToAnyObject(Loc, v, loweredResultTy);
+    }
+  }
+
   //  - existentials
   if (outputSubstType->isAnyExistentialType()) {
     // We have to re-abstract payload if its a metatype or a function

@@ -651,7 +651,7 @@ func foo(p: P) {
 
 // rdar://35402853
 //   Make sure that we don't peephole AnyObject? -> Any? -> AnyObject naively.
-// CHECK: sil hidden @_T022objc_bridging_peephole017testOptionalToNonE6BridgeyyF
+// CHECK-LABEL: sil hidden @_T022objc_bridging_peephole017testOptionalToNonE6BridgeyyF
 func testOptionalToNonOptionalBridge() {
   // CHECK: apply {{.*}}() : $@convention(c) () -> @autoreleased Optional<AnyObject>
   // CHECK: function_ref @_T0s018_bridgeAnyObjectToB0ypyXlSgF :
@@ -659,3 +659,17 @@ func testOptionalToNonOptionalBridge() {
   // CHECK: apply [[T0]]<Any>
   useAnyObject(returnNullableId() as AnyObject)
 } // CHECK: end sil function '_T022objc_bridging_peephole017testOptionalToNonE6BridgeyyF'
+
+// CHECK-LABEL: sil hidden @_T022objc_bridging_peephole34testBlockToOptionalAnyObjectBridgeyyyXB5block_tF
+func testBlockToOptionalAnyObjectBridge(block: @escaping @convention(block) () -> ()) {
+  // CHECK:      [[T0:%.*]] = begin_borrow {{%.*}} : $@convention(block) () -> ()
+  // CHECK-NEXT: [[T1:%.*]] = copy_value [[T0]]
+  // CHECK-NEXT: [[REF:%.*]] = unchecked_ref_cast [[T1]] : $@convention(block) () -> () to $AnyObject
+  // CHECK-NEXT: [[OPTREF:%.*]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1, [[REF]] : $AnyObject
+  // CHECK-NEXT: end_borrow [[T0]]
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[FN:%.*]] = function_ref @takeNullableId : $@convention(c) (Optional<AnyObject>) -> ()
+  // CHECK-NEXT: apply [[FN]]([[OPTREF]])
+  // CHECK-NEXT: destroy_value [[OPTREF]]
+  takeNullableId(block as Any)
+}
