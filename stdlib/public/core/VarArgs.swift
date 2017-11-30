@@ -60,7 +60,7 @@ protocol _CVarArgAligned : CVarArg {
 
 #if arch(x86_64)
 @_versioned
-internal let _x86_64CountGPRegisters = 6
+internal let _countGPRegisters = 6
 // Note to future visitors concerning the following SSE register count.
 //
 // AMD64-ABI section 3.5.7 says -- as recently as v0.99.7, Nov 2014 -- to make
@@ -75,11 +75,24 @@ internal let _x86_64CountGPRegisters = 6
 // from 8 to 16 based on reading the spec, probably the bug you're looking for
 // is elsewhere.
 @_versioned
-internal let _x86_64CountSSERegisters = 8
+internal let _countSSERegisters = 8
 @_versioned
-internal let _x86_64SSERegisterWords = 2
+internal let _sseRegisterWords = 2
 @_versioned
-internal let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
+internal let _registerSaveWords = _countGPRegisters + _countSSERegisters * _sseRegisterWords
+#elseif arch(s390x)
+@_versioned
+internal let _countGPRegisters = 16
+@_versioned
+internal let _registerSaveWords = _countGPRegisters
+#endif
+
+#if arch(s390x)
+internal typealias _VAUInt = CUnsignedLongLong
+internal typealias _VAInt  = Int64
+#else
+internal typealias _VAUInt = CUnsignedInt
+internal typealias _VAInt  = Int32
 #endif
 
 /// Invokes the given closure with a C `va_list` argument derived from the
@@ -178,7 +191,7 @@ extension Int : CVarArg {
 
 extension Bool : CVarArg {
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(Int32(self ? 1:0))
+    return _encodeBitsAsWords(_VAInt(self ? 1:0))
   }
 }
 
@@ -204,7 +217,7 @@ extension Int32 : CVarArg {
   /// appropriately interpreted by C varargs.
   @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(self)
+    return _encodeBitsAsWords(_VAInt(self))
   }
 }
 
@@ -213,7 +226,7 @@ extension Int16 : CVarArg {
   /// appropriately interpreted by C varargs.
   @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(Int32(self))
+    return _encodeBitsAsWords(_VAInt(self))
   }
 }
 
@@ -222,7 +235,7 @@ extension Int8 : CVarArg {
   /// appropriately interpreted by C varargs.
   @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(Int32(self))
+    return _encodeBitsAsWords(_VAInt(self))
   }
 }
 
@@ -258,7 +271,7 @@ extension UInt32 : CVarArg {
   /// appropriately interpreted by C varargs.
   @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(self)
+    return _encodeBitsAsWords(_VAUInt(self))
   }
 }
 
@@ -267,7 +280,7 @@ extension UInt16 : CVarArg {
   /// appropriately interpreted by C varargs.
   @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CUnsignedInt(self))
+    return _encodeBitsAsWords(_VAUInt(self))
   }
 }
 
@@ -276,7 +289,7 @@ extension UInt8 : CVarArg {
   /// appropriately interpreted by C varargs.
   @_inlineable // FIXME(sil-serialize-all)
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(CUnsignedInt(self))
+    return _encodeBitsAsWords(_VAUInt(self))
   }
 }
 
@@ -352,7 +365,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   }
 }
 
-#if arch(x86_64)
+#if arch(x86_64) || arch(s390x)
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
@@ -371,7 +384,7 @@ final internal class _VaListBuilder {
     internal var gp_offset = CUnsignedInt(0)
     @_versioned // FIXME(sil-serialize-all)
     internal var fp_offset =
-      CUnsignedInt(_x86_64CountGPRegisters * MemoryLayout<Int>.stride)
+      CUnsignedInt(_countGPRegisters * MemoryLayout<Int>.stride)
     @_versioned // FIXME(sil-serialize-all)
     internal var overflow_arg_area: UnsafeMutablePointer<Int>?
     @_versioned // FIXME(sil-serialize-all)
@@ -382,7 +395,7 @@ final internal class _VaListBuilder {
   @_versioned // FIXME(sil-serialize-all)
   internal init() {
     // prepare the register save area
-    storage = ContiguousArray(repeating: 0, count: _x86_64RegisterSaveWords)
+    storage = ContiguousArray(repeating: 0, count: _registerSaveWords)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -394,10 +407,11 @@ final internal class _VaListBuilder {
   internal func append(_ arg: CVarArg) {
     var encoded = arg._cVarArgEncoding
 
+#if arch(x86_64)
     if arg is _CVarArgPassedAsDouble
-      && sseRegistersUsed < _x86_64CountSSERegisters {
-      var startIndex = _x86_64CountGPRegisters
-           + (sseRegistersUsed * _x86_64SSERegisterWords)
+      && sseRegistersUsed < _countSSERegisters {
+      var startIndex = _countGPRegisters
+           + (sseRegistersUsed * _sseRegisterWords)
       for w in encoded {
         storage[startIndex] = w
         startIndex += 1
@@ -406,7 +420,7 @@ final internal class _VaListBuilder {
     }
     else if encoded.count == 1
       && !(arg is _CVarArgPassedAsDouble)
-      && gpRegistersUsed < _x86_64CountGPRegisters {
+      && gpRegistersUsed < _countGPRegisters {
       storage[gpRegistersUsed] = encoded[0]
       gpRegistersUsed += 1
     }
@@ -415,6 +429,19 @@ final internal class _VaListBuilder {
         storage.append(w)
       }
     }
+#elseif arch(s390x)
+    if gpRegistersUsed < _countGPRegisters {
+      for w in encoded {
+        storage[gpRegistersUsed] = w
+        gpRegistersUsed += 1
+      }
+    } else {
+      for w in encoded {
+        storage.append(w)
+      }
+    }
+#endif
+
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -422,7 +449,7 @@ final internal class _VaListBuilder {
   internal func va_list() -> CVaListPointer {
     header.reg_save_area = storage._baseAddress
     header.overflow_arg_area
-      = storage._baseAddress + _x86_64RegisterSaveWords
+      = storage._baseAddress + _registerSaveWords
     return CVaListPointer(
              _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
                Builtin.addressof(&self.header)))
