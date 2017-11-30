@@ -244,8 +244,11 @@ def create_argument_parser():
     append = builder.actions.append
     store = builder.actions.store
     store_true = builder.actions.store_true
+    # store_false = builder.actions.store_false
+    store_int = builder.actions.store_int
     store_path = builder.actions.store_path
     toggle_true = builder.actions.toggle_true
+    toggle_false = builder.actions.toggle_false
 
     # -------------------------------------------------------------------------
     # Top-level options
@@ -760,106 +763,65 @@ def create_argument_parser():
            help="use CMake's Xcode generator (%(default)s by default)")
 
     # -------------------------------------------------------------------------
-    run_tests_group = parser.add_argument_group(
-        title='Run tests')
+    in_group('Run tests')
 
     # NOTE: We can't merge -t and --test, because nargs='?' makes
     #       `-ti` to be treated as `-t=i`.
-    run_tests_group.add_argument(
-        '-t',
-        action='store_const',
-        const=True,
-        dest='test',
-        help='test Swift after building')
-    run_tests_group.add_argument(
-        '--test',
-        action=arguments.action.enable,
-        help='test Swift after building')
-    run_tests_group.add_argument(
-        '-T',
-        action='store_const',
-        const=True,
-        dest='validation_test',
-        help='run the validation test suite (implies --test)')
-    run_tests_group.add_argument(
-        '--validation-test',
-        action=arguments.action.enable,
-        help='run the validation test suite (implies --test)')
-    run_tests_group.add_argument(
-        '--test-paths',
-        action=arguments.action.concat,
-        type=arguments.type.shell_split,
-        default=[],
-        help='run tests located in specific directories and/or files '
-             '(implies --test and/or --validation-test)')
-    run_tests_group.add_argument(
-        '-o',
-        action='store_const',
-        const=True,
-        dest='test_optimized',
-        help='run the test suite in optimized mode too (implies --test)')
-    run_tests_group.add_argument(
-        '--test-optimized',
-        action=arguments.action.enable,
-        help='run the test suite in optimized mode too (implies --test)')
-    run_tests_group.add_argument(
-        '-s',
-        action='store_const',
-        const=True,
-        dest='test_optimize_for_size',
-        help='run the test suite in optimize for size mode too '
-             '(implies --test)')
-    run_tests_group.add_argument(
-        '--test-optimize-for-size',
-        action=arguments.action.enable,
-        help='run the test suite in optimize for size mode too '
-             '(implies --test)')
-    run_tests_group.add_argument(
-        '--long-test',
-        action=arguments.action.enable,
-        help='run the long test suite')
-    run_tests_group.add_argument(
-        '--host-test',
-        action=arguments.action.enable,
-        help='run executable tests on host devices (such as iOS or tvOS)')
-    run_tests_group.add_argument(
-        '-B', '--benchmark',
-        action='store_true',
-        help='run the Swift Benchmark Suite after building')
-    run_tests_group.add_argument(
-        '--benchmark-num-o-iterations',
-        type=int,
-        default=3,
-        metavar='N',
-        help='if the Swift Benchmark Suite is run after building, run N '
-             'iterations with -O')
-    run_tests_group.add_argument(
-        '--benchmark-num-onone-iterations',
-        type=int,
-        default=3,
-        metavar='N',
-        help='if the Swift Benchmark Suite is run after building, run N '
-             'iterations with -Onone')
-    run_tests_group.add_argument(
-        '--skip-test-osx',
-        action=arguments.action.disable,
-        dest='test_osx',
-        help='skip testing Swift stdlibs for Mac OS X')
-    run_tests_group.add_argument(
-        '--skip-test-linux',
-        action=arguments.action.disable,
-        dest='test_linux',
-        help='skip testing Swift stdlibs for Linux')
-    run_tests_group.add_argument(
-        '--skip-test-freebsd',
-        action=arguments.action.disable,
-        dest='test_freebsd',
-        help='skip testing Swift stdlibs for FreeBSD')
-    run_tests_group.add_argument(
-        '--skip-test-cygwin',
-        action=arguments.action.disable,
-        dest='test_cygwin',
-        help='skip testing Swift stdlibs for Cygwin')
+    # FIXME: Convert to store_true action
+    option('-t', store('test', const=True),
+           help='test Swift after building')
+    option('--test', toggle_true,
+           help='test Swift after building')
+
+    option('-T', store('validation_test', const=True),
+           help='run the validation test suite (implies --test)')
+    option('--validation-test', toggle_true,
+           help='run the validation test suite (implies --test)')
+
+    # FIXME: Convert to store_true action
+    option('-o', store('test_optimized', const=True),
+           help='run the test suite in optimized mode too (implies --test)')
+    option('--test-optimized', toggle_true,
+           help='run the test suite in optimized mode too (implies --test)')
+
+    # FIXME: Convert to store_true action
+    option('-s', store('test_optimize_for_size', const=True),
+           help='run the test suite in optimize for size mode too '
+                '(implies --test)')
+    option('--test-optimize-for-size', toggle_true,
+           help='run the test suite in optimize for size mode too '
+                '(implies --test)')
+
+    option('--long-test', toggle_true,
+           help='run the long test suite')
+
+    option('--host-test', toggle_true,
+           help='run executable tests on host devices (such as iOS or tvOS)')
+
+    option('--test-paths', append,
+           type=argparse.ShellSplitType(),
+           help='run tests located in specific directories and/or files '
+                '(implies --test and/or --validation-test)')
+
+    option(['-B', '--benchmark'], store_true,
+           help='run the Swift Benchmark Suite after building')
+    option('--benchmark-num-o-iterations', store_int,
+           default=3,
+           help='if the Swift Benchmark Suite is run after building, run N '
+                'iterations with -O')
+    option('--benchmark-num-onone-iterations', store_int,
+           default=3,
+           help='if the Swift Benchmark Suite is run after building, run N '
+                'iterations with -Onone')
+
+    option('--skip-test-osx', toggle_false('test_osx'),
+           help='skip testing Swift stdlibs for Mac OS X')
+    option('--skip-test-linux', toggle_false('test_linux'),
+           help='skip testing Swift stdlibs for Linux')
+    option('--skip-test-freebsd', toggle_false('test_freebsd'),
+           help='skip testing Swift stdlibs for FreeBSD')
+    option('--skip-test-cygwin', toggle_false('test_cygwin'),
+           help='skip testing Swift stdlibs for Cygwin')
 
     # -------------------------------------------------------------------------
     run_build_group = parser.add_argument_group(
