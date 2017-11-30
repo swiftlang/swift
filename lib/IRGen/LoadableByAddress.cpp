@@ -1461,6 +1461,10 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
       SILValue tgt = storeUser->getDest();
       createOutlinedCopyCall(copyBuilder, allocInstr, tgt, pass);
       storeUser->eraseFromParent();
+    } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
+      SILBuilder dbgBuilder(dbgInst);
+      // We need to create a debug for the alloc stack as well for LLDB
+      dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), allocInstr);
     }
   }
 }
