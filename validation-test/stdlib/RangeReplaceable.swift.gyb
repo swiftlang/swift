@@ -2,6 +2,9 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+// FIXME: rdar://35646292
+// XFAIL: resilient_stdlib
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 
