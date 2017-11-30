@@ -301,7 +301,7 @@ parse_operator:
     }
         
     case tok::kw_is: {
-      SyntaxParsingContext AssignContext(SyntaxContext, SyntaxKind::IsExpr);
+      SyntaxParsingContext IsContext(SyntaxContext, SyntaxKind::IsExpr);
       // Parse a type after the 'is' token instead of an expression.
       ParserResult<Expr> is = parseExprIs();
       if (is.isNull() || is.hasCodeCompletion())
@@ -318,7 +318,7 @@ parse_operator:
     }
         
     case tok::kw_as: {
-      SyntaxParsingContext AssignContext(SyntaxContext, SyntaxKind::AsExpr);
+      SyntaxParsingContext AsContext(SyntaxContext, SyntaxKind::AsExpr);
       ParserResult<Expr> as = parseExprAs();
       if (as.isNull() || as.hasCodeCompletion())
         return as;

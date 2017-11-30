@@ -240,14 +240,14 @@ EXPR_NODES = [
     # is TypeName
     Node('IsExpr', kind='Expr',
          children=[
-             Child("Is", kind='IsToken'),
+             Child("IsTok", kind='IsToken'),
              Child("TypeName", kind='Type')
          ]),
 
     # as TypeName
     Node('AsExpr', kind='Expr',
          children=[
-             Child("As", kind='AsToken'),
+             Child("AsTok", kind='AsToken'),
              Child("QuestionOrExclamationMark", kind='Token',
                    is_optional=True,
                    token_choices=[
