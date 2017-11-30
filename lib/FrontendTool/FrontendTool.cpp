@@ -391,9 +391,13 @@ private:
 // This is a separate function so that it shows up in stack traces.
 LLVM_ATTRIBUTE_NOINLINE
 static void debugFailWithAssertion() {
-  // This assertion should always fail, per the user's request, and should
-  // not be converted to llvm_unreachable.
-  assert(0 && "This is an assertion!");
+  // Per the user's request, this assertion should always fail in
+  // builds with assertions enabled.
+
+  // This should not be converted to llvm_unreachable, as those are
+  // treated as optimization hints in builds where they turn into
+  // __builtin_unreachable().
+  assert((0) && "This is an assertion!");
 }
 
 // This is a separate function so that it shows up in stack traces.
