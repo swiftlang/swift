@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// FIXME(double-width): <rdar://problem/32726173>
+// REQUIRES: rdar32726173
 
 import StdlibUnittest
 

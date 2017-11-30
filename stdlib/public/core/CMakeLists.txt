@@ -47,7 +47,8 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
-  DoubleWidth.swift.gyb
+  # FIXME(double-width): <rdar://problem/32726173>
+  #DoubleWidth.swift.gyb
   DropWhile.swift.gyb
   Dump.swift
   EmptyCollection.swift
