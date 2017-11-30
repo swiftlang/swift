@@ -54,4 +54,5 @@ class R<K: Hashable, V> {
 infix operator +=+ : AdditionPrecedence
 func +=+(_ lhs: Int, _ rhs: Int) -> Bool { return lhs == rhs }
 func +=+<T: BinaryInteger>(_ lhs: T, _ rhs: Int) -> Bool { return lhs == rhs }
-let _ = DoubleWidth<Int>(Int.min) - 1 +=+ Int.min // Ok
+// FIXME: uncomment when <rdar://problem/32726173> is resolved and DoubleWidth is back
+// let _ = DoubleWidth<Int>(Int.min) - 1 +=+ Int.min // Ok
