@@ -83,6 +83,13 @@ PrintNodeKind("print-node-kind",
               llvm::cl::desc("To print syntax node kind"),
               llvm::cl::cat(Category),
               llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+PrintTrivialNodeKind("print-trivial-node-kind",
+                     llvm::cl::desc("To print trivial syntax node kind"),
+                     llvm::cl::cat(Category),
+                     llvm::cl::init(false));
+
 static llvm::cl::opt<bool>
 Visual("v",
        llvm::cl::desc("Print visually"),
@@ -227,6 +234,7 @@ int dumpParserGen(const char *MainExecutablePath,
   SyntaxPrintOptions Opts;
   Opts.PrintSyntaxKind = options::PrintNodeKind;
   Opts.Visual = options::Visual;
+  Opts.PrintTrivialNodeKind = options::PrintTrivialNodeKind;
   SF->getSyntaxRoot().print(llvm::outs(), Opts);
   return 0;
 }
