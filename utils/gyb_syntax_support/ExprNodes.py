@@ -236,4 +236,24 @@ EXPR_NODES = [
              Child("Dot", kind='PeriodToken'),
              Child("Name", kind='Token')
          ]),
+
+    # is TypeName
+    Node('IsExpr', kind='Expr',
+         children=[
+             Child("IsTok", kind='IsToken'),
+             Child("TypeName", kind='Type')
+         ]),
+
+    # as TypeName
+    Node('AsExpr', kind='Expr',
+         children=[
+             Child("AsTok", kind='AsToken'),
+             Child("QuestionOrExclamationMark", kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'PostfixQuestionMarkToken',
+                       'ExclamationMarkToken',
+                   ]),
+             Child("TypeName", kind='Type')
+         ]),
 ]
