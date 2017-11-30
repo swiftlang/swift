@@ -681,7 +681,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 }
 
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
-  if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
+  if (Opts.RequestedAction != FrontendOptions::ActionType::Immediate && !FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
     Opts.OutputFilenames.clear();
     return false;
   }
