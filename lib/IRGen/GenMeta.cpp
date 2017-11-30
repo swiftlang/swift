@@ -1303,8 +1303,7 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   assert(!type->hasArchetype() &&
          "cannot emit metadata accessor for context-dependent type");
 
-  // We only take this path for That means
-  // everything except non-generic nominal types.
+  // We only take this path for non-generic nominal types.
   auto typeDecl = type->getAnyNominal();
   if (!typeDecl)
     return emitDirectTypeMetadataRef(IGF, type);
@@ -3581,6 +3580,15 @@ namespace {
                                       /*allowUninit*/ false)) {
         HasUnfilledSuperclass = true;
       }
+      
+      // If the superclass came from another module, we may have dropped
+      // stored properties due to the Swift language version availability of
+      // their types. In these cases we can't precisely lay out the ivars in
+      // the class object at compile time so we need to do runtime layout.
+      if (classHasIncompleteLayout(IGM,
+                                 superclassTy->getClassOrBoundGenericClass())) {
+        HasUnfilledSuperclass = true;
+      }
     }
 
     bool canBeConstant() {
@@ -4052,9 +4060,13 @@ irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                 llvm::Value *metadata) {
   // FIXME: The below checks should capture this property already, but
   // resilient class metadata layout is not fully implemented yet.
-  if (theClass->getParentModule() != IGF.IGM.getSwiftModule()) {
-    return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
-  }
+  auto superClass = theClass;
+  do {
+    if (superClass->getParentModule() != IGF.IGM.getSwiftModule()) {
+      return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass,
+                                                        metadata);
+    }
+  } while ((superClass = superClass->getSuperclassDecl()));
 
   // If the class has fragile fixed layout, return the constant size and
   // alignment.
