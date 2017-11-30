@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 4 %S/Inputs/mixed_mode/UsingObjCStuff.swift
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 3 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 3 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V3
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V4
 
 // REQUIRES: objc_interop
 
@@ -66,3 +66,10 @@ public func invokeMethod(on holder: SubButtHolder) {
   // CHECK: call swiftcc void [[IMPL]]
   holder.subVirtual()
 }
+
+// CHECK-V3-LABEL: define private void @initialize_metadata_SubButtHolder
+// CHECK-V3:   call %swift.type* @swift_initClassMetadata_UniversalStrategy
+
+// CHECK-V3-LABEL: define private void @initialize_metadata_SubSubButtHolder
+// CHECK-V3:   call %swift.type* @swift_initClassMetadata_UniversalStrategy
+
