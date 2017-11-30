@@ -2,6 +2,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
+// FIXME: rdar://35779008
+// UNSUPPORTED: resilient_stdlib
+
 let empty: [Int] = []
 let _ = empty +
 %for i in range(0, N):
