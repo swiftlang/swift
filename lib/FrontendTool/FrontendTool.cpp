@@ -33,7 +33,6 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/LegacyASTTransformer.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
