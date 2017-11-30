@@ -53,6 +53,8 @@ class C {
     _ = a.b
     _ = 1.a
     (1 + 1).a.b.foo
+    _ = a as Bool || a as! Bool || a as? Bool
+    _ = a is Bool
   }
 }
 
