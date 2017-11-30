@@ -22,6 +22,13 @@ CHANGELOG
 Swift 4.1
 ---------
 
+* [SE-0166][] / [SE-0143][]
+
+  The standard library now defines the conformances of `Optional`,
+  `Array`, `Dictionary`, and `Set` to `Encodable` and `Decodable` as
+  conditional conformances, available only when their type parameters
+  conform to `Encodable` or `Decodable`, respectively.
+
 * [SE-0188][] 
   
   Index types for most standard library collections now conform to `Hashable`. 
