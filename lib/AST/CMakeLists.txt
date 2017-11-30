@@ -33,7 +33,6 @@ add_swift_library(swiftAST STATIC
   GenericSignatureBuilder.cpp
   Identifier.cpp
   LayoutConstraint.cpp
-  LegacyASTTransformer.cpp
   LookupVisibleDecls.cpp
   Module.cpp
   ModuleLoader.cpp
