@@ -15,6 +15,9 @@ typealias Int256 = DoubleWidth<Int128>
 typealias Int512 = DoubleWidth<Int256>
 typealias Int1024 = DoubleWidth<Int512>
 
+func checkSignedIntegerConformance<T: SignedInteger>(_ x: T) {}
+func checkUnsignedIntegerConformance<T: UnsignedInteger>(_ x: T) {}
+
 dwTests.test("Literals") {
   let w: DoubleWidth<UInt8> = 100
   expectTrue(w == 100 as Int)
@@ -339,6 +342,14 @@ dwTests.test("Words") {
     repeatElement(UInt.max, count: 1024 / UInt.bitWidth))
   expectEqualSequence((1 as Int1024).words,
     [1] + Array(repeating: 0, count: 1024 / UInt.bitWidth - 1))
+}
+
+dwTests.test("Conditional Conformance") {
+  checkSignedIntegerConformance(0 as Int128)
+  checkSignedIntegerConformance(0 as Int1024)
+
+  checkUnsignedIntegerConformance(0 as UInt128)
+  checkUnsignedIntegerConformance(0 as UInt1024)
 }
 
 runAllTests()
