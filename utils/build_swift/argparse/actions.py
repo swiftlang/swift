@@ -76,8 +76,10 @@ class Action(argparse.Action):
         dests = dests or dest
         if dests == argparse.SUPPRESS:
             dests = []
+            metavar = metavar or ''
         elif isinstance(dests, str):
             dests = [dests]
+            metavar = metavar or dests[0].upper()
 
         super(Action, self).__init__(
             option_strings=option_strings,
@@ -242,6 +244,7 @@ class StorePathAction(StoreAction):
     def __init__(self, option_strings, **kwargs):
         kwargs['nargs'] = Nargs.SINGLE
         kwargs['type'] = PathType()
+        kwargs.setdefault('metavar', 'PATH')
 
         super(StorePathAction, self).__init__(
             option_strings=option_strings,
