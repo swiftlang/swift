@@ -893,70 +893,51 @@ def create_argument_parser():
            help='skip building Swift Benchmark Suite')
 
     # -------------------------------------------------------------------------
-    skip_test_group = parser.add_argument_group(
-        title='Skip testing specified targets')
-    skip_test_group.add_argument(
-        '--skip-test-ios',
-        action=arguments.action.disable,
-        dest='test_ios',
-        help='skip testing all iOS targets. Equivalent to specifying both '
-             '--skip-test-ios-simulator and --skip-test-ios-host')
-    skip_test_group.add_argument(
-        '--skip-test-ios-simulator',
-        action=arguments.action.disable,
-        dest='test_ios_simulator',
-        help='skip testing iOS simulator targets')
-    skip_test_group.add_argument(
-        '--skip-test-ios-32bit-simulator',
-        action=arguments.action.disable,
-        dest='test_ios_32bit_simulator',
-        help='skip testing iOS 32 bit simulator targets')
-    skip_test_group.add_argument(
-        '--skip-test-ios-host',
-        action=arguments.action.disable,
-        dest='test_ios_host',
-        help='skip testing iOS device targets on the host machine (the phone '
-             'itself)')
-    skip_test_group.add_argument(
-        '--skip-test-tvos',
-        action=arguments.action.disable,
-        dest='test_tvos',
-        help='skip testing all tvOS targets. Equivalent to specifying both '
-             '--skip-test-tvos-simulator and --skip-test-tvos-host')
-    skip_test_group.add_argument(
-        '--skip-test-tvos-simulator',
-        action=arguments.action.disable,
-        dest='test_tvos_simulator',
-        help='skip testing tvOS simulator targets')
-    skip_test_group.add_argument(
-        '--skip-test-tvos-host',
-        action=arguments.action.disable,
-        dest='test_tvos_host',
-        help='skip testing tvOS device targets on the host machine (the TV '
-             'itself)')
-    skip_test_group.add_argument(
-        '--skip-test-watchos',
-        action=arguments.action.disable,
-        dest='test_watchos',
-        help='skip testing all tvOS targets. Equivalent to specifying both '
-             '--skip-test-watchos-simulator and --skip-test-watchos-host')
-    skip_test_group.add_argument(
-        '--skip-test-watchos-simulator',
-        action=arguments.action.disable,
-        dest='test_watchos_simulator',
-        help='skip testing watchOS simulator targets')
-    skip_test_group.add_argument(
-        '--skip-test-watchos-host',
-        action=arguments.action.disable,
-        dest='test_watchos_host',
-        help='skip testing watchOS device targets on the host machine (the '
-             'watch itself)')
-    skip_test_group.add_argument(
-        '--skip-test-android-host',
-        action=arguments.action.disable,
-        dest='test_android_host',
-        help='skip testing Android device targets on the host machine (the '
-             'phone itself)')
+    in_group('Skip testing specified targets')
+
+    option('--skip-test-ios',
+           toggle_false('test_ios'),
+           help='skip testing all iOS targets. Equivalent to specifying both '
+                '--skip-test-ios-simulator and --skip-test-ios-host')
+    option('--skip-test-ios-simulator',
+           toggle_false('test_ios_simulator'),
+           help='skip testing iOS simulator targets')
+    option('--skip-test-ios-32bit-simulator',
+           toggle_false('test_ios_32bit_simulator'),
+           help='skip testing iOS 32 bit simulator targets')
+    option('--skip-test-ios-host',
+           toggle_false('test_ios_host'),
+           help='skip testing iOS device targets on the host machine (the '
+                'phone itself)')
+
+    option('--skip-test-tvos',
+           toggle_false('test_tvos'),
+           help='skip testing all tvOS targets. Equivalent to specifying both '
+                '--skip-test-tvos-simulator and --skip-test-tvos-host')
+    option('--skip-test-tvos-simulator',
+           toggle_false('test_tvos_simulator'),
+           help='skip testing tvOS simulator targets')
+    option('--skip-test-tvos-host',
+           toggle_false('test_tvos_host'),
+           help='skip testing tvOS device targets on the host machine (the '
+                'TV itself)')
+
+    option('--skip-test-watchos',
+           toggle_false('test_watchos'),
+           help='skip testing all tvOS targets. Equivalent to specifying both '
+                '--skip-test-watchos-simulator and --skip-test-watchos-host')
+    option('--skip-test-watchos-simulator',
+           toggle_false('test_watchos_simulator'),
+           help='skip testing watchOS simulator targets')
+    option('--skip-test-watchos-host',
+           toggle_false('test_watchos_host'),
+           help='skip testing watchOS device targets on the host machine (the '
+                'watch itself)')
+
+    option('--skip-test-android-host',
+           toggle_false('test_android_host'),
+           help='skip testing Android device targets on the host machine (the '
+                'phone itself)')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
