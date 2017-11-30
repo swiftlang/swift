@@ -1555,9 +1555,15 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       diagnose(initExpr->getLoc(), diag::delegation_here);
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
-  }
 
-  diagnoseResilientConstructor(ctor);
+    // An inlinable constructor in a class must always be delegating.
+    if (!isDelegating && !ClassD->hasFixedLayout() &&
+        ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      diagnose(ctor, diag::class_designated_init_inlineable_resilient,
+               ClassD->getDeclaredInterfaceType(),
+               static_cast<unsigned>(getFragileFunctionKind(ctor)));
+    }
+  }
 
   // If we want a super.init call...
   if (wantSuperInitCall) {

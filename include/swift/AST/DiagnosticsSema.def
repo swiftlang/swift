@@ -2846,6 +2846,10 @@ NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 
+ERROR(assignment_let_property_delegating_init,none,
+      "'let' property %0 may not be initialized directly; use "
+      "\"self.init(...)\" or \"self = ...\" instead", (DeclName))
+
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,
       "SequenceType protocol definition is broken", ())

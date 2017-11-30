@@ -5395,15 +5395,21 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // Struct initializers that cannot see the layout of the struct type are
   // always delegating. This occurs if the struct type is not fixed layout,
   // and the constructor is either inlinable or defined in another module.
-  //
-  // FIXME: Figure out the right condition to use here that does not depend
-  // on the -enable-resilience flag, and make it conditional on
-  // -swift-version 5 instead, once the "disallow memberwise cross-module
-  // initializer" proposal lands.
-  if (Kind == BodyInitKind::None) {
-    if (isa<StructDecl>(NTD) &&
-        !NTD->hasFixedLayout(getParentModule(), getResilienceExpansion())) {
+  if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
+    if (getResilienceExpansion() == ResilienceExpansion::Minimal &&
+        !NTD->hasFixedLayout()) {
       Kind = BodyInitKind::Delegating;
+
+    } else if (isa<ExtensionDecl>(getDeclContext())) {
+      const ModuleDecl *containingModule = getParentModule();
+      // Prior to Swift 5, cross-module initializers were permitted to be
+      // non-delegating. However, if the struct isn't fixed-layout, we have to
+      // be delegating because, well, we don't know the layout.
+      if (!NTD->hasFixedLayout() ||
+          containingModule->getASTContext().isSwiftVersionAtLeast(5)) {
+        if (containingModule != NTD->getParentModule())
+          Kind = BodyInitKind::Delegating;
+      }
     }
   }
 

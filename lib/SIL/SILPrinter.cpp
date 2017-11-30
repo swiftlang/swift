@@ -1290,6 +1290,9 @@ public:
     switch (MU->getKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;
     case MarkUninitializedInst::RootSelf:  *this << "[rootself] "; break;
+    case MarkUninitializedInst::CrossModuleRootSelf:
+      *this << "[crossmodulerootself] ";
+      break;
     case MarkUninitializedInst::DerivedSelf:  *this << "[derivedself] "; break;
     case MarkUninitializedInst::DerivedSelfOnly:
       *this << "[derivedselfonly] ";
