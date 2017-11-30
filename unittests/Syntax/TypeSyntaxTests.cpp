@@ -313,7 +313,7 @@ TEST(TypeSyntaxTests, OptionalTypeWithAPIs) {
     auto StringType = SyntaxFactory::makeTypeIdentifier("String",
                                                         Trivia::spaces(1), {});
     SyntaxFactory::makeBlankOptionalType()
-      .withValueType(StringType)
+      .withWrappedType(StringType)
       .withQuestionMark(SyntaxFactory::makePostfixQuestionMarkToken({}, {}))
       .print(OS);
     ASSERT_EQ(OS.str(), " String?");
@@ -341,7 +341,7 @@ TEST(TypeSyntaxTests, ImplicitlyUnwrappedOptionalTypeWithAPIs) {
                                                           { Trivia::spaces(1) },
                                                           {});
     SyntaxFactory::makeBlankImplicitlyUnwrappedOptionalType()
-      .withValueType(StringType)
+      .withWrappedType(StringType)
       .withExclamationMark(SyntaxFactory::makeExclamationMarkToken({}, {}))
       .print(OS);
     ASSERT_EQ(OS.str(), " String!");
