@@ -98,22 +98,7 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
     // Implicitly unwrapped optionals need to be unwrapped;
     // ImplicitlyUnwrappedOptional does not need to conform to Codable directly
     // -- only its inner type does.
-    if (nominalTypeDecl == tc.Context.getImplicitlyUnwrappedOptionalDecl() ||
-        // FIXME: Remove the following when conditional conformance lands.
-        // Some generic types in the stdlib currently conform to Codable even
-        // when the type they are generic on does not [Optional, Array, Set,
-        // Dictionary].  For synthesizing conformance, we don't want to
-        // consider these types as Codable if the nested type is not Codable.
-        // Look through the generic type parameters of these types recursively
-        // to avoid synthesizing code that will crash at runtime.
-        //
-        // We only want to look through generic params for these types; other
-        // types may validly conform to Codable even if their generic param
-        // types do not.
-        nominalTypeDecl == tc.Context.getOptionalDecl() ||
-        nominalTypeDecl == tc.Context.getArrayDecl() ||
-        nominalTypeDecl == tc.Context.getSetDecl() ||
-        nominalTypeDecl == tc.Context.getDictionaryDecl()) {
+    if (nominalTypeDecl == tc.Context.getImplicitlyUnwrappedOptionalDecl()) {
       for (auto paramType : genericType->getGenericArgs()) {
         if (typeConformsToCodable(tc, context, paramType, proto) != Conforms)
           return DoesNotConform;

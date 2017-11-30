@@ -97,8 +97,7 @@ extension NSRange {
         }
         
         
-        self.location = location
-        self.length = length
+        self.init(location: location, length: length)
     }
 }
 
@@ -143,8 +142,7 @@ extension NSRange {
   public init<R: RangeExpression>(_ region: R)
   where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
     let r = region.relative(to: 0..<R.Bound.max)
-    location = numericCast(r.lowerBound)
-    length = numericCast(r.count)
+    self.init(location: numericCast(r.lowerBound), length: numericCast(r.count))
   }
   
   public init<R: RangeExpression, S: StringProtocol>(_ region: R, in target: S)

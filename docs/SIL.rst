@@ -2311,6 +2311,7 @@ mark_uninitialized
   sil-instruction ::= 'mark_uninitialized' '[' mu_kind ']' sil-operand
   mu_kind ::= 'var'
   mu_kind ::= 'rootself'
+  mu_kind ::= 'crossmodulerootself'
   mu_kind ::= 'derivedself'
   mu_kind ::= 'derivedselfonly'
   mu_kind ::= 'delegatingself'
@@ -2328,6 +2329,9 @@ the mark_uninitialized instruction refers to:
 
 - ``var``: designates the start of a normal variable live range
 - ``rootself``: designates ``self`` in a struct, enum, or root class
+- ``crossmodulerootself``: same as ``rootself``, but in a case where it's not
+    really safe to treat ``self`` as a root because the original module might add
+    more stored properties. This is only used for Swift 4 compatibility.
 - ``derivedself``: designates ``self`` in a derived (non-root) class
 - ``derivedselfonly``: designates ``self`` in a derived (non-root) class whose stored properties have already been initialized
 - ``delegatingself``: designates ``self`` on a struct, enum, or class in a delegating constructor (one that calls self.init)

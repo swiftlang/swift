@@ -60,14 +60,18 @@ public:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
-  /// True if the memory object being analyzed represents a 'let', which is
-  /// initialize-only (reassignments are not allowed).
-  bool IsLet = false;
-
   /// This is the count of elements being analyzed.  For memory objects that are
   /// tuples, this is the flattened element count.  For 'self' members in init
   /// methods, this is the local field count (+1 for derive classes).
   unsigned NumElements;
+
+  /// True if the memory object being analyzed represents a 'let', which is
+  /// initialize-only (reassignments are not allowed).
+  bool IsLet = false;
+
+  /// True if NumElements has a dummy value in it to force a struct to be
+  /// non-empty.
+  bool HasDummyElement = false;
 
 public:
   DIMemoryObjectInfo(SingleValueInstruction *MemoryInst);
@@ -108,10 +112,22 @@ public:
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      if (MUI->isRootSelf())
+      if (MUI->isRootSelf() || MUI->isCrossModuleRootSelf())
         if (auto decl = getType()->getAnyNominal())
           if (isa<StructDecl>(decl))
             return true;
+    return false;
+  }
+
+  /// True if the memory object is the 'self' argument of a non-delegating
+  /// cross-module struct initializer.
+  bool isCrossModuleStructInitSelf() const {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
+      if (MUI->isCrossModuleRootSelf()) {
+        assert(isStructInitSelf());
+        return true;
+      }
+    }
     return false;
   }
 
@@ -125,17 +141,15 @@ public:
     return false;
   }
 
-  /// isDerivedClassSelf - Return true if this memory object is the 'self' of
-  /// a derived class init method.
+  /// True if this memory object is the 'self' of a derived class initializer.
   bool isDerivedClassSelf() const {
     if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       return MUI->isDerivedClassSelf();
     return false;
   }
 
-  /// isDerivedClassSelfOnly - Return true if this memory object is the 'self'
-  /// of a derived class init method for which we can assume that all ivars
-  /// have been initialized.
+  /// True if this memory object is the 'self' of a derived class initializer for
+  /// which we can assume that all ivars have been initialized.
   bool isDerivedClassSelfOnly() const {
     if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       return MUI->isDerivedClassSelfOnly();
@@ -171,9 +185,17 @@ public:
   /// stored properties.
   bool isNonDelegatingInit() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
-      if (MUI->isDerivedClassSelf() || MUI->isDerivedClassSelfOnly() ||
-          MUI->isRootSelf())
+      switch (MUI->getKind()) {
+      case MarkUninitializedInst::Var:
+        return false;
+      case MarkUninitializedInst::RootSelf:
+      case MarkUninitializedInst::CrossModuleRootSelf:
+      case MarkUninitializedInst::DerivedSelf:
+      case MarkUninitializedInst::DerivedSelfOnly:
         return true;
+      case MarkUninitializedInst::DelegatingSelf:
+        return false;
+      }
     }
     return false;
   }

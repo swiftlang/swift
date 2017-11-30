@@ -582,17 +582,17 @@ extension Bool : _ObjectiveCBridgeable {
 extension CGFloat : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
     public init(_ number: NSNumber) {
-        native = CGFloat.NativeType(truncating: number)
+        self.init(CGFloat.NativeType(truncating: number))
     }
 
     public init(truncating number: NSNumber) {
-        native = CGFloat.NativeType(truncating: number)
+        self.init(CGFloat.NativeType(truncating: number))
     }
 
     public init?(exactly number: NSNumber) {
         var nativeValue: CGFloat.NativeType? = 0
         guard CGFloat.NativeType._conditionallyBridgeFromObjectiveC(number, result: &nativeValue) else { return nil }
-        self.native = nativeValue!
+        self.init(nativeValue!)
     }
 
     @_semantics("convertToObjectiveC")

@@ -117,6 +117,12 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI)
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
   NumElements += unsigned(isDerivedClassSelf());
+
+  // Make sure we track /something/ in a cross-module struct initializer.
+  if (NumElements == 0 && isCrossModuleStructInitSelf()) {
+    NumElements = 1;
+    HasDummyElement = true;
+  }
 }
 
 SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {

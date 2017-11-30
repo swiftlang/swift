@@ -2291,7 +2291,19 @@ public:
   bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
                                  const DeclContext *DC);
 
-  void diagnoseResilientConstructor(ConstructorDecl *ctor);
+  /// Used in diagnostic %selects.
+  enum class FragileFunctionKind : unsigned {
+    Transparent,
+    InlineAlways,
+    Inlineable,
+    DefaultArgument
+  };
+
+  /// Given that \p DC is within a fragile context for some reason, describe
+  /// why.
+  ///
+  /// \see FragileFunctionKind
+  FragileFunctionKind getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
   ///
