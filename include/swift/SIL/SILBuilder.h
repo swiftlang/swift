@@ -1282,11 +1282,10 @@ public:
 
   WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
                                          ProtocolConformanceRef Conformance,
-                                         SILDeclRef Member, SILType MethodTy,
-                                         bool Volatile = false) {
+                                         SILDeclRef Member, SILType MethodTy) {
     return insert(WitnessMethodInst::create(
         getSILDebugLocation(Loc), LookupTy, Conformance, Member, MethodTy,
-        &getFunction(), OpenedArchetypes, Volatile));
+        &getFunction(), OpenedArchetypes));
   }
 
   OpenExistentialAddrInst *

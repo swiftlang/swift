@@ -62,7 +62,7 @@ func protocol_generic_method(x: Existentiable) -> Loadable {
 }
 
 // CHECK-LABEL: sil hidden @_T09witnesses20protocol_objc_methodyAA8ObjCAble_p1x_tF : $@convention(thin) (@owned ObjCAble) -> ()
-// CHECK:         witness_method [volatile] $@opened({{.*}}) ObjCAble, #ObjCAble.foo!1.foreign
+// CHECK:         objc_method {{%.*}} : $@opened({{.*}}) ObjCAble, #ObjCAble.foo!1.foreign
 func protocol_objc_method(x: ObjCAble) {
   x.foo()
 }

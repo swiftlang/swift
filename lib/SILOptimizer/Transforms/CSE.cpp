@@ -880,9 +880,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
       return false;
     return !BI->mayReadOrWriteMemory();
   }
-  if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
-    return !WMI->isVolatile();
-  }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
     return !EMI->getOperand()->getType().isAddress();
   }
@@ -937,6 +934,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::WitnessMethodInst:
     return true;
   default:
     return false;
