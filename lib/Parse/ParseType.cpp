@@ -157,10 +157,6 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
                                                alignment, Context);
 }
 
-ParserResult<TypeRepr> Parser::parseTypeSimple() {
-  return parseTypeSimple(diag::expected_type);
-}
-
 /// parseTypeSimple
 ///   type-simple:
 ///     type-identifier
@@ -675,10 +671,6 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
   }
 
   return makeSyntaxResult(Status, SyntaxNode, ITR);
-}
-
-ParserResult<TypeRepr> Parser::parseTypeSimpleOrComposition() {
-  return parseTypeSimpleOrComposition(diag::expected_identifier_for_type);
 }
 
 /// parseTypeSimpleOrComposition
