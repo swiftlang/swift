@@ -109,10 +109,10 @@ public struct CollectionOfOne<Element>
 
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Int>)
-    -> MutableRandomAccessSlice<CollectionOfOne<Element>> {
+    -> Slice<CollectionOfOne<Element>> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableRandomAccessSlice(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
     set {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
