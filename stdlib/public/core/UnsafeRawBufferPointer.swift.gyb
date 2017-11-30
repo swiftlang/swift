@@ -100,7 +100,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
   public typealias Index = Int
   public typealias IndexDistance = Int
-  public typealias SubSequence = ${Mutable}RandomAccessSlice<${Self}>
+  public typealias SubSequence = ${Mutable}Slice<${Self}>
 
   /// An iterator over the bytes viewed by a raw buffer pointer.
   @_fixed_layout
@@ -386,7 +386,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter slice: The raw buffer slice to rebase.
   @_inlineable
-  public init(rebasing slice: RandomAccessSlice<UnsafeRawBufferPointer>) {
+  public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
     self.init(start: slice.base.baseAddress! + slice.startIndex,
       count: slice.count)
   }
@@ -414,7 +414,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// - Parameter slice: The raw buffer slice to rebase.
   @_inlineable
   public init(
-    rebasing slice: MutableRandomAccessSlice<UnsafeMutableRawBufferPointer>
+    rebasing slice: Slice<UnsafeMutableRawBufferPointer>
   ) {
     self.init(start: slice.base.baseAddress! + slice.startIndex,
       count: slice.count)
@@ -471,11 +471,11 @@ public struct Unsafe${Mutable}RawBufferPointer
   @_inlineable
   public subscript(
     bounds: Range<Int>
-  ) -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}RawBufferPointer> {
+  ) -> Slice<Unsafe${Mutable}RawBufferPointer> {
     get {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
-      return ${Mutable}RandomAccessSlice(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
 %  if mutable:
     nonmutating set {

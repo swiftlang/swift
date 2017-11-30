@@ -82,9 +82,11 @@ public typealias Indexable = Collection
 ///     // Prints "15.0"
 ///     // Prints "20.0"
 @_fixed_layout
-public struct IndexingIterator<
-  Elements : Collection
-> : IteratorProtocol, Sequence {
+public struct IndexingIterator<Elements : Collection> {
+  @_versioned
+  internal let _elements: Elements
+  @_versioned
+  internal var _position: Elements.Index
 
   @_inlineable
   @inline(__always)
@@ -103,6 +105,12 @@ public struct IndexingIterator<
     self._elements = _elements
     self._position = _position
   }
+}
+
+extension IndexingIterator: IteratorProtocol, Sequence {
+  public typealias Element = Elements.Element
+  public typealias Iterator = IndexingIterator<Elements>
+  public typealias SubSequence = AnySequence<Element>
 
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -136,11 +144,6 @@ public struct IndexingIterator<
     _elements.formIndex(after: &_position)
     return element
   }
-  
-  @_versioned
-  internal let _elements: Elements
-  @_versioned
-  internal var _position: Elements.Index
 }
 
 /// A sequence whose elements can be traversed multiple times,
@@ -345,8 +348,7 @@ public struct IndexingIterator<
 /// or bidirectional collection must traverse the entire collection to count
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
-public protocol Collection : Sequence
-{
+public protocol Collection: Sequence where SubSequence: Collection {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
@@ -403,7 +405,7 @@ public protocol Collection : Sequence
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence : Collection = Slice<Self>
+  associatedtype SubSequence = Slice<Self>
     where SubSequence.Index == Index,
           SubSequence.IndexDistance == IndexDistance
 

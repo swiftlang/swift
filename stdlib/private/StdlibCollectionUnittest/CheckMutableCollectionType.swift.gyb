@@ -276,7 +276,8 @@ self.test("\(testNamePrefix).subscript(_: Range)/Set/semantics") {
       // Call setter implicitly through an inout mutation.
       var c = makeWrappedCollection(test.collection)
 
-      _mapInPlace(&c[test.bounds(in: c)]) {
+      var s = c[test.bounds(in: c)]
+      _mapInPlace(&s) {
         wrapValue(OpaqueValue(extractValue($0).value + 90000))
       }
 
