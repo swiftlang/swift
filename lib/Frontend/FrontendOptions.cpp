@@ -373,7 +373,6 @@ bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
-  case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::Typecheck:
   case ActionType::DumpParse:
@@ -383,24 +382,24 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-    return false;
   case ActionType::EmitPCH:
   case ActionType::EmitSILGen:
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:
   case ActionType::EmitModuleOnly:
-  case ActionType::MergeModules:
-    return true;
-  case ActionType::Immediate:
-  case ActionType::REPL:
-    return false;
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
+  case ActionType::MergeModules:
     return true;
+
+  case ActionType::NoneAction:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    return false;
   }
   llvm_unreachable("Unknown ActionType");
 }
