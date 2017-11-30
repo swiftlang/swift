@@ -35,7 +35,7 @@ func repr(_ x: NSString) -> String {
   return "\(NSStringFromClass(object_getClass(x)))\(hexAddr(x)) = \"\(x)\""
 }
 
-func repr(_ x: _StringCore) -> String {
+func repr(_ x: _LegacyStringCore) -> String {
   if x.hasContiguousStorage {
     if let b = x.nativeBuffer {
     let offset = x.elementWidth == 2

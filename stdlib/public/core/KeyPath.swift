@@ -1523,7 +1523,7 @@ internal struct KeyPathBuffer {
                      alignment: MemoryLayout<T>.alignment)
     let resultBuf = UnsafeMutablePointer<T>.allocate(capacity: 1)
     _memcpy(dest: resultBuf,
-            src: UnsafeMutableRawPointer(mutating: raw.baseAddress.unsafelyUnwrapped),
+            src: raw.baseAddress.unsafelyUnwrapped,
             size: UInt(MemoryLayout<T>.size))
     let result = resultBuf.pointee
     resultBuf.deallocate()
@@ -2029,12 +2029,12 @@ public func _appendingKeyPaths<
         let rootPtr = root._kvcKeyPathStringPtr.unsafelyUnwrapped
         let leafPtr = leaf._kvcKeyPathStringPtr.unsafelyUnwrapped
         _memcpy(dest: kvcStringBuffer,
-                src: UnsafeMutableRawPointer(mutating: rootPtr),
+                src: rootPtr,
                 size: UInt(rootKVCLength))
         kvcStringBuffer.advanced(by: rootKVCLength)
           .storeBytes(of: 0x2E /* '.' */, as: CChar.self)
         _memcpy(dest: kvcStringBuffer.advanced(by: rootKVCLength + 1),
-                src: UnsafeMutableRawPointer(mutating: leafPtr),
+                src: leafPtr,
                 size: UInt(leafKVCLength))
         result._kvcKeyPathStringPtr =
           UnsafePointer(kvcStringBuffer.assumingMemoryBound(to: CChar.self))

@@ -45,25 +45,6 @@ func _stdlib_binary_CFStringGetCharactersPtr(
   return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
-/// Bridges `source` to `Swift.String`, assuming that `source` has non-ASCII
-/// characters (does not apply ASCII optimizations).
-@_versioned // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
-func _cocoaStringToSwiftString_NonASCII(
-  _ source: _CocoaString
-) -> String {
-  let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
-  let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
-  let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
-
-  return String(_StringCore(
-    baseAddress: start,
-    count: length,
-    elementShift: 1,
-    hasCocoaBuffer: true,
-    owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self)))
-}
-
 /// Loading Foundation initializes these function variables
 /// with useful values
 
@@ -90,7 +71,7 @@ internal func _cocoaStringToContiguous(
   return buffer
 }
 
-/// Reads the entire contents of a _CocoaString into contiguous
+/// Copies the entire contents of a _CocoaString into contiguous
 /// storage of sufficient capacity.
 @_versioned // FIXME(sil-serialize-all)
 @inline(never) // Hide the CF dependency
@@ -102,14 +83,27 @@ internal func _cocoaStringReadAll(
       location: 0, length: _swift_stdlib_CFStringGetLength(source)), destination)
 }
 
+/// Copies a slice of a _CocoaString into contiguous storage of
+/// sufficient capacity.
+@_versioned // FIXME(sil-serialize-all)
+@inline(never) // Hide the CF dependency
+internal func _cocoaStringCopyCharacters(
+  from source: _CocoaString,
+  range: Range<Int>,
+  into destination: UnsafeMutablePointer<UTF16.CodeUnit>
+) {
+  _swift_stdlib_CFStringGetCharacters(
+    source,
+    _swift_shims_CFRange(location: range.lowerBound, length: range.count),
+    destination)
+}
+
 @_versioned // FIXME(sil-serialize-all)
 @inline(never) // Hide the CF dependency
 internal func _cocoaStringSlice(
-  _ target: _StringCore, _ bounds: Range<Int>
-) -> _StringCore {
-  _sanityCheck(target.hasCocoaBuffer)
-  
-  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
+  _ target: _CocoaString, _ bounds: Range<Int>
+) -> _CocoaString {
+  let cfSelf: _swift_shims_CFStringRef = target
   
   _sanityCheck(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
@@ -119,15 +113,15 @@ internal func _cocoaStringSlice(
     nil, cfSelf, _swift_shims_CFRange(
       location: bounds.lowerBound, length: bounds.count)) as AnyObject
 
-  return String(_cocoaString: cfResult)._core
+  return cfResult
 }
 
 @_versioned // FIXME(sil-serialize-all)
 @inline(never) // Hide the CF dependency
 internal func _cocoaStringSubscript(
-  _ target: _StringCore, _ position: Int
+  _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
-  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
+  let cfSelf: _swift_shims_CFStringRef = target
 
   _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
@@ -145,47 +139,94 @@ internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   return 0x0600
 }
 
+internal func _getCocoaStringPointer(
+  _ cfImmutableValue: _CocoaString
+) -> (UnsafeRawPointer?, isUTF16: Bool)  {
+  // Look first for null-terminated ASCII
+  // Note: the code in clownfish appears to guarantee
+  // nul-termination, but I'm waiting for an answer from Chris Kane
+  // about whether we can count on it for all time or not.
+  let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
+    cfImmutableValue, kCFStringEncodingASCII)
+
+  // start will hold the base pointer of contiguous storage, if it
+  // is found.
+  var start: UnsafeRawPointer?
+  let isUTF16 = (nulTerminatedASCII == nil)
+  if isUTF16 {
+    let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
+    start = UnsafeRawPointer(utf16Buf)
+  } else {
+    start = UnsafeRawPointer(nulTerminatedASCII)
+  }
+  return (start, isUTF16: isUTF16)
+}
+
+@_versioned
+@inline(never) // Hide the CF dependency
+internal
+func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
+  if let wrapped = cocoaString as? _NSContiguousString {
+    return wrapped._guts
+  }
+  if _isObjCTaggedPointer(cocoaString) {
+    return _StringGuts(SmallCocoaString(cocoaString))
+  }
+  // "copy" it into a value to be sure nobody will modify behind
+  // our backs.  In practice, when value is already immutable, this
+  // just does a retain.
+  let cfImmutableValue
+    = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
+
+  if _isObjCTaggedPointer(cfImmutableValue) {
+    return _StringGuts(SmallCocoaString(cfImmutableValue))
+  }
+  
+  let (start, isUTF16) = _getCocoaStringPointer(cfImmutableValue)
+  return _StringGuts(NonTaggedCocoaString(
+      cfImmutableValue,
+      isSingleByte: !isUTF16,
+      start: start))
+}
+
+@inline(never) // Hide the CF dependency
+internal
+func makeCocoaLegacyStringCore(_cocoaString: AnyObject) -> _LegacyStringCore {
+  if let wrapped = _cocoaString as? _NSContiguousString {
+    return wrapped._core
+  }
+
+  // "copy" it into a value to be sure nobody will modify behind
+  // our backs.  In practice, when value is already immutable, this
+  // just does a retain.
+  let cfImmutableValue
+    = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
+
+  let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
+
+  // Look first for null-terminated ASCII
+  // Note: the code in clownfish appears to guarantee
+  // nul-termination, but I'm waiting for an answer from Chris Kane
+  // about whether we can count on it for all time or not.
+  let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
+    cfImmutableValue, kCFStringEncodingASCII)
+
+  // start will hold the base pointer of contiguous storage, if it
+  // is found.
+  let (start, isUTF16) = _getCocoaStringPointer(cfImmutableValue)
+
+  return _LegacyStringCore(
+    baseAddress: UnsafeMutableRawPointer(mutating: start),
+    count: length,
+    elementShift: isUTF16 ? 1 : 0,
+    hasCocoaBuffer: true,
+    owner: cfImmutableValue)
+}
+
 extension String {
-  @inline(never) // Hide the CF dependency
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
-    if let wrapped = _cocoaString as? _NSContiguousString {
-      self._core = wrapped._core
-      return
-    }
-
-    // "copy" it into a value to be sure nobody will modify behind
-    // our backs.  In practice, when value is already immutable, this
-    // just does a retain.
-    let cfImmutableValue
-      = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
-
-    let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
-
-    // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
-    let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
-      cfImmutableValue, kCFStringEncodingASCII)
-
-    // start will hold the base pointer of contiguous storage, if it
-    // is found.
-    var start: UnsafeMutableRawPointer?
-    let isUTF16 = (nulTerminatedASCII == nil)
-    if isUTF16 {
-      let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-      start = UnsafeMutableRawPointer(mutating: utf16Buf)
-    } else {
-      start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
-    }
-
-    self._core = _StringCore(
-      baseAddress: start,
-      count: length,
-      elementShift: isUTF16 ? 1 : 0,
-      hasCocoaBuffer: true,
-      owner: cfImmutableValue)
+    self._guts = _makeCocoaStringGuts(_cocoaString)
   }
 }
 
@@ -223,16 +264,22 @@ public protocol _NSStringCore :
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
 @_fixed_layout // FIXME(sil-serialize-all)
 public final class _NSContiguousString : _SwiftNativeNSString {
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(_ _core: _StringCore) {
-    _sanityCheck(
-      _core.hasContiguousStorage,
-      "_NSContiguousString requires contiguous storage")
-    self._core = _core
-    super.init()
-  }
+  public let _guts: _StringGuts
 
   @_inlineable // FIXME(sil-serialize-all)
+  public init(_ _guts: _StringGuts) {
+    _sanityCheck(
+      !_guts._isOpaque,
+      "_NSContiguousString requires contiguous storage")
+    self._guts = _guts
+    super.init()
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  public convenience init(_fixmeLegacyCore _core: _LegacyStringCore) {
+    self.init(_StringGuts(_core))
+  }
+
   @_versioned // FIXME(sil-serialize-all)
 	@objc
   init(coder aDecoder: AnyObject) {
@@ -242,73 +289,84 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @_inlineable // FIXME(sil-serialize-all)
   deinit {}
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal var _unmanagedContiguous: UnsafeString {
+    @inline(__always)
+    get {
+      return _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
+    }
+  }
+  
   @_versioned // FIXME(sil-serialize-all)
 	@objc
   func length() -> Int {
-    return _core.count
+    return _guts.count
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
 	@objc
   func characterAtIndex(_ index: Int) -> UInt16 {
-    return _core[index]
+    defer { _fixLifetime(self) }
+    return _unmanagedContiguous[index]
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @objc @inline(__always) // Performance: To save on reference count operations.
   func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
-
-    _precondition(aRange.location + aRange.length <= Int(_core.count))
-
-    if _core.elementWidth == 2 {
-      UTF16._copy(
-        source: _core.startUTF16 + aRange.location,
-        destination: UnsafeMutablePointer<UInt16>(buffer),
-        count: aRange.length)
-    }
-    else {
-      UTF16._copy(
-        source: _core.startASCII + aRange.location,
-        destination: UnsafeMutablePointer<UInt16>(buffer),
-        count: aRange.length)
-    }
+    _precondition(aRange.location >= 0 && aRange.length >= 0)
+    _precondition(aRange.location + aRange.length <= Int(_guts.count))
+    let slice = _unmanagedContiguous.slice(
+      aRange.location ..< aRange.location + aRange.length)
+    slice._copy(
+      into: UnsafeMutableRawPointer(buffer),
+      capacityEnd: UnsafeMutableRawPointer(buffer + aRange.length),
+      accomodatingElementWidth: 2)
+    _fixLifetime(self)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @objc
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
-    return _core.elementWidth == 2 ? _core.startUTF16 : nil
+    let unmanaged = _unmanagedContiguous
+    defer { _fixLifetime(self) }
+    guard !unmanaged.isSingleByte else { return nil }
+    return UnsafeMutablePointer(mutating: unmanaged.utf16Buffer.baseAddress)
   }
+
+  #if false // FIXME Bool parameter
+  @_versioned // FIXME(sil-serialize_all)
+  @objc(_fastCStringContents:)
+  func _fastCStringContents(
+    _ nullTerminationRequired: Bool
+  ) -> UnsafePointer<UInt8>? {
+    let unmanaged = _unmanagedContiguous
+    defer { _fixLifetime(_guts) }
+    guard !nullTerminationRequired, unmanaged.isSingleByte else { return nil }
+    return unmanaged.asciiBuffer.baseAddress
+  }
+  #endif
 
   //
   // Implement sub-slicing without adding layers of wrapping
   //
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @objc func substringFromIndex(_ start: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[Int(start)..<Int(_core.count)])
+    return _NSContiguousString(_fixmeLegacyCore: _core[Int(start)..<Int(_guts.count)])
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @objc func substringToIndex(_ end: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[0..<Int(end)])
+    return _NSContiguousString(_fixmeLegacyCore: _core[0..<Int(end)])
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @objc func substringWithRange(_ aRange: _SwiftNSRange) -> _NSContiguousString {
-    return _NSContiguousString(
+    return _NSContiguousString(_fixmeLegacyCore:
       _core[Int(aRange.location)..<Int(aRange.location + aRange.length)])
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @objc func copy() -> AnyObject {
     // Since this string is immutable we can just return ourselves.
@@ -352,7 +410,10 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     return try body(selfAsPointer, rhsAsPointer)
   }
 
-  public let _core: _StringCore
+  public // @testable
+  var _core: _LegacyStringCore {
+    return _guts._legacyCore
+  }
 }
 
 extension String {
@@ -360,12 +421,10 @@ extension String {
   /// library.
   @_inlineable // FIXME(sil-serialize-all)
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer,
-        _swift_stdlib_CFStringGetLength(ns) == _core.count {
-      return ns
+    if let cocoa = _guts._cocoaObject {
+      return cocoa
     }
-    _sanityCheck(_core.hasContiguousStorage)
-    return _NSContiguousString(_core)
+    return _NSContiguousString(_guts)
   }
 
   @inline(never) // Hide the CF dependency

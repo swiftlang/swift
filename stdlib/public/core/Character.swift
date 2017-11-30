@@ -182,14 +182,11 @@ public struct Character :
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
     default:
       _representation = Character(
-        _largeRepresentationString: String(
-          _StringCore(
-            baseAddress: UnsafeMutableRawPointer(start), 
-            count: utf16.count,
-            elementShift: 1,
-            hasCocoaBuffer: false,
-            owner: nil)
-        ))._representation
+        _largeRepresentationString: String(_StringGuts(UnsafeString(
+          baseAddress: UnsafeMutableRawPointer(start),
+          count: utf16.count,
+          isSingleByte: false
+        ))))._representation
     }
   }
   
@@ -223,13 +220,13 @@ public struct Character :
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ s: String) {
     _precondition(
-      s._core.count != 0, "Can't form a Character from an empty String")
+      s._guts.count != 0, "Can't form a Character from an empty String")
     _debugPrecondition(
       s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    if _fastPath(s._core.count <= 4) {
-      let b = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(s._core)
+    if _fastPath(s._guts.count <= 4) {
+      let b = _SmallUTF16(s._core)
       if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
         _representation = .smallUTF16(
           Builtin.trunc_Int64_Int63(b._storage._value))
@@ -248,15 +245,7 @@ public struct Character :
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_largeRepresentationString s: String) {
-    if let native = s._core.nativeBuffer,
-      native.start == s._core._baseAddress!,
-      native.usedCount == s._core.count {
-      _representation = .large(native._storage)
-      return
-    }
-    var nativeString = ""
-    nativeString.append(s)
-    _representation = .large(nativeString._core.nativeBuffer!._storage)
+    _representation = .large(s._guts._extractStringBuffer()._storage)
   }
 
   // FIXME(sil-serialize-all): Should be @_inlineable  @_versioned
@@ -305,14 +294,16 @@ extension Character : CustomDebugStringConvertible {
 }
 
 extension Character {
+  internal typealias _SmallUTF16 = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>
+
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _smallUTF16 : _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>? {
+  internal var _smallUTF16 : _SmallUTF16? {
     guard case .smallUTF16(let _63bits) = _representation else { return nil }
     _onFastPath()
     let bits = UInt64(Builtin.zext_Int63_Int64(_63bits))
     let minBitWidth = type(of: bits).bitWidth - bits.leadingZeroBitCount
-    return _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>(
+    return _SmallUTF16(
       _storage: bits,
       _bitCount: UInt8(
         truncatingIfNeeded: 16 * Swift.max(1, (minBitWidth + 15) / 16))
@@ -321,9 +312,9 @@ extension Character {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _largeUTF16 : _StringCore? {
+  internal var _largeUTF16 : _StringGuts? {
     guard case .large(let storage) = _representation else { return nil }
-    return _StringCore(_StringBuffer(storage))
+    return _StringGuts(_StringBuffer(storage))
   }
 }
 

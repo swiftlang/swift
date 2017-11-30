@@ -1,4 +1,4 @@
-//===--- StringUTF8.swift - A UTF8 view of _StringCore --------------------===//
+//===--- StringUTF8.swift - A UTF8 view of _LegacyStringCore --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  _StringCore currently has three representations: Native ASCII,
+//  _LegacyStringCore currently has three representations: Native ASCII,
 //  Native UTF-16, and Opaque Cocoa.  Expose each of these as UTF-8 in a
 //  way that will hopefully be efficient to traverse
 //
@@ -99,7 +99,13 @@ extension String {
 
     /// Underlying UTF-16-compatible representation 
     @_versioned
-    internal let _core: _StringCore
+    internal var _guts: _StringGuts
+
+    @_versioned
+    internal var _core: _LegacyStringCore {
+      get { return _guts._legacyCore }
+      set { self._guts = _StringGuts(newValue) }
+    }
 
     /// Distances to `(startIndex, endIndex)` from the endpoints of _core,
     /// measured in UTF-8 code units.
@@ -110,13 +116,27 @@ extension String {
     @_versioned
     internal let _legacyOffsets: (start: Int8, end: Int8)
 
+    /// Flags indicating whether the limits of this view did not originally fall
+    /// on grapheme cluster boundaries in the original string. This is used to
+    /// emulate (undocumented) Swift 3 behavior where String.init?(_:) returned
+    /// nil in such cases.
+    ///
+    /// Note: this is *only* here to support legacy Swift3-style slicing where
+    /// `s.utf8[i..<j]` produces a `String.UTF8View`, and should be removed when
+    /// those semantics are no longer supported.
+    @_versioned
+    internal let _legacyPartialCharacters: (start: Bool, end: Bool)
+
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
-    internal init(_ _core: _StringCore,
-      legacyOffsets: (Int, Int) = (0, 0)
+    internal init(
+      _ _guts: _StringGuts,
+      legacyOffsets: (Int, Int) = (0, 0),
+      legacyPartialCharacters: (Bool, Bool) = (false, false)
     ) {
-      self._core = _core
+      self._guts = _guts
       self._legacyOffsets = (Int8(legacyOffsets.0), Int8(legacyOffsets.1))
+      self._legacyPartialCharacters = legacyPartialCharacters
     }
 
     public typealias Index = String.Index
@@ -128,7 +148,7 @@ extension String {
     /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
     @_inlineable // FIXME(sil-serialize-all)
     public var startIndex: Index {
-      let r = _index(atEncodedOffset: _core.startIndex)
+      let r = _index(atEncodedOffset: _guts.startIndex)
       if _legacyOffsets.start == 0 { return r }
       return index(r, offsetBy: numericCast(_legacyOffsets.start))
     }
@@ -142,7 +162,7 @@ extension String {
       _sanityCheck(_legacyOffsets.end >= -3 && _legacyOffsets.end <= 0,
         "out of bounds legacy end")
 
-      var r = Index(encodedOffset: _core.endIndex)
+      var r = Index(encodedOffset: _guts.endIndex)
       if _fastPath(_legacyOffsets.end == 0) {
         return r
       }
@@ -157,8 +177,8 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned
     internal func _index(atEncodedOffset n: Int) -> Index {
-      if _fastPath(_core.isASCII) { return Index(encodedOffset: n) }
-      if n == _core.endIndex { return endIndex }
+      if _fastPath(_guts.isASCII) { return Index(encodedOffset: n) }
+      if n == _guts.endIndex { return endIndex }
       
       var p = UTF16.ForwardParser()
       var i = _core[n...].makeIterator()
@@ -188,8 +208,8 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     @inline(__always)
     public func index(after i: Index) -> Index {
-      if _fastPath(_core.isASCII) {
-        precondition(i.encodedOffset < _core.count)
+      if _fastPath(_guts.isASCII) {
+        precondition(i.encodedOffset < _guts.count)
         return Index(encodedOffset: i.encodedOffset + 1)
       }
 
@@ -238,7 +258,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     public func index(before i: Index) -> Index {
-      if _fastPath(_core.isASCII) {
+      if _fastPath(_guts.isASCII) {
         precondition(i.encodedOffset > 0)
         return Index(encodedOffset: i.encodedOffset - 1)
       }
@@ -274,7 +294,7 @@ extension String {
     
     @_inlineable // FIXME(sil-serialize-all)
     public func distance(from i: Index, to j: Index) -> IndexDistance {
-      if _fastPath(_core.isASCII) {
+      if _fastPath(_guts.isASCII) {
         return j.encodedOffset - i.encodedOffset
       }
       return j >= i
@@ -309,9 +329,15 @@ extension String {
     public subscript(position: Index) -> UTF8.CodeUnit {
       @inline(__always)
       get {
-        if _fastPath(_core.asciiBuffer != nil), let ascii = _core.asciiBuffer {
-          _precondition(position < endIndex, "Index out of bounds")
-          return ascii[position.encodedOffset]
+        if _fastPath(_guts.isASCII) {
+          let contigOpt = _guts._unmanagedContiguous
+          if _fastPath(contigOpt != nil) {
+            let offset = position.encodedOffset
+            _precondition(offset < contigOpt._unsafelyUnwrappedUnchecked.count,
+              "Index out of bounds")
+            return contigOpt._unsafelyUnwrappedUnchecked.asciiBuffer[
+              position.encodedOffset]
+          }
         }
         var j = position
         while true {
@@ -328,7 +354,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     public var description: String {
-      return String(_core)
+      return String(_guts)
     }
 
     @_inlineable // FIXME(sil-serialize-all)
@@ -341,7 +367,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public var utf8: UTF8View {
     get {
-      return UTF8View(self._core)
+      return UTF8View(self._guts)
     }
     set {
       self = String(describing: newValue)
@@ -415,29 +441,12 @@ extension String {
     message: "Please use non-failable String.init(_:UTF8View) instead")
   public init?(_ utf8: UTF8View) {
     if utf8.startIndex._transcodedOffset != 0
-    || utf8.endIndex._transcodedOffset != 0 {
+      || utf8.endIndex._transcodedOffset != 0
+      || utf8._legacyPartialCharacters.start
+      || utf8._legacyPartialCharacters.end {
       return nil
     }
-    // Attempt to recover the whole string, the better to implement the actual
-    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
-    // semantics may be impossible to preserve in the case of string literals,
-    // since we no longer have access to the length of the original string when
-    // there is no owner and elements have been dropped from the end.
-    if let nativeBuffer = utf8._core.nativeBuffer {
-      let wholeString = String(_StringCore(nativeBuffer))
-      let offset = (utf8._core._baseAddress! - nativeBuffer.start)
-        &>> utf8._core.elementShift
-
-      if Index(
-        encodedOffset: utf8.startIndex.encodedOffset + offset
-      ).samePosition(in: wholeString) == nil
-      || Index(
-        encodedOffset: utf8.endIndex.encodedOffset + offset
-      ).samePosition(in: wholeString) == nil {
-        return nil
-      }
-    }
-    self = String(utf8._core)
+    self = String(utf8._guts)
   }
 
   /// Creates a string corresponding to the given sequence of UTF-8 code units.
@@ -445,7 +454,7 @@ extension String {
   @available(swift, introduced: 4.0, message:
     "Please use failable String.init?(_:UTF8View) when in Swift 3.2 mode")
   public init(_ utf8: UTF8View) {
-    self = String(utf8._core)
+    self = String(utf8._guts)
   }
 
   /// The index type for subscripting a string.
@@ -455,7 +464,21 @@ extension String {
 extension String.UTF8View : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal var _persistentContent : String { return String(self._core) }
+  internal var _persistentContent : String {
+    return String(self._guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  var _wholeString : String {
+    return String(_guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  var _encodedOffsetRange : Range<Int> {
+    return 0..<_guts.count
+  }
 }
 
 extension String.UTF8View {
@@ -463,7 +486,7 @@ extension String.UTF8View {
   public struct Iterator {
     internal typealias _OutputBuffer = UInt64
     @_versioned // FIXME(sil-serialize-all)
-    internal let _source: _StringCore
+    internal let _source: _LegacyStringCore
     @_versioned // FIXME(sil-serialize-all)
     internal var _sourceIndex: Int
     @_versioned // FIXME(sil-serialize-all)
@@ -477,7 +500,7 @@ extension String.UTF8View {
 extension String.UTF8View.Iterator : IteratorProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_ source: _StringCore) {
+  internal init(_ source: _LegacyStringCore) {
     _source = source
     _sourceIndex = 0
     _buffer = 0
@@ -565,7 +588,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
 extension String.UTF8View {
   @_inlineable // FIXME(sil-serialize-all)
   public var count: Int {
-    if _fastPath(_core.isASCII) { return _core.count }
+    if _fastPath(_guts.isASCII) { return _guts.count }
     let b = _core._unmanagedUTF16
     if _fastPath(b != nil) {
       defer { _fixLifetime(_core) }
@@ -642,7 +665,7 @@ extension String.UTF8View.Index {
         transcodedOffset:sourcePosition._transcodedOffset, sourcePosition._cache)
 
     default:
-      guard String.UnicodeScalarView(target._core)._isOnUnicodeScalarBoundary(
+      guard String.UnicodeScalarView(target._guts)._isOnUnicodeScalarBoundary(
         sourcePosition) else { return nil }
       self.init(encodedOffset: sourcePosition.encodedOffset)
     }
@@ -708,7 +731,7 @@ extension String.UTF8View {
 /// `String.UTF8View`.
 extension String.UTF8View {
   public typealias SubSequence = Substring.UTF8View
-  
+
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
@@ -718,21 +741,36 @@ extension String.UTF8View {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(r: Range<Index>) -> String.UTF8View {
+    let wholeString = String(_guts)
+    let legacyPartialCharacters = (
+      (self._legacyPartialCharacters.start &&
+        r.lowerBound.encodedOffset == 0) ||
+      r.lowerBound.samePosition(in: wholeString) == nil,
+      (self._legacyPartialCharacters.end &&
+        r.upperBound.encodedOffset == _guts.count) ||
+      r.upperBound.samePosition(in: wholeString) == nil)
+
     if r.upperBound._transcodedOffset == 0 {
+      let slice = _guts._copySliceToStringBuffer(
+        r.lowerBound.encodedOffset..<r.upperBound.encodedOffset)
       return String.UTF8View(
-        _core[r.lowerBound.encodedOffset..<r.upperBound.encodedOffset],
-        legacyOffsets: (r.lowerBound._transcodedOffset, 0))
+        _StringGuts(slice),
+        legacyOffsets: (r.lowerBound._transcodedOffset, 0),
+        legacyPartialCharacters: legacyPartialCharacters)
     }
 
     let b0 = r.upperBound._cache.utf8!.first!
     let scalarLength8 = (~b0).leadingZeroBitCount
     let scalarLength16 = scalarLength8 == 4 ? 2 : 1
     let coreEnd = r.upperBound.encodedOffset + scalarLength16
+    let slice = _guts._copySliceToStringBuffer(
+      r.lowerBound.encodedOffset..<coreEnd)
     return String.UTF8View(
-      _core[r.lowerBound.encodedOffset..<coreEnd],
+      _StringGuts(slice),
       legacyOffsets: (
         r.lowerBound._transcodedOffset,
-        r.upperBound._transcodedOffset - scalarLength8))
+        r.upperBound._transcodedOffset - scalarLength8),
+      legacyPartialCharacters: legacyPartialCharacters)
   }
 
   @_inlineable // FIXME(sil-serialize-all)

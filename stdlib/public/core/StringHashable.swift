@@ -82,46 +82,46 @@ extension Unicode {
   }
 }
 
-@_versioned // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
-internal func _hashString(_ string: String) -> Int {
-  let core = string._core
-#if _runtime(_ObjC)
-    // Mix random bits into NSString's hash so that clients don't rely on
-    // Swift.String.hashValue and NSString.hash being the same.
-#if arch(i386) || arch(arm)
-    let hashOffset = Int(bitPattern: 0x88dd_cc21)
-#else
-    let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
-#endif
-  // If we have a contiguous string then we can use the stack optimization.
-  let isASCII = core.isASCII
-  if core.hasContiguousStorage {
-    if isASCII {
-      return hashOffset ^ _stdlib_CFStringHashCString(
-                              OpaquePointer(core.startASCII), core.count)
-    } else {
-      let stackAllocated = _NSContiguousString(core)
-      return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
-        return _stdlib_NSStringHashValuePointer($0, false)
-      }
-    }
-  } else {
-    let cocoaString = unsafeBitCast(
-      string._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
-    return hashOffset ^ _stdlib_NSStringHashValue(cocoaString, isASCII)
-  }
-#else
-  if let asciiBuffer = core.asciiBuffer {
-    return Unicode.hashASCII(UnsafeBufferPointer(
-      start: asciiBuffer.baseAddress!,
-      count: asciiBuffer.count))
-  } else {
-    return Unicode.hashUTF16(
-      UnsafeBufferPointer(start: core.startUTF16, count: core.count))
-  }
-#endif
-}
+// @_versioned // FIXME(sil-serialize-all)
+// @inline(never) // Hide the CF dependency
+// internal func _hashString(_ string: String) -> Int {
+//   let core = string._core
+// #if _runtime(_ObjC)
+//     // Mix random bits into NSString's hash so that clients don't rely on
+//     // Swift.String.hashValue and NSString.hash being the same.
+// #if arch(i386) || arch(arm)
+//     let hashOffset = Int(bitPattern: 0x88dd_cc21)
+// #else
+//     let hashOffset = Int(bitPattern: 0x429b_1266_88dd_cc21)
+// #endif
+//   // If we have a contiguous string then we can use the stack optimization.
+//   let isASCII = core.isASCII
+//   if core.hasContiguousStorage {
+//     if isASCII {
+//       return hashOffset ^ _stdlib_CFStringHashCString(
+//                               OpaquePointer(core.startASCII), core.count)
+//     } else {
+//       let stackAllocated = _NSContiguousString(core)
+//       return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
+//         return _stdlib_NSStringHashValuePointer($0, false)
+//       }
+//     }
+//   } else {
+//     let cocoaString = unsafeBitCast(
+//       string._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
+//     return hashOffset ^ _stdlib_NSStringHashValue(cocoaString, isASCII)
+//   }
+// #else
+//   if let asciiBuffer = core.asciiBuffer {
+//     return Unicode.hashASCII(UnsafeBufferPointer(
+//       start: asciiBuffer.baseAddress!,
+//       count: asciiBuffer.count))
+//   } else {
+//     return Unicode.hashUTF16(
+//       UnsafeBufferPointer(start: core.startUTF16, count: core.count))
+//   }
+// #endif
+// }
 
 
 extension String : Hashable {
@@ -131,7 +131,7 @@ extension String : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashString(self)
+    return _guts._computeHashValue()
   }
 }
 

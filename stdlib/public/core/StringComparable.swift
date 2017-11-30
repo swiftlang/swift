@@ -64,11 +64,11 @@ extension String {
     else {
       compare = Int(truncatingIfNeeded: _swift_stdlib_memcmp(
         self._core.startASCII, rhs._core.startASCII,
-        Swift.min(self._core.count, rhs._core.count)))      
+        Swift.min(self._guts.count, rhs._guts.count)))      
     }
 
     if compare == 0 {
-      compare = self._core.count - rhs._core.count
+      compare = self._guts.count - rhs._guts.count
     }
     // This efficiently normalizes the result to -1, 0, or 1 to match the
     // behavior of NSString's compare function.
@@ -84,8 +84,8 @@ extension String {
     // Character.
 #if _runtime(_ObjC)
     if self._core.hasContiguousStorage && rhs._core.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(self._core)
-      let rhsStr = _NSContiguousString(rhs._core)
+      let lhsStr = _NSContiguousString(self._guts)
+      let rhsStr = _NSContiguousString(rhs._guts)
       let res = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
         return Int(
             _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))
@@ -95,22 +95,22 @@ extension String {
     return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(
       _bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()))
 #else
-    switch (_core.isASCII, rhs._core.isASCII) {
+    switch (_guts.isASCII, rhs._guts.isASCII) {
     case (true, false):
       return Int(_swift_stdlib_unicode_compare_utf8_utf16(
-          _core.startASCII, Int32(_core.count),
-          rhs._core.startUTF16, Int32(rhs._core.count)))
+          _core.startASCII, Int32(_guts.count),
+          rhs._core.startUTF16, Int32(rhs._guts.count)))
     case (false, true):
       // Just invert it and recurse for this case.
       return -rhs._compareDeterministicUnicodeCollation(self)
     case (false, false):
       return Int(_swift_stdlib_unicode_compare_utf16_utf16(
-        _core.startUTF16, Int32(_core.count),
-        rhs._core.startUTF16, Int32(rhs._core.count)))
+        _core.startUTF16, Int32(_guts.count),
+        rhs._core.startUTF16, Int32(rhs._guts.count)))
     case (true, true):
       return Int(_swift_stdlib_unicode_compare_utf8_utf8(
-        _core.startASCII, Int32(_core.count),
-        rhs._core.startASCII, Int32(rhs._core.count)))
+        _core.startASCII, Int32(_guts.count),
+        rhs._core.startASCII, Int32(rhs._guts.count)))
     }
 #endif
   }
@@ -122,7 +122,7 @@ extension String {
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
     // This is consistent with Foundation, but incorrect as defined by Unicode.
-    if _core.isASCII && rhs._core.isASCII {
+    if _guts.isASCII && rhs._guts.isASCII {
       return _compareASCII(rhs)
     }
 #endif
@@ -130,34 +130,34 @@ extension String {
   }
 }
 
-extension String : Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public static func == (lhs: String, rhs: String) -> Bool {
-#if _runtime(_ObjC)
-    // We only want to perform this optimization on objc runtimes. Elsewhere,
-    // we will make it follow the unicode collation algorithm even for ASCII.
-    // This is consistent with Foundation, but incorrect as defined by Unicode.
-    if lhs._core.isASCII && rhs._core.isASCII {
-      if lhs._core.count != rhs._core.count {
-        return false
-      }
-      if lhs._core.startASCII == rhs._core.startASCII {
-        return true
-      }
-      return _swift_stdlib_memcmp(
-        lhs._core.startASCII, rhs._core.startASCII,
-        rhs._core.count) == (0 as CInt)
-    }
-#endif
-    return lhs._compareString(rhs) == 0
-  }
-}
+// extension String : Equatable {
+//   @_inlineable // FIXME(sil-serialize-all)
+//   @inline(__always)
+//   public static func == (lhs: String, rhs: String) -> Bool {
+// #if _runtime(_ObjC)
+//     // We only want to perform this optimization on objc runtimes. Elsewhere,
+//     // we will make it follow the unicode collation algorithm even for ASCII.
+//     // This is consistent with Foundation, but incorrect as defined by Unicode.
+//     if lhs._guts.isASCII && rhs._guts.isASCII {
+//       if lhs._guts.count != rhs._guts.count {
+//         return false
+//       }
+//       if lhs._core.startASCII == rhs._core.startASCII {
+//         return true
+//       }
+//       return _swift_stdlib_memcmp(
+//         lhs._core.startASCII, rhs._core.startASCII,
+//         rhs._guts.count) == (0 as CInt)
+//     }
+// #endif
+//     return lhs._compareString(rhs) == 0
+//   }
+// }
 
-extension String : Comparable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func < (lhs: String, rhs: String) -> Bool {
-    return lhs._compareString(rhs) < 0
-  }
-}
+// extension String : Comparable {
+//   @_inlineable // FIXME(sil-serialize-all)
+//   public static func < (lhs: String, rhs: String) -> Bool {
+//     return lhs._compareString(rhs) < 0
+//   }
+// }
 

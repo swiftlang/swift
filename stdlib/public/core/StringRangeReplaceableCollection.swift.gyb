@@ -62,7 +62,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
-    self._core = CharacterView(other)._core
+    self._guts = CharacterView(other)._guts
   }
   
   // The defaulted argument prevents this initializer from satisfies the
@@ -73,7 +73,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
   public init?(_ other: String, obsoletedInSwift4: () = ()) {
-    self.init(other._core)
+    self.init(other._guts)
   }
 
   /// The position of the first character in a nonempty string.
@@ -96,13 +96,13 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The index value immediately after `i`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
-    return characters.index(after: i)
+    return _guts.characterIndex(after: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
-    return characters.index(before: i)
+    return _guts.characterIndex(before: i)
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -127,10 +127,10 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    return characters.index(i, offsetBy: n)
-  }
+//  @_inlineable // FIXME(sil-serialize-all)
+//  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+//    return _guts.characterIndex(i, offsetBy: n)
+//  }
 
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
@@ -169,12 +169,12 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
-  ) -> Index? {
-    return characters.index(i, offsetBy: n, limitedBy: limit)
-  }
+//  @_inlineable // FIXME(sil-serialize-all)
+//  public func index(
+//    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+//  ) -> Index? {
+//    return characters.index(i, offsetBy: n, limitedBy: limit)
+//  }
 
   /// Returns the distance between two indices.
   ///
@@ -190,23 +190,23 @@ extension String : StringProtocol, RangeReplaceableCollection {
     return characters.distance(from: start, to: end)
   }
 
-  /// Accesses the character at the given position.
-  ///
-  /// You can use the same indices for subscripting a string and its substring.
-  /// For example, this code finds the first letter after the first space:
-  ///
-  ///     let str = "Greetings, friend! How are you?"
-  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
-  ///     let substr = str[firstSpace...]
-  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
-  ///         print("Capital after a space: \(str[nextCapital])")
-  ///     }
-  ///     // Prints "Capital after a space: H"
-  ///
-  /// - Parameter i: A valid index of the string. `i` must be less than the
-  ///   string's end index.
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(i: Index) -> Character { return characters[i] }
+  // /// Accesses the character at the given position.
+  // ///
+  // /// You can use the same indices for subscripting a string and its substring.
+  // /// For example, this code finds the first letter after the first space:
+  // ///
+  // ///     let str = "Greetings, friend! How are you?"
+  // ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  // ///     let substr = str[firstSpace...]
+  // ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  // ///         print("Capital after a space: \(str[nextCapital])")
+  // ///     }
+  // ///     // Prints "Capital after a space: H"
+  // ///
+  // /// - Parameter i: A valid index of the string. `i` must be less than the
+  // ///   string's end index.
+  // @_inlineable // FIXME(sil-serialize-all)
+  // public subscript(i: Index) -> Character { return characters[i] }
 }
 
 extension String {
@@ -228,7 +228,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
     where S.Iterator.Element == Character {
-    self._core = CharacterView(characters)._core
+    self._guts = CharacterView(characters)._guts
   }
 
   /// Reserves enough space in the string's underlying storage to store the
@@ -245,9 +245,7 @@ extension String {
   /// - Complexity: O(*n*)
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.reserveCapacity(n)
-    }
+    _guts.reserveCapacity(n)
   }
 
   /// Appends the given character to the string.
@@ -262,9 +260,23 @@ extension String {
   /// - Parameter c: The character to append to the string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.append(c)
+    if let small = c._smallUTF16 {
+      _guts.append(contentsOf: small)
+    } else {
+      _guts.append(c._largeUTF16!)
     }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func append(contentsOf newElements: String) {
+    _guts.append(newElements._guts)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public mutating func append(contentsOf newElements: Substring) {
+    _guts.append(
+      newElements._wholeString._guts,
+      range: newElements._encodedOffsetRange)
   }
 
   /// Appends the characters in the given sequence to the string.
@@ -273,9 +285,18 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Character {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.append(contentsOf: newElements)
+    if _fastPath(newElements is _SwiftStringView) {
+      let v = newElements as! _SwiftStringView
+      _guts.append(v._wholeString._guts, range: v._encodedOffsetRange)
+      return
     }
+    if _fastPath(newElements is Character._SmallUTF16) {
+      let v = newElements as! Character._SmallUTF16
+      
+      return
+    }
+    reserveCapacity(_guts.count + newElements.underestimatedCount)
+    for c in newElements { self.append(c) }
   }
 
   /// Replaces the text within the specified bounds with the given characters.
