@@ -1755,7 +1755,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
             assocType->getDeclContext());
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
-        if (result)
+        if (result && !result->hasError())
           return result;
       }
 
