@@ -712,15 +712,15 @@ extension String {
     return element
   }
 }
-extension String.CharacterView {
+extension String._CharacterView {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, obsoleted: 4, message:
     "Please use 'first', 'dropFirst()', or 'Substring.CharacterView.popFirst()'.")
-  public mutating func popFirst() -> String.CharacterView.Element? {
+  public mutating func popFirst() -> String._CharacterView.Element? {
     guard !isEmpty else { return nil }
     let element = first!
     let nextIdx = self.index(after: self.startIndex)
-    self = String(self[nextIdx...]).characters
+    self = String(self[nextIdx...])._characters
     return element
   }
 }

@@ -163,7 +163,7 @@ extension String : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
-    return characters._persistentContent
+    return _characters._persistentContent
   }
 }
 
