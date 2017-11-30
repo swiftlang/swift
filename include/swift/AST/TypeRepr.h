@@ -594,7 +594,6 @@ struct TupleTypeReprElement {
   SourceLoc SecondNameLoc;
   SourceLoc UnderscoreLoc;
   SourceLoc ColonLoc;
-  SourceLoc InOutLoc;
   TypeRepr *Type;
   SourceLoc TrailingCommaLoc;
 
