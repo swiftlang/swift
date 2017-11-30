@@ -640,7 +640,7 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
       (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
     return false;
   }
-  if (!Opts.actionHasOutput() || Opts.isCompilingExactlyOneSwiftFile()) {
+  if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) || Opts.isCompilingExactlyOneSwiftFile()) {
     Opts.ModuleName = "main";
     return false;
   }
@@ -680,8 +680,11 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 }
 
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
+  if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
+    Opts.OutputFilenames.clear();
+    return false;
+  }
   assert(
-      FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) ||
       !FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction));
 
   ArrayRef<std::string> outputFilenamesFromCommandLineOrFilelist =
@@ -711,6 +714,7 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
 }
 
 bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
+  assert(!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction) && "No name if no output");
   if (Opts.Inputs.isReadingFromStdin() ||
       FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction)) {
     Opts.setOutputFilenameToStdout();
