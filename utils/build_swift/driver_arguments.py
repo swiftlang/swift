@@ -824,126 +824,73 @@ def create_argument_parser():
            help='skip testing Swift stdlibs for Cygwin')
 
     # -------------------------------------------------------------------------
-    run_build_group = parser.add_argument_group(
-        title='Run build')
-    run_build_group.add_argument(
-        '--build-swift-dynamic-stdlib',
-        action=arguments.action.enable,
-        default=True,
-        help='build dynamic variants of the Swift standard library')
-    run_build_group.add_argument(
-        '--build-swift-static-stdlib',
-        action=arguments.action.enable,
-        help='build static variants of the Swift standard library')
-    run_build_group.add_argument(
-        '--build-swift-dynamic-sdk-overlay',
-        action=arguments.action.enable,
-        default=True,
-        help='build dynamic variants of the Swift SDK overlay')
-    run_build_group.add_argument(
-        '--build-swift-static-sdk-overlay',
-        action=arguments.action.enable,
-        help='build static variants of the Swift SDK overlay')
-    run_build_group.add_argument(
-        '--build-swift-stdlib-unittest-extra',
-        action=arguments.action.enable,
-        help='Build optional StdlibUnittest components')
-    run_build_group.add_argument(
-        '-S', '--skip-build',
-        action='store_true',
-        help='generate build directory only without building')
-    run_build_group.add_argument(
-        '--skip-build-linux',
-        action=arguments.action.disable,
-        dest='build_linux',
-        help='skip building Swift stdlibs for Linux')
-    run_build_group.add_argument(
-        '--skip-build-freebsd',
-        action=arguments.action.disable,
-        dest='build_freebsd',
-        help='skip building Swift stdlibs for FreeBSD')
-    run_build_group.add_argument(
-        '--skip-build-cygwin',
-        action=arguments.action.disable,
-        dest='build_cygwin',
-        help='skip building Swift stdlibs for Cygwin')
-    run_build_group.add_argument(
-        '--skip-build-osx',
-        action=arguments.action.disable,
-        dest='build_osx',
-        help='skip building Swift stdlibs for MacOSX')
+    in_group('Run build')
 
-    run_build_group.add_argument(
-        '--skip-build-ios',
-        action=arguments.action.disable,
-        dest='build_ios',
-        help='skip building Swift stdlibs for iOS')
-    run_build_group.add_argument(
-        '--skip-build-ios-device',
-        action=arguments.action.disable,
-        dest='build_ios_device',
-        help='skip building Swift stdlibs for iOS devices '
-             '(i.e. build simulators only)')
-    run_build_group.add_argument(
-        '--skip-build-ios-simulator',
-        action=arguments.action.disable,
-        dest='build_ios_simulator',
-        help='skip building Swift stdlibs for iOS simulator '
-             '(i.e. build devices only)')
+    option('--build-swift-dynamic-stdlib', toggle_true,
+           default=True,
+           help='build dynamic variants of the Swift standard library')
 
-    run_build_group.add_argument(
-        '--skip-build-tvos',
-        action=arguments.action.disable,
-        dest='build_tvos',
-        help='skip building Swift stdlibs for tvOS')
-    run_build_group.add_argument(
-        '--skip-build-tvos-device',
-        action=arguments.action.disable,
-        dest='build_tvos_device',
-        help='skip building Swift stdlibs for tvOS devices '
-             '(i.e. build simulators only)')
-    run_build_group.add_argument(
-        '--skip-build-tvos-simulator',
-        action=arguments.action.disable,
-        dest='build_tvos_simulator',
-        help='skip building Swift stdlibs for tvOS simulator '
-             '(i.e. build devices only)')
+    option('--build-swift-static-stdlib', toggle_true,
+           help='build static variants of the Swift standard library')
 
-    run_build_group.add_argument(
-        '--skip-build-watchos',
-        action=arguments.action.disable,
-        dest='build_watchos',
-        help='skip building Swift stdlibs for watchOS')
-    run_build_group.add_argument(
-        '--skip-build-watchos-device',
-        action=arguments.action.disable,
-        dest='build_watchos_device',
-        help='skip building Swift stdlibs for watchOS devices '
-             '(i.e. build simulators only)')
-    run_build_group.add_argument(
-        '--skip-build-watchos-simulator',
-        action=arguments.action.disable,
-        dest='build_watchos_simulator',
-        help='skip building Swift stdlibs for watchOS simulator '
-             '(i.e. build devices only)')
+    option('--build-swift-dynamic-sdk-overlay', toggle_true,
+           default=True,
+           help='build dynamic variants of the Swift SDK overlay')
 
-    run_build_group.add_argument(
-        '--skip-build-android',
-        action=arguments.action.disable,
-        dest='build_android',
-        help='skip building Swift stdlibs for Android')
+    option('--build-swift-static-sdk-overlay', toggle_true,
+           help='build static variants of the Swift SDK overlay')
 
-    run_build_group.add_argument(
-        '--skip-build-benchmarks',
-        action=arguments.action.disable,
-        dest='build_benchmarks',
-        help='skip building Swift Benchmark Suite')
+    option('--build-swift-stdlib-unittest-extra', toggle_true,
+           help='Build optional StdlibUnittest components')
 
-    run_build_group.add_argument(
-        '--build-external-benchmarks',
-        action=arguments.action.enable,
-        dest='build_external_benchmarks',
-        help='skip building Swift Benchmark Suite')
+    option(['-S', '--skip-build'], store_true,
+           help='generate build directory only without building')
+
+    option('--skip-build-linux', toggle_false('build_linux'),
+           help='skip building Swift stdlibs for Linux')
+    option('--skip-build-freebsd', toggle_false('build_freebsd'),
+           help='skip building Swift stdlibs for FreeBSD')
+    option('--skip-build-cygwin', toggle_false('build_cygwin'),
+           help='skip building Swift stdlibs for Cygwin')
+    option('--skip-build-osx', toggle_false('build_osx'),
+           help='skip building Swift stdlibs for MacOSX')
+
+    option('--skip-build-ios', toggle_false('build_ios'),
+           help='skip building Swift stdlibs for iOS')
+    option('--skip-build-ios-device', toggle_false('build_ios_device'),
+           help='skip building Swift stdlibs for iOS devices '
+                '(i.e. build simulators only)')
+    option('--skip-build-ios-simulator', toggle_false('build_ios_simulator'),
+           help='skip building Swift stdlibs for iOS simulator '
+                '(i.e. build devices only)')
+
+    option('--skip-build-tvos', toggle_false('build_tvos'),
+           help='skip building Swift stdlibs for tvOS')
+    option('--skip-build-tvos-device', toggle_false('build_tvos_device'),
+           help='skip building Swift stdlibs for tvOS devices '
+                '(i.e. build simulators only)')
+    option('--skip-build-tvos-simulator', toggle_false('build_tvos_simulator'),
+           help='skip building Swift stdlibs for tvOS simulator '
+                '(i.e. build devices only)')
+
+    option('--skip-build-watchos', toggle_false('build_watchos'),
+           help='skip building Swift stdlibs for watchOS')
+    option('--skip-build-watchos-device', toggle_false('build_watchos_device'),
+           help='skip building Swift stdlibs for watchOS devices '
+                '(i.e. build simulators only)')
+    option('--skip-build-watchos-simulator',
+           toggle_false('build_watchos_simulator'),
+           help='skip building Swift stdlibs for watchOS simulator '
+                '(i.e. build devices only)')
+
+    option('--skip-build-android', toggle_false('build_android'),
+           help='skip building Swift stdlibs for Android')
+
+    option('--skip-build-benchmarks', toggle_false('build_benchmarks'),
+           help='skip building Swift Benchmark Suite')
+
+    option('--build-external-benchmarks', toggle_true,
+           help='skip building Swift Benchmark Suite')
 
     # -------------------------------------------------------------------------
     skip_test_group = parser.add_argument_group(
