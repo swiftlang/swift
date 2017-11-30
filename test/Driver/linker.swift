@@ -260,13 +260,12 @@
 // LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
 // LINUX_DYNLIB-x86_64-NOT: -pie
 // LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
-// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_begin.o
+// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swiftrt.o
 // LINUX_DYNLIB-x86_64-DAG: [[OBJECTFILE]]
 // LINUX_DYNLIB-x86_64-DAG: @[[AUTOLINKFILE]]
 // LINUX_DYNLIB-x86_64-DAG: [[STDLIB_PATH]]
 // LINUX_DYNLIB-x86_64-DAG: -lswiftCore
 // LINUX_DYNLIB-x86_64-DAG: -L bar
-// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_end.o
 // LINUX_DYNLIB-x86_64: -o dynlib.out
 
 // DEBUG: bin/swift

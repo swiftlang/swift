@@ -273,8 +273,8 @@ _registerProtocolConformances(ConformanceState &C,
 
 void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
                                                    uintptr_t conformancesSize) {
-  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
-         && "weird-sized conformances section?!");
+  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0 &&
+         "conformances section not a multiple of ProtocolConformanceRecord");
 
   // If we have a section, enqueue the conformances for lookup.
   auto conformanceBytes = reinterpret_cast<const char *>(conformances);

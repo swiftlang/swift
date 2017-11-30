@@ -22,6 +22,7 @@
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/ELF.h"
+#include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/CommandLine.h"
 
 #if defined(_WIN32)
@@ -92,46 +93,52 @@ static SectionRef getSectionRef(const ObjectFile *objectFile,
   return SectionRef();
 }
 
-template<typename Section>
-static Section findReflectionSection(const ObjectFile *objectFile,
-                                     ArrayRef<StringRef> anySectionNames) {
+template <typename Section>
+static std::pair<Section, uintptr_t>
+findReflectionSection(const ObjectFile *objectFile,
+                      ArrayRef<StringRef> anySectionNames) {
   auto sectionRef = getSectionRef(objectFile, anySectionNames);
 
   if (sectionRef.getObject() == nullptr)
-    return {nullptr, nullptr};
+    return {{nullptr, nullptr}, 0};
 
   StringRef sectionContents;
   sectionRef.getContents(sectionContents);
 
-  return {
-    reinterpret_cast<const void *>(sectionContents.begin()),
-    reinterpret_cast<const void *>(sectionContents.end())
-  };
+  uintptr_t Offset = 0;
+  if (isa<ELFObjectFileBase>(sectionRef.getObject())) {
+    ELFSectionRef S{sectionRef};
+    Offset = sectionRef.getAddress() - S.getOffset();
+  }
+
+  return {{reinterpret_cast<const void *>(sectionContents.begin()),
+           reinterpret_cast<const void *>(sectionContents.end())},
+          Offset};
 }
 
 static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
   auto fieldSection = findReflectionSection<FieldSection>(
-      objectFile, {"__swift3_fieldmd", ".swift3_fieldmd"});
+      objectFile, {"__swift3_fieldmd", ".swift3_fieldmd", "swift3_fieldmd"});
   auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
-      objectFile, {"__swift3_assocty", ".swift3_assocty"});
+      objectFile, {"__swift3_assocty", ".swift3_assocty", "swift3_assocty"});
   auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
-      objectFile, {"__swift3_builtin", ".swift3_builtin"});
+      objectFile, {"__swift3_builtin", ".swift3_builtin", "swift3_builtin"});
   auto captureSection = findReflectionSection<CaptureSection>(
-      objectFile, {"__swift3_capture", ".swift3_capture"});
+      objectFile, {"__swift3_capture", ".swift3_capture", "swift3_capture"});
   auto typeRefSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift3_typeref", ".swift3_typeref"});
+      objectFile, {"__swift3_typeref", ".swift3_typeref", "swift3_typeref"});
   auto reflectionStringsSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift3_reflstr", ".swift3_reflstr"});
+      objectFile, {"__swift3_reflstr", ".swift3_reflstr", "swift3_reflstr"});
 
   return {
-    fieldSection,
-    associatedTypeSection,
-    builtinTypeSection,
-    captureSection,
-    typeRefSection,
-    reflectionStringsSection,
-    /*LocalStartAddress*/ 0,
-    /*RemoteStartAddress*/ 0,
+      {fieldSection.first, fieldSection.second},
+      {associatedTypeSection.first, associatedTypeSection.second},
+      {builtinTypeSection.first, builtinTypeSection.second},
+      {captureSection.first, captureSection.second},
+      {typeRefSection.first, typeRefSection.second},
+      {reflectionStringsSection.first, reflectionStringsSection.second},
+      /*LocalStartAddress*/ 0,
+      /*RemoteStartAddress*/ 0,
   };
 }
 

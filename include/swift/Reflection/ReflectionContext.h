@@ -147,7 +147,7 @@ public:
       if (CD == nullptr)
         return nullptr;
 
-      auto Info = getBuilder().getClosureContextInfo(*CD);
+      auto Info = getBuilder().getClosureContextInfo(*CD, 0);
 
       return getClosureContextInfo(ObjectAddress, Info);
     }
