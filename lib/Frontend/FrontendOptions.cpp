@@ -96,8 +96,8 @@ void FrontendInputs::transformInputFilenames(
   }
 }
 
-bool FrontendOptions::actionHasOutput() const {
-  switch (RequestedAction) {
+bool FrontendOptions::doesActionImplyMainModule(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::Typecheck:
@@ -108,7 +108,7 @@ bool FrontendOptions::actionHasOutput() const {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-    return false;
+    return true;
   case ActionType::EmitPCH:
   case ActionType::EmitSILGen:
   case ActionType::EmitSIL:
@@ -116,16 +116,16 @@ bool FrontendOptions::actionHasOutput() const {
   case ActionType::EmitSIB:
   case ActionType::EmitModuleOnly:
   case ActionType::MergeModules:
-    return true;
+    return false;
   case ActionType::Immediate:
   case ActionType::REPL:
-    return false;
+    return true;
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
-    return true;
+    return false;
   }
   llvm_unreachable("Unknown ActionType");
 }
@@ -406,37 +406,35 @@ bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
-    // FIXME: Some of these don't actually produce output
-    // but for now stay consistent with the status quo.
-  case ActionType::NoneAction:
-  case ActionType::EmitPCH:
-  case ActionType::EmitSIBGen:
-  case ActionType::EmitSIB:
-  case ActionType::MergeModules:
-  case ActionType::EmitModuleOnly:
-  case ActionType::EmitBC:
-  case ActionType::EmitObject:
   case ActionType::Parse:
   case ActionType::Typecheck:
   case ActionType::DumpParse:
-  case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
   case ActionType::EmitSyntax:
+  case ActionType::DumpInterfaceHash:
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCH:
   case ActionType::EmitSILGen:
   case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+  case ActionType::MergeModules:
     return true;
 
+  case ActionType::NoneAction:
   case ActionType::Immediate:
   case ActionType::REPL:
-    // These modes have no frontend-generated output.
     return false;
   }
+  llvm_unreachable("Unknown ActionType");
 }
 
 bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {

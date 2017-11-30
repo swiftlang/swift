@@ -514,9 +514,6 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
-  /// Indicates whether the RequestedAction has output.
-  bool actionHasOutput() const;
-
   /// Indicates whether the RequestedAction will immediately run code.
   bool actionIsImmediate() const;
 
@@ -551,6 +548,7 @@ private:
 
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
+  static bool doesActionImplyMainModule(ActionType);
 };
 
 }
