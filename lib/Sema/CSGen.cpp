@@ -408,11 +408,6 @@ namespace {
       // argument types, we can directly simplify the associated constraint
       // graph.
       auto simplifyBinOpExprTyVars = [&]() {
-        // Don't attempt to do linking if there are
-        // literals intermingled with other inferred types.
-        if (lti.haveLiteral())
-          return;
-
         for (auto binExp1 : lti.binaryExprs) {
           for (auto binExp2 : lti.binaryExprs) {
             if (binExp1 == binExp2)
