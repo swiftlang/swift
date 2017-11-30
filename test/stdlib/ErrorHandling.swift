@@ -200,9 +200,9 @@ ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/elementsEqual") {
+ErrorHandlingTests.test("ErrorHandling/elementsEqualInIterationOrder") {
   do {
-    let x: Bool = try [1, 2, 3].elementsEqual([1, 2, 3]) { _, _ in
+    let x: Bool = try [1, 2, 3].elementsEqualInIterationOrder([1, 2, 3]) { _, _ in
       throw SillyError.JazzHands
       return false
     }

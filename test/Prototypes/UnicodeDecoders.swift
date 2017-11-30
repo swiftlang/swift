@@ -242,7 +242,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
   func check<C: Collection>(_ expected: C, _ description: String)
   where C.Element == UInt32
   {
-    if !expected.elementsEqual(decoded) {
+    if !expected.elementsEqualInIterationOrder(decoded) {
       if result.description == "" { result = assertionFailure()  }
       result = result.withDescription(" [\(description)]\n")
         .withDescription("expected: \(asHex(expectedHead))\n")
