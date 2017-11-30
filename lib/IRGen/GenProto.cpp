@@ -2016,7 +2016,7 @@ ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
   auto checkCache =
       [&](const ProtocolConformance *conf) -> Optional<ConformanceInfo *> {
     // Check whether we've already cached this.
-    auto it = Conformances.find(conformance);
+    auto it = Conformances.find(conf);
     if (it != Conformances.end())
       return it->second;
 
