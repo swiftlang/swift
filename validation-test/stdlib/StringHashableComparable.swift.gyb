@@ -36,7 +36,7 @@ func calculateSortOrder(_ tests: inout [StringComparisonTest]) {
   }
 
   tests[0].order = 0
-  for i in tests.indices.dropFirst() {
+  for i in tests.indices.removingFirst() {
     if collationElements(
       tests[i - 1].collationElements,
       areLessThan: tests[i].collationElements

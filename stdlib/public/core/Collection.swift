@@ -158,7 +158,7 @@ public struct IndexingIterator<
 /// that position.
 ///
 ///     let text = "Buffalo buffalo buffalo buffalo."
-///     if let firstSpace = text.index(of: " ") {
+///     if let firstSpace = text.firstIndex(of: " ") {
 ///         print(text[..<firstSpace])
 ///     }
 ///     // Prints "Buffalo"
@@ -223,7 +223,7 @@ public struct IndexingIterator<
 /// You can retrieve the same slice using the string's ranged subscript, which
 /// takes a range expression.
 ///
-///     if let firstSpace = text.index(of: " ") {
+///     if let firstSpace = text.firstIndex(of: " ") {
 ///         print(text[..<firstSpace]
 ///         // Prints "Buffalo"
 ///     }
@@ -371,7 +371,7 @@ public protocol Collection : Sequence
   /// safe to use with `endIndex`. For example:
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let index = numbers.index(of: 30) {
+  ///     if let index = numbers.firstIndex(of: 30) {
   ///         print(numbers[index ..< numbers.endIndex])
   ///     }
   ///     // Prints "[30, 40, 50]"
@@ -443,7 +443,7 @@ public protocol Collection : Sequence
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // Prints "Evarts"
   ///
@@ -488,7 +488,7 @@ public protocol Collection : Sequence
   /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(upTo: i))
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -503,7 +503,7 @@ public protocol Collection : Sequence
   /// half-open range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(upTo:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[..<i])
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -523,7 +523,7 @@ public protocol Collection : Sequence
   /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.suffix(from: i))
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -538,7 +538,7 @@ public protocol Collection : Sequence
   /// from the index as the collection's subscript. The subscript notation is
   /// preferred over `suffix(from:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[i...])
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -559,7 +559,7 @@ public protocol Collection : Sequence
   /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(through: i))
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -568,7 +568,7 @@ public protocol Collection : Sequence
   /// closed range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(through:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -612,7 +612,7 @@ public protocol Collection : Sequence
   ///   of the collection.
   var count: IndexDistance { get }
   
-  // The following requirement enables dispatching for index(of:) when
+  // The following requirement enables dispatching for firstIndex(of:) when
   // the element type is Equatable.
   /// Returns `Optional(Optional(index))` if an element was found
   /// or `Optional(nil)` if an element was determined to be missing;
@@ -1057,7 +1057,7 @@ extension Collection where SubSequence == Slice<Self> {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // Prints "Evarts"
   ///
@@ -1170,7 +1170,7 @@ extension Collection {
   }
 
   // TODO: swift-3-indexing-model - rename the following to _customIndexOfEquatable(element)?
-  /// Customization point for `Collection.index(of:)`.
+  /// Customization point for `Collection.firstIndex(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(*n*) by exploiting collection-specific knowledge.
@@ -1240,9 +1240,9 @@ extension Collection {
   /// the collection, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropFirst(2))
+  ///     print(numbers.removingPrefix(2))
   ///     // Prints "[3, 4, 5]"
-  ///     print(numbers.dropFirst(10))
+  ///     print(numbers.removingPrefix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
@@ -1253,13 +1253,13 @@ extension Collection {
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from
   ///   the beginning of the collection.
   @_inlineable
-  public func dropFirst(_ n: Int) -> SubSequence {
+  public func removingPrefix(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
       offsetBy: numericCast(n), limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
-
+    
   /// Returns a subsequence containing all but the specified number of final
   /// elements.
   ///
@@ -1267,9 +1267,9 @@ extension Collection {
   /// collection, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast(2))
+  ///     print(numbers.removingSuffix(2))
   ///     // Prints "[1, 2, 3]"
-  ///     print(numbers.dropLast(10))
+  ///     print(numbers.removingSuffix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop off the end of the
@@ -1279,7 +1279,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public func dropLast(_ n: Int) -> SubSequence {
+  public func removingSuffix(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, numericCast(count) - n)
@@ -1298,7 +1298,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public func drop(
+  public func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var start = startIndex
@@ -1307,7 +1307,7 @@ extension Collection {
     } 
     return self[start..<endIndex]
   }
-
+  
   /// Returns a subsequence, up to the specified maximum length, containing
   /// the initial elements of the collection.
   ///
@@ -1392,7 +1392,7 @@ extension Collection {
   /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(upTo: i))
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -1407,7 +1407,7 @@ extension Collection {
   /// half-open range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(upTo:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[..<i])
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -1430,7 +1430,7 @@ extension Collection {
   /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.suffix(from: i))
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -1445,7 +1445,7 @@ extension Collection {
   /// from the index as the collection's subscript. The subscript notation is
   /// preferred over `suffix(from:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[i...])
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -1469,7 +1469,7 @@ extension Collection {
   /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(through: i))
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -1478,7 +1478,7 @@ extension Collection {
   /// closed range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(through:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -1675,7 +1675,7 @@ extension Collection where SubSequence == Self {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*).
   @_inlineable
-  public mutating func removeFirst(_ n: Int) {
+  public mutating func removePrefix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -1704,4 +1704,14 @@ extension Collection {
 extension Collection {
   @available(swift, deprecated: 3.2, renamed: "Element")
   public typealias _Element = Element
+}
+
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension Collection where SubSequence == Self {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removePrefix(_:)")
+  @_inlineable
+  public mutating func removeFirst(_ n: Int) {
+    return removePrefix(n)
+  }
 }

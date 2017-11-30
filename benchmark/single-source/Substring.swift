@@ -81,7 +81,7 @@ private func equivalentWithDistinctBuffers() -> (String, Substring) {
   s0 += "!"
   
   // These two should be equal but with distinct buffers, both refcounted.
-  let a = Substring(s0).dropFirst()
+  let a = Substring(s0).removingFirst()
   let b = String(a)
   return (b, a)
 }

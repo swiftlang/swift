@@ -49,7 +49,7 @@ var SequenceTypeTests = TestSuite("Sequence")
 //
 // - NaN behavior of floating point types, combined with these generic
 // algorithms, should make sense if possible.  For example,
-// [1.0, Double.nan].starts(with: [1.0, 2.0]) should be false.
+// [1.0, Double.nan].hasPrefix([1.0, 2.0]) should be false.
 
 //===----------------------------------------------------------------------===//
 // min(), max()
@@ -274,11 +274,11 @@ SequenceTypeTests.test("enumerated()") {
 }
 
 //===----------------------------------------------------------------------===//
-// starts(with:)
+// hasPrefix(_:)
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
-  for test in startsWithTests {
+SequenceTypeTests.test("hasPrefix(_:)/WhereElementIsEquatable") {
+  for test in hasPrefixTests {
     do {
       let s = MinimalSequence<MinimalEquatableValue>(
         elements: test.sequence.map(MinimalEquatableValue.init))
@@ -286,7 +286,7 @@ SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
         elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.starts(with: prefix),
+        s.hasPrefix(prefix),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -304,7 +304,7 @@ SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
         elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
-        s.starts(with: prefix),
+        s.hasPrefix(prefix),
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -316,8 +316,8 @@ SequenceTypeTests.test("starts(with:)/WhereElementIsEquatable") {
   }
 }
 
-SequenceTypeTests.test("starts(with:)/Predicate") {
-  for test in startsWithTests {
+SequenceTypeTests.test("hasPrefix(_:)/Predicate") {
+  for test in hasPrefixTests {
     do {
       let s = MinimalSequence<OpaqueValue<Int>>(
         elements: test.sequence.map(OpaqueValue.init))
@@ -325,7 +325,7 @@ SequenceTypeTests.test("starts(with:)/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.starts(with: prefix) { $0.value == $1.value },
+        s.hasPrefix(prefix) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
@@ -341,7 +341,7 @@ SequenceTypeTests.test("starts(with:)/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.starts(with: prefix) { $0.value / 2 == $1.value },
+        s.hasPrefix(prefix) { $0.value / 2 == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value / 2 },
@@ -359,7 +359,7 @@ SequenceTypeTests.test("starts(with:)/Predicate") {
         elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
-        s.starts(with: prefix) { $0.value == $1.value },
+        s.hasPrefix(prefix) { $0.value == $1.value },
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
@@ -943,33 +943,33 @@ SequenceTypeTests.test("forEach/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// dropFirst()
+// removingPrefix()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("dropFirst/dispatch") {
+SequenceTypeTests.test("removingPrefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.dropFirst(1)
-  expectCustomizable(tester, tester.log.dropFirst)
+  _ = tester.removingPrefix(1)
+  expectCustomizable(tester, tester.log.removingPrefix)
 }
 
 //===----------------------------------------------------------------------===//
-// dropLast()
+// removingSuffix()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("dropLast/dispatch") {
+SequenceTypeTests.test("removingSuffix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.dropLast(1)
-  expectCustomizable(tester, tester.log.dropLast)
+  _ = tester.removingSuffix(1)
+  expectCustomizable(tester, tester.log.removingSuffix)
 }
 
 //===----------------------------------------------------------------------===//
-// drop(while:)
+// removingPrefix(while:)
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("drop(while:)/dispatch") {
+SequenceTypeTests.test("removingPrefix(while:)/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.drop { _ in return false }
-  expectCustomizable(tester, tester.log.dropWhile)
+  tester.removingPrefix { _ in return false }
+  expectCustomizable(tester, tester.log.removingPrefixWhile)
 }
 
 //===----------------------------------------------------------------------===//
@@ -982,9 +982,9 @@ SequenceTypeTests.test("prefix/dispatch") {
   expectCustomizable(tester, tester.log.prefixMaxLength)
 }
 
-SequenceTypeTests.test("prefix/drop/dispatch") {
+SequenceTypeTests.test("prefix/removingPrefix/dispatch") {
   let xs = sequence(first: 1, next: {$0 < 10 ? $0 + 1 : nil})
-  expectEqualSequence([], Array(xs.prefix(3).drop(while: {$0 < 7})))
+  expectEqualSequence([], Array(xs.prefix(3).removingPrefix(while: {$0 < 7})))
 }
 
 //===----------------------------------------------------------------------===//

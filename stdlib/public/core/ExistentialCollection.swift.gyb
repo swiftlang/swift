@@ -266,7 +266,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   override = 'override' if Kind != 'Sequence' else ''
   @_versioned
   @_inlineable
-  internal ${override} func _drop(
+  internal ${override} func _removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
     _abstract()
@@ -274,13 +274,13 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   @_versioned
   @_inlineable
-  internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
+  internal ${override} func _removingPrefix(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
   @_versioned
   @_inlineable
-  internal ${override} func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
+  internal ${override} func _removingSuffix(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
@@ -512,20 +512,20 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   }
   @_versioned
   @_inlineable
-  internal override func _drop(
+  internal override func _removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
-    return try _${Kind}Box<S.SubSequence>(_base: _base.drop(while: predicate))
+    return try _${Kind}Box<S.SubSequence>(_base: _base.removingPrefix(while: predicate))
   }
   @_versioned
   @_inlineable
-  internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
-    return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
+  internal override func _removingPrefix(_ n: Int) -> _Any${Kind}Box<Element> {
+    return _${Kind}Box<S.SubSequence>(_base: _base.removingPrefix(n))
   }
   @_versioned
   @_inlineable
-  internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
-    return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
+  internal override func _removingSuffix(_ n: Int) -> _Any${Kind}Box<Element> {
+    return _${Kind}Box<S.SubSequence>(_base: _base.removingSuffix(n))
   }
   @_versioned
   @_inlineable
@@ -817,20 +817,20 @@ extension Any${Kind} {
   }
 
   @_inlineable
-  public func drop(
+  public func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> Any${Kind}<Element> {
-    return try Any${Kind}(_box: _box._drop(while: predicate))
+    return try Any${Kind}(_box: _box._removingPrefix(while: predicate))
   }
 
   @_inlineable
-  public func dropFirst(_ n: Int) -> Any${Kind}<Element> {
-    return Any${Kind}(_box: _box._dropFirst(n))
+  public func removingPrefix(_ n: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._removingPrefix(n))
   }
 
   @_inlineable
-  public func dropLast(_ n: Int) -> Any${Kind}<Element> {
-    return Any${Kind}(_box: _box._dropLast(n))
+  public func removingSuffix(_ n: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._removingSuffix(n))
   }
 
   @_inlineable

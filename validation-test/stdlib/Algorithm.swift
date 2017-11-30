@@ -234,7 +234,7 @@ Algorithm.test("sort3/simple")
 }
 
 func isSorted<T>(_ a: [T], by areInIncreasingOrder: (T, T) -> Bool) -> Bool {
-  return !a.dropFirst().enumerated().contains(where: { (offset, element) in
+  return !a.removingFirst().enumerated().contains(where: { (offset, element) in
     areInIncreasingOrder(element, a[offset])
   })
 }

@@ -192,7 +192,7 @@ public struct MUseStruct {
 // CHECK: ret void
 public func stringAndSubstring() -> (String, Substring) {
   let s = "Hello, World"
-  let a = Substring(s).dropFirst()
+  let a = Substring(s).removingFirst()
   return (s, a)
 }
 

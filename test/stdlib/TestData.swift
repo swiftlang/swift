@@ -1152,9 +1152,9 @@ class TestData : TestDataSuper {
         expectEqual(expected, actual)
     }
 
-    func test_dropFirst() {
+    func test_removingFirst() {
         var data = Data([0, 1, 2, 3, 4, 5])
-        let sliced = data.dropFirst()
+        let sliced = data.removingFirst()
         expectEqual(data.count - 1, sliced.count)
         expectEqual(UInt8(1), sliced[1])
         expectEqual(UInt8(2), sliced[2])
@@ -1163,9 +1163,9 @@ class TestData : TestDataSuper {
         expectEqual(UInt8(5), sliced[5])
     }
 
-    func test_dropFirst2() {
+    func test_removingPrefix2() {
         var data = Data([0, 1, 2, 3, 4, 5])
-        let sliced = data.dropFirst(2)
+        let sliced = data.removingPrefix(2)
         expectEqual(data.count - 2, sliced.count)
         expectEqual(UInt8(2), sliced[2])
         expectEqual(UInt8(3), sliced[3])
@@ -3777,8 +3777,8 @@ DataTests.test("test_sliceEquality") { TestData().test_sliceEquality() }
 DataTests.test("test_sliceEquality2") { TestData().test_sliceEquality2() }
 DataTests.test("test_splittingHttp") { TestData().test_splittingHttp() }
 DataTests.test("test_map") { TestData().test_map() }
-DataTests.test("test_dropFirst") { TestData().test_dropFirst() }
-DataTests.test("test_dropFirst2") { TestData().test_dropFirst2() }
+DataTests.test("test_removingPrefix") { TestData().test_removingFirst() }
+DataTests.test("test_removingPrefix2") { TestData().test_removingPrefix2() }
 DataTests.test("test_copyBytes1") { TestData().test_copyBytes1() }
 DataTests.test("test_copyBytes2") { TestData().test_copyBytes2() }
 DataTests.test("test_sliceOfSliceViaRangeExpression") { TestData().test_sliceOfSliceViaRangeExpression() }

@@ -815,7 +815,7 @@ final public class ForkJoinPool {
     if ForkJoinPool._getCurrentThread() != nil {
       // Run the first task in this thread, fork the rest.
       let first = tasks.first
-      for t in tasks.dropFirst() {
+      for t in tasks.removingFirst() {
         // FIXME: optimize forking in bulk.
         t.fork()
       }

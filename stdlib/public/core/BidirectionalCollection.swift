@@ -123,7 +123,7 @@ public protocol BidirectionalCollection : Collection
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // Prints "Evarts"
   ///
@@ -257,7 +257,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
   @_inlineable // FIXME(sil-serialize-all)
-  public mutating func removeLast(_ n: Int) {
+  public mutating func removeSuffix(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
@@ -274,9 +274,9 @@ extension BidirectionalCollection {
   /// collection, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast(2))
+  ///     print(numbers.removingSuffix(2))
   ///     // Prints "[1, 2, 3]"
-  ///     print(numbers.dropLast(10))
+  ///     print(numbers.removingSuffix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop off the end of the
@@ -285,7 +285,7 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop.
   @_inlineable // FIXME(sil-serialize-all)
-  public func dropLast(_ n: Int) -> SubSequence {
+  public func removingSuffix(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(
@@ -294,7 +294,7 @@ extension BidirectionalCollection {
       limitedBy: startIndex) ?? startIndex
     return self[startIndex..<end]
   }
-
+  
   /// Returns a subsequence, up to the given maximum length, containing the
   /// final elements of the collection.
   ///
@@ -326,3 +326,12 @@ extension BidirectionalCollection {
   }
 }
 
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension BidirectionalCollection where SubSequence == Self {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removeSuffix(_:)")
+  @_inlineable
+  public mutating func removeLast(_ n: Int) {
+    removeSuffix(n)
+  }
+}

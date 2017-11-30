@@ -213,7 +213,7 @@ ${orderingExplanation}
 % end
 
 //===----------------------------------------------------------------------===//
-// starts(with:)
+// hasPrefix(_:)
 //===----------------------------------------------------------------------===//
 
 % # Generate two versions: with explicit predicates and with
@@ -246,13 +246,13 @@ ${equivalenceExplanation}
   ///     let a = 1...3
   ///     let b = 1...10
   ///
-  ///     print(b.starts(with: a))
+  ///     print(b.hasPrefix(a))
   ///     // Prints "true"
   ///
   /// Passing a sequence with no elements or an empty collection as
   /// `possiblePrefix` always results in `true`.
   ///
-  ///     print(b.starts(with: []))
+  ///     print(b.hasPrefix([]))
   ///     // Prints "true"
   ///
   /// - Parameter possiblePrefix: A sequence to compare to this sequence.
@@ -261,8 +261,8 @@ ${equivalenceExplanation}
   ///   `possiblePrefix` has no elements, the return value is `true`.
 %   end
   @_inlineable
-  public func starts<PossiblePrefix>(
-    with possiblePrefix: PossiblePrefix${"," if preds else ""}
+  public func hasPrefix<PossiblePrefix>(
+    _ possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
     by areEquivalent: (Element, Element) throws -> Bool
 %   end
@@ -283,6 +283,25 @@ ${equivalenceExplanation}
       }
     }
     return possiblePrefixIterator.next() == nil
+  }
+    
+  // Compatibility alias for Swift 4 name (see SE-0132)
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "hasPrefix(_:${"by:" if preds else ""})")
+  @_inlineable
+  public func starts<PossiblePrefix>(
+    with possiblePrefix: PossiblePrefix${"," if preds else ""}
+%   if preds:
+    by areEquivalent: (Element, Element) throws -> Bool
+%   end
+  ) ${rethrows_}-> Bool
+    where
+    PossiblePrefix : Sequence,
+    PossiblePrefix.Element == Element {
+%   if preds:
+    return try hasPrefix(possiblePrefix, by: areEquivalent)
+%   else:
+    return hasPrefix(possiblePrefix)
+%   end
   }
 }
 

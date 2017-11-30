@@ -51,7 +51,7 @@ SetTraps.test("RemoveInvalidIndex4")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s: Set<Int> = [ 10 ]
-  let index = s.index(of: 10)!
+  let index = s.firstIndex(of: 10)!
   s.remove(at: index)
   expectFalse(s.contains(10))
   expectCrashLater()

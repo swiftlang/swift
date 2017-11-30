@@ -24,7 +24,7 @@ public let StringMatch = BenchmarkInfo(
 
 extension String {
   @inline(__always)
-  func dropFirst(_ n: Int = 1) -> String {
+  func removingPrefix(_ n: Int = 1) -> String {
     let startIndex = self.index(self.startIndex, offsetBy: n)
     return self[startIndex ..< self.endIndex]
   }
@@ -33,7 +33,7 @@ extension String {
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {
   if regexp.first == "^" {
-    return matchHere(regexp.dropFirst(), text)
+    return matchHere(regexp.removingFirst(), text)
   }
   
   var idx = text.startIndex
@@ -55,16 +55,16 @@ func matchHere(_ regexp: String, _ text: String) -> Bool {
     return true
   }
   
-  if let c = regexp.first, regexp.dropFirst().first == "*" {
-    return matchStar(c, regexp.dropFirst(2), text)
+  if let c = regexp.first, regexp.removingFirst().first == "*" {
+    return matchStar(c, regexp.removingPrefix(2), text)
   }
   
-  if regexp.first == "$" && regexp.dropFirst().isEmpty {
+  if regexp.first == "$" && regexp.removingFirst().isEmpty {
     return text.isEmpty
   }
   
   if let tc = text.first, let rc = regexp.first, rc == "." || tc == rc {
-    return matchHere(regexp.dropFirst(), text.dropFirst())
+    return matchHere(regexp.removingFirst(), text.removingFirst())
   }
   
   return false

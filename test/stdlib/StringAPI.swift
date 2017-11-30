@@ -269,11 +269,11 @@ func checkHasPrefixHasSuffix(
     rhs.decomposedStringWithCanonicalMapping.characters.map {
       Array(String($0).unicodeScalars)
     }
-  let expectHasPrefix = lhsNFDGraphemeClusters.starts(
-    with: rhsNFDGraphemeClusters, by: (==))
+  let expectHasPrefix = lhsNFDGraphemeClusters.hasPrefix(
+    rhsNFDGraphemeClusters, by: (==))
 
   let expectHasSuffix = lhsNFDGraphemeClusters.lazy.reversed()
-    .starts(with: rhsNFDGraphemeClusters.lazy.reversed(), by: (==))
+    .hasPrefix(rhsNFDGraphemeClusters.lazy.reversed(), by: (==))
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
@@ -377,7 +377,7 @@ StringTests.test("UnicodeScalarView.Iterator.Lifetime") {
   for s in sources {
     // Append something to s so that it creates a dynamically-allocated buffer.
     let i = (s + "X").unicodeScalars.makeIterator()
-    expectEqualSequence(s.unicodeScalars, IteratorSequence(i).dropLast(),
+    expectEqualSequence(s.unicodeScalars, IteratorSequence(i).removingLast(),
       "Actual Contents: \(Array(IteratorSequence(i)))")
   }
 }

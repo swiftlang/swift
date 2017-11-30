@@ -565,10 +565,10 @@ public struct Set<Element : Hashable> :
   /// - Returns: The index of `member` if it exists in the set; otherwise,
   ///   `nil`.
   @_inlineable // FIXME(sil-serialize-all)
-  public func index(of member: Element) -> Index? {
+  public func firstIndex(of member: Element) -> Index? {
     return _variantBuffer.index(forKey: member)
   }
-
+  
   /// Inserts the given element in the set if it is not already present.
   ///
   /// If an element equal to `newMember` is already contained in the set, this
@@ -1207,7 +1207,7 @@ public struct Set<Element : Hashable> :
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
-    return Optional(index(of: member))
+    return Optional(firstIndex(of: member))
   }
 
   //
@@ -1661,7 +1661,7 @@ public func _setBridgeFromObjectiveCConditional<
 /// provides, see the `DictionaryLiteral` type for an alternative.
 ///
 /// You can search a dictionary's contents for a particular value using the
-/// `contains(where:)` or `index(where:)` methods supplied by default
+/// `contains(where:)` or `firstIndex(where:)` methods supplied by default
 /// implementation. The following example checks to see if `imagePaths` contains
 /// any paths in the `"/glyphs"` directory:
 ///
@@ -1952,10 +1952,10 @@ public struct Dictionary<Key : Hashable, Value> :
   /// this subscript with the resulting value.
   ///
   /// For example, to find the key for a particular value in a dictionary, use
-  /// the `index(where:)` method.
+  /// the `firstIndex(where:)` method.
   ///
   ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     if let index = countryCodes.index(where: { $0.value == "Japan" }) {
+  ///     if let index = countryCodes.firstIndex(where: { $0.value == "Japan" }) {
   ///         print(countryCodes[index])
   ///         print("Japan's country code is '\(countryCodes[index].key)'.")
   ///     } else {
@@ -6723,5 +6723,15 @@ extension Set {
         insert(member)
       }
     }
+  }
+}
+
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension Set {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "firstIndex(of:)")
+  @_inlineable // FIXME(sil-serialize-all)
+  public func index(of member: Element) -> Index? {
+    return firstIndex(of: member)
   }
 }

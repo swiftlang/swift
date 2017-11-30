@@ -415,10 +415,10 @@ public protocol Sequence {
   ///   parameter.
   func forEach(_ body: (Element) throws -> Void) rethrows
 
-  // Note: The complexity of Sequence.dropFirst(_:) requirement
-  // is documented as O(n) because Collection.dropFirst(_:) is
+  // Note: The complexity of Sequence.removingPrefix(_:) requirement
+  // is documented as O(n) because Collection.removingPrefix(_:) is
   // implemented in O(n), even though the default
-  // implementation for Sequence.dropFirst(_:) is O(1).
+  // implementation for Sequence.removingPrefix(_:) is O(1).
   /// Returns a subsequence containing all but the given number of initial
   /// elements.
   ///
@@ -426,9 +426,9 @@ public protocol Sequence {
   /// the sequence, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropFirst(2))
+  ///     print(numbers.removingPrefix(2))
   ///     // Prints "[3, 4, 5]"
-  ///     print(numbers.dropFirst(10))
+  ///     print(numbers.removingPrefix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
@@ -438,7 +438,7 @@ public protocol Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from
   ///   the beginning of the sequence.
-  func dropFirst(_ n: Int) -> SubSequence
+  func removingPrefix(_ n: Int) -> SubSequence
 
   /// Returns a subsequence containing all but the specified number of final
   /// elements.
@@ -448,9 +448,9 @@ public protocol Sequence {
   /// subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast(2))
+  ///     print(numbers.removingSuffix(2))
   ///     // Prints "[1, 2, 3]"
-  ///     print(numbers.dropLast(10))
+  ///     print(numbers.removingSuffix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop off the end of the
@@ -458,7 +458,7 @@ public protocol Sequence {
   /// - Returns: A subsequence leaving off the specified number of elements.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  func dropLast(_ n: Int) -> SubSequence
+  func removingSuffix(_ n: Int) -> SubSequence
 
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
@@ -468,7 +468,7 @@ public protocol Sequence {
   ///   whether the element is a match.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  func drop(
+  func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence
 
@@ -629,7 +629,7 @@ extension Sequence where Self.Iterator == Self {
 /// The underlying iterator's sequence may be infinite.
 @_versioned
 @_fixed_layout
-internal struct _DropFirstSequence<Base : IteratorProtocol>
+internal struct _RemovingPrefixSequence<Base : IteratorProtocol>
     : Sequence, IteratorProtocol {
 
   @_versioned
@@ -649,7 +649,7 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func makeIterator() -> _DropFirstSequence<Base> {
+  internal func makeIterator() -> _RemovingPrefixSequence<Base> {
     return self
   }
 
@@ -668,14 +668,14 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func dropFirst(_ n: Int) -> AnySequence<Base.Element> {
-    // If this is already a _DropFirstSequence, we need to fold in
+  internal func removingPrefix(_ n: Int) -> AnySequence<Base.Element> {
+    // If this is already a _RemovingPrefixSequence, we need to fold in
     // the current drop count and drop limit so no data is lost.
     //
-    // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
-    // [1,2,3,4].dropFirst(2).
+    // i.e. [1,2,3,4].removingPrefix(1).removingPrefix(1) should be equivalent to
+    // [1,2,3,4].removingPrefix(2).
     return AnySequence(
-      _DropFirstSequence(
+      _RemovingPrefixSequence(
         _iterator: _iterator, limit: _limit + n, dropped: _dropped))
   }
 }
@@ -785,7 +785,7 @@ internal struct _DropWhileSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func drop(
+  internal func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> AnySequence<Element> {
     // If this is already a _DropWhileSequence, avoid multiple
@@ -1193,9 +1193,9 @@ extension Sequence where SubSequence == AnySequence<Element> {
   /// the sequence, the result is an empty subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropFirst(2))
+  ///     print(numbers.removingPrefix(2))
   ///     // Prints "[3, 4, 5]"
-  ///     print(numbers.dropFirst(10))
+  ///     print(numbers.removingPrefix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop from the beginning of
@@ -1205,12 +1205,12 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///
   /// - Complexity: O(1).
   @_inlineable
-  public func dropFirst(_ n: Int) -> AnySequence<Element> {
+  public func removingPrefix(_ n: Int) -> AnySequence<Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
-    return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
+    return AnySequence(_RemovingPrefixSequence(_iterator: makeIterator(), limit: n))
   }
-
+  
   /// Returns a subsequence containing all but the given number of final
   /// elements.
   ///
@@ -1219,9 +1219,9 @@ extension Sequence where SubSequence == AnySequence<Element> {
   /// subsequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast(2))
+  ///     print(numbers.removingSuffix(2))
   ///     // Prints "[1, 2, 3]"
-  ///     print(numbers.dropLast(10))
+  ///     print(numbers.removingSuffix(10))
   ///     // Prints "[]"
   ///
   /// - Parameter n: The number of elements to drop off the end of the
@@ -1230,7 +1230,7 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_inlineable
-  public func dropLast(_ n: Int) -> AnySequence<Element> {
+  public func removingSuffix(_ n: Int) -> AnySequence<Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
 
@@ -1255,17 +1255,17 @@ extension Sequence where SubSequence == AnySequence<Element> {
     }
     return AnySequence(result)
   }
-
+  
   /// Returns a subsequence by skipping the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
-  /// The following example uses the `drop(while:)` method to skip over the
+  /// The following example uses the `removingPrefix(while:)` method to skip over the
   /// positive numbers at the beginning of the `numbers` array. The result
   /// begins with the first element of `numbers` that does not satisfy
   /// `predicate`.
   ///
   ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
-  ///     let startingWithNegative = numbers.drop(while: { $0 > 0 })
+  ///     let startingWithNegative = numbers.removingPrefix(while: { $0 > 0 })
   ///     // startingWithNegative == [-2, 9, -6, 10, 1]
   ///
   /// If `predicate` matches every element in the sequence, the result is an
@@ -1279,14 +1279,14 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @_inlineable
-  public func drop(
+  public func removingPrefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> AnySequence<Element> {
     return try AnySequence(
       _DropWhileSequence(
         iterator: makeIterator(), nextElement: nil, predicate: predicate))
   }
-
+  
   /// Returns a subsequence, up to the specified maximum length, containing the
   /// initial elements of the sequence.
   ///
@@ -1360,13 +1360,13 @@ extension Sequence {
   /// The following example drops the first element from an array of integers.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropFirst())
+  ///     print(numbers.removingFirst())
   ///     // Prints "[2, 3, 4, 5]"
   ///
   /// If the sequence has no elements, the result is an empty subsequence.
   ///
   ///     let empty: [Int] = []
-  ///     print(empty.dropFirst())
+  ///     print(empty.removingFirst())
   ///     // Prints "[]"
   ///
   /// - Returns: A subsequence starting after the first element of the
@@ -1374,28 +1374,28 @@ extension Sequence {
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public func dropFirst() -> SubSequence { return dropFirst(1) }
-
+  public func removingFirst() -> SubSequence { return removingPrefix(1) }
+    
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
   ///
   /// The sequence must be finite.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast())
+  ///     print(numbers.removingLast())
   ///     // Prints "[1, 2, 3, 4]"
   ///
   /// If the sequence has no elements, the result is an empty subsequence.
   ///
   ///     let empty: [Int] = []
-  ///     print(empty.dropLast())
+  ///     print(empty.removingLast())
   ///     // Prints "[]"
   ///
   /// - Returns: A subsequence leaving off the last element of the sequence.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @_inlineable
-  public func dropLast() -> SubSequence  { return dropLast(1) }
+  public func removingLast() -> SubSequence  { return removingSuffix(1) }
 }
 
 extension Sequence {
@@ -1456,4 +1456,36 @@ public struct IteratorSequence<
 
   @_versioned
   internal var _base: Base
+}
+
+// Compatibility aliases for Swift 4 names (see SE-0132)
+
+extension Sequence {
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(_:)")
+  @_inlineable
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return removingPrefix(n)
+  }
+
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingSuffix(_:)")
+  @_inlineable
+  public func dropLast(_ n: Int) -> SubSequence {
+    return removingSuffix(n)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingPrefix(while:)")
+  @_inlineable
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try removingPrefix(while: predicate)
+  }
+  
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingFirst()")
+  @_inlineable
+  public func dropFirst() -> SubSequence { return removingFirst() }
+
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "removingLast()")
+  @_inlineable
+  public func dropLast() -> SubSequence { return removingLast() }
 }

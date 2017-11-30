@@ -56,7 +56,7 @@ extension String {
   /// using the `String` type's `init(_:)` initializer.
   ///
   ///     let name = "Marie Curie"
-  ///     if let firstSpace = name.characters.index(of: " ") {
+  ///     if let firstSpace = name.characters.firstIndex(of: " ") {
   ///         let firstName = String(name.characters[..<firstSpace])
   ///         print(firstName)
   ///     }
@@ -116,7 +116,7 @@ extension String {
   ///     var str = "All this happened, more or less."
   ///     let afterSpace = str.withMutableCharacters {
   ///         chars -> String.CharacterView in
-  ///         if let i = chars.index(of: " ") {
+  ///         if let i = chars.firstIndex(of: " ") {
   ///             let result = chars[chars.index(after: i)...]
   ///             chars.removeSubrange(i...)
   ///             return result
@@ -631,7 +631,7 @@ extension String.CharacterView : BidirectionalCollection {
   /// letter and then prints the character at the found index:
   ///
   ///     let greeting = "Hello, friend!"
-  ///     if let i = greeting.characters.index(where: { "A"..."Z" ~= $0 }) {
+  ///     if let i = greeting.characters.firstIndex(where: { "A"..."Z" ~= $0 }) {
   ///         print("First capital letter: \(greeting.characters[i])")
   ///     }
   ///     // Prints "First capital letter: H"
@@ -764,7 +764,7 @@ extension String.CharacterView {
   /// not including, the first comma (`","`) in the string.
   ///
   ///     let str = "All this happened, more or less."
-  ///     let i = str.characters.index(of: ",")!
+  ///     let i = str.characters.firstIndex(of: ",")!
   ///     let substring = str.characters[str.characters.startIndex ..< i]
   ///     print(String(substring))
   ///     // Prints "All this happened"

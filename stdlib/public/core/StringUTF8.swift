@@ -224,7 +224,7 @@ extension String {
         // We reached a scalar boundary; compute the underlying utf16's width
         // based on the number of utf8 code units
         scalarLength16 = n8 >> 2 + 1
-        nextBuffer.removeFirst(n8)
+        nextBuffer.removePrefix(n8)
       }
 
       if _fastPath(!nextBuffer.isEmpty) {        
@@ -398,7 +398,7 @@ extension String {
   /// another string's `utf8` view.
   ///
   ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf8.index(of: 32) {
+  ///     if let i = picnicGuest.utf8.firstIndex(of: 32) {
   ///         let adjective = String(picnicGuest.utf8[..<i])
   ///         print(adjective)
   ///     }
@@ -606,7 +606,7 @@ extension String.UTF8View.Index {
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let utf16Index = cafe.utf16.index(of: 32)!
+  ///     let utf16Index = cafe.utf16.firstIndex(of: 32)!
   ///     let utf8Index = String.UTF8View.Index(utf16Index, within: cafe.utf8)!
   ///
   ///     print(Array(cafe.utf8[..<utf8Index]))

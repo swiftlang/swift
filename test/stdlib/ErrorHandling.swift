@@ -95,9 +95,9 @@ ErrorHandlingTests.test("ErrorHandling/withCString extends lifetime") {
   // TODO: Some way to check string was deallocated?
 }
 
-ErrorHandlingTests.test("ErrorHandling/index(where:)") {
+ErrorHandlingTests.test("ErrorHandling/firstIndex(where:)") {
   do {
-    let _: Int? = try [1, 2, 3].index {
+    let _: Int? = try [1, 2, 3].firstIndex {
       throw SillyError.JazzHands
       return $0 == $0
     }
@@ -190,9 +190,9 @@ ErrorHandlingTests.test("ErrorHandling/min") {
   } catch {}
 }
 
-ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
+ErrorHandlingTests.test("ErrorHandling/hasPrefix(_:)") {
   do {
-    let x: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
+    let x: Bool = try [1, 2, 3].hasPrefix([1, 2]) { _, _ in
       throw SillyError.JazzHands
       return false
     }

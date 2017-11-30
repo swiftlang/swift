@@ -712,7 +712,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       return 0
     }
 
-    let i = _data.index(where: { $0 != 0 })!
+    let i = _data.firstIndex(where: { $0 != 0 })!
     _sanityCheck(_data[i] != 0)
     return i * Word.bitWidth + _data[i].trailingZeroBitCount
   }
@@ -935,7 +935,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // Check for a single prefixing hyphen
     let negative = source.hasPrefix("-")
     if negative {
-      source = String(source.characters.dropFirst())
+      source = String(source.characters.removingFirst())
     }
 
     // Loop through characters, multiplying

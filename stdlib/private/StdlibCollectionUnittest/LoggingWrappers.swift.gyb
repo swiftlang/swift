@@ -82,9 +82,9 @@ public class SequenceLog {
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
   public static var forEach = TypeIndexed(0)
-  public static var dropFirst = TypeIndexed(0)
-  public static var dropLast = TypeIndexed(0)
-  public static var dropWhile = TypeIndexed(0)
+  public static var removingPrefix = TypeIndexed(0)
+  public static var removingSuffix = TypeIndexed(0)
+  public static var removingPrefixWhile = TypeIndexed(0)
   public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
@@ -248,21 +248,21 @@ public struct ${Self}<
 
   public typealias SubSequence = Base.SubSequence
 
-  public func dropFirst(_ n: Int) -> SubSequence {
-    Log.dropFirst[selfType] += 1
-    return base.dropFirst(n)
+  public func removingPrefix(_ n: Int) -> SubSequence {
+    Log.removingPrefix[selfType] += 1
+    return base.removingPrefix(n)
   }
 
-  public func dropLast(_ n: Int) -> SubSequence {
-    Log.dropLast[selfType] += 1
-    return base.dropLast(n)
+  public func removingSuffix(_ n: Int) -> SubSequence {
+    Log.removingSuffix[selfType] += 1
+    return base.removingSuffix(n)
   }
 
-  public func drop(
+  public func removingPrefix(
     while predicate: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
-    Log.dropWhile[selfType] += 1
-    return try base.drop(while: predicate)
+    Log.removingPrefixWhile[selfType] += 1
+    return try base.removingPrefix(while: predicate)
   }
 
   public func prefix(_ maxLength: Int) -> SubSequence {
@@ -493,9 +493,9 @@ public struct ${Self}<
     return base._customRemoveLast()
   }
 
-  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+  public mutating func _customRemoveSuffix(_ n: Int) -> Bool {
     Log._customRemoveLastN[selfType] += 1
-    return base._customRemoveLast(n)
+    return base._customRemoveSuffix(n)
   }
 
   public mutating func append(_ newElement: Base.Iterator.Element) {
@@ -541,9 +541,9 @@ public struct ${Self}<
     return base.removeFirst()
   }
 
-  public mutating func removeFirst(_ n: Int) {
+  public mutating func removePrefix(_ n: Int) {
     Log.removeFirstN[selfType] += 1
-    base.removeFirst(n)
+    base.removePrefix(n)
   }
 
   public mutating func removeSubrange(_ bounds: Range<Index>) {

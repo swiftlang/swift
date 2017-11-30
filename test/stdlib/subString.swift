@@ -22,8 +22,8 @@ SubstringTests.test("Equality") {
   expectEqual(s1, "cd")
   expectEqual(s2, "cd")
   expectEqual(s3, "cd")
-	expectTrue("" == s.dropFirst(s.count))
-	expectTrue(s.dropFirst().dropFirst(s.count) == s.dropFirst(s.count))
+	expectTrue("" == s.removingPrefix(s.count))
+	expectTrue(s.removingFirst().removingPrefix(s.count) == s.removingPrefix(s.count))
   
   expectEqual("ab" as String, s.prefix(2))
   expectEqual("fg" as String, s.suffix(2))
@@ -32,24 +32,24 @@ SubstringTests.test("Equality") {
   let emoji: String = s + "😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈" + "😡🇧🇪🇨🇦🇮🇳"
   expectTrue(s == s[...])
   expectTrue(s[...] == s)
-  expectTrue(s.dropFirst(2) != s)
-  expectTrue(s == s.dropFirst(0))
-  expectTrue(s != s.dropFirst(1))
-  expectTrue(s != s.dropLast(1))
+  expectTrue(s.removingPrefix(2) != s)
+  expectTrue(s == s.removingPrefix(0))
+  expectTrue(s != s.removingPrefix(1))
+  expectTrue(s != s.removingSuffix(1))
   expectEqual(s[...], s[...])
-  expectEqual(s.dropFirst(0), s.dropFirst(0))
-  expectTrue(s == s.dropFirst(0))
-  expectTrue(s.dropFirst(2) != s.dropFirst(1))
-  expectNotEqual(s.dropLast(2), s.dropLast(1))
-  expectEqual(s.dropFirst(1), s.dropFirst(1))
-  expectTrue(s != s[...].dropFirst(1))
-  let i = emoji.index(of: "😄")!
+  expectEqual(s.removingPrefix(0), s.removingPrefix(0))
+  expectTrue(s == s.removingPrefix(0))
+  expectTrue(s.removingPrefix(2) != s.removingPrefix(1))
+  expectNotEqual(s.removingSuffix(2), s.removingSuffix(1))
+  expectEqual(s.removingPrefix(1), s.removingPrefix(1))
+  expectTrue(s != s[...].removingPrefix(1))
+  let i = emoji.firstIndex(of: "😄")!
   expectEqual("😄👍🏽" as String, emoji[i...].prefix(2))
-  expectTrue("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].dropLast(2))
-  expectTrue("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].dropLast(2).dropFirst(2))
-  expectTrue(s as String != emoji[i...].dropLast(2).dropFirst(2))
-  expectEqualSequence("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2))
-  expectEqualSequence("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2).dropFirst(2))
+  expectTrue("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].removingSuffix(2))
+  expectTrue("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].removingSuffix(2).removingPrefix(2))
+  expectTrue(s as String != emoji[i...].removingSuffix(2).removingPrefix(2))
+  expectEqualSequence("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].removingSuffix(2))
+  expectEqualSequence("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].removingSuffix(2).removingPrefix(2))
 #endif
 	// equatable conformance
 	expectTrue("one,two,three".split(separator: ",").contains("two"))
@@ -72,20 +72,20 @@ SubstringTests.test("Comparison") {
 	expectTrue(s[...] >= s[...])
 	expectFalse(s[...] > s[...])
 
-	expectTrue(s < s.dropFirst())
-	expectFalse(s > s.dropFirst())
-	expectFalse(s < s.dropLast())
-	expectTrue(s > s.dropLast())
-	expectTrue(s.dropFirst() < s.dropFirst(2))
-	expectFalse(s.dropFirst() > s.dropFirst(2))
-	expectFalse(s.dropLast() < s.dropLast(2))
-	expectTrue(s.dropLast() > s.dropLast(2))
-	expectFalse(s.dropFirst() < s.dropFirst().dropLast())
-	expectTrue(s.dropFirst() > s.dropFirst().dropLast())
-	expectTrue(s.dropFirst() > s)
-	expectTrue(s.dropFirst() > s[...])
+	expectTrue(s < s.removingFirst())
+	expectFalse(s > s.removingFirst())
+	expectFalse(s < s.removingLast())
+	expectTrue(s > s.removingLast())
+	expectTrue(s.removingFirst() < s.removingPrefix(2))
+	expectFalse(s.removingFirst() > s.removingPrefix(2))
+	expectFalse(s.removingLast() < s.removingSuffix(2))
+	expectTrue(s.removingLast() > s.removingSuffix(2))
+	expectFalse(s.removingFirst() < s.removingFirst().removingLast())
+	expectTrue(s.removingFirst() > s.removingFirst().removingLast())
+	expectTrue(s.removingFirst() > s)
+	expectTrue(s.removingFirst() > s[...])
 	expectTrue(s >= s[...])
-	expectTrue(s.dropFirst() >= s.dropFirst())
+	expectTrue(s.removingFirst() >= s.removingFirst())
 
 	// comparable conformance
 	expectEqualSequence("pen,pineapple,apple,pen".split(separator: ",").sorted(),
@@ -93,7 +93,7 @@ SubstringTests.test("Comparison") {
 }
 
 SubstringTests.test("Filter") {
-  var name = "😂Edward Woodward".dropFirst()
+  var name = "😂Edward Woodward".removingFirst()
   var filtered = name.filter { $0 != "d" }
   expectType(Substring.self, &name)
   expectType(String.self, &filtered)
@@ -102,8 +102,8 @@ SubstringTests.test("Filter") {
 
 SubstringTests.test("CharacterView") {
   let s = "abcdefg"
-  var t = s.characters.dropFirst(2)
-  var u = t.dropFirst(2)
+  var t = s.characters.removingPrefix(2)
+  var u = t.removingPrefix(2)
   
   checkMatch(s.characters, t, t.startIndex)
   checkMatch(s.characters, t, t.index(after: t.startIndex))
@@ -114,10 +114,10 @@ SubstringTests.test("CharacterView") {
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
-  expectEqual("", String(t.dropFirst(10)))
-  expectEqual("", String(t.dropLast(10)))
-  expectEqual("", String(u.dropFirst(10)))
-  expectEqual("", String(u.dropLast(10)))
+  expectEqual("", String(t.removingPrefix(10)))
+  expectEqual("", String(t.removingSuffix(10)))
+  expectEqual("", String(u.removingPrefix(10)))
+  expectEqual("", String(u.removingSuffix(10)))
   
   t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
@@ -128,8 +128,8 @@ SubstringTests.test("CharacterView") {
 
 SubstringTests.test("UnicodeScalars") {
   let s = "abcdefg"
-  var t = s.unicodeScalars.dropFirst(2)
-  var u = t.dropFirst(2)
+  var t = s.unicodeScalars.removingPrefix(2)
+  var u = t.removingPrefix(2)
   
   checkMatch(s.unicodeScalars, t, t.startIndex)
   checkMatch(s.unicodeScalars, t, t.index(after: t.startIndex))
@@ -140,10 +140,10 @@ SubstringTests.test("UnicodeScalars") {
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
-  expectEqual("", String(t.dropFirst(10)))
-  expectEqual("", String(t.dropLast(10)))
-  expectEqual("", String(u.dropFirst(10)))
-  expectEqual("", String(u.dropLast(10)))
+  expectEqual("", String(t.removingPrefix(10)))
+  expectEqual("", String(t.removingSuffix(10)))
+  expectEqual("", String(u.removingPrefix(10)))
+  expectEqual("", String(u.removingSuffix(10)))
   
   t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
@@ -154,8 +154,8 @@ SubstringTests.test("UnicodeScalars") {
 
 SubstringTests.test("UTF16View") {
   let s = "abcdefg"
-  let t = s.utf16.dropFirst(2)
-  let u = t.dropFirst(2)
+  let t = s.utf16.removingPrefix(2)
+  let u = t.removingPrefix(2)
   
   checkMatch(s.utf16, t, t.startIndex)
   checkMatch(s.utf16, t, t.index(after: t.startIndex))
@@ -166,16 +166,16 @@ SubstringTests.test("UTF16View") {
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
   
-  expectEqual("", String(t.dropFirst(10))!)
-  expectEqual("", String(t.dropLast(10))!)
-  expectEqual("", String(u.dropFirst(10))!)
-  expectEqual("", String(u.dropLast(10))!)
+  expectEqual("", String(t.removingPrefix(10))!)
+  expectEqual("", String(t.removingSuffix(10))!)
+  expectEqual("", String(u.removingPrefix(10))!)
+  expectEqual("", String(u.removingSuffix(10))!)
 }
 
 SubstringTests.test("UTF8View") {
   let s = "abcdefg"
-  let t = s.utf8.dropFirst(2)
-  let u = t.dropFirst(2)
+  let t = s.utf8.removingPrefix(2)
+  let u = t.removingPrefix(2)
   
   checkMatch(s.utf8, t, t.startIndex)
   checkMatch(s.utf8, t, t.index(after: t.startIndex))
@@ -184,17 +184,17 @@ SubstringTests.test("UTF8View") {
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
 
-  expectEqual("", String(t.dropFirst(10))!)
-  expectEqual("", String(t.dropLast(10))!)
-  expectEqual("", String(u.dropFirst(10))!)
-  expectEqual("", String(u.dropLast(10))!)
+  expectEqual("", String(t.removingPrefix(10))!)
+  expectEqual("", String(t.removingSuffix(10))!)
+  expectEqual("", String(u.removingPrefix(10))!)
+  expectEqual("", String(u.removingSuffix(10))!)
 }
 
 SubstringTests.test("Persistent Content") {
   var str = "abc"
   str += "def"
-  expectEqual("bcdefg", str.dropFirst(1) + "g")
-  expectEqual("bcdefg", (str.dropFirst(1) + "g") as String)
+  expectEqual("bcdefg", str.removingPrefix(1) + "g")
+  expectEqual("bcdefg", (str.removingPrefix(1) + "g") as String)
 }
 
 runAllTests()

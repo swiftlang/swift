@@ -280,7 +280,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
       expectEqual(1, errorCount)
       let x = (expected + expectedRepairedTail).reversed()
       expectTrue(
-        x.starts(with: decoded),
+        x.hasPrefix(decoded),
         "reverse, repairing: false\n\t\(Array(x)) does not start with \(decoded)")
       decoded.removeAll(keepingCapacity: true)
     }
@@ -321,10 +321,10 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
   
   do {
     let s0 = "\n" + String(decoding: utfStr, as: Codec.self) + "\n"
-    let s = s0.dropFirst().dropLast()
+    let s = s0.removingFirst().removingLast()
     expectEqualSequence(expected, utf32(s), "Sliced Substring")
     checkStringProtocol(
-      s0.dropFirst().dropLast(),
+      s0.removingFirst().removingLast(),
       utfStr, encodedAs: Codec.self, expectingUTF32: expected)
   }
 

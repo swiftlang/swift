@@ -46,7 +46,7 @@ public func parseArgs(_ validOptions: [String]? = nil)
   for arg in CommandLine.arguments[1..<CommandLine.arguments.count] {
     // If the argument doesn't match the optional argument pattern. Add
     // it to the positional argument list and continue...
-    if passThroughArgs || !arg.starts(with: "-") {
+    if passThroughArgs || !arg.hasPrefix("-") {
       positionalArgs.append(arg)
       continue
     }
