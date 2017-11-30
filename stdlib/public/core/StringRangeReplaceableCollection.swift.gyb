@@ -16,7 +16,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// In Swift, *reachability* refers to the ability to produce one value from
   /// the other through zero or more applications of `index(after:)`.
-  public typealias IndexDistance = CharacterView.IndexDistance
+  public typealias IndexDistance = _CharacterView.IndexDistance
 
   public typealias SubSequence = Substring
 
@@ -62,7 +62,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
-    self._core = CharacterView(other)._core
+    self._core = _CharacterView(other)._core
   }
   
   // The defaulted argument prevents this initializer from satisfies the
@@ -80,14 +80,14 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// In an empty string, `startIndex` is equal to `endIndex`.
   @_inlineable // FIXME(sil-serialize-all)
-  public var startIndex: Index { return characters.startIndex }
+  public var startIndex: Index { return _characters.startIndex }
 
   /// A string's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
   ///
   /// In an empty string, `endIndex` is equal to `startIndex`.
   @_inlineable // FIXME(sil-serialize-all)
-  public var endIndex: Index { return characters.endIndex }
+  public var endIndex: Index { return _characters.endIndex }
 
   /// Returns the position immediately after the given index.
   ///
@@ -96,13 +96,13 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The index value immediately after `i`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
-    return characters.index(after: i)
+    return _characters.index(after: i)
   }
 
   // TODO: swift-3-indexing-model - add docs
   @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
-    return characters.index(before: i)
+    return _characters.index(before: i)
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -129,7 +129,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    return characters.index(i, offsetBy: n)
+    return _characters.index(i, offsetBy: n)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -173,7 +173,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    return characters.index(i, offsetBy: n, limitedBy: limit)
+    return _characters.index(i, offsetBy: n, limitedBy: limit)
   }
 
   /// Returns the distance between two indices.
@@ -187,7 +187,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   @_inlineable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    return characters.distance(from: start, to: end)
+    return _characters.distance(from: start, to: end)
   }
 
   /// Accesses the character at the given position.
@@ -206,7 +206,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(i: Index) -> Character { return characters[i] }
+  public subscript(i: Index) -> Character { return _characters[i] }
 }
 
 extension String {
@@ -228,7 +228,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
     where S.Iterator.Element == Character {
-    self._core = CharacterView(characters)._core
+    self._core = _CharacterView(characters)._core
   }
 
   /// Reserves enough space in the string's underlying storage to store the
@@ -246,7 +246,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.reserveCapacity(n)
+      (v: inout _CharacterView) in v.reserveCapacity(n)
     }
   }
 
@@ -263,7 +263,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.append(c)
+      (v: inout _CharacterView) in v.append(c)
     }
   }
 
@@ -274,7 +274,7 @@ extension String {
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Character {
     withMutableCharacters {
-      (v: inout CharacterView) in v.append(contentsOf: newElements)
+      (v: inout _CharacterView) in v.append(contentsOf: newElements)
     }
   }
 
@@ -298,7 +298,7 @@ extension String {
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Character {
     withMutableCharacters {
-      (v: inout CharacterView)
+      (v: inout _CharacterView)
       in v.replaceSubrange(bounds, with: newElements)
     }
   }
@@ -317,7 +317,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func insert(_ newElement: Character, at i: Index) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.insert(newElement, at: i)
+      (v: inout _CharacterView) in v.insert(newElement, at: i)
     }
   }
 
@@ -340,7 +340,7 @@ extension String {
     contentsOf newElements: S, at i: Index
   ) where S.Iterator.Element == Character {
     withMutableCharacters {
-      (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
+      (v: inout _CharacterView) in v.insert(contentsOf: newElements, at: i)
     }
   }
 
@@ -366,7 +366,7 @@ extension String {
   @discardableResult
   public mutating func remove(at i: Index) -> Character {
     return withMutableCharacters {
-      (v: inout CharacterView) in v.remove(at: i)
+      (v: inout _CharacterView) in v.remove(at: i)
     }
   }
 
@@ -383,7 +383,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.removeSubrange(bounds)
+      (v: inout _CharacterView) in v.removeSubrange(bounds)
     }
   }
 
@@ -399,7 +399,7 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     withMutableCharacters {
-      (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
+      (v: inout _CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
     }
   }
 }
