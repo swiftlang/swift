@@ -57,7 +57,8 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
     return;
 
   const bool PrintKind = Opts.PrintSyntaxKind && !isToken() &&
-    !isTrivialSyntaxKind(Kind);
+    (Opts.PrintTrivialNodeKind || !isTrivialSyntaxKind(Kind));
+
   if (PrintKind) {
     printSyntaxKind(Kind, OS, Opts, true);
   }

@@ -188,6 +188,7 @@ enum class SourcePresence {
 struct SyntaxPrintOptions {
   bool Visual = false;
   bool PrintSyntaxKind = false;
+  bool PrintTrivialNodeKind = false;
 };
 
 /// RawSyntax - the strictly immutable, shared backing nodes for all syntax.
