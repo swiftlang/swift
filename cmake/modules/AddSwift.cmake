@@ -821,7 +821,15 @@ function(_add_swift_library_single target name)
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
   if("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" AND SWIFTLIB_TARGET_LIBRARY)
     if("${libkind}" STREQUAL "SHARED")
-      target_sources(${target} PRIVATE $<TARGET_OBJECTS:swiftImageRegistrationObject-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}>)
+      # TODO(compnerd) switch to the generator expression when cmake is upgraded
+      # to a version which supports it.
+      # target_sources(${target} PRIVATE $<TARGET_OBJECTS:swiftImageRegistrationObject-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}>)
+      target_sources(${target}
+                     PRIVATE
+                       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+      set_source_files_properties("${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}"
+                                  PROPERTIES
+                                    GENERATED 1)
     endif()
   endif()
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
