@@ -96,13 +96,6 @@ extension String {
       self._guts = _guts
       self._coreOffset = coreOffset
     }
-
-    @_inlineable // FIXME(sil-serialize-all)
-    public // @testable
-    init(_fixmeLegacyCore core: _LegacyStringCore, coreOffset: Int = 0) {
-      self._guts = _StringGuts(core)
-      self._coreOffset = coreOffset
-    }
   }
   
   /// A view of the string's contents as a collection of characters.
@@ -411,19 +404,15 @@ extension String._CharacterView : BidirectionalCollection {
     let startOffset = startPosition - _coreOffset
 
     // Grapheme breaking is much simpler if known ASCII
-    if _guts.isSingleByte {
+    if _guts.isASCII {
       _onFastPath() // Please aggressively inline
-      let unsafeString = _guts._unmanagedContiguous.unsafelyUnwrapped
-      let asciiBuffer = unsafeString.asciiBuffer
-      _sanityCheck(startOffset+1 < asciiBuffer.endIndex, 
+      let ascii = _guts._unmanagedASCIIView
+      _sanityCheck(startOffset + 1 < ascii.count,
         "Already checked for last code unit")
 
       // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
       // for that one exception.
-      if _slowPath(
-        asciiBuffer[startOffset] == _CR &&
-        asciiBuffer[startOffset+1] == _LF
-      ) {
+      if _slowPath(ascii[startOffset] == _CR && ascii[startOffset+1] == _LF) {
         return 2
       }
 
@@ -451,7 +440,7 @@ extension String._CharacterView : BidirectionalCollection {
     _sanityCheck(numCodeUnits >= 2, "should have at least two code units")
 
     // The vast majority of time, we can get a pointer and a length directly
-    if _fastPath(_guts._unmanagedContiguous != nil) {
+    if _fastPath(_guts._isContiguous) {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _guts)
       let ubrkFollowingOffset = __swift_stdlib_ubrk_following(
@@ -550,20 +539,15 @@ extension String._CharacterView : BidirectionalCollection {
     let endOffset = lastOffset + 1
 
     // Grapheme breaking is much simpler if known ASCII
-    if _guts.isSingleByte {
+    if _guts.isASCII {
       _onFastPath() // Please aggressively inline
-      let unsafeString = _guts._unmanagedContiguous.unsafelyUnwrapped
-      let asciiBuffer = unsafeString.asciiBuffer
-      _sanityCheck(
-        lastOffset-1 >= asciiBuffer.startIndex,
+      let ascii = _guts._unmanagedASCIIView
+      _sanityCheck(lastOffset - 1 >= 0,
         "should of been caught in earlier trivially-sized checks")
 
       // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
       // for that one exception.
-      if _slowPath(
-        asciiBuffer[lastOffset-1] == _CR &&
-        asciiBuffer[lastOffset] == _LF
-      ) {
+      if _slowPath(ascii[lastOffset-1] == _CR && ascii[lastOffset] == _LF) {
         return 2
       }
 
@@ -603,7 +587,7 @@ extension String._CharacterView : BidirectionalCollection {
     }
 
     // The vast majority of time, we can get a pointer and a length directly
-    if _fastPath(!_guts._isOpaque) {
+    if _fastPath(_guts._isContiguous) {
       _onFastPath() // Please aggressively inline
       let breakIterator = _ThreadLocalStorage.getUBreakIterator(for: _guts)
       let ubrkPrecedingOffset = __swift_stdlib_ubrk_preceding(
@@ -680,23 +664,23 @@ extension String._CharacterView : BidirectionalCollection {
           // For single-code-unit graphemes, we can construct a Character directly
           // from a single unicode scalar (if sub-surrogate).
           let relativeOffset = i.encodedOffset - _coreOffset
-          if _guts.isSingleByte {
-            let unsafeString = _guts._unmanagedContiguous.unsafelyUnwrapped
-            let asciiBuffer = unsafeString.asciiBuffer
+          if _guts.isASCII {
+            let ascii = _guts._unmanagedASCIIView
             // Bounds checks in an UnsafeBufferPointer (asciiBuffer) are only
             // performed in Debug mode, so they need to be duplicated here.
             // Falling back to the non-optimal behavior in the case they don't
             // pass.
-            if relativeOffset >= asciiBuffer.startIndex &&
-            relativeOffset < asciiBuffer.endIndex {
-              return Character(Unicode.Scalar(asciiBuffer[relativeOffset]))
+            if relativeOffset >= 0 && relativeOffset < ascii.count {
+              return Character(Unicode.Scalar(ascii.start[relativeOffset]))
             }
-          } else if !_guts._isOpaque {
-            let unsafeString = _guts._unmanagedContiguous.unsafelyUnwrapped
-            let cu = unsafeString[relativeOffset]
-            // Only constructible if sub-surrogate
-            if (cu < 0xd800) {
-              return Character(Unicode.Scalar(cu)._unsafelyUnwrappedUnchecked)
+          } else if _guts._isContiguous {
+            let utf16 = _guts._unmanagedUTF16View
+            if relativeOffset >= 0 && relativeOffset < utf16.count {
+              let cu = utf16[relativeOffset]
+              // Only constructible if sub-surrogate
+              if (cu < 0xd800) {
+                return Character(Unicode.Scalar(cu)._unsafelyUnwrappedUnchecked)
+              }
             }
           }
         }
@@ -739,7 +723,7 @@ extension String._CharacterView : RangeReplaceableCollection {
       bounds.lowerBound.encodedOffset - _coreOffset
       ..< bounds.upperBound.encodedOffset - _coreOffset
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
-    _core.replaceSubrange(rawSubRange, with: lazyUTF16)
+    _guts.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
 
   /// Reserves enough space in the character view's underlying storage to store
@@ -756,7 +740,11 @@ extension String._CharacterView : RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    _guts.reserveCapacity(n)
+    if _guts.isASCII {
+      _guts.reserveCapacity(n, of: UInt8.self)
+    } else {
+      _guts.reserveCapacity(n, of: UTF16.CodeUnit.self)
+    }
   }
 
   /// Appends the given character to the character view.
@@ -768,7 +756,8 @@ extension String._CharacterView : RangeReplaceableCollection {
       _guts.append(contentsOf: c0)
       return
     }
-    _guts.append(c._largeUTF16!)
+    _guts.append(c._largeUTF16!.unmanagedView)
+    _fixLifetime(c)
   }
 
   /// Appends the characters in the given sequence to the character view.

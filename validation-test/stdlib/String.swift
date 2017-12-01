@@ -43,10 +43,10 @@ extension String {
   }
   func _rawIdentifier() -> UInt64 {
     let bits = unsafeBitCast(self, to: (UInt64, UInt64).self)
-    if _guts._isNative || _guts._isNonTaggedCocoa || _guts._isUnsafe {
+    if _guts._isNative || _guts._isNonTaggedCocoa || _guts._isUnmanaged {
       return bits.0 // Raw storage pointer or object reference, plus flags
     } else {
-      precondition(_guts._isSmallCocoa)
+      precondition(_guts._isTaggedCocoa)
       return bits.1 // Tagged Cocoa pointer
     }
   }

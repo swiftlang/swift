@@ -329,14 +329,10 @@ extension String {
       @inline(__always)
       get {
         if _fastPath(_guts.isASCII) {
-          let contigOpt = _guts._unmanagedContiguous
-          if _fastPath(contigOpt != nil) {
-            let offset = position.encodedOffset
-            _precondition(offset < contigOpt._unsafelyUnwrappedUnchecked.count,
-              "Index out of bounds")
-            return contigOpt._unsafelyUnwrappedUnchecked.asciiBuffer[
-              position.encodedOffset]
-          }
+          let ascii = _guts._unmanagedASCIIView
+          let offset = position.encodedOffset
+          _precondition(offset < ascii.count, "Index out of bounds")
+          return ascii.buffer[position.encodedOffset]
         }
         var j = position
         while true {
@@ -750,10 +746,9 @@ extension String.UTF8View {
       r.upperBound.samePosition(in: wholeString) == nil)
 
     if r.upperBound._transcodedOffset == 0 {
-      let slice = _guts._copySliceToStringBuffer(
-        r.lowerBound.encodedOffset..<r.upperBound.encodedOffset)
       return String.UTF8View(
-        _StringGuts(slice),
+        _guts._extractSlice(
+        r.lowerBound.encodedOffset..<r.upperBound.encodedOffset),
         legacyOffsets: (r.lowerBound._transcodedOffset, 0),
         legacyPartialCharacters: legacyPartialCharacters)
     }
@@ -762,10 +757,8 @@ extension String.UTF8View {
     let scalarLength8 = (~b0).leadingZeroBitCount
     let scalarLength16 = scalarLength8 == 4 ? 2 : 1
     let coreEnd = r.upperBound.encodedOffset + scalarLength16
-    let slice = _guts._copySliceToStringBuffer(
-      r.lowerBound.encodedOffset..<coreEnd)
     return String.UTF8View(
-      _StringGuts(slice),
+      _guts._extractSlice(r.lowerBound.encodedOffset..<coreEnd),
       legacyOffsets: (
         r.lowerBound._transcodedOffset,
         r.upperBound._transcodedOffset - scalarLength8),

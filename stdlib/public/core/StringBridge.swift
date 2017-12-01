@@ -166,27 +166,31 @@ internal func _getCocoaStringPointer(
 @inline(never) // Hide the CF dependency
 internal
 func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
-  if let wrapped = cocoaString as? _NSContiguousString {
+  if let ascii = cocoaString as? _ASCIIStringStorage {
+    return _StringGuts(ascii)
+  } else if let utf16 = cocoaString as? _UTF16StringStorage {
+    return _StringGuts(utf16)
+  } else if let wrapped = cocoaString as? _NSContiguousString {
     return wrapped._guts
-  }
-  if _isObjCTaggedPointer(cocoaString) {
-    return _StringGuts(SmallCocoaString(cocoaString))
+  } else if _isObjCTaggedPointer(cocoaString) {
+    return _StringGuts(_taggedCocoaObject: cocoaString)
   }
   // "copy" it into a value to be sure nobody will modify behind
   // our backs.  In practice, when value is already immutable, this
   // just does a retain.
-  let cfImmutableValue
+  let immutableCopy
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
 
-  if _isObjCTaggedPointer(cfImmutableValue) {
-    return _StringGuts(SmallCocoaString(cfImmutableValue))
+  if _isObjCTaggedPointer(immutableCopy) {
+    return _StringGuts(_taggedCocoaObject: immutableCopy)
   }
-  
-  let (start, isUTF16) = _getCocoaStringPointer(cfImmutableValue)
-  return _StringGuts(NonTaggedCocoaString(
-      cfImmutableValue,
-      isSingleByte: !isUTF16,
-      start: start))
+
+  let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)
+  return _StringGuts(
+    _nonTaggedCocoaObject: immutableCopy,
+    count: _stdlib_binary_CFStringGetLength(immutableCopy),
+    isSingleByte: !isUTF16,
+    start: start)
 }
 
 @inline(never) // Hide the CF dependency
@@ -268,20 +272,43 @@ public final class _NSContiguousString : _SwiftNativeNSString {
 
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ _guts: _StringGuts) {
-    _sanityCheck(
-      !_guts._isOpaque,
+    _sanityCheck(!_guts._isOpaque,
       "_NSContiguousString requires contiguous storage")
     self._guts = _guts
     super.init()
   }
-  
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(_unmanaged guts: _StringGuts) {
+    _sanityCheck(!guts._isOpaque,
+      "_NSContiguousString requires contiguous storage")
+    if guts.isASCII {
+      self._guts = _StringGuts(guts._unmanagedASCIIView)
+    } else {
+      self._guts = _StringGuts(guts._unmanagedUTF16View)
+    }
+    super.init()
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public init(_unmanaged guts: _StringGuts, range: Range<Int>) {
+    _sanityCheck(!guts._isOpaque,
+      "_NSContiguousString requires contiguous storage")
+    if guts.isASCII {
+      self._guts = _StringGuts(guts._unmanagedASCIIView[range])
+    } else {
+      self._guts = _StringGuts(guts._unmanagedUTF16View[range])
+    }
+    super.init()
+  }
+
   @_inlineable // FIXME(sil-serialize-all)
   public convenience init(_fixmeLegacyCore _core: _LegacyStringCore) {
     self.init(_StringGuts(_core))
   }
 
   @_versioned // FIXME(sil-serialize-all)
-	@objc
+  @objc
   init(coder aDecoder: AnyObject) {
     _sanityCheckFailure("init(coder:) not implemented for _NSContiguousString")
   }
@@ -289,25 +316,17 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @_inlineable // FIXME(sil-serialize-all)
   deinit {}
 
-  @_versioned
-  internal var _unmanagedContiguous: UnsafeString {
-    @inline(__always)
-    get {
-      return _guts._unmanagedContiguous._unsafelyUnwrappedUnchecked
-    }
-  }
-  
   @_versioned // FIXME(sil-serialize-all)
-	@objc
+  @objc
   func length() -> Int {
     return _guts.count
   }
 
   @_versioned // FIXME(sil-serialize-all)
-	@objc
+  @objc
   func characterAtIndex(_ index: Int) -> UInt16 {
     defer { _fixLifetime(self) }
-    return _unmanagedContiguous[index]
+    return _guts[index]
   }
 
   @_versioned // FIXME(sil-serialize-all)
@@ -316,37 +335,25 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
     _precondition(aRange.location >= 0 && aRange.length >= 0)
-    _precondition(aRange.location + aRange.length <= Int(_guts.count))
-    let slice = _unmanagedContiguous.slice(
-      aRange.location ..< aRange.location + aRange.length)
-    slice._copy(
-      into: UnsafeMutableRawPointer(buffer),
-      capacityEnd: UnsafeMutableRawPointer(buffer + aRange.length),
-      accomodatingElementWidth: 2)
+    let range: Range<Int> = aRange.location ..< aRange.location + aRange.length
+    _precondition(range.upperBound <= Int(_guts.count))
+
+    if _guts.isASCII {
+      _guts._unmanagedASCIIView[range]._copy(
+        into: UnsafeMutableBufferPointer(start: buffer, count: range.count))
+    } else {
+      _guts._unmanagedUTF16View[range]._copy(
+        into: UnsafeMutableBufferPointer(start: buffer, count: range.count))
+    }
     _fixLifetime(self)
   }
 
   @_versioned // FIXME(sil-serialize-all)
-  @objc
-  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
-    let unmanaged = _unmanagedContiguous
-    defer { _fixLifetime(self) }
-    guard !unmanaged.isSingleByte else { return nil }
-    return UnsafeMutablePointer(mutating: unmanaged.utf16Buffer.baseAddress)
+  @objc(_fastCharacterContents)
+  func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+    guard !_guts.isASCII else { return nil }
+    return _guts._unmanagedUTF16View.start
   }
-
-  #if false // FIXME Bool parameter
-  @_versioned // FIXME(sil-serialize_all)
-  @objc(_fastCStringContents:)
-  func _fastCStringContents(
-    _ nullTerminationRequired: Bool
-  ) -> UnsafePointer<UInt8>? {
-    let unmanaged = _unmanagedContiguous
-    defer { _fixLifetime(_guts) }
-    guard !nullTerminationRequired, unmanaged.isSingleByte else { return nil }
-    return unmanaged.asciiBuffer.baseAddress
-  }
-  #endif
 
   //
   // Implement sub-slicing without adding layers of wrapping
@@ -421,7 +428,7 @@ extension String {
   /// library.
   @_inlineable // FIXME(sil-serialize-all)
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let cocoa = _guts._cocoaObject {
+    if let cocoa = _guts._underlyingCocoaString {
       return cocoa
     }
     return _NSContiguousString(_guts)

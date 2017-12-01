@@ -124,24 +124,20 @@ extension String {
     if prefixCount == 0 {
       return true
     }
-    if let unmanagedSelf = self._guts._unmanagedContiguous,
-      let unmanagedPrefix = prefix._guts._unmanagedContiguous {
-      defer {
-        _fixLifetime(self)
-        _fixLifetime(prefix)
-      }
-      if unmanagedSelf.isSingleByte, unmanagedPrefix.isSingleByte {
+    if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
+      defer { _fixLifetime(self); _fixLifetime(prefix) }
+      if _fastPath(self._guts.isASCII && prefix._guts.isASCII) {
         if prefixCount > self._guts.count {
           // Prefix is longer than self.
           return false
         }
         return (0 as CInt) == _stdlib_memcmp(
-          unmanagedSelf.baseAddress,
-          unmanagedPrefix.baseAddress,
+          self._guts._unmanagedASCIIView.rawStart,
+          prefix._guts._unmanagedASCIIView.rawStart,
           prefixCount)
       } else {
-        let lhsStr = _NSContiguousString(_StringGuts(unmanagedSelf))
-        let rhsStr = _NSContiguousString(_StringGuts(unmanagedPrefix))
+        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
+        let rhsStr = _NSContiguousString(_unmanaged: prefix._guts)
         return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
           return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
         }
@@ -187,25 +183,21 @@ extension String {
     if suffixCount == 0 {
       return true
     }
-    if let unmanagedSelf = self._guts._unmanagedContiguous,
-      let unmanagedSuffix = suffix._guts._unmanagedContiguous {
-      defer {
-        _fixLifetime(self)
-        _fixLifetime(suffix)
-      }
-      if unmanagedSelf.isSingleByte, unmanagedSuffix.isSingleByte {
+    if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
+      defer { _fixLifetime(self); _fixLifetime(suffix) }
+      if _fastPath(self._guts.isASCII && suffix._guts.isASCII) {
         if suffixCount > self._guts.count {
           // Suffix is longer than self.
           return false
         }
         return (0 as CInt) == _stdlib_memcmp(
-          unmanagedSelf.baseAddress +
-            (unmanagedSelf.count - unmanagedSuffix.count),
-          unmanagedSuffix.baseAddress,
+          self._guts._unmanagedASCIIView.rawStart +
+            (self._guts.count - suffixCount),
+          suffix._guts._unmanagedASCIIView.rawStart,
           suffixCount)
       } else {
-        let lhsStr = _NSContiguousString(_StringGuts(unmanagedSelf))
-        let rhsStr = _NSContiguousString(_StringGuts(unmanagedSuffix))
+        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
+        let rhsStr = _NSContiguousString(_unmanaged: suffix._guts)
         return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
           return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
         }
