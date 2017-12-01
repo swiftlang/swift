@@ -64,3 +64,13 @@ typealias C = <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</Arr
 typealias D = <DictionaryType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier>]</DictionaryType>
 typealias E = <MetatypeType><OptionalType><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>?</OptionalType>.Protocol</MetatypeType>
 typealias F = <MetatypeType><ImplicitlyUnwrappedOptionalType><ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>!</ImplicitlyUnwrappedOptionalType>.Type</MetatypeType>
+
+struct foo <MemberDeclBlock>{
+  struct foo <MemberDeclBlock>{
+    struct foo <MemberDeclBlock>{
+      func foo() <CodeBlock>{
+      }</CodeBlock>
+    }</MemberDeclBlock>
+  }</MemberDeclBlock>
+  struct foo <MemberDeclBlock>{}</MemberDeclBlock>
+}</MemberDeclBlock>

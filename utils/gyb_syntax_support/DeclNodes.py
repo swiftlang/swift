@@ -68,11 +68,6 @@ DECL_NODES = [
              Child('PoundEndif', kind='PoundEndifToken'),
          ]),
 
-    # struct-members -> struct-member struct-members?
-    # struct-member -> declaration | compiler-control-statement
-    Node('StructMembers', kind='SyntaxCollection',
-         element='Decl'),
-
     Node('DeclModifier', kind='Syntax',
          children=[
              Child('Name', kind='Token',
@@ -122,11 +117,16 @@ DECL_NODES = [
                    is_optional=True),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
+    Node('MemberDeclBlock', kind='Syntax',
+         children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('Members', kind='StructMembers'),
+             Child('Members', kind='DeclList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
-    
+
     # decl-list = decl decl-list?
     Node('DeclList', kind='SyntaxCollection',
          element='Decl'),
