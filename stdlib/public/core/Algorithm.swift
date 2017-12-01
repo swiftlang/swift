@@ -90,9 +90,7 @@ public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// To create an instance of `EnumeratedIterator`, call
 /// `enumerated().makeIterator()` on a sequence or collection.
 @_fixed_layout
-public struct EnumeratedIterator<
-  Base : IteratorProtocol
-> : IteratorProtocol, Sequence {
+public struct EnumeratedIterator<Base: IteratorProtocol> {
   @_versioned
   internal var _base: Base
   @_versioned
@@ -105,7 +103,9 @@ public struct EnumeratedIterator<
     self._base = _base
     self._count = 0
   }
+}
 
+extension EnumeratedIterator: IteratorProtocol, Sequence {
   /// The type of element returned by `next()`.
   public typealias Element = (offset: Int, element: Base.Element)
 
@@ -139,7 +139,7 @@ public struct EnumeratedIterator<
 ///     // Prints "0: foo"
 ///     // Prints "1: bar"
 @_fixed_layout
-public struct EnumeratedSequence<Base : Sequence> : Sequence {
+public struct EnumeratedSequence<Base: Sequence> {
   @_versioned
   internal var _base: Base
 
@@ -149,7 +149,9 @@ public struct EnumeratedSequence<Base : Sequence> : Sequence {
   internal init(_base: Base) {
     self._base = _base
   }
+}
 
+extension EnumeratedSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   @_inlineable
   public func makeIterator() -> EnumeratedIterator<Base.Iterator> {
