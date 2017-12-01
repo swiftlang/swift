@@ -1798,13 +1798,12 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
   PrettyStackTraceDecl trace("loading members for", IDC->getDecl());
 
   assert(IDC->wasDeserialized());
+  assert(DeclMemberNames);
 
-  if (!DeclMemberNames)
-    return None;
-
+  TinyPtrVector<ValueDecl *> results;
   auto i = DeclMemberNames->find(N.getBaseName());
   if (i == DeclMemberNames->end())
-    return None;
+    return results;
 
   BitOffset subTableOffset = *i;
   std::unique_ptr<SerializedDeclMembersTable> &subTable =
@@ -1827,7 +1826,6 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
   }
 
   assert(subTable);
-  TinyPtrVector<ValueDecl *> results;
   auto j = subTable->find(IDC->getDeclID());
   if (j != subTable->end()) {
     for (DeclID d : *j) {
