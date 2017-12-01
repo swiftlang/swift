@@ -125,23 +125,29 @@ extension String {
       return true
     }
     if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
-      defer { _fixLifetime(self); _fixLifetime(prefix) }
-      if _fastPath(self._guts.isASCII && prefix._guts.isASCII) {
-        if prefixCount > self._guts.count {
+      let result: Bool
+      if self._guts.isASCII && prefix._guts.isASCII {
+        let selfASCII = self._guts._unmanagedASCIIView
+        let prefixASCII = prefix._guts._unmanagedASCIIView
+        if prefixASCII.count > selfASCII.count {
           // Prefix is longer than self.
-          return false
+          result = false
+        } else {
+          result = (0 as CInt) == _stdlib_memcmp(
+            selfASCII.rawStart,
+            prefixASCII.rawStart,
+            prefixASCII.count)
         }
-        return (0 as CInt) == _stdlib_memcmp(
-          self._guts._unmanagedASCIIView.rawStart,
-          prefix._guts._unmanagedASCIIView.rawStart,
-          prefixCount)
       } else {
         let lhsStr = _NSContiguousString(_unmanaged: self._guts)
         let rhsStr = _NSContiguousString(_unmanaged: prefix._guts)
-        return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
           return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
         }
       }
+      _fixLifetime(self)
+      _fixLifetime(prefix)
+      return result
     }
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(),
@@ -184,24 +190,29 @@ extension String {
       return true
     }
     if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
-      defer { _fixLifetime(self); _fixLifetime(suffix) }
+      let result: Bool
       if _fastPath(self._guts.isASCII && suffix._guts.isASCII) {
-        if suffixCount > self._guts.count {
+        let selfASCII = self._guts._unmanagedASCIIView
+        let suffixASCII = suffix._guts._unmanagedASCIIView
+        if suffixASCII.count > self._guts.count {
           // Suffix is longer than self.
-          return false
+          result = false
+        } else {
+          result = (0 as CInt) == _stdlib_memcmp(
+            selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
+            suffixASCII.rawStart,
+            suffixASCII.count)
         }
-        return (0 as CInt) == _stdlib_memcmp(
-          self._guts._unmanagedASCIIView.rawStart +
-            (self._guts.count - suffixCount),
-          suffix._guts._unmanagedASCIIView.rawStart,
-          suffixCount)
       } else {
         let lhsStr = _NSContiguousString(_unmanaged: self._guts)
         let rhsStr = _NSContiguousString(_unmanaged: suffix._guts)
-        return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
           return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
         }
       }
+      _fixLifetime(self)
+      _fixLifetime(suffix)
+      return result
     }
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(),
