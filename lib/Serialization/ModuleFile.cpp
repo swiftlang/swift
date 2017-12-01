@@ -19,7 +19,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1795,15 +1794,15 @@ void ModuleFile::loadObjCMethods(
 Optional<TinyPtrVector<ValueDecl *>>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
                              uint64_t contextData) {
-  PrettyStackTraceDecl trace("loading members for", IDC->getDecl());
 
   assert(IDC->wasDeserialized());
-  assert(DeclMemberNames);
 
-  TinyPtrVector<ValueDecl *> results;
+  if (!DeclMemberNames)
+    return None;
+
   auto i = DeclMemberNames->find(N.getBaseName());
   if (i == DeclMemberNames->end())
-    return results;
+    return None;
 
   BitOffset subTableOffset = *i;
   std::unique_ptr<SerializedDeclMembersTable> &subTable =
@@ -1826,6 +1825,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
   }
 
   assert(subTable);
+  TinyPtrVector<ValueDecl *> results;
   auto j = subTable->find(IDC->getDeclID());
   if (j != subTable->end()) {
     for (DeclID d : *j) {
@@ -1838,9 +1838,8 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
-        // Eat the error and treat this as a cache-miss to the caller; let
-        // them attempt to refill through the normal loadAllMembers() path.
-        llvm::consumeError(mem.takeError());
+        // Treat this as a cache-miss to the caller and let them attempt
+        // to refill through the normal loadAllMembers() path.
         return None;
       }
     }
