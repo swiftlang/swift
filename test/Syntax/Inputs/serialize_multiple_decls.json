@@ -63,29 +63,42 @@
                           "presence": "Present"
                         },
                         {
-                          "tokenKind": {
-                            "kind": "l_brace"
-                          },
-                          "leadingTrivia": [
-
-                          ],
-                          "trailingTrivia": [
-
-                          ],
-                          "presence": "Present"
-                        },
-                        {
-                          "tokenKind": {
-                            "kind": "r_brace"
-                          },
-                          "leadingTrivia": [
+                          "kind": "MemberDeclBlock",
+                          "layout": [
                             {
-                              "kind": "Newline",
-                              "value": 1
-                            }
-                          ],
-                          "trailingTrivia": [
+                              "tokenKind": {
+                                "kind": "l_brace"
+                              },
+                              "leadingTrivia": [
 
+                              ],
+                              "trailingTrivia": [
+
+                              ],
+                              "presence": "Present"
+                            },
+                            {
+                              "kind": "DeclList",
+                              "layout": [
+
+                              ],
+                              "presence": "Present"
+                            },
+                            {
+                              "tokenKind": {
+                                "kind": "r_brace"
+                              },
+                              "leadingTrivia": [
+                                {
+                                  "kind": "Newline",
+                                  "value": 1
+                                }
+                              ],
+                              "trailingTrivia": [
+
+                              ],
+                              "presence": "Present"
+                            }
                           ],
                           "presence": "Present"
                         }
@@ -148,29 +161,42 @@
                           "presence": "Present"
                         },
                         {
-                          "tokenKind": {
-                            "kind": "l_brace"
-                          },
-                          "leadingTrivia": [
-
-                          ],
-                          "trailingTrivia": [
-
-                          ],
-                          "presence": "Present"
-                        },
-                        {
-                          "tokenKind": {
-                            "kind": "r_brace"
-                          },
-                          "leadingTrivia": [
+                          "kind": "MemberDeclBlock",
+                          "layout": [
                             {
-                              "kind": "Newline",
-                              "value": 1
-                            }
-                          ],
-                          "trailingTrivia": [
+                              "tokenKind": {
+                                "kind": "l_brace"
+                              },
+                              "leadingTrivia": [
 
+                              ],
+                              "trailingTrivia": [
+
+                              ],
+                              "presence": "Present"
+                            },
+                            {
+                              "kind": "DeclList",
+                              "layout": [
+
+                              ],
+                              "presence": "Present"
+                            },
+                            {
+                              "tokenKind": {
+                                "kind": "r_brace"
+                              },
+                              "leadingTrivia": [
+                                {
+                                  "kind": "Newline",
+                                  "value": 1
+                                }
+                              ],
+                              "trailingTrivia": [
+
+                              ],
+                              "presence": "Present"
+                            }
                           ],
                           "presence": "Present"
                         }

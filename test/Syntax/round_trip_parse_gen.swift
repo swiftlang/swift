@@ -58,3 +58,13 @@ class C {
 
 typealias A = Any
 typealias B = (Array<Array<Any>>.Element)
+
+struct foo {
+  struct foo {
+    struct foo {
+      func foo() {
+      }
+    }
+  }
+  struct foo {}
+}

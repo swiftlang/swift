@@ -58,3 +58,13 @@ class C {
 
 typealias A = <SimpleTypeIdentifier>Any</SimpleTypeIdentifier>
 typealias B = (<MemberTypeIdentifier><SimpleTypeIdentifier>Array<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Array<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Any</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier>.Element</MemberTypeIdentifier>)
+
+struct foo <MemberDeclBlock>{
+  struct foo <MemberDeclBlock>{
+    struct foo <MemberDeclBlock>{
+      func foo() <CodeBlock>{
+      }</CodeBlock>
+    }</MemberDeclBlock>
+  }</MemberDeclBlock>
+  struct foo <MemberDeclBlock>{}</MemberDeclBlock>
+}</MemberDeclBlock>
