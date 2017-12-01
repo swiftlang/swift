@@ -45,7 +45,8 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
 internal typealias _ASCIIStringStorage = _SwiftStringStorage<UInt8>
 internal typealias _UTF16StringStorage = _SwiftStringStorage<UTF16.CodeUnit>
 
-public final class _SwiftStringStorage<CodeUnit> : _SwiftRawStringStorage
+public final class _SwiftStringStorage<CodeUnit>
+  : _SwiftRawStringStorage, _NSStringCore
 where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
   /// Create uninitialized storage of at least the specified capacity.
@@ -81,29 +82,25 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
   // NSString API
 
-  @_versioned
   @objc(initWithCoder:)
-  convenience init(coder aDecoder: AnyObject) {
+  public convenience init(coder aDecoder: AnyObject) {
     _sanityCheckFailure("init(coder:) not implemented for _SwiftStringStorage")
   }
 
-  @_versioned
   @objc(length)
-  func length() -> UInt {
+  public func length() -> UInt {
     return UInt(count)
   }
 
-  @_versioned
   @objc(characterAtIndex:)
-  func character(at index: Int) -> UInt16 {
+  public func character(at index: Int) -> UInt16 {
     defer { _fixLifetime(self) }
     precondition(index >= 0 && index < count, "Index out of bounds")
     return UInt16(start[index])
   }
 
-  @_versioned
   @objc(getCharacters:range:)
-  func getCharacters(
+  public func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange
   ) {
@@ -120,16 +117,14 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     _fixLifetime(self)
   }
 
-  @_versioned
   @objc(_fastCharacterContents)
-  func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+  public func _fastCharacterContents() -> UnsafePointer<UInt16>? {
     guard CodeUnit.self == UInt16.self else { return nil }
     return UnsafePointer(rawStart.assumingMemoryBound(to: UInt16.self))
   }
 
-  @_versioned // FIXME(sil-serialize-all)
   @objc(copyWithZone:)
-  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+  public func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While _SwiftStringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
