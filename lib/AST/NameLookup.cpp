@@ -1355,10 +1355,11 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // will flip the hasLazyMembers() flag to false as well.
     if (!useNamedLazyMemberLoading) {
       // If we're about to load members here, purge the MemberLookupTable;
-      // it will be rebuilt in prepareLookup, below.
-      if (hasLazyMembers() && LookupTable.getPointer()) {
-        // We should not have scanned the IDC list yet. Double check.
-        assert(!LookupTable.getInt());
+      // it will be rebuilt in prepareLookup, below. Base this decision on
+      // the LookupTable's int value, not hasLazyMembers(), since the latter
+      // can sometimes change underfoot if some other party calls getMembers
+      // outside of lookup (eg. typo correction).
+      if (LookupTable.getPointer() && !LookupTable.getInt()) {
         LookupTable.getPointer()->clear();
       }
 
