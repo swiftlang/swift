@@ -2355,6 +2355,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       if (Kind) {
         parseNewDeclAttribute(Attributes, SourceLoc(), *Kind);
+        continue;
       }
 
       // Otherwise this is not a context-sensitive keyword.
