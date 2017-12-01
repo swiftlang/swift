@@ -51,6 +51,28 @@
 @end
 
 
+// Don't conform to the protocol; that loads all protocol members.
+@interface SimpleDoer (Category)
+- (void)categoricallyDoSomeWork;
+- (void)categoricallyDoSomeWorkWithSpeed:(int)s;
+- (void)categoricallyDoSomeWorkWithSpeed:(int)s thoroughness:(int)t
+  NS_SWIFT_NAME(categoricallyDoVeryImportantWork(speed:thoroughness:));
+- (void)categoricallyDoSomeWorkWithSpeed:(int)s alacrity:(int)a
+  NS_SWIFT_NAME(categoricallyDoSomeWorkWithSpeed(speed:levelOfAlacrity:));
+
+// These we are generally trying to not-import, via laziness.
+- (void)categoricallyGoForWalk;
+- (void)categoricallyTakeNap;
+- (void)categoricallyEatMeal;
+- (void)categoricallyTidyHome;
+- (void)categoricallyCallFamily;
+- (void)categoricallySingSong;
+- (void)categoricallyReadBook;
+- (void)categoricallyAttendLecture;
+- (void)categoricallyWriteLetter;
+@end
+
+
 @protocol MirroredBase
 + (void)mirroredBaseClassMethod;
 - (void)mirroredBaseInstanceMethod;
