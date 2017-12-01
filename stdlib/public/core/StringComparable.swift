@@ -164,10 +164,12 @@ extension _StringGuts {
     //
     // FIXME: String ordering should be consistent across all platforms.
     if left.isASCII && right.isASCII {
-      defer { _fixLifetime(left); _fixLifetime(right) }
       let leftASCII = left._unmanagedASCIIView[leftRange]
       let rightASCII = right._unmanagedASCIIView[rightRange]
-      return leftASCII.compareASCII(to: rightASCII)
+      let result = leftASCII.compareASCII(to: rightASCII)
+      _fixLifetime(left)
+      _fixLifetime(right)
+      return result
     }
     return _compareDeterministicUnicodeCollation(
       left, leftRange,
