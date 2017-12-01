@@ -5,7 +5,9 @@ add_swift_library(swiftFrontend STATIC
   FrontendOptions.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
-  DEPENDS SwiftOptions
+  DEPENDS
+    SwiftOptions
+    swift-syntax-generated-headers
   LINK_LIBRARIES
     swiftSIL
     swiftMigrator
