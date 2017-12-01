@@ -17,9 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 @_fixed_layout
-public struct _ValidUTF8Buffer<
-  Storage: UnsignedInteger & FixedWidthInteger
-> {
+public struct _ValidUTF8Buffer<Storage: UnsignedInteger & FixedWidthInteger> {
   public typealias Element = Unicode.UTF8.CodeUnit
   internal typealias _Storage = Storage
   

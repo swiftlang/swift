@@ -895,6 +895,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
     _memmove(dest: self, src: source, size: UInt(byteCount))
   }
 %  end # mutable
+}
 
 extension ${Self}: Strideable {
   /// Returns the distance from this pointer to the given pointer.
