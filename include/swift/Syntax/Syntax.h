@@ -54,7 +54,6 @@ const auto NoParent = llvm::None;
 /// their children.
 class Syntax {
   friend struct SyntaxFactory;
-  friend class LegacyASTTransformer;
   friend class swift::SyntaxASTMap;
 
 protected:

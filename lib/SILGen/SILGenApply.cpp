@@ -418,7 +418,10 @@ public:
     case Kind::IndirectValue:
     case Kind::StandaloneFunction:
     case Kind::EnumElement:
+      return false;
     case Kind::WitnessMethod:
+      if (Constant.isForeign)
+        return true;
       return false;
     case Kind::ClassMethod:
     case Kind::SuperMethod:
@@ -548,9 +551,17 @@ public:
                             ->getRValueInstanceType()
                             ->getCanonicalType();
 
-      SILValue fn = SGF.B.createWitnessMethod(
+      SILValue fn;
+
+      if (!constant->isForeign) {
+        fn = SGF.B.createWitnessMethod(
           Loc, lookupType, ProtocolConformanceRef(proto), *constant,
-          constantInfo.getSILType(), constant->isForeign);
+          constantInfo.getSILType());
+      } else {
+        fn = SGF.B.createObjCMethod(Loc, borrowedSelf->getValue(),
+                                    *constant, constantInfo.getSILType());
+      }
+
       return ManagedValue::forUnmanaged(fn);
     }
     case Kind::DynamicMethod: {
@@ -4086,9 +4097,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
                                                 functionTy);
     }
   }
-  auto calleeConvention = SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
-                              ? ParameterConvention::Direct_Guaranteed
-                              : ParameterConvention::Direct_Owned;
+  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
       constantInfo.getSILType(), 1, SGF.B.getModule(), subs, calleeConvention);
 
@@ -5278,9 +5287,7 @@ static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
                                             SILValue self,
                                          CanAnyFunctionType foreignFormalType,
                                          CanAnyFunctionType nativeFormalType) {
-  auto calleeConvention = SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
-                              ? ParameterConvention::Direct_Guaranteed
-                              : ParameterConvention::Direct_Owned;
+  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
   auto partialApplyTy =
       SILBuilder::getPartialApplyResultType(method->getType(),

@@ -1687,79 +1687,81 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   // and the inserted conversion function.
   bool needRetainBeforeCall = false;
   bool needReleaseAfterCall = false;
-  bool needReleaseInSucc = false;
+  bool needReleaseInSuccess = false;
   switch (ParamTypes[0].getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
-      assert(!AddressOnlyType &&
-             "AddressOnlyType with Direct_Guaranteed is not supported");
+    case ParameterConvention::Indirect_In_Guaranteed:
       switch (ConsumptionKind) {
-        case CastConsumptionKind::TakeAlways:
-          needReleaseAfterCall = true;
-          break;
-        case CastConsumptionKind::TakeOnSuccess:
-          needReleaseInSucc = true;
-          break;
-        case CastConsumptionKind::CopyOnSuccess:
-          // Conservatively insert a retain/release pair around the conversion
-          // function because the conversion function could decrement the
-          // (global) reference count of the source object.
-          //
-          // %src = load %global_var
-          // apply %conversion_func(@guaranteed %src)
-          //
-          // sil conversion_func {
-          //    %old_value = load %global_var
-          //    store %something_else, %global_var
-          //    strong_release %old_value
-          // }
-          needRetainBeforeCall = true;
-          needReleaseAfterCall = true;
-          break;
+      case CastConsumptionKind::TakeAlways:
+        needReleaseAfterCall = true;
+        break;
+      case CastConsumptionKind::TakeOnSuccess:
+        needReleaseInSuccess = true;
+        break;
+      case CastConsumptionKind::CopyOnSuccess:
+        // Conservatively insert a retain/release pair around the conversion
+        // function because the conversion function could decrement the
+        // (global) reference count of the source object.
+        //
+        // %src = load %global_var
+        // apply %conversion_func(@guaranteed %src)
+        //
+        // sil conversion_func {
+        //    %old_value = load %global_var
+        //    store %something_else, %global_var
+        //    strong_release %old_value
+        // }
+        needRetainBeforeCall = true;
+        needReleaseAfterCall = true;
+        break;
       }
       break;
     case ParameterConvention::Direct_Owned:
-      // The Direct_Owned case is only handled for completeness. Currently this
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Constant:
+      // Currently this
       // cannot appear, because the _bridgeToObjectiveC protocol witness method
       // always receives the this pointer (= the source) as guaranteed.
-      assert(!AddressOnlyType &&
-             "AddressOnlyType with Direct_Owned is not supported");
+      // If it became possible (perhaps with the advent of ownership and
+      // explicit +1 annotations), the implementation should look something
+      // like this:
+      /*
       switch (ConsumptionKind) {
         case CastConsumptionKind::TakeAlways:
           break;
         case CastConsumptionKind::TakeOnSuccess:
           needRetainBeforeCall = true;
-          needReleaseInSucc = true;
+          needReleaseInSuccess = true;
           break;
         case CastConsumptionKind::CopyOnSuccess:
           needRetainBeforeCall = true;
           break;
       }
       break;
+       */
+      llvm_unreachable("this should never happen so is currently untestable");
     case ParameterConvention::Direct_Unowned:
       assert(!AddressOnlyType &&
              "AddressOnlyType with Direct_Unowned is not supported");
       break;
-    case ParameterConvention::Indirect_In_Guaranteed:
-      // Source as-is, we don't need to copy it due to guarantee
-      break;
-    case ParameterConvention::Indirect_In_Constant:
-    case ParameterConvention::Indirect_In: {
-      assert(substConv.isSILIndirect(ParamTypes[0])
-             && "unsupported convention for bridging conversion");
-      // Need to make a copy of the source, can be changed in ObjC
-      auto BridgeStack = Builder.createAllocStack(Loc, Src->getType());
-      Builder.createCopyAddr(Loc, Src, BridgeStack, IsNotTake,
-                             IsInitialization);
-      break;
-    }
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
       // TODO handle remaining indirect argument types
       return nullptr;
   }
 
-  if (needRetainBeforeCall)
-    Builder.createRetainValue(Loc, Src, Builder.getDefaultAtomicity());
+  bool needStackAllocatedTemporary = false;
+  if (needRetainBeforeCall) {
+    if (AddressOnlyType) {
+      needStackAllocatedTemporary = true;
+      auto NewSrc = Builder.createAllocStack(Loc, Src->getType());
+      Builder.createCopyAddr(Loc, Src, NewSrc,
+                             IsNotTake, IsInitialization);
+      Src = NewSrc;
+    } else {
+      Builder.createRetainValue(Loc, Src, Builder.getDefaultAtomicity());
+    }
+  }
 
   SmallVector<Substitution, 4> Subs;
   if (auto *Sig = Source->getAnyNominal()->getGenericSignature())
@@ -1768,12 +1770,41 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, Subs, Src, false);
 
+  auto releaseSrc = [&](SILBuilder &Builder) {
+    if (AddressOnlyType) {
+      Builder.createDestroyAddr(Loc, Src);
+    } else {
+      Builder.createReleaseValue(Loc, Src, Builder.getDefaultAtomicity());
+    }
+  };
+  
+  Optional<SILBuilder> SuccBuilder;
+  if (needReleaseInSuccess || needStackAllocatedTemporary)
+    SuccBuilder.emplace(SuccessBB->begin());
+  
   if (needReleaseAfterCall) {
-    Builder.createReleaseValue(Loc, Src, Builder.getDefaultAtomicity());
-  } else if (needReleaseInSucc) {
-    SILBuilder SuccBuilder(SuccessBB->begin());
-    SuccBuilder.createReleaseValue(Loc, Src, SuccBuilder.getDefaultAtomicity());
+    releaseSrc(Builder);
+  } else if (needReleaseInSuccess) {
+    if (SuccessBB) {
+      releaseSrc(*SuccBuilder);
+    } else {
+      // For an unconditional cast, success is the only defined path
+      releaseSrc(Builder);
+    }
   }
+  
+  // Pop the temporary stack slot for a copied temporary.
+  if (needStackAllocatedTemporary) {
+    assert((bool)SuccessBB == (bool)FailureBB);
+    if (SuccessBB) {
+      SuccBuilder->createDeallocStack(Loc, Src);
+      SILBuilder FailBuilder(FailureBB->begin());
+      FailBuilder.createDeallocStack(Loc, Src);
+    } else {
+      Builder.createDeallocStack(Loc, Src);
+    }
+  }
+  
   SILInstruction *NewI = NewAI;
 
   if (Dest) {

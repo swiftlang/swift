@@ -255,6 +255,7 @@ enum class LabelRangeType {
   None,
   CallArg,    // foo([a: ]2) or .foo([a: ]String)
   Param,  // func([a b]: Int)
+  NoncollapsibleParam, // subscript([a a]: Int)
   Selector,   // #selector(foo.func([a]:))
 };
 
@@ -500,14 +501,15 @@ enum class RegionType {
 };
 
 enum class RefactoringRangeKind {
-  BaseName,              // func [foo](a b: Int)
-  KeywordBaseName,       // [init](a: Int)
-  ParameterName,         // func foo(a [b]: Int)
-  DeclArgumentLabel,     // func foo([a] b: Int)
-  CallArgumentLabel,     // foo([a]: 1)
-  CallArgumentColon,     // foo(a[: ]1)
-  CallArgumentCombined,  // foo([]1) could expand to foo([a: ]1)
-  SelectorArgumentLabel, // foo([a]:)
+  BaseName,                    // func [foo](a b: Int)
+  KeywordBaseName,             // [init](a: Int)
+  ParameterName,               // func foo(a[ b]: Int)
+  NoncollapsibleParameterName, // subscript(a[ a]: Int)
+  DeclArgumentLabel,           // func foo([a] b: Int)
+  CallArgumentLabel,           // foo([a]: 1)
+  CallArgumentColon,           // foo(a[: ]1)
+  CallArgumentCombined,        // foo([]1) could expand to foo([a: ]1)
+  SelectorArgumentLabel,       // foo([a]:)
 };
 
 struct NoteRegion {

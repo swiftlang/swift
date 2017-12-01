@@ -358,6 +358,10 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
       || context->getText() != STDLIB_NAME)
     return false;
 
+  // Ignore private stdlib names
+  if (node->getChild(1)->getKind() != Node::Kind::Identifier)
+    return false;
+
   if (char Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
     if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
       Buffer << 'S' << Subst;

@@ -6,7 +6,7 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import argparse
+
 import multiprocessing
 
 import android.adb.commands
@@ -14,10 +14,10 @@ import android.adb.commands
 from swift_build_support.swift_build_support import arguments
 from swift_build_support.swift_build_support import host
 from swift_build_support.swift_build_support import targets
-
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 
+from . import argparse
 from . import defaults
 
 
@@ -59,7 +59,7 @@ def _apply_default_arguments(args):
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = "Debug"
+        args.build_variant = 'Debug'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -104,20 +104,20 @@ def _apply_default_arguments(args):
 
     # Set the default CMake generator.
     if args.cmake_generator is None:
-        args.cmake_generator = "Ninja"
+        args.cmake_generator = 'Ninja'
 
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
-        raise ValueError("error: --ios-all is unavailable in open-source "
-                         "Swift.\nUse --ios to skip iOS device tests.")
+        raise ValueError('error: --ios-all is unavailable in open-source '
+                         'Swift.\nUse --ios to skip iOS device tests.')
 
     if args.tvos_all:
-        raise ValueError("error: --tvos-all is unavailable in open-source "
-                         "Swift.\nUse --tvos to skip tvOS device tests.")
+        raise ValueError('error: --tvos-all is unavailable in open-source '
+                         'Swift.\nUse --tvos to skip tvOS device tests.')
 
     if args.watchos_all:
-        raise ValueError("error: --watchos-all is unavailable in open-source "
-                         "Swift.\nUse --watchos to skip watchOS device tests.")
+        raise ValueError('error: --watchos-all is unavailable in open-source '
+                         'Swift.\nUse --watchos to skip watchOS device tests.')
 
     # Propagate global --skip-build
     if args.skip_build:
@@ -224,6 +224,7 @@ def _apply_default_arguments(args):
 def create_argument_parser():
     """Return a configured argument parser."""
 
+    # NOTE: USAGE, DESCRIPTION and EPILOG are defined at the bottom of the file
     parser = _ApplyDefaultsArgumentParser(
         apply_defaults=_apply_default_arguments,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -231,905 +232,910 @@ def create_argument_parser():
         description=DESCRIPTION,
         epilog=EPILOG)
 
-    parser.add_argument(
-        "-n", "--dry-run",
-        help="print the commands that would be executed, but do not execute "
-             "them",
-        action="store_true",
-        default=False)
-    parser.add_argument(
-        "--no-legacy-impl", dest="legacy_impl",
-        help="avoid legacy implementation",
-        action="store_false",
-        default=True)
+    builder = parser.to_builder()
 
+    # Prepare DSL functions
+    option = builder.add_option
+    set_defaults = builder.set_defaults
+    in_group = builder.in_group
+    mutually_exclusive_group = builder.mutually_exclusive_group
+
+    # Prepare DSL actions
+    store = builder.actions.store
+    store_path = builder.actions.store_path
+
+    # -------------------------------------------------------------------------
+    # Top-level options
+
+    parser.add_argument(
+        '-n', '--dry-run',
+        action='store_true',
+        default=False,
+        help='print the commands that would be executed, but do not execute '
+             'them')
+    parser.add_argument(
+        '--no-legacy-impl',
+        action='store_false',
+        dest='legacy_impl',
+        default=True,
+        help='avoid legacy implementation')
+
+    parser.add_argument(
+        '--build-runtime-with-host-compiler',
+        action=arguments.action.enable,
+        help='Use the host compiler, not the self-built one to compile the '
+             'Swift runtime')
+
+    parser.add_argument(
+        '-i', '--ios',
+        action='store_true',
+        help='also build for iOS, but disallow tests that require an iOS '
+             'device')
+    parser.add_argument(
+        '-I', '--ios-all',
+        action='store_true',
+        dest='ios_all',
+        help='also build for iOS, and allow all iOS tests')
+    parser.add_argument(
+        '--skip-ios',
+        action='store_false',
+        dest='ios',
+        help='set to skip everything iOS-related')
+
+    parser.add_argument(
+        '--tvos',
+        action=arguments.action.enable,
+        help='also build for tvOS, but disallow tests that require a tvos '
+             'device')
+    parser.add_argument(
+        '--tvos-all',
+        action=arguments.action.enable,
+        dest='tvos_all',
+        help='also build for tvOS, and allow all tvOS tests')
+    parser.add_argument(
+        '--skip-tvos',
+        action='store_false',
+        dest='tvos',
+        help='set to skip everything tvOS-related')
+
+    parser.add_argument(
+        '--watchos',
+        action=arguments.action.enable,
+        help='also build for watchOS, but disallow tests that require an '
+             'watchOS device')
+    parser.add_argument(
+        '--watchos-all',
+        action=arguments.action.enable,
+        dest='watchos_all',
+        help='also build for Apple watchOS, and allow all Apple watchOS tests')
+    parser.add_argument(
+        '--skip-watchos',
+        action='store_false',
+        dest='watchos',
+        help='set to skip everything watchOS-related')
+
+    parser.add_argument(
+        '--android',
+        action=arguments.action.enable,
+        help='also build for Android')
+
+    parser.add_argument(
+        '--swift-analyze-code-coverage',
+        dest='swift_analyze_code_coverage',
+        choices=['false', 'not-merged', 'merged'],
+        # so CMake can see the inert mode as a false value
+        default=defaults.SWIFT_ANALYZE_CODE_COVERAGE,
+        help='enable code coverage analysis in Swift (false, not-merged, '
+             'merged).')
+
+    parser.add_argument(
+        '--build-subdir',
+        metavar='PATH',
+        help='name of the directory under $SWIFT_BUILD_ROOT where the build '
+             'products will be placed')
+    parser.add_argument(
+        '--install-prefix',
+        default=targets.install_prefix(),
+        metavar='PATH',
+        help='The installation prefix. This is where built Swift products '
+             '(like bin, lib, and include) will be installed.')
+    parser.add_argument(
+        '--install-symroot',
+        metavar='PATH',
+        help='the path to install debug symbols into')
+
+    parser.add_argument(
+        '-j', '--jobs',
+        type=int,
+        dest='build_jobs',
+        default=multiprocessing.cpu_count(),
+        help='the number of parallel build jobs to use')
+
+    parser.add_argument(
+        '--darwin-xcrun-toolchain',
+        default=defaults.DARWIN_XCRUN_TOOLCHAIN,
+        help='the name of the toolchain to use on Darwin')
+    parser.add_argument(
+        '--cmake',
+        type=arguments.type.executable,
+        metavar='PATH',
+        help='the path to a CMake executable that will be used to build '
+             'Swift')
+    parser.add_argument(
+        '--show-sdks',
+        action=arguments.action.enable,
+        help='print installed Xcode and SDK versions')
+
+    parser.add_argument(
+        '--extra-swift-args',
+        action='append',
+        dest='extra_swift_args',
+        default=[],
+        help='Pass through extra flags to swift in the form of a cmake list '
+             '"module_regexp;flag". Can be called multiple times to add '
+             'multiple such module_regexp flag pairs. All semicolons in flags '
+             'must be escaped with a "\\"')
+
+    parser.add_argument(
+        '--host-cc',
+        type=arguments.type.executable,
+        metavar='PATH',
+        help='the absolute path to CC, the "clang" compiler for the host '
+             'platform. Default is auto detected.')
+    parser.add_argument(
+        '--host-cxx',
+        type=arguments.type.executable,
+        metavar='PATH',
+        help='the absolute path to CXX, the "clang++" compiler for the host '
+             'platform. Default is auto detected.')
+    parser.add_argument(
+        '--host-lipo',
+        type=arguments.type.executable,
+        metavar='PATH',
+        help='the absolute path to lipo. Default is auto detected.')
+    parser.add_argument(
+        '--host-libtool',
+        type=arguments.type.executable,
+        metavar='PATH',
+        help='the absolute path to libtool. Default is auto detected.')
+    parser.add_argument(
+        '--distcc',
+        action=arguments.action.enable,
+        help='use distcc in pump mode')
+    parser.add_argument(
+        '--enable-asan',
+        action=arguments.action.enable,
+        help='enable Address Sanitizer')
+    parser.add_argument(
+        '--enable-ubsan',
+        action=arguments.action.enable,
+        help='enable Undefined Behavior Sanitizer')
+    parser.add_argument(
+        '--enable-tsan',
+        action=arguments.action.enable,
+        help='enable Thread Sanitizer for swift tools')
+    parser.add_argument(
+        '--enable-tsan-runtime',
+        action=arguments.action.enable,
+        help='enable Thread Sanitizer on the swift runtime')
+    parser.add_argument(
+        '--enable-lsan',
+        action=arguments.action.enable,
+        help='enable Leak Sanitizer for swift tools')
+
+    parser.add_argument(
+        '--compiler-vendor',
+        choices=['none', 'apple'],
+        default=defaults.COMPILER_VENDOR,
+        help='Compiler vendor name')
+    parser.add_argument(
+        '--clang-compiler-version',
+        type=arguments.type.clang_compiler_version,
+        metavar='MAJOR.MINOR.PATCH',
+        help='string that indicates a compiler version for Clang')
+    parser.add_argument(
+        '--clang-user-visible-version',
+        type=arguments.type.clang_compiler_version,
+        default=defaults.CLANG_USER_VISIBLE_VERSION,
+        metavar='MAJOR.MINOR.PATCH',
+        help='User-visible version of the embedded Clang and LLVM compilers')
+    parser.add_argument(
+        '--swift-compiler-version',
+        type=arguments.type.swift_compiler_version,
+        metavar='MAJOR.MINOR',
+        help='string that indicates a compiler version for Swift')
+    parser.add_argument(
+        '--swift-user-visible-version',
+        type=arguments.type.swift_compiler_version,
+        default=defaults.SWIFT_USER_VISIBLE_VERSION,
+        metavar='MAJOR.MINOR',
+        help='User-visible version of the embedded Swift compiler')
+
+    parser.add_argument(
+        '--darwin-deployment-version-osx',
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+        metavar='MAJOR.MINOR',
+        help='minimum deployment target version for OS X')
+    parser.add_argument(
+        '--darwin-deployment-version-ios',
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+        metavar='MAJOR.MINOR',
+        help='minimum deployment target version for iOS')
+    parser.add_argument(
+        '--darwin-deployment-version-tvos',
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+        metavar='MAJOR.MINOR',
+        help='minimum deployment target version for tvOS')
+    parser.add_argument(
+        '--darwin-deployment-version-watchos',
+        default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+        metavar='MAJOR.MINOR',
+        help='minimum deployment target version for watchOS')
+
+    parser.add_argument(
+        '--extra-cmake-options',
+        action=arguments.action.concat,
+        type=arguments.type.shell_split,
+        default=[],
+        help='Pass through extra options to CMake in the form of comma '
+             'separated options "-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp". Can be '
+             'called multiple times to add multiple such options.')
+
+    parser.add_argument(
+        '--build-args',
+        type=arguments.type.shell_split,
+        default=[],
+        help='arguments to the build tool. This would be prepended to the '
+             'default argument that is "-j8" when CMake generator is '
+             '"Ninja".')
+
+    parser.add_argument(
+        '--verbose-build',
+        action=arguments.action.enable,
+        help='print the commands executed during the build')
+
+    parser.add_argument(
+        '--lto',
+        dest='lto_type',
+        nargs='?',
+        choices=['thin', 'full'],
+        const='full',
+        default=None,
+        metavar='LTO_TYPE',
+        help='use lto optimization on llvm/swift tools. This does not '
+             'imply using lto on the swift standard library or runtime. '
+             'Options: thin, full. If no optional arg is provided, full is '
+             'chosen by default')
+
+    parser.add_argument(
+        '--clang-profile-instr-use',
+        metavar='PATH',
+        help='profile file to use for clang PGO')
+
+    default_max_lto_link_job_counts = host.max_lto_link_job_counts()
+    parser.add_argument(
+        '--llvm-max-parallel-lto-link-jobs',
+        default=default_max_lto_link_job_counts['llvm'],
+        metavar='COUNT',
+        help='the maximum number of parallel link jobs to use when compiling '
+             'llvm')
+
+    parser.add_argument(
+        '--swift-tools-max-parallel-lto-link-jobs',
+        default=default_max_lto_link_job_counts['swift'],
+        metavar='COUNT',
+        help='the maximum number of parallel link jobs to use when compiling '
+             'swift tools.')
+
+    parser.add_argument(
+        '--enable-sil-ownership',
+        action='store_true',
+        help='Enable the SIL ownership model')
+
+    parser.add_argument(
+        '--force-optimized-typechecker',
+        action='store_true',
+        help='Force the type checker to be built with '
+             'optimization')
+
+    parser.add_argument(
+        '--lit-args',
+        default='-sv',
+        metavar='LITARGS',
+        help='lit args to use when testing')
+
+    parser.add_argument(
+        '--coverage-db',
+        metavar='PATH',
+        help='coverage database to use when prioritizing testing')
+
+    parser.add_argument(
+        # Explicitly unavailable options here.
+        '--build-jobs',
+        '--common-cmake-options',
+        '--only-execute',
+        '--skip-test-optimize-for-size',
+        '--skip-test-optimized',
+        action=arguments.action.unavailable)
+
+    # -------------------------------------------------------------------------
     targets_group = parser.add_argument_group(
-        title="Host and cross-compilation targets")
+        title='Host and cross-compilation targets')
     targets_group.add_argument(
-        "--host-target",
-        help="The host target. LLVM, Clang, and Swift will be built for this "
-             "target. The built LLVM and Clang will be used to compile Swift "
-             "for the cross-compilation targets.",
-        default=StdlibDeploymentTarget.host_target().name)
+        '--host-target',
+        default=StdlibDeploymentTarget.host_target().name,
+        help='The host target. LLVM, Clang, and Swift will be built for this '
+             'target. The built LLVM and Clang will be used to compile Swift '
+             'for the cross-compilation targets.')
     targets_group.add_argument(
-        "--cross-compile-hosts",
-        help="A space separated list of targets to cross-compile host Swift "
-             "tools for. Can be used multiple times.",
-        action=arguments.action.concat, type=arguments.type.shell_split,
-        default=[])
+        '--cross-compile-hosts',
+        action=arguments.action.concat,
+        type=arguments.type.shell_split,
+        default=[],
+        help='A space separated list of targets to cross-compile host Swift '
+             'tools for. Can be used multiple times.')
     targets_group.add_argument(
-        "--stdlib-deployment-targets",
-        help="list of targets to compile or cross-compile the Swift standard "
-             "library for. %(default)s by default.",
-        action=arguments.action.concat, type=arguments.type.shell_split,
-        default=None)
+        '--stdlib-deployment-targets',
+        action=arguments.action.concat,
+        type=arguments.type.shell_split,
+        default=None,
+        help='list of targets to compile or cross-compile the Swift standard '
+             'library for. %(default)s by default.')
     targets_group.add_argument(
-        "--build-stdlib-deployment-targets",
-        help="A space-separated list that filters which of the configured "
-             "targets to build the Swift standard library for, or 'all'.",
-        type=arguments.type.shell_split, default=["all"])
+        '--build-stdlib-deployment-targets',
+        type=arguments.type.shell_split,
+        default=['all'],
+        help='A space-separated list that filters which of the configured '
+             'targets to build the Swift standard library for, or "all".')
 
+    # -------------------------------------------------------------------------
     projects_group = parser.add_argument_group(
-        title="Options to select projects")
+        title='Options to select projects')
     projects_group.add_argument(
-        "-l", "--lldb",
-        help="build LLDB",
-        action="store_true",
-        dest="build_lldb")
+        '-l', '--lldb',
+        action='store_true',
+        dest='build_lldb',
+        help='build LLDB')
     projects_group.add_argument(
-        "-b", "--llbuild",
-        help="build llbuild",
-        action="store_true",
-        dest="build_llbuild")
+        '-b', '--llbuild',
+        action='store_true',
+        dest='build_llbuild',
+        help='build llbuild')
     projects_group.add_argument(
-        "-p", "--swiftpm",
-        help="build swiftpm",
-        action="store_true",
-        dest="build_swiftpm")
+        '-p', '--swiftpm',
+        action='store_true',
+        dest='build_swiftpm',
+        help='build swiftpm')
     projects_group.add_argument(
-        "--xctest",
-        help="build xctest",
+        '--xctest',
         action=arguments.action.enable,
-        dest="build_xctest")
+        dest='build_xctest',
+        help='build xctest')
     projects_group.add_argument(
-        "--foundation",
-        help="build foundation",
+        '--foundation',
         action=arguments.action.enable,
-        dest="build_foundation")
+        dest='build_foundation',
+        help='build foundation')
     projects_group.add_argument(
-        "--libdispatch",
-        help="build libdispatch",
+        '--libdispatch',
         action=arguments.action.enable,
-        dest="build_libdispatch")
+        dest='build_libdispatch',
+        help='build libdispatch')
     projects_group.add_argument(
-        "--libicu",
-        help="build libicu",
+        '--libicu',
         action=arguments.action.enable,
-        dest="build_libicu")
+        dest='build_libicu',
+        help='build libicu')
     projects_group.add_argument(
-        "--playgroundlogger",
-        help="build playgroundlogger",
-        action="store_true",
-        dest="build_playgroundlogger")
+        '--playgroundlogger',
+        action='store_true',
+        dest='build_playgroundlogger',
+        help='build playgroundlogger')
     projects_group.add_argument(
-        "--playgroundsupport",
-        help="build PlaygroundSupport",
-        action="store_true",
-        dest="build_playgroundsupport")
+        '--playgroundsupport',
+        action='store_true',
+        dest='build_playgroundsupport',
+        help='build PlaygroundSupport')
     projects_group.add_argument(
-        "--build-ninja",
-        help="build the Ninja tool",
-        action=arguments.action.enable)
+        '--build-ninja',
+        action=arguments.action.enable,
+        help='build the Ninja tool')
 
+    # -------------------------------------------------------------------------
     extra_actions_group = parser.add_argument_group(
-        title="Extra actions to perform before or in addition to building")
+        title='Extra actions to perform before or in addition to building')
     extra_actions_group.add_argument(
-        "-c", "--clean",
-        help="do a clean build",
-        action="store_true")
+        '-c', '--clean',
+        action='store_true',
+        help='do a clean build')
     extra_actions_group.add_argument(
-        "--export-compile-commands",
-        help="generate compilation databases in addition to building",
-        action=arguments.action.enable)
+        '--export-compile-commands',
+        action=arguments.action.enable,
+        help='generate compilation databases in addition to building')
     extra_actions_group.add_argument(
-        "--symbols-package",
-        metavar="PATH",
-        help="if provided, an archive of the symbols directory will be "
-             "generated at this path")
+        '--symbols-package',
+        metavar='PATH',
+        help='if provided, an archive of the symbols directory will be '
+             'generated at this path')
 
+    # -------------------------------------------------------------------------
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
     build_variant_group.add_argument(
-        "-d", "--debug",
-        help="build the Debug variant of everything (LLVM, Clang, Swift host "
-             "tools, target Swift standard libraries, LLDB (if enabled) "
-             "(default)",
-        action="store_const",
-        const="Debug",
-        dest="build_variant")
+        '-d', '--debug',
+        action='store_const',
+        const='Debug',
+        dest='build_variant',
+        help='build the Debug variant of everything (LLVM, Clang, Swift host '
+             'tools, target Swift standard libraries, LLDB (if enabled) '
+             '(default)')
     build_variant_group.add_argument(
-        "-r", "--release-debuginfo",
-        help="build the RelWithDebInfo variant of everything (default is "
-             "Debug)",
-        action="store_const",
-        const="RelWithDebInfo",
-        dest="build_variant")
+        '-r', '--release-debuginfo',
+        action='store_const',
+        const='RelWithDebInfo',
+        dest='build_variant',
+        help='build the RelWithDebInfo variant of everything (default is '
+             'Debug)')
     build_variant_group.add_argument(
-        "-R", "--release",
-        help="build the Release variant of everything (default is Debug)",
-        action="store_const",
-        const="Release",
-        dest="build_variant")
+        '-R', '--release',
+        action='store_const',
+        const='Release',
+        dest='build_variant',
+        help='build the Release variant of everything (default is Debug)')
 
+    # -------------------------------------------------------------------------
     build_variant_override_group = parser.add_argument_group(
-        title="Override build variant for a specific project")
+        title='Override build variant for a specific project')
     build_variant_override_group.add_argument(
-        "--debug-llvm",
-        help="build the Debug variant of LLVM",
-        action="store_const",
-        const="Debug",
-        dest="llvm_build_variant")
+        '--debug-llvm',
+        action='store_const',
+        const='Debug',
+        dest='llvm_build_variant',
+        help='build the Debug variant of LLVM')
     build_variant_override_group.add_argument(
-        "--debug-swift",
-        help="build the Debug variant of Swift host tools",
-        action="store_const",
-        const="Debug",
-        dest="swift_build_variant")
+        '--debug-swift',
+        action='store_const',
+        const='Debug',
+        dest='swift_build_variant',
+        help='build the Debug variant of Swift host tools')
     build_variant_override_group.add_argument(
-        "--debug-swift-stdlib",
-        help="build the Debug variant of the Swift standard library and SDK "
-             "overlay",
-        action="store_const",
-        const="Debug",
-        dest="swift_stdlib_build_variant")
+        '--debug-swift-stdlib',
+        action='store_const',
+        const='Debug',
+        dest='swift_stdlib_build_variant',
+        help='build the Debug variant of the Swift standard library and SDK '
+             'overlay')
     build_variant_override_group.add_argument(
-        "--debug-lldb",
-        help="build the Debug variant of LLDB",
-        action="store_const",
-        const="Debug",
-        dest="lldb_build_variant")
+        '--debug-lldb',
+        action='store_const',
+        const='Debug',
+        dest='lldb_build_variant',
+        help='build the Debug variant of LLDB')
     build_variant_override_group.add_argument(
-        "--debug-cmark",
-        help="build the Debug variant of CommonMark",
-        action="store_const",
-        const="Debug",
-        dest="cmark_build_variant")
+        '--debug-cmark',
+        action='store_const',
+        const='Debug',
+        dest='cmark_build_variant',
+        help='build the Debug variant of CommonMark')
     build_variant_override_group.add_argument(
-        "--debug-foundation",
-        help="build the Debug variant of Foundation",
-        action="store_const",
-        const="Debug",
-        dest="foundation_build_variant")
+        '--debug-foundation',
+        action='store_const',
+        const='Debug',
+        dest='foundation_build_variant',
+        help='build the Debug variant of Foundation')
     build_variant_override_group.add_argument(
-        "--debug-libdispatch",
-        help="build the Debug variant of libdispatch",
-        action="store_const",
-        const="Debug",
-        dest="libdispatch_build_variant")
+        '--debug-libdispatch',
+        action='store_const',
+        const='Debug',
+        dest='libdispatch_build_variant',
+        help='build the Debug variant of libdispatch')
     build_variant_override_group.add_argument(
-        "--debug-libicu",
-        help="build the Debug variant of libicu",
-        action="store_const",
-        const="Debug",
-        dest="libicu_build_variant")
+        '--debug-libicu',
+        action='store_const',
+        const='Debug',
+        dest='libicu_build_variant',
+        help='build the Debug variant of libicu')
 
-    assertions_group = parser.add_mutually_exclusive_group(required=False)
-    assertions_group.add_argument(
-        "--assertions",
-        help="enable assertions in all projects",
-        action="store_const",
-        const=True,
-        dest="assertions")
-    assertions_group.add_argument(
-        "--no-assertions",
-        help="disable assertions in all projects",
-        action="store_const",
-        const=False,
-        dest="assertions")
+    # -------------------------------------------------------------------------
+    # Assertions group
 
-    assertions_override_group = parser.add_argument_group(
-        title="Control assertions in a specific project")
-    assertions_override_group.add_argument(
-        "--cmark-assertions",
-        help="enable assertions in CommonMark",
-        action="store_const",
-        const=True,
-        dest="cmark_assertions")
-    assertions_override_group.add_argument(
-        "--llvm-assertions",
-        help="enable assertions in LLVM",
-        action="store_const",
-        const=True,
-        dest="llvm_assertions")
-    assertions_override_group.add_argument(
-        "--no-llvm-assertions",
-        help="disable assertions in LLVM",
-        action="store_const",
-        const=False,
-        dest="llvm_assertions")
-    assertions_override_group.add_argument(
-        "--swift-assertions",
-        help="enable assertions in Swift",
-        action="store_const",
-        const=True,
-        dest="swift_assertions")
-    assertions_override_group.add_argument(
-        "--no-swift-assertions",
-        help="disable assertions in Swift",
-        action="store_const",
-        const=False,
-        dest="swift_assertions")
-    assertions_override_group.add_argument(
-        "--swift-stdlib-assertions",
-        help="enable assertions in the Swift standard library",
-        action="store_const",
-        const=True,
-        dest="swift_stdlib_assertions")
-    assertions_override_group.add_argument(
-        "--no-swift-stdlib-assertions",
-        help="disable assertions in the Swift standard library",
-        action="store_const",
-        const=False,
-        dest="swift_stdlib_assertions")
-    assertions_override_group.add_argument(
-        "--lldb-assertions",
-        help="enable assertions in LLDB",
-        action="store_const",
-        const=True,
-        dest="lldb_assertions")
-    assertions_override_group.add_argument(
-        "--no-lldb-assertions",
-        help="disable assertions in LLDB",
-        action="store_const",
-        const=False,
-        dest="lldb_assertions")
+    with mutually_exclusive_group():
+        set_defaults(assertions=True)
 
-    # FIXME: This should be one option using choices=[...]
-    cmake_generator_group = parser.add_argument_group(
-        title="Select the CMake generator")
-    cmake_generator_group.add_argument(
-        "-x", "--xcode",
-        help="use CMake's Xcode generator (default is Ninja)",
-        action="store_const",
-        const="Xcode",
-        dest="cmake_generator")
-    cmake_generator_group.add_argument(
-        "-m", "--make",
-        help="use CMake's Makefile generator (default is Ninja)",
-        action="store_const",
-        const="Unix Makefiles",
-        dest="cmake_generator")
-    cmake_generator_group.add_argument(
-        "-e", "--eclipse",
-        help="use CMake's Eclipse generator (default is Ninja)",
-        action="store_const",
-        const="Eclipse CDT4 - Ninja",
-        dest="cmake_generator")
+        # TODO: Convert to store_true
+        option('--assertions', store,
+               const=True,
+               help='enable assertions in all projects')
 
+        # TODO: Convert to store_false
+        option('--no-assertions', store('assertions'),
+               const=False,
+               help='disable assertions in all projects')
+
+    # -------------------------------------------------------------------------
+    in_group('Control assertions in a specific project')
+
+    option('--cmark-assertions', store,
+           const=True,
+           help='enable assertions in CommonMark')
+
+    option('--llvm-assertions', store,
+           const=True,
+           help='enable assertions in LLVM')
+    option('--no-llvm-assertions', store('llvm_assertions'),
+           const=False,
+           help='disable assertions in LLVM')
+
+    option('--swift-assertions', store,
+           const=True,
+           help='enable assertions in Swift')
+    option('--no-swift-assertions', store('swift_assertions'),
+           const=False,
+           help='disable assertions in Swift')
+
+    option('--swift-stdlib-assertions', store,
+           const=True,
+           help='enable assertions in the Swift standard library')
+    option('--no-swift-stdlib-assertions', store('swift_stdlib_assertions'),
+           const=False,
+           help='disable assertions in the Swift standard library')
+
+    option('--lldb-assertions', store,
+           const=True,
+           help='enable assertions in LLDB')
+    option('--no-lldb-assertions', store('lldb_assertions'),
+           const=False,
+           help='disable assertions in LLDB')
+
+    # -------------------------------------------------------------------------
+    in_group('Select the CMake generator')
+
+    set_defaults(cmake_generator=defaults.CMAKE_GENERATOR)
+
+    option(['-e', '--eclipse'], store('cmake_generator'),
+           const='Eclipse CDT4 - Ninja',
+           help="use CMake's Eclipse generator (%(default)s by default)")
+    option(['-m', '--make'], store('cmake_generator'),
+           const='Unix Makefiles',
+           help="use CMake's Makefile generator (%(default)s by default)")
+    option(['-x', '--xcode'], store('cmake_generator'),
+           const='Xcode',
+           help="use CMake's Xcode generator (%(default)s by default)")
+
+    # -------------------------------------------------------------------------
     run_tests_group = parser.add_argument_group(
-        title="Run tests")
+        title='Run tests')
 
     # NOTE: We can't merge -t and --test, because nargs='?' makes
     #       `-ti` to be treated as `-t=i`.
     run_tests_group.add_argument(
-        "-t",
-        help="test Swift after building",
-        action="store_const",
+        '-t',
+        action='store_const',
         const=True,
-        dest="test")
+        dest='test',
+        help='test Swift after building')
     run_tests_group.add_argument(
-        "--test",
-        help="test Swift after building",
-        action=arguments.action.enable)
+        '--test',
+        action=arguments.action.enable,
+        help='test Swift after building')
     run_tests_group.add_argument(
-        "-T",
-        help="run the validation test suite (implies --test)",
-        action="store_const",
+        '-T',
+        action='store_const',
         const=True,
-        dest="validation_test")
+        dest='validation_test',
+        help='run the validation test suite (implies --test)')
     run_tests_group.add_argument(
-        "--validation-test",
-        help="run the validation test suite (implies --test)",
-        action=arguments.action.enable)
-    run_tests_group.add_argument(
-        "--test-paths",
-        help="run tests located in specific directories and/or files \
-        (implies --test and/or --validation-test)",
-        action=arguments.action.concat, type=arguments.type.shell_split,
-        default=[])
-    run_tests_group.add_argument(
-        "-o",
-        help="run the test suite in optimized mode too (implies --test)",
-        action="store_const",
-        const=True,
-        dest="test_optimized")
-    run_tests_group.add_argument(
-        "--test-optimized",
-        help="run the test suite in optimized mode too (implies --test)",
-        action=arguments.action.enable)
-    run_tests_group.add_argument(
-        "-s",
-        help="run the test suite in optimize for size mode too \
-        (implies --test)",
-        action="store_const",
-        const=True,
-        dest="test_optimize_for_size")
-    run_tests_group.add_argument(
-        "--test-optimize-for-size",
-        help="run the test suite in optimize for size mode too \
-        (implies --test)",
-        action=arguments.action.enable)
-    run_tests_group.add_argument(
-        "--long-test",
-        help="run the long test suite",
-        action=arguments.action.enable)
-    run_tests_group.add_argument(
-        "--host-test",
-        help="run executable tests on host devices (such as iOS or tvOS)",
-        action=arguments.action.enable)
-    run_tests_group.add_argument(
-        "-B", "--benchmark",
-        help="run the Swift Benchmark Suite after building",
-        action="store_true")
-    run_tests_group.add_argument(
-        "--benchmark-num-o-iterations",
-        help="if the Swift Benchmark Suite is run after building, run N \
-iterations with -O",
-        metavar='N', type=int, default=3)
-    run_tests_group.add_argument(
-        "--benchmark-num-onone-iterations",
-        help="if the Swift Benchmark Suite is run after building, run N \
-        iterations with -Onone", metavar='N', type=int, default=3)
-    run_tests_group.add_argument(
-        "--skip-test-osx",
-        dest='test_osx',
-        action=arguments.action.disable,
-        help="skip testing Swift stdlibs for Mac OS X")
-    run_tests_group.add_argument(
-        "--skip-test-linux",
-        dest='test_linux',
-        action=arguments.action.disable,
-        help="skip testing Swift stdlibs for Linux")
-    run_tests_group.add_argument(
-        "--skip-test-freebsd",
-        dest='test_freebsd',
-        action=arguments.action.disable,
-        help="skip testing Swift stdlibs for FreeBSD")
-    run_tests_group.add_argument(
-        "--skip-test-cygwin",
-        dest='test_cygwin',
-        action=arguments.action.disable,
-        help="skip testing Swift stdlibs for Cygwin")
-    parser.add_argument(
-        "--build-runtime-with-host-compiler",
-        help="Use the host compiler, not the self-built one to compile the "
-             "Swift runtime",
-        action=arguments.action.enable)
-
-    run_build_group = parser.add_argument_group(
-        title="Run build")
-    run_build_group.add_argument(
-        "--build-swift-dynamic-stdlib",
-        help="build dynamic variants of the Swift standard library",
+        '--validation-test',
         action=arguments.action.enable,
-        default=True)
-    run_build_group.add_argument(
-        "--build-swift-static-stdlib",
-        help="build static variants of the Swift standard library",
-        action=arguments.action.enable)
-    run_build_group.add_argument(
-        "--build-swift-dynamic-sdk-overlay",
-        help="build dynamic variants of the Swift SDK overlay",
-        action=arguments.action.enable,
-        default=True)
-    run_build_group.add_argument(
-        "--build-swift-static-sdk-overlay",
-        help="build static variants of the Swift SDK overlay",
-        action=arguments.action.enable)
-    run_build_group.add_argument(
-        "--build-swift-stdlib-unittest-extra",
-        help="Build optional StdlibUnittest components",
-        action=arguments.action.enable)
-    run_build_group.add_argument(
-        "-S", "--skip-build",
-        help="generate build directory only without building",
-        action="store_true")
-    run_build_group.add_argument(
-        "--skip-build-linux",
-        dest='build_linux',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for Linux")
-    run_build_group.add_argument(
-        "--skip-build-freebsd",
-        dest='build_freebsd',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for FreeBSD")
-    run_build_group.add_argument(
-        "--skip-build-cygwin",
-        dest='build_cygwin',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for Cygwin")
-    run_build_group.add_argument(
-        "--skip-build-osx",
-        dest='build_osx',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for MacOSX")
-
-    run_build_group.add_argument(
-        "--skip-build-ios",
-        dest='build_ios',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for iOS")
-    run_build_group.add_argument(
-        "--skip-build-ios-device",
-        dest='build_ios_device',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for iOS devices "
-             "(i.e. build simulators only)")
-    run_build_group.add_argument(
-        "--skip-build-ios-simulator",
-        dest='build_ios_simulator',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for iOS simulator "
-             "(i.e. build devices only)")
-
-    run_build_group.add_argument(
-        "--skip-build-tvos",
-        dest='build_tvos',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for tvOS")
-    run_build_group.add_argument(
-        "--skip-build-tvos-device",
-        dest='build_tvos_device',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for tvOS devices "
-             "(i.e. build simulators only)")
-    run_build_group.add_argument(
-        "--skip-build-tvos-simulator",
-        dest='build_tvos_simulator',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for tvOS simulator "
-             "(i.e. build devices only)")
-
-    run_build_group.add_argument(
-        "--skip-build-watchos",
-        dest='build_watchos',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for watchOS")
-    run_build_group.add_argument(
-        "--skip-build-watchos-device",
-        dest='build_watchos_device',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for watchOS devices "
-             "(i.e. build simulators only)")
-    run_build_group.add_argument(
-        "--skip-build-watchos-simulator",
-        dest='build_watchos_simulator',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for watchOS simulator "
-             "(i.e. build devices only)")
-
-    run_build_group.add_argument(
-        "--skip-build-android",
-        dest='build_android',
-        action=arguments.action.disable,
-        help="skip building Swift stdlibs for Android")
-
-    run_build_group.add_argument(
-        "--skip-build-benchmarks",
-        dest='build_benchmarks',
-        action=arguments.action.disable,
-        help="skip building Swift Benchmark Suite")
-
-    run_build_group.add_argument(
-        "--build-external-benchmarks",
-        dest='build_external_benchmarks',
-        action=arguments.action.enable,
-        help="skip building Swift Benchmark Suite")
-
-    skip_test_group = parser.add_argument_group(
-        title="Skip testing specified targets")
-    skip_test_group.add_argument(
-        "--skip-test-ios",
-        dest='test_ios',
-        action=arguments.action.disable,
-        help="skip testing all iOS targets. Equivalent to specifying both "
-             "--skip-test-ios-simulator and --skip-test-ios-host")
-    skip_test_group.add_argument(
-        "--skip-test-ios-simulator",
-        dest='test_ios_simulator',
-        action=arguments.action.disable,
-        help="skip testing iOS simulator targets")
-    skip_test_group.add_argument(
-        "--skip-test-ios-32bit-simulator",
-        dest='test_ios_32bit_simulator',
-        action=arguments.action.disable,
-        help="skip testing iOS 32 bit simulator targets")
-    skip_test_group.add_argument(
-        "--skip-test-ios-host",
-        dest='test_ios_host',
-        action=arguments.action.disable,
-        help="skip testing iOS device targets on the host machine (the phone "
-             "itself)")
-    skip_test_group.add_argument(
-        "--skip-test-tvos",
-        dest='test_tvos',
-        action=arguments.action.disable,
-        help="skip testing all tvOS targets. Equivalent to specifying both "
-             "--skip-test-tvos-simulator and --skip-test-tvos-host")
-    skip_test_group.add_argument(
-        "--skip-test-tvos-simulator",
-        dest='test_tvos_simulator',
-        action=arguments.action.disable,
-        help="skip testing tvOS simulator targets")
-    skip_test_group.add_argument(
-        "--skip-test-tvos-host",
-        dest='test_tvos_host',
-        action=arguments.action.disable,
-        help="skip testing tvOS device targets on the host machine (the TV "
-             "itself)")
-    skip_test_group.add_argument(
-        "--skip-test-watchos",
-        dest='test_watchos',
-        action=arguments.action.disable,
-        help="skip testing all tvOS targets. Equivalent to specifying both "
-             "--skip-test-watchos-simulator and --skip-test-watchos-host")
-    skip_test_group.add_argument(
-        "--skip-test-watchos-simulator",
-        dest='test_watchos_simulator',
-        action=arguments.action.disable,
-        help="skip testing watchOS simulator targets")
-    skip_test_group.add_argument(
-        "--skip-test-watchos-host",
-        dest='test_watchos_host',
-        action=arguments.action.disable,
-        help="skip testing watchOS device targets on the host machine (the "
-             "watch itself)")
-    skip_test_group.add_argument(
-        "--skip-test-android-host",
-        dest='test_android_host',
-        action=arguments.action.disable,
-        help="skip testing Android device targets on the host machine (the "
-             "phone itself)")
-
-    parser.add_argument(
-        "-i", "--ios",
-        help="also build for iOS, but disallow tests that require an iOS "
-             "device",
-        action="store_true")
-    parser.add_argument(
-        "-I", "--ios-all",
-        help="also build for iOS, and allow all iOS tests",
-        action="store_true",
-        dest="ios_all")
-    parser.add_argument(
-        "--skip-ios",
-        help="set to skip everything iOS-related",
-        dest="ios",
-        action="store_false")
-
-    parser.add_argument(
-        "--tvos",
-        help="also build for tvOS, but disallow tests that require a tvos "
-             "device",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--tvos-all",
-        help="also build for tvOS, and allow all tvOS tests",
-        action=arguments.action.enable,
-        dest="tvos_all")
-    parser.add_argument(
-        "--skip-tvos",
-        help="set to skip everything tvOS-related",
-        dest="tvos",
-        action="store_false")
-
-    parser.add_argument(
-        "--watchos",
-        help="also build for watchOS, but disallow tests that require an "
-             "watchOS device",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--watchos-all",
-        help="also build for Apple watchOS, and allow all Apple watchOS tests",
-        action=arguments.action.enable,
-        dest="watchos_all")
-    parser.add_argument(
-        "--skip-watchos",
-        help="set to skip everything watchOS-related",
-        dest="watchos",
-        action="store_false")
-
-    parser.add_argument(
-        "--android",
-        help="also build for Android",
-        action=arguments.action.enable)
-
-    parser.add_argument(
-        "--swift-analyze-code-coverage",
-        help="enable code coverage analysis in Swift (false, not-merged, "
-             "merged).",
-        choices=["false", "not-merged", "merged"],
-        # so CMake can see the inert mode as a false value
-        default=defaults.SWIFT_ANALYZE_CODE_COVERAGE,
-        dest="swift_analyze_code_coverage")
-
-    parser.add_argument(
-        "--build-subdir",
-        help="name of the directory under $SWIFT_BUILD_ROOT where the build "
-             "products will be placed",
-        metavar="PATH")
-    parser.add_argument(
-        "--install-prefix",
-        help="The installation prefix. This is where built Swift products "
-             "(like bin, lib, and include) will be installed.",
-        metavar="PATH",
-        default=targets.install_prefix())
-    parser.add_argument(
-        "--install-symroot",
-        help="the path to install debug symbols into",
-        metavar="PATH")
-
-    parser.add_argument(
-        "-j", "--jobs",
-        help="the number of parallel build jobs to use",
-        type=int,
-        dest="build_jobs",
-        default=multiprocessing.cpu_count())
-
-    parser.add_argument(
-        "--darwin-xcrun-toolchain",
-        help="the name of the toolchain to use on Darwin",
-        default=defaults.DARWIN_XCRUN_TOOLCHAIN)
-    parser.add_argument(
-        "--cmake",
-        help="the path to a CMake executable that will be used to build "
-             "Swift",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--show-sdks",
-        help="print installed Xcode and SDK versions",
-        action=arguments.action.enable)
-
-    parser.add_argument(
-        "--extra-swift-args",
-        help="Pass through extra flags to swift in the form of a cmake list "
-             "'module_regexp;flag'. Can be called multiple times to add "
-             "multiple such module_regexp flag pairs. All semicolons in flags "
-             "must be escaped with a '\\'",
-        action="append", dest="extra_swift_args", default=[])
-
-    llvm_group = parser.add_argument_group(
-        title="Build settings specific for LLVM")
-    llvm_group.add_argument(
-        '--llvm-targets-to-build',
-        help='LLVM target generators to build',
-        default="X86;ARM;AArch64;PowerPC;SystemZ;Mips")
-
-    android_group = parser.add_argument_group(
-        title="Build settings for Android")
-    android_group.add_argument(
-        "--android-ndk",
-        help="An absolute path to the NDK that will be used as a libc "
-             "implementation for Android builds",
-        metavar="PATH")
-    android_group.add_argument(
-        "--android-api-level",
-        help="The Android API level to target when building for Android. "
-             "Currently only 21 or above is supported",
-        default="21")
-    android_group.add_argument(
-        "--android-ndk-gcc-version",
-        help="The GCC version to use when building for Android. Currently "
-             "only 4.9 is supported. %(default)s is also the default value. "
-             "This option may be used when experimenting with versions "
-             "of the Android NDK not officially supported by Swift",
-        choices=["4.8", "4.9"],
-        default="4.9")
-    android_group.add_argument(
-        "--android-icu-uc",
-        help="Path to a directory containing libicuuc.so",
-        metavar="PATH")
-    android_group.add_argument(
-        "--android-icu-uc-include",
-        help="Path to a directory containing headers for libicuuc",
-        metavar="PATH")
-    android_group.add_argument(
-        "--android-icu-i18n",
-        help="Path to a directory containing libicui18n.so",
-        metavar="PATH")
-    android_group.add_argument(
-        "--android-icu-i18n-include",
-        help="Path to a directory containing headers libicui18n",
-        metavar="PATH")
-    android_group.add_argument(
-        "--android-deploy-device-path",
-        help="Path on an Android device to which built Swift stdlib products "
-             "will be deployed. If running host tests, specify the '{}' "
-             "directory.".format(android.adb.commands.DEVICE_TEMP_DIR),
-        default=android.adb.commands.DEVICE_TEMP_DIR,
-        metavar="PATH")
-
-    parser.add_argument(
-        "--host-cc",
-        help="the absolute path to CC, the 'clang' compiler for the host "
-             "platform. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--host-cxx",
-        help="the absolute path to CXX, the 'clang++' compiler for the host "
-             "platform. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--host-lipo",
-        help="the absolute path to lipo. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--host-libtool",
-        help="the absolute path to libtool. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
-    parser.add_argument(
-        "--distcc",
-        help="use distcc in pump mode",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-asan",
-        help="enable Address Sanitizer",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-ubsan",
-        help="enable Undefined Behavior Sanitizer",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-tsan",
-        help="enable Thread Sanitizer for swift tools",
-        action=arguments.action.enable)
-    parser.add_argument(
-        "--enable-tsan-runtime",
-        help="enable Thread Sanitizer on the swift runtime")
-    parser.add_argument(
-        "--enable-lsan",
-        help="enable Leak Sanitizer for swift tools",
-        action=arguments.action.enable)
-
-    parser.add_argument(
-        "--compiler-vendor",
-        choices=["none", "apple"],
-        default=defaults.COMPILER_VENDOR,
-        help="Compiler vendor name")
-    parser.add_argument(
-        "--clang-compiler-version",
-        help="string that indicates a compiler version for Clang",
-        type=arguments.type.clang_compiler_version,
-        metavar="MAJOR.MINOR.PATCH")
-    parser.add_argument(
-        "--clang-user-visible-version",
-        help="User-visible version of the embedded Clang and LLVM compilers",
-        type=arguments.type.clang_compiler_version,
-        default=defaults.CLANG_USER_VISIBLE_VERSION,
-        metavar="MAJOR.MINOR.PATCH")
-    parser.add_argument(
-        "--swift-compiler-version",
-        help="string that indicates a compiler version for Swift",
-        type=arguments.type.swift_compiler_version,
-        metavar="MAJOR.MINOR")
-    parser.add_argument(
-        "--swift-user-visible-version",
-        help="User-visible version of the embedded Swift compiler",
-        type=arguments.type.swift_compiler_version,
-        default=defaults.SWIFT_USER_VISIBLE_VERSION,
-        metavar="MAJOR.MINOR")
-
-    parser.add_argument(
-        "--darwin-deployment-version-osx",
-        help="minimum deployment target version for OS X",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX)
-    parser.add_argument(
-        "--darwin-deployment-version-ios",
-        help="minimum deployment target version for iOS",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS)
-    parser.add_argument(
-        "--darwin-deployment-version-tvos",
-        help="minimum deployment target version for tvOS",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS)
-    parser.add_argument(
-        "--darwin-deployment-version-watchos",
-        help="minimum deployment target version for watchOS",
-        metavar="MAJOR.MINOR",
-        default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS)
-
-    parser.add_argument(
-        "--extra-cmake-options",
-        help="Pass through extra options to CMake in the form of comma "
-             "separated options '-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp'. Can be "
-             "called multiple times to add multiple such options.",
+        help='run the validation test suite (implies --test)')
+    run_tests_group.add_argument(
+        '--test-paths',
         action=arguments.action.concat,
         type=arguments.type.shell_split,
-        default=[])
+        default=[],
+        help='run tests located in specific directories and/or files '
+             '(implies --test and/or --validation-test)')
+    run_tests_group.add_argument(
+        '-o',
+        action='store_const',
+        const=True,
+        dest='test_optimized',
+        help='run the test suite in optimized mode too (implies --test)')
+    run_tests_group.add_argument(
+        '--test-optimized',
+        action=arguments.action.enable,
+        help='run the test suite in optimized mode too (implies --test)')
+    run_tests_group.add_argument(
+        '-s',
+        action='store_const',
+        const=True,
+        dest='test_optimize_for_size',
+        help='run the test suite in optimize for size mode too '
+             '(implies --test)')
+    run_tests_group.add_argument(
+        '--test-optimize-for-size',
+        action=arguments.action.enable,
+        help='run the test suite in optimize for size mode too '
+             '(implies --test)')
+    run_tests_group.add_argument(
+        '--long-test',
+        action=arguments.action.enable,
+        help='run the long test suite')
+    run_tests_group.add_argument(
+        '--host-test',
+        action=arguments.action.enable,
+        help='run executable tests on host devices (such as iOS or tvOS)')
+    run_tests_group.add_argument(
+        '-B', '--benchmark',
+        action='store_true',
+        help='run the Swift Benchmark Suite after building')
+    run_tests_group.add_argument(
+        '--benchmark-num-o-iterations',
+        type=int,
+        default=3,
+        metavar='N',
+        help='if the Swift Benchmark Suite is run after building, run N '
+             'iterations with -O')
+    run_tests_group.add_argument(
+        '--benchmark-num-onone-iterations',
+        type=int,
+        default=3,
+        metavar='N',
+        help='if the Swift Benchmark Suite is run after building, run N '
+             'iterations with -Onone')
+    run_tests_group.add_argument(
+        '--skip-test-osx',
+        action=arguments.action.disable,
+        dest='test_osx',
+        help='skip testing Swift stdlibs for Mac OS X')
+    run_tests_group.add_argument(
+        '--skip-test-linux',
+        action=arguments.action.disable,
+        dest='test_linux',
+        help='skip testing Swift stdlibs for Linux')
+    run_tests_group.add_argument(
+        '--skip-test-freebsd',
+        action=arguments.action.disable,
+        dest='test_freebsd',
+        help='skip testing Swift stdlibs for FreeBSD')
+    run_tests_group.add_argument(
+        '--skip-test-cygwin',
+        action=arguments.action.disable,
+        dest='test_cygwin',
+        help='skip testing Swift stdlibs for Cygwin')
 
-    parser.add_argument(
-        "--build-args",
-        help="arguments to the build tool. This would be prepended to the "
-             "default argument that is '-j8' when CMake generator is "
-             "\"Ninja\".",
-        type=arguments.type.shell_split,
-        default=[])
+    # -------------------------------------------------------------------------
+    run_build_group = parser.add_argument_group(
+        title='Run build')
+    run_build_group.add_argument(
+        '--build-swift-dynamic-stdlib',
+        action=arguments.action.enable,
+        default=True,
+        help='build dynamic variants of the Swift standard library')
+    run_build_group.add_argument(
+        '--build-swift-static-stdlib',
+        action=arguments.action.enable,
+        help='build static variants of the Swift standard library')
+    run_build_group.add_argument(
+        '--build-swift-dynamic-sdk-overlay',
+        action=arguments.action.enable,
+        default=True,
+        help='build dynamic variants of the Swift SDK overlay')
+    run_build_group.add_argument(
+        '--build-swift-static-sdk-overlay',
+        action=arguments.action.enable,
+        help='build static variants of the Swift SDK overlay')
+    run_build_group.add_argument(
+        '--build-swift-stdlib-unittest-extra',
+        action=arguments.action.enable,
+        help='Build optional StdlibUnittest components')
+    run_build_group.add_argument(
+        '-S', '--skip-build',
+        action='store_true',
+        help='generate build directory only without building')
+    run_build_group.add_argument(
+        '--skip-build-linux',
+        action=arguments.action.disable,
+        dest='build_linux',
+        help='skip building Swift stdlibs for Linux')
+    run_build_group.add_argument(
+        '--skip-build-freebsd',
+        action=arguments.action.disable,
+        dest='build_freebsd',
+        help='skip building Swift stdlibs for FreeBSD')
+    run_build_group.add_argument(
+        '--skip-build-cygwin',
+        action=arguments.action.disable,
+        dest='build_cygwin',
+        help='skip building Swift stdlibs for Cygwin')
+    run_build_group.add_argument(
+        '--skip-build-osx',
+        action=arguments.action.disable,
+        dest='build_osx',
+        help='skip building Swift stdlibs for MacOSX')
 
-    parser.add_argument(
-        "--verbose-build",
-        help="print the commands executed during the build",
-        action=arguments.action.enable)
+    run_build_group.add_argument(
+        '--skip-build-ios',
+        action=arguments.action.disable,
+        dest='build_ios',
+        help='skip building Swift stdlibs for iOS')
+    run_build_group.add_argument(
+        '--skip-build-ios-device',
+        action=arguments.action.disable,
+        dest='build_ios_device',
+        help='skip building Swift stdlibs for iOS devices '
+             '(i.e. build simulators only)')
+    run_build_group.add_argument(
+        '--skip-build-ios-simulator',
+        action=arguments.action.disable,
+        dest='build_ios_simulator',
+        help='skip building Swift stdlibs for iOS simulator '
+             '(i.e. build devices only)')
 
-    parser.add_argument(
-        "--lto",
-        help="use lto optimization on llvm/swift tools. This does not "
-             "imply using lto on the swift standard library or runtime. "
-             "Options: thin, full. If no optional arg is provided, full is "
-             "chosen by default",
-        metavar="LTO_TYPE",
-        nargs='?',
-        choices=['thin', 'full'],
-        default=None,
-        const='full',
-        dest='lto_type')
+    run_build_group.add_argument(
+        '--skip-build-tvos',
+        action=arguments.action.disable,
+        dest='build_tvos',
+        help='skip building Swift stdlibs for tvOS')
+    run_build_group.add_argument(
+        '--skip-build-tvos-device',
+        action=arguments.action.disable,
+        dest='build_tvos_device',
+        help='skip building Swift stdlibs for tvOS devices '
+             '(i.e. build simulators only)')
+    run_build_group.add_argument(
+        '--skip-build-tvos-simulator',
+        action=arguments.action.disable,
+        dest='build_tvos_simulator',
+        help='skip building Swift stdlibs for tvOS simulator '
+             '(i.e. build devices only)')
 
-    parser.add_argument(
-        "--clang-profile-instr-use",
-        help="profile file to use for clang PGO",
-        metavar="PATH")
+    run_build_group.add_argument(
+        '--skip-build-watchos',
+        action=arguments.action.disable,
+        dest='build_watchos',
+        help='skip building Swift stdlibs for watchOS')
+    run_build_group.add_argument(
+        '--skip-build-watchos-device',
+        action=arguments.action.disable,
+        dest='build_watchos_device',
+        help='skip building Swift stdlibs for watchOS devices '
+             '(i.e. build simulators only)')
+    run_build_group.add_argument(
+        '--skip-build-watchos-simulator',
+        action=arguments.action.disable,
+        dest='build_watchos_simulator',
+        help='skip building Swift stdlibs for watchOS simulator '
+             '(i.e. build devices only)')
 
-    default_max_lto_link_job_counts = host.max_lto_link_job_counts()
-    parser.add_argument(
-        "--llvm-max-parallel-lto-link-jobs",
-        help="the maximum number of parallel link jobs to use when compiling "
-             "llvm",
-        metavar="COUNT",
-        default=default_max_lto_link_job_counts['llvm'])
+    run_build_group.add_argument(
+        '--skip-build-android',
+        action=arguments.action.disable,
+        dest='build_android',
+        help='skip building Swift stdlibs for Android')
 
-    parser.add_argument(
-        "--swift-tools-max-parallel-lto-link-jobs",
-        help="the maximum number of parallel link jobs to use when compiling "
-             "swift tools.",
-        metavar="COUNT",
-        default=default_max_lto_link_job_counts['swift'])
+    run_build_group.add_argument(
+        '--skip-build-benchmarks',
+        action=arguments.action.disable,
+        dest='build_benchmarks',
+        help='skip building Swift Benchmark Suite')
 
-    parser.add_argument("--enable-sil-ownership",
-                        help="Enable the SIL ownership model",
-                        action='store_true')
+    run_build_group.add_argument(
+        '--build-external-benchmarks',
+        action=arguments.action.enable,
+        dest='build_external_benchmarks',
+        help='skip building Swift Benchmark Suite')
 
-    parser.add_argument("--force-optimized-typechecker",
-                        help="Force the type checker to be built with "
-                        "optimization",
-                        action='store_true')
+    # -------------------------------------------------------------------------
+    skip_test_group = parser.add_argument_group(
+        title='Skip testing specified targets')
+    skip_test_group.add_argument(
+        '--skip-test-ios',
+        action=arguments.action.disable,
+        dest='test_ios',
+        help='skip testing all iOS targets. Equivalent to specifying both '
+             '--skip-test-ios-simulator and --skip-test-ios-host')
+    skip_test_group.add_argument(
+        '--skip-test-ios-simulator',
+        action=arguments.action.disable,
+        dest='test_ios_simulator',
+        help='skip testing iOS simulator targets')
+    skip_test_group.add_argument(
+        '--skip-test-ios-32bit-simulator',
+        action=arguments.action.disable,
+        dest='test_ios_32bit_simulator',
+        help='skip testing iOS 32 bit simulator targets')
+    skip_test_group.add_argument(
+        '--skip-test-ios-host',
+        action=arguments.action.disable,
+        dest='test_ios_host',
+        help='skip testing iOS device targets on the host machine (the phone '
+             'itself)')
+    skip_test_group.add_argument(
+        '--skip-test-tvos',
+        action=arguments.action.disable,
+        dest='test_tvos',
+        help='skip testing all tvOS targets. Equivalent to specifying both '
+             '--skip-test-tvos-simulator and --skip-test-tvos-host')
+    skip_test_group.add_argument(
+        '--skip-test-tvos-simulator',
+        action=arguments.action.disable,
+        dest='test_tvos_simulator',
+        help='skip testing tvOS simulator targets')
+    skip_test_group.add_argument(
+        '--skip-test-tvos-host',
+        action=arguments.action.disable,
+        dest='test_tvos_host',
+        help='skip testing tvOS device targets on the host machine (the TV '
+             'itself)')
+    skip_test_group.add_argument(
+        '--skip-test-watchos',
+        action=arguments.action.disable,
+        dest='test_watchos',
+        help='skip testing all tvOS targets. Equivalent to specifying both '
+             '--skip-test-watchos-simulator and --skip-test-watchos-host')
+    skip_test_group.add_argument(
+        '--skip-test-watchos-simulator',
+        action=arguments.action.disable,
+        dest='test_watchos_simulator',
+        help='skip testing watchOS simulator targets')
+    skip_test_group.add_argument(
+        '--skip-test-watchos-host',
+        action=arguments.action.disable,
+        dest='test_watchos_host',
+        help='skip testing watchOS device targets on the host machine (the '
+             'watch itself)')
+    skip_test_group.add_argument(
+        '--skip-test-android-host',
+        action=arguments.action.disable,
+        dest='test_android_host',
+        help='skip testing Android device targets on the host machine (the '
+             'phone itself)')
 
-    parser.add_argument(
-        # Explicitly unavailable options here.
-        "--build-jobs",
-        "--common-cmake-options",
-        "--only-execute",
-        "--skip-test-optimize-for-size",
-        "--skip-test-optimized",
-        action=arguments.action.unavailable)
+    # -------------------------------------------------------------------------
+    in_group('Build settings specific for LLVM')
 
-    parser.add_argument(
-        "--lit-args",
-        help="lit args to use when testing",
-        metavar="LITARGS",
-        default="-sv")
+    option('--llvm-targets-to-build', store,
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
+           help='LLVM target generators to build')
 
-    parser.add_argument(
-        "--coverage-db",
-        help="coverage database to use when prioritizing testing",
-        metavar="PATH")
+    # -------------------------------------------------------------------------
+    in_group('Build settings for Android')
 
-    return parser
+    option('--android-ndk', store_path,
+           help='An absolute path to the NDK that will be used as a libc '
+                'implementation for Android builds')
+
+    option('--android-api-level', store,
+           default='21',
+           help='The Android API level to target when building for Android. '
+                'Currently only 21 or above is supported')
+
+    option('--android-ndk-gcc-version', store,
+           choices=['4.8', '4.9'],
+           default='4.9',
+           help='The GCC version to use when building for Android. Currently '
+                'only 4.9 is supported. %(default)s is also the default '
+                'value. This option may be used when experimenting with '
+                'versions of the Android NDK not officially supported by '
+                'Swift')
+
+    option('--android-icu-uc', store_path,
+           help='Path to a directory containing libicuuc.so')
+    option('--android-icu-uc-include', store_path,
+           help='Path to a directory containing headers for libicuuc')
+    option('--android-icu-i18n', store_path,
+           help='Path to a directory containing libicui18n.so')
+    option('--android-icu-i18n-include', store_path,
+           help='Path to a directory containing headers libicui18n')
+    option('--android-deploy-device-path', store_path,
+           default=android.adb.commands.DEVICE_TEMP_DIR,
+           help='Path on an Android device to which built Swift stdlib '
+                'products will be deployed. If running host tests, specify '
+                'the "{}" directory.'.format(
+                    android.adb.commands.DEVICE_TEMP_DIR))
+
+    # -------------------------------------------------------------------------
+    return builder.build()
 
 
 # ----------------------------------------------------------------------------

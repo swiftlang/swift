@@ -893,7 +893,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
     auto type = TC.resolveTypeInContext(typeDecl, nullptr, DC,
-                                        TR_InExpression,
+                                        TypeResolutionFlags::InExpression,
                                         /*isSpecialized=*/false);
 
     // Open the type.
@@ -1051,7 +1051,10 @@ void ConstraintSystem::openGeneric(
   bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
 
   // Add the requirements as constraints.
-  for (auto req : sig->getRequirements()) {
+  auto requirements = sig->getRequirements();
+  for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
+    const auto &req = requirements[pos];
+
     Optional<Requirement> openedReq;
     auto openedFirst = openType(req.getFirstType(), replacements);
 
@@ -1078,7 +1081,11 @@ void ConstraintSystem::openGeneric(
       openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
       break;
     }
-    addConstraint(*openedReq, locatorPtr);
+
+    addConstraint(
+        *openedReq,
+        locator.withPathElement(ConstraintLocator::OpenedGeneric)
+            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos)));
   }
 }
 
@@ -1748,7 +1755,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
             assocType->getDeclContext());
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
-        if (result)
+        if (result && !result->hasError())
           return result;
       }
 

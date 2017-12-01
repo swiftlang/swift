@@ -37,6 +37,7 @@ Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
     .Case("_endian", PlatformConditionKind::Endianness)
     .Case("_runtime", PlatformConditionKind::Runtime)
     .Case("canImport", PlatformConditionKind::CanImport)
+    .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
     .Default(None);
 }
 
@@ -325,6 +326,8 @@ public:
         DiagName = "endianness"; break;
       case PlatformConditionKind::CanImport:
         DiagName = "import conditional"; break;
+      case PlatformConditionKind::TargetEnvironment:
+        DiagName = "target environment"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
@@ -544,7 +547,96 @@ static bool isVersionIfConfigCondition(Expr *Condition) {
   return IsVersionIfConfigCondition().visit(Condition);
 }
 
+/// Get the identifier string from an \c Expr if it's an
+/// \c UnresolvedDeclRefExpr, otherwise the empty string.
+static StringRef getDeclRefStr(Expr *E) {
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+    return UDRE->getName().getBaseIdentifier().str();
+  }
+  return "";
+}
+
+static bool isPlatformConditionDisjunction(Expr *E, PlatformConditionKind Kind,
+                                           ArrayRef<StringRef> Vals) {
+  if (auto *Or = dyn_cast<BinaryExpr>(E)) {
+    if (getDeclRefStr(Or->getFn()) == "||") {
+      auto Args = Or->getArg()->getElements();
+      return (isPlatformConditionDisjunction(Args[0], Kind, Vals) &&
+              isPlatformConditionDisjunction(Args[1], Kind, Vals));
+    }
+  } else if (auto *P = dyn_cast<ParenExpr>(E)) {
+    return isPlatformConditionDisjunction(P->getSubExpr(), Kind, Vals);
+  } else if (auto *C = dyn_cast<CallExpr>(E)) {
+    if (getPlatformConditionKind(getDeclRefStr(C->getFn())) != Kind)
+      return false;
+    if (auto *ArgP = dyn_cast<ParenExpr>(C->getArg())) {
+      if (auto *Arg = ArgP->getSubExpr()) {
+        auto ArgStr = getDeclRefStr(Arg);
+        for (auto V : Vals) {
+          if (ArgStr == V)
+            return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Search for the first occurrence of a _likely_ (but not definite) implicit
+// simulator-environment platform condition, or negation thereof. This is
+// defined as any logical conjunction of one or more os() platform conditions
+// _strictly_ from the set {iOS, tvOS, watchOS} and one or more arch() platform
+// conditions _strictly_ from the set {i386, x86_64}.
+//
+// These are (at the time of writing) defined as de-facto simulators in
+// Platform.cpp, and if a user is testing them they're _likely_ looking for
+// simulator-ness indirectly. If there is anything else in the condition aside
+// from these conditions (or the negation of such a conjunction), we
+// conservatively assume the user is testing something other than
+// simulator-ness.
+static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
+
+  if (!Condition)
+    return nullptr;
+
+  if (auto *N = dyn_cast<PrefixUnaryExpr>(Condition)) {
+    return findAnyLikelySimulatorEnvironmentTest(N->getArg());
+  } else if (auto *P = dyn_cast<ParenExpr>(Condition)) {
+    return findAnyLikelySimulatorEnvironmentTest(P->getSubExpr());
+  }
+
+  // We assume the user is writing the condition in CNF -- say (os(iOS) ||
+  // os(tvOS)) && (arch(i386) || arch(x86_64)) -- rather than DNF, as the former
+  // is exponentially more terse, and these conditions are already quite
+  // unwieldy. If field evidence shows people using other variants, possibly add
+  // them here.
+
+  auto isSimulatorPlatformOSTest = [](Expr *E) -> bool {
+    return isPlatformConditionDisjunction(
+      E, PlatformConditionKind::OS, {"iOS", "tvOS", "watchOS"});
+  };
+
+  auto isSimulatorPlatformArchTest = [](Expr *E) -> bool {
+    return isPlatformConditionDisjunction(
+      E, PlatformConditionKind::Arch, {"i386", "x86_64"});
+  };
+
+  if (auto *And = dyn_cast<BinaryExpr>(Condition)) {
+    if (getDeclRefStr(And->getFn()) == "&&") {
+      auto Args = And->getArg()->getElements();
+      if ((isSimulatorPlatformOSTest(Args[0]) &&
+           isSimulatorPlatformArchTest(Args[1])) ||
+          (isSimulatorPlatformOSTest(Args[1]) &&
+           isSimulatorPlatformArchTest(Args[0]))) {
+        return And;
+      }
+    }
+  }
+  return nullptr;
+}
+
 } // end anonymous namespace
+
 
 /// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
@@ -592,6 +684,13 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
       diagnose(Tok.getLoc(),
                diag::extra_tokens_conditional_compilation_directive);
+    }
+
+    if (Expr *Test = findAnyLikelySimulatorEnvironmentTest(Condition)) {
+      diagnose(Test->getLoc(),
+               diag::likely_simulator_platform_condition)
+        .fixItReplace(Test->getSourceRange(),
+                      "targetEnvironment(simulator)");
     }
 
     // Parse elements

@@ -1368,6 +1368,9 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
+ERROR(experimental_conditional_conformances,none,
+      "conditional conformance of %0 to %1 depends on an experimental feature "
+      "(SE-0143)", (Type, Type))
 
 ERROR(protocol_does_not_conform_objc,none,
       "using %0 as a concrete type conforming to protocol %1 is not supported",
@@ -2842,6 +2845,10 @@ ERROR(assignment_bang_has_immutable_subcomponent,none,
 NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
+
+ERROR(assignment_let_property_delegating_init,none,
+      "'let' property %0 may not be initialized directly; use "
+      "\"self.init(...)\" or \"self = ...\" instead", (DeclName))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,none,

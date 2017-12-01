@@ -1917,7 +1917,7 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
                                      bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
-  Invocation.getFrontendOptions().Inputs.clearPrimaryInput();
+  Invocation.getFrontendOptions().Inputs.setPrimaryInputToFirstFile();
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI;
   // Display diagnostics to stderr.
@@ -1948,7 +1948,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
                         bool AnnotatePrint) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
-  Invocation.getFrontendOptions().Inputs.clearPrimaryInput();
+  Invocation.getFrontendOptions().Inputs.setPrimaryInputToFirstFile();
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   CompilerInstance CI;
   // Display diagnostics to stderr.

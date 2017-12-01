@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift
-
-// FIXME: Should be part of the standard library.
-extension Array: Equatable where Element: Equatable { }
+// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances
 
 struct NotEquatable { }
 

@@ -455,16 +455,15 @@ internal struct _UnmanagedAnyObjectArray {
 /// same copy-on-write optimization that is used when two instances of `Set`
 /// share buffer.
 @_fixed_layout
-public struct Set<Element : Hashable> :
-  SetAlgebra, Hashable, Collection, ExpressibleByArrayLiteral {
-
-  internal typealias _Self = Set<Element>
+public struct Set<Element : Hashable> {
   internal typealias _VariantBuffer = _VariantSetBuffer<Element>
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
 
   @_versioned
   internal var _variantBuffer: _VariantBuffer
+}
 
+extension Set {
   /// Creates a new, empty set with at least the specified number of elements'
   /// worth of buffer.
   ///
@@ -511,30 +510,44 @@ public struct Set<Element : Hashable> :
       _CocoaSetBuffer(cocoaSet: _immutableCocoaSet))
   }
 #endif
+}
 
-  /// The starting position for iterating members of the set.
+extension Set : ExpressibleByArrayLiteral {
+
+  //
+  // `ExpressibleByArrayLiteral` conformance
+  //
+  /// Creates a set containing the elements of the given array literal.
   ///
-  /// If the set is empty, `startIndex` is equal to `endIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var startIndex: Index {
-    return _variantBuffer.startIndex
-  }
-
-  /// The "past the end" position for the set---that is, the position one
-  /// greater than the last valid subscript argument.
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you use an array literal. Instead, create a new set using an array
+  /// literal as its value by enclosing a comma-separated list of values in
+  /// square brackets. You can use an array literal anywhere a set is expected
+  /// by the type context.
   ///
-  /// If the set is empty, `endIndex` is equal to `startIndex`.
+  /// Here, a set of strings is created from an array literal holding only
+  /// strings.
+  ///
+  ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
+  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
+  ///         print("Whatever it is, it's bound to be delicious!")
+  ///     }
+  ///     // Prints "Whatever it is, it's bound to be delicious!"
+  ///
+  /// - Parameter elements: A variadic list of elements of the new set.
   @_inlineable // FIXME(sil-serialize-all)
-  public var endIndex: Index {
-    return _variantBuffer.endIndex
+  public init(arrayLiteral elements: Element...) {
+    self.init(_nativeBuffer: _NativeSetBuffer.fromArray(elements))
   }
+}
 
+extension Set : Sequence {
+  /// Returns an iterator over the members of the set.
   @_inlineable // FIXME(sil-serialize-all)
-  public func index(after i: Index) -> Index {
-    return _variantBuffer.index(after: i)
+  @inline(__always)
+  public func makeIterator() -> SetIterator<Element> {
+    return _variantBuffer.makeIterator()
   }
-
-  // APINAMING: complexity docs are broadly missing in this file.
 
   /// Returns a Boolean value that indicates whether the given element exists
   /// in the set.
@@ -558,6 +571,79 @@ public struct Set<Element : Hashable> :
     return _variantBuffer.maybeGet(member) != nil
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _customContainsEquatableElement(_ member: Element) -> Bool? {
+    return contains(member)
+  }
+}
+
+// This is not quite Sequence.filter, because that returns [Element], not Self
+// (RangeReplaceableCollection.filter returns Self, but Set isn't an RRC)
+extension Set {
+  /// Returns a new set containing the elements of the set that satisfy the
+  /// given predicate.
+  ///
+  /// In this example, `filter(_:)` is used to include only names shorter than
+  /// five characters.
+  ///
+  ///     let cast: Set = ["Vivien", "Marlon", "Kim", "Karl"]
+  ///     let shortNames = cast.filter { $0.count < 5 }
+  ///
+  ///     shortNames.isSubset(of: cast)
+  ///     // true
+  ///     shortNames.contains("Vivien")
+  ///     // false
+  ///
+  /// - Parameter isIncluded: A closure that takes an element as its argument
+  ///   and returns a Boolean value indicating whether the element should be
+  ///   included in the returned set.
+  /// - Returns: A set of the elements that `isIncluded` allows.
+  @_inlineable
+  @available(swift, introduced: 4.0)
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> Set {
+    var result = Set()
+    for element in self {
+      if try isIncluded(element) {
+        result.insert(element)
+      }
+    }
+    return result
+  }
+}
+
+extension Set : Collection {
+  /// The starting position for iterating members of the set.
+  ///
+  /// If the set is empty, `startIndex` is equal to `endIndex`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var startIndex: Index {
+    return _variantBuffer.startIndex
+  }
+
+  /// The "past the end" position for the set---that is, the position one
+  /// greater than the last valid subscript argument.
+  ///
+  /// If the set is empty, `endIndex` is equal to `startIndex`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var endIndex: Index {
+    return _variantBuffer.endIndex
+  }
+
+  /// Accesses the member at the given position.
+  @_inlineable // FIXME(sil-serialize-all)
+  public subscript(position: Index) -> Element {
+    return _variantBuffer.assertingGet(position)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func index(after i: Index) -> Index {
+    return _variantBuffer.index(after: i)
+  }
+
+  // APINAMING: complexity docs are broadly missing in this file.
+
   /// Returns the index of the given element in the set, or `nil` if the
   /// element is not a member of the set.
   ///
@@ -568,6 +654,149 @@ public struct Set<Element : Hashable> :
   public func index(of member: Element) -> Index? {
     return _variantBuffer.index(forKey: member)
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _customIndexOfEquatableElement(
+     _ member: Element
+    ) -> Index?? {
+    return Optional(index(of: member))
+  }
+
+  /// The number of elements in the set.
+  ///
+  /// - Complexity: O(1).
+  @_inlineable // FIXME(sil-serialize-all)
+  public var count: Int {
+    return _variantBuffer.count
+  }
+
+  /// A Boolean value that indicates whether the set is empty.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var isEmpty: Bool {
+    return count == 0
+  }
+
+  /// The first element of the set.
+  ///
+  /// The first element of the set is not necessarily the first element added
+  /// to the set. Don't expect any particular ordering of set elements.
+  ///
+  /// If the set is empty, the value of this property is `nil`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var first: Element? {
+    return count > 0 ? self[startIndex] : nil
+  }
+}
+  
+/// Check for both subset and equality relationship between
+/// a set and some sequence (which may itself be a `Set`).
+///
+/// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
+@_inlineable
+@_versioned
+internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
+  -> (isSubset: Bool, isEqual: Bool) {
+  // FIXME(performance): performance could be better if we start by comparing
+  // counts.
+  for member in lhs {
+    if !rhs.contains(member) {
+      return (false, false)
+    }
+  }
+  return (true, lhs.count == rhs.count)
+}
+
+// FIXME: rdar://problem/23549059 (Optimize == for Set)
+// Look into initially trying to compare the two sets by directly comparing the
+// contents of both buffers in order. If they happen to have the exact same
+// ordering we can get the `true` response without ever hashing. If the two
+// buffers' contents differ at all then we have to fall back to hashing the
+// rest of the elements (but we don't need to hash any prefix that did match).
+extension Set : Equatable {
+  /// Returns a Boolean value indicating whether two sets have equal elements.
+  ///
+  /// - Parameters:
+  ///   - lhs: A set.
+  ///   - rhs: Another set.
+  /// - Returns: `true` if the `lhs` and `rhs` have the same elements; otherwise,
+  ///   `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
+    switch (lhs._variantBuffer, rhs._variantBuffer) {
+    case (.native(let lhsNative), .native(let rhsNative)):
+
+      if lhsNative._storage === rhsNative._storage {
+        return true
+      }
+
+      if lhsNative.count != rhsNative.count {
+        return false
+      }
+
+      for member in lhs {
+        let (_, found) =
+          rhsNative._find(member, startBucket: rhsNative._bucket(member))
+        if !found {
+          return false
+        }
+      }
+      return true
+
+  #if _runtime(_ObjC)
+    case (_VariantSetBuffer.cocoa(let lhsCocoa),
+        _VariantSetBuffer.cocoa(let rhsCocoa)):
+      return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
+
+    case (_VariantSetBuffer.native(let lhsNative),
+      _VariantSetBuffer.cocoa(let rhsCocoa)):
+
+      if lhsNative.count != rhsCocoa.count {
+        return false
+      }
+
+      let endIndex = lhsNative.endIndex
+      var i = lhsNative.startIndex
+      while i != endIndex {
+        let key = lhsNative.assertingGet(i)
+        let bridgedKey: AnyObject = _bridgeAnythingToObjectiveC(key)
+        let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
+        if let rhsValue = optRhsValue {
+          if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
+            i = lhsNative.index(after: i)
+            continue
+          }
+        }
+        i = lhsNative.index(after: i)
+        return false
+      }
+      return true
+
+    case (_VariantSetBuffer.cocoa, _VariantSetBuffer.native):
+      return rhs == lhs
+  #endif
+    }
+  }
+}
+
+extension Set : Hashable {
+  /// The hash value for the set.
+  ///
+  /// Two sets that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
+    var result: Int = _mixInt(0)
+    for member in self {
+       result ^= _mixInt(member.hashValue)
+    }
+    return result
+  }
+}
+
+extension Set : SetAlgebra {
 
   /// Inserts the given element in the set if it is not already present.
   ///
@@ -692,57 +921,6 @@ public struct Set<Element : Hashable> :
     return remove(at: startIndex)
   }
 
-  /// The number of elements in the set.
-  ///
-  /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
-  public var count: Int {
-    return _variantBuffer.count
-  }
-
-  //
-  // `Sequence` conformance
-  //
-
-  /// Accesses the member at the given position.
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(position: Index) -> Element {
-    return _variantBuffer.assertingGet(position)
-  }
-
-  /// Returns an iterator over the members of the set.
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public func makeIterator() -> SetIterator<Element> {
-    return _variantBuffer.makeIterator()
-  }
-
-  //
-  // `ExpressibleByArrayLiteral` conformance
-  //
-  /// Creates a set containing the elements of the given array literal.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you use an array literal. Instead, create a new set using an array
-  /// literal as its value by enclosing a comma-separated list of values in
-  /// square brackets. You can use an array literal anywhere a set is expected
-  /// by the type context.
-  ///
-  /// Here, a set of strings is created from an array literal holding only
-  /// strings.
-  ///
-  ///     let ingredients: Set = ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///     if ingredients.isSuperset(of: ["sugar", "salt"]) {
-  ///         print("Whatever it is, it's bound to be delicious!")
-  ///     }
-  ///     // Prints "Whatever it is, it's bound to be delicious!"
-  ///
-  /// - Parameter elements: A variadic list of elements of the new set.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(arrayLiteral elements: Element...) {
-    self.init(_nativeBuffer: _NativeSetBuffer.fromArray(elements))
-  }
-
   //
   // APIs below this comment should be implemented strictly in terms of
   // *public* APIs above.  `_variantBuffer` should not be accessed directly.
@@ -811,38 +989,6 @@ public struct Set<Element : Hashable> :
         insert(item)
       }
     }
-  }
-
-  /// Returns a new set containing the elements of the set that satisfy the
-  /// given predicate.
-  ///
-  /// In this example, `filter(_:)` is used to include only names shorter than
-  /// five characters.
-  ///
-  ///     let cast: Set = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let shortNames = cast.filter { $0.count < 5 }
-  ///
-  ///     shortNames.isSubset(of: cast)
-  ///     // true
-  ///     shortNames.contains("Vivien")
-  ///     // false
-  ///
-  /// - Parameter isIncluded: A closure that takes an element as its argument
-  ///   and returns a Boolean value indicating whether the element should be
-  ///   included in the returned set.
-  /// - Returns: A set of the elements that `isIncluded` allows.
-  @_inlineable
-  @available(swift, introduced: 4.0)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> Set {
-    var result = Set()
-    for element in self {
-      if try isIncluded(element) {
-        result.insert(element)
-      }
-    }
-    return result
   }
 
   /// Returns a Boolean value that indicates whether the set is a subset of the
@@ -1176,149 +1322,6 @@ public struct Set<Element : Hashable> :
     where S.Element == Element {
     let otherSet = Set(other)
     formSymmetricDifference(otherSet)
-  }
-
-  /// The hash value for the set.
-  ///
-  /// Two sets that are equal will always have equal hash values.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
-    var result: Int = _mixInt(0)
-    for member in self {
-       result ^= _mixInt(member.hashValue)
-    }
-    return result
-  }
-
-  //
-  // `Sequence` conformance
-  //
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func _customContainsEquatableElement(_ member: Element) -> Bool? {
-    return contains(member)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func _customIndexOfEquatableElement(
-     _ member: Element
-    ) -> Index?? {
-    return Optional(index(of: member))
-  }
-
-  //
-  // Collection conformance
-  //
-
-  /// A Boolean value that indicates whether the set is empty.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var isEmpty: Bool {
-    return count == 0
-  }
-
-  /// The first element of the set.
-  ///
-  /// The first element of the set is not necessarily the first element added
-  /// to the set. Don't expect any particular ordering of set elements.
-  ///
-  /// If the set is empty, the value of this property is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var first: Element? {
-    return count > 0 ? self[startIndex] : nil
-  }
-}
-
-/// Check for both subset and equality relationship between
-/// a set and some sequence (which may itself be a `Set`).
-///
-/// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-@_inlineable
-@_versioned
-internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
-  -> (isSubset: Bool, isEqual: Bool) {
-  // FIXME(performance): performance could be better if we start by comparing
-  // counts.
-  for member in lhs {
-    if !rhs.contains(member) {
-      return (false, false)
-    }
-  }
-  return (true, lhs.count == rhs.count)
-}
-
-// FIXME: rdar://problem/23549059 (Optimize == for Set)
-// Look into initially trying to compare the two sets by directly comparing the
-// contents of both buffers in order. If they happen to have the exact same
-// ordering we can get the `true` response without ever hashing. If the two
-// buffers' contents differ at all then we have to fall back to hashing the
-// rest of the elements (but we don't need to hash any prefix that did match).
-extension Set {
-  /// Returns a Boolean value indicating whether two sets have equal elements.
-  ///
-  /// - Parameters:
-  ///   - lhs: A set.
-  ///   - rhs: Another set.
-  /// - Returns: `true` if the `lhs` and `rhs` have the same elements; otherwise,
-  ///   `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
-    switch (lhs._variantBuffer, rhs._variantBuffer) {
-    case (.native(let lhsNative), .native(let rhsNative)):
-
-      if lhsNative._storage === rhsNative._storage {
-        return true
-      }
-
-      if lhsNative.count != rhsNative.count {
-        return false
-      }
-
-      for member in lhs {
-        let (_, found) =
-          rhsNative._find(member, startBucket: rhsNative._bucket(member))
-        if !found {
-          return false
-        }
-      }
-      return true
-
-  #if _runtime(_ObjC)
-    case (_VariantSetBuffer.cocoa(let lhsCocoa),
-        _VariantSetBuffer.cocoa(let rhsCocoa)):
-      return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
-
-    case (_VariantSetBuffer.native(let lhsNative),
-      _VariantSetBuffer.cocoa(let rhsCocoa)):
-
-      if lhsNative.count != rhsCocoa.count {
-        return false
-      }
-
-      let endIndex = lhsNative.endIndex
-      var i = lhsNative.startIndex
-      while i != endIndex {
-        let key = lhsNative.assertingGet(i)
-        let bridgedKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-        let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
-        if let rhsValue = optRhsValue {
-          if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
-            i = lhsNative.index(after: i)
-            continue
-          }
-        }
-        i = lhsNative.index(after: i)
-        return false
-      }
-      return true
-
-    case (_VariantSetBuffer.cocoa, _VariantSetBuffer.native):
-      return rhs == lhs
-  #endif
-    }
   }
 }
 
@@ -1713,8 +1716,7 @@ public func _setBridgeFromObjectiveCConditional<
 /// optimization that is used when two instances of `Dictionary` share
 /// buffer.
 @_fixed_layout
-public struct Dictionary<Key : Hashable, Value> :
-  Collection, ExpressibleByDictionaryLiteral {
+public struct Dictionary<Key : Hashable, Value> {
 
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantBuffer = _VariantDictionaryBuffer<Key, Value>
@@ -1887,12 +1889,63 @@ public struct Dictionary<Key : Hashable, Value> :
       _CocoaDictionaryBuffer(cocoaDictionary: _immutableCocoaDictionary))
   }
 #endif
+}
 
-  //
-  // All APIs below should dispatch to `_variantBuffer`, without doing any
-  // additional processing.
-  //
+//
+// All APIs below should dispatch to `_variantBuffer`, without doing any
+// additional processing.
+//
 
+extension Dictionary : Sequence {
+  /// Returns an iterator over the dictionary's key-value pairs.
+  ///
+  /// Iterating over a dictionary yields the key-value pairs as two-element
+  /// tuples. You can decompose the tuple in a `for`-`in` loop, which calls
+  /// `makeIterator()` behind the scenes, or when calling the iterator's
+  /// `next()` method directly.
+  ///
+  ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+  ///     for (name, hueValue) in hues {
+  ///         print("The hue of \(name) is \(hueValue).")
+  ///     }
+  ///     // Prints "The hue of Heliotrope is 296."
+  ///     // Prints "The hue of Coral is 16."
+  ///     // Prints "The hue of Aquamarine is 156."
+  ///
+  /// - Returns: An iterator over the dictionary with elements of type
+  ///   `(key: Key, value: Value)`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @inline(__always)
+  public func makeIterator() -> DictionaryIterator<Key, Value> {
+    return _variantBuffer.makeIterator()
+  }
+}
+
+// This is not quite Sequence.filter, because that returns [Element], not Self
+extension Dictionary {
+  /// Returns a new dictionary containing the key-value pairs of the dictionary
+  /// that satisfy the given predicate.
+  ///
+  /// - Parameter isIncluded: A closure that takes a key-value pair as its
+  ///   argument and returns a Boolean value indicating whether the pair
+  ///   should be included in the returned dictionary.
+  /// - Returns: A dictionary of the key-value pairs that `isIncluded` allows.
+  @_inlineable
+  @available(swift, introduced: 4.0)
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Key: Value] {
+    var result = Dictionary()
+    for el in self {
+      if try isIncluded(el) {
+        result[el.key] = el.value
+      }
+    }
+    return result
+  }
+}
+
+extension Dictionary: Collection {
   /// The position of the first element in a nonempty dictionary.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
@@ -1973,7 +2026,9 @@ public struct Dictionary<Key : Hashable, Value> :
   public subscript(position: Index) -> Element {
     return _variantBuffer.assertingGet(position)
   }
+}
 
+extension Dictionary {
   /// Accesses the value associated with the given key for reading and writing.
   ///
   /// This *key-based* subscript returns the value for the given key if the key
@@ -2035,7 +2090,59 @@ public struct Dictionary<Key : Hashable, Value> :
       }
     }
   }
+  
+  
+  /// The number of key-value pairs in the dictionary.
+  ///
+  /// - Complexity: O(1).
+  @_inlineable // FIXME(sil-serialize-all)
+  public var count: Int {
+    return _variantBuffer.count
+  }
 
+  //
+  // `Sequence` conformance
+  //
+
+  /// A Boolean value that indicates whether the dictionary is empty.
+  ///
+  /// Dictionaries are empty when created with an initializer or an empty
+  /// dictionary literal.
+  ///
+  ///     var frequencies: [String: Int] = [:]
+  ///     print(frequencies.isEmpty)
+  ///     // Prints "true"
+  @_inlineable // FIXME(sil-serialize-all)
+  public var isEmpty: Bool {
+    return count == 0
+  }
+}
+
+extension Dictionary : ExpressibleByDictionaryLiteral {
+  /// Creates a dictionary initialized with a dictionary literal.
+  ///
+  /// Do not call this initializer directly. It is called by the compiler to
+  /// handle dictionary literals. To use a dictionary literal as the initial
+  /// value of a dictionary, enclose a comma-separated list of key-value pairs
+  /// in square brackets.
+  ///
+  /// For example, the code sample below creates a dictionary with string keys
+  /// and values.
+  ///
+  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+  ///     print(countryCodes)
+  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+  ///
+  /// - Parameter elements: The key-value pairs that will make up the new
+  ///   dictionary. Each key in `elements` must be unique.
+  @_inlineable // FIXME(sil-serialize-all)
+  @effects(readonly)
+  public init(dictionaryLiteral elements: (Key, Value)...) {
+    self.init(_nativeBuffer: _NativeDictionaryBuffer.fromArray(elements))
+  }
+}
+
+extension Dictionary {
   /// Accesses the element with the given key, or the specified default value,
   /// if the dictionary doesn't contain the given key.
   @_inlineable // FIXME(sil-serialize-all)
@@ -2050,27 +2157,6 @@ public struct Dictionary<Key : Hashable, Value> :
       // FIXME(performance): this loads and discards the old value.
       _variantBuffer.updateValue(newValue, forKey: key)
     }
-  }
-
-  /// Returns a new dictionary containing the key-value pairs of the dictionary
-  /// that satisfy the given predicate.
-  ///
-  /// - Parameter isIncluded: A closure that takes a key-value pair as its
-  ///   argument and returns a Boolean value indicating whether the pair
-  ///   should be included in the returned dictionary.
-  /// - Returns: A dictionary of the key-value pairs that `isIncluded` allows.
-  @_inlineable
-  @available(swift, introduced: 4.0)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Key: Value] {
-    var result = Dictionary()
-    for el in self {
-      if try isIncluded(el) {
-        result[el.key] = el.value
-      }
-    }
-    return result
   }
 
   /// Returns a new dictionary containing the keys of this dictionary with the
@@ -2350,94 +2436,6 @@ public struct Dictionary<Key : Hashable, Value> :
     // native buffer.
     _variantBuffer.removeAll(keepingCapacity: keepCapacity)
   }
-
-  /// The number of key-value pairs in the dictionary.
-  ///
-  /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
-  public var count: Int {
-    return _variantBuffer.count
-  }
-
-  //
-  // `Sequence` conformance
-  //
-
-  /// Returns an iterator over the dictionary's key-value pairs.
-  ///
-  /// Iterating over a dictionary yields the key-value pairs as two-element
-  /// tuples. You can decompose the tuple in a `for`-`in` loop, which calls
-  /// `makeIterator()` behind the scenes, or when calling the iterator's
-  /// `next()` method directly.
-  ///
-  ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
-  ///     for (name, hueValue) in hues {
-  ///         print("The hue of \(name) is \(hueValue).")
-  ///     }
-  ///     // Prints "The hue of Heliotrope is 296."
-  ///     // Prints "The hue of Coral is 16."
-  ///     // Prints "The hue of Aquamarine is 156."
-  ///
-  /// - Returns: An iterator over the dictionary with elements of type
-  ///   `(key: Key, value: Value)`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public func makeIterator() -> DictionaryIterator<Key, Value> {
-    return _variantBuffer.makeIterator()
-  }
-
-  //
-  // ExpressibleByDictionaryLiteral conformance
-  //
-
-  /// Creates a dictionary initialized with a dictionary literal.
-  ///
-  /// Do not call this initializer directly. It is called by the compiler to
-  /// handle dictionary literals. To use a dictionary literal as the initial
-  /// value of a dictionary, enclose a comma-separated list of key-value pairs
-  /// in square brackets.
-  ///
-  /// For example, the code sample below creates a dictionary with string keys
-  /// and values.
-  ///
-  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     print(countryCodes)
-  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
-  ///
-  /// - Parameter elements: The key-value pairs that will make up the new
-  ///   dictionary. Each key in `elements` must be unique.
-  @_inlineable // FIXME(sil-serialize-all)
-  @effects(readonly)
-  public init(dictionaryLiteral elements: (Key, Value)...) {
-    self.init(_nativeBuffer: _NativeDictionaryBuffer.fromArray(elements))
-  }
-
-  //
-  // APIs below this comment should be implemented strictly in terms of
-  // *public* APIs above.  `_variantBuffer` should not be accessed directly.
-  //
-  // This separates concerns for testing.  Tests for the following APIs need
-  // not to concern themselves with testing correctness of behavior of
-  // underlying buffer (and different variants of it), only correctness of the
-  // API itself.
-  //
-
-  //
-  // Collection conformance
-  //
-  
-  /// A Boolean value that indicates whether the dictionary is empty.
-  ///
-  /// Dictionaries are empty when created with an initializer or an empty
-  /// dictionary literal.
-  ///
-  ///     var frequencies: [String: Int] = [:]
-  ///     print(frequencies.isEmpty)
-  ///     // Prints "true"
-  @_inlineable // FIXME(sil-serialize-all)
-  public var isEmpty: Bool {
-    return count == 0
-  }
 }
 
 // Maintain old `keys` and `values` types in Swift 3 mode.
@@ -2709,7 +2707,7 @@ extension Dictionary {
   }
 }
 
-extension Dictionary where Value : Equatable {
+extension Dictionary : Equatable where Value : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
   public static func == (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
     switch (lhs._variantBuffer, rhs._variantBuffer) {
@@ -5967,7 +5965,7 @@ elif Self == 'Dictionary':
 
 ${SubscriptingWithIndexDoc}
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct Index : Comparable {
+public struct Index : Comparable, Hashable {
   // Index for native buffer is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving
   // backwards.  Even if they did, there is another issue: NSEnumerator does
@@ -6086,6 +6084,22 @@ extension ${Self}.Index {
       return lhsCocoa < rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different sets")
+  #endif
+    }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    if _fastPath(_guaranteedNative) {
+      return _nativeIndex.offset
+    }
+
+    switch _value {
+    case ._native(let nativeIndex):
+      return nativeIndex.offset
+  #if _runtime(_ObjC)
+    case ._cocoa(let cocoaIndex):
+      return cocoaIndex.currentKeyIndex
   #endif
     }
   }

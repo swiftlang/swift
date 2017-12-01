@@ -44,7 +44,7 @@ namespace Lowering {
 /// The default convention for handling the callee object on thick
 /// callees.
 const ParameterConvention DefaultThickCalleeConvention =
-  ParameterConvention::Direct_Owned;
+    ParameterConvention::Direct_Guaranteed;
 
 /// Given an AST function type, return a type that is identical except
 /// for using the given ExtInfo.
@@ -79,13 +79,10 @@ adjustFunctionType(CanSILFunctionType type, SILFunctionType::ExtInfo extInfo,
 }
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
-                   Optional<ProtocolConformanceRef> witnessMethodConformance,
-                   bool UseGuaranteedClosures) {
+                   Optional<ProtocolConformanceRef> witnessMethodConformance) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
-  auto contextConvention = UseGuaranteedClosures
-                               ? ParameterConvention::Direct_Guaranteed
-                               : DefaultThickCalleeConvention;
+  auto contextConvention = DefaultThickCalleeConvention;
   return adjustFunctionType(t, extInfo,
                             extInfo.hasContext()
                                 ? contextConvention
@@ -93,8 +90,8 @@ adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
                             witnessMethodConformance);
 }
 inline CanSILFunctionType
-adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep, bool UseGuaranteedClosures) {
-  return adjustFunctionType(t, rep, t->getWitnessMethodConformanceOrNone(), UseGuaranteedClosures);
+adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep) {
+  return adjustFunctionType(t, rep, t->getWitnessMethodConformanceOrNone());
 }
   
 

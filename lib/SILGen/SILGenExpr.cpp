@@ -680,8 +680,9 @@ RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
-  return B.createTuple(loc,
-               getLoweredType(TupleType::getEmpty(SGM.M.getASTContext())), {});
+  return B.createTuple(
+      loc, getLoweredType(TupleType::getEmpty(SGM.M.getASTContext())),
+      ArrayRef<SILValue>());
 }
 
 /// Emit the specified declaration as an address if possible,
@@ -1906,8 +1907,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
       auto v = SGF.B.createThinToThickFunction(
           loc, source.getValue(),
           SILType::getPrimitiveObjectType(adjustFunctionType(
-              sourceTy, SILFunctionType::Representation::Thick,
-              SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts)));
+              sourceTy, SILFunctionType::Representation::Thick)));
       // FIXME: what if other reabstraction is required?
       return ManagedValue(v, source.getCleanup());
     }
@@ -1934,8 +1934,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
       auto v = SGF.B.createThinToThickFunction(
           loc, source.getValue(),
           SILType::getPrimitiveObjectType(adjustFunctionType(
-              sourceTy, SILFunctionType::Representation::Thick,
-              SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts)));
+              sourceTy, SILFunctionType::Representation::Thick)));
       source = ManagedValue(v, source.getCleanup());
       LLVM_FALLTHROUGH;
     }

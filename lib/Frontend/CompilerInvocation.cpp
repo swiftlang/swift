@@ -11,22 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
-
-#if __APPLE__
-# include "AppleHostVersionDetection.h"
-#endif
-
-#include "swift/Strings.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -82,6 +78,147 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
 
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
+
+namespace swift {
+
+/// Implement argument semantics in a way that will make it easier to have
+/// >1 primary file (or even a primary file list) in the future without
+/// breaking anything today.
+///
+/// Semantics today:
+/// If input files are on command line, primary files on command line are also
+/// input files; they are not repeated without -primary-file. If input files are
+/// in a file list, the primary files on the command line are repeated in the
+/// file list. Thus, if there are any primary files, it is illegal to have both
+/// (non-primary) input files and a file list. Finally, the order of input files
+/// must match the order given on the command line or the file list.
+///
+/// Side note:
+/// since each input file will cause a lot of work for the compiler, this code
+/// is biased towards clarity and not optimized.
+/// In the near future, it will be possible to put primary files in the
+/// filelist, or to have a separate filelist for primaries. The organization
+/// here anticipates that evolution.
+
+class ArgsToFrontendInputsConverter {
+  DiagnosticEngine &Diags;
+  const ArgList &Args;
+  FrontendInputs &Inputs;
+
+  Arg const *const FilelistPathArg;
+
+  std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
+
+  llvm::StringMap<unsigned> FileIndices;
+  std::vector<StringRef> PrimaryFiles;
+
+  StringRef filelistPath() { return FilelistPathArg->getValue(); }
+
+  void addPrimary(StringRef file) { PrimaryFiles.push_back(file); }
+
+  void addInput(StringRef file) {
+    FileIndices.insert({file, Inputs.inputFilenameCount()});
+    Inputs.addInputFilename(file);
+  }
+
+  bool arePrimariesOnCommandLineAlsoAppearingInFilelist() {
+    return FilelistPathArg != nullptr;
+  }
+
+  enum class Whence {
+    PrimaryFromCommandLine,
+    SecondaryFromCommandLine,
+    SecondaryFromFileList
+  };
+
+  void addFile(StringRef file, Whence whence) {
+    switch (whence) {
+    case Whence::PrimaryFromCommandLine:
+      addPrimary(file);
+      if (!arePrimariesOnCommandLineAlsoAppearingInFilelist())
+        addInput(file);
+      break;
+    case Whence::SecondaryFromCommandLine:
+    case Whence::SecondaryFromFileList:
+      addInput(file);
+      break;
+    }
+  }
+
+public:
+  ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
+                                FrontendInputs &Inputs)
+      : Diags(Diags), Args(Args), Inputs(Inputs),
+        FilelistPathArg(Args.getLastArg(options::OPT_filelist)) {}
+
+  bool convert() {
+    if (enforceFilelistExclusion())
+      return true;
+    getFilesFromCommandLine();
+    if (getFilesFromFilelist())
+      return true;
+    return setPrimaryFiles();
+  }
+
+private:
+  bool enforceFilelistExclusion() {
+    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg != nullptr) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_cannot_have_input_files_with_file_list);
+      return true;
+    }
+    return false;
+  }
+  void getFilesFromCommandLine() {
+    for (const Arg *A :
+         Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+      StringRef file = A->getValue();
+      if (A->getOption().matches(options::OPT_INPUT))
+        addFile(file, Whence::SecondaryFromCommandLine);
+      else if (A->getOption().matches(options::OPT_primary_file))
+        addFile(file, Whence::PrimaryFromCommandLine);
+      else
+        llvm_unreachable("Unknown input-related argument!");
+    }
+  }
+
+  bool getFilesFromFilelist() {
+    if (FilelistPathArg == nullptr)
+      return false;
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
+        llvm::MemoryBuffer::getFile(filelistPath());
+    if (!filelistBufferOrError) {
+      Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath(),
+                     filelistBufferOrError.getError().message());
+      return true;
+    }
+    // Keep buffer alive because code passes around StringRefs.
+    FilelistBuffer = std::move(*filelistBufferOrError);
+    for (auto file : llvm::make_range(llvm::line_iterator(*FilelistBuffer),
+                                      llvm::line_iterator())) {
+      addFile(file, Whence::SecondaryFromFileList);
+    }
+    return false;
+  }
+
+  bool setPrimaryFiles() {
+    for (StringRef primaryFile : PrimaryFiles) {
+      const auto iterator = FileIndices.find(primaryFile);
+      // Catch "swiftc -frontend -c -filelist foo -primary-file
+      // some-file-not-in-foo".
+      if (iterator == FileIndices.end()) {
+        assert(FilelistPathArg != nullptr &&
+               "Missing primary with no filelist");
+        Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
+                       primaryFile, filelistPath());
+        return true;
+      }
+      Inputs.addPrimaryInputFilename(iterator->second);
+    }
+    return false;
+  }
+};
+} // namespace swift
 
 // This is a separate function so that it shows up in stack traces.
 LLVM_ATTRIBUTE_NOINLINE
@@ -224,7 +361,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.Inputs.setInputFilenamesAndPrimaryInput(Diags, Args);
+  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.Inputs).convert())
+    return true;
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
@@ -323,7 +461,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
-      Opts.Inputs.hasPrimaryInput()) {
+      Opts.Inputs.havePrimaryInputs()) {
     Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
@@ -711,7 +849,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.getPrimaryInput() && !Opts.ModuleOutputPath.empty();
+        !Opts.Inputs.havePrimaryInputs() && !Opts.ModuleOutputPath.empty();
   }
 
   for (const Arg *A : Args.filtered(OPT_import_module)) {
@@ -844,12 +982,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTargetOSChecking
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
-  
+
+  Opts.EnableConditionalConformances |=
+  Args.hasArg(OPT_enable_experimental_conditional_conformances);
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
-  Opts.NamedLazyMemberLoading |= Args.hasArg(OPT_enable_named_lazy_member_loading);
+  Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
@@ -960,21 +1100,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
   }
-#if __APPLE__
-  else if (FrontendOpts.actionIsImmediate()) {
-    clang::VersionTuple currentOSVersion = inferAppleHostOSVersion();
-    if (currentOSVersion.getMajor() != 0) {
-      llvm::Triple::OSType currentOS = Target.getOS();
-      if (currentOS == llvm::Triple::Darwin)
-        currentOS = llvm::Triple::MacOSX;
-
-      SmallString<16> newOSBuf;
-      llvm::raw_svector_ostream newOS(newOSBuf);
-      newOS << llvm::Triple::getOSTypeName(currentOS) << currentOSVersion;
-      Target.setOSName(newOS.str());
-    }
-  }
-#endif
 
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
@@ -1302,8 +1427,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
 
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
-  Opts.EnableGuaranteedClosureContexts |=
-    Args.hasArg(OPT_enable_guaranteed_closure_contexts);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
@@ -1466,11 +1589,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (FrontendOpts.Inputs.getPrimaryInput() &&
-             FrontendOpts.Inputs.getPrimaryInput()->isFilename()) {
-    unsigned Index = FrontendOpts.Inputs.getPrimaryInput()->Index;
-    Opts.MainInputFilename = FrontendOpts.Inputs.getInputFilenames()[Index];
-  } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
+  } else if (const Optional<StringRef> filename =
+                 FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename()) {
+    Opts.MainInputFilename = filename.getValue();
+  } else if (FrontendOpts.Inputs.haveUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
   Opts.OutputFilenames = FrontendOpts.OutputFilenames;

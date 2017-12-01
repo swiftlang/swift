@@ -5,7 +5,7 @@ PATTERN_NODES = [
     # enum-case-pattern -> type-identifier? '.' identifier tuple-pattern?
     Node('EnumCasePattern', kind='Pattern',
          children=[
-             Child('TypeIdentifier', kind='TypeIdentifier',
+             Child('Type', kind='Type',
                    is_optional=True),
              Child('Period', kind='PeriodToken'),
              Child('CaseName', kind='IdentifierToken'),

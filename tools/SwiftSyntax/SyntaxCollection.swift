@@ -99,6 +99,11 @@ public class SyntaxCollection<SyntaxElement: Syntax>: Syntax {
     newLayout.removeLast()
     return replacingLayout(newLayout)
   }
+
+  /// Returns an iterator over the elements of this syntax collection.
+  public func makeIterator() -> SyntaxCollectionIterator<SyntaxElement> {
+    return SyntaxCollectionIterator(collection: self)
+  }
 }
 
 /// Conformance for SyntaxCollection to the Collection protocol.
@@ -119,3 +124,27 @@ extension SyntaxCollection: Collection {
     return child(at: index)! as! SyntaxElement
   }
 }
+
+/// A type that iterates over a syntax collection using its indices.
+public struct SyntaxCollectionIterator<Element: Syntax>: IteratorProtocol {
+  private let collection: SyntaxCollection<Element>
+  private var index: SyntaxCollection<Element>.Index
+
+  fileprivate init(collection: SyntaxCollection<Element>) {
+    self.collection = collection
+    self.index = collection.startIndex
+  }
+
+  public mutating func next() -> Element? {
+    guard
+      !(self.collection.isEmpty || self.index == self.collection.endIndex)
+    else {
+      return nil
+    }
+
+    let result = collection[index]
+    collection.formIndex(after: &index)
+    return result
+  }
+}
+

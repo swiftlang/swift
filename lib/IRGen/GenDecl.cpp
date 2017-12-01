@@ -2329,7 +2329,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     sectionName = "__TEXT, __swift2_proto, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = ".swift2_protocol_conformances";
+    sectionName = "swift2_protocol_conformances";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw2prtc";
@@ -2352,7 +2352,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     sectionName = "__TEXT, __swift2_types, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = ".swift2_type_metadata";
+    sectionName = "swift2_type_metadata";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw2tymd";

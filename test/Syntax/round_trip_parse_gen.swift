@@ -39,5 +39,28 @@ class C {
   func foo2() {
     _ = true ? 1 : 0
     _ = (true ? 1 : 0) ? (true ? 1 : 0) : (true ? 1 : 0)
+    _ = (1, 2)
+    _ = (first: 1, second: 2)
+    _ = (1)
+    _ = (first: 1)
+    if !true {
+      return
+    }
+  }
+
+  func foo3() {
+    _ = a.a.a
+    _ = a.b
+    _ = 1.a
+    (1 + 1).a.b.foo
+    _ = a as Bool || a as! Bool || a as? Bool
+    _ = a is Bool
   }
 }
+
+typealias A = Any
+typealias B = (Array<Array<Any>>.Element)
+typealias C = [Int]
+typealias D = [Int: String]
+typealias E = Int?.Protocol
+typealias F = [Int]!.Type

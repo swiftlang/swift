@@ -46,6 +46,8 @@ namespace swift {
     Runtime,
     /// Conditional import of module
     CanImport,
+    /// Target Environment (currently just 'simulator' or absent)
+    TargetEnvironment,
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
@@ -132,6 +134,9 @@ namespace swift {
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
 
+    /// Whether SE-0143: Conditional Conformances are enabled.
+    bool EnableConditionalConformances = false;
+
     ///
     /// Flags for developers
     ///
@@ -154,7 +159,7 @@ namespace swift {
     bool IterativeTypeChecker = false;
 
     /// \brief Enable named lazy member loading.
-    bool NamedLazyMemberLoading = false;
+    bool NamedLazyMemberLoading = true;
 
     /// Debug the generic signatures computed by the generic signature builder.
     bool DebugGenericSignatures = false;
@@ -351,7 +356,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 4>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };

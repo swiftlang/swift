@@ -173,9 +173,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     canGuarantee = true;
     break;
   }
-  // TODO: Or we always retain them when guaranteed contexts aren't enabled.
-  if (!SGM.M.getOptions().EnableGuaranteedClosureContexts)
-    canGuarantee = false;
   
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
@@ -362,9 +359,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   for (auto capture : capturedArgs)
     forwardedArgs.push_back(capture.forward(*this));
 
-  auto calleeConvention = SGM.M.getOptions().EnableGuaranteedClosureContexts
-                              ? ParameterConvention::Direct_Guaranteed
-                              : ParameterConvention::Direct_Owned;
+  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
   SILType closureTy = SILGenBuilder::getPartialApplyResultType(
       functionRef->getType(), capturedArgs.size(), SGM.M, subs,

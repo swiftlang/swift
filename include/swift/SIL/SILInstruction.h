@@ -3386,6 +3386,14 @@ public:
     /// RootSelf designates "self" in a struct, enum, or root class.
     RootSelf,
 
+    /// CrossModuleRootSelf is the same as "RootSelf", but in a case where
+    /// it's not really safe to treat 'self' as root because the original
+    /// module might add more stored properties.
+    ///
+    /// This is only used for Swift 4 compatibility. In Swift 5, cross-module
+    /// initializers are always DelegatingSelf.
+    CrossModuleRootSelf,
+
     /// DerivedSelf designates "self" in a derived (non-root) class.
     DerivedSelf,
 
@@ -3411,6 +3419,9 @@ public:
   bool isVar() const { return ThisKind == Var; }
   bool isRootSelf() const {
     return ThisKind == RootSelf;
+  }
+  bool isCrossModuleRootSelf() const {
+    return ThisKind == CrossModuleRootSelf;
   }
   bool isDerivedClassSelf() const {
     return ThisKind == DerivedSelf;
@@ -5464,16 +5475,13 @@ class WitnessMethodInst final
   CanType LookupType;
   ProtocolConformanceRef Conformance;
   unsigned NumOperands;
-  bool Volatile;
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
-                    SILType Ty, ArrayRef<SILValue> TypeDependentOperands,
-                    bool Volatile = false)
+                    SILType Ty, ArrayRef<SILValue> TypeDependentOperands)
       : InstructionBase(DebugLoc, Ty, Member),
         LookupType(LookupType), Conformance(Conformance),
-        NumOperands(TypeDependentOperands.size()),
-        Volatile(Volatile) {
+        NumOperands(TypeDependentOperands.size()) {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
                                            TypeDependentOperands);
   }
@@ -5493,8 +5501,7 @@ class WitnessMethodInst final
   static WitnessMethodInst *
   create(SILDebugLocation DebugLoc, CanType LookupType,
          ProtocolConformanceRef Conformance, SILDeclRef Member, SILType Ty,
-         SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes,
-         bool Volatile = false);
+         SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
   ~WitnessMethodInst() {
@@ -5509,8 +5516,6 @@ public:
     return getMember().getDecl()->getDeclContext()
              ->getAsProtocolOrProtocolExtensionContext();
   }
-
-  bool isVolatile() const { return Volatile; }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
 

@@ -270,41 +270,33 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
   return emitPreconditionOptionalHasValue(loc, src);
 }
 
-ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
-                                                    ManagedValue addrOrValue,
-                                                    const TypeLowering &optTL,
-                                                    SGFContext C) {
+ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(
+    SILLocation loc, ManagedValue addrOrValue, const TypeLowering &optTL,
+    SGFContext C) {
   SILType origPayloadTy =
     addrOrValue.getType().getAnyOptionalObjectType();
 
   auto someDecl = getASTContext().getOptionalSomeDecl();
- 
-  ManagedValue payload;
 
-  // Take the payload from the optional.  Cheat a bit in the +0
-  // case--UncheckedTakeEnumData will never actually invalidate an Optional enum
-  // value.
-  SILValue payloadVal;
+  // Take the payload from the optional.
   if (!addrOrValue.getType().isAddress()) {
-    payloadVal = B.createUncheckedEnumData(loc, addrOrValue.forward(*this),
-                                           someDecl);
-  } else {
-    payloadVal =
-      B.createUncheckedTakeEnumDataAddr(loc, addrOrValue.forward(*this),
-                                        someDecl, origPayloadTy);
-  
-    if (optTL.isLoadable())
-      payloadVal =
-          optTL.emitLoad(B, loc, payloadVal, LoadOwnershipQualifier::Take);
+    return B.createUncheckedEnumData(loc, addrOrValue, someDecl);
   }
 
-  // Produce a correctly managed value.
-  if (addrOrValue.hasCleanup())
-    payload = emitManagedRValueWithCleanup(payloadVal);
-  else
-    payload = ManagedValue::forUnmanaged(payloadVal);
-  
-  return payload;
+  // Cheat a bit in the +0 case--UncheckedTakeEnumData will never actually
+  // invalidate an Optional enum value. This is specific to optionals.
+  ManagedValue payload = B.createUncheckedTakeEnumDataAddr(
+      loc, addrOrValue, someDecl, origPayloadTy);
+  if (!optTL.isLoadable())
+    return payload;
+
+  // If we do not have a cleanup on our address, use a load_borrow.
+  if (!payload.hasCleanup()) {
+    return B.createLoadBorrow(loc, payload);
+  }
+
+  // Otherwise, perform a load take.
+  return B.createLoadTake(loc, payload);
 }
 
 ManagedValue
@@ -1269,7 +1261,31 @@ static bool isValueToAnyConversion(CanType from, CanType to) {
   }
 
   assert(to->isAny());
-  return !from->isAnyClassReferenceType();
+
+  // Types that we can easily transform into AnyObject:
+  //   - classes and class-bounded archetypes
+  //   - class existentials, even if not pure-@objc
+  //   - @convention(objc) metatypes
+  //   - @convention(block) functions
+  return !from->isAnyClassReferenceType() &&
+         !from->isBridgeableObjectType();
+}
+
+/// Check whether this conversion is Any??? to AnyObject???.  If the result
+/// type is less optional, it doesn't count.
+static bool isMatchedAnyToAnyObjectConversion(CanType from, CanType to) {
+  while (auto fromObject = from.getAnyOptionalObjectType()) {
+    auto toObject = to.getAnyOptionalObjectType();
+    if (!toObject) return false;
+    from = fromObject;
+    to = toObject;
+  }
+
+  if (from->isAny()) {
+    assert(to->lookThroughAllAnyOptionalTypes()->isAnyObject());
+    return true;
+  }
+  return false;
 }
 
 Optional<ConversionPeepholeHint>
@@ -1332,8 +1348,7 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
 
       // Converting to Any doesn't do anything semantically special, so we
       // can apply the peephole unconditionally.
-      if (intermediateType->lookThroughAllAnyOptionalTypes()->isAny()) {
-        assert(resultType->lookThroughAllAnyOptionalTypes()->isAnyObject());
+      if (isMatchedAnyToAnyObjectConversion(intermediateType, resultType)) {
         if (loweredSourceTy == loweredResultTy) {
           return applyPeephole(ConversionPeepholeHint::Identity);
         } else if (isValueToAnyConversion(sourceType, intermediateType)) {
@@ -1375,7 +1390,8 @@ Lowering::canPeepholeConversions(SILGenFunction &SGF,
       if (!forced &&
           innerConversion.getKind() == Conversion::BridgeResultFromObjC) {
         if (auto sourceValueType = sourceType.getAnyOptionalObjectType()) {
-          if (areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
+          if (!intermediateType.getAnyOptionalObjectType() &&
+              areRelatedTypesForBridgingPeephole(sourceValueType, resultType)) {
             forced = true;
             return applyPeephole(ConversionPeepholeHint::Subtype);
           }

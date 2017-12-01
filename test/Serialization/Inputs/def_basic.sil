@@ -240,7 +240,7 @@ protocol Runcible {
   //%5 = apply %4(%0) : $@cc(method) ((), @inout T) -> @thick T.U.Type
   //store %5 to %3#1 : $*@thick T.U.Type
   //%7 = metatype $@thick T.Type
-  //%8 = witness_method [volatile] $*T, #Runcible.static_method!1 : $(@thick T.Type) -> ()
+  //%8 = objc_method %7 : $*T, #Runcible.static_method!1 : $(@thick T.Type) -> ()
   //%9 = apply %8(%7) : $((), @thick T.Type) -> ()
   //dealloc_stack %3#0 : $*@thick T.U.Type
   //%11 = tuple ()

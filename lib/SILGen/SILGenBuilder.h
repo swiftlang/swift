@@ -191,6 +191,9 @@ public:
                         bool objc, ArrayRef<SILType> elementTypes,
                         ArrayRef<ManagedValue> elementCountOperands);
 
+  using SILBuilder::createTuple;
+  ManagedValue createTuple(SILLocation loc, SILType type,
+                           ArrayRef<ManagedValue> elements);
   using SILBuilder::createTupleExtract;
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index, SILType type);
@@ -298,6 +301,10 @@ public:
   using SILBuilder::createOpenExistentialBoxValue;
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
+
+  /// Convert a @convention(block) value to AnyObject.
+  ManagedValue createBlockToAnyObject(SILLocation loc, ManagedValue block,
+                                      SILType type);
 
   using SILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);

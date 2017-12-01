@@ -119,3 +119,23 @@ bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
                                         const void *targetKeyHashable) {
   abort();
 }
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+int _T0s13_getErrorCodeSiSPyxGs0B0RzlF(void *) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void *_T0s23_getErrorDomainNSStringyXlSPyxGs0B0RzlF(void *) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void *_T0s29_getErrorUserInfoNSDictionaryyXlSgSPyxGs0B0RzlF(void *) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void *_T0s32_getErrorEmbeddedNSErrorIndirectyXlSgSPyxGs0B0RzlF(void *) {
+  abort();
+}

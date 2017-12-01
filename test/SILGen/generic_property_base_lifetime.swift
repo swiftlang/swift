@@ -96,7 +96,7 @@ func getIntPropGeneric<T: ProtocolB>(_ a: T) -> Int {
 // CHECK:  [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:  [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
 // CHECK:  [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
-// CHECK:  [[METHOD:%.*]] = witness_method [volatile] $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!getter.1.foreign : {{.*}}, [[PROJECTION]]
+// CHECK:  [[METHOD:%.*]] = objc_method [[PROJECTION_COPY]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!getter.1.foreign : {{.*}}
 // CHECK:  apply [[METHOD]]<@opened{{.*}}>([[PROJECTION_COPY]])
 // CHECK:  destroy_value [[PROJECTION_COPY]]
 // CHECK:  end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -111,7 +111,7 @@ func getIntPropExistential(_ a: ProtocolO) -> Int {
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[BORROWED_ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
-// CHECK:   [[METHOD:%.*]] = witness_method [volatile] $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!setter.1.foreign : {{.*}}, [[PROJECTION]]
+// CHECK:   [[METHOD:%.*]] = objc_method [[PROJECTION_COPY]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!setter.1.foreign : {{.*}}
 // CHECK:   apply [[METHOD]]<@opened{{.*}}>({{.*}}, [[PROJECTION_COPY]])
 // CHECK:   destroy_value [[PROJECTION_COPY]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]

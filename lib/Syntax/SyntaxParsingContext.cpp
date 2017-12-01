@@ -110,25 +110,17 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     return;
 
   switch (Kind) {
-  case SyntaxKind::IntegerLiteralExpr:
-  case SyntaxKind::FloatLiteralExpr: {
-    assert(!Parts.empty());
-    bool HasSign = false;
-    if (Parts.size() >= 2) {
-      auto Sign = make<Syntax>(Parts[Parts.size() - 2]).getAs<TokenSyntax>();
-      HasSign = Sign && (Sign->getText() == "-" || Sign->getText() == "+");
-    }
-    createNodeInPlace(Kind, HasSign ? 2 : 1);
-    break;
-  }
-
+  case SyntaxKind::MemberAccessExpr:
   case SyntaxKind::TernaryExpr: {
     auto Pair = SyntaxFactory::countChildren(Kind);
     assert(Pair.first == Pair.second);
     createNodeInPlace(Kind, Pair.first);
     break;
   }
-
+  case SyntaxKind::ExprList: {
+    createNodeInPlace(Kind, Parts.size());
+    break;
+  }
   default:
     llvm_unreachable("Unrecognized node kind.");
   }

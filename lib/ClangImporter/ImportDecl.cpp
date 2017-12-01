@@ -4970,6 +4970,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
     }
   }
 
+  theClass->addImplicitDestructor();
   return theClass;
 }
 
@@ -6747,6 +6748,9 @@ enum MirrorImportComparison {
 static bool isMirrorImportSuppressedBy(ClangImporter::Implementation &importer,
                                        const clang::ObjCMethodDecl *first,
                                        const clang::ObjCMethodDecl *second) {
+  if (first->isInstanceMethod() != second->isInstanceMethod())
+    return false;
+
   auto firstProto = cast<clang::ObjCProtocolDecl>(first->getDeclContext());
   auto secondProto = cast<clang::ObjCProtocolDecl>(second->getDeclContext());
 

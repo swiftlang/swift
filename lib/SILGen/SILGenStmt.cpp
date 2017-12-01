@@ -798,27 +798,19 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+    // Create the initialization outside of the innerForScope so that the
+    // innerForScope doesn't clean it up.
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
-    SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
-    nextBufOrValue =
-        ManagedValue::forUnmanaged(nextInit->getManagedAddress().forward(SGF));
-  } else {
-    // SEMANTIC SIL TODO: I am doing this to match previous behavior. We need to
-    // forward tmp below to ensure that we do not prematurely destroy the
-    // induction variable at the end of scope. I tried to use the
-    // CleanupRestorationScope and dormant, but it seemingly did not work and I
-    // do not have time to look into this now = (.
-    SILValue tmpValue;
-    bool hasCleanup;
     {
-      Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
-      ManagedValue tmp = SGF.emitRValueAsSingleValue(S->getIteratorNext());
-      hasCleanup = tmp.hasCleanup();
-      tmpValue = tmp.forward(SGF);
+      Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+      SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
     }
-    nextBufOrValue = hasCleanup ? SGF.emitManagedRValueWithCleanup(tmpValue)
-                                : ManagedValue::forUnmanaged(tmpValue);
+    nextBufOrValue = nextInit->getManagedAddress();
+
+  } else {
+    Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+    nextBufOrValue = innerForScope.popPreservingValue(
+        SGF.emitRValueAsSingleValue(S->getIteratorNext()));
   }
 
   SILBasicBlock *failExitingBlock = createBasicBlock();
@@ -850,8 +842,6 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           // *NOTE* If we do not have an address only value, then inputValue is
           // *already properly unwrapped.
           if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-            inputValue =
-                SGF.emitManagedBufferWithCleanup(nextBufOrValue.getValue());
             inputValue = SGF.emitUncheckedGetOptionalValueFrom(
                 S, inputValue, optTL, SGFContext(initLoopVars.get()));
           }

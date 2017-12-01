@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
-// RUN: %target-swift-frontend -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
+// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
 // REQUIRES: asserts
 
 // This tests SILGen and AccessEnforcementSelection as a single set of tests.

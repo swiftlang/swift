@@ -34,13 +34,13 @@ extension ${quat} {
   ///   - r: The real (scalar) part.
   @_transparent
   public init(ix: ${scalar}, iy: ${scalar}, iz: ${scalar}, r: ${scalar}) {
-    vector = ${vec4}(ix, iy, iz, r)
+    self.init(vector: ${vec4}(ix, iy, iz, r))
   }
 
   /// Construct a quaternion from real and imaginary parts.
   @_transparent
   public init(real: ${scalar}, imag: ${vec3}) {
-    vector = simd_make_${vec4}(imag, real)
+    self.init(vector: simd_make_${vec4}(imag, real))
   }
 
   /// A quaternion whose action is a rotation by `angle` radians about `axis`.

@@ -19,6 +19,9 @@ EXPR_NODES = [
     Node('FunctionCallArgumentList', kind='SyntaxCollection',
          element='FunctionCallArgument'),
 
+    Node('TupleElementList', kind='SyntaxCollection',
+         element='TupleElement'),
+
     Node('ArrayElementList', kind='SyntaxCollection',
          element='ArrayElement'),
 
@@ -58,6 +61,18 @@ EXPR_NODES = [
              Child('Wildcard', kind='WildcardToken'),
          ]),
 
+    # An = expression.
+    Node('AssignmentExpr', kind='Expr',
+         children=[
+             Child('AssignToken', kind='EqualToken'),
+         ]),
+
+    # A flat list of expressions before sequence folding, e.g. 1 + 2 + 3.
+    Node('SequenceExpr', kind='Expr',
+         children=[
+             Child('Elements', kind='ExprList'),
+         ]),
+
     # A #line expression.
     Node('PoundLineExpr', kind='Expr',
          children=[
@@ -94,14 +109,18 @@ EXPR_NODES = [
              Child('PostfixExpression', kind='Expr'),
          ]),
 
+    # An operator like + or -.
+    Node('BinaryOperatorExpr', kind='Expr',
+         children=[
+             Child('OperatorToken', kind='BinaryOperatorToken'),
+         ]),
+
     # A floating-point literal
     # 4.0
     # -3.9
     # +4e20
     Node('FloatLiteralExpr', kind='Expr',
          children=[
-             Child('Sign', kind='PrefixOperatorToken',
-                   is_optional=True),
              Child('FloatingDigits', kind='FloatingLiteralToken'),
          ]),
 
@@ -110,6 +129,13 @@ EXPR_NODES = [
              Child('CalledExpression', kind='Expr'),
              Child('LeftParen', kind='LeftParenToken'),
              Child('ArgumentList', kind='FunctionCallArgumentList'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    Node('TupleExpr', kind='Expr',
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('ElementList', kind='TupleElementList'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
@@ -131,6 +157,18 @@ EXPR_NODES = [
 
     # function-call-argument -> label? ':'? expression ','?
     Node('FunctionCallArgument', kind='Syntax',
+         children=[
+             Child('Label', kind='IdentifierToken',
+                   is_optional=True),
+             Child('Colon', kind='ColonToken',
+                   is_optional=True),
+             Child('Expression', kind='Expr'),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+         ]),
+
+    # An element inside a tuple element list
+    Node('TupleElement', kind='Syntax',
          children=[
              Child('Label', kind='IdentifierToken',
                    is_optional=True),
@@ -163,8 +201,6 @@ EXPR_NODES = [
     # +0x4f
     Node('IntegerLiteralExpr', kind='Expr',
          children=[
-             Child('Sign', kind='PrefixOperatorToken',
-                   is_optional=True),
              Child('Digits', kind='IntegerLiteralToken'),
          ]),
 
@@ -191,5 +227,33 @@ EXPR_NODES = [
              Child("FirstChoice", kind='Expr'),
              Child("ColonMark", kind='ColonToken'),
              Child("SecondChoice", kind='Expr')
+         ]),
+
+    # a.b
+    Node('MemberAccessExpr', kind='Expr',
+         children=[
+             Child("Base", kind='Expr'),
+             Child("Dot", kind='PeriodToken'),
+             Child("Name", kind='Token')
+         ]),
+
+    # is TypeName
+    Node('IsExpr', kind='Expr',
+         children=[
+             Child("IsTok", kind='IsToken'),
+             Child("TypeName", kind='Type')
+         ]),
+
+    # as TypeName
+    Node('AsExpr', kind='Expr',
+         children=[
+             Child("AsTok", kind='AsToken'),
+             Child("QuestionOrExclamationMark", kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'PostfixQuestionMarkToken',
+                       'ExclamationMarkToken',
+                   ]),
+             Child("TypeName", kind='Type')
          ]),
 ]

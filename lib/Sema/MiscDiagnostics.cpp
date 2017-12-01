@@ -267,19 +267,44 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         unsigned uncurryLevel = 0;
         while (auto conv = dyn_cast<ImplicitConversionExpr>(base))
           base = conv->getSubExpr();
+
+        const auto findDynamicMemberRefExpr =
+            [](Expr *e) -> DynamicMemberRefExpr* {
+          if (auto open = dyn_cast<OpenExistentialExpr>(e)) {
+            return dyn_cast<DynamicMemberRefExpr>(open->getSubExpr());
+          }
+          return nullptr;
+        };
+
+        if (auto force = dyn_cast<ForceValueExpr>(base)) {
+          if (auto ref = findDynamicMemberRefExpr(force->getSubExpr()))
+            base = ref;
+        } else if (auto bind = dyn_cast<BindOptionalExpr>(base)) {
+          if (auto ref = findDynamicMemberRefExpr(bind->getSubExpr()))
+            base = ref;
+        }
+
         while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(base))
           base = ignoredBase->getRHS();
-        auto *calleeDRE = dyn_cast<DeclRefExpr>(base);
-        if (calleeDRE) {
+
+        ConcreteDeclRef callee;
+        if (auto *calleeDRE = dyn_cast<DeclRefExpr>(base)) {
           checkNoEscapeParameterUse(calleeDRE, Call, OperandKind::Callee);
           checkForSuspiciousBitCasts(calleeDRE, Call);
+          callee = calleeDRE->getDeclRef();
 
         // Otherwise, try to drill down through member calls for the purposes
         // of argument-matching code below.
         } else if (auto selfApply = dyn_cast<SelfApplyExpr>(base)) {
           uncurryLevel++;
           base = selfApply->getSemanticFn();
-          calleeDRE = dyn_cast<DeclRefExpr>(base);
+          if (auto calleeDRE = dyn_cast<DeclRefExpr>(base))
+            callee = calleeDRE->getDeclRef();
+
+        // Otherwise, check for a dynamic member.
+        } else if (auto dynamicMRE = dyn_cast<DynamicMemberRefExpr>(base)) {
+          uncurryLevel++;
+          callee = dynamicMRE->getMember();
         }
 
         visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
@@ -305,9 +330,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
             // Also do some additional work based on how the function uses
             // the argument.
-            if (calleeDRE) {
-              checkConvertedPointerArgument(calleeDRE->getDeclRef(),
-                                            uncurryLevel, argIndex,
+            if (callee) {
+              checkConvertedPointerArgument(callee, uncurryLevel, argIndex,
                                             unwrapped, operand);
             }
           }

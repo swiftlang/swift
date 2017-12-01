@@ -769,7 +769,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << ".sw3" << FourCC;
     break;
   case llvm::Triple::ELF:
-    OS << ".swift3_" << LongName;
+    OS << "swift3_" << LongName;
     break;
   case llvm::Triple::MachO:
     assert(LongName.size() <= 7 &&

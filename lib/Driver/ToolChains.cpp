@@ -140,6 +140,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
                        options::OPT_warn_swift3_objc_inference_complete);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(
+                     arguments,
+                     options::OPT_enable_experimental_conditional_conformances);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
@@ -1530,26 +1533,6 @@ bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
   return true;
 }
 
-std::string toolchains::GenericUnix::getPreInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  // On Linux and FreeBSD and Haiku (really, ELF binaries) we need to add objects
-  // to provide markers and size for the metadata sections.
-  SmallString<128> PreInputObjectPath = RuntimeLibraryPath;
-  llvm::sys::path::append(PreInputObjectPath,
-      swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(PreInputObjectPath, "swift_begin.o");
-  return PreInputObjectPath.str();
-}
-
-std::string toolchains::GenericUnix::getPostInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  SmallString<128> PostInputObjectPath = RuntimeLibraryPath;
-  llvm::sys::path::append(PostInputObjectPath,
-      swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(PostInputObjectPath, "swift_end.o");
-  return PostInputObjectPath.str();
-}
-
 ToolChain::InvocationInfo
 toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
                                              const JobContext &context) const {
@@ -1627,22 +1610,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
 
   SmallString<128> SharedRuntimeLibPath;
-  SmallString<128> StaticRuntimeLibPath;
-  // Path to swift_begin.o and swift_end.o.
-  SmallString<128> ObjectLibPath;
   getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, *this);
 
-  // -static-stdlib uses the static lib path for libswiftCore but
-  // the shared lib path for swift_begin.o and swift_end.o.
-  if (staticExecutable || staticStdlib) {
-    getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
-  }
-
-  if (staticExecutable) {
-    ObjectLibPath = StaticRuntimeLibPath;
-  } else {
-    ObjectLibPath = SharedRuntimeLibPath;
-  }
+  SmallString<128> StaticRuntimeLibPath;
+  getRuntimeStaticLibraryPath(StaticRuntimeLibPath, context.Args, *this);
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
@@ -1655,10 +1626,12 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
   }
 
-  auto PreInputObjectPath = getPreInputObjectPath(ObjectLibPath);
-  if (!PreInputObjectPath.empty()) {
-    Arguments.push_back(context.Args.MakeArgString(PreInputObjectPath));
-  }
+  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  llvm::sys::path::append(swiftrtPath,
+                          swift::getMajorArchitectureName(getTriple()));
+  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+
   addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
@@ -1753,13 +1726,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
 
-  // Just before the output option, allow GenericUnix toolchains to add
-  // additional inputs.
-  auto PostInputObjectPath = getPostInputObjectPath(ObjectLibPath);
-  if (!PostInputObjectPath.empty()) {
-    Arguments.push_back(context.Args.MakeArgString(PostInputObjectPath));
-  }
-
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
@@ -1792,14 +1758,3 @@ std::string toolchains::Cygwin::getTargetForLinker() const {
   return "";
 }
 
-std::string toolchains::Cygwin::getPreInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  // Cygwin does not add "begin" and "end" objects.
-  return "";
-}
-
-std::string toolchains::Cygwin::getPostInputObjectPath(
-    StringRef RuntimeLibraryPath) const {
-  // Cygwin does not add "begin" and "end" objects.
-  return "";
-}

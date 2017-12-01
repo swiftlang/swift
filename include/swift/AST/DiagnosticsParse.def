@@ -1280,6 +1280,8 @@ ERROR(attr_interpolated_string,none,
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
+ERROR(attr_only_on_parameters_parse, none,
+      "'%0' may only be used on parameters", (StringRef))
 
 // Access control
 ERROR(attr_access_expected_set,none,
@@ -1503,6 +1505,10 @@ ERROR(empty_version_string,none,
 WARNING(unknown_platform_condition_argument,none,
       "unknown %0 for build configuration '%1'",
       (StringRef, StringRef))
+WARNING(likely_simulator_platform_condition,none,
+      "plaform condition appears to be testing for simulator environment; "
+      "use 'targetEnvironment(simulator)' instead",
+      ())
 
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics

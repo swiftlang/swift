@@ -77,6 +77,13 @@ DictionaryTestSuite.test("sizeof") {
 #endif
 }
 
+DictionaryTestSuite.test("Index.Hashable") {
+  let d = [1: "meow", 2: "meow", 3: "meow"]
+  let e = Dictionary(uniqueKeysWithValues: zip(d.indices, d))
+  expectEqual(d.count, e.count)
+  expectNotNil(e[d.startIndex])
+}
+
 DictionaryTestSuite.test("valueDestruction") {
   var d1 = Dictionary<Int, TestValueTy>()
   for i in 100...110 {
@@ -3192,9 +3199,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.U
     { ($0 as! TestObjCKeyTy).value },
     { ($0 as! TestObjCValueTy).value })
 
-  let autoreleased  = _isDebugAssertConfiguration() ?
-    (0, 0) : (3, 3)
-  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromObjC") {
@@ -3206,9 +3211,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.U
     { ($0 as! TestObjCKeyTy).value },
     { ($0 as! TestObjCValueTy).value })
 
-  let autoreleased  = _isDebugAssertConfiguration() ?
-    (0, 0) : (3, 3)
-  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_Empty") {
@@ -3293,9 +3296,7 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.Use
     { ($0 as! TestObjCKeyTy).value },
     { ($0 as! TestObjCValueTy).value })
 
-  let autoreleased  = _isDebugAssertConfiguration() ?
-    (0, 0) : (3, 3)
-  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift.Partial") {
@@ -3321,9 +3322,7 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.Use
     { ($0 as! TestObjCKeyTy).value },
     { ($0 as! TestObjCValueTy).value })
 
-  let autoreleased  = _isDebugAssertConfiguration() ?
-    (0, 0) : (3, 3)
-  expectAutoreleasedKeysAndValues(opt: autoreleased, unopt: (3, 3))
+  expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {

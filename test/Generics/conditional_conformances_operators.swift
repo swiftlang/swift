@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
+// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances -typecheck %s -verify
 
 // rdar://problem/35480952
 

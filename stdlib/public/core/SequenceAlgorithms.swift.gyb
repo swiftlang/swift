@@ -338,12 +338,14 @@ ${equivalenceExplanation}
   public func elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    by areEquivalent: (Element, Element) throws -> Bool
+    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
-    OtherSequence: Sequence,
+    OtherSequence: Sequence${" {" if preds else ","}
+%   if not preds:
     OtherSequence.Element == Element {
+%   end
 
     var iter1 = self.makeIterator()
     var iter2 = other.makeIterator()

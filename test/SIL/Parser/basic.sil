@@ -279,7 +279,6 @@ bb0(%0: $Optional<D>):
 // Generated from:
 // func archetype_member_ref<T:Runcible>(x:T) {
 //   x.free_method()
-//   var u = x.associated_method()
 //   T.static_method()
 // }
 
@@ -290,28 +289,20 @@ protocol Runcible {
   static func static_method()
 }
 
-/* SIL parsing of substitutions in apply insts is totally busted.
-// C/HECK: $@convention(thin) <T : Runcible> (@in T) -> ()
+// CHECK: $@convention(thin) <T where T : Runcible> (@in T) -> ()
 sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@convention(thin) <T : Runcible> (@in T) -> () {
 bb0(%0 : $*T):
-  // C/HECK: witness_method $*T, #Runcible.free_method!1
-  %1 = witness_method $*T, #Runcible.free_method!1 : $@cc(method) (@inout T) -> Int
-  %2 = apply %1(%0) : $@cc(method) (@inout T) -> Int
-  %3 = alloc_stack $@thick T.U.Type
-  // C/HECK: witness_method $*T, #Runcible.associated_method!1
-  %4 = witness_method $*T, #Runcible.associated_method!1 : $@cc(method) (@inout T) -> @thick T.U.Type
-  %5 = apply %4(%0) : $@cc(method) (@inout T) -> @thick T.U.Type
-  store %5 to %3 : $*@thick T.U.Type
-  %7 = metatype $@thick T.Type
-  // C/HECK: witness_method [volatile] $*T, #Runcible.static_method!1
-  %8 = witness_method [volatile] $*T, #Runcible.static_method!1 : $(@thick T.Type) -> ()
-  %9 = apply %8(%7) : $(@thick T.Type) -> ()
-  dealloc_stack %3 : $*@thick T.U.Type
-  %11 = tuple ()
+  // CHECK: witness_method $T, #Runcible.free_method!1
+  %1 = witness_method $T, #Runcible.free_method!1 : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
+  %2 = apply %1<T>(%0) : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
+  %3 = metatype $@thick T.Type
+  // CHECK: witness_method $T, #Runcible.static_method!1
+  %4 = witness_method $T, #Runcible.static_method!1 : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
+  %5 = apply %4<T>(%3) : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
+  %6 = tuple ()
   destroy_addr %0 : $*T
-  return %11 : $()
+  return %6 : $()
 }
-*/
 
 protocol Bendable { }
 

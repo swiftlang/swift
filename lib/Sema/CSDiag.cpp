@@ -1431,7 +1431,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   ValueDecl *member = nullptr;
   for (auto cand : result.UnviableCandidates) {
     if (member == nullptr)
-      member = cand.first;
+      member = cand.first.getDecl();
     sameProblem &= cand.second == firstProblem;
   }
   
@@ -1537,12 +1537,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     }
         
     case MemberLookupResult::UR_Inaccessible: {
-      auto decl = result.UnviableCandidates[0].first;
+      auto decl = result.UnviableCandidates[0].first.getDecl();
       // FIXME: What if the unviable candidates have different levels of access?
       diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
                decl->getFormalAccess());
       for (auto cand : result.UnviableCandidates)
-        diagnose(cand.first, diag::decl_declared_here, memberName);
+        diagnose(cand.first.getDecl(), diag::decl_declared_here, memberName);
         
       return;
     }
@@ -3099,6 +3099,27 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
   if (isa<LiteralExpr>(dest->getValueProvidingExpr())) {
     TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
     return;
+  }
+
+  // Diagnose assignments to let-properties in delegating initializers.
+  if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
+    if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
+      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
+        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+            ctor->getDelegatingOrChainedInitKind(nullptr) ==
+              ConstructorDecl::BodyInitKind::Delegating) {
+          auto resolved = resolveImmutableBase(member, *this);
+          assert(resolved.first == member);
+          TC.diagnose(equalLoc, diag::assignment_let_property_delegating_init,
+                      member->getName());
+          if (resolved.second) {
+            TC.diagnose(resolved.second, diag::decl_declared_here,
+                        member->getName());
+          }
+          return;
+        }
+      }
+    }
   }
 
   Diag<StringRef> diagID;
@@ -4810,7 +4831,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
   SmallVector<OverloadChoice, 2> choices;
   for (auto &unviable : results.UnviableCandidates)
-    choices.push_back(OverloadChoice(baseType, unviable.first,
+    choices.push_back(OverloadChoice(baseType, unviable.first.getDecl(),
                                      UDE->getFunctionRefKind()));
 
   CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
@@ -5082,6 +5103,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   if (!callExpr->hasTrailingClosure())
     return false;
 
+  auto *DC = CS.DC;
   auto *fnExpr = callExpr->getFn();
   auto *argExpr = callExpr->getArg();
 
@@ -5238,6 +5260,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
       auto expectedArgType = FunctionType::get(fnType->getInput(), resultType,
                                                fnType->getExtInfo());
 
+      llvm::SaveAndRestore<DeclContext *> SavedDC(CS.DC, DC);
       ClosureCalleeListener listener(expectedArgType, CS.getContextualType());
       return !typeCheckChildIndependently(callExpr->getFn(), Type(),
                                           CTP_CalleeResult, TCC_ForceRecheck,
@@ -7360,14 +7383,16 @@ bool FailureDiagnosis::diagnoseMemberFailures(
   // and the source range for y.
   SourceRange memberRange;
   SourceLoc BaseLoc;
+  DeclNameLoc NameLoc;
 
   Type baseTy, baseObjTy;
   // UnresolvedMemberExpr doesn't have "base" expression,
   // it's represented as ".foo", which means that we need
   // to get base from the context.
-  if (isa<UnresolvedMemberExpr>(E)) {
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
     memberRange = E->getSourceRange();
     BaseLoc = E->getLoc();
+    NameLoc = UME->getNameLoc();
     baseTy = CS.getContextualType();
     if (!baseTy)
       return false;
@@ -7387,6 +7412,8 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       locator = simplifyLocator(CS, locator, memberRange);
 
     BaseLoc = baseExpr->getLoc();
+    NameLoc = DeclNameLoc(memberRange.Start);
+
     // Retypecheck the anchor type, which is the base of the member expression.
     baseExpr =
         typeCheckArbitrarySubExprIndependently(baseExpr, TCC_AllowLValue);
@@ -7572,7 +7599,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
     // FIXME: Dig out the property DeclNameLoc.
     diagnoseUnviableLookupResults(result, baseObjTy, baseExpr, memberName,
-                                  DeclNameLoc(memberRange.Start), BaseLoc);
+                                  NameLoc, BaseLoc);
     return true;
   }
 

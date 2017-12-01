@@ -283,8 +283,12 @@ getNewParameter(GenericEnvironment *env, SILParameterInfo param,
       return param;
     }
   } else if (isLargeLoadableType(env, storageType, IGM)) {
-    return  SILParameterInfo(storageType.getSwiftRValueType(),
-                             ParameterConvention::Indirect_In_Constant);
+    if (param.getConvention() == ParameterConvention::Direct_Guaranteed)
+      return  SILParameterInfo(storageType.getSwiftRValueType(),
+                               ParameterConvention::Indirect_In_Guaranteed);
+    else
+      return  SILParameterInfo(storageType.getSwiftRValueType(),
+                               ParameterConvention::Indirect_In_Constant);
   } else {
     return param;
   }
@@ -1993,7 +1997,6 @@ static void rewriteFunction(StructLoweringState &pass,
     }
     case SILInstructionKind::WitnessMethodInst: {
       auto *WMI = dyn_cast<WitnessMethodInst>(instr);
-      assert(!WMI->isVolatile());
       assert(WMI && "ValueKind is Witness Method but dyn_cast failed");
       newInstr = methodBuilder.createWitnessMethod(
           loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType);

@@ -289,7 +289,8 @@ protected:
 
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    unsigned ExtInfo : 7;
+    enum { NumExtInfoBits = 7 };
+    unsigned ExtInfo : NumExtInfoBits;
   };
   enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
@@ -316,7 +317,8 @@ protected:
 
   struct SILFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
-    unsigned ExtInfo : 6;
+    enum { NumExtInfoBits = 6 };
+    unsigned ExtInfo : NumExtInfoBits;
     unsigned CalleeConvention : 3;
     unsigned HasErrorResult : 1;
     unsigned CoroutineKind : 2;
@@ -413,10 +415,10 @@ public:
   }
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
+  ///
+  /// To compare sugar, check for pointer equality of the underlying TypeBase *
+  /// values, obtained by calling getPointer().
   bool isEqual(Type Other);
-  
-  /// isSpelledLike - Return true if these two types share a sugared spelling.
-  bool isSpelledLike(Type Other);
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -2392,20 +2394,21 @@ public:
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // NOTE: If bits are added or removed, then TypeBase::AnyFunctionTypeBits
-    // must be updated to match.
-
+    // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
+    // and NumMaskBits must be updated, and they must match.
+    //
     //   |representation|isAutoClosure|noEscape|throws|
     //   |    0 .. 3    |      4      |    5   |   6  |
     //
     enum : unsigned {
-      RepresentationMask     = 0x0F,
-      AutoClosureMask        = 0x10,
-      NoEscapeMask           = 0x20,
-      ThrowsMask             = 0x40,
+      RepresentationMask     = 0xF << 0,
+      AutoClosureMask        = 1 << 4,
+      NoEscapeMask           = 1 << 5,
+      ThrowsMask             = 1 << 6,
+      NumMaskBits            = 7
     };
 
-    unsigned Bits;
+    unsigned Bits; // Naturally sized for speed.
 
     ExtInfo(unsigned Bits) : Bits(Bits) {}
 
@@ -2505,7 +2508,7 @@ public:
         return ExtInfo(Bits & ~ThrowsMask);
     }
 
-    uint16_t getFuncAttrKey() const {
+    unsigned getFuncAttrKey() const {
       return Bits;
     }
     
@@ -2539,7 +2542,11 @@ protected:
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
     NumParams(NumParams) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
+    // The use of both assert() and static_assert() is intentional.
     assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
+    static_assert(ExtInfo::NumMaskBits ==
+                  AnyFunctionTypeBitfields::NumExtInfoBits,
+                 "ExtInfo and AnyFunctionTypeBitfields must agree on bit size");
   }
 
 public:
@@ -3249,19 +3256,20 @@ public:
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
-    // NOTE: If bits are added or removed, then TypeBase::SILFunctionTypeBits
-    // must be updated to match.
+    // If bits are added or removed, then TypeBase::SILFunctionTypeBits
+    // and NumMaskBits must be updated, and they must match.
 
     //   |representation|pseudogeneric| noescape |
     //   |    0 .. 3    |      4      |     5    |
     //
     enum : unsigned {
-      RepresentationMask = 0x0F,
-      PseudogenericMask  = 0x10,
-      NoEscapeMask       = 0x20,
+      RepresentationMask = 0xF << 0,
+      PseudogenericMask  = 1 << 4,
+      NoEscapeMask       = 1 << 5,
+      NumMaskBits        = 6
     };
 
-    unsigned Bits;
+    unsigned Bits; // Naturally sized for speed.
 
     ExtInfo(unsigned Bits) : Bits(Bits) {}
 
@@ -3364,7 +3372,7 @@ public:
         return ExtInfo(Bits & ~NoEscapeMask);
     }
 
-    uint16_t getFuncAttrKey() const {
+    unsigned getFuncAttrKey() const {
       return Bits;
     }
 
@@ -3685,6 +3693,44 @@ public:
   }
 
   bool isNoReturnFunction(); // Defined in SILType.cpp
+
+  class ABICompatibilityCheckResult {
+    friend class SILFunctionType;
+
+    enum innerty {
+      None,
+      DifferentFunctionRepresentations,
+      DifferentNumberOfResults,
+      DifferentReturnValueConventions,
+      ABIIncompatibleReturnValues,
+      DifferentErrorResultConventions,
+      ABIIncompatibleErrorResults,
+      DifferentNumberOfParameters,
+      DifferingParameterConvention,
+      ABIIncompatibleParameterType,
+    } kind;
+    Optional<uintptr_t> payload;
+
+    ABICompatibilityCheckResult(innerty kind) : kind(kind) {}
+    ABICompatibilityCheckResult(innerty kind, uintptr_t payload)
+        : kind(kind), payload(payload) {}
+
+  public:
+    ABICompatibilityCheckResult() = delete;
+
+    bool isCompatible() const { return kind == innerty::None; }
+
+    bool hasPayload() const { return payload.hasValue(); }
+    uintptr_t getPayload() const { return payload.getValue(); }
+    StringRef getMessage() const;
+  };
+
+  /// Returns no-error if this SILFunctionType is ABI compatible with \p
+  /// other. Otherwise, it returns a true error with a message in
+  /// std::error_code. This is only meant to be used in assertions. When
+  /// assertions are disabled, this just returns true.
+  ABICompatibilityCheckResult
+  isABICompatibleWith(CanSILFunctionType other) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       SubstitutionList subs);

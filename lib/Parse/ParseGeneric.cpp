@@ -18,6 +18,9 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Syntax/SyntaxBuilders.h"
+#include "swift/Syntax/SyntaxNodes.h"
+#include "swift/Syntax/SyntaxParsingContext.h"
 using namespace swift;
 
 /// parseGenericParameters - Parse a sequence of generic parameters, e.g.,
@@ -248,7 +251,10 @@ ParserStatus Parser::parseGenericWhereClause(
   FirstTypeInComplete = false;
   do {
     // Parse the leading type-identifier.
-    ParserResult<TypeRepr> FirstType = parseTypeIdentifier();
+    auto FirstTypeResult = parseTypeIdentifier();
+    if (FirstTypeResult.hasSyntax())
+      SyntaxContext->addSyntax(FirstTypeResult.getSyntax());
+    ParserResult<TypeRepr> FirstType = FirstTypeResult.getASTResult();
 
     if (FirstType.hasCodeCompletion()) {
       Status.setHasCodeCompletion();

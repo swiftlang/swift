@@ -1632,14 +1632,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   DominanceScope dominance(*this, InEntryBlock ? DominancePoint::universal()
                                                : DominancePoint(BB));
 
-  // The basic blocks are visited in a random order. Reset the debug location.
-  std::unique_ptr<AutoRestoreLocation> ScopedLoc;
-  if (InEntryBlock)
-    ScopedLoc = llvm::make_unique<PrologueLocation>(IGM.DebugInfo, Builder);
-  else
-    ScopedLoc = llvm::make_unique<ArtificialLocation>(
-        CurSILFn->getDebugScope(), IGM.DebugInfo, Builder);
-
   // Generate the body.
   bool InCleanupBlock = false;
   bool KeepCurrentLocation = false;
@@ -5032,13 +5024,6 @@ IRGenSILFunction::visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i) {
 }
 
 void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
-  // For Objective-C classes we need to arrange for a msgSend
-  // to happen when the method is called.
-  if (i->getMember().isForeign) {
-    setLoweredObjCMethod(i, i->getMember());
-    return;
-  }
-
   CanType baseTy = i->getLookupType();
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();

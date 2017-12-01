@@ -38,7 +38,8 @@ public typealias RandomAccessIndexable = RandomAccessCollection
 /// collection, either the index for your custom type must conform to the
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
-public protocol RandomAccessCollection : BidirectionalCollection
+public protocol RandomAccessCollection: BidirectionalCollection
+where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
@@ -46,15 +47,11 @@ public protocol RandomAccessCollection : BidirectionalCollection
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Index
 
-  /// A collection that represents a contiguous subrange of the collection's
-  /// elements.
-  associatedtype SubSequence : RandomAccessCollection
-    = RandomAccessSlice<Self>
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype SubSequence = Slice<Self>
 
-  /// A type that represents the indices that are valid for subscripting the
-  /// collection, in ascending order.
-  associatedtype Indices : RandomAccessCollection
-    = DefaultRandomAccessIndices<Self>
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Indices = DefaultIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -106,38 +103,6 @@ public protocol RandomAccessCollection : BidirectionalCollection
 
   // FIXME(ABI): Associated type inference requires this.
   var endIndex: Index { get }
-}
-
-/// Supply the default "slicing" `subscript` for `RandomAccessCollection`
-/// models that accept the default associated `SubSequence`,
-/// `RandomAccessSlice<Self>`.
-extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
-  /// Accesses a contiguous subrange of the collection's elements.
-  ///
-  /// The accessed slice uses the same indices for the same elements as the
-  /// original collection uses. Always use the slice's `startIndex` property
-  /// instead of assuming that its indices start at a particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
-  ///     print(streets[index!])
-  ///     // Prints "Evarts"
-  ///
-  /// - Parameter bounds: A range of the collection's indices. The bounds of
-  ///   the range must be valid indices of the collection.
-  @_inlineable
-  public subscript(bounds: Range<Index>) -> RandomAccessSlice<Self> {
-    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-    return RandomAccessSlice(base: self, bounds: bounds)
-  }
 }
 
 // TODO: swift-3-indexing-model - Make sure RandomAccessCollection has

@@ -221,12 +221,8 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(subMap)->getCanonicalType();
       auto conformance = subMap.lookupConformance(origSelfType, protocol);
-      SILValue OpenedExistential;
-      if (substSelfType->isOpenedExistential())
-        OpenedExistential = selfArg;
       return SGF.B.createWitnessMethod(loc, substSelfType, *conformance, next,
-                                      constantInfo.getSILType(),
-                                      OpenedExistential);
+                                      constantInfo.getSILType());
     }
   }
 
@@ -265,9 +261,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   resultTy = F.mapTypeIntoContext(resultTy);
   auto substTy = toFn->getType().substGenericArgs(SGM.M,  subs);
 
-  auto calleeConvention = SGM.M.getOptions().EnableGuaranteedClosureContexts
-                              ? ParameterConvention::Direct_Guaranteed
-                              : ParameterConvention::Direct_Owned;
+  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
   // Partially apply the next uncurry level and return the result closure.
   auto closureTy = SILGenBuilder::getPartialApplyResultType(

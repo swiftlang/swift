@@ -1290,6 +1290,9 @@ public:
     switch (MU->getKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;
     case MarkUninitializedInst::RootSelf:  *this << "[rootself] "; break;
+    case MarkUninitializedInst::CrossModuleRootSelf:
+      *this << "[crossmodulerootself] ";
+      break;
     case MarkUninitializedInst::DerivedSelf:  *this << "[derivedself] "; break;
     case MarkUninitializedInst::DerivedSelfOnly:
       *this << "[derivedselfonly] ";
@@ -1669,8 +1672,6 @@ public:
     PrintOptions QualifiedSILTypeOptions =
         PrintOptions::printQualifiedSILType();
     QualifiedSILTypeOptions.CurrentModule = WMI->getModule().getSwiftModule();
-    if (WMI->isVolatile())
-      *this << "[volatile] ";
     *this << "$" << WMI->getLookupType() << ", " << WMI->getMember() << " : ";
     WMI->getMember().getDecl()->getInterfaceType().print(
         PrintState.OS, QualifiedSILTypeOptions);

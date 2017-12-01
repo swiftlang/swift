@@ -53,8 +53,12 @@ static void printSyntaxKind(SyntaxKind Kind, llvm::raw_ostream &OS,
 
 } // end of anonymous namespace
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
+  if (isMissing())
+    return;
+
   const bool PrintKind = Opts.PrintSyntaxKind && !isToken() &&
-    !isTrivialSyntaxKind(Kind);
+    (Opts.PrintTrivialNodeKind || !isTrivialSyntaxKind(Kind));
+
   if (PrintKind) {
     printSyntaxKind(Kind, OS, Opts, true);
   }

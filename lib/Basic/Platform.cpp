@@ -18,25 +18,37 @@ using namespace swift;
 bool swift::tripleIsiOSSimulator(const llvm::Triple &triple) {
   llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isiOS() &&
-          (arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+          // FIXME: transitional, this should eventually stop testing arch, and
+          // switch to only checking the -environment field.
+          (triple.isSimulatorEnvironment() ||
+           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
 }
 
 bool swift::tripleIsAppleTVSimulator(const llvm::Triple &triple) {
   llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isTvOS() &&
-         (arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+          // FIXME: transitional, this should eventually stop testing arch, and
+          // switch to only checking the -environment field.
+          (triple.isSimulatorEnvironment() ||
+           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
 }
 
 bool swift::tripleIsWatchSimulator(const llvm::Triple &triple) {
   llvm::Triple::ArchType arch = triple.getArch();
   return (triple.isWatchOS() &&
-         (arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
+          // FIXME: transitional, this should eventually stop testing arch, and
+          // switch to only checking the -environment field.
+          (triple.isSimulatorEnvironment() ||
+           arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64));
 }
 
 bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
-  return tripleIsiOSSimulator(triple) ||
-      tripleIsWatchSimulator(triple) ||
-      tripleIsAppleTVSimulator(triple);
+  // FIXME: transitional, this should eventually just use the -environment
+  // field.
+  return triple.isSimulatorEnvironment() ||
+    tripleIsiOSSimulator(triple) ||
+    tripleIsWatchSimulator(triple) ||
+    tripleIsAppleTVSimulator(triple);
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {

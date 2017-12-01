@@ -29,11 +29,11 @@ func testSymbols() {
 
 // CHECK-IR-LABEL: define{{.*}} void @_T08typedefs18testVTableBuildingy3Lib4UserC4user_tF
 public func testVTableBuilding(user: User) {
-  // The important thing in this CHECK line is the "i64 24", which is the offset
+  // The important thing in this CHECK line is the "i64 30", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here
-  // changes, please check that offset 24 is still correct.
+  // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 24|i32 27}}
+  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 30|i32 33}}
   _ = user.lastMethod()
 } // CHECK-IR: ret void
 
@@ -133,9 +133,20 @@ open class User {
   // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
+  // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == UnwrappedInt
+  // CHECK-RECOVERY: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
+  public func constrainedUnwrapped<T: HasAssoc>(_: T) where T.Assoc == UnwrappedInt { fatalError() }
+  // CHECK: func constrainedWrapped<T>(_: T) where T : HasAssoc, T.Assoc == WrappedInt
+  // CHECK-RECOVERY: /* placeholder for constrainedWrapped(_:) */
+  public func constrainedWrapped<T: HasAssoc>(_: T) where T.Assoc == WrappedInt { fatalError() }
+
   // CHECK: subscript(_: WrappedInt) -> () { get }
   // CHECK-RECOVERY: /* placeholder for _ */
   public subscript(_: WrappedInt) -> () { return () }
+
+  // CHECK: subscript<T>(_: T) -> () where T : HasAssoc, T.Assoc == WrappedInt { get }
+  // CHECK-RECOVERY: /* placeholder for _ */
+  public subscript<T: HasAssoc>(_: T) -> () where T.Assoc == WrappedInt { return () }
 
   // CHECK: init()
   // CHECK-RECOVERY: init()
@@ -149,9 +160,25 @@ open class User {
   // CHECK-RECOVERY: convenience init(conveniently: Int)
   public convenience init(conveniently: Int) { self.init() }
 
+  // CHECK: convenience init<T>(generic: T) where T : HasAssoc, T.Assoc == WrappedInt
+  // CHECK-RECOVERY: /* placeholder for init(generic:) */
+  public convenience init<T: HasAssoc>(generic: T) where T.Assoc == WrappedInt { self.init() }
+
   // CHECK: required init(wrappedRequired: WrappedInt)
   // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
   public required init(wrappedRequired: WrappedInt) {}
+
+  // CHECK: {{^}} init(wrappedRequiredInSub: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  public init(wrappedRequiredInSub: WrappedInt) {}
+
+  // CHECK: dynamic init(wrappedDynamic: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedDynamic:) */
+  @objc public dynamic init(wrappedDynamic: WrappedInt) {}
+
+  // CHECK: dynamic required init(wrappedRequiredDynamic: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredDynamic:) */
+  @objc public dynamic required init(wrappedRequiredDynamic: WrappedInt) {}
 
   public func lastMethod() {}
 }
@@ -170,13 +197,19 @@ open class User {
 // 15 CHECK-VTABLE-NEXT: #User.wrappedProp!materializeForSet.1:
 // 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
 // 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
-// 18 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 19 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 20 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 21 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped!1:
+// 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped!1:
+// 20 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
+// 21 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
+// 22 CHECK-VTABLE-NEXT: #User.init!initializer.1:
 // 23 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 24 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 24 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 25 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 26 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 27 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 28 CHECK-VTABLE-NEXT: #User.init!initializer.1:
+// 29 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 30 CHECK-VTABLE-NEXT: #User.lastMethod!1:
 // CHECK-VTABLE: }
 
 
@@ -245,6 +278,14 @@ open class UserSub : User {
   // CHECK: required init(wrappedRequired: WrappedInt?)
   // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
   public required init(wrappedRequired: WrappedInt?) { super.init() }
+
+  // CHECK: required init(wrappedRequiredInSub: WrappedInt?)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  public required override init(wrappedRequiredInSub: WrappedInt?) { super.init() }
+
+  // CHECK: required init(wrappedRequiredDynamic: WrappedInt)
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredDynamic:) */
+  public required init(wrappedRequiredDynamic: WrappedInt) { super.init() }
 }
 // CHECK: {{^}$}}
 // CHECK-RECOVERY: {{^}$}}

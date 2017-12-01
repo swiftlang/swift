@@ -63,13 +63,13 @@ public:
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  std::string getMangledTypeName(uintptr_t Offset) const {
+    return MangledTypeName.get() + Offset;
   }
 
-  std::string getFieldName()  const {
+  std::string getFieldName(uintptr_t Offset)  const {
     if (FieldName)
-      return FieldName.get();
+      return FieldName.get() + Offset;
     return "";
   }
 
@@ -188,16 +188,16 @@ public:
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  std::string getMangledTypeName(uintptr_t Offset) const {
+    return MangledTypeName.get() + Offset;
   }
 
   bool hasSuperclass() const {
     return Superclass;
   }
 
-  std::string getSuperclass() const {
-    return Superclass.get();
+  std::string getSuperclass(uintptr_t Offset) const {
+    return Superclass.get() + Offset;
   }
 };
 
@@ -241,12 +241,12 @@ class AssociatedTypeRecord {
   const RelativeDirectPointer<const char> SubstitutedTypeName;
 
 public:
-  std::string getName() const {
-    return Name.get();
+  std::string getName(uintptr_t Offset) const {
+    return Name.get() + Offset;
   }
 
-  std::string getMangledSubstitutedTypeName() const {
-    return SubstitutedTypeName.get();
+  std::string getMangledSubstitutedTypeName(uintptr_t Offset) const {
+    return SubstitutedTypeName.get() + Offset;
   }
 };
 
@@ -319,12 +319,12 @@ public:
     return const_iterator { End, End };
   }
 
-  std::string getMangledProtocolTypeName() const {
-    return ProtocolTypeName.get();
+  std::string getMangledProtocolTypeName(uintptr_t Offset) const {
+    return ProtocolTypeName.get() + Offset;
   }
 
-  std::string getMangledConformingTypeName() const {
-    return ConformingTypeName.get();
+  std::string getMangledConformingTypeName(uintptr_t Offset) const {
+    return ConformingTypeName.get() + Offset;
   }
 };
 
@@ -377,8 +377,8 @@ public:
     return TypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return TypeName.get();
+  std::string getMangledTypeName(uintptr_t Offset) const {
+    return TypeName.get() + Offset;
   }
 };
 
@@ -424,8 +424,8 @@ public:
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  std::string getMangledTypeName(uintptr_t Offset) const {
+    return MangledTypeName.get() + Offset;
   }
 };
 
@@ -470,16 +470,16 @@ public:
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  std::string getMangledTypeName(uintptr_t Offset) const {
+    return MangledTypeName.get() + Offset;
   }
 
   bool hasMangledMetadataSource() const {
     return MangledMetadataSource;
   }
 
-  std::string getMangledMetadataSource() const {
-    return MangledMetadataSource.get();
+  std::string getMangledMetadataSource(uintptr_t Offset) const {
+    return MangledMetadataSource.get() + Offset;
   }
 };
 

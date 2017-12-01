@@ -85,6 +85,17 @@ extension ClosedRangeIndex : Comparable {
   }
 }
 
+extension ClosedRangeIndex : Hashable where Bound : Hashable {
+  public var hashValue: Int {
+    switch _value {
+    case .inRange(let value):
+      return value.hashValue
+    case .pastEnd:
+      return .max
+    }
+  }
+}
+
 /// A closed range that forms a collection of consecutive values.
 ///
 /// You create a `CountableClosedRange` instance by using the closed range
@@ -250,8 +261,8 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 
   @_inlineable
   public subscript(bounds: Range<Index>)
-    -> RandomAccessSlice<CountableClosedRange<Bound>> {
-    return RandomAccessSlice(base: self, bounds: bounds)
+    -> Slice<CountableClosedRange<Bound>> {
+    return Slice(base: self, bounds: bounds)
   }
 
   /// Creates an instance with the given bounds.

@@ -378,38 +378,8 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // True if any instructions were changed or generated.
   bool Changed = false;
 
-  // Collect the direct and indirect subclasses for the class.
-  // Sort these subclasses in the order they should be tested by the
-  // speculative devirtualization. Different strategies could be used,
-  // E.g. breadth-first, depth-first, etc.
-  // Currently, let's use the breadth-first strategy.
-  // The exact static type of the instance should be tested first.
-  auto &DirectSubs = CHA->getDirectSubClasses(CD);
-  auto &IndirectSubs = CHA->getIndirectSubClasses(CD);
-
-  SmallVector<ClassDecl *, 8> Subs(DirectSubs);
-  Subs.append(IndirectSubs.begin(), IndirectSubs.end());
-
-  if (ClassType.is<BoundGenericClassType>()) {
-    // Filter out any subclasses that do not inherit from this
-    // specific bound class.
-    auto RemovedIt = std::remove_if(Subs.begin(),
-        Subs.end(),
-        [&ClassType](ClassDecl *Sub){
-          auto SubCanTy = Sub->getDeclaredType()->getCanonicalType();
-          // Unbound generic type can override a method from
-          // a bound generic class, but this unbound generic
-          // class is not considered to be a subclass of a
-          // bound generic class in a general case.
-          if (isa<UnboundGenericType>(SubCanTy))
-            return false;
-          // Handle the usual case here: the class in question
-          // should be a real subclass of a bound generic class.
-          return !ClassType.isBindableToSuperclassOf(
-              SILType::getPrimitiveObjectType(SubCanTy));
-        });
-    Subs.erase(RemovedIt, Subs.end());
-  }
+  SmallVector<ClassDecl *, 8> Subs;
+  getAllSubclasses(CHA, CD, ClassType, M, Subs);
 
   // Number of subclasses which cannot be handled by checked_cast_br checks.
   int NotHandledSubsNum = 0;
@@ -484,14 +454,14 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
           << CD->getName() << " and subclass " << S->getName() << "\n");
 
-    CanType CanClassType = S->getDeclaredType()->getCanonicalType();
-    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
-    if (!ClassType.getClassOrBoundGenericClass()) {
-      // This subclass cannot be handled. This happens e.g. if it is
-      // a generic class.
+    // FIXME: Add support for generic subclasses.
+    if (S->isGenericContext()) {
       NotHandledSubsNum++;
       continue;
     }
+
+    CanType CanClassType = S->getDeclaredInterfaceType()->getCanonicalType();
+    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
 
     auto ClassOrMetatypeType = ClassType;
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {

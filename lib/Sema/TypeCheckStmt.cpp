@@ -555,9 +555,9 @@ public:
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
     TypeResolutionOptions options;
-    options |= TR_AllowUnspecifiedTypes;
-    options |= TR_AllowUnboundGenerics;
-    options |= TR_InExpression;
+    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+    options |= TypeResolutionFlags::InExpression;
     
     if (auto *P = TC.resolvePattern(S->getPattern(), DC,
                                     /*isStmtCondition*/false)) {
@@ -856,7 +856,7 @@ public:
           pattern = newPattern;
           // Coerce the pattern to the subject's type.
           if (!subjectType || TC.coercePatternToType(pattern, DC, subjectType,
-                                     TR_InExpression)) {
+                                     TypeResolutionFlags::InExpression)) {
             hadError = true;
 
             // If that failed, mark any variables binding pieces of the pattern
@@ -977,7 +977,8 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 
     // Coerce the pattern to the exception type.
     if (!exnType ||
-        coercePatternToType(pattern, DC, exnType, TR_InExpression)) {
+        coercePatternToType(pattern, DC, exnType,
+                            TypeResolutionFlags::InExpression)) {
       // If that failed, be sure to give the variables error types
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
@@ -1554,9 +1555,15 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       diagnose(initExpr->getLoc(), diag::delegation_here);
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
-  }
 
-  diagnoseResilientConstructor(ctor);
+    // An inlinable constructor in a class must always be delegating.
+    if (!isDelegating && !ClassD->hasFixedLayout() &&
+        ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      diagnose(ctor, diag::class_designated_init_inlineable_resilient,
+               ClassD->getDeclaredInterfaceType(),
+               static_cast<unsigned>(getFragileFunctionKind(ctor)));
+    }
+  }
 
   // If we want a super.init call...
   if (wantSuperInitCall) {

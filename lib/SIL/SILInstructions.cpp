@@ -1688,8 +1688,7 @@ WitnessMethodInst *
 WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
                           ProtocolConformanceRef Conformance, SILDeclRef Member,
                           SILType Ty, SILFunction *F,
-                          SILOpenedArchetypesState &OpenedArchetypes,
-                          bool Volatile) {
+                          SILOpenedArchetypesState &OpenedArchetypes) {
   assert(cast<ProtocolDecl>(Member.getDecl()->getDeclContext())
          == Conformance.getRequirement());
 
@@ -1704,7 +1703,7 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
 
   declareWitnessTable(Mod, Conformance);
   return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,
-                                          Ty, TypeDependentOperands, Volatile);
+                                          Ty, TypeDependentOperands);
 }
 
 ObjCMethodInst *
@@ -2107,8 +2106,18 @@ ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
-  return ::new (Buffer) ConvertFunctionInst(DebugLoc, Operand,
-                                            TypeDependentOperands, Ty);
+  auto *CFI = ::new (Buffer)
+      ConvertFunctionInst(DebugLoc, Operand, TypeDependentOperands, Ty);
+  // Make sure we are not performing ABI-incompatible conversions.
+  CanSILFunctionType opTI =
+      CFI->getOperand()->getType().castTo<SILFunctionType>();
+  (void)opTI;
+  CanSILFunctionType resTI =
+      CFI->getOperand()->getType().castTo<SILFunctionType>();
+  (void)resTI;
+  assert(opTI->isABICompatibleWith(resTI).isCompatible() &&
+         "Can not convert in between ABI incompatible function types");
+  return CFI;
 }
 
 bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {

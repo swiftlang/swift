@@ -3081,6 +3081,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       Kind = MarkUninitializedInst::Var;
     else if (KindId.str() == "rootself")
       Kind = MarkUninitializedInst::RootSelf;
+    else if (KindId.str() == "crossmodulerootself")
+      Kind = MarkUninitializedInst::CrossModuleRootSelf;
     else if (KindId.str() == "derivedself")
       Kind = MarkUninitializedInst::DerivedSelf;
     else if (KindId.str() == "derivedselfonly")
@@ -3089,8 +3091,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       Kind = MarkUninitializedInst::DelegatingSelf;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
-                 "var, rootself, derivedself, derivedselfonly, "
-                 "or delegatingself");
+                 "var, rootself, crossmodulerootself, derivedself, "
+                 "derivedselfonly, or delegatingself");
       return true;
     }
 
@@ -3902,9 +3904,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
   case SILInstructionKind::WitnessMethodInst: {
-    bool IsVolatile = false;
-    if (parseSILOptional(IsVolatile, *this, "volatile"))
-      return true;
     CanType LookupTy;
     SILDeclRef Member;
     SILType MethodTy;
@@ -3945,7 +3944,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     
     ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
-                                      MethodTy, IsVolatile);
+                                      MethodTy);
     break;
   }
   case SILInstructionKind::CopyAddrInst: {

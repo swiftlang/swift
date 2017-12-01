@@ -213,6 +213,65 @@ extension String {
 // rdar://problem/18878343
 #endif
 
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _ascii8(_ c: Unicode.Scalar) -> UInt8 {
+  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
+  return UInt8(c.value)
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _digitASCII(
+  _ digit: UInt8, numeralsOnly: Bool, uppercase: Bool
+) -> UInt8 {
+  if numeralsOnly || digit < 10 {
+    return _ascii8("0") &+ digit
+  } else {
+    let base = (uppercase ? _ascii8("A") : _ascii8("a")) &- 10
+    return base &+ digit
+  }
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal func _integerToString<T: FixedWidthInteger>(
+  _ value: T, radix: Int, uppercase: Bool
+) -> String {
+  if value == 0 {
+    return "0"
+  }
+
+  // Bit shifting / masking is much faster than division when `radix`
+  // is a power of two.
+  let radixIsPowerOfTwo = radix.nonzeroBitCount == 1
+  let radix = T.Magnitude(radix)
+  let quotientAndRemainder: (T.Magnitude) -> (T.Magnitude, T.Magnitude) =
+    radixIsPowerOfTwo
+      ? { ( $0 &>> radix.trailingZeroBitCount, $0 & (radix - 1) ) }
+      : { $0.quotientAndRemainder(dividingBy: radix) }
+
+  let isNegative = T.isSigned && value < 0
+  var value = value.magnitude
+
+  var result: [UInt8] = []
+  while value != 0 {
+    let (q, r) = quotientAndRemainder(value)
+    result.append(
+      _digitASCII(
+        UInt8(truncatingIfNeeded: r),
+        numeralsOnly: radix <= 10,
+        uppercase: uppercase))
+    value = q
+  }
+  
+  if isNegative {
+    result.append(_ascii8("-"))
+  }
+  return String._fromWellFormedCodeUnitSequence(
+    UTF8.self, input: result.reversed())
+}
+
 // Conversions to string from other types.
 extension String {
   /// Creates a string representing the given value in base 10, or some other
@@ -250,9 +309,13 @@ extension String {
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
-    _precondition(radix > 1, "Radix must be greater than 1")
-    self = _int64ToString(
-      Int64(value), radix: Int64(radix), uppercase: uppercase)
+    _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
+    if T.bitWidth <= 64 {
+      self = _int64ToString(
+        Int64(value), radix: Int64(radix), uppercase: uppercase)
+    } else {
+      self = _integerToString(value, radix: radix, uppercase: uppercase)
+    }
   }
   
   /// Creates a string representing the given value in base 10, or some other
@@ -290,9 +353,13 @@ extension String {
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) where T : SignedInteger {
-    _precondition(radix > 1, "Radix must be greater than 1")
-    self = _int64ToString(
-      Int64(value), radix: Int64(radix), uppercase: uppercase)
+    _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
+    if T.bitWidth <= 64 {
+      self = _int64ToString(
+        Int64(value), radix: Int64(radix), uppercase: uppercase)
+    } else {
+      self = _integerToString(value, radix: radix, uppercase: uppercase)
+    }
   }
   
   /// Creates a string representing the given value in base 10, or some other
@@ -329,9 +396,13 @@ extension String {
   public init<T : FixedWidthInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) where T : UnsignedInteger {
-    _precondition(radix > 1, "Radix must be greater than 1")
-    self = _uint64ToString(
-      UInt64(value), radix: Int64(radix), uppercase: uppercase)
+    _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
+    if T.bitWidth <= 64 {
+      self = _uint64ToString(
+        UInt64(value), radix: Int64(radix), uppercase: uppercase)
+    } else {
+      self = _integerToString(value, radix: radix, uppercase: uppercase)
+    }
   }
   
   /// Creates a string representing the given value in base 10, or some other
@@ -368,7 +439,7 @@ extension String {
   public init<T : SignedInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
-    _precondition(radix > 1, "Radix must be greater than 1")
+    _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
     self = _int64ToString(
       Int64(value), radix: Int64(radix), uppercase: uppercase)
   }
@@ -407,7 +478,7 @@ extension String {
   public init<T : UnsignedInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
-    _precondition(radix > 1, "Radix must be greater than 1")
+    _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
     self = _uint64ToString(
       UInt64(value), radix: Int64(radix), uppercase: uppercase)
   }

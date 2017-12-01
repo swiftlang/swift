@@ -22,6 +22,31 @@ CHANGELOG
 Swift 4.1
 ---------
 
+* [SE-0166][] / [SE-0143][]
+
+  The standard library now defines the conformances of `Optional`,
+  `Array`, `Dictionary`, and `Set` to `Encodable` and `Decodable` as
+  conditional conformances, available only when their type parameters
+  conform to `Encodable` or `Decodable`, respectively.
+
+* [SE-0188][] 
+  
+  Index types for most standard library collections now conform to `Hashable`. 
+  These indices can now be used in key-path subscripts and hashed collections:
+  
+  ```swift
+  let s = "Hashable"
+  let p = \String.[s.startIndex]
+  s[keyPath: p] // "H"
+  ```
+
+* [SE-0143][] The standard library types `Optional`, `Array`, and
+	`Dictionary` now conform to the `Equatable` protocol when their element types
+	conform to `Equatable`. This allows the `==` operator to compose (e.g., one
+	can compare two values of type `[Int : [Int?]?]` with `==`), as well as use
+  various algorthims defined for `Equatable` element types, such as
+	`index(of:)`.
+
 * [SE-0157][] is implemented. Associated types can now declare "recursive"
 	constraints, which require that the associated type conform to the enclosing
 	protocol. The standard library protocols have been updated to make use of
@@ -6803,3 +6828,4 @@ Swift 1.0
 [SE-0184]: <https://github.com/apple/swift-evolution/blob/master/proposals/0184-unsafe-pointers-add-missing.md>
 [SE-0185]: <https://github.com/apple/swift-evolution/blob/master/proposals/0185-synthesize-equatable-hashable.md>
 [SE-0186]: <https://github.com/apple/swift-evolution/blob/master/proposals/0186-remove-ownership-keyword-support-in-protocols.md>
+[SE-0188]: <https://github.com/apple/swift-evolution/blob/master/proposals/0188-stdlib-index-types-hashable.md>

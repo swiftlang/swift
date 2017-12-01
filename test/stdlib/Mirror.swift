@@ -52,8 +52,8 @@ mirrors.test("RandomAccessStructure") {
 let letters = "abcdefghijklmnopqrstuvwxyz "
 
 func find(_ substring: String, within domain: String) -> String.Index? {
-  let domainCount = domain.characters.count
-  let substringCount = substring.characters.count
+  let domainCount = domain.count
+  let substringCount = substring.count
 
   if (domainCount < substringCount) { return nil }
   var sliceStart = domain.startIndex
@@ -76,19 +76,19 @@ mirrors.test("ForwardStructure") {
     var customMirror: Mirror {
       return Mirror(
         self,
-        unlabeledChildren: Set(letters.characters),
+        unlabeledChildren: Set(letters),
         displayStyle: .`set`)
     }
   }
 
   let w = DoubleYou().customMirror
   expectEqual(.`set`, w.displayStyle)
-  expectEqual(letters.characters.count, numericCast(w.children.count))
+  expectEqual(letters.count, numericCast(w.children.count))
   
   // Because we don't control the order of a Set, we need to do a
   // fancy dance in order to validate the result.
   let description = w.testDescription
-  for c in letters.characters {
+  for c in letters {
     let expected = "nil: \"\(c)\""
     expectNotNil(find(expected, within: description))
   }
@@ -99,7 +99,7 @@ mirrors.test("BidirectionalStructure") {
     var customMirror: Mirror {
       return Mirror(
         self,
-        unlabeledChildren: letters.characters,
+        unlabeledChildren: letters,
         displayStyle: .collection)
     }
   }
@@ -111,7 +111,7 @@ mirrors.test("BidirectionalStructure") {
   let description = y.testDescription
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
-    description[description.startIndex..<description.characters.index(of: "d")!])
+    description[description.startIndex..<description.index(of: "d")!])
 }
 
 mirrors.test("LabeledStructure") {

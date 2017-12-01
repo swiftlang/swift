@@ -29,6 +29,11 @@ struct Buffer {
 
 typealias AnyObject = Builtin.AnyObject
 
+protocol Protocol {
+  associatedtype AssocType
+  static func useInput(_ input: Builtin.Int32, into processInput: (AssocType) -> ())
+}
+
 ///////////
 // Tests //
 ///////////
@@ -84,5 +89,13 @@ struct StructContainingBridgeObject {
   // CHECK: } // end sil function '_T0s28StructContainingBridgeObjectVAByXl8swiftObj_tcfC'
   init(swiftObj: AnyObject) {
     rawValue = Builtin.reinterpretCast(swiftObj)
+  }
+}
+
+struct ReabstractionThunkTest : Protocol {
+  typealias AssocType = Builtin.Int32
+
+  static func useInput(_ input: Builtin.Int32, into processInput: (AssocType) -> ()) {
+    processInput(input)
   }
 }

@@ -3089,34 +3089,35 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   // Local function that adds the given declaration if it is a
   // reasonable choice.
-  auto addChoice = [&](ValueDecl *cand, bool isBridged,
-                       bool isUnwrappedOptional) {
+  auto addChoice = [&](OverloadChoice candidate) {
+    auto decl = candidate.getDecl();
+    
     // If the result is invalid, skip it.
-    TC.validateDecl(cand);
-    if (cand->isInvalid()) {
+    TC.validateDecl(decl);
+    if (decl->isInvalid()) {
       result.markErrorAlreadyDiagnosed();
       return;
     }
 
     // FIXME: Deal with broken recursion
-    if (!cand->hasInterfaceType())
+    if (!decl->hasInterfaceType())
       return;
 
     // If the argument labels for this result are incompatible with
     // the call site, skip it.
-    if (!hasCompatibleArgumentLabels(cand)) {
+    if (!hasCompatibleArgumentLabels(decl)) {
       labelMismatch = true;
-      result.addUnviable(cand, MemberLookupResult::UR_LabelMismatch);
+      result.addUnviable(candidate, MemberLookupResult::UR_LabelMismatch);
       return;
     }
 
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
     if (isExistential) {
-      if (auto *proto = cand->getDeclContext()
+      if (auto *proto = decl->getDeclContext()
               ->getAsProtocolOrProtocolExtensionContext()) {
-        if (!proto->isAvailableInExistential(cand)) {
-          result.addUnviable(cand,
+        if (!proto->isAvailableInExistential(decl)) {
+          result.addUnviable(candidate,
                              MemberLookupResult::UR_UnavailableInExistential);
           return;
         }
@@ -3126,18 +3127,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // If the invocation's argument expression has a favored type,
     // use that information to determine whether a specific overload for
     // the candidate should be favored.
-    if (isa<ConstructorDecl>(cand) && favoredType &&
+    if (isa<ConstructorDecl>(decl) && favoredType &&
         result.FavoredChoice == ~0U) {
       // Only try and favor monomorphic initializers.
-      if (auto fnTypeWithSelf = cand->getInterfaceType()
-                                                      ->getAs<FunctionType>()) {
-        if (auto fnType = fnTypeWithSelf->getResult()
-                                                      ->getAs<FunctionType>()) {
+      if (auto fnTypeWithSelf = decl->getInterfaceType()
+                                                     ->getAs<FunctionType>()) {
+        if (auto fnType = fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
           auto argType = fnType->getInput()->getWithoutParens();
-          argType = cand->getInnermostDeclContext()
+          argType = decl->getInnermostDeclContext()
                                                   ->mapTypeIntoContext(argType);
           if (argType->isEqual(favoredType))
-            if (!cand->getAttrs().isUnavailable(getASTContext()))
+            if (!decl->getAttrs().isUnavailable(getASTContext()))
               result.FavoredChoice = result.ViableCandidates.size();
         }
       }
@@ -3145,25 +3145,27 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
-    if (cand->isInstanceMember()) {
-      if ((isa<FuncDecl>(cand) && !hasInstanceMethods) ||
-          (!isa<FuncDecl>(cand) && !hasInstanceMembers)) {
-        result.addUnviable(cand, MemberLookupResult::UR_InstanceMemberOnType);
+    if (decl->isInstanceMember()) {
+      if ((isa<FuncDecl>(decl) && !hasInstanceMethods) ||
+          (!isa<FuncDecl>(decl) && !hasInstanceMembers)) {
+        result.addUnviable(candidate,
+                           MemberLookupResult::UR_InstanceMemberOnType);
         return;
       }
 
     // If the underlying type of a typealias is fully concrete, it is legal
     // to access the type with a protocol metatype base.
     } else if (isExistential &&
-               isa<TypeAliasDecl>(cand) &&
-               !cast<TypeAliasDecl>(cand)->getInterfaceType()->getCanonicalType()
+               isa<TypeAliasDecl>(decl) &&
+               !cast<TypeAliasDecl>(decl)->getInterfaceType()->getCanonicalType()
                   ->hasTypeParameter()) {
 
       /* We're OK */
 
     } else {
       if (!hasStaticMembers) {
-        result.addUnviable(cand, MemberLookupResult::UR_TypeMemberOnInstance);
+        result.addUnviable(candidate,
+                           MemberLookupResult::UR_TypeMemberOnInstance);
         return;
       }
     }
@@ -3171,19 +3173,19 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // If we have an rvalue base, make sure that the result isn't 'mutating'
     // (only valid on lvalues).
     if (!isMetatype &&
-        !baseTy->is<LValueType>() && cand->isInstanceMember()) {
-      if (auto *FD = dyn_cast<FuncDecl>(cand))
+        !baseTy->is<LValueType>() && decl->isInstanceMember()) {
+      if (auto *FD = dyn_cast<FuncDecl>(decl))
         if (FD->isMutating()) {
-          result.addUnviable(cand,
+          result.addUnviable(candidate,
                              MemberLookupResult::UR_MutatingMemberOnRValue);
           return;
         }
 
       // Subscripts and computed properties are ok on rvalues so long
       // as the getter is nonmutating.
-      if (auto storage = dyn_cast<AbstractStorageDecl>(cand)) {
+      if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
         if (storage->isGetterMutating()) {
-          result.addUnviable(cand,
+          result.addUnviable(candidate,
                              MemberLookupResult::UR_MutatingGetterOnRValue);
           return;
         }
@@ -3191,52 +3193,55 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     }
     
     // If the result's type contains delayed members, we need to force them now.
-    if (auto NT = dyn_cast<NominalType>(cand->getInterfaceType().getPointer())) {
+    if (auto NT = dyn_cast<NominalType>(decl->getInterfaceType().getPointer())){
       if (auto *NTD = dyn_cast<NominalTypeDecl>(NT->getDecl())) {
         TC.forceExternalDeclMembers(NTD);
       }
     }
 
+    // Otherwise, we're good, add the candidate to the list.
+    result.addViable(candidate);
+  };
+
+  // Local function that turns a ValueDecl into a properly configured
+  // OverloadChoice.
+  auto getOverloadChoice = [&](ValueDecl *cand, bool isBridged,
+                               bool isUnwrappedOptional) -> OverloadChoice {
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (isDynamicLookup) {
       assert(cand->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
-
+      
       // We found this declaration via dynamic lookup, record it as such.
-      result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand,
-                                                         functionRefKind));
-      return;
+      return OverloadChoice::getDeclViaDynamic(baseTy, cand, functionRefKind);
     }
-
+    
     // If we have a bridged type, we found this declaration via bridging.
-    if (isBridged) {
-      result.addViable(OverloadChoice::getDeclViaBridge(bridgedType, cand,
-                                                        functionRefKind));
-      return;
-    }
-
+    if (isBridged)
+      return OverloadChoice::getDeclViaBridge(bridgedType, cand,
+                                              functionRefKind);
+    
     // If we got the choice by unwrapping an optional type, unwrap the base
     // type.
     Type ovlBaseTy = baseTy;
     if (isUnwrappedOptional) {
       ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
-        ->getInstanceType()
-        ->getAnyOptionalObjectType());
-      result.addViable(
-        OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
-                                                    functionRefKind));
-    } else {
-      result.addViable(OverloadChoice(ovlBaseTy, cand, functionRefKind));
+                                    ->getInstanceType()
+                                    ->getAnyOptionalObjectType());
+      return OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy, cand,
+                                                         functionRefKind);
     }
+    
+    return OverloadChoice(ovlBaseTy, cand, functionRefKind);
   };
-
+  
   // Add all results from this lookup.
 retry_after_fail:
   labelMismatch = false;
   for (auto result : lookup)
-    addChoice(result.getValueDecl(),
-              /*isBridged=*/false,
-              /*isUnwrappedOptional=*/false);
+    addChoice(getOverloadChoice(result.getValueDecl(),
+                                /*isBridged=*/false,
+                                /*isUnwrappedOptional=*/false));
 
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
@@ -3259,9 +3264,9 @@ retry_after_fail:
         continue;
       }
       
-      addChoice(result.getValueDecl(),
-                /*isBridged=*/true,
-                /*isUnwrappedOptional=*/false);
+      addChoice(getOverloadChoice(result.getValueDecl(),
+                                  /*isBridged=*/true,
+                                  /*isUnwrappedOptional=*/false));
     }
   }
 
@@ -3275,9 +3280,9 @@ retry_after_fail:
       if (objectType->mayHaveMembers()) {
         LookupResult &optionalLookup = lookupMember(objectType, memberName);
         for (auto result : optionalLookup)
-          addChoice(result.getValueDecl(),
-                    /*bridged*/false,
-                    /*isUnwrappedOptional=*/true);
+          addChoice(getOverloadChoice(result.getValueDecl(),
+                                      /*bridged*/false,
+                                      /*isUnwrappedOptional=*/true));
       }
     }
   }
@@ -3319,7 +3324,9 @@ retry_after_fail:
       if (!cand->hasInterfaceType())
         continue;
 
-      result.addUnviable(cand, MemberLookupResult::UR_Inaccessible);
+      result.addUnviable(getOverloadChoice(cand, /*isBridged=*/false,
+                                           /*isUnwrappedOptional=*/false),
+                         MemberLookupResult::UR_Inaccessible);
     }
   }
   
