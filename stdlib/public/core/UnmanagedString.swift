@@ -37,6 +37,7 @@ struct _UnmanagedString<CodeUnit>
   @_versioned
   internal var count: Int
 
+  @_inlineable
   @_versioned
   init(start: UnsafePointer<CodeUnit>, count: Int) {
     _sanityCheck(CodeUnit.self == UInt8.self || CodeUnit.self == UInt16.self)

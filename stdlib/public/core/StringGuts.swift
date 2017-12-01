@@ -278,7 +278,8 @@ internal var _emptyStringBase: UnsafeRawPointer {
 }
 
 extension _StringGuts {
-  @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     if _isNative {
