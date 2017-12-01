@@ -408,14 +408,15 @@ static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
   std::string S;
   llvm::raw_string_ostream SS(S);
   D->print(SS, Options);
-  std::string Signature = SS.str();
   auto OI = Doc.find(Open);
   auto CI = Doc.find(Close);
-  if (StringRef::npos != OI && StringRef::npos != CI && CI > OI)
-    OS << Doc.substr(0, OI) << Open << Signature << Close <<
-      Doc.substr(CI + Close.size());
-  else
+  if (StringRef::npos != OI && StringRef::npos != CI && CI > OI) {
+    OS << Doc.substr(0, OI) << Open;
+    appendWithXMLEscaping(OS, SS.str());
+    OS << Close << Doc.substr(CI + Close.size());
+  } else {
     OS << Doc;
+  }
 }
 
 static LineList getLineListFromComment(SourceManager &SourceMgr,
