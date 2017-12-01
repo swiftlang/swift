@@ -134,3 +134,9 @@ public func testOutlining() {
 // CHECK:   %7 = apply %2(%6, %1) : $@convention(objc_method) (Optional<NSArray>, Gizmo) -> @autoreleased Optional<AnyObject>
 // CHECK:   strong_release %4 : $NSArray
 // CHECK:   return %7 : $Optional<AnyObject>
+
+public func dontCrash<T: Proto>(x : Gizmo2<T>) {
+  let s = x.doSomething()
+  print(s)
+
+}

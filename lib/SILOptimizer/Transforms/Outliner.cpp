@@ -427,7 +427,8 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
   SILValue Instance =
       FirstInst != ObjCMethod ? FirstInst : ObjCMethod->getOperand();
   if (!ObjCMethod || !ObjCMethod->hasOneUse() ||
-      ObjCMethod->getOperand() != Instance)
+      ObjCMethod->getOperand() != Instance ||
+      ObjCMethod->getFunction()->getLoweredFunctionType()->isPolymorphic())
     return false;
 
   // Don't outline in the outlined function.
@@ -568,7 +569,7 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
   if (!Load) {
     // Try to match without the load/strong_retain prefix.
     auto *CMI = dyn_cast<ObjCMethodInst>(It);
-    if (!CMI)
+    if (!CMI || CMI->getFunction()->getLoweredFunctionType()->isPolymorphic())
       return false;
     FirstInst = CMI;
   } else
@@ -1104,7 +1105,8 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   clearState();
 
   ObjCMethod = dyn_cast<ObjCMethodInst>(I);
-  if (!ObjCMethod)
+  if (!ObjCMethod ||
+      ObjCMethod->getFunction()->getLoweredFunctionType()->isPolymorphic())
     return false;
   auto *Use = ObjCMethod->getSingleUse();
   if (!Use)
