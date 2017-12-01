@@ -168,4 +168,7 @@ func testLogicalComparisons() {
 func testRecursion() {
   _ = RECURSION // expected-error {{use of unresolved identifier 'RECURSION'}}
   _ = REF_TO_RECURSION // expected-error {{use of unresolved identifier 'REF_TO_RECURSION'}}
+  _ = RECURSION_IN_EXPR // expected-error {{use of unresolved identifier 'RECURSION_IN_EXPR'}}
+  _ = RECURSION_IN_EXPR2 // expected-error {{use of unresolved identifier 'RECURSION_IN_EXPR2'}}
+  _ = RECURSION_IN_EXPR3 // expected-error {{use of unresolved identifier 'RECURSION_IN_EXPR3'}}
 }
