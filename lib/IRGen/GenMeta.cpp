@@ -3154,10 +3154,8 @@ namespace {
     }
 
     void addDestructorFunction() {
-      auto expansion = ResilienceExpansion::Minimal;
       auto dtorRef = SILDeclRef(Target->getDestructor(),
-                                SILDeclRef::Kind::Deallocator,
-                                expansion);
+                                SILDeclRef::Kind::Deallocator);
       SILFunction *dtorFunc = IGM.getSILModule().lookUpFunction(dtorRef);
       if (dtorFunc) {
         B.add(IGM.getAddrOfSILFunction(dtorFunc, NotForDefinition));
@@ -3410,16 +3408,6 @@ namespace {
     }
 
   protected:
-    bool isFinishInitializationIdempotent() {
-      if (!Layout.isFixedLayout())
-        return false;
-
-      if (doesClassMetadataRequireDynamicInitialization(IGM, Target))
-        return false;
-
-      return true;
-    }
-
     llvm::Value *emitFinishIdempotentInitialization(IRGenFunction &IGF,
                                                     llvm::Value *metadata) {
       if (IGF.IGM.ObjCInterop) {
@@ -3458,8 +3446,12 @@ namespace {
                                                    metadata,
                                                    /*vwtable=*/nullptr);
 
-      // TODO: do something intermediate when e.g. all we needed to do was
-      // set parent metadata pointers.
+        // Realizing the class with the ObjC runtime will copy back to the
+        // field offset globals for us; but if ObjC interop is disabled, we
+        // have to do that ourselves, assuming we didn't just emit them all
+        // correctly in the first place.
+        if (!IGF.IGM.ObjCInterop)
+          emitInitializeFieldOffsets(IGF, metadata);
 
       // Otherwise, all we need to do is register with the ObjC runtime.
       } else {
@@ -3468,13 +3460,6 @@ namespace {
       }
 
       emitInitializeMethodOverrides(IGF, metadata);
-
-      // Realizing the class with the ObjC runtime will copy back to the
-      // field offset globals for us; but if ObjC interop is disabled, we
-      // have to do that ourselves, assuming we didn't just emit them all
-      // correctly in the first place.
-      if (!Layout.isFixedLayout() && !IGF.IGM.ObjCInterop)
-        emitInitializeFieldOffsets(IGF, metadata);
 
       return metadata;
     }
@@ -3580,15 +3565,6 @@ namespace {
                                       /*allowUninit*/ false)) {
         HasUnfilledSuperclass = true;
       }
-      
-      // If the superclass came from another module, we may have dropped
-      // stored properties due to the Swift language version availability of
-      // their types. In these cases we can't precisely lay out the ivars in
-      // the class object at compile time so we need to do runtime layout.
-      if (classHasIncompleteLayout(IGM,
-                                 superclassTy->getClassOrBoundGenericClass())) {
-        HasUnfilledSuperclass = true;
-      }
     }
 
     bool canBeConstant() {
@@ -3608,7 +3584,7 @@ namespace {
         // There's an interesting special case where we can do the
         // initialization idempotently and thus avoid the need for a lock.
         if (!HasUnfilledSuperclass &&
-            isFinishInitializationIdempotent()) {
+            !doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
           auto type = Target->getDeclaredType()->getCanonicalType();
           auto metadata =
             IGF.IGM.getAddrOfTypeMetadata(type, /*pattern*/ false);
@@ -3749,9 +3725,7 @@ namespace {
       llvm_unreachable("classes should never have dependent vwtables");
     }
 
-    void noteStartOfFieldOffsets(ClassDecl *whichClass) {
-      HasDependentMetadata = true;
-    }
+    void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
     
     void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
     
@@ -3766,7 +3740,6 @@ namespace {
       } else {
         // Lay out the field, but don't fill it in, we will copy it from
         // the superclass.
-        HasDependentMetadata = true;
         ClassMetadataBuilderBase::addGenericArgument(type, forClass);
       }
     }
@@ -3779,7 +3752,6 @@ namespace {
       } else {
         // Lay out the field, but don't provide the fill op, which we'll get
         // from the superclass.
-        HasDependentMetadata = true;
         ClassMetadataBuilderBase::addGenericWitnessTable(type, conf, forClass);
       }
     }
