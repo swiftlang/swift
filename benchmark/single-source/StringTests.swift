@@ -13,14 +13,14 @@ import TestsUtils
 
 public let StringTests = [
   BenchmarkInfo(name: "StringEqualPointerComparison", runFunction: run_StringEqualPointerComparison, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringHasPrefix", runFunction: run_StringHasPrefix, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringHasPrefixAscii", runFunction: run_StringHasPrefixAscii, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringHasPrefixUnicode", runFunction: run_StringHasPrefixUnicode, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringHasSuffix", runFunction: run_StringHasSuffix, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "StringHasSuffixAscii", runFunction: run_StringHasSuffixAscii, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringHasSuffixUnicode", runFunction: run_StringHasSuffixUnicode, tags: [.validation, .api, .String]),
 ]
 
 // FIXME(string)
-public func run_StringHasPrefix(_ N: Int) {
+public func run_StringHasPrefixAscii(_ N: Int) {
 #if _runtime(_ObjC)
   let prefix = "prefix"
   let testString = "prefixedString"
@@ -33,7 +33,7 @@ public func run_StringHasPrefix(_ N: Int) {
 }
 
 // FIXME(string)
-public func run_StringHasSuffix(_ N: Int) {
+public func run_StringHasSuffixAscii(_ N: Int) {
 #if _runtime(_ObjC)
   let suffix = "Suffixed"
   let testString = "StringSuffixed"
