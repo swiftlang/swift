@@ -358,7 +358,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
   associatedtype Index : Comparable
-  
+
   /// The position of the first element in a nonempty collection.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
