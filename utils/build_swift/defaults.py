@@ -12,6 +12,9 @@ Default option value definitions.
 
 __all__ = [
     # Command line configuarable
+    'BUILD_VARIANT',
+    'CMAKE_GENERATOR',
+    'COMPILER_VENDOR',
     'SWIFT_USER_VISIBLE_VERSION',
     'CLANG_USER_VISIBLE_VERSION',
     'SWIFT_ANALYZE_CODE_COVERAGE',

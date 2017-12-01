@@ -7,7 +7,6 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-import argparse
 import multiprocessing
 
 import android.adb.commands
@@ -18,6 +17,7 @@ from swift_build_support.swift_build_support import targets
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 
+from . import argparse
 from . import defaults
 
 
@@ -224,12 +224,28 @@ def _apply_default_arguments(args):
 def create_argument_parser():
     """Return a configured argument parser."""
 
+    # NOTE: USAGE, DESCRIPTION and EPILOG are defined at the bottom of the file
     parser = _ApplyDefaultsArgumentParser(
         apply_defaults=_apply_default_arguments,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=USAGE,
         description=DESCRIPTION,
         epilog=EPILOG)
+
+    builder = parser.to_builder()
+
+    # Prepare DSL functions
+    option = builder.add_option
+    set_defaults = builder.set_defaults
+    in_group = builder.in_group
+    mutually_exclusive_group = builder.mutually_exclusive_group
+
+    # Prepare DSL actions
+    store = builder.actions.store
+    store_path = builder.actions.store_path
+
+    # -------------------------------------------------------------------------
+    # Top-level options
 
     parser.add_argument(
         '-n', '--dry-run',
@@ -238,8 +254,9 @@ def create_argument_parser():
         help='print the commands that would be executed, but do not execute '
              'them')
     parser.add_argument(
-        '--no-legacy-impl', dest='legacy_impl',
+        '--no-legacy-impl',
         action='store_false',
+        dest='legacy_impl',
         default=True,
         help='avoid legacy implementation')
 
@@ -541,6 +558,7 @@ def create_argument_parser():
         '--skip-test-optimized',
         action=arguments.action.unavailable)
 
+    # -------------------------------------------------------------------------
     targets_group = parser.add_argument_group(
         title='Host and cross-compilation targets')
     targets_group.add_argument(
@@ -570,6 +588,7 @@ def create_argument_parser():
         help='A space-separated list that filters which of the configured '
              'targets to build the Swift standard library for, or "all".')
 
+    # -------------------------------------------------------------------------
     projects_group = parser.add_argument_group(
         title='Options to select projects')
     projects_group.add_argument(
@@ -622,6 +641,7 @@ def create_argument_parser():
         action=arguments.action.enable,
         help='build the Ninja tool')
 
+    # -------------------------------------------------------------------------
     extra_actions_group = parser.add_argument_group(
         title='Extra actions to perform before or in addition to building')
     extra_actions_group.add_argument(
@@ -638,6 +658,7 @@ def create_argument_parser():
         help='if provided, an archive of the symbols directory will be '
              'generated at this path')
 
+    # -------------------------------------------------------------------------
     build_variant_group = parser.add_mutually_exclusive_group(required=False)
     build_variant_group.add_argument(
         '-d', '--debug',
@@ -661,6 +682,7 @@ def create_argument_parser():
         dest='build_variant',
         help='build the Release variant of everything (default is Debug)')
 
+    # -------------------------------------------------------------------------
     build_variant_override_group = parser.add_argument_group(
         title='Override build variant for a specific project')
     build_variant_override_group.add_argument(
@@ -713,99 +735,73 @@ def create_argument_parser():
         dest='libicu_build_variant',
         help='build the Debug variant of libicu')
 
-    assertions_group = parser.add_mutually_exclusive_group(required=False)
-    assertions_group.add_argument(
-        '--assertions',
-        action='store_const',
-        const=True,
-        dest='assertions',
-        help='enable assertions in all projects')
-    assertions_group.add_argument(
-        '--no-assertions',
-        action='store_const',
-        const=False,
-        dest='assertions',
-        help='disable assertions in all projects')
+    # -------------------------------------------------------------------------
+    # Assertions group
 
-    assertions_override_group = parser.add_argument_group(
-        title='Control assertions in a specific project')
-    assertions_override_group.add_argument(
-        '--cmark-assertions',
-        action='store_const',
-        const=True,
-        dest='cmark_assertions',
-        help='enable assertions in CommonMark')
-    assertions_override_group.add_argument(
-        '--llvm-assertions',
-        action='store_const',
-        const=True,
-        dest='llvm_assertions',
-        help='enable assertions in LLVM')
-    assertions_override_group.add_argument(
-        '--no-llvm-assertions',
-        action='store_const',
-        const=False,
-        dest='llvm_assertions',
-        help='disable assertions in LLVM')
-    assertions_override_group.add_argument(
-        '--swift-assertions',
-        action='store_const',
-        const=True,
-        dest='swift_assertions',
-        help='enable assertions in Swift')
-    assertions_override_group.add_argument(
-        '--no-swift-assertions',
-        action='store_const',
-        const=False,
-        dest='swift_assertions',
-        help='disable assertions in Swift')
-    assertions_override_group.add_argument(
-        '--swift-stdlib-assertions',
-        action='store_const',
-        const=True,
-        dest='swift_stdlib_assertions',
-        help='enable assertions in the Swift standard library')
-    assertions_override_group.add_argument(
-        '--no-swift-stdlib-assertions',
-        action='store_const',
-        const=False,
-        dest='swift_stdlib_assertions',
-        help='disable assertions in the Swift standard library')
-    assertions_override_group.add_argument(
-        '--lldb-assertions',
-        action='store_const',
-        const=True,
-        dest='lldb_assertions',
-        help='enable assertions in LLDB')
-    assertions_override_group.add_argument(
-        '--no-lldb-assertions',
-        action='store_const',
-        const=False,
-        dest='lldb_assertions',
-        help='disable assertions in LLDB')
+    with mutually_exclusive_group():
+        set_defaults(assertions=True)
 
-    # FIXME: This should be one option using choices=[...]
-    cmake_generator_group = parser.add_argument_group(
-        title='Select the CMake generator')
-    cmake_generator_group.add_argument(
-        '-x', '--xcode',
-        action='store_const',
-        const='Xcode',
-        dest='cmake_generator',
-        help="use CMake's Xcode generator (default is Ninja)")
-    cmake_generator_group.add_argument(
-        '-m', '--make',
-        action='store_const',
-        const='Unix Makefiles',
-        dest='cmake_generator',
-        help="use CMake's Makefile generator (default is Ninja)")
-    cmake_generator_group.add_argument(
-        '-e', '--eclipse',
-        action='store_const',
-        const='Eclipse CDT4 - Ninja',
-        dest='cmake_generator',
-        help="use CMake's Eclipse generator (default is Ninja)")
+        # TODO: Convert to store_true
+        option('--assertions', store,
+               const=True,
+               help='enable assertions in all projects')
 
+        # TODO: Convert to store_false
+        option('--no-assertions', store('assertions'),
+               const=False,
+               help='disable assertions in all projects')
+
+    # -------------------------------------------------------------------------
+    in_group('Control assertions in a specific project')
+
+    option('--cmark-assertions', store,
+           const=True,
+           help='enable assertions in CommonMark')
+
+    option('--llvm-assertions', store,
+           const=True,
+           help='enable assertions in LLVM')
+    option('--no-llvm-assertions', store('llvm_assertions'),
+           const=False,
+           help='disable assertions in LLVM')
+
+    option('--swift-assertions', store,
+           const=True,
+           help='enable assertions in Swift')
+    option('--no-swift-assertions', store('swift_assertions'),
+           const=False,
+           help='disable assertions in Swift')
+
+    option('--swift-stdlib-assertions', store,
+           const=True,
+           help='enable assertions in the Swift standard library')
+    option('--no-swift-stdlib-assertions', store('swift_stdlib_assertions'),
+           const=False,
+           help='disable assertions in the Swift standard library')
+
+    option('--lldb-assertions', store,
+           const=True,
+           help='enable assertions in LLDB')
+    option('--no-lldb-assertions', store('lldb_assertions'),
+           const=False,
+           help='disable assertions in LLDB')
+
+    # -------------------------------------------------------------------------
+    in_group('Select the CMake generator')
+
+    set_defaults(cmake_generator=defaults.CMAKE_GENERATOR)
+
+    option(['-e', '--eclipse'], store('cmake_generator'),
+           const='Eclipse CDT4 - Ninja',
+           help="use CMake's Eclipse generator (%(default)s by default)")
+    option(['-m', '--make'], store('cmake_generator'),
+           const='Unix Makefiles',
+           help="use CMake's Makefile generator (%(default)s by default)")
+    option(['-x', '--xcode'], store('cmake_generator'),
+           const='Xcode',
+           help="use CMake's Xcode generator (%(default)s by default)")
+
+    # -------------------------------------------------------------------------
     run_tests_group = parser.add_argument_group(
         title='Run tests')
 
@@ -907,6 +903,7 @@ def create_argument_parser():
         dest='test_cygwin',
         help='skip testing Swift stdlibs for Cygwin')
 
+    # -------------------------------------------------------------------------
     run_build_group = parser.add_argument_group(
         title='Run build')
     run_build_group.add_argument(
@@ -1028,6 +1025,7 @@ def create_argument_parser():
         dest='build_external_benchmarks',
         help='skip building Swift Benchmark Suite')
 
+    # -------------------------------------------------------------------------
     skip_test_group = parser.add_argument_group(
         title='Skip testing specified targets')
     skip_test_group.add_argument(
@@ -1093,58 +1091,51 @@ def create_argument_parser():
         help='skip testing Android device targets on the host machine (the '
              'phone itself)')
 
-    llvm_group = parser.add_argument_group(
-        title='Build settings specific for LLVM')
-    llvm_group.add_argument(
-        '--llvm-targets-to-build',
-        default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
-        help='LLVM target generators to build')
+    # -------------------------------------------------------------------------
+    in_group('Build settings specific for LLVM')
 
-    android_group = parser.add_argument_group(
-        title='Build settings for Android')
-    android_group.add_argument(
-        '--android-ndk',
-        metavar='PATH',
-        help='An absolute path to the NDK that will be used as a libc '
-             'implementation for Android builds')
-    android_group.add_argument(
-        '--android-api-level',
-        default='21',
-        help='The Android API level to target when building for Android. '
-             'Currently only 21 or above is supported')
-    android_group.add_argument(
-        '--android-ndk-gcc-version',
-        choices=['4.8', '4.9'],
-        default='4.9',
-        help='The GCC version to use when building for Android. Currently '
-             'only 4.9 is supported. %(default)s is also the default value. '
-             'This option may be used when experimenting with versions '
-             'of the Android NDK not officially supported by Swift')
-    android_group.add_argument(
-        '--android-icu-uc',
-        metavar='PATH',
-        help='Path to a directory containing libicuuc.so')
-    android_group.add_argument(
-        '--android-icu-uc-include',
-        metavar='PATH',
-        help='Path to a directory containing headers for libicuuc')
-    android_group.add_argument(
-        '--android-icu-i18n',
-        metavar='PATH',
-        help='Path to a directory containing libicui18n.so')
-    android_group.add_argument(
-        '--android-icu-i18n-include',
-        metavar='PATH',
-        help='Path to a directory containing headers libicui18n')
-    android_group.add_argument(
-        '--android-deploy-device-path',
-        default=android.adb.commands.DEVICE_TEMP_DIR,
-        metavar='PATH',
-        help='Path on an Android device to which built Swift stdlib products '
-             'will be deployed. If running host tests, specify the "{}" '
-             'directory.'.format(android.adb.commands.DEVICE_TEMP_DIR))
+    option('--llvm-targets-to-build', store,
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
+           help='LLVM target generators to build')
 
-    return parser
+    # -------------------------------------------------------------------------
+    in_group('Build settings for Android')
+
+    option('--android-ndk', store_path,
+           help='An absolute path to the NDK that will be used as a libc '
+                'implementation for Android builds')
+
+    option('--android-api-level', store,
+           default='21',
+           help='The Android API level to target when building for Android. '
+                'Currently only 21 or above is supported')
+
+    option('--android-ndk-gcc-version', store,
+           choices=['4.8', '4.9'],
+           default='4.9',
+           help='The GCC version to use when building for Android. Currently '
+                'only 4.9 is supported. %(default)s is also the default '
+                'value. This option may be used when experimenting with '
+                'versions of the Android NDK not officially supported by '
+                'Swift')
+
+    option('--android-icu-uc', store_path,
+           help='Path to a directory containing libicuuc.so')
+    option('--android-icu-uc-include', store_path,
+           help='Path to a directory containing headers for libicuuc')
+    option('--android-icu-i18n', store_path,
+           help='Path to a directory containing libicui18n.so')
+    option('--android-icu-i18n-include', store_path,
+           help='Path to a directory containing headers libicui18n')
+    option('--android-deploy-device-path', store_path,
+           default=android.adb.commands.DEVICE_TEMP_DIR,
+           help='Path on an Android device to which built Swift stdlib '
+                'products will be deployed. If running host tests, specify '
+                'the "{}" directory.'.format(
+                    android.adb.commands.DEVICE_TEMP_DIR))
+
+    # -------------------------------------------------------------------------
+    return builder.build()
 
 
 # ----------------------------------------------------------------------------
