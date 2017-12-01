@@ -334,7 +334,3 @@ extension LazyCollectionProtocol
     return ReversedCollection(_base: elements).lazy
   }
 }
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
