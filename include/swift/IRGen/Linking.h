@@ -110,6 +110,10 @@ class LinkEntity {
     /// A swift metaclass-stub reference.  The pointer is a ClassDecl*.
     SwiftMetaclassStub,
 
+    /// A class metadata base offset global variable.
+    /// The pointer is a ClassDecl*.
+    ClassMetadataBaseOffset,
+
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
@@ -413,6 +417,12 @@ public:
   static LinkEntity forForeignTypeMetadataCandidate(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::ForeignTypeMetadataCandidate, type);
+    return entity;
+  }
+
+  static LinkEntity forClassMetadataBaseOffset(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ClassMetadataBaseOffset, decl);
     return entity;
   }
 

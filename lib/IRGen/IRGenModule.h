@@ -1055,6 +1055,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
+  llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
+                                                 ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                                  ConstantInitFuture definition);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,

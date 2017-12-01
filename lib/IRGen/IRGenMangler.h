@@ -52,6 +52,10 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mm");
   }
 
+  std::string mangleClassMetadataBaseOffset(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Mo");
+  }
+
   std::string mangleNominalTypeDescriptor(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mn");
   }

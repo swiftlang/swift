@@ -66,29 +66,20 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
 /// Mangle this entity as a std::string.
 std::string LinkEntity::mangleAsString() const {
-  // Almost everything below gets the common prefix:
-  //   mangled-name ::= '_T' global
   IRGenMangler mangler;
   switch (getKind()) {
-      //   global ::= 'w' value-witness-kind          // value witness
     case Kind::ValueWitness:
       return mangler.mangleValueWitness(getType(), getValueWitness());
 
-      //   global ::= 'WV' type                       // value witness
     case Kind::ValueWitnessTable:
       return mangler.mangleValueWitnessTable(getType());
 
-      //   global ::= 'Ma' type               // type metadata access function
     case Kind::TypeMetadataAccessFunction:
       return mangler.mangleTypeMetadataAccessFunction(getType());
 
-      //   global ::= 'ML' type               // type metadata lazy cache variable
     case Kind::TypeMetadataLazyCacheVariable:
       return mangler.mangleTypeMetadataLazyCacheVariable(getType());
 
-      //   global ::= 'Mf' type                       // 'full' type metadata
-      //   global ::= 'M' directness type             // type metadata
-      //   global ::= 'MP' directness type            // type metadata pattern
     case Kind::TypeMetadata:
       switch (getMetadataAddress()) {
         case TypeMetadataAddress::FullMetadata:
@@ -98,72 +89,58 @@ std::string LinkEntity::mangleAsString() const {
       }
       llvm_unreachable("invalid metadata address");
 
-      //   global ::= 'M' directness type             // type metadata
     case Kind::ForeignTypeMetadataCandidate:
       return mangler.mangleTypeMetadataFull(getType(), /*isPattern=*/false);
 
-      //   global ::= 'Mm' type                       // class metaclass
     case Kind::SwiftMetaclassStub:
       return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
 
-      //   global ::= 'Mn' type                       // nominal type descriptor
+    case Kind::ClassMetadataBaseOffset:               // class metadata base offset
+      return mangler.mangleClassMetadataBaseOffset(cast<ClassDecl>(getDecl()));
+
     case Kind::NominalTypeDescriptor:
       return mangler.mangleNominalTypeDescriptor(
                                           cast<NominalTypeDecl>(getDecl()));
 
-      //   global ::= 'Mp' type                       // protocol descriptor
     case Kind::ProtocolDescriptor:
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
-      //   global ::= 'Wv' directness entity
     case Kind::FieldOffset:
       return mangler.mangleFieldOffsetFull(getDecl(), isOffsetIndirect());
 
-      //   global ::= 'WP' protocol-conformance
     case Kind::DirectProtocolWitnessTable:
       return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
 
-      //   global ::= 'WG' protocol-conformance
     case Kind::GenericProtocolWitnessTableCache:
       return mangler.mangleGenericProtocolWitnessTableCache(
                                                       getProtocolConformance());
 
-      //   global ::= 'WI' protocol-conformance
     case Kind::GenericProtocolWitnessTableInstantiationFunction:
       return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
                                                       getProtocolConformance());
 
-      //   global ::= 'Wa' protocol-conformance
     case Kind::ProtocolWitnessTableAccessFunction:
       return mangler.mangleProtocolWitnessTableAccessFunction(
                                                       getProtocolConformance());
 
-      //   global ::= 'Wl' type protocol-conformance
     case Kind::ProtocolWitnessTableLazyAccessFunction:
       return mangler.mangleProtocolWitnessTableLazyAccessFunction(getType(),
                                                       getProtocolConformance());
 
-      //   global ::= 'WL' type protocol-conformance
     case Kind::ProtocolWitnessTableLazyCacheVariable:
       return mangler.mangleProtocolWitnessTableLazyCacheVariable(getType(),
                                                       getProtocolConformance());
 
-      //   global ::= 'Wt' protocol-conformance identifier
     case Kind::AssociatedTypeMetadataAccessFunction:
       return mangler.mangleAssociatedTypeMetadataAccessFunction(
                   getProtocolConformance(), getAssociatedType()->getNameStr());
 
-      //   global ::= protocol-conformance identifier+ nominal-type 'WT'
     case Kind::AssociatedTypeWitnessTableAccessFunction: {
       auto assocConf = getAssociatedConformance();
       return mangler.mangleAssociatedTypeWitnessTableAccessFunction(
                   getProtocolConformance(), assocConf.first, assocConf.second);
     }
 
-      // For all the following, this rule was imposed above:
-      //   global ::= local-marker? entity            // some identifiable thing
-
-      //   entity ::= declaration                     // other declaration
     case Kind::Function:
       // As a special case, functions can have manually mangled names.
       if (auto AsmA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
