@@ -181,7 +181,7 @@ where Index : Strideable,
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   @_inlineable
-  public var indices: CountableRange<Index> {
+  public var indices: Range<Index> {
     return startIndex..<endIndex
   }
 

@@ -60,7 +60,7 @@ ${stringSubscriptComment}
     Builtin.unreachable()
   }
 
-% for Range in 'Range', 'ClosedRange', 'CountableRange', 'CountableClosedRange':
+% for Range in 'Range', 'ClosedRange', 'CountableClosedRange':
 ${stringSubscriptComment}
   @available(
     *, unavailable,

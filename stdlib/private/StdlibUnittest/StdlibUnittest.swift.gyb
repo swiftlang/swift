@@ -319,7 +319,7 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   }
 }
 
-% for OtherRange in ['Range', 'CountableRange', 'ClosedRange', 'CountableClosedRange']:
+% for OtherRange in ['Range', 'ClosedRange', 'CountableClosedRange']:
 extension Range
 %   if 'Countable' in OtherRange:
   where
@@ -338,7 +338,7 @@ extension Range
 }
 % end
 
-% for Range in ['Range', 'CountableRange', 'ClosedRange', 'CountableClosedRange']:
+% for Range in ['Range', 'ClosedRange', 'CountableClosedRange']:
 public func expectTrapping<Bound>(
   _ point: Bound, in range: ${Range}<Bound>, ${TRACE}
 ) {
@@ -2433,31 +2433,16 @@ public func expectEqualsUnordered<T : Comparable>(
   expectEqualSequence(x, y, ${trace})
 }
 
-public func expectEqualsUnordered<
-  T : Strideable
->(
+public func expectEqualsUnordered<T : Strideable>(
   _ expected: Range<T>, _ actual: [T], ${TRACE}
 ) where T.Stride: SignedInteger {
-  expectEqualsUnordered(
-    CountableRange(uncheckedBounds:
-      (lower: expected.lowerBound, upper: expected.upperBound)),
-    actual,
-    ${trace},
-    showFrame: false)
-}
-
-public func expectEqualsUnordered<T : Strideable>(
-  _ expected: CountableRange<T>, _ actual: [T], ${TRACE}
-) {
   if expected.count != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
-  let r = Range(uncheckedBounds:
-    (lower: expected.lowerBound, upper: expected.upperBound))
   for e in actual {
-    if !r.contains(e) {
+    if !expected.contains(e) {
       expectationFailure("expected elements: \"\(expected)\"\n"
         + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
         trace: ${trace})

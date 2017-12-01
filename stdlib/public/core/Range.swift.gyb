@@ -80,88 +80,35 @@ extension RangeExpression {
   }  
 }
 
-/// A half-open range that forms a collection of consecutive values.
+/// A half-open interval over a comparable type, from a lower bound up to, but
+/// not including, an upper bound.
 ///
-/// You create a `CountableRange` instance by using the half-open range
-/// operator (`..<`).
+/// You create `Range` instances by using the half-open range operator (`..<`).
 ///
-///     let upToFive = 0..<5
+///     let underFive = 0.0..<5.0
 ///
-/// The associated `Bound` type is both the element and index type of
-/// `CountableRange`. Each element of the range is its own corresponding
-/// index. The lower bound of a `CountableRange` instance is its start index,
-/// and the upper bound is its end index.
+/// You can use a `Range` instance to quickly check if a value is contained in
+/// a particular range of values. For example:
 ///
-///     print(upToFive.contains(3))         // Prints "true"
-///     print(upToFive.contains(10))        // Prints "false"
-///     print(upToFive.contains(5))         // Prints "false"
+///     print(underFive.contains(3.14))     // Prints "true"
+///     print(underFive.contains(6.28))     // Prints "false"
+///     print(underFive.contains(5.0))      // Prints "false"
 ///
-/// If the `Bound` type has a maximal value, it can serve as an upper bound but
-/// can never be contained in a `CountableRange<Bound>` instance. For example,
-/// a `CountableRange<Int8>` instance can use `Int8.max` as its upper bound,
-/// but it can't represent a range that includes `Int8.max`.
+/// `Range` instances can represent an empty interval, unlike `ClosedRange`.
 ///
-///     let maximumRange = Int8.min..<Int8.max
-///     print(maximumRange.contains(Int8.max))
-///     // Prints "false"
-///
-/// If you need to create a range that includes the maximal value of its
-/// `Bound` type, see the `CountableClosedRange` type.
-///
-/// You can create a countable range over any type that conforms to the
-/// `Strideable` protocol and uses an integer as its associated `Stride` type.
-/// By default, Swift's integer and pointer types are usable as the bounds of
-/// a countable range.
-///
-/// Because floating-point types such as `Float` and `Double` are their own
-/// `Stride` types, they cannot be used as the bounds of a countable range. If
-/// you need to test whether values are contained within an interval bound by
-/// floating-point values, see the `Range` type. If you need to iterate over
-/// consecutive floating-point values, see the `stride(from:to:by:)` function.
-///
-/// Integer Index Ambiguity
-/// -----------------------
-///
-/// Because each element of a `CountableRange` instance is its own index, for
-/// the range `(-99..<100)` the element at index `0` is `0`. This is an
-/// unexpected result for those accustomed to zero-based collection indices,
-/// who might expect the result to be `-99`. To prevent this confusion, in a
-/// context where `Bound` is known to be an integer type, subscripting
-/// directly is a compile-time error:
-///
-///     // error: ambiguous use of 'subscript'
-///     print((-99..<100)[0])
-///
-/// However, subscripting that range still works in a generic context:
-///
-///     func brackets<T>(_ x: CountableRange<T>, _ i: T) -> T {
-///         return x[i] // Just forward to subscript
-///     }
-///     print(brackets(-99..<100, 0))
-///     // Prints "0"
+///     let empty = 0.0..<0.0
+///     print(empty.contains(0.0))          // Prints "false"
+///     print(empty.isEmpty)                // Prints "true"
 @_fixed_layout
-public struct CountableRange<Bound>
-where Bound : Strideable, Bound.Stride : SignedInteger {
-  /// The range's lower bound.
-  ///
-  /// In an empty range, `lowerBound` is equal to `upperBound`.
-  public let lowerBound: Bound
-
-  /// The range's upper bound.
-  ///
-  /// `upperBound` is not a valid subscript argument and is always
-  /// reachable from `lowerBound` by zero or more applications of
-  /// `index(after:)`.
-  ///
-  /// In an empty range, `upperBound` is equal to `lowerBound`.
-  public let upperBound: Bound
-
+public struct Range<
+  Bound : Comparable
+> {
   /// Creates an instance with the given bounds.
   ///
   /// Because this initializer does not perform any checks, it should be used
   /// as an optimization only when you are absolutely certain that `lower` is
   /// less than or equal to `upper`. Using the half-open range operator
-  /// (`..<`) to form `CountableRange` instances is preferred.
+  /// (`..<`) to form `Range` instances is preferred.
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @_inlineable
@@ -169,17 +116,58 @@ where Bound : Strideable, Bound.Stride : SignedInteger {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
+
+  /// The range's lower bound.
+  ///
+  /// In an empty range, `lowerBound` is equal to `upperBound`.
+  public let lowerBound: Bound
+
+  /// The range's upper bound.
+  ///
+  /// In an empty range, `upperBound` is equal to `lowerBound`. A `Range`
+  /// instance does not contain its upper bound.
+  public let upperBound: Bound
+
+  /// Returns a Boolean value indicating whether the given element is contained
+  /// within the range.
+  ///
+  /// Because `Range` represents a half-open range, a `Range` instance does not
+  /// contain its upper bound. `element` is contained in the range if it is
+  /// greater than or equal to the lower bound and less than the upper bound.
+  ///
+  /// - Parameter element: The element to check for containment.
+  /// - Returns: `true` if `element` is contained in the range; otherwise,
+  ///   `false`.
+  @_inlineable
+  public func contains(_ element: Bound) -> Bool {
+    return lowerBound <= element && element < upperBound
+  }
+
+  /// A Boolean value indicating whether the range contains no elements.
+  ///
+  /// An empty `Range` instance has equal lower and upper bounds.
+  ///
+  ///     let empty: Range = 10..<10
+  ///     print(empty.isEmpty)
+  ///     // Prints "true"
+  @_inlineable
+  public var isEmpty: Bool {
+    return lowerBound == upperBound
+  }
 }
 
-extension CountableRange: RandomAccessCollection {
-
+extension Range : Sequence, Collection,
+  BidirectionalCollection, RandomAccessCollection
+  where Bound : Strideable, Bound.Stride : SignedInteger
+{
   /// The bound type of the range.
   public typealias Element = Bound
 
   /// A type that represents a position in the range.
-  public typealias Index = Element
-  public typealias Indices = CountableRange<Bound>
-  public typealias SubSequence = CountableRange<Bound>
+  public typealias Index = Bound
+  public typealias Indices = Range<Bound>
+  public typealias SubSequence = Range<Bound>
+  public typealias Iterator = IndexingIterator<Range<Bound>>
 
   @_inlineable
   public var startIndex: Index {
@@ -224,17 +212,8 @@ extension CountableRange: RandomAccessCollection {
   /// - Parameter bounds: A range of the range's indices. The upper and lower
   ///   bounds of the `bounds` range must be valid indices of the collection.
   @_inlineable
-  public subscript(bounds: Range<Index>) -> SubSequence {
-    return CountableRange(bounds)
-  }
-
-  /// Accesses the subsequence bounded by the given range.
-  ///
-  /// - Parameter bounds: A range of the range's indices. The upper and lower
-  ///   bounds of the `bounds` range must be valid indices of the collection.
-  @_inlineable
-  public subscript(bounds: CountableRange<Bound>) -> CountableRange<Bound> {
-    return self[Range(bounds)]
+  public subscript(bounds: Range<Index>) -> Range<Bound> {
+    return bounds
   }
 
   /// The indices that are valid for subscripting the range, in ascending
@@ -249,45 +228,16 @@ extension CountableRange: RandomAccessCollection {
     return lowerBound <= element && element < upperBound
   }
 
-  /// A Boolean value indicating whether the range contains no elements.
-  ///
-  /// An empty range has equal lower and upper bounds.
-  ///
-  ///     let empty = 10..<10
-  ///     print(empty.isEmpty)
-  ///     // Prints "true"
-  @_inlineable
-  public var isEmpty: Bool {
-    return lowerBound == upperBound
-  }
+  //===--- Protection against 0-based indexing assumption -------------------===//
+  // The following two extensions provide subscript overloads that
+  // create *intentional* ambiguities to prevent the use of integers as
+  // indices for ranges, outside a generic context.  This prevents mistakes
+  // such as x = r[0], which will trap unless 0 happens to be contained in the
+  // range r.
+  //
+  // FIXME(ABI)#56 (Statically Unavailable/Dynamically Available): remove this
+  // code, it creates an ABI burden on the library.
 
-  /// Returns a Boolean value indicating whether the given element is contained
-  /// within the range.
-  ///
-  /// Because `CountableRange` represents a half-open range, a `CountableRange`
-  /// instance does not contain its upper bound. `element` is contained in the
-  /// range if it is greater than or equal to the lower bound and less than
-  /// the upper bound.
-  ///
-  /// - Parameter element: The element to check for containment.
-  /// - Returns: `true` if `element` is contained in the range; otherwise,
-  ///   `false`.
-  @_inlineable
-  public func contains(_ element: Bound) -> Bool {
-    return lowerBound <= element && element < upperBound
-  }
-}
-
-//===--- Protection against 0-based indexing assumption -------------------===//
-// The following two extensions provide subscript overloads that
-// create *intentional* ambiguities to prevent the use of integers as
-// indices for ranges, outside a generic context.  This prevents mistakes
-// such as x = r[0], which will trap unless 0 happens to be contained in the
-// range r.
-//
-// FIXME(ABI)#56 (Statically Unavailable/Dynamically Available): remove this
-// code, it creates an ABI burden on the library.
-extension CountableRange {
   /// Accesses the element at specified position.
   ///
   /// You can subscript a collection with any valid index other than the
@@ -311,8 +261,9 @@ extension CountableRange {
   }
 }
 
-extension CountableRange
-where
+extension Range
+  where
+  Bound : Strideable,
   Bound._DisabledRangeIndex : Strideable,
   Bound._DisabledRangeIndex.Stride : SignedInteger {
 
@@ -325,22 +276,8 @@ where
 
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(
-    _bounds: CountableRange<Bound._DisabledRangeIndex>
-  ) -> CountableRange<Bound> {
-    fatalError("uncallable")
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(
     _bounds: ClosedRange<Bound._DisabledRangeIndex>
-  ) -> CountableRange<Bound> {
-    fatalError("uncallable")
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(
-    _bounds: CountableClosedRange<Bound._DisabledRangeIndex>
-  ) -> CountableRange<Bound> {
+  ) -> Range<Bound> {
     fatalError("uncallable")
   }
 
@@ -350,105 +287,19 @@ where
   ///   lower bounds of the `bounds` range must be valid indices of the
   ///   collection and `bounds.upperBound` must be less than the collection's
   ///   end index.
-  @_inlineable
-  public subscript(bounds: ClosedRange<Bound>) -> CountableRange<Bound> {
-    return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
-  }
-
-  /// Accesses the subsequence bounded by the given range.
-  ///
-  /// - Parameter bounds: A range of the collection's indices. The upper and
-  ///   lower bounds of the `bounds` range must be valid indices of the
-  ///   collection and `bounds.upperBound` must be less than the collection's
-  ///   end index.
-  @_inlineable
-  public subscript(
-    bounds: CountableClosedRange<Bound>
-  ) -> CountableRange<Bound> {
-    return self[ClosedRange(bounds)]
-  }
+//  @_inlineable
+//  public subscript(bounds: ClosedRange<Bound>) -> Range<Bound> {
+//    return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
+//  }
 }
+
+public typealias CountableRange<Bound: Comparable> = Range<Bound>
 
 //===--- End 0-based indexing protection ----------------------------------===//
-
-/// A half-open interval over a comparable type, from a lower bound up to, but
-/// not including, an upper bound.
-///
-/// You create `Range` instances by using the half-open range operator (`..<`).
-///
-///     let underFive = 0.0..<5.0
-///
-/// You can use a `Range` instance to quickly check if a value is contained in
-/// a particular range of values. For example:
-///
-///     print(underFive.contains(3.14))     // Prints "true"
-///     print(underFive.contains(6.28))     // Prints "false"
-///     print(underFive.contains(5.0))      // Prints "false"
-///
-/// `Range` instances can represent an empty interval, unlike `ClosedRange`.
-///
-///     let empty = 0.0..<0.0
-///     print(empty.contains(0.0))          // Prints "false"
-///     print(empty.isEmpty)                // Prints "true"
-@_fixed_layout
-public struct Range<Bound : Comparable> {
-  /// The range's lower bound.
-  ///
-  /// In an empty range, `lowerBound` is equal to `upperBound`.
-  public let lowerBound: Bound
-
-  /// The range's upper bound.
-  ///
-  /// In an empty range, `upperBound` is equal to `lowerBound`. A `Range`
-  /// instance does not contain its upper bound.
-  public let upperBound: Bound
-
-  /// Creates an instance with the given bounds.
-  ///
-  /// Because this initializer does not perform any checks, it should be used
-  /// as an optimization only when you are absolutely certain that `lower` is
-  /// less than or equal to `upper`. Using the half-open range operator
-  /// (`..<`) to form `Range` instances is preferred.
-  ///
-  /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
-  @_inlineable
-  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-    self.lowerBound = bounds.lower
-    self.upperBound = bounds.upper
-  }
-
-  /// Returns a Boolean value indicating whether the given element is contained
-  /// within the range.
-  ///
-  /// Because `Range` represents a half-open range, a `Range` instance does not
-  /// contain its upper bound. `element` is contained in the range if it is
-  /// greater than or equal to the lower bound and less than the upper bound.
-  ///
-  /// - Parameter element: The element to check for containment.
-  /// - Returns: `true` if `element` is contained in the range; otherwise,
-  ///   `false`.
-  @_inlineable
-  public func contains(_ element: Bound) -> Bool {
-    return lowerBound <= element && element < upperBound
-  }
-
-  /// A Boolean value indicating whether the range contains no elements.
-  ///
-  /// An empty `Range` instance has equal lower and upper bounds.
-  ///
-  ///     let empty: Range = 10..<10
-  ///     print(empty.isEmpty)
-  ///     // Prints "true"
-  @_inlineable
-  public var isEmpty: Bool {
-    return lowerBound == upperBound
-  }
-}
 
 %{
 all_range_types = [
   ('Range', '..<'),
-  ('CountableRange', '..<'),
   ('ClosedRange', '...'),
   ('CountableClosedRange', '...')
 ]
@@ -706,33 +557,6 @@ extension ${Self} : Equatable {
 }
 % end
 
-% for Self in [
-%   'Range',
-%   'ClosedRange',
-% ]:
-// FIXME(ABI)#57 (Conditional Conformance): replace this extension with a
-// conditional conformance.
-// rdar://problem/17144340
-/// Ranges whose `Bound` is `Strideable` with `Integer` `Stride` have all
-/// the capabilities of `RandomAccessCollection`s, just like
-/// `CountableRange` and `CountableClosedRange`.
-///
-/// Unfortunately, we can't forward the full collection API, so we are
-/// forwarding a few select APIs.
-extension ${Self} where Bound : Strideable, Bound.Stride : SignedInteger {
-  /// The number of values contained in the range.
-  @_inlineable
-  public var count: Bound.Stride {
-    let distance = lowerBound.distance(to: upperBound)
-%   if 'Closed' in Self:
-    return distance + 1
-%   else:
-    return distance
-%   end
-  }
-}
-% end
-
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
 /// You create `PartialRangeUpTo` instances by using the prefix half-open range
@@ -820,50 +644,6 @@ extension PartialRangeThrough: RangeExpression {
   }
 }
 
-/// A partial interval extending upward from a lower bound.
-///
-/// You create `PartialRangeFrom` instances by using the postfix range
-/// operator (postfix `...`).
-///
-///     let atLeastFive = 5.0...
-///
-/// You can use a `PartialRangeFrom` instance to quickly check if a value is
-/// contained in a particular range of values. For example:
-///
-///     atLeastFive.contains(4.0)     // false
-///     atLeastFive.contains(5.0)     // true
-///     atLeastFive.contains(6.0)     // true
-///
-/// You can use a `PartialRangeFrom` instance of a collection's indices to
-/// represent the range from the partial range's lower bound up to the end
-/// of the collection.
-///
-///     let numbers = [10, 20, 30, 40, 50, 60, 70]
-///     print(numbers[3...])
-///     // Prints "[40, 50, 60, 70]"
-@_fixed_layout
-public struct PartialRangeFrom<Bound: Comparable> {
-  public let lowerBound: Bound
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
-}
-
-extension PartialRangeFrom: RangeExpression {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public func relative<C: Collection>(to collection: C) -> Range<Bound>
-  where C.Index == Bound {
-    return self.lowerBound..<collection.endIndex
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public func contains(_ element: Bound) -> Bool {
-    return lowerBound <= element
-  }
-}
-
 /// A partial interval extending upward from a lower bound that forms a
 /// sequence of increasing values.
 ///
@@ -945,15 +725,14 @@ extension PartialRangeFrom: RangeExpression {
 /// `CountablePartialRangeFrom<Int>` traps when the sequence's next value
 /// would be above `Int.max`.
 @_fixed_layout
-public struct CountablePartialRangeFrom<Bound: Strideable>
-where Bound.Stride : SignedInteger  {
+public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
 
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
 }
 
-extension CountablePartialRangeFrom: RangeExpression {
+extension PartialRangeFrom: RangeExpression {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public func relative<C: Collection>(
@@ -967,7 +746,11 @@ extension CountablePartialRangeFrom: RangeExpression {
   }
 }
 
-extension CountablePartialRangeFrom: Sequence {
+extension PartialRangeFrom: Sequence
+  where Bound : Strideable, Bound.Stride : SignedInteger
+{
+  public typealias Element = Bound
+
   @_fixed_layout
   public struct Iterator: IteratorProtocol {
     @_versioned
@@ -1123,87 +906,6 @@ extension Strideable where Stride: SignedInteger {
     _precondition(minimum <= maximum,
       "Can't form Range with upperBound < lowerBound")
     return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
-  }
-
-  /// Returns a countable partial range extending upward from a lower bound.
-  ///
-  /// Use the postfix range operator (postfix `...`) to create a partial range
-  /// of any type that conforms to the `Strideable` protocol with an
-  /// associated integer `Stride` type, such as any of the standard library's
-  /// integer types. This example creates a `CountablePartialRangeFrom<Int>`
-  /// instance that includes any value greater than or equal to `5`.
-  ///
-  ///     let atLeastFive = 5...
-  ///
-  ///     atLeastFive.contains(4)       // false
-  ///     atLeastFive.contains(5)       // true
-  ///     atLeastFive.contains(6)       // true
-  ///
-  /// You can use this type of partial range of a collection's indices to
-  /// represent the range from the partial range's lower bound up to the end
-  /// of the collection.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
-  ///     print(numbers[3...])
-  ///     // Prints "[40, 50, 60, 70]"
-  ///
-  /// You can also iterate over this type of partial range using a `for`-`in`
-  /// loop, or call any sequence method that doesn't require that the sequence
-  /// is finite.
-  ///
-  ///     func isTheMagicNumber(_ x: Int) -> Bool {
-  ///         return x == 3
-  ///     }
-  ///
-  ///     for x in 1... {
-  ///         if isTheMagicNumber(x) {
-  ///             print("\(x) is the magic number!")
-  ///             break
-  ///         } else {
-  ///             print("\(x) wasn't it...")
-  ///         }
-  ///     }
-  ///     // "1 wasn't it..."
-  ///     // "2 wasn't it..."
-  ///     // "3 is the magic number!"
-  ///
-  /// Because a sequence created with the postfix range operator counts upward
-  /// indefinitely, do not use one with methods such as `map(_:)`,
-  /// `filter(_:)`, or `suffix(_:)` that read the entire sequence before
-  /// returning. It is safe to use operations that put an upper limit on the
-  /// number of elements they access, such as `prefix(_:)` or `dropFirst(_:)`,
-  /// and operations that you can guarantee will terminate, such as passing a
-  /// closure you know will eventually return `true` to `first(where:)`.
-  ///
-  /// In the following example, the `asciiTable` sequence is made by zipping
-  /// together the characters in the `alphabet` string with a partial range
-  /// starting at 65, the ASCII value of the capital letter A.
-  /// Iterating over two zipped sequence continues only as long as the shorter
-  /// of the two sequences, so the iteration stops at the end of `alphabet`.
-  ///
-  ///     let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  ///     let asciiTable = zip(65..., alphabet)
-  ///     for (code, letter) in asciiTable {
-  ///         print(code, letter)
-  ///     }
-  ///     // "65 A"
-  ///     // "66 B"
-  ///     // "67 C"
-  ///     // ...
-  ///     // "89 Y"
-  ///     // "90 Z"
-  ///
-  /// The behavior of incrementing indefinitely is determined by the type of
-  /// `Bound`. For example, iterating over an instance of
-  /// `CountablePartialRangeFrom<Int>` traps when the sequence's next
-  /// value would be above `Int.max`.
-  ///
-  /// - Parameter minimum: The lower bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static postfix func ... (minimum: Self)
-  -> CountablePartialRangeFrom<Self> {
-    return CountablePartialRangeFrom(minimum)
   }
 }
 
