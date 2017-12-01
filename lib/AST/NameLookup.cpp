@@ -1400,7 +1400,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     } else {
       if (!ignoreNewExtensions) {
         for (auto E : getExtensions()) {
-          if (E->wasDeserialized()) {
+          if (E->wasDeserialized() || E->hasClangNode()) {
             if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
                                                           name, E)) {
               useNamedLazyMemberLoading = false;
