@@ -610,14 +610,9 @@ class IterableDeclContext {
   mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
     LastDeclAndKind;
 
-  /// The DeclID this IDC was deserialized from, if any. Used for named lazy
-  /// member loading, as a key when doing lookup in this IDC.
+  // The DeclID this IDC was deserialized from, if any. Used for named lazy
+  // member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
-
-  /// Lazy member loading has a variety of feedback loops that need to
-  /// switch to pseudo-empty-member behaviour to avoid infinite recursion;
-  /// we use this flag to control them.
-  bool lazyMemberLoadingInProgress = false;
 
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
@@ -646,14 +641,6 @@ public:
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
     return FirstDeclAndLazyMembers.getInt();
-  }
-
-  bool isLoadingLazyMembers() {
-    return lazyMemberLoadingInProgress;
-  }
-
-  void setLoadingLazyMembers(bool inProgress) {
-    lazyMemberLoadingInProgress = inProgress;
   }
 
   /// Setup the loader for lazily-loaded members.
