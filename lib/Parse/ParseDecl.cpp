@@ -509,12 +509,14 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK) {
-  // We can only make this attribute a token list intead of an Attribute node
-  // because the attribute node may include '@'
-  SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef AttrName = Tok.getText();
   SourceLoc Loc = consumeToken();
+
+  // We can only make this attribute a token list intead of an Attribute node
+  // because the attribute node may include '@'
+  SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
   bool DiscardAttribute = false;
 
   // Diagnose duplicated attributes.
