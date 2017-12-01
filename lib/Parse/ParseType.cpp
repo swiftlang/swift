@@ -157,10 +157,6 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
                                                alignment, Context);
 }
 
-ParserResult<TypeRepr> Parser::parseTypeSimple() {
-  return parseTypeSimple(diag::expected_type);
-}
-
 /// parseTypeSimple
 ///   type-simple:
 ///     type-identifier
@@ -176,22 +172,14 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
                                                bool HandleCodeCompletion) {
   ParserResult<TypeRepr> ty;
-  // If this is an "inout" marker for an identifier type, consume the inout.
-  SourceLoc SpecifierLoc;
-  VarDecl::Specifier TypeSpecifier;
-  if (Tok.is(tok::kw_inout)) {
-    SpecifierLoc = consumeToken();
-    TypeSpecifier = VarDecl::Specifier::InOut;
-  } else if (Tok.is(tok::identifier)) {
-    if (Tok.getRawText().equals("__shared")) {
-      assert(false);
-      SpecifierLoc = consumeToken();
-      TypeSpecifier = VarDecl::Specifier::Shared;
-    } else if (Tok.getRawText().equals("__owned")) {
-      assert(false);
-      SpecifierLoc = consumeToken();
-      TypeSpecifier = VarDecl::Specifier::Owned;
-    }
+
+  if (Tok.is(tok::kw_inout) ||
+      (Tok.is(tok::identifier) && (Tok.getRawText().equals("__shared") ||
+                                   Tok.getRawText().equals("__owned")))) {
+    // Type specifier should already be parsed before here. This only happens
+    // for construct like 'P1 & inout P2'.
+    diagnose(Tok.getLoc(), diag::attr_only_on_parameters_parse, Tok.getText());
+    consumeToken();
   }
 
   switch (Tok.getKind()) {
@@ -299,24 +287,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
       }
     }
     break;
-  }
-
-  // If we parsed any specifier, prepend it.
-  if (SpecifierLoc.isValid() && ty.isNonNull()) {
-    TypeRepr *repr = ty.get();
-    switch (TypeSpecifier) {
-    case VarDecl::Specifier::InOut:
-      repr = new (Context) InOutTypeRepr(repr, SpecifierLoc);
-      break;
-    case VarDecl::Specifier::Shared:
-      repr = new (Context) SharedTypeRepr(repr, SpecifierLoc);
-      break;
-    case VarDecl::Specifier::Owned:
-      break;
-    case VarDecl::Specifier::Var:
-      llvm_unreachable("tried to create var type specifier?");
-    }
-    ty = makeParserResult(repr);
   }
 
   return ty;
@@ -675,10 +645,6 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeIdentifier() {
   }
 
   return makeSyntaxResult(Status, SyntaxNode, ITR);
-}
-
-ParserResult<TypeRepr> Parser::parseTypeSimpleOrComposition() {
-  return parseTypeSimpleOrComposition(diag::expected_identifier_for_type);
 }
 
 /// parseTypeSimpleOrComposition

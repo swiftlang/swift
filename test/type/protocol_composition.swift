@@ -174,3 +174,7 @@ takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
 takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
 takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-error {{use of unresolved identifier 'DoesNotExist'}}
 takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift' has no member named 'DoesNotExist'}}
+
+typealias T08 = P1 & inout P2 // expected-error {{'inout' may only be used on parameters}}
+typealias T09 = P1 & __shared P2 // expected-error {{'__shared' may only be used on parameters}}
+typealias T10 = P1 & __owned P2 // expected-error {{'__owned' may only be used on parameters}}
