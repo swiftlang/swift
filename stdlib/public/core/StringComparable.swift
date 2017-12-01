@@ -62,7 +62,7 @@ extension String {
       compare = 0 
     }
     else {
-      compare = Int(truncatingIfNeeded: _swift_stdlib_memcmp(
+      compare = Int(truncatingIfNeeded: _stdlib_memcmp(
         self._core.startASCII, rhs._core.startASCII,
         Swift.min(self._core.count, rhs._core.count)))      
     }
@@ -145,7 +145,7 @@ extension String : Equatable {
       if lhs._core.startASCII == rhs._core.startASCII {
         return true
       }
-      return _swift_stdlib_memcmp(
+      return _stdlib_memcmp(
         lhs._core.startASCII, rhs._core.startASCII,
         rhs._core.count) == (0 as CInt)
     }

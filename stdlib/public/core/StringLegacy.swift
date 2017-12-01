@@ -132,7 +132,7 @@ extension String {
         // Prefix is longer than self.
         return false
       }
-      return _swift_stdlib_memcmp(
+      return _stdlib_memcmp(
         selfASCIIBuffer.baseAddress!,
         prefixASCIIBuffer.baseAddress!,
         prefixASCIIBuffer.count) == (0 as CInt)
@@ -191,7 +191,7 @@ extension String {
         // Suffix is longer than self.
         return false
       }
-      return _swift_stdlib_memcmp(
+      return _stdlib_memcmp(
         selfASCIIBuffer.baseAddress!
           + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
         suffixASCIIBuffer.baseAddress!,

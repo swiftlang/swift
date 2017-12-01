@@ -66,7 +66,7 @@ open class ManagedBuffer<Header, Element> {
   @_inlineable // FIXME(sil-serialize-all)
   public final var capacity: Int {
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
-    let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
+    let endAddr = storageAddr + _stdlib_malloc_size(storageAddr)
     let realCapacity = endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
@@ -430,7 +430,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _capacityInBytes: Int {
-    return _swift_stdlib_malloc_size(_address)
+    return _stdlib_malloc_size(_address)
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
