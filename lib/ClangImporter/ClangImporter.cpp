@@ -3278,6 +3278,7 @@ ClangImporter::Implementation::loadNamedMembers(
   auto *D = IDC->getDecl();
   auto *DC = cast<DeclContext>(D);
   auto *CD = D->getClangDecl();
+  auto *CDC = cast<clang::DeclContext>(CD);
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 
 
@@ -3317,29 +3318,32 @@ ClangImporter::Implementation::loadNamedMembers(
 
   clang::ASTContext &clangCtx = getClangASTContext();
 
+  assert(isa<clang::ObjCContainerDecl>(CD));
+
   TinyPtrVector<ValueDecl *> Members;
-  if (auto *CCD = dyn_cast<clang::ObjCContainerDecl>(CD)) {
-    for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()), CCD)) {
-      if (!entry.is<clang::NamedDecl *>()) continue;
-      auto member = entry.get<clang::NamedDecl *>();
-      if (!isVisibleClangEntry(clangCtx, member)) continue;
-      SmallVector<Decl*, 4> tmp;
-      insertMembersAndAlternates(member, tmp);
-      for (auto *TD : tmp) {
-        if (auto *V = dyn_cast<ValueDecl>(TD)) {
-          // Skip ValueDecls if they import into different DeclContexts
-          // or under different names than the one we asked about.
-          if (V->getDeclContext() == DC &&
-              V->getFullName().matchesRef(N)) {
-            Members.push_back(V);
-          }
+  auto *Nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto ClangContext = getEffectiveClangContext(Nominal);
+  for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()),
+                                  ClangContext)) {
+    if (!entry.is<clang::NamedDecl *>()) continue;
+    auto member = entry.get<clang::NamedDecl *>();
+    if (!isVisibleClangEntry(clangCtx, member)) continue;
+
+    // Skip Decls from different clang::DeclContexts
+    if (member->getDeclContext() != CDC) continue;
+
+    SmallVector<Decl*, 4> tmp;
+    insertMembersAndAlternates(member, tmp);
+    for (auto *TD : tmp) {
+      if (auto *V = dyn_cast<ValueDecl>(TD)) {
+        // Skip ValueDecls if they import under different names.
+        if (V->getFullName().matchesRef(N)) {
+          Members.push_back(V);
         }
       }
     }
-    return Members;
   }
-
-  return None;
+  return Members;
 }
 
 
