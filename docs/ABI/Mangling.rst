@@ -55,6 +55,7 @@ Globals
   global ::= type 'ML'                   // type metadata lazy cache variable
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= nominal-type 'Mo'           // class metadata immediate member base offset
   global ::= protocol 'Mp'               // protocol descriptor
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor
   global ::= type 'MB'                   // metadata for remote mirrors: builtin type descriptor
