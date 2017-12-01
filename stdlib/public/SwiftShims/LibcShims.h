@@ -49,7 +49,13 @@ typedef      long int __swift_ssize_t;
 
 // This declaration might not be universally correct.
 // We verify its correctness for the current platform in the runtime code.
+#if defined(__linux__)
+typedef __swift_uint32_t __swift_mode_t;
+#elif defined(__APPLE__)
 typedef __swift_uint16_t __swift_mode_t;
+#else  // just guessing
+typedef __swift_uint16_t __swift_mode_t;
+#endif
 
 
 // General utilities <stdlib.h>
