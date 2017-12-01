@@ -64,3 +64,13 @@ typealias C = [Int]
 typealias D = [Int: String]
 typealias E = Int?.Protocol
 typealias F = [Int]!.Type
+
+struct foo {
+  struct foo {
+    struct foo {
+      func foo() {
+      }
+    }
+  }
+  struct foo {}
+}
