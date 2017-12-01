@@ -908,10 +908,16 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
             auto declaringClass =
               cast<ClassDecl>(overridden.getDecl()->getDeclContext());
             auto &metadataLayout = getMetadataLayout(declaringClass);
+            // FIXME: Resilience. We don't want vtable layout to be ABI, so this
+            // should be encoded as a reference to the method dispatch thunk
+            // instead.
             auto offset = metadataLayout.getStaticMethodOffset(overridden);
             idValue = llvm::ConstantInt::get(SizeTy, offset.getValue());
             idResolved = true;
           } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
+            // FIXME: Resilience. We don't want witness table layout to be ABI,
+            // so this should be encoded as a reference to the method dispatch
+            // thunk instead.
             auto &protoInfo = getProtocolInfo(methodProto);
             auto index = protoInfo.getFunctionIndex(
                                  cast<AbstractFunctionDecl>(declRef.getDecl()));
