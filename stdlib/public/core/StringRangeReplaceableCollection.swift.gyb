@@ -242,7 +242,11 @@ extension String {
   /// - Complexity: O(*n*)
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    _guts.reserveCapacity(n)
+    if _guts.isASCII {
+      _guts.reserveCapacity(n, of: UInt8.self)
+    } else {
+      _guts.reserveCapacity(n, of: UTF16.CodeUnit.self)
+    }
   }
 
   /// Appends the given character to the string.
@@ -260,13 +264,13 @@ extension String {
     if let small = c._smallUTF16 {
       _guts.append(contentsOf: small)
     } else {
-      _guts.append(c._largeUTF16!)
+      _guts.append(c._largeUTF16!.unmanagedView)
     }
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: String) {
-    _guts.append(newElements._guts)
+    append(newElements)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -285,11 +289,6 @@ extension String {
     if _fastPath(newElements is _SwiftStringView) {
       let v = newElements as! _SwiftStringView
       _guts.append(v._wholeString._guts, range: v._encodedOffsetRange)
-      return
-    }
-    if _fastPath(newElements is Character._SmallUTF16) {
-      let v = newElements as! Character._SmallUTF16
-      
       return
     }
     reserveCapacity(_guts.count + newElements.underestimatedCount)

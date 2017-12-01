@@ -23,17 +23,17 @@ func repr(_ x: _StringGuts) -> String {
     return "Native("
       + "owner: \(hexAddrVal(x._owner)), "
       + "count: \(x.count), "
-      + "capacity = \(x.capacity))"
+      + "capacity: \(x.capacity))"
   } else if x._isNonTaggedCocoa {
     return "Cocoa("
       + "owner: \(hexAddrVal(x._owner)), "
       + "count: \(x.count))"
-  } else if x._isSmallCocoa {
+  } else if x._isTaggedCocoa {
     return "Cocoa("
       + "owner: <tagged>, "
       + "count: \(x.count))"
-  } else if x._isUnsafe {
-    return "Unsafe("
+  } else if x._isUnmanaged {
+    return "Unmanaged("
       + "count: \(x.count))"
   }
   return "?????"
@@ -52,13 +52,13 @@ print("Testing...")
 var nsb = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: Hello, snowy world: 🏂☃❅❆❄︎⛄️❄️
 print("Hello, snowy world: \(nsb)")
-// CHECK-NEXT: String(Unsafe(count: 11))
+// CHECK-NEXT: String(Unmanaged(count: 11))
 print("  \(repr(nsb))")
 
 var empty = String()
 // CHECK-NEXT: These are empty: <>
 print("These are empty: <\(empty)>")
-// CHECK-NEXT: String(Unsafe(count: 0))
+// CHECK-NEXT: String(Unmanaged(count: 0))
 print("  \(repr(empty))")
 
 
@@ -98,9 +98,9 @@ func nonASCII() {
   let slice = newNSUTF16[i2..<i8]
   print("  \(repr(slice))")
 
-  // Representing a slice as an NSString requires a new object
+  // The storage of the slice implements NSString directly
   // CHECK-NOT: @[[utf16address]] = "❅❆❄︎⛄️"
-  // CHECK-NEXT: _NSContiguousString@[[nsSliceAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
+  // CHECK-NEXT: _TtGCs19_SwiftStringStorageVs6UInt16_@[[sliceAddress]] = "❅❆❄︎⛄️"
   let nsSlice = slice as NSString
   print("  \(repr(nsSlice))")
 
@@ -161,13 +161,13 @@ ascii()
 // CHECK: --- Literals ---
 print("--- Literals ---")
 
-// CHECK-NEXT: String(Unsafe(count: 6)) = "foobar"
+// CHECK-NEXT: String(Unmanaged(count: 6)) = "foobar"
 // CHECK-NEXT: true
 let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
 print("  \(asciiLiteral._core.isASCII)")
 
-// CHECK-NEXT: String(Unsafe(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
+// CHECK-NEXT: String(Unmanaged(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
 let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")

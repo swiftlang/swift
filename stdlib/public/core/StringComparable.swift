@@ -40,8 +40,8 @@ public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
 ) -> Int32
 #endif
 
-extension String {
 #if _runtime(_ObjC)
+extension _UnmanagedString where CodeUnit == UInt8 {
   /// This is consistent with Foundation, but incorrect as defined by Unicode.
   /// Unicode weights some ASCII punctuation in a different order than ASCII
   /// value. Such as:
@@ -52,112 +52,188 @@ extension String {
   ///   0026  ; [*0389.0020.0002] # AMPERSAND
   ///   0027  ; [*02F8.0020.0002] # APOSTROPHE
   ///
-  /// - Precondition: Both `self` and `rhs` are ASCII strings.
   @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  func _compareASCII(_ rhs: String) -> Int {
-    var compare: Int
-    
-    if self._core.startASCII == rhs._core.startASCII  { 
-      compare = 0 
+  @_versioned
+  internal func compareASCII(to other: _UnmanagedString<UInt8>) -> Int {
+    // FIXME Results should be the same across all platforms.
+    if self.start == other.start {
+      return (self.count - other.count).signum()
     }
-    else {
-      compare = Int(truncatingIfNeeded: _stdlib_memcmp(
-        self._core.startASCII, rhs._core.startASCII,
-        Swift.min(self._guts.count, rhs._guts.count)))      
+    var cmp = Int(truncatingIfNeeded:
+      _stdlib_memcmp(
+        self.rawStart, other.rawStart,
+        Swift.min(self.count, other.count)))
+    if cmp == 0 {
+      cmp = self.count - other.count
     }
-
-    if compare == 0 {
-      compare = self._guts.count - rhs._guts.count
-    }
-    // This efficiently normalizes the result to -1, 0, or 1 to match the
-    // behavior of NSString's compare function.
-    return (compare > 0 ? 1 : 0) - (compare < 0 ? 1 : 0)
+    return cmp.signum()
   }
+}
 #endif
 
-  /// Compares two strings with the Unicode Collation Algorithm.
+extension _StringGuts {
+  /// Compares two slices of strings with the Unicode Collation Algorithm.
   @inline(never) // Hide the CF/ICU dependency
   public  // @testable
-  func _compareDeterministicUnicodeCollation(_ rhs: String) -> Int {
+  static func _compareDeterministicUnicodeCollation(
+    _ left: _StringGuts, _ leftRange: Range<Int>,
+    to right: _StringGuts, _ rightRange: Range<Int>) -> Int {
     // Note: this operation should be consistent with equality comparison of
     // Character.
 #if _runtime(_ObjC)
-    if self._core.hasContiguousStorage && rhs._core.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(self._guts)
-      let rhsStr = _NSContiguousString(rhs._guts)
-      let res = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
+    if _fastPath(left._isContiguous && right._isContiguous) {
+      let l = _NSContiguousString(_unmanaged: left, range: leftRange)
+      let r = _NSContiguousString(_unmanaged: right, range: rightRange)
+      return l._unsafeWithNotEscapedSelfPointerPair(r) {
         return Int(
-            _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))
+          _stdlib_compareNSStringDeterministicUnicodeCollationPointer($0, $1))
       }
-      return res
+    } else {
+      let l = left._ephemeralCocoaString(leftRange)
+      let r = right._ephemeralCocoaString(rightRange)
+      return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(l, r))
     }
-    return Int(_stdlib_compareNSStringDeterministicUnicodeCollation(
-      _bridgeToObjectiveCImpl(), rhs._bridgeToObjectiveCImpl()))
 #else
     switch (_guts.isASCII, rhs._guts.isASCII) {
     case (true, false):
+      let l = left._unmanagedASCIIView[leftRange]
+      let r = right._unmanagedUTF16View[rightRange]
       return Int(_swift_stdlib_unicode_compare_utf8_utf16(
-          _core.startASCII, Int32(_guts.count),
-          rhs._core.startUTF16, Int32(rhs._guts.count)))
+          l.start, Int32(l.count),
+          r.start, Int32(r.count)))
     case (false, true):
       // Just invert it and recurse for this case.
       return -rhs._compareDeterministicUnicodeCollation(self)
     case (false, false):
+      let l = left._unmanagedUTF16View[leftRange]
+      let r = right._unmanagedUTF16View[rightRange]
       return Int(_swift_stdlib_unicode_compare_utf16_utf16(
-        _core.startUTF16, Int32(_guts.count),
-        rhs._core.startUTF16, Int32(rhs._guts.count)))
+          l.start, Int32(l.count),
+          r.start, Int32(r.count)))
     case (true, true):
+      let l = left._unmanagedASCIIView[leftRange]
+      let r = right._unmanagedASCIIView[rightRange]
       return Int(_swift_stdlib_unicode_compare_utf8_utf8(
-        _core.startASCII, Int32(_guts.count),
-        rhs._core.startASCII, Int32(rhs._guts.count)))
+          l.start, Int32(l.count),
+          r.start, Int32(r.count)))
     }
 #endif
   }
+}
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public  // @testable
-  func _compareString(_ rhs: String) -> Int {
+extension _StringGuts {
+  @inline(__always)
+  @_inlineable
+  public func _bitwiseEqualTo(_ other: _StringGuts) -> Bool {
+    return self._objectBitPattern == other._objectBitPattern
+      && self._otherBits == other._otherBits
+  }
+
+  @_inlineable
+  @_versioned
+  internal static func isEqual(
+    _ left: _StringGuts, _ leftRange: Range<Int>,
+    to right: _StringGuts, _ rightRange: Range<Int>
+  ) -> Bool {
+    // Bitwise equality implies string equality
+    if left._bitwiseEqualTo(right) && leftRange == rightRange {
+      return true
+    }
+    return compare(left, leftRange, to: right, rightRange) == 0
+  }
+
+  @_inlineable
+  @_versioned
+  internal static func isLess(
+    _ left: _StringGuts, _ leftRange: Range<Int>,
+    than right: _StringGuts, _ rightRange: Range<Int>
+  ) -> Bool {
+    return compare(left, leftRange, to: right, rightRange) == -1
+  }
+
+  @_inlineable
+  @_versioned
+  internal static func compare(
+    _ left: _StringGuts, _ leftRange: Range<Int>,
+    to right: _StringGuts, _ rightRange: Range<Int>
+  ) -> Int {
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
     // This is consistent with Foundation, but incorrect as defined by Unicode.
-    if _guts.isASCII && rhs._guts.isASCII {
-      return _compareASCII(rhs)
+    //
+    // FIXME: String ordering should be consistent across all platforms.
+    if left.isASCII && right.isASCII {
+      defer { _fixLifetime(left); _fixLifetime(right) }
+      let leftASCII = left._unmanagedASCIIView[leftRange]
+      let rightASCII = right._unmanagedASCIIView[rightRange]
+      return leftASCII.compareASCII(to: rightASCII)
     }
+    return _compareDeterministicUnicodeCollation(
+      left, leftRange,
+      to: right, rightRange)
+#else
+    return _compareDeterministicUnicodeCollation(
+      left, leftRange,
+      to: right, rightRange)
 #endif
-    return _compareDeterministicUnicodeCollation(rhs)
   }
 }
 
-// extension String : Equatable {
-//   @_inlineable // FIXME(sil-serialize-all)
-//   @inline(__always)
-//   public static func == (lhs: String, rhs: String) -> Bool {
-// #if _runtime(_ObjC)
-//     // We only want to perform this optimization on objc runtimes. Elsewhere,
-//     // we will make it follow the unicode collation algorithm even for ASCII.
-//     // This is consistent with Foundation, but incorrect as defined by Unicode.
-//     if lhs._guts.isASCII && rhs._guts.isASCII {
-//       if lhs._guts.count != rhs._guts.count {
-//         return false
-//       }
-//       if lhs._core.startASCII == rhs._core.startASCII {
-//         return true
-//       }
-//       return _swift_stdlib_memcmp(
-//         lhs._core.startASCII, rhs._core.startASCII,
-//         rhs._guts.count) == (0 as CInt)
-//     }
-// #endif
-//     return lhs._compareString(rhs) == 0
-//   }
-// }
+extension StringProtocol {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+    return _StringGuts.isEqual(
+      lhs._wholeString._guts, lhs._encodedOffsetRange,
+      to: rhs._wholeString._guts, rhs._encodedOffsetRange)
+  }
 
-// extension String : Comparable {
-//   @_inlineable // FIXME(sil-serialize-all)
-//   public static func < (lhs: String, rhs: String) -> Bool {
-//     return lhs._compareString(rhs) < 0
-//   }
-// }
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func !=<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
+    return !(lhs == rhs)
+  }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return _StringGuts.isLess(
+      lhs._wholeString._guts, lhs._encodedOffsetRange,
+      than: rhs._wholeString._guts, rhs._encodedOffsetRange)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func > <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return rhs < lhs
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func <= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return !(rhs < lhs)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func >= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return !(lhs < rhs)
+  }
+}
+
+extension String : Equatable {
+  // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func ==(lhs: String, rhs: String) -> Bool {
+    return _StringGuts.isEqual(
+      lhs._guts, 0..<lhs._guts.count,
+      to: rhs._guts, 0..<rhs._guts.count)
+  }
+}
+
+extension String : Comparable {
+  // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func < (lhs: String, rhs: String) -> Bool {
+    return _StringGuts.isLess(
+      lhs._guts, 0..<lhs._guts.count,
+      than: rhs._guts, 0..<rhs._guts.count)
+  }
+}
+
+extension Substring : Equatable {}

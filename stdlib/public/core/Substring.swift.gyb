@@ -20,17 +20,8 @@ extension String {
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ substring: Substring) {
-    let x = substring._wholeString
-    let start = substring.startIndex
-    let end = substring.endIndex
-    let u16 = x._core[start.encodedOffset..<end.encodedOffset]
-    if start.samePosition(in: x.unicodeScalars) != nil
-    && end.samePosition(in: x.unicodeScalars) != nil {
-      self = String(_fixmeLegacyCore: _LegacyStringCore(u16))
-    }
-    else {
-      self = String(decoding: u16, as: UTF16.self)
-    }
+    let wholeGuts = substring._wholeString._guts
+    self.init(wholeGuts._extractSlice(substring._encodedOffsetRange))
   }
 }
 
@@ -314,38 +305,13 @@ extension Substring : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent: String {
-    let wholeCore = _wholeString._core
-    let native = wholeCore.nativeBuffer
-    if _fastPath(native != nil) {
-      let wholeString = String(_fixmeLegacyCore: wholeCore)
-      let n = native._unsafelyUnwrappedUnchecked
-      if _fastPath(
-        n.start == wholeCore._baseAddress
-        && n.usedCount == wholeCore.count
-        && _slice.startIndex == wholeString.startIndex
-        && _slice.endIndex == wholeString.endIndex
-      ) {
-        return wholeString
-      }
-    }
-    var r = String()
-    r._guts.append(_ephemeralContent._guts)
-    _sanityCheck(r._core._owner !== _ephemeralContent._core._owner)
-    return r
+    return String(self)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   var _ephemeralContent: String {
-    let wholeCore = _wholeString._core
-    let subCore : _LegacyStringCore = wholeCore[
-      startIndex.encodedOffset..<endIndex.encodedOffset]
-    // Check that we haven't allocated a new buffer for the result, if we have
-    // contiguous storage.
-    _sanityCheck(
-      subCore._owner === wholeCore._owner || !wholeCore.hasContiguousStorage)
-
-    return String(_fixmeLegacyCore: subCore)
+    return _persistentContent
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -394,46 +360,6 @@ extension Substring : LosslessStringConvertible {
   }
 }
 
-extension StringProtocol {
-  // @_inlineable // FIXME(sil-serialize-all)
-  // public static func ==<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-  //   return lhs._ephemeralString == rhs._ephemeralString
-  // }
-
-  // @_inlineable // FIXME(sil-serialize-all)
-  // public static func !=<R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-  //   return lhs._ephemeralString != rhs._ephemeralString
-  // }
-}
-
-extension StringProtocol {
-  // @_inlineable // FIXME(sil-serialize-all)
-  // public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-  //   return lhs._ephemeralString < rhs._ephemeralString
-  // }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func > <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return rhs < lhs
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func <= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return !(rhs < lhs)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func >= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return !(lhs < rhs)
-  }
-}
-
-extension StringProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue : Int {
-    return self._ephemeralString.hashValue
-  }
-}
 
 % for (property, ViewPrefix) in [
 %   ('utf8', 'UTF8'),

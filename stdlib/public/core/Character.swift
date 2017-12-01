@@ -72,7 +72,7 @@ public struct Character {
   @_versioned
   internal enum Representation {
     case smallUTF16(Builtin.Int63)
-    case large(_StringBuffer._Storage)
+    case large(_UTF16StringStorage)
   }
 
   @_versioned
@@ -100,8 +100,8 @@ public struct Character {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_largeRepresentationString s: String) {
-    _representation = .large(s._guts._extractStringBuffer()._storage)
-  }
+    _representation = .large(
+      s._guts._extractNativeStorage(of: UTF16.CodeUnit.self))  }
 }
 
 extension Character
@@ -190,8 +190,8 @@ extension Character
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
   ) {
-    let utf16 = UnsafeBufferPointer(
-      start: UnsafePointer<Unicode.UTF16.CodeUnit>(start),
+    let utf16 = _UnmanagedString<UTF16.CodeUnit>(
+      start: UnsafePointer(start),
       count: Int(utf16CodeUnitCount))
 
     switch utf16.count {
@@ -213,11 +213,7 @@ extension Character
       _representation = .smallUTF16(Builtin.trunc_Int64_Int63(bits._value))
     default:
       _representation = Character(
-        _largeRepresentationString: String(_StringGuts(UnsafeString(
-          baseAddress: UnsafeMutableRawPointer(start),
-          count: utf16.count,
-          isSingleByte: false
-        ))))._representation
+        _largeRepresentationString: String(_StringGuts(utf16)))._representation
     }
   }
   
@@ -266,6 +262,46 @@ extension Character
     }
     self = Character(_largeRepresentationString: s)
   }
+
+  /// Creates a Character from a String that is already known to require the
+  /// large representation.
+  ///
+  /// - Note: `s` should contain only a single grapheme, but we can't require
+  ///   that formally because of grapheme cluster literals and the shifting
+  ///   sands of Unicode.  https://bugs.swift.org/browse/SR-4955
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal init(_largeRepresentationString s: String) {
+    _representation = .large(
+      s._guts._extractNativeStorage(of: UTF16.CodeUnit.self))
+  }
+
+  // FIXME(sil-serialize-all): Should be @_inlineable  @_versioned
+  // <rdar://problem/34557187>
+  internal static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
+    return UInt64(Builtin.zext_Int63_Int64(value))
+  }
+
+  /// The character's hash value.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(performance): constructing a temporary string is extremely
+    // wasteful and inefficient.
+    return String(self).hashValue
+  }
+
+  typealias UTF16View = String.UTF16View
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var utf16: UTF16View {
+    return String(self).utf16
+  }
+
+  @_versioned
+  internal var _representation: Representation
 }
 
 extension Character : CustomStringConvertible {
@@ -304,9 +340,18 @@ extension Character {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
-  internal var _largeUTF16 : _StringGuts? {
+  internal var _largeUTF16 : _UTF16StringStorage? {
     guard case .large(let storage) = _representation else { return nil }
-    return _StringGuts(_StringBuffer(storage))
+    return storage
+  }
+}
+
+extension Character {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal var _count : Int {
+    if let small = _smallUTF16 { return small.count }
+    return _largeUTF16!.count
   }
 }
 
@@ -320,7 +365,7 @@ extension String {
       self = String(decoding: utf16, as: Unicode.UTF16.self)
     }
     else {
-      self = String(c._largeUTF16!)
+      self = String(_StringGuts(c._largeUTF16!))
     }
   }
 }

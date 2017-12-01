@@ -396,7 +396,11 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    _guts.reserveCapacity(n)
+    if _guts.isASCII {
+      _guts.reserveCapacity(n, of: UInt8.self)
+    } else {
+      _guts.reserveCapacity(n, of: UTF16.CodeUnit.self)
+    }
   }
   
   /// Appends the given Unicode scalar to the view.
@@ -441,7 +445,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
     let rawSubRange: Range<Int> = _toCoreIndex(bounds.lowerBound) ..<
       _toCoreIndex(bounds.upperBound)
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
-    _core.replaceSubrange(rawSubRange, with: lazyUTF16)
+    _guts.replaceSubrange(rawSubRange, with: lazyUTF16)
   }
 }
 

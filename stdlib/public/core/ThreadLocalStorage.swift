@@ -87,8 +87,7 @@ internal struct _ThreadLocalStorage {
   static internal func getUBreakIterator(
     for guts: _StringGuts
   ) -> OpaquePointer {
-    let unsafeString = guts._unmanagedContiguous.unsafelyUnwrapped
-    return getUBreakIterator(for: unsafeString.utf16Buffer)
+    return getUBreakIterator(for: guts._unmanagedUTF16View.buffer)
   }
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)

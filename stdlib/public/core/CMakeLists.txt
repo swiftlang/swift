@@ -130,6 +130,7 @@ set(SWIFTLIB_ESSENTIAL
   StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
+  StringStorage.swift
   StringSwitch.swift
   StringIndexConversions.swift
   StringUnicodeScalarView.swift
@@ -143,6 +144,8 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeEncoding.swift
   UnicodeParser.swift
   Unmanaged.swift
+  UnmanagedOpaqueString.swift
+  UnmanagedString.swift
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
