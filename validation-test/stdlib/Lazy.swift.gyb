@@ -880,22 +880,22 @@ tests.test("LazyMapCollection/AssociatedTypes") {
 
 tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
   typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
-  typealias Subject = LazyMapBidirectionalCollection<Base, OpaqueValue<Int32>>
+  typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    subSequenceType: LazyMapBidirectionalCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
+    subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indicesType: Base.Indices.self)
 }
 
 tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
   typealias Base = MinimalRandomAccessCollection<OpaqueValue<Int>>
-  typealias Subject = LazyMapRandomAccessCollection<Base, OpaqueValue<Int32>>
+  typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    subSequenceType: LazyMapRandomAccessCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
+    subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indicesType: Base.Indices.self)
 }
@@ -936,7 +936,7 @@ tests.test("lazy.mapped/TypeInference") {
     var mapped = MinimalRandomAccessCollection(elements: baseArray)
       .lazy.map { _ in OpaqueValue<Int8>(0) }
     expectType(
-      LazyMapRandomAccessCollection<
+      LazyMapCollection<
         MinimalRandomAccessCollection<OpaqueValue<Int>>,
         OpaqueValue<Int8>
       >.self,
@@ -985,7 +985,7 @@ tests.test("ReversedCollection/Lazy") {
 
     let base = Array(stride(from: 11, through: 0, by: -1)).lazy.map { $0 }
 
-    typealias Base = LazyMapRandomAccessCollection<[Int], Int>
+    typealias Base = LazyMapCollection<[Int], Int>
     ExpectType<Base>.test(base)
 
     typealias LazyReversedBase = LazyRandomAccessCollection<
@@ -1007,8 +1007,7 @@ tests.test("ReversedCollection/Lazy") {
     >
 
     let base = "foobar".characters.lazy.map { $0 }
-    typealias Base = LazyMapBidirectionalCollection<
-      String.CharacterView, Character>
+    typealias Base = LazyMapCollection<String.CharacterView, Character>
     ExpectType<Base>.test(base)
 
     typealias LazyReversedBase = LazyBidirectionalCollection<
