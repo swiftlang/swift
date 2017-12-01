@@ -43,7 +43,10 @@ internal func _abstract(
 /// iterator having the same `Element` type, hiding the specifics of the
 /// underlying `IteratorProtocol`.
 @_fixed_layout
-public struct AnyIterator<Element> : IteratorProtocol {
+public struct AnyIterator<Element> {
+  @_versioned
+  internal let _box: _AnyIteratorBoxBase<Element>
+
   /// Creates an iterator that wraps a base iterator but whose type depends
   /// only on the base iterator's element type.
   ///
@@ -96,7 +99,9 @@ public struct AnyIterator<Element> : IteratorProtocol {
   internal init(_box: _AnyIteratorBoxBase<Element>) {
     self._box = _box
   }
+}
 
+extension AnyIterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -105,14 +110,11 @@ public struct AnyIterator<Element> : IteratorProtocol {
   public func next() -> Element? {
     return _box.next()
   }
-
-  @_versioned
-  internal let _box: _AnyIteratorBoxBase<Element>
 }
 
 /// Every `IteratorProtocol` can also be a `Sequence`.  Note that
 /// traversing the sequence consumes the iterator.
-extension AnyIterator : Sequence {}
+extension AnyIterator: Sequence { }
 
 @_versioned
 @_fixed_layout
@@ -722,23 +724,23 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 
 @_versioned
 @_fixed_layout
-internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
-  : Sequence {
+internal struct _ClosureBasedSequence<Iterator : IteratorProtocol> {
+  @_versioned
+  internal var _makeUnderlyingIterator: () -> Iterator
 
   @_versioned
   @_inlineable
   internal init(_ makeUnderlyingIterator: @escaping () -> Iterator) {
     self._makeUnderlyingIterator = makeUnderlyingIterator
   }
+}
 
+extension _ClosureBasedSequence: Sequence {
   @_versioned
   @_inlineable
   internal func makeIterator() -> Iterator {
     return _makeUnderlyingIterator()
   }
-
-  @_versioned
-  internal var _makeUnderlyingIterator: () -> Iterator
 }
 
 /// A type-erased sequence.
@@ -748,15 +750,10 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
 /// underlying sequence.
 //@_versioned
 @_fixed_layout
-public struct AnySequence<Element> : Sequence {
-  /// Creates a new sequence that wraps and forwards operations to `base`.
-  @_inlineable
-  public init<S : Sequence>(_ base: S)
-    where
-    S.Element == Element {
-    self._box = _SequenceBox(_base: base)
-  }
-
+public struct AnySequence<Element> {
+  @_versioned
+  internal let _box: _AnySequenceBox<Element>
+  
   /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
   @_inlineable
@@ -766,16 +763,23 @@ public struct AnySequence<Element> : Sequence {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
-  public typealias Iterator = AnyIterator<Element>
-
   @_versioned
   @_inlineable
   internal init(_box: _AnySequenceBox<Element>) {
     self._box = _box
   }
+}
 
-  @_versioned
-  internal let _box: _AnySequenceBox<Element>
+extension  AnySequence: Sequence {
+  public typealias Iterator = AnyIterator<Element>
+
+  /// Creates a new sequence that wraps and forwards operations to `base`.
+  @_inlineable
+  public init<S : Sequence>(_ base: S)
+    where
+    S.Element == Element {
+    self._box = _SequenceBox(_base: base)
+  }
 }
 
 % for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
@@ -952,6 +956,9 @@ internal final class _IndexBox<
 /// A wrapper over an underlying index that hides the specific underlying type.
 @_fixed_layout
 public struct AnyIndex {
+  @_versioned
+  internal var _box: _AnyIndexBox
+
   /// Creates a new index wrapping `base`.
   @_inlineable
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
@@ -969,9 +976,6 @@ public struct AnyIndex {
   internal var _typeID: ObjectIdentifier {
     return _box._typeID
   }
-
-  @_versioned
-  internal var _box: _AnyIndexBox
 }
 
 extension AnyIndex : Comparable {
@@ -1024,19 +1028,25 @@ protocol _AnyCollectionProtocol : Collection {
 /// same `Element` type, hiding the specifics of the underlying
 /// collection.
 @_fixed_layout
-public struct ${Self}<Element>
-  : _AnyCollectionProtocol, ${SelfProtocol} {
-
-  public typealias Indices
-    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
-
-  public typealias Iterator = AnyIterator<Element>
+public struct ${Self}<Element> {
+  @_versioned
+  internal let _box: _${Self}Box<Element>
 
   @_versioned
   @_inlineable
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
   }
+}
+
+extension ${Self}: ${SelfProtocol} {
+  public typealias Indices
+    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
+
+  public typealias Iterator = AnyIterator<Element>
+  public typealias Index = AnyIndex
+  public typealias IndexDistance = Int64
+  public typealias SubSequence = ${Self}<Element> 
 
 %   for SubTraversal in TRAVERSALS[ti:]:
 %     SubProtocol = collectionForTraversal(SubTraversal)
@@ -1046,10 +1056,7 @@ public struct ${Self}<Element>
   ///
   /// - Complexity: O(1).
   @_inlineable
-  public init<C : ${SubProtocol}>(_ base: C)
-  where
-    C.Element == Element
-     {
+  public init<C : ${SubProtocol}>(_ base: C) where C.Element == Element {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
     self._box = _${SubProtocol}Box<C>(
@@ -1060,9 +1067,7 @@ public struct ${Self}<Element>
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public init(
-    _ other: Any${SubProtocol}<Element>
-  ) {
+  public init(_ other: Any${SubProtocol}<Element>) {
     self._box = other._box
   }
 %   end
@@ -1075,9 +1080,7 @@ public struct ${Self}<Element>
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public init?(
-    _ other: Any${collectionForTraversal(SuperTraversal)}<Element>
-  ) {
+  public init?(_ other: Any${collectionForTraversal(SuperTraversal)}<Element>) {
     guard let box =
       other._box as? _${Self}Box<Element> else {
       return nil
@@ -1086,14 +1089,11 @@ public struct ${Self}<Element>
   }
 %   end
 
-  public typealias Index = AnyIndex
-  public typealias IndexDistance = Int64
-
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
   @_inlineable
-  public var startIndex: AnyIndex {
+  public var startIndex: Index {
     return AnyIndex(_box: _box._startIndex)
   }
 
@@ -1103,7 +1103,7 @@ public struct ${Self}<Element>
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
   @_inlineable
-  public var endIndex: AnyIndex {
+  public var endIndex: Index {
     return AnyIndex(_box: _box._endIndex)
   }
 
@@ -1112,18 +1112,18 @@ public struct ${Self}<Element>
   /// - Precondition: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
   @_inlineable
-  public subscript(position: AnyIndex) -> Element {
+  public subscript(position: Index) -> Element {
     return _box[position._box]
   }
 
   @_inlineable
-  public subscript(bounds: Range<AnyIndex>) -> ${Self}<Element> {
+  public subscript(bounds: Range<Index>) -> SubSequence {
     return ${Self}(_box:
       _box[start: bounds.lowerBound._box, end: bounds.upperBound._box])
   }
 
   @_inlineable
-  public func _failEarlyRangeCheck(_ index: AnyIndex, bounds: Range<AnyIndex>) {
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     // Do nothing.  Doing a range check would involve unboxing indices,
     // performing dynamic dispatch etc.  This seems to be too costly for a fast
     // range check for QoI purposes.
@@ -1137,12 +1137,12 @@ public struct ${Self}<Element>
   }
 
   @_inlineable
-  public func index(after i: AnyIndex) -> AnyIndex {
+  public func index(after i: Index) -> Index {
     return AnyIndex(_box: _box._index(after: i._box))
   }
 
   @_inlineable
-  public func formIndex(after i: inout AnyIndex) {
+  public func formIndex(after i: inout Index) {
     if _isUnique(&i._box) {
       _box._formIndex(after: i._box)
     }
@@ -1152,22 +1152,20 @@ public struct ${Self}<Element>
   }
 
   @_inlineable
-  public func index(_ i: AnyIndex, offsetBy n: Int64) -> AnyIndex {
+  public func index(_ i: Index, offsetBy n: Int64) -> Index {
     return AnyIndex(_box: _box._index(i._box, offsetBy: n))
   }
 
   @_inlineable
   public func index(
-    _ i: AnyIndex,
-    offsetBy n: Int64,
-    limitedBy limit: AnyIndex
-  ) -> AnyIndex? {
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
     return _box._index(i._box, offsetBy: n, limitedBy: limit._box)
       .map { AnyIndex(_box:$0) }
   }
 
   @_inlineable
-  public func formIndex(_ i: inout AnyIndex, offsetBy n: Int64) {
+  public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
     if _isUnique(&i._box) {
       return _box._formIndex(&i._box, offsetBy: n)
     } else {
@@ -1177,9 +1175,9 @@ public struct ${Self}<Element>
 
   @_inlineable
   public func formIndex(
-    _ i: inout AnyIndex,
-    offsetBy n: Int64,
-    limitedBy limit: AnyIndex
+    _ i: inout Index,
+    offsetBy n: IndexDistance,
+    limitedBy limit: Index
   ) -> Bool {
     if _isUnique(&i._box) {
       return _box._formIndex(&i._box, offsetBy: n, limitedBy: limit._box)
@@ -1193,7 +1191,7 @@ public struct ${Self}<Element>
   }
 
   @_inlineable
-  public func distance(from start: AnyIndex, to end: AnyIndex) -> Int64 {
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
     return _box._distance(from: start._box, to: end._box)
   }
 
@@ -1207,7 +1205,7 @@ public struct ${Self}<Element>
 % end
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   @_inlineable
-  public var count: Int64 {
+  public var count: IndexDistance {
     return _box._count
   }
 
@@ -1218,12 +1216,12 @@ public struct ${Self}<Element>
 
 %   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
   @_inlineable
-  public func index(before i: AnyIndex) -> AnyIndex {
+  public func index(before i: Index) -> Index {
     return AnyIndex(_box: _box._index(before: i._box))
   }
 
   @_inlineable
-  public func formIndex(before i: inout AnyIndex) {
+  public func formIndex(before i: inout Index) {
     if _isUnique(&i._box) {
       _box._formIndex(before: i._box)
     }
@@ -1237,15 +1235,14 @@ public struct ${Self}<Element>
     return _box._last
   }
 %   end
+}
 
+extension ${Self}: _AnyCollectionProtocol {
   /// Uniquely identifies the stored underlying collection.
   @_inlineable
   public // Due to language limitations only
   var _boxID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
-
-  @_versioned
-  internal let _box: _${Self}Box<Element>
 }
 % end
