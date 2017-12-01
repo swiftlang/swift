@@ -147,7 +147,7 @@ static llvm::Value *emitLoadOfGenericRequirement(IRGenFunction &IGF,
                                                  llvm::Type *reqtTy) {
   auto offset =
     IGF.IGM.getMetadataLayout(decl).getGenericRequirementsOffset(IGF);
-  offset = offset.offsetBy(IGF, Offset(reqtIndex * IGF.IGM.getPointerSize()));
+  offset = offset.offsetBy(IGF, Size(reqtIndex * IGF.IGM.getPointerSize()));
 
   auto slot = IGF.emitAddressAtOffset(metadata, offset, reqtTy,
                                       IGF.IGM.getPointerAlignment());

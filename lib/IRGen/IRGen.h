@@ -484,7 +484,7 @@ public:
   }
 
   llvm::Value *getAsValue(IRGenFunction &IGF) const;
-  Offset offsetBy(IRGenFunction &IGF, Offset other) const;
+  Offset offsetBy(IRGenFunction &IGF, Size other) const;
 };
 
 } // end namespace irgen
