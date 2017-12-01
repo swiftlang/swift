@@ -384,7 +384,7 @@ internal var _nilNativeObject: AnyObject? {
 /// already have writeback-scoped lifetime.
 @_fixed_layout
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
-  : Equatable, _Pointer {
+  :  _Pointer {
 
   public let _rawValue: Builtin.RawPointer
 
@@ -508,7 +508,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
+}
 
+extension AutoreleasingUnsafeMutablePointer: Equatable {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (

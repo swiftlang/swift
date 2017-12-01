@@ -62,10 +62,7 @@
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 @_fixed_layout
-public struct Character :
-  _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral,
-  ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
-
+public struct Character {
   // Fundamentally, it is just a String, but it is optimized for the common case
   // where the UTF-16 representation fits in 63 bits.  The remaining bit is used
   // to discriminate between small and large representations.  Since a grapheme
@@ -77,6 +74,47 @@ public struct Character :
     case large(_StringBuffer._Storage)
   }
 
+  @_versioned
+  internal var _representation: Representation
+
+  // FIXME(sil-serialize-all): Should be @_inlineable  @_versioned
+  // <rdar://problem/34557187>
+  internal static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
+    return UInt64(Builtin.zext_Int63_Int64(value))
+  }
+
+  typealias UTF16View = String.UTF16View
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var utf16: UTF16View {
+    return String(self).utf16
+  }
+
+  /// Creates a Character from a String that is already known to require the
+  /// large representation.
+  ///
+  /// - Note: `s` should contain only a single grapheme, but we can't require
+  ///   that formally because of grapheme cluster literals and the shifting
+  ///   sands of Unicode.  https://bugs.swift.org/browse/SR-4955
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal init(_largeRepresentationString s: String) {
+    if let native = s._core.nativeBuffer,
+      native.start == s._core._baseAddress!,
+      native.usedCount == s._core.count {
+      _representation = .large(native._storage)
+      return
+    }
+    var nativeString = ""
+    nativeString.append(s)
+    _representation = .large(nativeString._core.nativeBuffer!._storage)
+  }
+}
+
+extension Character
+ : _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral,
+   ExpressibleByExtendedGraphemeClusterLiteral
+{
   /// Creates a character containing the given Unicode scalar value.
   ///
   /// - Parameter content: The Unicode scalar value to convert into a character.
@@ -238,53 +276,6 @@ public struct Character :
     }
     self = Character(_largeRepresentationString: s)
   }
-
-  /// Creates a Character from a String that is already known to require the
-  /// large representation.
-  ///
-  /// - Note: `s` should contain only a single grapheme, but we can't require
-  ///   that formally because of grapheme cluster literals and the shifting
-  ///   sands of Unicode.  https://bugs.swift.org/browse/SR-4955
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal init(_largeRepresentationString s: String) {
-    if let native = s._core.nativeBuffer,
-      native.start == s._core._baseAddress!,
-      native.usedCount == s._core.count {
-      _representation = .large(native._storage)
-      return
-    }
-    var nativeString = ""
-    nativeString.append(s)
-    _representation = .large(nativeString._core.nativeBuffer!._storage)
-  }
-
-  // FIXME(sil-serialize-all): Should be @_inlineable  @_versioned
-  // <rdar://problem/34557187>
-  internal static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
-    return UInt64(Builtin.zext_Int63_Int64(value))
-  }
-
-  /// The character's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    // FIXME(performance): constructing a temporary string is extremely
-    // wasteful and inefficient.
-    return String(self).hashValue
-  }
-
-  typealias UTF16View = String.UTF16View
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var utf16: UTF16View {
-    return String(self).utf16
-  }
-
-  @_versioned
-  internal var _representation: Representation
 }
 
 extension Character : CustomStringConvertible {
@@ -294,7 +285,7 @@ extension Character : CustomStringConvertible {
   }
 }
 
-extension Character : LosslessStringConvertible {}
+extension Character : LosslessStringConvertible { }
 
 extension Character : CustomDebugStringConvertible {
   /// A textual representation of the character, suitable for debugging.
@@ -391,5 +382,18 @@ extension Character : Comparable {
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.
     return String(lhs) < String(rhs)
+  }
+}
+
+extension Character: Hashable {
+  /// The character's hash value.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    // FIXME(performance): constructing a temporary string is extremely
+    // wasteful and inefficient.
+    return String(self).hashValue
   }
 }
