@@ -93,19 +93,17 @@
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
 % end
 @_fixed_layout
-public struct Unsafe${Mutable}RawBufferPointer
-  : ${Mutable}Collection, RandomAccessCollection {
-  // TODO: Specialize `index` and `formIndex` and
-  // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
+public struct Unsafe${Mutable}RawBufferPointer {
+  @_versioned
+  internal let _position, _end: Unsafe${Mutable}RawPointer?
+}
 
-  public typealias Index = Int
-  public typealias IndexDistance = Int
-  public typealias SubSequence = ${Mutable}Slice<${Self}>
+extension Unsafe${Mutable}RawBufferPointer: Sequence {
+  public typealias SubSequence = Slice<${Self}>
 
   /// An iterator over the bytes viewed by a raw buffer pointer.
   @_fixed_layout
   public struct Iterator : IteratorProtocol, Sequence {
-
     /// Advances to the next byte and returns it, or `nil` if no next byte
     /// exists.
     ///
@@ -133,6 +131,105 @@ public struct Unsafe${Mutable}RawBufferPointer
     }
   }
 
+  /// Returns an iterator over the bytes of this sequence.
+  @_inlineable
+  public func makeIterator() -> Iterator {
+    return Iterator(_position: _position, _end: _end)
+  }
+}
+
+extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
+  // TODO: Specialize `index` and `formIndex` and
+  // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
+  public typealias Element = UInt8
+  public typealias Index = Int
+  public typealias IndexDistance = Int
+  public typealias Indices = CountableRange<Int>
+
+  /// Always zero, which is the index of the first byte in a nonempty buffer.
+  @_inlineable
+  public var startIndex: Index {
+    return 0
+  }
+
+  /// The "past the end" position---that is, the position one greater than the
+  /// last valid subscript argument.
+  ///
+  /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
+  /// instance is always identical to `count`.
+  @_inlineable
+  public var endIndex: Index {
+    return count
+  }
+
+  @_inlineable
+  public var indices: Indices {
+    return startIndex..<endIndex
+  }
+
+  /// Accesses the byte at the given offset in the memory region as a `UInt8`
+  /// value.
+  ///
+  /// - Parameter i: The offset of the byte to access. `i` must be in the range
+  ///   `0..<count`.
+  @_inlineable
+  public subscript(i: Int) -> Element {
+    get {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      return _position!.load(fromByteOffset: i, as: UInt8.self)
+    }
+%  if mutable:
+    nonmutating set {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      _position!.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
+    }
+%  end # mutable
+  }
+
+  /// Accesses the bytes in the specified memory region.
+  ///
+  /// - Parameter bounds: The range of byte offsets to access. The upper and
+  ///   lower bounds of the range must be in the range `0...count`.
+  @_inlineable
+  public subscript(bounds: Range<Int>) -> SubSequence {
+    get {
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
+      return Slice(base: self, bounds: bounds)
+    }
+%  if mutable:
+    nonmutating set {
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
+      _debugPrecondition(bounds.count == newValue.count)
+
+      if !newValue.isEmpty {
+        (baseAddress! + bounds.lowerBound).copyMemory(
+          from: newValue.base.baseAddress! + newValue.startIndex,
+          byteCount: newValue.count)
+      }
+    }
+%  end # mutable
+  }
+
+  /// The number of bytes in the buffer.
+  ///
+  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
+  /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  @_inlineable
+  public var count: Int {
+    if let pos = _position {
+      return _end! - pos
+    }
+    return 0
+  }
+}
+
+extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
+
+extension Unsafe${Mutable}RawBufferPointer {
 %  if mutable:
   @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "allocate(byteCount:alignment:)")
   public static func allocate(count: Int) -> UnsafeMutableRawBufferPointer { 
@@ -413,89 +510,9 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter slice: The raw buffer slice to rebase.
   @_inlineable
-  public init(
-    rebasing slice: Slice<UnsafeMutableRawBufferPointer>
-  ) {
+  public init(rebasing slice: Slice<UnsafeMutableRawBufferPointer>) {
     self.init(start: slice.base.baseAddress! + slice.startIndex,
       count: slice.count)
-  }
-
-  /// Always zero, which is the index of the first byte in a nonempty buffer.
-  @_inlineable
-  public var startIndex: Int {
-    return 0
-  }
-
-  /// The "past the end" position---that is, the position one greater than the
-  /// last valid subscript argument.
-  ///
-  /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
-  /// instance is always identical to `count`.
-  @_inlineable
-  public var endIndex: Int {
-    return count
-  }
-
-  public typealias Indices = CountableRange<Int>
-
-  @_inlineable
-  public var indices: Indices {
-    return startIndex..<endIndex
-  }
-
-  /// Accesses the byte at the given offset in the memory region as a `UInt8`
-  /// value.
-  ///
-  /// - Parameter i: The offset of the byte to access. `i` must be in the range
-  ///   `0..<count`.
-  @_inlineable
-  public subscript(i: Int) -> UInt8 {
-    get {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
-      return _position!.load(fromByteOffset: i, as: UInt8.self)
-    }
-%  if mutable:
-    nonmutating set {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
-      _position!.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
-    }
-%  end # mutable
-  }
-
-  /// Accesses the bytes in the specified memory region.
-  ///
-  /// - Parameter bounds: The range of byte offsets to access. The upper and
-  ///   lower bounds of the range must be in the range `0...count`.
-  @_inlineable
-  public subscript(
-    bounds: Range<Int>
-  ) -> Slice<Unsafe${Mutable}RawBufferPointer> {
-    get {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
-      return Slice(base: self, bounds: bounds)
-    }
-%  if mutable:
-    nonmutating set {
-      _debugPrecondition(bounds.lowerBound >= startIndex)
-      _debugPrecondition(bounds.upperBound <= endIndex)
-      _debugPrecondition(bounds.count == newValue.count)
-
-      if !newValue.isEmpty {
-        (baseAddress! + bounds.lowerBound).copyMemory(
-          from: newValue.base.baseAddress! + newValue.startIndex,
-          byteCount: newValue.count)
-      }
-    }
-%  end # mutable
-  }
-
-  /// Returns an iterator over the bytes of this sequence.
-  @_inlineable
-  public func makeIterator() -> Iterator {
-    return Iterator(_position: _position, _end: _end)
   }
 
   /// A pointer to the first byte of the buffer.
@@ -505,18 +522,6 @@ public struct Unsafe${Mutable}RawBufferPointer
   @_inlineable
   public var baseAddress: Unsafe${Mutable}RawPointer? {
     return _position
-  }
-
-  /// The number of bytes in the buffer.
-  ///
-  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
-  /// a buffer can have a `count` of zero even with a non-`nil` base address.
-  @_inlineable
-  public var count: Int {
-    if let pos = _position {
-      return _end! - pos
-    }
-    return 0
   }
 
   %  if mutable:
@@ -649,9 +654,6 @@ public struct Unsafe${Mutable}RawBufferPointer
     return Unsafe${Mutable}BufferPointer<T>(
       start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: capacity)
   }
-  
-  @_versioned
-  internal let _position, _end: Unsafe${Mutable}RawPointer?
 }
 
 extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
