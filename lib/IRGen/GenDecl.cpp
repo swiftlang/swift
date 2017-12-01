@@ -2389,7 +2389,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     sectionName = "swift2_protocol_conformances";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2prtc";
+    sectionName = ".sw2prtc$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit protocol conformances for "
@@ -2412,7 +2412,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     sectionName = "swift2_type_metadata";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2tymd";
+    sectionName = ".sw2tymd$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit type metadata table for "
