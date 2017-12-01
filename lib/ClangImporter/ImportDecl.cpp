@@ -4970,7 +4970,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
     }
   }
 
-  theClass->addImplicitDestructor();
   return theClass;
 }
 
