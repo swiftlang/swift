@@ -1024,6 +1024,15 @@ public:
     return Lookup.find(name);
   }
 
+  /// \brief Add an empty entry to the lookup map for a given name if it does
+  /// not yet have one.
+  void addEmptyEntry(DeclName name) {
+    (void)Lookup[name];
+    if (!name.isSimpleName()) {
+      (void)Lookup[name.getBaseName()];
+    }
+  }
+
   // \brief Mark all Decls in this table as not-resident in a table, drop
   // references to them. Should only be called when this was not fully-populated
   // from an IterableDeclContext.
@@ -1280,14 +1289,13 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
                                           MemberLookupTable &LookupTable,
                                           DeclName name,
                                           IterableDeclContext *IDC) {
-  if (IDC->isLoadingLazyMembers()) {
-    return false;
-  }
-  IDC->setLoadingLazyMembers(true);
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
+  // Populate LookupTable with an empty vector before we call into our loader,
+  // so that any reentry of this routine will find the set-so-far, and not
+  // fall into infinite recursion.
+  LookupTable.addEmptyEntry(name);
   if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
-    IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
     }
@@ -1296,7 +1304,6 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
     }
     return false;
   } else {
-    IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
     }
@@ -1339,13 +1346,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
 
-  // FIXME: At present, lazy member loading conflicts with a bunch of other code
-  // that appears to special-case initializers (clang-imported initializer
-  // sorting, implicit initializer synthesis), so for the time being we have to
-  // turn it off for them entirely.
-  if (name.getBaseName() == ctx.Id_init)
-    useNamedLazyMemberLoading = false;
-
   // We check the LookupTable at most twice, possibly treating a miss in the
   // first try as a cache-miss that we then do a cache-fill on, and retry.
   for (int i = 0; i < 2; ++i) {
@@ -1355,11 +1355,10 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // will flip the hasLazyMembers() flag to false as well.
     if (!useNamedLazyMemberLoading) {
       // If we're about to load members here, purge the MemberLookupTable;
-      // it will be rebuilt in prepareLookup, below. Base this decision on
-      // the LookupTable's int value, not hasLazyMembers(), since the latter
-      // can sometimes change underfoot if some other party calls getMembers
-      // outside of lookup (eg. typo correction).
-      if (LookupTable.getPointer() && !LookupTable.getInt()) {
+      // it will be rebuilt in prepareLookup, below.
+      if (hasLazyMembers() && LookupTable.getPointer()) {
+        // We should not have scanned the IDC list yet. Double check.
+        assert(!LookupTable.getInt());
         LookupTable.getPointer()->clear();
       }
 
@@ -1401,7 +1400,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     } else {
       if (!ignoreNewExtensions) {
         for (auto E : getExtensions()) {
-          if (E->wasDeserialized() || E->hasClangNode()) {
+          if (E->wasDeserialized()) {
             if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
                                                           name, E)) {
               useNamedLazyMemberLoading = false;
