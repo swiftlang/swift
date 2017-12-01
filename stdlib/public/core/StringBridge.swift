@@ -251,23 +251,36 @@ public class _SwiftNativeNSString {
   deinit {}
 }
 
+/// A shadow for the "core operations" of NSString.
+///
+/// Covers a set of operations everyone needs to implement in order to
+/// be a useful `NSString` subclass.
 @objc
-public protocol _NSStringCore :
-    _NSCopying, _NSFastEnumeration {
+public protocol _NSStringCore : _NSCopying /* _NSFastEnumeration */ {
 
   // The following methods should be overridden when implementing an
   // NSString subclass.
 
-  func length() -> Int
+  @objc(length)
+  func length() -> UInt
 
-  func characterAtIndex(_ index: Int) -> UInt16
+  @objc(characterAtIndex:)
+  func character(at index: Int) -> UInt16
 
   // We also override the following methods for efficiency.
+
+  @objc(getCharacters:range:)
+  func getCharacters(
+    _ buffer: UnsafeMutablePointer<UInt16>,
+    range aRange: _SwiftNSRange)
+
+  @objc(_fastCharacterContents)
+  func _fastCharacterContents() -> UnsafePointer<UInt16>?
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
 @_fixed_layout // FIXME(sil-serialize-all)
-public final class _NSContiguousString : _SwiftNativeNSString {
+public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   public let _guts: _StringGuts
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -316,22 +329,19 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @_inlineable // FIXME(sil-serialize-all)
   deinit {}
 
-  @_versioned // FIXME(sil-serialize-all)
-  @objc
-  func length() -> Int {
-    return _guts.count
+  @objc(length)
+  public func length() -> UInt {
+    return UInt(_guts.count)
   }
 
-  @_versioned // FIXME(sil-serialize-all)
-  @objc
-  func characterAtIndex(_ index: Int) -> UInt16 {
+  @objc(characterAtIndex:)
+  public func character(at index: Int) -> UInt16 {
     defer { _fixLifetime(self) }
     return _guts[index]
   }
 
-  @_versioned // FIXME(sil-serialize-all)
-  @objc @inline(__always) // Performance: To save on reference count operations.
-  func getCharacters(
+  @objc(getCharacters:range:)
+  public func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
     _precondition(aRange.location >= 0 && aRange.length >= 0)
@@ -348,9 +358,8 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     _fixLifetime(self)
   }
 
-  @_versioned // FIXME(sil-serialize-all)
   @objc(_fastCharacterContents)
-  func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+  public func _fastCharacterContents() -> UnsafePointer<UInt16>? {
     guard !_guts.isASCII else { return nil }
     return _guts._unmanagedUTF16View.start
   }
@@ -374,8 +383,8 @@ public final class _NSContiguousString : _SwiftNativeNSString {
       _core[Int(aRange.location)..<Int(aRange.location + aRange.length)])
   }
 
-  @_versioned // FIXME(sil-serialize-all)
-  @objc func copy() -> AnyObject {
+  @objc(copyWithZone:)
+  public func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Since this string is immutable we can just return ourselves.
     return self
   }
