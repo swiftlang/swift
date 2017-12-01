@@ -274,7 +274,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 extension StrideTo : RandomAccessCollection
 where Element.Stride : BinaryInteger {
   public typealias Index = Int
-  public typealias SubSequence = RandomAccessSlice<StrideTo<Element>>
+  public typealias SubSequence = Slice<StrideTo<Element>>
   public typealias Indices = CountableRange<Int>
 
   @_inlineable
@@ -295,11 +295,9 @@ where Element.Stride : BinaryInteger {
     return _start.advanced(by: Element.Stride(position) * _stride)
   }
 
-  public subscript(
-    bounds: Range<Index>
-  ) -> RandomAccessSlice<StrideTo<Element>> {
-    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-    return RandomAccessSlice(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice<StrideTo<Element>> {
+    _failEarlyRangeCheck(bounds, bounds: startIndex ..< endIndex)
+    return Slice(base: self, bounds: bounds)
   }
 
   @_inlineable
@@ -448,7 +446,7 @@ extension StrideThrough : RandomAccessCollection
 where Element.Stride : BinaryInteger {
   public typealias Index = ClosedRangeIndex<Int>
   public typealias IndexDistance = Int
-  public typealias SubSequence = RandomAccessSlice<StrideThrough<Element>>
+  public typealias SubSequence = Slice<StrideThrough<Element>>
 
   @_inlineable
   public var startIndex: Index {
@@ -474,10 +472,8 @@ where Element.Stride : BinaryInteger {
     return _start.advanced(by: offset)
   }
 
-  public subscript(
-    bounds: Range<Index>
-  ) -> RandomAccessSlice<StrideThrough<Element>> {
-    return RandomAccessSlice(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice<StrideThrough<Element>> {
+    return Slice(base: self, bounds: bounds)
   }
 
   @_inlineable

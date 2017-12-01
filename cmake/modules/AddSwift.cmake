@@ -716,19 +716,6 @@ function(_add_swift_library_single target name)
     set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 
-  # On platforms that use ELF binaries we add markers for metadata sections in
-  # the shared libraries using these object files.  This wouldn't be necessary
-  # if the link was done by the swift binary: rdar://problem/19007002
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY AND
-     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    if("${libkind}" STREQUAL "SHARED")
-      set(arch_subdir "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}")
-
-      set(SWIFT_SECTIONS_OBJECT_BEGIN "${arch_subdir}/swift_begin.o")
-      set(SWIFT_SECTIONS_OBJECT_END   "${arch_subdir}/swift_end.o")
-    endif()
-  endif()
-
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
     swift_windows_generate_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS)
@@ -828,12 +815,23 @@ function(_add_swift_library_single target name)
   endif()
 
   add_library("${target}" ${libkind}
-      ${SWIFT_SECTIONS_OBJECT_BEGIN}
-      ${SWIFTLIB_SINGLE_SOURCES}
-      ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
-      ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
-      ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES}
-      ${SWIFT_SECTIONS_OBJECT_END})
+              ${SWIFTLIB_SINGLE_SOURCES}
+              ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
+              ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
+              ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+  if("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" AND SWIFTLIB_TARGET_LIBRARY)
+    if("${libkind}" STREQUAL "SHARED")
+      # TODO(compnerd) switch to the generator expression when cmake is upgraded
+      # to a version which supports it.
+      # target_sources(${target} PRIVATE $<TARGET_OBJECTS:swiftImageRegistrationObject-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}>)
+      target_sources(${target}
+                     PRIVATE
+                       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+      set_source_files_properties("${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}"
+                                  PROPERTIES
+                                    GENERATED 1)
+    endif()
+  endif()
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
@@ -870,17 +868,6 @@ function(_add_swift_library_single target name)
       add_dependencies(${target}_IMPLIB ${${target}_IMPORT_LIBRARY})
     endif()
     set_property(TARGET "${target}" PROPERTY NO_SONAME ON)
-  endif()
-
-  # The section metadata objects are generated sources, and we need to tell CMake
-  # not to expect to find them prior to their generation.
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY AND
-     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    if("${libkind}" STREQUAL "SHARED")
-      set_source_files_properties(${SWIFT_SECTIONS_OBJECT_BEGIN} PROPERTIES GENERATED 1)
-      set_source_files_properties(${SWIFT_SECTIONS_OBJECT_END} PROPERTIES GENERATED 1)
-      add_dependencies("${target}" section_magic)
-    endif()
   endif()
 
   llvm_update_compile_flags(${target})

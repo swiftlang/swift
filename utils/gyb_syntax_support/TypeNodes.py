@@ -34,6 +34,23 @@ TYPE_NODES = [
                    is_optional=True),
          ]),
 
+    # array-type -> '[' type ']'
+    Node('ArrayType', kind='Type',
+         children=[
+             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
+             Child('ElementType', kind='Type'),
+             Child('RightSquareBracket', kind='RightSquareBracketToken'),
+         ]),
+
+    # dictionary-type -> '[' type ':' type ']'
+    Node('DictionaryType', kind='Type',
+         children=[
+             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
+             Child('KeyType', kind='Type'),
+             Child('Colon', kind='ColonToken'),
+             Child('ValueType', kind='Type'),
+             Child('RightSquareBracket', kind='RightSquareBracketToken'),
+         ]),
 
     # metatype-type -> type '.' 'Type'
     #                | type '.' 'Protocol
@@ -48,14 +65,18 @@ TYPE_NODES = [
                    ]),
          ]),
 
-    # dictionary-type -> '[' type ':' type ']'
-    Node('DictionaryType', kind='Type',
+    # optional-type -> type '?'
+    Node('OptionalType', kind='Type',
          children=[
-             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
-             Child('KeyType', kind='Type'),
-             Child('Colon', kind='ColonToken'),
-             Child('ValueType', kind='Type'),
-             Child('RightSquareBracket', kind='RightSquareBracketToken'),
+             Child('WrappedType', kind='Type'),
+             Child('QuestionMark', kind='PostfixQuestionMarkToken'),
+         ]),
+
+    # implicitly-unwrapped-optional-type -> type '!'
+    Node('ImplicitlyUnwrappedOptionalType', kind='Type',
+         children=[
+             Child('WrappedType', kind='Type'),
+             Child('ExclamationMark', kind='ExclamationMarkToken'),
          ]),
 
     # throwing-specifier -> 'throws' | 'rethrows'
@@ -99,14 +120,6 @@ TYPE_NODES = [
                    is_optional=True),
          ]),
 
-    # array-type -> '[' type ']'
-    Node('ArrayType', kind='Type',
-         children=[
-             Child('LeftSquareBracket', kind='LeftSquareBracketToken'),
-             Child('ElementType', kind='Type'),
-             Child('RightSquareBracket', kind='RightSquareBracketToken'),
-         ]),
-
     # type-annotation -> attribute-list 'inout'? type
     Node('TypeAnnotation', kind='Syntax',
          children=[
@@ -124,13 +137,6 @@ TYPE_NODES = [
     # tuple-type-element-list -> tuple-type-element tuple-type-element-list?
     Node('TupleTypeElementList', kind='SyntaxCollection',
          element='TupleTypeElement'),
-
-    # implicitly-unwrapped-optional-type -> type '!'
-    Node('ImplicitlyUnwrappedOptionalType', kind='Type',
-         children=[
-             Child('ValueType', kind='Type'),
-             Child('ExclamationMark', kind='ExclamationMarkToken'),
-         ]),
 
     # protocol-composition-element -> type-identifier '&'
     Node('ProtocolCompositionElement', kind='Syntax',
@@ -175,13 +181,6 @@ TYPE_NODES = [
              Child('TypeAnnotation', kind='TypeAnnotation'),
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
-         ]),
-
-    # optional-type -> type '?'
-    Node('OptionalType', kind='Type',
-         children=[
-             Child('ValueType', kind='Type'),
-             Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
     # function-type-argument-list -> function-type-argument

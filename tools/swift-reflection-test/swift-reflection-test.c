@@ -301,12 +301,12 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
       errorAndExit("Couldn't read reflection information");
 
     swift_reflection_info_t Info = {
-      makeLocalSection(Buffer, RemoteInfo.fieldmd, RemoteInfo),
-      makeLocalSection(Buffer, RemoteInfo.assocty, RemoteInfo),
-      makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo),
-      makeLocalSection(Buffer, RemoteInfo.capture, RemoteInfo),
-      makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo),
-      makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo),
+      {makeLocalSection(Buffer, RemoteInfo.fieldmd, RemoteInfo), 0},
+      {makeLocalSection(Buffer, RemoteInfo.assocty, RemoteInfo), 0},
+      {makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo), 0},
+      {makeLocalSection(Buffer, RemoteInfo.capture, RemoteInfo), 0},
+      {makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo), 0},
+      {makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo), 0},
       /*LocalStartAddress*/ (uintptr_t) Buffer,
       /*RemoteStartAddress*/ RemoteInfo.StartAddress,
     };

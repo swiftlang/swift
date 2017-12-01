@@ -215,9 +215,13 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult<TypeRepr>();
-  case tok::l_square:
-    ty = parseTypeCollection();
+  case tok::l_square: {
+    auto Result = parseTypeCollection();
+    if (Result.hasSyntax())
+      SyntaxContext->addSyntax(Result.getSyntax());
+    ty = Result.getASTResult();
     break;
+  }
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
       ty = parseOldStyleProtocolComposition();
@@ -240,6 +244,17 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     checkForInputIncomplete();
     return nullptr;
   }
+
+  auto makeMetatypeTypeSyntax = [&]() {
+    if (!SyntaxContext->isEnabled())
+      return;
+    MetatypeTypeSyntaxBuilder Builder;
+    Builder
+      .useTypeOrProtocol(SyntaxContext->popToken())
+      .usePeriod(SyntaxContext->popToken())
+      .useBaseType(SyntaxContext->popIf<TypeSyntax>().getValue());
+    SyntaxContext->addSyntax(Builder.build());
+  };
   
   // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
   while (ty.isNonNull()) {
@@ -249,6 +264,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
         SourceLoc metatypeLoc = consumeToken(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
+        makeMetatypeTypeSyntax();
         continue;
       }
       if (peekToken().isContextualKeyword("Protocol")) {
@@ -256,17 +272,24 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
         SourceLoc protocolLoc = consumeToken(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) ProtocolTypeRepr(ty.get(), protocolLoc));
+        makeMetatypeTypeSyntax();
         continue;
       }
     }
 
     if (!Tok.isAtStartOfLine()) {
       if (isOptionalToken(Tok)) {
-        ty = parseTypeOptional(ty.get());
+        auto Result = parseTypeOptional(ty.get());
+        if (Result.hasSyntax())
+          SyntaxContext->addSyntax(Result.getSyntax());
+        ty = Result.getASTResult();
         continue;
       }
       if (isImplicitlyUnwrappedOptionalToken(Tok)) {
-        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
+        auto Result = parseTypeImplicitlyUnwrappedOptional(ty.get());
+        if (Result.hasSyntax())
+          SyntaxContext->addSyntax(Result.getSyntax());
+        ty = Result.getASTResult();
         continue;
       }
       // Parse legacy array types for migration.
@@ -730,6 +753,7 @@ Parser::parseAnyType() {
 ///     type-identifier
 ///     type-composition-list-deprecated ',' type-identifier
 ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
+  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxContextKind::Type);
   assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
 
   // Start a context for creating type syntax.
@@ -839,6 +863,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///     identifier ':' type
 ///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
+  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxContextKind::Type);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
@@ -1051,7 +1076,8 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   return makeParserResult(ATR);
 }
 
-ParserResult<TypeRepr> Parser::parseTypeCollection() {
+SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
+  ParserStatus Status;
   // Parse the leading '['.
   assert(Tok.is(tok::l_square));
   Parser::StructureMarkerRAII parsingCollection(*this, Tok);
@@ -1059,6 +1085,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
 
   // Parse the element type.
   ParserResult<TypeRepr> firstTy = parseType(diag::expected_element_type);
+  Status |= firstTy;
 
   // If there is a ':', this is a dictionary type.
   SourceLoc colonLoc;
@@ -1068,36 +1095,57 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
 
     // Parse the second type.
     secondTy = parseType(diag::expected_dictionary_value_type);
+    Status |= secondTy;
   }
 
   // Parse the closing ']'.
   SourceLoc rsquareLoc;
-  parseMatchingToken(tok::r_square, rsquareLoc,
-                     colonLoc.isValid()
-                       ? diag::expected_rbracket_dictionary_type
-                       : diag::expected_rbracket_array_type, 
-                     lsquareLoc);
+  if (parseMatchingToken(tok::r_square, rsquareLoc,
+                         colonLoc.isValid()
+                             ? diag::expected_rbracket_dictionary_type
+                             : diag::expected_rbracket_array_type,
+                         lsquareLoc))
+    Status.setIsParseError();
 
-  if (firstTy.hasCodeCompletion() || secondTy.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
+  if (Status.hasCodeCompletion())
+    return Status;
 
   // If we couldn't parse anything for one of the types, propagate the error.
-  if (firstTy.isNull() || (colonLoc.isValid() && secondTy.isNull()))
+  if (Status.isError())
     return makeParserError();
 
-  // Form the dictionary type.
+  TypeRepr *TyR;
+  llvm::Optional<TypeSyntax> SyntaxNode;
+
   SourceRange brackets(lsquareLoc, rsquareLoc);
-  if (colonLoc.isValid())
-    return makeParserResult(ParserStatus(firstTy) | ParserStatus(secondTy),
-                            new (Context) DictionaryTypeRepr(firstTy.get(),
-                                                             secondTy.get(),
-                                                             colonLoc,
-                                                             brackets));
+  if (colonLoc.isValid()) {
+    // Form the dictionary type.
+    TyR = new (Context)
+        DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
+    if (SyntaxContext->isEnabled()) {
+      DictionaryTypeSyntaxBuilder Builder;
+      Builder
+        .useRightSquareBracket(SyntaxContext->popToken())
+        .useValueType(SyntaxContext->popIf<TypeSyntax>().getValue())
+        .useColon(SyntaxContext->popToken())
+        .useKeyType(SyntaxContext->popIf<TypeSyntax>().getValue())
+        .useLeftSquareBracket(SyntaxContext->popToken());
+      SyntaxNode.emplace(Builder.build());
+    }
+  } else {
+    // Form the array type.
+    TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
+    if (SyntaxContext->isEnabled()) {
+      ArrayTypeSyntaxBuilder Builder;
+      Builder
+        .useRightSquareBracket(SyntaxContext->popToken())
+        .useElementType(SyntaxContext->popIf<TypeSyntax>().getValue())
+        .useLeftSquareBracket(SyntaxContext->popToken());
+      SyntaxNode.emplace(Builder.build());
+    }
+  }
     
-  // Form the array type.
-  return makeParserResult(firstTy,
-                          new (Context) ArrayTypeRepr(firstTy.get(),
-                                                      brackets));
+  return makeSyntaxResult(Status, SyntaxNode, TyR);
 }
 
 bool Parser::isOptionalToken(const Token &T) const {
@@ -1142,19 +1190,37 @@ SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
 
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
-ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
+SyntaxParserResult<TypeSyntax, OptionalTypeRepr>
+Parser::parseTypeOptional(TypeRepr *base) {
   SourceLoc questionLoc = consumeOptionalToken();
-  return makeParserResult(new (Context) OptionalTypeRepr(base, questionLoc));
+  auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
+  llvm::Optional<TypeSyntax> SyntaxNode;
+  if (SyntaxContext->isEnabled()) {
+    OptionalTypeSyntaxBuilder Builder;
+    Builder
+      .useQuestionMark(SyntaxContext->popToken())
+      .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
+    SyntaxNode.emplace(Builder.build());
+  }
+  return makeSyntaxResult(SyntaxNode, TyR);
 }
 
 /// Parse a single implicitly unwrapped optional suffix, given that we
 /// are looking at the exclamation mark.
-ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
+SyntaxParserResult<TypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
 Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
   SourceLoc exclamationLoc = consumeImplicitlyUnwrappedOptionalToken();
-  return makeParserResult(
-           new (Context) ImplicitlyUnwrappedOptionalTypeRepr(
-                           base, exclamationLoc));
+  auto TyR =
+      new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc);
+  llvm::Optional<TypeSyntax> SyntaxNode;
+  if (SyntaxContext->isEnabled()) {
+    ImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder;
+    Builder
+      .useExclamationMark(SyntaxContext->popToken())
+      .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
+    SyntaxNode.emplace(Builder.build());
+  }
+  return makeSyntaxResult(SyntaxNode, TyR);
 }
 
 //===----------------------------------------------------------------------===//

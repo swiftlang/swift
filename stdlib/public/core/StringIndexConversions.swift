@@ -57,7 +57,7 @@ extension String.Index {
     guard target.unicodeScalars._isOnGraphemeClusterBoundary(sourcePosition)
     else { return nil }
 
-    self = target.characters._index(
+    self = target._characters._index(
       atEncodedOffset: sourcePosition.encodedOffset)
   }
 

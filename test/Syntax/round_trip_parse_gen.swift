@@ -53,11 +53,17 @@ class C {
     _ = a.b
     _ = 1.a
     (1 + 1).a.b.foo
+    _ = a as Bool || a as! Bool || a as? Bool
+    _ = a is Bool
   }
 }
 
 typealias A = Any
 typealias B = (Array<Array<Any>>.Element)
+typealias C = [Int]
+typealias D = [Int: String]
+typealias E = Int?.Protocol
+typealias F = [Int]!.Type
 
 struct foo {
   struct foo {

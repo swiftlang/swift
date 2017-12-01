@@ -4146,153 +4146,72 @@ public extension RawRepresentable where RawValue == String, Self : Decodable {
 // Optional/Collection Type Conformances
 //===----------------------------------------------------------------------===//
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal func assertTypeIsEncodable<T>(_ type: T.Type, in wrappingType: Any.Type) {
-    guard T.self is Encodable.Type else {
-        if T.self == Encodable.self || T.self == Codable.self {
-            preconditionFailure("\(wrappingType) does not conform to Encodable because Encodable does not conform to itself. You must use a concrete type to encode or decode.")
-        } else {
-            preconditionFailure("\(wrappingType) does not conform to Encodable because \(T.self) does not conform to Encodable.")
-        }
-    }
-}
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal func assertTypeIsDecodable<T>(_ type: T.Type, in wrappingType: Any.Type) {
-    guard T.self is Decodable.Type else {
-        if T.self == Decodable.self || T.self == Codable.self {
-            preconditionFailure("\(wrappingType) does not conform to Decodable because Decodable does not conform to itself. You must use a concrete type to encode or decode.")
-        } else {
-            preconditionFailure("\(wrappingType) does not conform to Decodable because \(T.self) does not conform to Decodable.")
-        }
-    }
-}
-
-// Temporary resolution for SR-5206.
-// 
-// The following two extension on Encodable and Decodable are used below to provide static type information where we don't have any yet.
-// The wrapped contents of the below generic types have to expose their Encodable/Decodable conformance via an existential cast/their metatype.
-// Since those are dynamic types without static type guarantees, we cannot call generic methods taking those arguments, e.g.
-// 
-//   try container.encode((someElement as! Encodable))
-// 
-// One way around this is to get elements to encode into `superEncoder`s and decode from `superDecoder`s because those interfaces are available via the existentials/metatypes.
-// However, this direct encoding/decoding never gives containers a chance to intercept and do something custom on types.
-// 
-// If we instead expose this custom private functionality of writing to/reading from containers directly, the containers do get this chance.
-
-// FIXME: Remove when conditional conformance is available.
-extension Encodable {
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal func __encode(to container: inout SingleValueEncodingContainer) throws { try container.encode(self) }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal func __encode(to container: inout UnkeyedEncodingContainer)     throws { try container.encode(self) }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal func __encode<Key>(to container: inout KeyedEncodingContainer<Key>, forKey key: Key) throws { try container.encode(self, forKey: key) }
-}
-
-// FIXME: Remove when conditional conformance is available.
-extension Decodable {
-    // Since we cannot call these __init, we'll give the parameter a '__'.
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal init(__from container: SingleValueDecodingContainer)   throws { self = try container.decode(Self.self) }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal init(__from container: inout UnkeyedDecodingContainer) throws { self = try container.decode(Self.self) }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
-    internal init<Key>(__from container: KeyedDecodingContainer<Key>, forKey key: Key) throws { self = try container.decode(Self.self, forKey: key) }
-}
-
-// FIXME: Uncomment when conditional conformance is available.
-extension Optional : Encodable /* where Wrapped : Encodable */ {
+extension Optional : Encodable where Wrapped : Encodable {
     @_inlineable // FIXME(sil-serialize-all)
     public func encode(to encoder: Encoder) throws {
-        assertTypeIsEncodable(Wrapped.self, in: type(of: self))
-
         var container = encoder.singleValueContainer()
         switch self {
         case .none: try container.encodeNil()
-        case .some(let wrapped): try (wrapped as! Encodable).__encode(to: &container)
+        case .some(let wrapped): try container.encode(wrapped)
         }
     }
 }
 
-extension Optional : Decodable /* where Wrapped : Decodable */ {
+extension Optional : Decodable where Wrapped : Decodable {
     @_inlineable // FIXME(sil-serialize-all)
     public init(from decoder: Decoder) throws {
-        // Initialize self here so we can get type(of: self).
-        self = .none
-        assertTypeIsDecodable(Wrapped.self, in: type(of: self))
-
         let container = try decoder.singleValueContainer()
-        if !container.decodeNil() {
-            let metaType = (Wrapped.self as! Decodable.Type)
-            let element = try metaType.init(__from: container)
-            self = .some(element as! Wrapped)
+        if container.decodeNil() {
+            self = .none
+        }  else {
+            let element = try container.decode(Wrapped.self)
+            self = .some(element)
         }
     }
 }
 
-// FIXME: Uncomment when conditional conformance is available.
-extension Array : Encodable /* where Element : Encodable */ {
+extension Array : Encodable where Element : Encodable {
     @_inlineable // FIXME(sil-serialize-all)
     public func encode(to encoder: Encoder) throws {
-        assertTypeIsEncodable(Element.self, in: type(of: self))
-
         var container = encoder.unkeyedContainer()
         for element in self {
-            try (element as! Encodable).__encode(to: &container)
+          try container.encode(element)
         }
     }
 }
 
-extension Array : Decodable /* where Element : Decodable */ {
+extension Array : Decodable where Element : Decodable {
     @_inlineable // FIXME(sil-serialize-all)
     public init(from decoder: Decoder) throws {
-        // Initialize self here so we can get type(of: self).
         self.init()
-        assertTypeIsDecodable(Element.self, in: type(of: self))
 
-        let metaType = (Element.self as! Decodable.Type)
         var container = try decoder.unkeyedContainer()
         while !container.isAtEnd {
-            let element = try metaType.init(__from: &container)
-            self.append(element as! Element)
+            let element = try container.decode(Element.self)
+            self.append(element)
         }
     }
 }
 
-extension Set : Encodable /* where Element : Encodable */ {
+extension Set : Encodable where Element : Encodable {
     @_inlineable // FIXME(sil-serialize-all)
     public func encode(to encoder: Encoder) throws {
-        assertTypeIsEncodable(Element.self, in: type(of: self))
-
         var container = encoder.unkeyedContainer()
         for element in self {
-            try (element as! Encodable).__encode(to: &container)
+          try container.encode(element)
         }
     }
 }
 
-extension Set : Decodable /* where Element : Decodable */ {
+extension Set : Decodable where Element : Decodable {
     @_inlineable // FIXME(sil-serialize-all)
     public init(from decoder: Decoder) throws {
-        // Initialize self here so we can get type(of: self).
         self.init()
-        assertTypeIsDecodable(Element.self, in: type(of: self))
 
-        let metaType = (Element.self as! Decodable.Type)
         var container = try decoder.unkeyedContainer()
         while !container.isAtEnd {
-            let element = try metaType.init(__from: &container)
-            self.insert(element as! Element)
+            let element = try container.decode(Element.self)
+            self.insert(element)
         }
     }
 }
@@ -4321,57 +4240,49 @@ internal struct _DictionaryCodingKey : CodingKey {
     }
 }
 
-extension Dictionary : Encodable /* where Key : Encodable, Value : Encodable */ {
+extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
     @_inlineable // FIXME(sil-serialize-all)
     public func encode(to encoder: Encoder) throws {
-        assertTypeIsEncodable(Key.self, in: type(of: self))
-        assertTypeIsEncodable(Value.self, in: type(of: self))
-
         if Key.self == String.self {
             // Since the keys are already Strings, we can use them as keys directly.
             var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
             for (key, value) in self {
                 let codingKey = _DictionaryCodingKey(stringValue: key as! String)!
-                try (value as! Encodable).__encode(to: &container, forKey: codingKey)
+                try container.encode(value, forKey: codingKey)
             }
         } else if Key.self == Int.self {
             // Since the keys are already Ints, we can use them as keys directly.
             var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
             for (key, value) in self {
                 let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
-                try (value as! Encodable).__encode(to: &container, forKey: codingKey)
+                try container.encode(value, forKey: codingKey)
             }
         } else {
             // Keys are Encodable but not Strings or Ints, so we cannot arbitrarily convert to keys.
             // We can encode as an array of alternating key-value pairs, though.
             var container = encoder.unkeyedContainer()
             for (key, value) in self {
-                try (key as! Encodable).__encode(to: &container)
-                try (value as! Encodable).__encode(to: &container)
+                try container.encode(key)
+                try container.encode(value)
             }
         }
     }
 }
 
-extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ {
+extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
     @_inlineable // FIXME(sil-serialize-all)
     public init(from decoder: Decoder) throws {
-        // Initialize self here so we can print type(of: self).
         self.init()
-        assertTypeIsDecodable(Key.self, in: type(of: self))
-        assertTypeIsDecodable(Value.self, in: type(of: self))
 
         if Key.self == String.self {
             // The keys are Strings, so we should be able to expect a keyed container.
             let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
-            let valueMetaType = Value.self as! Decodable.Type
             for key in container.allKeys {
-                let value = try valueMetaType.init(__from: container, forKey: key)
-                self[key.stringValue as! Key] = (value as! Value)
+                let value = try container.decode(Value.self, forKey: key)
+                self[key.stringValue as! Key] = value
             }
         } else if Key.self == Int.self {
             // The keys are Ints, so we should be able to expect a keyed container.
-            let valueMetaType = Value.self as! Decodable.Type
             let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
             for key in container.allKeys {
                 guard key.intValue != nil else {
@@ -4385,8 +4296,8 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
                                                                            debugDescription: "Expected Int key but found String key instead."))
                 }
 
-                let value = try valueMetaType.init(__from: container, forKey: key)
-                self[key.intValue! as! Key] = (value as! Value)
+                let value = try container.decode(Value.self, forKey: key)
+                self[key.intValue! as! Key] = value
             }
         } else {
             // We should have encoded as an array of alternating key-value pairs.
@@ -4400,18 +4311,16 @@ extension Dictionary : Decodable /* where Key : Decodable, Value : Decodable */ 
                 }
             }
 
-            let keyMetaType = (Key.self as! Decodable.Type)
-            let valueMetaType = (Value.self as! Decodable.Type)
             while !container.isAtEnd {
-                let key = try keyMetaType.init(__from: &container)
+               let key = try container.decode(Key.self)
 
                 guard !container.isAtEnd else {
                     throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
                                                                                  debugDescription: "Unkeyed container reached end before value in key-value pair."))
                 }
 
-                let value = try valueMetaType.init(__from: &container)
-                self[key as! Key] = (value as! Value)
+                let value = try container.decode(Value.self)
+                self[key] = value
             }
         }
     }

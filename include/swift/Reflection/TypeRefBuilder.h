@@ -73,12 +73,36 @@ using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
-  FieldSection fieldmd;
-  AssociatedTypeSection assocty;
-  BuiltinTypeSection builtin;
-  CaptureSection capture;
-  GenericSection typeref;
-  GenericSection reflstr;
+  struct {
+    FieldSection Metadata;
+    uintptr_t SectionOffset;
+  } Field;
+
+  struct {
+    AssociatedTypeSection Metadata;
+    uintptr_t SectionOffset;
+  } AssociatedType;
+
+  struct {
+    BuiltinTypeSection Metadata;
+    uintptr_t SectionOffset;
+  } Builtin;
+
+  struct {
+    CaptureSection Metadata;
+    uintptr_t SectionOffset;
+  } Capture;
+
+  struct {
+    GenericSection Metadata;
+    uintptr_t SectionOffset;
+  } TypeReference;
+
+  struct {
+    GenericSection Metadata;
+    uintptr_t SectionOffset;
+  } ReflectionString;
+
   uintptr_t LocalStartAddress;
   uintptr_t RemoteStartAddress;
 };
@@ -322,10 +346,12 @@ public:
   lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
-  const FieldDescriptor *getFieldTypeInfo(const TypeRef *TR);
+  std::pair<const FieldDescriptor *, uintptr_t>
+  getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  bool getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD,
+  bool getFieldTypeRefs(const TypeRef *TR,
+                        const std::pair<const FieldDescriptor *, uintptr_t> &FD,
                         std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.
@@ -336,7 +362,8 @@ public:
   const CaptureDescriptor *getCaptureDescriptor(uintptr_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
-  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD);
+  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD,
+                                           uintptr_t Offset);
 
   ///
   /// Dumping typerefs, field declarations, associated types

@@ -38,7 +38,7 @@ public struct _UIntBuffer<
 }
 
 extension _UIntBuffer : Sequence {
-  public typealias SubSequence = RangeReplaceableRandomAccessSlice<_UIntBuffer>
+  public typealias SubSequence = Slice<_UIntBuffer>
   
   @_fixed_layout
   public struct Iterator : IteratorProtocol, Sequence {

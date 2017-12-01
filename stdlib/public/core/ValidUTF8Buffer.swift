@@ -42,7 +42,7 @@ public struct _ValidUTF8Buffer<
 }
 
 extension _ValidUTF8Buffer : Sequence {
-  public typealias SubSequence = RangeReplaceableRandomAccessSlice<_ValidUTF8Buffer>
+  public typealias SubSequence = Slice<_ValidUTF8Buffer>
   
 
   @_fixed_layout // FIXME(sil-serialize-all)

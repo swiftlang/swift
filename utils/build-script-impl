@@ -323,7 +323,11 @@ function to_varname() {
 }
 
 function set_lldb_build_mode() {
-    LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
+    if [[ "${LLDB_BUILD_TYPE}" == "RelWithDebInfo" ]]; then
+      LLDB_BUILD_MODE="CustomSwift-Release"
+    else
+      LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
+    fi
 }
 
 function is_llvm_lto_enabled() {

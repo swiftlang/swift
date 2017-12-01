@@ -261,8 +261,8 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 
   @_inlineable
   public subscript(bounds: Range<Index>)
-    -> RandomAccessSlice<CountableClosedRange<Bound>> {
-    return RandomAccessSlice(base: self, bounds: bounds)
+    -> Slice<CountableClosedRange<Bound>> {
+    return Slice(base: self, bounds: bounds)
   }
 
   /// Creates an instance with the given bounds.

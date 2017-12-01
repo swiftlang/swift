@@ -94,17 +94,17 @@ public struct Substring : StringProtocol {
   public typealias SubSequence = Substring
 
   @_versioned // FIXME(sil-serialize-all)
-  internal var _slice: RangeReplaceableBidirectionalSlice<String>
+  internal var _slice: Slice<String>
 
   /// Creates an empty substring.
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
-    _slice = RangeReplaceableBidirectionalSlice()
+    _slice = Slice()
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_slice: RangeReplaceableBidirectionalSlice<String>) {
+  internal init(_slice: Slice<String>) {
     self._slice = _slice
   }
   
@@ -116,7 +116,7 @@ public struct Substring : StringProtocol {
   ///     upper bounds of `bounds` must be valid indices of `base`.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_base base: String, _ bounds: Range<Index>) {
-    _slice = RangeReplaceableBidirectionalSlice(base: base, bounds: bounds)
+    _slice = Slice(base: base, bounds: bounds)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -434,7 +434,7 @@ extension Substring {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct ${View} {
     @_versioned // FIXME(sil-serialize-all)
-    internal var _slice: ${RangeReplaceable}BidirectionalSlice<String.${View}>
+    internal var _slice: Slice<String.${View}>
   }
 }
 
@@ -446,7 +446,7 @@ extension Substring.${View} : BidirectionalCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal init(_ base: String.${View}, _bounds: Range<Index>) {
-    _slice = ${RangeReplaceable}BidirectionalSlice(
+    _slice = Slice(
       base: String(base._core).${property},
       bounds: _bounds)
   }
@@ -537,7 +537,7 @@ extension String {
 // FIXME: The other String views should be RangeReplaceable too.
 extension Substring.UnicodeScalarView : RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
-  public init() { _slice = RangeReplaceableBidirectionalSlice.init() }
+  public init() { _slice = Slice.init() }
 
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C : Collection>(
@@ -661,7 +661,7 @@ extension String {
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
     return Substring(
-      _slice: RangeReplaceableBidirectionalSlice(base: self, bounds: r))
+      _slice: Slice(base: self, bounds: r))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -712,15 +712,15 @@ extension String {
     return element
   }
 }
-extension String.CharacterView {
+extension String._CharacterView {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, obsoleted: 4, message:
     "Please use 'first', 'dropFirst()', or 'Substring.CharacterView.popFirst()'.")
-  public mutating func popFirst() -> String.CharacterView.Element? {
+  public mutating func popFirst() -> String._CharacterView.Element? {
     guard !isEmpty else { return nil }
     let element = first!
     let nextIdx = self.index(after: self.startIndex)
-    self = String(self[nextIdx...]).characters
+    self = String(self[nextIdx...])._characters
     return element
   }
 }

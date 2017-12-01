@@ -94,14 +94,14 @@ extension BNNSImageStackDescriptor {
     _precondition(data_type != .indexed8,
                   "Image stacks cannot use the indexed8 data type.")
 
-    self.width = width
-    self.height = height
-    self.channels = channels
-    self.row_stride = row_stride
-    self.image_stride = image_stride
-    self.data_type = data_type
-    self.data_scale = 1
-    self.data_bias = 0
+    self.init(width: width,
+              height: height,
+              channels: channels,
+              row_stride: row_stride,
+              image_stride: image_stride,
+              data_type: data_type,
+              data_scale: 1,
+              data_bias: 0)
   }
 }
 
@@ -113,10 +113,10 @@ extension BNNSVectorDescriptor {
     _precondition(data_type != .indexed8,
                   "Vectors cannot use the indexed8 data type.")
 
-    self.size = size
-    self.data_type = data_type
-    self.data_scale = 1
-    self.data_bias = 0
+    self.init(size: size,
+              data_type: data_type,
+              data_scale: 1,
+              data_bias: 0)
   }
 }
 
@@ -130,11 +130,11 @@ extension BNNSLayerData {
     _precondition(data_type != .indexed8,
                   "This initializer cannot be used with the indexed8 data type; use BNNSLayerData.indexed8 instead.")
 
-    self.data = data
-    self.data_type = data_type
-    self.data_scale = data_scale
-    self.data_bias = data_bias
-    self.data_table = nil
+    self.init(data: data,
+              data_type: data_type,
+              data_scale: data_scale,
+              data_bias: data_bias,
+              data_table: nil)
   }
 
   ${available(bnns2016)}
@@ -167,15 +167,15 @@ extension BNNSActivation {
       _precondition(function != .integerLinearSaturatePerChannel,
                     "This initializer cannot be used with the integerLinearSaturatePerChannel activation function; use BNNSActivation.integerLinearSaturatePerChannel(scale:UnsafePointer<Int32>, offset:UnsafePointer<Int32>, shift:UnsafePointer<Int32>) instead.")
     }
-    self.function = function
-    self.alpha = alpha
-    self.beta = beta
-    iscale = 1                // unused
-    ioffset = 0               // unused
-    ishift = 0                // unused
-    iscale_per_channel = nil  // unused
-    ioffset_per_channel = nil // unused
-    ishift_per_channel = nil  // unused
+    self.init(function: function,
+              alpha: alpha,
+              beta: beta,
+              iscale: 1,                // unused
+              ioffset: 0,               // unused
+              ishift: 0,                // unused
+              iscale_per_channel: nil,  // unused
+              ioffset_per_channel: nil, // unused
+              ishift_per_channel: nil)  // unused
   }
 
   /// A BNNSActivation object that uses the identity activation function.
@@ -237,17 +237,17 @@ extension BNNSConvolutionLayerParameters {
               in_channels: Int,
               out_channels: Int,
               weights: BNNSLayerData) {
-    self.x_stride = x_stride
-    self.y_stride = y_stride
-    self.x_padding = x_padding
-    self.y_padding = y_padding
-    self.k_width = k_width
-    self.k_height = k_height
-    self.in_channels = in_channels
-    self.out_channels = out_channels
-    self.weights = weights
-    self.bias = .zero
-    self.activation = .identity
+    self.init(x_stride: x_stride,
+              y_stride: y_stride,
+              x_padding: x_padding,
+              y_padding: y_padding,
+              k_width: k_width,
+              k_height: k_height,
+              in_channels: in_channels,
+              out_channels: out_channels,
+              weights: weights,
+              bias: .zero,
+              activation: .identity)
   }
 }
 
@@ -262,17 +262,17 @@ extension BNNSPoolingLayerParameters {
               in_channels: Int,
               out_channels: Int,
               pooling_function: BNNSPoolingFunction) {
-    self.x_stride = x_stride
-    self.y_stride = y_stride
-    self.x_padding = x_padding
-    self.y_padding = y_padding
-    self.k_width = k_width
-    self.k_height = k_height
-    self.in_channels = in_channels
-    self.out_channels = out_channels
-    self.pooling_function = pooling_function
-    self.bias = .zero
-    self.activation = .identity
+    self.init(x_stride: x_stride,
+              y_stride: y_stride,
+              x_padding: x_padding,
+              y_padding: y_padding,
+              k_width: k_width,
+              k_height: k_height,
+              in_channels: in_channels,
+              out_channels: out_channels,
+              pooling_function: pooling_function,
+              bias: .zero,
+              activation: .identity)
   }
 }
 
@@ -281,10 +281,10 @@ extension BNNSFullyConnectedLayerParameters {
   public init(in_size: Int,
               out_size: Int,
               weights: BNNSLayerData) {
-    self.in_size = in_size
-    self.out_size = out_size
-    self.weights = weights
-    self.bias = .zero
-    self.activation = .identity
+    self.init(in_size: in_size,
+              out_size: out_size,
+              weights: weights,
+              bias: .zero,
+              activation: .identity)
   }
 }

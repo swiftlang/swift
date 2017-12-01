@@ -3101,6 +3101,27 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
     return;
   }
 
+  // Diagnose assignments to let-properties in delegating initializers.
+  if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
+    if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
+      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
+        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+            ctor->getDelegatingOrChainedInitKind(nullptr) ==
+              ConstructorDecl::BodyInitKind::Delegating) {
+          auto resolved = resolveImmutableBase(member, *this);
+          assert(resolved.first == member);
+          TC.diagnose(equalLoc, diag::assignment_let_property_delegating_init,
+                      member->getName());
+          if (resolved.second) {
+            TC.diagnose(resolved.second, diag::decl_declared_here,
+                        member->getName());
+          }
+          return;
+        }
+      }
+    }
+  }
+
   Diag<StringRef> diagID;
   if (isa<DeclRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_variable;
@@ -7362,14 +7383,16 @@ bool FailureDiagnosis::diagnoseMemberFailures(
   // and the source range for y.
   SourceRange memberRange;
   SourceLoc BaseLoc;
+  DeclNameLoc NameLoc;
 
   Type baseTy, baseObjTy;
   // UnresolvedMemberExpr doesn't have "base" expression,
   // it's represented as ".foo", which means that we need
   // to get base from the context.
-  if (isa<UnresolvedMemberExpr>(E)) {
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
     memberRange = E->getSourceRange();
     BaseLoc = E->getLoc();
+    NameLoc = UME->getNameLoc();
     baseTy = CS.getContextualType();
     if (!baseTy)
       return false;
@@ -7389,6 +7412,8 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       locator = simplifyLocator(CS, locator, memberRange);
 
     BaseLoc = baseExpr->getLoc();
+    NameLoc = DeclNameLoc(memberRange.Start);
+
     // Retypecheck the anchor type, which is the base of the member expression.
     baseExpr =
         typeCheckArbitrarySubExprIndependently(baseExpr, TCC_AllowLValue);
@@ -7574,7 +7599,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
     // FIXME: Dig out the property DeclNameLoc.
     diagnoseUnviableLookupResults(result, baseObjTy, baseExpr, memberName,
-                                  DeclNameLoc(memberRange.Start), BaseLoc);
+                                  NameLoc, BaseLoc);
     return true;
   }
 
