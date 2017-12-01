@@ -330,7 +330,7 @@ TEST(MetadataTest, getGenericMetadata) {
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
   { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1,
-    ClassFlags(), nullptr, 0, 0, 0, 0, 0 }
+    ClassFlags(), 0, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {
@@ -612,7 +612,7 @@ struct {
 } SuperclassWithPrefix = {
   { &Global1, &Global3, &Global2, &Global3 },
   { { { &destroySuperclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
+    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
       0, 0, 0, sizeof(SuperclassWithPrefix),
       sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
 };
@@ -644,7 +644,7 @@ struct {
     {} // private data
   },
   { { { &destroySubclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
+    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
       0, 0, 0,
       sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
       sizeof(HeapMetadataHeader) } },
