@@ -916,18 +916,6 @@ namespace {
         }
       }
       
-      // If the paren expr has a favored type, and the subExpr doesn't,
-      // propagate downwards. Otherwise, propagate upwards.
-      if (auto parenExpr = dyn_cast<ParenExpr>(expr)) {
-        if (!CS.getFavoredType(parenExpr->getSubExpr())) {
-          CS.setFavoredType(parenExpr->getSubExpr(),
-                            CS.getFavoredType(parenExpr));
-        } else if (!CS.getFavoredType(parenExpr)) {
-          CS.setFavoredType(parenExpr,
-                            CS.getFavoredType(parenExpr->getSubExpr()));
-        }
-      }
-      
       return { true, expr };
     }
     
@@ -1619,10 +1607,6 @@ namespace {
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {
-      if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
-        CS.setFavoredType(expr, favoredTy);
-      }
-
       auto &ctx = CS.getASTContext();
       auto parenType = CS.getType(expr->getSubExpr())->getInOutObjectType();
       auto parenFlags = ParameterTypeFlags().withInOut(expr->isSemanticallyInOutExpr());
