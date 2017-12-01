@@ -27,6 +27,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangModule.h"
 
 using namespace swift;
@@ -635,9 +636,14 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   if (!macro)
     return nullptr;
 
+  PrettyStackTraceStringAction stackRAII{"importing macro", name.str()};
+
   // Look for macros imported with the same name.
   auto known = ImportedMacros.find(name);
-  if (known != ImportedMacros.end()) {
+  if (known == ImportedMacros.end()) {
+    // Push in a placeholder to break circularity.
+    ImportedMacros[name].push_back({macro, nullptr});
+  } else {
     // Check whether this macro has already been imported.
     for (const auto &entry : known->second) {
       if (entry.first == macro) return entry.second;
@@ -655,6 +661,9 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
         return result;
       }
     }
+
+    // If not, push in a placeholder to break circularity.
+    known->second.push_back({macro, nullptr});
   }
 
   ImportingEntityRAII ImportingEntity(*this);
@@ -672,6 +681,20 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
 
   auto valueDecl = ::importMacro(*this, DC, name, macro, macroNode,
                                  /*castType*/{});
-  ImportedMacros[name].push_back({macro, valueDecl});
+
+  // Update the entry for the value we just imported.
+  // It's /probably/ the last entry in ImportedMacros[name], but there's an
+  // outside chance more macros with the same name have been imported
+  // re-entrantly since this method started.
+  if (valueDecl) {
+    auto entryIter = llvm::find_if(llvm::reverse(ImportedMacros[name]),
+        [macro](std::pair<const clang::MacroInfo *, ValueDecl *> entry) {
+      return entry.first == macro;
+    });
+    assert(entryIter != llvm::reverse(ImportedMacros[name]).end() &&
+           "placeholder not found");
+    entryIter->second = valueDecl;
+  }
+
   return valueDecl;
 }
