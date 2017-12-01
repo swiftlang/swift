@@ -391,8 +391,10 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
       if (SynthesizedTarget)
-        SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(VD,
-          (NominalTypeDecl*)SynthesizedTarget, OS);
+        SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
+            VD, const_cast<NominalTypeDecl *>(
+                    static_cast<const NominalTypeDecl *>(SynthesizedTarget)),
+            OS);
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     }
