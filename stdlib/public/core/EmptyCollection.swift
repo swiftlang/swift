@@ -19,11 +19,15 @@
 
 /// An iterator that never produces an element.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
+public struct EmptyIterator<Element> {
+  // no properties
+  
   /// Creates an instance.
   @_inlineable // FIXME(sil-serialize-all)
   public init() {}
+}
 
+extension EmptyIterator: IteratorProtocol, Sequence {
   /// Returns `nil`, indicating that there are no more elements.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {
@@ -33,20 +37,23 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 
 /// A collection whose element type is `Element` but that is always empty.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct EmptyCollection<Element> :
-  RandomAccessCollection, MutableCollection
-{
+public struct EmptyCollection<Element> {
+  // no properties
+
+  /// Creates an instance.
+  @_inlineable // FIXME(sil-serialize-all)
+  public init() {}
+}
+
+extension EmptyCollection: RandomAccessCollection, MutableCollection {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
   public typealias IndexDistance = Int
+  public typealias Indices = CountableRange<Int>
   public typealias SubSequence = EmptyCollection<Element>
-
-  /// Creates an instance.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init() {}
 
   /// Always zero, just like `endIndex`.
   @_inlineable // FIXME(sil-serialize-all)
@@ -155,8 +162,6 @@ public struct EmptyCollection<Element> :
     _debugPrecondition(bounds == Range(indices),
       "invalid bounds for an empty collection")
   }
-
-  public typealias Indices = CountableRange<Int>
 }
 
 extension EmptyCollection : Equatable {

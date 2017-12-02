@@ -164,7 +164,9 @@ extension ReversedIndex : Hashable where Base.Index : Hashable {
 ///
 /// - See also: `ReversedRandomAccessCollection`
 @_fixed_layout
-public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCollection {
+public struct ReversedCollection<Base: BidirectionalCollection> {
+  public let _base: Base
+
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -174,13 +176,14 @@ public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCo
   internal init(_base: Base) {
     self._base = _base
   }
+}
 
+extension ReversedCollection: BidirectionalCollection {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ReversedIndex<Base>
-
   public typealias IndexDistance = Base.IndexDistance
 
   @_fixed_layout
@@ -262,8 +265,6 @@ public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCo
   public subscript(bounds: Range<Index>) -> Slice<ReversedCollection> {
     return Slice(base: self, bounds: bounds)
   }
-
-  public let _base: Base
 }
 
 extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }

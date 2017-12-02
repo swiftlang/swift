@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
 public func fabs<T: FloatingPoint>(_ x: T) -> T
@@ -308,19 +310,14 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 #elseif os(Windows)
 // TODO(compnerd): implement
 #else
-% # On Darwin platform,
-% # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
-@_versioned
-@_silgen_name("_swift_Darwin_lgamma${f}_r")
-func _swift_Darwin_lgamma${f}_r(_: ${CT},
-                                _: UnsafeMutablePointer<Int32>) -> ${CT}
-
-@_transparent
+% # On Darwin platforms the real lgamma_r is not imported
+% # because it hides behind macro _REENTRANT.
+% # This is not @transparent because _stdlib_lgamma() is not public.
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
   var sign = Int32(0)
   let value = withUnsafeMutablePointer(to: &sign) {
     (signp: UnsafeMutablePointer<Int32>) -> ${CT} in
-    return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
+    return _stdlib_lgamma${f}_r(${CT}(x), signp)
   }
   return (${T}(value), Int(sign))
 }

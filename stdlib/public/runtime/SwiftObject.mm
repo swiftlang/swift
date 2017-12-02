@@ -453,10 +453,9 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 /// reference-counting.  The metadata is known to correspond to a class
 /// type, but note that does not imply being known to be a ClassMetadata
 /// due to the existence of ObjCClassWrapper.
-SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool
-swift_objc_class_usesNativeSwiftReferenceCounting(const Metadata *theClass) {
+_objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #if SWIFT_OBJC_INTEROP
   // If this is ObjC wrapper metadata, the class is definitely not using
   // Swift ref-counting.
@@ -1426,9 +1425,9 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 
 using ClassExtents = TwoWordPair<size_t, size_t>;
 
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 ClassExtents::Return
-swift_class_getInstanceExtents(const Metadata *c) {
+_getSwiftClassInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
   return ClassExtents{
@@ -1439,15 +1438,14 @@ swift_class_getInstanceExtents(const Metadata *c) {
 
 #if SWIFT_OBJC_INTEROP
 
-SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 ClassExtents::Return
-swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
+_getObjCClassInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.
   if (c->isPureObjC())
     return ClassExtents{0, class_getInstanceSize(class_const_cast(c))};
 
-  return swift_class_getInstanceExtents(c);
+  return _getSwiftClassInstanceExtents(c);
 }
 
 SWIFT_CC(swift)

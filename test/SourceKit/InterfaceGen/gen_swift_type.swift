@@ -5,6 +5,8 @@
 // RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DCS_2T1_ %s -- %s | %FileCheck -check-prefix=CHECK5 %s
 // RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DSi_ %s -- %s | %FileCheck -check-prefix=CHECK6 %s
 
+// REQUIRES: rdar35799113
+
 public struct A {
 	public func fa() {}
 }

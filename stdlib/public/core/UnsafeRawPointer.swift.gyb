@@ -219,7 +219,7 @@
 ///       let numberPointer = ${Self}(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @_fixed_layout
-public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
+public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// The underlying raw pointer.
   /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
@@ -895,21 +895,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     _memmove(dest: self, src: source, size: UInt(byteCount))
   }
 %  end # mutable
+}
 
-  //
-  // Protocol conformance
-  //
-
-  /// The pointer's hash value.
-  ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
-  @_inlineable
-  public var hashValue: Int {
-    return Int(bitPattern: self)
-  }
-
+extension ${Self}: Strideable {
   /// Returns the distance from this pointer to the given pointer.
   ///
   /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
@@ -941,7 +929,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 }
 
-extension ${Self} {
+extension ${Self}: Equatable {
   // - Note: This may be more efficient than Strideable's implementation
   //   calling ${Self}.distance().
   /// Returns a Boolean value indicating whether two pointers are equal.
@@ -956,7 +944,9 @@ extension ${Self} {
   public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
+}
 
+extension ${Self}: Comparable {
   // - Note: This is an unsigned comparison unlike Strideable's
   //   implementation.
   /// Returns a Boolean value indicating whether the first pointer references
@@ -971,6 +961,18 @@ extension ${Self} {
   @_transparent
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+}
+
+extension ${Self}: Hashable {
+  /// The pointer's hash value.
+  ///
+  /// The hash value is not guaranteed to be stable across different
+  /// invocations of the same program.  Do not persist the hash value across
+  /// program runs.
+  @_inlineable
+  public var hashValue: Int {
+    return Int(bitPattern: self)
   }
 }
 
