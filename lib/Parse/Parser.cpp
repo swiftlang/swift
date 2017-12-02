@@ -134,6 +134,8 @@ swift::Parser::BacktrackingScope::~BacktrackingScope() {
   if (Backtrack) {
     P.backtrackToPosition(PP);
     DT.abort();
+    P.LeadingTrivia = LeadingTrivia;
+    P.TrailingTrivia = TrailingTrivia;
   }
 }
 
