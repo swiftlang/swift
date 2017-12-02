@@ -38,18 +38,13 @@ extension LazyCollectionProtocol where Elements == Self {
   public var elements: Self { return self }
 }
 
-% for Traversal in TRAVERSALS:
-%   TraversalCollection = collectionForTraversal(Traversal)
-%   Self = 'Lazy' + TraversalCollection
-%   Slice = TraversalCollection.replace('Collection', 'Slice')
-
 /// A collection containing the same elements as a `Base` collection,
 /// but on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`, `LazyCollection`
 @_fixed_layout
-public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
+public struct LazyCollection<Base : Collection> : LazyCollectionProtocol {
 
   /// The type of the underlying collection.
   public typealias Elements = Base
@@ -78,7 +73,7 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
-extension ${Self} : Sequence {
+extension LazyCollection : Sequence {
   
   public typealias Iterator = Base.Iterator
 
@@ -118,7 +113,7 @@ extension ${Self} : Sequence {
   }
 }
 
-extension ${Self} : ${TraversalCollection} {
+extension LazyCollection : Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -162,7 +157,7 @@ extension ${Self} : ${TraversalCollection} {
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public subscript(bounds: Range<Index>) -> Slice<${Self}<Base>> {
+  public subscript(bounds: Range<Index>) -> Slice<LazyCollection<Base>> {
     return Slice(base: self, bounds: bounds)
   }
 
@@ -226,8 +221,10 @@ extension ${Self} : ${TraversalCollection} {
     return _base.distance(from:start, to: end)
   }
 
-%   if Traversal != 'Forward':
+}
 
+extension LazyCollection : BidirectionalCollection
+  where Base : BidirectionalCollection {
   @_inlineable
   public func index(before i: Base.Index) -> Base.Index {
     return _base.index(before: i)
@@ -237,11 +234,13 @@ extension ${Self} : ${TraversalCollection} {
   public var last: Base.Element? {
     return _base.last
   }
-%   end
 }
 
+extension LazyCollection : RandomAccessCollection
+  where Base : RandomAccessCollection {}
+
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
-extension ${TraversalCollection} {
+extension Collection {
   /// A view onto this collection that provides lazy implementations of
   /// normally eager operations, such as `map` and `filter`.
   ///
@@ -249,11 +248,13 @@ extension ${TraversalCollection} {
   /// intermediate operations from allocating storage, or when you only
   /// need a part of the final collection to avoid unnecessary computation.
   @_inlineable
-  public var lazy: ${Self}<Self> {
-    return ${Self}(_base: self)
+  public var lazy: LazyCollection<Self> {
+    return LazyCollection(_base: self)
   }
 }
 
+% for Traversal in TRAVERSALS:
+%   TraversalCollection = collectionForTraversal(Traversal)
 // Without this specific overload the non-re-wrapping extension on
 // LazyCollectionProtocol (below) is not selected for some reason.
 extension ${TraversalCollection} where Self : LazyCollectionProtocol {
@@ -263,12 +264,15 @@ extension ${TraversalCollection} where Self : LazyCollectionProtocol {
     return self
   }
 }
-
 % end
 
 extension Slice: LazySequenceProtocol where Base: LazySequenceProtocol { }
 extension Slice: LazyCollectionProtocol where Base: LazyCollectionProtocol { }
 
+@available(*, deprecated, renamed: "LazyCollection")
+public typealias LazyBidirectionalCollection<T> = LazyCollection<T> where T : BidirectionalCollection
+@available(*, deprecated, renamed: "LazyCollection")
+public typealias LazyRandomAccessCollection<T> = LazyCollection<T> where T : RandomAccessCollection
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

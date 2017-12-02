@@ -988,8 +988,7 @@ tests.test("ReversedCollection/Lazy") {
     typealias Base = LazyMapCollection<[Int], Int>
     ExpectType<Base>.test(base)
 
-    typealias LazyReversedBase = LazyRandomAccessCollection<
-      ReversedCollection<Base>>
+    typealias LazyReversedBase = LazyCollection<ReversedCollection<Base>>
 
     let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
@@ -1006,8 +1005,7 @@ tests.test("ReversedCollection/Lazy") {
     typealias Base = LazyMapCollection<String, Character>
     ExpectType<Base>.test(base)
 
-    typealias LazyReversedBase = LazyBidirectionalCollection<
-      ReversedCollection<Base>>
+    typealias LazyReversedBase = LazyCollection<ReversedCollection<Base>>
 
     let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
