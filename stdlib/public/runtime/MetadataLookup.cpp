@@ -258,10 +258,14 @@ _classByName(const llvm::StringRef typeName) {
 
 /// \param typeName The name of a class in the form: <module>.<class>
 /// \return Returns the metadata of the type, if found.
-SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT
+
+/// internal func _getTypeByName(_ name: UnsafePointer<UInt8>,
+///                              _ nameLength: UInt)  -> Any.Type?
+#define _getTypeByName \
+  MANGLE_SYM(s14_getTypeByNameypXpSgSPys5UInt8VG_SutF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *
-swift_getTypeByName(const char *typeName, size_t typeNameLength) {
+_getTypeByName(const char *typeName, size_t typeNameLength) {
   llvm::StringRef name(typeName, typeNameLength);
   return _classByName(name);
 }

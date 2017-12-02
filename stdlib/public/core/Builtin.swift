@@ -322,7 +322,7 @@ public func _onFastPath() {
 // when using RuntimeShims.h
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
-@_silgen_name("swift_objc_class_usesNativeSwiftReferenceCounting")
+@_silgen_name("_objcClassUsesNativeSwiftReferenceCounting")
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
 #else
 @_inlineable // FIXME(sil-serialize-all)
@@ -335,14 +335,14 @@ internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_class_getInstanceExtents")
-internal func swift_class_getInstanceExtents(_ theClass: AnyClass)
+@_silgen_name("_getSwiftClassInstanceExtents")
+internal func getSwiftClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_objc_class_unknownGetInstanceExtents")
-internal func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
+@_silgen_name("_getObjCClassInstanceExtents")
+internal func getObjCClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @_inlineable // FIXME(sil-serialize-all)
@@ -350,9 +350,9 @@ internal func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
-  return Int(swift_objc_class_unknownGetInstanceExtents(theClass).positive)
+  return Int(getObjCClassInstanceExtents(theClass).positive)
 #else
-  return Int(swift_class_getInstanceExtents(theClass).positive)
+  return Int(getSwiftClassInstanceExtents(theClass).positive)
 #endif
 }
 
@@ -488,16 +488,12 @@ internal func _makeBridgeObject(
   )
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
 @_silgen_name("_swift_class_getSuperclass")
 internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
-@_inlineable // FIXME(sil-serialize-all)
-@inline(__always)
-public // @testable
+public
 func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return _swift_class_getSuperclass(t)
 }
