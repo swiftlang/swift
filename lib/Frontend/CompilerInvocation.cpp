@@ -237,7 +237,6 @@ private:
 
   bool setUpForSILOrLLVM();
 
-
   /// Determine the correct output filename when none was specified.
   ///
   /// Such an absence should only occur when invoking the frontend
@@ -246,30 +245,27 @@ private:
   /// if output is required for the requested action.
   bool deriveOutputFilenameFromInputFile();
 
-  
   /// Determine the correct output filename when a directory was specified.
   ///
   /// Such a specification should only occur when invoking the frontend
-  /// directly, because the driver will always pass -o with an appropriate filename
-  /// if output is required for the requested action.
+  /// directly, because the driver will always pass -o with an appropriate
+  /// filename if output is required for the requested action.
   bool deriveOutputFilenameForDirectory(StringRef outputDir);
-  
+
   std::string determineBaseNameOfOutput() const;
 
   void deriveOutputFilenameFromParts(StringRef dir, StringRef base);
 
   void determineSupplementaryOutputFilenames();
-  
+
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
   ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
-  
-  bool checkForUnusedOutputPaths() const;
-  
-  std::vector<std::string>
-  readOutputFileList(StringRef filelistPath) const;
 
+  bool checkForUnusedOutputPaths() const;
+
+  std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
 
 public:
   FrontendArgsToOptionsConverter(DiagnosticEngine &Diags,
@@ -603,15 +599,6 @@ bool FrontendArgsToOptionsConverter::setUpForSILOrLLVM() {
   return false;
 }
 
-
-
-
-
-
-
-
-
-
 bool FrontendArgsToOptionsConverter::computeModuleName() {
   const Arg *A = Args.getLastArg(options::OPT_module_name);
   if (A) {
@@ -619,14 +606,14 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
   } else if (Opts.ModuleName.empty()) {
     // The user did not specify a module name, so determine a default fallback
     // based on other options.
-    
+
     // Note: this code path will only be taken when running the frontend
     // directly; the driver should always pass -module-name when invoking the
     // frontend.
     if (computeFallbackModuleName())
       return true;
   }
-  
+
   if (Lexer::isIdentifier(Opts.ModuleName) &&
       (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
     return false;
@@ -637,7 +624,7 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
     return false;
   }
   auto DID = (Opts.ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
-  : diag::error_bad_module_name;
+                                              : diag::error_bad_module_name;
   Diags.diagnose(SourceLoc(), DID, Opts.ModuleName, A == nullptr);
   Opts.ModuleName = "__bad__";
   return false; // FIXME: Must continue to run to pass the tests, but should not
@@ -660,7 +647,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   }
   ArrayRef<std::string> outputFilenames =
       getOutputFilenamesFromCommandLineOrFilelist();
-  
+
   bool isOutputAUniqueOrdinaryFile =
       outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
       !llvm::sys::fs::is_directory(outputFilenames[0]);
@@ -677,21 +664,21 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
     return false;
   }
   ArrayRef<std::string> outputFilenamesFromCommandLineOrFilelist =
-  getOutputFilenamesFromCommandLineOrFilelist();
-  
+      getOutputFilenamesFromCommandLineOrFilelist();
+
   if (outputFilenamesFromCommandLineOrFilelist.size() > 1) {
     // WMO, threaded with N files (also someday batch mode).
     Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
-  
+
   if (outputFilenamesFromCommandLineOrFilelist.empty()) {
     // When the Frontend is invoked without going through the driver
     // (e.g. for testing), it is convenient to derive output filenames from
     // input.
     return deriveOutputFilenameFromInputFile();
   }
-  
+
   StringRef outputFilename = outputFilenamesFromCommandLineOrFilelist[0];
   if (!llvm::sys::fs::is_directory(outputFilename)) {
     // Could be -primary-file (1), or -wmo (non-threaded w/ N (input) files)
@@ -722,10 +709,9 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
   return false;
 }
 
-
 bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
-                                                                      StringRef outputDir) {
-  
+    StringRef outputDir) {
+
   std::string baseName = determineBaseNameOfOutput();
   if (baseName.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
@@ -737,12 +723,12 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
 }
 
 void FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
-                                                                   StringRef dir, StringRef base) {
+    StringRef dir, StringRef base) {
   assert(!base.empty());
   llvm::SmallString<128> path(dir);
   llvm::sys::path::append(path, base);
   StringRef suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
-                                                                            Opts.RequestedAction);
+      Opts.RequestedAction);
   llvm::sys::path::replace_extension(path, suffix);
   Opts.OutputFilenames.push_back(path.str());
 }
@@ -752,16 +738,15 @@ std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
   if (Opts.Inputs.hasPrimaryInputs()) {
     nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().getFile();
   } else if (auto UserSpecifiedModuleName =
-             Args.getLastArg(options::OPT_module_name)) {
+                 Args.getLastArg(options::OPT_module_name)) {
     nameToStem = UserSpecifiedModuleName->getValue();
   } else if (Opts.Inputs.inputFilenameCount() == 1) {
     nameToStem = Opts.Inputs.getFilenameOfFirstInput();
   } else
     nameToStem = "";
-  
+
   return llvm::sys::path::stem(nameToStem).str();
 }
-
 
 void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
   using namespace options;
@@ -855,21 +840,20 @@ bool FrontendArgsToOptionsConverter::checkForUnusedOutputPaths() const {
   return false;
 }
 
-
 ArrayRef<std::string>
 FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   if (cachedOutputFilenamesFromCommandLineOrFilelist) {
     return *cachedOutputFilenamesFromCommandLineOrFilelist;
   }
-  
+
   if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
     assert(!Args.hasArg(options::OPT_o) &&
            "don't use -o with -output-filelist");
     cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
-                                                           readOutputFileList(A->getValue()));
+        readOutputFileList(A->getValue()));
   } else {
     cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
-                                                           Args.getAllArgValues(options::OPT_o));
+        Args.getAllArgValues(options::OPT_o));
   }
   return *cachedOutputFilenamesFromCommandLineOrFilelist;
 }
@@ -1137,21 +1121,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
   }
-#if __APPLE__
-  else if (FrontendOptions::isActionImmediate(FrontendOpts.RequestedAction)) {
-    clang::VersionTuple currentOSVersion = inferAppleHostOSVersion();
-    if (currentOSVersion.getMajor() != 0) {
-      llvm::Triple::OSType currentOS = Target.getOS();
-      if (currentOS == llvm::Triple::Darwin)
-        currentOS = llvm::Triple::MacOSX;
-
-      SmallString<16> newOSBuf;
-      llvm::raw_svector_ostream newOS(newOSBuf);
-      newOS << llvm::Triple::getOSTypeName(currentOS) << currentOSVersion;
-      Target.setOSName(newOS.str());
-    }
-  }
-#endif
 
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,

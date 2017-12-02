@@ -33,8 +33,9 @@ enum class InputFileKind {
   IFK_SIL,
   IFK_LLVM_IR
 };
-  
-// Inputs may include buffers that override contents, and eventually should always include a buffer.
+
+// Inputs may include buffers that override contents, and eventually should
+// always include a buffer.
 class InputFile {
   std::string Filename;
   bool IsPrimary;
@@ -47,7 +48,7 @@ public:
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
       : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {}
-  
+
   bool getIsPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *getBuffer() const { return Buffer; }
   StringRef getFile() const { return Filename; }
@@ -82,7 +83,6 @@ public:
   }
 
   // Readers:
-
 
   ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
 
@@ -125,7 +125,7 @@ private:
     assert(primaryInputCount() < 2 &&
            "have not implemented >1 primary input yet");
   }
-  bool ensureThatAllNonPrimariesEndWithSIB() const;
+  bool doAllNonPrimariesEndWithSIB() const;
 
 public:
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
@@ -156,24 +156,24 @@ public:
     const auto *input = getOptionalUniquePrimaryInput();
     return input == nullptr ? StringRef() : input->getFile();
   }
-  
+
   bool isFilePrimary(StringRef file) {
     StringRef correctedName = file.equals("<stdin>") ? "-" : file;
     auto iterator = PrimaryInputs.find(correctedName);
     return iterator != PrimaryInputs.end() &&
            AllFiles[iterator->second].getIsPrimary();
   }
-  
+
   unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
 
   // Multi-facet readers
-  
+
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
-  
+
   // Writers
 
   void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
