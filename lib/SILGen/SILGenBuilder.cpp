@@ -714,6 +714,18 @@ createValueMetatype(SILLocation loc, SILType metatype,
   return ManagedValue::forUnmanaged(v);
 }
 
+ManagedValue SILGenBuilder::createBlockToAnyObject(SILLocation loc,
+                                                   ManagedValue v,
+                                                   SILType destType) {
+  assert(destType.isAnyObject());
+  assert(v.getType().is<SILFunctionType>());
+  assert(v.getType().castTo<SILFunctionType>()->getRepresentation() ==
+           SILFunctionTypeRepresentation::Block);
+
+  // For now, we don't have a better instruction than this.
+  return createUncheckedRefCast(loc, v, destType);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//
