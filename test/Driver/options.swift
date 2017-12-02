@@ -7,7 +7,7 @@
 // SIL_FILES: this mode requires a single input file
 
 // RUN: not %target-swift-frontend -parse-sil -emit-sil %s %s 2>&1 | %FileCheck -check-prefix=DUPLICATE_FILES %s
-// DUPLICATE_FILES: input file 'SOURCE_DIR/test/Driver/options.swift' appears more than once on command line
+// DUPLICATE_FILES: duplicate input file 'SOURCE_DIR/test/Driver/options.swift'
 
 
 // RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME %s
