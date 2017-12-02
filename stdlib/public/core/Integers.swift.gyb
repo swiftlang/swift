@@ -3378,14 +3378,15 @@ ${assignmentOperatorComment(x.operator, True)}
   ) -> (quotient: ${Self}, remainder: ${Self}) {
     // FIXME(integers): tests
 %   # 128 bit types are not provided by the 32-bit LLVM
-%   #if word_bits == 32 and bits == 64:
-%   if bits == 64:
-    let lhs = DoubleWidth<${Self}>(dividend)
-    let rhs = DoubleWidth<${Self}>(self)
+%   if word_bits == 32 and bits == 64:
+%   #if bits == 64: #FIXME(double-width): uncomment when DoubleWidth is back
+    // let lhs = DoubleWidth<${Self}>(dividend)
+    // let rhs = DoubleWidth<${Self}>(self)
 
-    let (quotient, remainder) = lhs.quotientAndRemainder(dividingBy: rhs)
+    // let (quotient, remainder) = lhs.quotientAndRemainder(dividingBy: rhs)
     // FIXME(integers): check for high words in quotient and remainder
-    return (${Self}(quotient.low), ${Self}(remainder.low))
+    // return (${Self}(quotient.low), ${Self}(remainder.low))
+    fatalError("Operation is not supported")
 %   else:
     // FIXME(integers): handle division by zero and overflows
     _precondition(self != 0, "Division by zero")
