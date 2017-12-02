@@ -534,7 +534,7 @@ internal struct _Stdout : TextOutputStream {
     if let asciiBuffer = string._core.asciiBuffer {
       defer { _fixLifetime(string) }
 
-      _swift_stdlib_fwrite_stdout(
+      _stdlib_fwrite_stdout(
         UnsafePointer(asciiBuffer.baseAddress!),
         asciiBuffer.count,
         1)
@@ -542,7 +542,7 @@ internal struct _Stdout : TextOutputStream {
     }
 
     for c in string.utf8 {
-      _swift_stdlib_putchar_unlocked(Int32(c))
+      _stdlib_putchar_unlocked(Int32(c))
     }
   }
 }

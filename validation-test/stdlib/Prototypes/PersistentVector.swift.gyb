@@ -161,25 +161,6 @@ func _dumpRec(
   }
 }
 
-struct _Stdout : TextOutputStream {
-  mutating func _lock() {
-    _swift_stdlib_flockfile_stdout()
-  }
-
-  mutating func _unlock() {
-    _swift_stdlib_funlockfile_stdout()
-  }
-
-  mutating func write(_ string: String) {
-    // FIXME: buffering?
-    // It is important that we use stdio routines in order to correctly
-    // interoperate with stdio buffering.
-    for c in string.utf8 {
-      _swift_stdlib_putchar_unlocked(Int32(c))
-    }
-  }
-}
-
 % for (name, underlyingType) in [
 %   ('Int', 'UInt'), ('Int32', 'UInt32')
 % ]:
