@@ -1243,7 +1243,9 @@ static inline bool swift_unknownUnownedIsEqual(UnownedReference *ref,
 #endif /* SWIFT_OBJC_INTEROP */
 
 /// Return the name of a Swift type represented by a metadata object.
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+/// func _getTypeName(_ type: Any.Type, qualified: Bool)
+///   -> (UnsafePointer<UInt8>, Int)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 TwoWordPair<const char *, uintptr_t>::Return
 swift_getTypeName(const Metadata *type, bool qualified);  
 
