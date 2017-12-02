@@ -506,7 +506,7 @@ private:
 
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
-  static bool doesActionImplyMainModule(ActionType);
+  static bool needsProperModuleName(ActionType);
 };
 
 }

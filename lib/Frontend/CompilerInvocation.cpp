@@ -618,7 +618,7 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
       (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
     return false;
   }
-  if (FrontendOptions::doesActionImplyMainModule(Opts.RequestedAction) ||
+  if (FrontendOptions::needsProperModuleName(Opts.RequestedAction) ||
       Opts.isCompilingExactlyOneSwiftFile()) {
     Opts.ModuleName = "main";
     return false;
@@ -659,8 +659,9 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 }
 
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
+  assert(Opts.OutputFilenames.empty() &&
+         "Output filename should not be set at this point");
   if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
-    Opts.OutputFilenames.clear();
     return false;
   }
   ArrayRef<std::string> outputFilenamesFromCommandLineOrFilelist =
