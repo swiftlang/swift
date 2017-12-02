@@ -504,6 +504,7 @@ extension _StringGuts {
   // TODO: Use the extra 12 bits
 
   ///*fileprivate*/ internal // TODO: private in Swift 4
+  @_inlineable
   public // TODO(StringGuts): for testing only
   var _isUnmanaged: Bool {
     @inline(__always) get {
@@ -511,6 +512,7 @@ extension _StringGuts {
     }
   }
 
+  @_inlineable
   @_versioned
   internal var _unmanagedCount: Int {
     @inline(__always) get {
@@ -519,6 +521,7 @@ extension _StringGuts {
     }
   }
 
+  @_inlineable
   @_versioned
   internal var _unmanagedRawStart: UnsafeRawPointer {
     @inline(__always) get {
@@ -591,6 +594,7 @@ extension _StringGuts {
     get { return _isTagged && _objectBitPattern & _smallBit != 0 }
   }
 
+  @_inlineable
   @_versioned
   internal var _taggedCocoaCount: Int {
     let countMask: UInt = (1 &<< 60) &- 1
@@ -598,6 +602,7 @@ extension _StringGuts {
       _bridgeObject(toTagPayload: _object) & countMask)
   }
 
+  @_inlineable
   @_versioned
   internal var _taggedCocoaObject: _CocoaString {
     @inline(__always) get {
