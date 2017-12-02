@@ -271,9 +271,9 @@
 // CHECK-64: ] }
 
 
-// CHECK: @objc_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* @_T013objc_subclass10SwiftGizmoCN to i8*), i8* bitcast (%swift.type* @_T013objc_subclass11SwiftGizmo2CN to i8*)], section "__DATA, __objc_classlist, regular, no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
+// CHECK: @objc_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* @_T013objc_subclass10SwiftGizmoCN to i8*), i8* bitcast (%swift.type* @_T013objc_subclass11SwiftGizmo2CN to i8*)], section "__DATA,__objc_classlist,regular,no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
 
-// CHECK: @objc_non_lazy_classes = internal global [1 x i8*] [i8* bitcast (%swift.type* @_T013objc_subclass11SwiftGizmo2CN to i8*)], section "__DATA, __objc_nlclslist, regular, no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
+// CHECK: @objc_non_lazy_classes = internal global [1 x i8*] [i8* bitcast (%swift.type* @_T013objc_subclass11SwiftGizmo2CN to i8*)], section "__DATA,__objc_nlclslist,regular,no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
 
 import Foundation
 import gizmo

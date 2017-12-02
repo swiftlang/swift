@@ -329,7 +329,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
                                          llvm::GlobalValue::PrivateLinkage,
                                          init,
                           llvm::Twine("\01L_selector_data(") + selector + ")");
-  global->setSection("__TEXT,__objc_methname,cstring_literals");
+  SetCStringLiteralSection(global, ObjCLabelType::MethodVarName);
   global->setAlignment(1);
   addCompilerUsedGlobal(global);
 
@@ -364,7 +364,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   global->setAlignment(getPointerAlignment().getValue());
 
   // This section name is magical for the Darwin static and dynamic linkers.
-  global->setSection("__DATA,__objc_selrefs,literal_pointers,no_dead_strip");
+  global->setSection(GetObjCSectionName("__objc_selrefs",
+                                        "literal_pointers,no_dead_strip"));
 
   // Make sure that this reference does not get optimized away.
   addCompilerUsedGlobal(global);
@@ -426,19 +427,19 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                  + protocolName);
   protocolLabel->setAlignment(getPointerAlignment().getValue());
   protocolLabel->setVisibility(llvm::GlobalValue::HiddenVisibility);
-  protocolLabel->setSection("__DATA,__objc_protolist,coalesced,no_dead_strip");
-  
+  protocolLabel->setSection(GetObjCSectionName("__objc_protolist",
+                                               "coalesced,no_dead_strip"));
+
   // Introduce a variable to reference the protocol.
-  auto *protocolRef
-    = new llvm::GlobalVariable(Module, Int8PtrTy,
-                               /*constant*/ false,
+  auto *protocolRef =
+      new llvm::GlobalVariable(Module, Int8PtrTy, /*constant*/ false,
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
-                               llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_")
-                                 + protocolName);
+                               llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_") + protocolName);
   protocolRef->setAlignment(getPointerAlignment().getValue());
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
-  protocolRef->setSection("__DATA,__objc_protorefs,coalesced,no_dead_strip");
+  protocolRef->setSection(GetObjCSectionName("__objc_protorefs",
+                                             "coalesced,no_dead_strip"));
 
   ObjCProtocolPair pair{protocolRecord, protocolRef};
   ObjCProtocols.insert({proto, pair});
