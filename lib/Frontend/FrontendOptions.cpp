@@ -96,7 +96,7 @@ void FrontendInputs::transformInputFilenames(
   }
 }
 
-bool FrontendOptions::doesActionImplyMainModule(ActionType action) {
+bool FrontendOptions::needsProperModuleName(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
@@ -108,7 +108,7 @@ bool FrontendOptions::doesActionImplyMainModule(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-    return true;
+    return false;
   case ActionType::EmitPCH:
   case ActionType::EmitSILGen:
   case ActionType::EmitSIL:
@@ -116,16 +116,16 @@ bool FrontendOptions::doesActionImplyMainModule(ActionType action) {
   case ActionType::EmitSIB:
   case ActionType::EmitModuleOnly:
   case ActionType::MergeModules:
-    return false;
+    return true;
   case ActionType::Immediate:
   case ActionType::REPL:
-    return true;
+    return false;
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
-    return false;
+    return true;
   }
   llvm_unreachable("Unknown ActionType");
 }
