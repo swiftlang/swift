@@ -174,6 +174,8 @@ private:
   }
 
   bool getFilesFromFilelist() {
+    if (!FilelistPathArg)
+      return false;
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
         llvm::MemoryBuffer::getFile(filelistPath());
     if (!filelistBufferOrError) {
