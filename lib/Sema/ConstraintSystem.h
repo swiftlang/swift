@@ -90,8 +90,10 @@ class ConstraintLocator;
 
 /// Describes a conversion restriction or a fix.
 struct RestrictionOrFix {
-  ConversionRestrictionKind Restriction;
-  Fix TheFix;
+  union {
+    ConversionRestrictionKind Restriction;
+    Fix TheFix;
+  };
   bool IsRestriction;
 
 public:
@@ -1559,11 +1561,11 @@ public:
   
   TypeBase* getFavoredType(Expr *E) {
     assert(E != nullptr);
-    return this->FavoredTypes[E];
+    return this->FavoredTypes[E->getSemanticsProvidingExpr()];
   }
   void setFavoredType(Expr *E, TypeBase *T) {
     assert(E != nullptr);
-    this->FavoredTypes[E] = T;
+    this->FavoredTypes[E->getSemanticsProvidingExpr()] = T;
   }
 
   /// Set the type in our type map for a given expression. The side
