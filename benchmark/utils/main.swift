@@ -106,6 +106,7 @@ import StaticArray
 import StrComplexWalk
 import StrToInt
 import StringBuilder
+import StringComparison
 import StringEdits
 import StringEnum
 import StringInterpolation
@@ -225,6 +226,7 @@ registerBenchmark(StaticArrayTest)
 registerBenchmark(StrComplexWalk)
 registerBenchmark(StrToInt)
 registerBenchmark(StringBuilder)
+registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
 registerBenchmark(StringInterpolation)
