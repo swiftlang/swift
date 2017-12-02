@@ -661,9 +661,9 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
   assert(Opts.OutputFilenames.empty() &&
          "Output filename should not be set at this point");
-  if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
-    return false;
-  }
+//  if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
+//    return false;
+//  }
   ArrayRef<std::string> outputFilenamesFromCommandLineOrFilelist =
       getOutputFilenamesFromCommandLineOrFilelist();
 
