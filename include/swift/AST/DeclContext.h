@@ -627,12 +627,6 @@ class IterableDeclContext {
   /// Retrieve the \c ASTContext in which this iterable context occurs.
   ASTContext &getASTContext() const;
 
-protected:
-  /// Retrieve the set of members in this context without loading any from the
-  /// associated lazy loader; this should only be used as part of implementing
-  /// abstractions on top of member loading, such as a name lookup table.
-  DeclRange getCurrentMembersWithoutLoading() const;
-
 public:
   IterableDeclContext(IterableDeclContextKind kind)
     : LastDeclAndKind(nullptr, kind) { }
@@ -644,6 +638,11 @@ public:
 
   /// Retrieve the set of members in this context.
   DeclRange getMembers() const;
+
+  /// Retrieve the set of members in this context without loading any from the
+  /// associated lazy loader; this should only be used as part of implementing
+  /// abstractions on top of member loading, such as a name lookup table.
+  DeclRange getCurrentMembersWithoutLoading() const;
 
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
