@@ -150,7 +150,8 @@ public:
     for (auto file : PrimaryFiles) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
-      assert(FilelistPathArg != nullptr && "Missing primary with no filelist");
+      assert(doesCommandLineIncludeFilelist() &&
+             "Missing primary with no filelist");
       Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
                      filelistPath());
     }
@@ -159,7 +160,7 @@ public:
 
 private:
   bool enforceFilelistExclusion() {
-    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg != nullptr) {
+    if (Args.hasArg(options::OPT_INPUT) && doesCommandLineIncludeFilelist()) {
       Diags.diagnose(SourceLoc(),
                      diag::error_cannot_have_input_files_with_file_list);
       return true;
@@ -169,11 +170,22 @@ private:
 
   void getFilesFromCommandLine() {
     for (const Arg *A :
-         Args.filtered(options::OPT_INPUT, options::OPT_primary_file))
+         Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+      if (A->getOption().matches(options::OPT_primary_file) &&
+          mustPrimaryFilesOnCommandLineAlsoAppearInFileList())
+        continue;
       addFile(A->getValue());
+    }
+  }
+
+  bool doesCommandLineIncludeFilelist() { return FilelistPathArg; }
+  bool mustPrimaryFilesOnCommandLineAlsoAppearInFileList() {
+    return doesCommandLineIncludeFilelist();
   }
 
   bool getFilesFromFilelist() {
+    if (!doesCommandLineIncludeFilelist())
+      return false;
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
         llvm::MemoryBuffer::getFile(filelistPath());
     if (!filelistBufferOrError) {
@@ -618,7 +630,7 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
       (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
     return false;
   }
-  if (FrontendOptions::needsProperModuleName(Opts.RequestedAction) ||
+  if (!FrontendOptions::needsProperModuleName(Opts.RequestedAction) ||
       Opts.isCompilingExactlyOneSwiftFile()) {
     Opts.ModuleName = "main";
     return false;
@@ -857,6 +869,22 @@ FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
         Args.getAllArgValues(options::OPT_o));
   }
   return *cachedOutputFilenamesFromCommandLineOrFilelist;
+}
+
+/// Try to read an output file list file.
+std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
+    const StringRef filelistPath) const {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(filelistPath);
+  if (!buffer) {
+    Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
+                   buffer.getError().message());
+  }
+  std::vector<std::string> outputFiles;
+  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
+    outputFiles.push_back(line.str());
+  }
+  return outputFiles;
 }
 
 void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
@@ -1611,9 +1639,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // in other classes.
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const Optional<StringRef> filename =
-                 FrontendOpts.Inputs.getOptionalUniquePrimaryInputFilename()) {
-    Opts.MainInputFilename = filename.getValue();
+  } else if (const InputFile *input =
+                 FrontendOpts.Inputs.getOptionalUniquePrimaryInput()) {
+    Opts.MainInputFilename = input->getFile();
   } else if (FrontendOpts.Inputs.hasUniqueInputFilename()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
