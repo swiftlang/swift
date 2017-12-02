@@ -124,7 +124,7 @@ public struct URLResourceValues {
     @available(OSX 10.11, iOS 9.0, *)
     public var isApplication: Bool? { return _get(.isApplicationKey) }
     
-#if os(OSX)
+#if os(macOS)
     /// True if the resource is scriptable. Only applies to applications.
     @available(OSX 10.11, *)
     public var applicationIsScriptable: Bool? { return _get(.applicationIsScriptableKey) }
@@ -237,7 +237,7 @@ public struct URLResourceValues {
         set { _set(.isExcludedFromBackupKey, newValue: newValue) }
     }
     
-#if os(OSX)
+#if os(macOS)
     /// The array of Tag names.
     public var tagNames: [String]? { return _get(.tagNamesKey) }
 #endif
@@ -267,7 +267,7 @@ public struct URLResourceValues {
     @available(OSX 10.10, iOS 8.0, *)
     public var addedToDirectoryDate: Date? { return _get(.addedToDirectoryDateKey) }
     
-#if os(OSX)
+#if os(macOS)
     /// The quarantine properties as defined in LSQuarantine.h. To remove quarantine information from a file, pass `nil` as the value when setting this property.
     @available(OSX 10.10, *)
     public var quarantineProperties: [String : Any]? {
@@ -300,7 +300,7 @@ public struct URLResourceValues {
     /// Total free space in bytes.
     public var volumeAvailableCapacity : Int? { return _get(.volumeAvailableCapacityKey) }
     
-#if os(OSX) || os(iOS)
+#if os(macOS) || os(iOS)
     /// Total available capacity in bytes for "Important" resources, including space expected to be cleared by purging non-essential and cached resources. "Important" means something that the user or application clearly expects to be present on the local system, but is ultimately replaceable. This would include items that the user has explicitly requested via the UI, and resources that an application requires in order to provide functionality.
     /// Examples: A video that the user has explicitly requested to watch but has not yet finished watching or an audio file that the user has requested to download.
     /// This value should not be used in determining if there is room for an irreplaceable resource. In the case of irreplaceable resources, always attempt to save the resource regardless of available capacity and handle failure as gracefully as possible.
@@ -444,7 +444,7 @@ public struct URLResourceValues {
     @available(OSX 10.10, iOS 8.0, *)
     public var ubiquitousItemContainerDisplayName : String? { return _get(.ubiquitousItemContainerDisplayNameKey) }
     
-#if os(OSX) || os(iOS)
+#if os(macOS) || os(iOS)
     // true if ubiquitous item is shared.
     @available(OSX 10.13, iOS 11.0, *) @available(tvOS, unavailable) @available(watchOS, unavailable)
     public var ubiquitousItemIsShared: Bool? { return _get(.ubiquitousItemIsSharedKey) }
@@ -466,7 +466,7 @@ public struct URLResourceValues {
     public var ubiquitousSharedItemMostRecentEditorNameComponents: PersonNameComponents? { return _get(.ubiquitousSharedItemMostRecentEditorNameComponentsKey) }
 #endif
     
-#if !os(OSX)
+#if !os(macOS)
     /// The protection level for this file
     @available(iOS 9.0, *)
     public var fileProtection : URLFileProtection? { return _get(.fileProtectionKey) }
