@@ -526,10 +526,8 @@ extension _StringGuts {
   internal var _unmanagedRawStart: UnsafeRawPointer {
     @inline(__always) get {
       _sanityCheck(_isUnmanaged)
-      let startMask: UInt = (1 &<< 56) &- 1
-      let startPattern = _untaggedUnflaggedBitPattern & startMask
       return UnsafeRawPointer(
-        bitPattern: startPattern)._unsafelyUnwrappedUnchecked
+        bitPattern: _untaggedUnflaggedBitPattern)._unsafelyUnwrappedUnchecked
     }
   }
 
@@ -645,6 +643,7 @@ extension _StringGuts {
   @_versioned
   internal
   var _unmanagedUTF16View: _UnmanagedString<UTF16.CodeUnit> {
+    _sanityCheck(!isASCII)
     if _isUnmanaged {
       return _asUnmanaged()
     } else if _isNative {
@@ -654,14 +653,6 @@ extension _StringGuts {
     } else {
       _sanityCheckFailure("String isn't contiguous")
     }
-  }
-
-  @_inlineable
-  @_versioned
-  internal
-  var _unmanagedRawBufferView: UnsafeRawBufferPointer {
-    if isASCII { return _unmanagedASCIIView.rawBuffer }
-    return _unmanagedUTF16View.rawBuffer
   }
 }
 

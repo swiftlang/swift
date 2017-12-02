@@ -38,6 +38,7 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
   @nonobjc
   public // @testable
   final var unusedCapacity: Int {
+    _sanityCheck(capacity >= count)
     return capacity - count
   }
 }

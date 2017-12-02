@@ -351,7 +351,7 @@ extension Character {
   @_versioned
   internal var _count : Int {
     if let small = _smallUTF16 { return small.count }
-    return _largeUTF16!.count
+    return _largeUTF16._unsafelyUnwrappedUnchecked.count
   }
 }
 
