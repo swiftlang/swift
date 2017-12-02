@@ -122,14 +122,12 @@ extension _StringGuts {
   @inline(never) // Hide the CF dependency
   internal func _computeHashValue() -> Int {
     let hash: Int
-    if _fastPath(isASCII) {
-      let ascii = _unmanagedASCIIView
-      hash = ascii._computeASCIIHashValue()
-    } else if _fastPath(_isContiguous) {
-      let utf16 = _unmanagedUTF16View
-      hash = utf16._computeUTF16HashValue()
-    } else {
+    if isASCII {
+      hash = _unmanagedASCIIView._computeASCIIHashValue()
+    } else if _slowPath(_isOpaque) {
       hash = _stdlib_NSStringHashValue(_asOpaque().object, isASCII: false)
+    } else {
+      hash = _unmanagedUTF16View._computeUTF16HashValue()
     }
     _fixLifetime(self)
     // Mix random bits into NSString's hash so that clients don't rely on
@@ -142,17 +140,15 @@ extension _StringGuts {
   @inline(never) // Hide the CF dependency
   internal func _computeHashValue(_ range: Range<Int>) -> Int {
     let hash: Int
-    if _fastPath(isASCII) {
-      let ascii = _unmanagedASCIIView[range]
-      hash = ascii._computeASCIIHashValue()
-    } else if _fastPath(_isContiguous) {
-      let utf16 = _unmanagedUTF16View[range]
-      hash = utf16._computeUTF16HashValue()
-    } else {
+    if isASCII {
+      hash = _unmanagedASCIIView[range]._computeASCIIHashValue()
+    } else if _slowPath(_isOpaque) {
       // TODO: ranged hash?
       hash = _stdlib_NSStringHashValue(
         _asOpaque()[range].cocoaSlice(),
         isASCII: false)
+    } else {
+      hash = _unmanagedUTF16View[range]._computeUTF16HashValue()
     }
     _fixLifetime(self)
     // Mix random bits into NSString's hash so that clients don't rely on

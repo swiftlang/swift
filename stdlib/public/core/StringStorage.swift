@@ -242,12 +242,12 @@ extension _SwiftStringStorage {
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
-    if _fastPath(other.isASCII) {
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView[range])
-    } else if _fastPath(other._isContiguous) {
-      _appendInPlace(other._unmanagedUTF16View[range])
-    } else { // Opaque
+    } else if _slowPath(other._isOpaque) {
       _appendInPlace(other._asOpaque()[range])
+    } else {
+      _appendInPlace(other._unmanagedUTF16View[range])
     }
   }
 
@@ -255,12 +255,12 @@ extension _SwiftStringStorage {
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
-    if _fastPath(other.isASCII) {
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView)
-    } else if _fastPath(other._isContiguous) {
-      _appendInPlace(other._unmanagedUTF16View)
-    } else { // Opaque
+    } else if _slowPath(other._isOpaque) {
       _appendInPlace(other._asOpaque())
+    } else {
+      _appendInPlace(other._unmanagedUTF16View)
     }
   }
 

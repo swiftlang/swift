@@ -191,7 +191,7 @@ extension String {
     }
     if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
       let result: Bool
-      if _fastPath(self._guts.isASCII && suffix._guts.isASCII) {
+      if self._guts.isASCII && suffix._guts.isASCII {
         let selfASCII = self._guts._unmanagedASCIIView
         let suffixASCII = suffix._guts._unmanagedASCIIView
         if suffixASCII.count > self._guts.count {
