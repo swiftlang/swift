@@ -22,6 +22,7 @@
 // FIXME: rdar://35814988
 // UNSUPPORTED: CPU=armv7
 // UNSUPPORTED: CPU=armv7k
+// UNSUPPORTED: CPU=arm64
 
 import StdlibUnittest
 import Foundation
