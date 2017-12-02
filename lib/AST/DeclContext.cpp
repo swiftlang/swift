@@ -897,10 +897,14 @@ ASTContext &IterableDeclContext::getASTContext() const {
   return getDecl()->getASTContext();
 }
 
+DeclRange IterableDeclContext::getCurrentMembersWithoutLoading() const {
+  return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
+}
+
 DeclRange IterableDeclContext::getMembers() const {
   loadAllMembers();
 
-  return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
+  return getCurrentMembersWithoutLoading();
 }
 
 /// Add a member to this context.
