@@ -7514,9 +7514,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
     
   switch (fix.first.getKind()) {
-  case FixKind::None:
-    llvm_unreachable("no-fix marker should never make it into solution");
-
   case FixKind::ForceOptional: {
     const Expr *unwrapped = affected->getValueProvidingExpr();
     auto type = solution.simplifyType(getType(affected))
