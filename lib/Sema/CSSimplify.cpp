@@ -2395,13 +2395,6 @@ commit_to_conversions:
         continue;
       }
 
-      // If the first thing we found is a fix, add a "don't fix" marker.
-      if (conversionsOrFixes.empty()) {
-        constraints.push_back(
-          Constraint::createFixed(*this, constraintKind, FixKind::None,
-                                  type1, type2, fixedLocator));
-      }
-
       auto fix = *potential.getFix();
       constraints.push_back(
         Constraint::createFixed(*this, constraintKind, fix, type1, type2,
@@ -4729,15 +4722,15 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
   }
 
   // Record the fix.
-  if (fix.getKind() != FixKind::None) {
-    // Increase the score. If this would make the current solution worse than
-    // the best solution we've seen already, stop now.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
-      return true;
 
-    Fixes.push_back({fix, getConstraintLocator(locator)});
-  }
+  // Increase the score. If this would make the current solution worse than
+  // the best solution we've seen already, stop now.
+  increaseScore(SK_Fix);
+  if (worseThanBestSolution())
+    return true;
+
+  Fixes.push_back({fix, getConstraintLocator(locator)});
+
   return false;
 }
 
@@ -4753,9 +4746,6 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix.getKind()) {
-  case FixKind::None:
-    return matchTypes(type1, type2, matchKind, subflags, locator);
-
   case FixKind::ForceOptional:
   case FixKind::OptionalChaining:
     // Assume that '!' was applied to the first type.
