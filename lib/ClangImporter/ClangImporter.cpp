@@ -3281,6 +3281,8 @@ ClangImporter::Implementation::loadNamedMembers(
   auto *CDC = cast<clang::DeclContext>(CD);
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 
+  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto effectiveClangContext = getEffectiveClangContext(nominal);
 
   // FIXME: The legacy of mirroring protocol members rears its ugly head,
   // and as a result we have to bail on any @interface or @category that
@@ -3294,6 +3296,15 @@ ClangImporter::Implementation::loadNamedMembers(
       return None;
   }
 
+  // Also bail out if there are any global-as-member mappings for this type; we
+  // can support some of them lazily but the full set of idioms seems
+  // prohibitively complex (also they're not stored in by-name lookup, for
+  // reasons unclear).
+  if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+        return (table.lookupGlobalsAsMembers(
+                  effectiveClangContext).size() > 0);
+      }))
+    return None;
 
   // There are 3 cases:
   //
@@ -3321,10 +3332,8 @@ ClangImporter::Implementation::loadNamedMembers(
   assert(isa<clang::ObjCContainerDecl>(CD));
 
   TinyPtrVector<ValueDecl *> Members;
-  auto *Nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  auto ClangContext = getEffectiveClangContext(Nominal);
   for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()),
-                                  ClangContext)) {
+                                  effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
     if (!isVisibleClangEntry(clangCtx, member)) continue;
