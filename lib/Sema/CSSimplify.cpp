@@ -2395,13 +2395,6 @@ commit_to_conversions:
         continue;
       }
 
-      // If the first thing we found is a fix, add a "don't fix" marker.
-      if (conversionsOrFixes.empty()) {
-        constraints.push_back(
-          Constraint::createFixed(*this, constraintKind, FixKind::None,
-                                  type1, type2, fixedLocator));
-      }
-
       auto fix = *potential.getFix();
       constraints.push_back(
         Constraint::createFixed(*this, constraintKind, fix, type1, type2,
@@ -4193,7 +4186,21 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   ConstraintLocatorBuilder outerLocator =
     getConstraintLocator(anchor, parts, locator.getSummaryFlags());
 
-retry:
+  unsigned unwrapCount = 0;
+  if (shouldAttemptFixes()) {
+    // If we have an optional type, try forcing it to see if that
+    // helps. Note that we only deal with function and metatype types
+    // below, so there is no reason not to attempt to strip these off
+    // immediately.
+    while (auto objectType2 = desugar2->getOptionalObjectType()) {
+      type2 = objectType2;
+      desugar2 = type2->getDesugaredType();
+
+      // Track how many times we do this so that we can record a fix for each.
+      ++unwrapCount;
+    }
+  }
+
   // For a function, bind the output and convert the argument to the input.
   auto func1 = type1->castTo<FunctionType>();
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
@@ -4221,6 +4228,11 @@ retry:
           == SolutionKind::Error)
       return SolutionKind::Error;
 
+    // Record any fixes we attempted to get to the correct solution.
+    while (unwrapCount-- > 0)
+      if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator)))
+        return SolutionKind::Error;
+
     return SolutionKind::Solved;
   }
 
@@ -4231,23 +4243,18 @@ retry:
       return formUnsolved();
 
     // Construct the instance from the input arguments.
-    return simplifyConstructionConstraint(instance2, func1, subflags,
+    auto simplified = simplifyConstructionConstraint(instance2, func1, subflags,
                                           /*FIXME?*/ DC,
                                           FunctionRefKind::SingleApply,
                                           getConstraintLocator(outerLocator));
-  }
 
-  if (!shouldAttemptFixes())
-    return SolutionKind::Error;
+    // Record any fixes we attempted to get to the correct solution.
+    if (simplified == SolutionKind::Solved)
+      while (unwrapCount-- > 0)
+        if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator)))
+          return SolutionKind::Error;
 
-  // If we're coming from an optional type, unwrap the optional and try again.
-  if (auto objectType2 = desugar2->getOptionalObjectType()) {
-    if (recordFix(FixKind::ForceOptional, getConstraintLocator(locator)))
-      return SolutionKind::Error;
-
-    type2 = objectType2;
-    desugar2 = type2->getDesugaredType();
-    goto retry;
+    return simplified;
   }
 
   return SolutionKind::Error;
@@ -4729,15 +4736,15 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
   }
 
   // Record the fix.
-  if (fix.getKind() != FixKind::None) {
-    // Increase the score. If this would make the current solution worse than
-    // the best solution we've seen already, stop now.
-    increaseScore(SK_Fix);
-    if (worseThanBestSolution())
-      return true;
 
-    Fixes.push_back({fix, getConstraintLocator(locator)});
-  }
+  // Increase the score. If this would make the current solution worse than
+  // the best solution we've seen already, stop now.
+  increaseScore(SK_Fix);
+  if (worseThanBestSolution())
+    return true;
+
+  Fixes.push_back({fix, getConstraintLocator(locator)});
+
   return false;
 }
 
@@ -4746,31 +4753,40 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
                                         ConstraintKind matchKind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
-  if (recordFix(fix, locator))
-    return SolutionKind::Error;
-
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix.getKind()) {
-  case FixKind::None:
-    return matchTypes(type1, type2, matchKind, subflags, locator);
-
   case FixKind::ForceOptional:
-  case FixKind::OptionalChaining:
+  case FixKind::OptionalChaining: {
     // Assume that '!' was applied to the first type.
-    return matchTypes(type1->getRValueObjectType()->getOptionalObjectType(),
-                      type2, matchKind, subflags, locator);
+    auto result =
+        matchTypes(type1->getRValueObjectType()->getOptionalObjectType(), type2,
+                   matchKind, subflags, locator);
+    if (result == SolutionKind::Solved)
+      if (recordFix(fix, locator))
+        return SolutionKind::Error;
 
+    return result;
+  }
   case FixKind::ForceDowncast:
     // These work whenever they are suggested.
+    if (recordFix(fix, locator))
+      return SolutionKind::Error;
+
     return SolutionKind::Solved;
 
-  case FixKind::AddressOf:
+  case FixKind::AddressOf: {
     // Assume that '&' was applied to the first type, turning an lvalue into
     // an inout.
-    return matchTypes(InOutType::get(type1->getRValueType()), type2,
-                      matchKind, subflags, locator);
+    auto result = matchTypes(InOutType::get(type1->getRValueType()), type2,
+                             matchKind, subflags, locator);
+    if (result == SolutionKind::Solved)
+      if (recordFix(fix, locator))
+        return SolutionKind::Error;
+
+    return result;
+  }
 
   case FixKind::CoerceToCheckedCast:
     llvm_unreachable("handled elsewhere");
