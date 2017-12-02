@@ -4753,28 +4753,40 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
                                         ConstraintKind matchKind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
-  if (recordFix(fix, locator))
-    return SolutionKind::Error;
-
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix.getKind()) {
   case FixKind::ForceOptional:
-  case FixKind::OptionalChaining:
+  case FixKind::OptionalChaining: {
     // Assume that '!' was applied to the first type.
-    return matchTypes(type1->getRValueObjectType()->getOptionalObjectType(),
-                      type2, matchKind, subflags, locator);
+    auto result =
+        matchTypes(type1->getRValueObjectType()->getOptionalObjectType(), type2,
+                   matchKind, subflags, locator);
+    if (result == SolutionKind::Solved)
+      if (recordFix(fix, locator))
+        return SolutionKind::Error;
 
+    return result;
+  }
   case FixKind::ForceDowncast:
     // These work whenever they are suggested.
+    if (recordFix(fix, locator))
+      return SolutionKind::Error;
+
     return SolutionKind::Solved;
 
-  case FixKind::AddressOf:
+  case FixKind::AddressOf: {
     // Assume that '&' was applied to the first type, turning an lvalue into
     // an inout.
-    return matchTypes(InOutType::get(type1->getRValueType()), type2,
-                      matchKind, subflags, locator);
+    auto result = matchTypes(InOutType::get(type1->getRValueType()), type2,
+                             matchKind, subflags, locator);
+    if (result == SolutionKind::Solved)
+      if (recordFix(fix, locator))
+        return SolutionKind::Error;
+
+    return result;
+  }
 
   case FixKind::CoerceToCheckedCast:
     llvm_unreachable("handled elsewhere");
