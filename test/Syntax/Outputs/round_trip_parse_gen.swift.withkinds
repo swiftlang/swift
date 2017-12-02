@@ -74,3 +74,13 @@ struct foo <MemberDeclBlock>{
   }</MemberDeclBlock>
   struct foo <MemberDeclBlock>{}</MemberDeclBlock>
 }</MemberDeclBlock>
+
+struct foo <MemberDeclBlock>{<Attribute>
+  @available(*, unavailable)</Attribute>
+  struct foo <MemberDeclBlock>{}</MemberDeclBlock>
+  public class foo {<Attribute>
+    @available(*, unavailable)</Attribute><Attribute>
+    @objc(fooObjc)</Attribute>
+    private static func foo() <CodeBlock>{}</CodeBlock>
+  }
+}</MemberDeclBlock>
