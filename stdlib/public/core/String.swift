@@ -988,21 +988,19 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
     if self._guts._isEmptyLiteral {
+      // We must be careful not to discard any capacity that
+      // may have been reserved for the append -- this is why
+      // we check for the empty string singleton rather than
+      // a zero `count` above.
       self = other
       return
     }
-    if _fastPath(other._guts.isASCII) {
-      let otherView = other._guts._unmanagedASCIIView
-      guard otherView.count > 0 else { return }
-      self._guts.append(otherView)
-    } else if _fastPath(other._guts._isContiguous) {
-      let otherView = other._guts._unmanagedUTF16View
-      guard otherView.count > 0 else { return }
-      self._guts.append(otherView)
-    } else { // Opaque
-      let otherView = other._guts._asOpaque()
-      guard otherView.count > 0 else { return }
-      self._guts.append(otherView)
+    if other._guts.isASCII {
+      self._guts.append(other._guts._unmanagedASCIIView)
+    } else if _slowPath(other._guts._isOpaque) {
+      self._guts.append(other._guts._asOpaque())
+    } else {
+      self._guts.append(other._guts._unmanagedUTF16View)
     }
     _fixLifetime(other)
   }

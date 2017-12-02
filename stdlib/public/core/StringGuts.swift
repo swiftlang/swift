@@ -665,7 +665,7 @@ extension _StringGuts {
   @_versioned
   internal
   func _ephemeralCocoaString() -> _CocoaString {
-    if _fastPath(_isNative) {
+    if _isNative {
       return _nativeRawStorage
     } else if _isNonTaggedCocoa {
       return _nonTaggedCocoaObject
@@ -700,7 +700,7 @@ extension _StringGuts {
   @_versioned
   internal
   var _underlyingCocoaString: _CocoaString? {
-    if _fastPath(_isNative) {
+    if _isNative {
       return _nativeRawStorage
     } else if _isNonTaggedCocoa {
       return _nonTaggedCocoaObject
@@ -736,7 +736,7 @@ extension _StringGuts {
   @inline(never)
   @_versioned
   internal func _asOpaque() -> _UnmanagedOpaqueString {
-    if _fastPath(_isSmallCocoa) {
+    if _isSmallCocoa {
       return _UnmanagedOpaqueString(
         _taggedCocoaObject,
         count: _taggedCocoaCount)
@@ -1125,12 +1125,12 @@ extension _StringGuts {
   @_versioned
   @_inlineable // FIXME(sil-serialize-all)
   internal subscript(position: Int) -> UTF16.CodeUnit {
-    if _fastPath(isASCII) {
+    if isASCII {
       return _unmanagedASCIIView[position]
-    } else if _fastPath(_isContiguous) {
-      return _unmanagedUTF16View[position]
-    } else {
+    } else if _slowPath(_isOpaque) {
       return _asOpaque()[position]
+    } else {
+      return _unmanagedUTF16View[position]
     }
   }
 
@@ -1142,15 +1142,12 @@ extension _StringGuts {
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _sanityCheck(CodeUnit.bitWidth == 8 || CodeUnit.bitWidth == 16)
     _sanityCheck(dest.count >= range.count)
-    if _fastPath(isASCII) {
-      let ascii = _unmanagedASCIIView[range]
-      ascii._copy(into: dest)
-    } else if _fastPath(_isContiguous) {
-      let utf16 = _unmanagedUTF16View[range]
-      utf16._copy(into: dest)
+    if isASCII {
+      _unmanagedASCIIView[range]._copy(into: dest)
+    } else if _slowPath(_isOpaque) {
+      _asOpaque()[range]._copy(into: dest)
     } else {
-      let opaque = _asOpaque()[range]
-      opaque._copy(into: dest)
+      _unmanagedUTF16View[range]._copy(into: dest)
     }
   }
 
@@ -1220,12 +1217,12 @@ extension _StringGuts {
       self = other
       return
     }
-    if _fastPath(other.isASCII) {
+    if other.isASCII {
       self.append(other._unmanagedASCIIView[range])
-    } else if _fastPath(other._isContiguous) {
-      self.append(other._unmanagedUTF16View[range])
-    } else { // Opaque
+    } else if _slowPath(other._isOpaque) {
       self.append(other._asOpaque()[range])
+    } else {
+      self.append(other._unmanagedUTF16View[range])
     }
     _fixLifetime(other)
   }
@@ -1347,15 +1344,12 @@ extension _StringGuts {
   @_versioned
   internal
   func character(at i: String.Index) -> Character {
-    if _fastPath(isASCII) {
-      let ascii = _unmanagedASCIIView
-      return ascii.character(at: i)
-    } else if _fastPath(_isContiguous) {
-      let utf16 = _unmanagedUTF16View
-      return utf16.character(at: i)
+    if isASCII {
+      return _unmanagedASCIIView.character(at: i)
+    } else if _slowPath(_isOpaque) {
+      return _asOpaque().character(at: i)
     } else {
-      let opaque = _asOpaque()
-      return opaque.character(at: i)
+      return _unmanagedUTF16View.character(at: i)
     }
   }
 
@@ -1363,15 +1357,12 @@ extension _StringGuts {
   @_versioned
   internal
   func characterIndex(after i: String.Index) -> String.Index {
-    if _fastPath(isASCII) {
-      let ascii = _unmanagedASCIIView
-      return ascii.characterIndex(after: i)
-    } else if _fastPath(_isContiguous) {
-      let utf16 = _unmanagedUTF16View
-      return utf16.characterIndex(after: i)
+    if isASCII {
+      return _unmanagedASCIIView.characterIndex(after: i)
+    } else if _slowPath(_isOpaque) {
+      return _asOpaque().characterIndex(after: i)
     } else {
-      let opaque = _asOpaque()
-      return opaque.characterIndex(after: i)
+      return _unmanagedUTF16View.characterIndex(after: i)
     }
   }
 
@@ -1379,15 +1370,12 @@ extension _StringGuts {
   @_versioned
   internal
   func characterIndex(before i: String.Index) -> String.Index {
-    if _fastPath(isASCII) {
-      let ascii = _unmanagedASCIIView
-      return ascii.characterIndex(before: i)
-    } else if _fastPath(_isContiguous) {
-      let utf16 = _unmanagedUTF16View
-      return utf16.characterIndex(before: i)
+    if isASCII {
+      return _unmanagedASCIIView.characterIndex(before: i)
+    } else if _slowPath(_isOpaque) {
+      return _asOpaque().characterIndex(before: i)
     } else {
-      let opaque = _asOpaque()
-      return opaque.characterIndex(before: i)
+      return _unmanagedUTF16View.characterIndex(before: i)
     }
   }
 
@@ -1397,15 +1385,12 @@ extension _StringGuts {
   // func characterIndex(
   //   _ i: String.Index, offsetBy n: String.IndexDistance
   // ) -> String.Index {
-  //   if _fastPath(isASCII) {
-  //     let ascii = _unmanagedASCIIView
-  //     return ascii.characterIndex(i, offsetBy: n)
-  //   } else if _fastPath(_isContiguous) {
-  //     let utf16 = _unmanagedUTF16View
-  //     return utf16.characterIndex(i, offsetBy: n)
+  //   if isASCII {
+  //     return _unmanagedASCIIView.characterIndex(i, offsetBy: n)
+  //   } else if _slowPath(_isOpaque) {
+  //     return _asOpaque().characterIndex(i, offsetBy: n) // TODO
   //   } else {
-  //     let opaque = _asOpaque()
-  //     return opaque.characterIndex(i, offsetBy: n) // TODO
+  //     return _unmanagedUTF16View.characterIndex(i, offsetBy: n)
   //   }
   // }
 }
