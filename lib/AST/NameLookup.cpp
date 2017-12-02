@@ -1245,19 +1245,25 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
     LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
 
-  // If we're an IDC that has not yet loaded its full member set, we're doing
-  // NamedLazyMemberLoading, and we should not force getMembers().
-  if (hasLazyMembers())
-    return;
-
   // If we haven't walked the member list yet to update the lookup
   // table, do so now.
   if (!LookupTable.getInt()) {
     // Note that we'll have walked the members now.
     LookupTable.setInt(true);
 
-    // Add the members of the nominal declaration to the table.
-    LookupTable.getPointer()->addMembers(getMembers());
+    // We want to index the part of the member list in memory, but not force
+    // loading lazy members if we have them.
+    auto members = (hasLazyMembers()
+                    ? getCurrentMembersWithoutLoading()
+                    : getMembers());
+    LookupTable.getPointer()->addMembers(members);
+  }
+
+  // Avoid indexing extensions until we're at the point of loading _all_
+  // members; if callers are doing named lazy lookup they will search the
+  // extension list explicitly.
+  if (hasLazyMembers()) {
+    return;
   }
 
   if (!ignoreNewExtensions) {
@@ -1354,13 +1360,22 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // populated the IDC and brought it up to date with any extensions. This
     // will flip the hasLazyMembers() flag to false as well.
     if (!useNamedLazyMemberLoading) {
-      // If we're about to load members here, purge the MemberLookupTable;
-      // it will be rebuilt in prepareLookup, below. Base this decision on
-      // the LookupTable's int value, not hasLazyMembers(), since the latter
-      // can sometimes change underfoot if some other party calls getMembers
-      // outside of lookup (eg. typo correction).
-      if (LookupTable.getPointer() && !LookupTable.getInt()) {
+      // It's possible that the lookup table exists but has information in it
+      // that is either currently out of date or soon to be out of date.
+      // This can happen two ways:
+      //
+      //   - We've not yet indexed the members we have (LookupTable.getInt()
+      //     is zero).
+      //
+      //   - We've still got more lazy members left to load; this can happen
+      //     even if we _did_ index some members.
+      //
+      // In either of these cases, we want to reset the table to empty and
+      // mark it as needing reconstruction.
+      if (LookupTable.getPointer() &&
+          (hasLazyMembers() || !LookupTable.getInt())) {
         LookupTable.getPointer()->clear();
+        LookupTable.setInt(false);
       }
 
       (void)getMembers();
@@ -1374,8 +1389,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     }
 
     // Next, in all cases, prepare the lookup table for use, possibly
-    // repopulating it from the IDC if just did our initial IDC population
-    // above.
+    // repopulating it from the IDC if the IDC member list has just grown.
     prepareLookupTable(ignoreNewExtensions);
 
     // Look for a declaration with this name.
