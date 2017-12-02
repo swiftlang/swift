@@ -7358,8 +7358,10 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
 /// Validate the underlying type of the given typealias.
 static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   TypeResolutionOptions options = TypeResolutionFlags::TypeAliasUnderlyingType;
-  if (typeAlias->getFormalAccess() <= AccessLevel::FilePrivate)
-    options |= TypeResolutionFlags::KnownNonCascadingDependency;
+  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
+        /*functionsAreNonCascading*/true)) {
+     options |= TypeResolutionFlags::KnownNonCascadingDependency;
+  }
 
   if (typeAlias->getDeclContext()->isModuleScopeContext() &&
       typeAlias->getGenericParams() == nullptr) {
@@ -7832,20 +7834,16 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     // Perform earlier validation of typealiases in protocols.
     if (isa<ProtocolDecl>(dc)) {
       if (!typealias->getGenericParams()) {
-        ProtocolRequirementTypeResolver resolver;
-        TypeResolutionOptions options;
-
         if (typealias->isBeingValidated()) return;
 
         typealias->setIsBeingValidated();
         SWIFT_DEFER { typealias->setIsBeingValidated(false); };
 
         validateAccessControl(typealias);
-        if (typealias->getFormalAccess() <= AccessLevel::FilePrivate)
-          options |= TypeResolutionFlags::KnownNonCascadingDependency;
 
+        ProtocolRequirementTypeResolver resolver;
         if (validateType(typealias->getUnderlyingTypeLoc(),
-                         typealias, options, &resolver)) {
+                         typealias, TypeResolutionOptions(), &resolver)) {
           typealias->setInvalid();
           typealias->getUnderlyingTypeLoc().setInvalidType(Context);
         }
