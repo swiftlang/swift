@@ -137,16 +137,17 @@ This attribute specifies the name that a declaration will have at link time. It 
 Rather than hard-code Swift mangling into C code, `@_silgen_name` is used to provide a stable and known symbol name for linking. Note that C code still must understand and use the Swift calling convention (available in swift-clang) for such Swift functions (if they use Swift's CC). Example:
 
 ```swift
-@_silgen_name("_swift_stdlib_destroyTLS")
+@_silgen_name("_destroyTLS")
 internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
   // ... implementation ...
 }
 ```
 
 ```C++
-__attribute__((__swiftcall__)) extern "C" void _swift_stdlib_destroyTLS(void *);
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void _destroyTLS(void *);
 
-// ... C code can now call _swift_stdlib_destroyTLS on a void * ...
+// ... C code can now call _destroyTLS on a void * ...
 ```
 
 ##### Using `@_silgen_name` to call C from Swift
