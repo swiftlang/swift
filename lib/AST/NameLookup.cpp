@@ -1359,11 +1359,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                 .NominalTypeDecl__lookupDirect.getGuard();
   }
 
-  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
-        << ", lookupTable.getInt()=" << LookupTable.getInt()
-        << ", hasLazyMembers()=" << hasLazyMembers()
-        << "\n");
-
   // We only use NamedLazyMemberLoading when a user opts-in and we have
   // not yet loaded all the members into the IDC list in the first place.
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
@@ -1375,6 +1370,12 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // turn it off for them entirely.
   if (name.getBaseName() == ctx.Id_init)
     useNamedLazyMemberLoading = false;
+
+  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
+        << ", lookupTable.getInt()=" << LookupTable.getInt()
+        << ", hasLazyMembers()=" << hasLazyMembers()
+        << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
+        << "\n");
 
   // We check the LookupTable at most twice, possibly treating a miss in the
   // first try as a cache-miss that we then do a cache-fill on, and retry.
