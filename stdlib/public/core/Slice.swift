@@ -81,6 +81,12 @@
 ///   requirements into account.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct Slice<Base: Collection> {
+  public var _startIndex: Base.Index
+  public var _endIndex: Base.Index
+
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _base: Base
+
   /// Creates a view into the given collection that allows access to elements
   /// within the specified range.
   ///
@@ -106,12 +112,6 @@ public struct Slice<Base: Collection> {
     self._startIndex = bounds.lowerBound
     self._endIndex = bounds.upperBound
   }
-
-  public var _startIndex: Base.Index
-  public var _endIndex: Base.Index
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _base: Base
 
   /// The underlying collection of the slice.
   ///

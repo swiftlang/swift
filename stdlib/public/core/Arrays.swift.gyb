@@ -455,13 +455,44 @@ if True:
 
 ${SelfDocComment}
 @_fixed_layout
-public struct ${Self}<Element>
-  : RandomAccessCollection,
-    MutableCollection,
-    _DestructorSafeContainer
-{
+public struct ${Self}<Element>: _DestructorSafeContainer {
+  %if Self == 'Array':
+  #if _runtime(_ObjC)
+    internal typealias _Buffer = _ArrayBuffer<Element>
+  #else
+    internal typealias _Buffer = _ContiguousArrayBuffer<Element>
+  #endif
+  %elif Self == 'ArraySlice':
+    internal typealias _Buffer = _SliceBuffer<Element>
+  %else:
+    internal typealias _Buffer = _${Self.strip('_')}Buffer<Element>
+  %end
 
+  @_versioned
+  internal var _buffer: _Buffer
+
+  /// Initialization from an existing buffer does not have "array.init"
+  /// semantics because the caller may retain an alias to buffer.
+  @_inlineable
+  @_versioned
+  internal init(_buffer: _Buffer) {
+    self._buffer = _buffer
+  }
+
+  %if Self == 'ArraySlice':
+  /// Initialization from an existing buffer does not have "array.init"
+  /// semantics because the caller may retain an alias to buffer.
+  @_inlineable
+  @_versioned
+  internal init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
+    self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
+  }
+  %end
+}
+
+extension ${Self}: RandomAccessCollection, MutableCollection {
   public typealias Index = Int
+  public typealias Indices = CountableRange<Int>
   public typealias Iterator = IndexingIterator<${Self}>
 
 %if Self == 'ArraySlice':
@@ -662,8 +693,6 @@ public struct ${Self}<Element>
     // NOTE: This method is a no-op for performance reasons.
   }
 
-  public typealias Indices = CountableRange<Int>
-
   /// Accesses the element at the specified position.
   ///
   /// The following example uses indexed subscripting to update an array's
@@ -751,9 +780,10 @@ public struct ${Self}<Element>
       }
     }
   }
+}
 
-  //===--- private --------------------------------------------------------===//
-
+//===--- private helpers---------------------------------------------------===//
+extension ${Self} {
   /// Returns `true` if the array is native and does not need a deferred
   /// type check.  May be hoisted by the optimizer, which means its
   /// results may be stale by the time they are used if there is an
@@ -906,40 +936,6 @@ public struct ${Self}<Element>
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer.subscriptBaseAddress + index
   }
-
-%if Self == 'Array':
-#if _runtime(_ObjC)
-  internal typealias _Buffer = _ArrayBuffer<Element>
-#else
-  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
-#endif
-%elif Self == 'ArraySlice':
-  internal typealias _Buffer = _SliceBuffer<Element>
-%else:
-  internal typealias _Buffer = _${Self.strip('_')}Buffer<Element>
-%end
-
-  /// Initialization from an existing buffer does not have "array.init"
-  /// semantics because the caller may retain an alias to buffer.
-
-  @_inlineable
-  @_versioned
-  internal init(_buffer: _Buffer) {
-    self._buffer = _buffer
-  }
-
-%if Self == 'ArraySlice':
-  /// Initialization from an existing buffer does not have "array.init"
-  /// semantics because the caller may retain an alias to buffer.
-  @_inlineable
-  @_versioned
-  internal init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
-    self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
-  }
-%end
-
-  @_versioned
-  internal var _buffer: _Buffer
 }
 
 extension ${Self} : ExpressibleByArrayLiteral {
