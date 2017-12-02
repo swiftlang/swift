@@ -512,6 +512,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef AttrName = Tok.getText();
   SourceLoc Loc = consumeToken();
+
+  // We can only make this attribute a token list intead of an Attribute node
+  // because the attribute node may include '@'
+  SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
   bool DiscardAttribute = false;
 
   // Diagnose duplicated attributes.
@@ -1853,17 +1858,21 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
                                     bool &FoundCCToken) {
   FoundCCToken = false;
-  while (Tok.is(tok::at_sign)) {
+  if (Tok.isNot(tok::at_sign))
+    return false;
+  SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
+  do {
     if (peekToken().is(tok::code_complete)) {
       consumeToken(tok::at_sign);
       consumeToken(tok::code_complete);
       FoundCCToken = true;
       continue;
     }
+    SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     SourceLoc AtLoc = consumeToken();
     if (parseDeclAttribute(Attributes, AtLoc))
       return true;
-  }
+  } while (Tok.is(tok::at_sign));
   return false;
 }
 
@@ -2263,7 +2272,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     switch (Tok.getKind()) {
     // Modifiers
-    case tok::kw_static:
+    case tok::kw_static: {
       if (StaticLoc.isValid()) {
         diagnose(Tok, diag::decl_already_static,
                  StaticSpellingKind::KeywordStatic)
@@ -2275,7 +2284,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       consumeToken(tok::kw_static);
       continue;
-
+    }
     // 'class' is a modifier on func, but is also a top-level decl.
     case tok::kw_class: {
       SourceLoc ClassLoc = consumeToken(tok::kw_class);
@@ -2302,84 +2311,58 @@ Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_private:
     case tok::kw_fileprivate:
     case tok::kw_internal:
-    case tok::kw_public:
+    case tok::kw_public: {
       // We still model these specifiers as attributes.
       parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
       continue;
-
+    }
     // Context sensitive keywords.
-    case tok::identifier:
+    case tok::identifier: {
+      Optional<DeclAttrKind> Kind;
       // FIXME: This is ridiculous, this all needs to be sucked into the
       // declparsing goop.
       if (Tok.isContextualKeyword("open")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
-        continue;
+        Kind = DAK_AccessControl;
+      } else if (Tok.isContextualKeyword("weak") ||
+                 Tok.isContextualKeyword("unowned")) {
+        Kind = DAK_Ownership;
+      } else if (Tok.isContextualKeyword("optional")) {
+        Kind = DAK_Optional;
+      } else if (Tok.isContextualKeyword("required")) {
+        Kind = DAK_Required;
+      } else if (Tok.isContextualKeyword("lazy")) {
+        Kind = DAK_Lazy;
+      } else if (Tok.isContextualKeyword("final")) {
+        Kind = DAK_Final;
+      } else if (Tok.isContextualKeyword("dynamic")) {
+        Kind = DAK_Dynamic;
+      } else if (Tok.isContextualKeyword("prefix")) {
+        Kind = DAK_Prefix;
+      } else if (Tok.isContextualKeyword("postfix")) {
+        Kind = DAK_Postfix;
+      } else if (Tok.isContextualKeyword("indirect")) {
+        Kind = DAK_Indirect;
+      } else if (Tok.isContextualKeyword("infix")) {
+        Kind = DAK_Infix;
+      } else if (Tok.isContextualKeyword("override")) {
+        Kind = DAK_Override;
+      } else if (Tok.isContextualKeyword("mutating")) {
+        Kind = DAK_Mutating;
+      } else if (Tok.isContextualKeyword("nonmutating")) {
+        Kind = DAK_NonMutating;
+      } else if (Tok.isContextualKeyword("__consuming")) {
+        Kind = DAK_Consuming;
+      } else if (Tok.isContextualKeyword("convenience")) {
+        Kind = DAK_Convenience;
       }
-      if (Tok.isContextualKeyword("weak") ||
-          Tok.isContextualKeyword("unowned")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Ownership);
-        continue;
-      }
-      if (Tok.isContextualKeyword("optional")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Optional);
-        continue;
-      }
-      if (Tok.isContextualKeyword("required")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Required);
-        continue;
-      }
-      if (Tok.isContextualKeyword("lazy")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Lazy);
-        continue;
-      }
-      if (Tok.isContextualKeyword("final")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_Final);
-        continue;
-      }
-      if (Tok.isContextualKeyword("dynamic")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Dynamic);
-        continue;
-      }
-      if (Tok.isContextualKeyword("prefix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Prefix);
-        continue;
-      }
-      if (Tok.isContextualKeyword("postfix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Postfix);
-        continue;
-      }
-      if (Tok.isContextualKeyword("indirect")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Indirect);
-        continue;
-      }
-      if (Tok.isContextualKeyword("infix")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Infix);
-        continue;
-      }
-      if (Tok.isContextualKeyword("override")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Override);
-        continue;
-      }
-      if (Tok.isContextualKeyword("mutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Mutating);
-        continue;
-      }
-      if (Tok.isContextualKeyword("nonmutating")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_NonMutating);
-        continue;
-      }
-      if (Tok.isContextualKeyword("__consuming")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Consuming);
-        continue;
-      }
-      if (Tok.isContextualKeyword("convenience")) {
-        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Convenience);
+      if (Kind) {
+        parseNewDeclAttribute(Attributes, SourceLoc(), *Kind);
         continue;
       }
 
       // Otherwise this is not a context-sensitive keyword.
       LLVM_FALLTHROUGH;
-
+    }
     case tok::pound_if:
     case tok::pound_sourceLocation:
     case tok::pound_line:
