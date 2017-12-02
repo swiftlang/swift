@@ -19,7 +19,7 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
     llvm::raw_svector_ostream OS { Scratch };
     auto Autoclosure = SyntaxFactory::makeBlankAttribute()
       .withAtSignToken(At)
-      .withIdentifier(AutoclosureID);
+      .withAttributeName(AutoclosureID);
     Autoclosure.print(OS);
     ASSERT_EQ(OS.str().str(), "@autoclosure");
   }
@@ -31,15 +31,14 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
 
     auto Convention = SyntaxFactory::makeBlankAttribute()
       .withAtSignToken(At)
-      .withIdentifier(conventionID)
-      .withLeftParen(LeftParen)
-      .withRightParen(RightParen);
+      .withAttributeName(conventionID)
+      .withBalancedTokens(SyntaxFactory::makeTokenList({LeftParen, RightParen}));
 
     {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto cID = SyntaxFactory::makeIdentifier("c", {}, {});
-      auto cArgs = SyntaxFactory::makeTokenList({cID});
+      auto cArgs = SyntaxFactory::makeTokenList({LeftParen, cID, RightParen});
       Convention.withBalancedTokens(cArgs).print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(c)");
     }
@@ -48,7 +47,7 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto swiftID = SyntaxFactory::makeIdentifier("swift", {}, {});
-      auto swiftArgs = SyntaxFactory::makeTokenList({swiftID});
+      auto swiftArgs = SyntaxFactory::makeTokenList({LeftParen, swiftID, RightParen});
       Convention.withBalancedTokens(swiftArgs).print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(swift)");
     }
@@ -57,7 +56,7 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto blockID = SyntaxFactory::makeIdentifier("block", {}, {});
-      auto blockArgs = SyntaxFactory::makeTokenList({blockID});
+      auto blockArgs = SyntaxFactory::makeTokenList({LeftParen, blockID, RightParen});
       Convention.withBalancedTokens(blockArgs).print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(block)");
     }
@@ -69,7 +68,7 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
     auto EscapingID = SyntaxFactory::makeIdentifier("escaping", {}, {});
     auto Escaping = SyntaxFactory::makeBlankAttribute()
       .withAtSignToken(At)
-      .withIdentifier(EscapingID);
+      .withAttributeName(EscapingID);
     Escaping.print(OS);
     ASSERT_EQ(OS.str().str(), "@escaping");
   }
@@ -83,7 +82,7 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
     llvm::raw_svector_ostream OS { Scratch };
     auto Autoclosure = SyntaxFactory::makeBlankAttribute()
     .withAtSignToken(At)
-    .withIdentifier(AutoclosureID);
+    .withAttributeName(AutoclosureID);
     Autoclosure.print(OS);
     ASSERT_EQ(OS.str().str(), "@autoclosure");
   }
@@ -97,9 +96,8 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto cID = SyntaxFactory::makeIdentifier("c", {}, {});
-      auto cArgs = SyntaxFactory::makeTokenList({cID});
-      SyntaxFactory::makeAttribute(At, conventionID, LeftParen, cArgs,
-                                   RightParen)
+      auto cArgs = SyntaxFactory::makeTokenList({LeftParen, cID, RightParen});
+      SyntaxFactory::makeAttribute(At, conventionID, cArgs)
         .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(c)");
     }
@@ -108,9 +106,9 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto swiftID = SyntaxFactory::makeIdentifier("swift", {}, {});
-      auto swiftArgs = SyntaxFactory::makeTokenList({swiftID});
-      SyntaxFactory::makeAttribute(At, conventionID, LeftParen,
-                                   swiftArgs, RightParen)
+      auto swiftArgs = SyntaxFactory::makeTokenList({LeftParen, swiftID,
+        RightParen});
+      SyntaxFactory::makeAttribute(At, conventionID, swiftArgs)
         .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(swift)");
     }
@@ -119,9 +117,9 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto blockID = SyntaxFactory::makeIdentifier("block", {}, {});
-      auto blockArgs = SyntaxFactory::makeTokenList({blockID});
-      SyntaxFactory::makeAttribute(At, conventionID, LeftParen,
-                                   blockArgs,RightParen)
+      auto blockArgs = SyntaxFactory::makeTokenList({LeftParen, blockID,
+        RightParen});
+      SyntaxFactory::makeAttribute(At, conventionID, blockArgs)
         .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(block)");
     }
@@ -133,7 +131,7 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
     auto EscapingID = SyntaxFactory::makeIdentifier("escaping", {}, {});
     auto Escaping = SyntaxFactory::makeBlankAttribute()
       .withAtSignToken(At)
-      .withIdentifier(EscapingID);
+      .withAttributeName(EscapingID);
     Escaping.print(OS);
     ASSERT_EQ(OS.str().str(), "@escaping");
   }

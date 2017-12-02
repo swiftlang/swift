@@ -74,3 +74,13 @@ struct foo {
   }
   struct foo {}
 }
+
+struct foo {
+  @available(*, unavailable)
+  struct foo {}
+  public class foo {
+    @available(*, unavailable)
+    @objc(fooObjc)
+    private static func foo() {}
+  }
+}
