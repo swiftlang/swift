@@ -1161,7 +1161,7 @@ public:
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(F.hasUnqualifiedOwnership(),
+      require(!F.hasQualifiedOwnership(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
@@ -1278,7 +1278,7 @@ public:
     case StoreOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(F.hasUnqualifiedOwnership(),
+      require(!F.hasQualifiedOwnership(),
               "Qualified store in function with unqualified ownership?!");
       break;
     case StoreOwnershipQualifier::Init:
@@ -1448,14 +1448,14 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
   void checkRetainValueAddrInst(RetainValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
@@ -1488,14 +1488,14 @@ public:
   void checkReleaseValueInst(ReleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
   void checkReleaseValueAddrInst(ReleaseValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
@@ -1760,12 +1760,12 @@ public:
 
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "strong_retain is only in functions with unqualified ownership");
   }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "strong_release is only in functions with unqualified ownership");
   }
   void checkStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
@@ -1773,16 +1773,16 @@ public:
                                          "Operand of strong_retain_unowned");
     require(unownedType->isLoadable(ResilienceExpansion::Maximal),
             "strong_retain_unowned requires unowned type to be loadable");
-    require(F.hasUnqualifiedOwnership(), "strong_retain_unowned is only in "
-                                         "functions with unqualified "
-                                         "ownership");
+    require(!F.hasQualifiedOwnership(), "strong_retain_unowned is only in "
+                                        "functions with unqualified "
+                                        "ownership");
   }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
     auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
                                           "Operand of unowned_retain");
     require(unownedType->isLoadable(ResilienceExpansion::Maximal),
             "unowned_retain requires unowned type to be loadable");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "unowned_retain is only in functions with unqualified ownership");
   }
   void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
@@ -1790,7 +1790,7 @@ public:
                                          "Operand of unowned_release");
     require(unownedType->isLoadable(ResilienceExpansion::Maximal),
             "unowned_release requires unowned type to be loadable");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "unowned_release is only in functions with unqualified ownership");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
@@ -3465,7 +3465,7 @@ public:
                     SOI->getOperand()->getType(),
                 "Switch enum default block should have one argument that is "
                 "the same as the input type");
-      } else if (F.hasUnqualifiedOwnership()) {
+      } else if (!F.hasQualifiedOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
       }
