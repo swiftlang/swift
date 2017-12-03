@@ -480,23 +480,24 @@ extension String.UTF8View {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
     internal typealias _OutputBuffer = UInt64
-    @_versioned // FIXME(sil-serialize-all)
-    internal let _source: _LegacyStringCore
+    @_versioned
+    internal var _guts: _StringGuts
     @_versioned // FIXME(sil-serialize-all)
     internal var _sourceIndex: Int
     @_versioned // FIXME(sil-serialize-all)
     internal var _buffer: _OutputBuffer
   }
+
   public func makeIterator() -> Iterator {
-    return Iterator(_core)
+    return Iterator(_guts)
   }
 }
 
 extension String.UTF8View.Iterator : IteratorProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal init(_ source: _LegacyStringCore) {
-    _source = source
+  internal init(_ guts: _StringGuts) {
+    self._guts = guts
     _sourceIndex = 0
     _buffer = 0
   }
@@ -508,27 +509,28 @@ extension String.UTF8View.Iterator : IteratorProtocol {
       _buffer >>= 8
       return r
     }
-    if _slowPath(_sourceIndex == _source.count) { return nil }
+    if _slowPath(_sourceIndex == _guts.count) { return nil }
 
-    defer { _fixLifetime(_source) }
+    let isContiguous = _guts._isContiguous
+
+    defer { _fixLifetime(_guts) }
     
-    if _fastPath(_source._unmanagedASCII != nil),
-    let ascii = _source._unmanagedASCII {
-      let result = ascii[_sourceIndex]
-      _sourceIndex += 1
-      for i in 0 ..< _OutputBuffer.bitWidth>>3 {
-        if _sourceIndex == _source.count { break }
-        _buffer |= _OutputBuffer(ascii[_sourceIndex] &+ 1) &<< (i << 3)
+    if _fastPath(isContiguous) {
+      if _guts.isASCII {
+        let ascii = _guts._unmanagedASCIIView.start
+        let result = ascii[_sourceIndex]
         _sourceIndex += 1
+        for i in 0 ..< _OutputBuffer.bitWidth>>3 {
+          if _sourceIndex == _guts.count { break }
+          _buffer |= _OutputBuffer(ascii[_sourceIndex] &+ 1) &<< (i << 3)
+          _sourceIndex += 1
+        }
+        return result
       }
-      return result
+      return _next(refillingFrom: _guts._unmanagedUTF16View.buffer)
     }
     
-    if _fastPath(_source._unmanagedUTF16 != nil),
-    let utf16 = _source._unmanagedUTF16 {
-      return _next(refillingFrom: utf16)
-    }
-    return _next(refillingFrom: _source)
+    return _next(refillingFrom: _guts._legacyCore)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -543,8 +545,8 @@ extension String.UTF8View.Iterator : IteratorProtocol {
     var shift = 0
 
     // ASCII fastpath
-    while _sourceIndex != _source.endIndex && shift < _OutputBuffer.bitWidth {
-      let u = _source[_sourceIndex]
+    while _sourceIndex != _guts.endIndex && shift < _OutputBuffer.bitWidth {
+      let u = _guts[_sourceIndex]
       if u >= 0x80 { break }
       _buffer |= _OutputBuffer(UInt8(truncatingIfNeeded: u &+ 1)) &<< shift
       _sourceIndex += 1
