@@ -3390,6 +3390,13 @@ ${assignmentOperatorComment(x.operator, True)}
 %   else:
     // FIXME(integers): handle division by zero and overflows
     _precondition(self != 0, "Division by zero")
+
+%   if dbits == 128:
+#if os(Windows)
+      fatalError("Operation is not supported")
+#else
+%   end
+
     let lhsHigh = Builtin.${z}ext_Int${bits}_Int${dbits}(dividend.high._value)
     let shift = Builtin.zextOrBitCast_Int8_Int${dbits}(UInt8(${bits})._value)
     let lhsHighShifted = Builtin.shl_Int${dbits}(lhsHigh, shift)
@@ -3406,6 +3413,10 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.truncOrBitCast_Int${dbits}_Int${bits}(remainder_))
 
     return (quotient: quotient, remainder: remainder)
+
+%   if dbits == 128:
+#endif // os(Windows)
+%   end
 %   end
   }
 
