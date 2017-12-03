@@ -262,46 +262,6 @@ extension Character
     }
     self = Character(_largeRepresentationString: s)
   }
-
-  /// Creates a Character from a String that is already known to require the
-  /// large representation.
-  ///
-  /// - Note: `s` should contain only a single grapheme, but we can't require
-  ///   that formally because of grapheme cluster literals and the shifting
-  ///   sands of Unicode.  https://bugs.swift.org/browse/SR-4955
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal init(_largeRepresentationString s: String) {
-    _representation = .large(
-      s._guts._extractNativeStorage(of: UTF16.CodeUnit.self))
-  }
-
-  // FIXME(sil-serialize-all): Should be @_inlineable  @_versioned
-  // <rdar://problem/34557187>
-  internal static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
-    return UInt64(Builtin.zext_Int63_Int64(value))
-  }
-
-  /// The character's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    // FIXME(performance): constructing a temporary string is extremely
-    // wasteful and inefficient.
-    return String(self).hashValue
-  }
-
-  typealias UTF16View = String.UTF16View
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var utf16: UTF16View {
-    return String(self).utf16
-  }
-
-  @_versioned
-  internal var _representation: Representation
 }
 
 extension Character : CustomStringConvertible {
