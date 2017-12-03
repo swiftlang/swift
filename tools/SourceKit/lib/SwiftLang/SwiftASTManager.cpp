@@ -88,6 +88,8 @@ struct InvocationOptions {
   }
 
   void applyTo(CompilerInvocation &CompInvok) const;
+  void applyToSubstitutingInputs(CompilerInvocation &CompInvok,
+                                 FrontendInputs &&Inputs) const;
   void profile(llvm::FoldingSetNodeID &ID) const;
   void raw(std::vector<std::string> &Args, std::string &PrimaryFile) const;
 
@@ -131,6 +133,11 @@ void SwiftInvocation::raw(std::vector<std::string> &Args,
 
 void InvocationOptions::applyTo(CompilerInvocation &CompInvok) const {
   CompInvok = this->Invok;
+}
+void InvocationOptions::applyToSubstitutingInputs(
+    CompilerInvocation &CompInvok, FrontendInputs &&inputs) const {
+  CompInvok = this->Invok;
+  CompInvok.getFrontendOptions().Inputs = inputs;
 }
 
 void InvocationOptions::raw(std::vector<std::string> &Args,
@@ -231,15 +238,20 @@ typedef uint64_t BufferStamp;
 
 struct FileContent {
   ImmutableTextSnapshotRef Snapshot;
+  std::string Filename;
   std::unique_ptr<llvm::MemoryBuffer> Buffer;
+  bool IsPrimary;
   BufferStamp Stamp;
 
-  FileContent(ImmutableTextSnapshotRef Snapshot,
-              std::unique_ptr<llvm::MemoryBuffer> Buffer,
+  FileContent(ImmutableTextSnapshotRef Snapshot, std::string Filename,
+              std::unique_ptr<llvm::MemoryBuffer> Buffer, bool IsPrimary,
               BufferStamp Stamp)
-    : Snapshot(std::move(Snapshot)),
-      Buffer(std::move(Buffer)),
-      Stamp(Stamp) {}
+      : Snapshot(std::move(Snapshot)), Filename(Filename),
+        Buffer(std::move(Buffer)), IsPrimary(IsPrimary), Stamp(Stamp) {}
+
+  explicit operator InputFile() const {
+    return InputFile(Filename, IsPrimary, Buffer.get());
+  }
 };
 
 class ASTProducer : public ThreadSafeRefCountedBase<ASTProducer> {
@@ -284,6 +296,11 @@ private:
   ASTUnitRef createASTUnit(SwiftASTManager::Implementation &MgrImpl,
                            ArrayRef<ImmutableTextSnapshotRef> Snapshots,
                            std::string &Error);
+
+  void findSnapshotAndOpenFiles(SwiftASTManager::Implementation &MgrImpl,
+                                ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+                                SmallVectorImpl<FileContent> &Contents,
+                                std::string &Error) const;
 };
 
 typedef IntrusiveRefCntPtr<ASTProducer> ASTProducerRef;
@@ -330,7 +347,8 @@ struct SwiftASTManager::Implementation {
                            "sourcekit.swift.ASTBuilding" };
 
   ASTProducerRef getASTProducer(SwiftInvocationRef InvokRef);
-  FileContent getFileContent(StringRef FilePath, std::string &Error);
+  FileContent getFileContent(StringRef FilePath, bool IsPrimary,
+                             std::string &Error);
   BufferStamp getBufferStamp(StringRef FilePath);
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);
@@ -389,6 +407,14 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
       continue;
     NewArgs.push_back(CArg);
   }
+}
+
+static FrontendInputs
+convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
+  FrontendInputs inputs;
+  for (const FileContent &content : contents)
+    inputs.addInput(InputFile(content));
+  return inputs;
 }
 
 static FrontendInputs
@@ -547,23 +573,25 @@ SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef InvokRef) {
 }
 
 static FileContent getFileContentFromSnap(ImmutableTextSnapshotRef Snap,
-                                          StringRef FilePath) {
+                                          bool IsPrimary, StringRef FilePath) {
   auto Buf = llvm::MemoryBuffer::getMemBufferCopy(
       Snap->getBuffer()->getText(), FilePath);
-  return FileContent(Snap, std::move(Buf), Snap->getStamp());
+  return FileContent(Snap, FilePath, std::move(Buf), IsPrimary,
+                     Snap->getStamp());
 }
 
-FileContent
-SwiftASTManager::Implementation::getFileContent(StringRef UnresolvedPath,
-                                                std::string &Error) {
+FileContent SwiftASTManager::Implementation::getFileContent(
+    StringRef UnresolvedPath, bool IsPrimary, std::string &Error) {
   std::string FilePath = SwiftLangSupport::resolvePathSymlinks(UnresolvedPath);
   if (auto EditorDoc = EditorDocs.findByPath(FilePath))
-    return getFileContentFromSnap(EditorDoc->getLatestSnapshot(), FilePath);
+    return getFileContentFromSnap(EditorDoc->getLatestSnapshot(), IsPrimary,
+                                  FilePath);
 
   // FIXME: Is there a way to get timestamp and buffer for a file atomically ?
   auto Stamp = getBufferStamp(FilePath);
   auto Buffer = getMemoryBuffer(FilePath, Error);
-  return FileContent(nullptr, std::move(Buffer), Stamp);
+  return FileContent(nullptr, UnresolvedPath, std::move(Buffer), IsPrimary,
+                     Stamp);
 }
 
 BufferStamp SwiftASTManager::Implementation::getBufferStamp(StringRef FilePath){
@@ -766,35 +794,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   Stamps.clear();
   DependencyStamps.clear();
 
-  const InvocationOptions &Opts = InvokRef->Impl.Opts;
-
   SmallVector<FileContent, 8> Contents;
-  for (const auto &input :
-       Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
-    StringRef File = input.file();
-    if (File.empty())
-      continue;
-    bool FoundSnapshot = false;
-    for (auto &Snap : Snapshots) {
-      if (Snap->getFilename() == File) {
-        FoundSnapshot = true;
-        Contents.push_back(getFileContentFromSnap(Snap, File));
-        break;
-      }
-    }
-    if (FoundSnapshot)
-      break;
-
-    auto Content = MgrImpl.getFileContent(File, Error);
-    if (!Content.Buffer) {
-      LOG_WARN_FUNC("failed getting file contents for " << File << ": " << Error);
-      // File may not exist, continue and recover as if it was empty.
-      Content.Buffer = llvm::MemoryBuffer::getNewMemBuffer(0, File);
-    }
-    Contents.push_back(std::move(Content));
-  }
-  assert(Contents.size() ==
-         Opts.Invok.getFrontendOptions().Inputs.inputCount());
+  findSnapshotAndOpenFiles(MgrImpl, Snapshots, Contents, Error);
 
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
@@ -802,8 +803,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   trace::SwiftInvocation TraceInfo;
 
   if (trace::enabled()) {
-    TraceInfo.Args.PrimaryFile = Opts.PrimaryFile;
-    TraceInfo.Args.Args = Opts.Args;
+    TraceInfo.Args.PrimaryFile = InvokRef->Impl.Opts.PrimaryFile;
+    TraceInfo.Args.Args = InvokRef->Impl.Opts.Args;
   }
 
   ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
@@ -814,7 +815,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     if (trace::enabled()) {
       TraceInfo.addFile(Content.Buffer->getBufferIdentifier(),
                         Content.Buffer->getBuffer());
-
     }
   }
   auto &CompIns = ASTRef->Impl.CompInst;
@@ -824,12 +824,10 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   CompIns.addDiagnosticConsumer(&Consumer);
 
   CompilerInvocation Invocation;
-  Opts.applyTo(Invocation);
+  InvokRef->Impl.Opts.applyToSubstitutingInputs(
+      Invocation, convertFileContentsToInputs(Contents));
+
   Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
-  for (auto i : indices(Contents)) {
-    Invocation.getFrontendOptions().Inputs.setBuffer(Contents[i].Buffer.get(),
-                                                     i);
-  }
 
   if (CompIns.setup(Invocation)) {
     // FIXME: Report the diagnostic.
@@ -890,4 +888,37 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   ASTRef->Impl.TypeResolver = createLazyResolver(CompIns.getASTContext());
 
   return ASTRef;
+}
+
+void ASTProducer::findSnapshotAndOpenFiles(
+    SwiftASTManager::Implementation &MgrImpl,
+    ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+    SmallVectorImpl<FileContent> &Contents, std::string &Error) const {
+  const InvocationOptions &Opts = InvokRef->Impl.Opts;
+  for (const auto &input :
+       Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
+    StringRef File = input.file();
+    bool IsPrimary = input.isPrimary();
+    bool FoundSnapshot = false;
+    for (auto &Snap : Snapshots) {
+      if (Snap->getFilename() == File) {
+        FoundSnapshot = true;
+        Contents.push_back(getFileContentFromSnap(Snap, IsPrimary, File));
+        break;
+      }
+    }
+    if (FoundSnapshot)
+      break;
+
+    auto Content = MgrImpl.getFileContent(File, IsPrimary, Error);
+    if (!Content.Buffer) {
+      LOG_WARN_FUNC("failed getting file contents for " << File << ": "
+                                                        << Error);
+      // File may not exist, continue and recover as if it was empty.
+      Content.Buffer = llvm::MemoryBuffer::getNewMemBuffer(0, File);
+    }
+    Contents.push_back(std::move(Content));
+  }
+  assert(Contents.size() ==
+         Opts.Invok.getFrontendOptions().Inputs.inputCount());
 }
