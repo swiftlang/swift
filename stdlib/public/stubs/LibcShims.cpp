@@ -183,8 +183,7 @@ char * _Nullable *swift::_stdlib_getEnviron() {
 }
 #endif
 
-// not Windows
-#endif
+#endif // !(defined(_WIN32) && !defined(__CYGWIN__))
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int swift::_stdlib_getErrno() {
