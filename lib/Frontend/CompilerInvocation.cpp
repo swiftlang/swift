@@ -118,18 +118,20 @@ class ArgsToFrontendInputsConverter {
   FrontendInputs &Inputs;
 
   Arg const *const FilelistPathArg;
+  Arg const *const PrimaryFilelistPathArg;
 
-  std::unique_ptr<llvm::MemoryBuffer> FilelistBuffer;
-
-  StringRef filelistPath() { return FilelistPathArg->getValue(); }
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> BuffersToKeepAlive;
 
   llvm::SetVector<StringRef> Files;
+  std::set<StringRef> PrimaryFiles;
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
                                 FrontendInputs &Inputs)
       : Diags(Diags), Args(Args), Inputs(Inputs),
-        FilelistPathArg(Args.getLastArg(options::OPT_filelist)) {}
+        FilelistPathArg(Args.getLastArg(options::OPT_filelist)),
+        PrimaryFilelistPathArg(Args.getLastArg(options::OPT_primary_filelist)) {
+  }
 
   bool convert() {
     if (enforceFilelistExclusion())
@@ -141,7 +143,8 @@ public:
     if (hadError)
       return true;
 
-    llvm::StringSet<> PrimaryFiles = getPrimaries();
+    if (getPrimaries())
+      return true;
 
     for (auto file : Files) {
       bool isPrimary = PrimaryFiles.count(file) > 0;
@@ -152,19 +155,24 @@ public:
     for (auto &file : PrimaryFiles) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
-      assert(doesCommandLineIncludeFilelist() &&
-             "Missing primary with no filelist");
-      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
-                     file.getKey(), filelistPath());
+      assert(FilelistPathArg && "Missing primary with no filelist");
+      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
+                     FilelistPathArg->getValue());
     }
     return !PrimaryFiles.empty();
   }
 
 private:
   bool enforceFilelistExclusion() {
-    if (Args.hasArg(options::OPT_INPUT) && doesCommandLineIncludeFilelist()) {
+    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg) {
       Diags.diagnose(SourceLoc(),
                      diag::error_cannot_have_input_files_with_file_list);
+      return true;
+    }
+    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg) {
+      Diags.diagnose(
+          SourceLoc(),
+          diag::error_cannot_have_input_files_with_primary_file_list);
       return true;
     }
     return false;
@@ -183,29 +191,37 @@ private:
                   // on it.
   }
 
-  bool doesCommandLineIncludeFilelist() { return FilelistPathArg; }
-  bool mustPrimaryFilesOnCommandLineAlsoAppearInFileList() {
-    return doesCommandLineIncludeFilelist();
+  bool getFilesFromInputFilelist() {
+    bool hadDuplicates = false;
+    if (forAllFilesInFilelist(FilelistPathArg, [&](StringRef file) -> void {
+          hadDuplicates = addFile(file) || hadDuplicates;
+        }))
+      return true;
+    return false; // Don't bail out for duplicates, too many tests depend on it.
   }
 
-  bool getFilesFromFilelist() {
-    if (!doesCommandLineIncludeFilelist())
+  bool mustPrimaryFilesOnCommandLineAlsoAppearInFileList() const {
+    return FilelistPathArg;
+  }
+
+  bool forAllFilesInFilelist(Arg const *const pathArg,
+                             llvm::function_ref<void(StringRef)> fn) {
+    if (!pathArg)
       return false;
+    StringRef path = pathArg->getValue();
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
-        llvm::MemoryBuffer::getFile(filelistPath());
+        llvm::MemoryBuffer::getFile(path);
     if (!filelistBufferOrError) {
-      Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath(),
+      Diags.diagnose(SourceLoc(), diag::cannot_open_file, path,
                      filelistBufferOrError.getError().message());
       return true;
     }
-    // Keep buffer alive because code passes around StringRefs.
-    FilelistBuffer = std::move(*filelistBufferOrError);
-    bool hadDuplicates = false;
-    for (auto file : llvm::make_range(llvm::line_iterator(*FilelistBuffer),
-                                      llvm::line_iterator()))
-      hadDuplicates = addFile(file) || hadDuplicates;
-    return false; // FIXME: Don't bail out for duplicates, too many tests depend
-                  // on it.
+    for (auto file :
+         llvm::make_range(llvm::line_iterator(*filelistBufferOrError->get()),
+                          llvm::line_iterator()))
+      fn(file);
+    BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
+    return false;
   }
 
   bool addFile(StringRef file) {
@@ -215,11 +231,14 @@ private:
     return true;
   }
 
-  llvm::StringSet<> getPrimaries() const {
-    llvm::StringSet<> primaryFiles;
+  bool getPrimaries() {
     for (const Arg *A : Args.filtered(options::OPT_primary_file))
-      primaryFiles.insert(A->getValue());
-    return primaryFiles;
+      PrimaryFiles.insert(A->getValue());
+    if (forAllFilesInFilelist(
+            PrimaryFilelistPathArg,
+            [&](StringRef file) -> void { PrimaryFiles.insert(file); }))
+      return true;
+    return false;
   }
 };
 class FrontendArgsToOptionsConverter {
