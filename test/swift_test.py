@@ -31,22 +31,6 @@ class SwiftTest(lit.formats.ShTest, object):
         self.skipped_tests = set()
 
     def before_test(self, test, litConfig):
-        _, tmp_base = lit.TestRunner.getTempPaths(test)
-
-        # Apparently despite the docs, tmpDir is not actually unique for each
-        # test, but tmpBase is. Remove it here and add a tmpBase substitution
-        # in before_test. Speculative fix for rdar://32928464.
-        try:
-            percentT_index = \
-                [x[0] for x in test.config.substitutions].index('%T')
-        except ValueError:
-            pass
-        else:
-            test.config.substitutions.pop(percentT_index)
-
-            test.config.substitutions.append(
-                ('%T', '$(mkdir -p %r && echo %r)' % (tmp_base, tmp_base)))
-
         if self.coverage_mode:
             # FIXME: The compiler crashers run so fast they fill up the
             # merger's queue (and therefore the build bot's disk)
@@ -56,7 +40,9 @@ class SwiftTest(lit.formats.ShTest, object):
                 return
 
             if self.coverage_mode == "NOT_MERGED":
-                profdir = tmp_base + '.profdir'
+                execpath = test.getExecPath()
+                profdir = os.path.join(os.path.dirname(execpath), "Output",
+                                       os.path.basename(execpath) + '.profdir')
                 if not os.path.exists(profdir):
                     os.makedirs(profdir)
 
