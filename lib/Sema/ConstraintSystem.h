@@ -1561,11 +1561,11 @@ public:
   
   TypeBase* getFavoredType(Expr *E) {
     assert(E != nullptr);
-    return this->FavoredTypes[E->getSemanticsProvidingExpr()];
+    return this->FavoredTypes[E];
   }
   void setFavoredType(Expr *E, TypeBase *T) {
     assert(E != nullptr);
-    this->FavoredTypes[E->getSemanticsProvidingExpr()] = T;
+    this->FavoredTypes[E] = T;
   }
 
   /// Set the type in our type map for a given expression. The side
