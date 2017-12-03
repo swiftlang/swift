@@ -662,7 +662,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
                           F->isSerialized(), F->getEntryCount(), F->isThunk(),
                           F->getClassSubclassScope(), F->getInlineStrategy(),
                           F->getEffectsKind(), nullptr, F->getDebugScope());
-  if (F->hasUnqualifiedOwnership()) {
+  if (!F->hasQualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
 

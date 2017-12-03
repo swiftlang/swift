@@ -648,7 +648,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
-  if (Orig->hasUnqualifiedOwnership()) {
+  if (!Orig->hasQualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
   return Fn;
