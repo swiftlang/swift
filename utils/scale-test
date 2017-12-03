@@ -102,6 +102,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
         d = ensure_tmpdir(args.tmpdir)
         inputs = [write_input_file(args, ast, d, i) for i in rng]
         primary = inputs[primary_idx]
+        # frontend no longer accepts duplicate inputs
+        del inputs[primary_idx]
         ofile = "out.o"
 
         mode = "-c"
