@@ -1704,7 +1704,29 @@ extension Collection {
 
 
 extension Collection {
-  @available(swift, deprecated: 4.1, message: "all index disatnces are now of type Int")
+  @available(swift, deprecated, message: "all index distances are now of type Int")
   public typealias IndexDistance = Int
-}
 
+  @available(*, deprecated, message: "all index distances are now of type Int")
+  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
+    return index(i, offsetBy: Int(n))
+  }
+  /* FIXME: crashes the compiler
+  @available(*, deprecated, message: "all index distances are now of type Int")
+  public func formIndex<T: BinaryInteger>(_ i: Index, offsetBy n: T) {
+    return formIndex(i, offsetBy: Int(n))
+  }
+  @available(*, deprecated, message: "all index distances are now of type Int")
+  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index {
+    return index(i, offsetBy: Int(n), limitedBy: limit)
+  }
+  */
+  @available(*, deprecated, message: "all index distances are now of type Int")
+  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T, limitedBy limit: Index) -> Bool {
+    return formIndex(&i, offsetBy: Int(n), limitedBy: limit)
+  }
+  @available(*, deprecated, message: "all index distances are now of type Int")
+  public func distance<T: BinaryInteger>(from start: Index, to end: Index) -> T {
+    return numericCast(distance(from: start, to: end) as Int)
+  }
+}
