@@ -130,8 +130,8 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
-bool FrontendOptions::actionIsImmediate() const {
-  switch (RequestedAction) {
+bool FrontendOptions::isActionImmediate(ActionType action) {
+  switch (action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::Typecheck:

@@ -111,31 +111,33 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
                                SourceMgr, Diagnostics));
 
   if (Invocation.getFrontendOptions().EnableSourceImport) {
-    bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
+    bool immediate = FrontendOptions::isActionImmediate(
+        Invocation.getFrontendOptions().RequestedAction);
     bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
                                                   enableResilience,
                                                   DepTracker));
   }
-  
-  auto SML = SerializedModuleLoader::create(*Context, DepTracker);
-  this->SML = SML.get();
-  Context->addModuleLoader(std::move(SML));
-
-  // Wire up the Clang importer. If the user has specified an SDK, use it.
-  // Otherwise, we just keep it around as our interface to Clang's ABI
-  // knowledge.
-  auto clangImporter =
-    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getPCHHash(),
-                          DepTracker);
-  if (!clangImporter) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
-    return true;
+  {
+    auto SML = SerializedModuleLoader::create(*Context, DepTracker);
+    this->SML = SML.get();
+    Context->addModuleLoader(std::move(SML));
   }
+  {
+    // Wire up the Clang importer. If the user has specified an SDK, use it.
+    // Otherwise, we just keep it around as our interface to Clang's ABI
+    // knowledge.
+    auto clangImporter =
+        ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                              Invocation.getPCHHash(), DepTracker);
+    if (!clangImporter) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+      return true;
+    }
 
-  Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
+    Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
+  }
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
@@ -390,11 +392,11 @@ void CompilerInstance::getImplicitlyImportedModules(
 
 void CompilerInstance::createREPLFile(
     const ImplicitImports &implicitImports) const {
-  auto *SingleInputFile = new (*Context) SourceFile(
+  auto *singleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
       Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
-  MainModule->addFile(*SingleInputFile);
-  addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
+  MainModule->addFile(*singleInputFile);
+  addAdditionalInitialImportsTo(singleInputFile, implicitImports);
 }
 
 std::unique_ptr<DelayedParsingCallbacks>
@@ -534,7 +536,7 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   if (options.DebugTimeFunctionBodies) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
   }
-  if (options.actionIsImmediate()) {
+  if (FrontendOptions::isActionImmediate(options.RequestedAction)) {
     TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
   }
   if (options.DebugTimeExpressionTypeChecking) {
@@ -627,8 +629,8 @@ void CompilerInstance::parseAndTypeCheckMainFile(
 static void
 forEachSourceFileIn(ModuleDecl *module,
                     llvm::function_ref<void(SourceFile &)> fn) {
-  for (auto File : module->getFiles()) {
-    if (auto SF = dyn_cast<SourceFile>(File))
+  for (auto file : module->getFiles()) {
+    if (auto SF = dyn_cast<SourceFile>(file))
       fn(*SF);
   }
 }
