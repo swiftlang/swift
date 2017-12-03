@@ -7,9 +7,11 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+import os
+
 from ..utils import TestCase, redirect_stderr
-from ...argparse import (ArgumentParser, BoolType, Nargs, PathType, SUPPRESS,
-                         actions)
+from ...argparse import (ArgumentParser, ArgumentTypeError, BoolType, Nargs,
+                         PathType, SUPPRESS, actions)
 
 
 # -----------------------------------------------------------------------------
@@ -251,6 +253,22 @@ class TestStorePathAction(TestCase):
 
         self.assertEqual(action.nargs, Nargs.SINGLE)
         self.assertIsInstance(action.type, PathType)
+
+    def test_exists(self):
+        pass
+
+    def test_executable(self):
+        parser = ArgumentParser()
+        parser.add_argument('--foo', action=actions.StorePathAction,
+                            executable=True)
+
+        bash_path = '/bin/bash'
+        if os.path.exists(bash_path) and os.access(bash_path, os.X_OK):
+            with self.assertNotRaises(ArgumentTypeError):
+                parser.parse_args(['--foo', bash_path])
+
+        with self.assertRaises(SystemExit):
+            parser.parse_args(['--foo', __file__])
 
 
 class TestToggleTrueAction(TestCase):

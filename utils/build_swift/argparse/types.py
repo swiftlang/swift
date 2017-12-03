@@ -62,18 +62,29 @@ class PathType(object):
     by the path exists.
     """
 
-    def __init__(self, assert_exists=False):
+    def __init__(self, assert_exists=False, assert_executable=False):
+        if assert_executable:
+            assert_exists = True
+
         self.assert_exists = assert_exists
+        self.assert_executable = assert_executable
 
     def __call__(self, path):
         path = os.path.expanduser(path)
         path = os.path.abspath(path)
         path = os.path.realpath(path)
 
-        if self.assert_exists:
-            assert os.path.exists(path)
+        if self.assert_exists and not os.path.exists(path):
+            raise ArgumentTypeError('{} does not exists'.format(path))
+
+        if self.assert_executable and not PathType._is_executable(path):
+            raise ArgumentTypeError('{} is not an executable'.format(path))
 
         return path
+
+    @staticmethod
+    def _is_executable(path):
+        return os.path.isfile(path) and os.access(path, os.X_OK)
 
 
 class RegexType(object):

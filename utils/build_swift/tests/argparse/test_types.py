@@ -90,12 +90,25 @@ class TestPathType(TestCase):
     def test_assert_exists(self):
         path_type = types.PathType(assert_exists=True)
 
-        with self.assertNotRaises(AssertionError):
+        with self.assertNotRaises(ArgumentTypeError):
             path_type(__file__)
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(ArgumentTypeError):
             path_type('/nonsensisal/path/')
             path_type('~/not-a-real/path to a file')
+
+    def test_assert_executable(self):
+        path_type = types.PathType(assert_executable=True)
+
+        self.assertTrue(path_type.assert_exists)
+
+        bash_path = '/bin/bash'
+        if os.path.isfile(bash_path) and os.access(bash_path, os.X_OK):
+            with self.assertNotRaises(ArgumentTypeError):
+                path_type(bash_path)
+
+        with self.assertRaises(ArgumentTypeError):
+            path_type(__file__)
 
 
 class TestRegexType(TestCase):
