@@ -620,7 +620,7 @@ bool FrontendArgsToOptionsConverter::computeModuleName() {
       (Opts.ModuleName != STDLIB_NAME || Opts.ParseStdlib)) {
     return false;
   }
-  if (FrontendOptions::needsProperModuleName(Opts.RequestedAction) ||
+  if (!FrontendOptions::needsProperModuleName(Opts.RequestedAction) ||
       Opts.isCompilingExactlyOneSwiftFile()) {
     Opts.ModuleName = "main";
     return false;
