@@ -1352,7 +1352,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
       ++II;
       loadBuilder.setInsertionPoint(II);
     }
-    if (pass.F->hasUnqualifiedOwnership()) {
+    if (!pass.F->hasQualifiedOwnership()) {
       load = loadBuilder.createLoad(applyInst->getLoc(), value,
                                     LoadOwnershipQualifier::Unqualified);
     } else {
@@ -1373,7 +1373,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
   auto *applyOutlinedCopy =
       createOutlinedCopyCall(allocBuilder, value, allocInstr, pass);
 
-  if (pass.F->hasUnqualifiedOwnership()) {
+  if (!pass.F->hasQualifiedOwnership()) {
     loadCopy = allocBuilder.createLoad(applyOutlinedCopy->getLoc(), allocInstr,
                                        LoadOwnershipQualifier::Unqualified);
   } else {
@@ -1703,7 +1703,7 @@ static void rewriteFunction(StructLoweringState &pass,
 
           // Load the enum addr then see if we can get rid of the load:
           LoadInst *loadArg = nullptr;
-          if (pass.F->hasUnqualifiedOwnership()) {
+          if (!pass.F->hasQualifiedOwnership()) {
             loadArg = argBuilder.createLoad(
                 newArg->getLoc(), newArg, LoadOwnershipQualifier::Unqualified);
           } else {
@@ -1747,7 +1747,7 @@ static void rewriteFunction(StructLoweringState &pass,
           instr->getType().getAddressType());
       // Load the struct element then see if we can get rid of the load:
       LoadInst *loadArg = nullptr;
-      if (pass.F->hasUnqualifiedOwnership()) {
+      if (!pass.F->hasQualifiedOwnership()) {
         loadArg = structBuilder.createLoad(newInstr->getLoc(), newInstr,
                                            LoadOwnershipQualifier::Unqualified);
       } else {
