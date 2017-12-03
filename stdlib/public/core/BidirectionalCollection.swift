@@ -178,17 +178,17 @@ extension BidirectionalCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> Int {
     var start = start
-    var count: Int = 0
+    var count = 0
 
     if start < end {
       while start != end {
-        count += 1 as Int
+        count += 1
         formIndex(after: &start)
       }
     }
     else if start > end {
       while start != end {
-        count -= 1 as Int
+        count -= 1
         formIndex(before: &start)
       }
     }

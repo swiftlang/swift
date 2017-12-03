@@ -284,7 +284,7 @@ extension String {
     @_versioned
     @inline(__always)
     internal func _forwardDistance(from i: Index, to j: Index) -> Int {
-      var r: Int = j._transcodedOffset - i._transcodedOffset
+      var r = j._transcodedOffset - i._transcodedOffset
       UTF8._transcode(
         _core[i.encodedOffset..<j.encodedOffset], from: UTF16.self) {
         r += $0.count

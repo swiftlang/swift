@@ -306,8 +306,7 @@ extension Slice: RangeReplaceableCollection
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
-    let sliceOffset =
-      _base.distance(from: _base.startIndex, to: _startIndex)
+    let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
     let newSliceCount = count + 1
     _base.insert(newElement, at: i)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
@@ -358,7 +357,7 @@ extension Slice
   ) where C : Collection, C.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if subRange.lowerBound == _base.startIndex {
-      let newSliceCount: Int =
+      let newSliceCount =
         _base.distance(from: _startIndex, to: subRange.lowerBound)
         + _base.distance(from: subRange.upperBound, to: _endIndex)
         + (numericCast(newElements.count) as Int)
@@ -383,7 +382,7 @@ extension Slice
   public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount: Int = count + 1
+      let newSliceCount = count + 1
       _base.insert(newElement, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -404,8 +403,7 @@ extension Slice
   where S : Collection, S.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount: Int =
-        count + (numericCast(newElements.count) as Int)
+      let newSliceCount = count + numericCast(newElements.count)
       _base.insert(contentsOf: newElements, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -414,7 +412,7 @@ extension Slice
       let lastValidIndex = _base.index(before: i)
       let newEndIndexOffset =
         _base.distance(from: i, to: _endIndex)
-        + (numericCast(newElements.count) as Int) + 1
+        + numericCast(newElements.count) + 1
       _base.insert(contentsOf: newElements, at: i)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -427,7 +425,7 @@ extension Slice
   public mutating func remove(at i: Index) -> Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount: Int = count - 1
+      let newSliceCount = count - 1
       let result = _base.remove(at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -449,17 +447,16 @@ extension Slice
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check.
     if bounds.lowerBound == _base.startIndex {
-      let newSliceCount: Int =
-        count
-        - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
+      let newSliceCount =
+        count - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
       _base.removeSubrange(bounds)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
     } else {
       let shouldUpdateStartIndex = bounds.lowerBound == _startIndex
       let lastValidIndex = _base.index(before: bounds.lowerBound)
-      let newEndIndexOffset: Int =
-        _base.distance(from: bounds.lowerBound, to: _endIndex)
+      let newEndIndexOffset =
+          _base.distance(from: bounds.lowerBound, to: _endIndex)
         - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
         + 1
       _base.removeSubrange(bounds)

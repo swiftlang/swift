@@ -401,8 +401,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence = Slice<Self>
-    where SubSequence.Index == Index
+  associatedtype SubSequence = Slice<Self> where SubSequence.Index == Index
 
   /// Accesses the element at the specified position.
   ///
