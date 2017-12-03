@@ -98,7 +98,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
 bool FrontendInputs::doAllNonPrimariesEndWithSIB() const {
   for (const InputFile &input : getAllFiles()) {
     assert(!input.getFile().empty() && "all files have (perhaps pseudo) names");
-    if (!input.getIsPrimary())
+    if (input.getIsPrimary())
       continue;
     if (!llvm::sys::path::extension(input.getFile()).endswith(SIB_EXTENSION)) {
       return false;
