@@ -150,7 +150,8 @@ public:
     for (auto file : PrimaryFiles) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
-      assert(FilelistPathArg != nullptr && "Missing primary with no filelist");
+      assert(doesCommandLineIncludeFilelist() &&
+             "Missing primary with no filelist");
       Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
                      filelistPath());
     }
@@ -159,7 +160,7 @@ public:
 
 private:
   bool enforceFilelistExclusion() {
-    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg != nullptr) {
+    if (Args.hasArg(options::OPT_INPUT) && doesCommandLineIncludeFilelist()) {
       Diags.diagnose(SourceLoc(),
                      diag::error_cannot_have_input_files_with_file_list);
       return true;
@@ -169,12 +170,21 @@ private:
 
   void getFilesFromCommandLine() {
     for (const Arg *A :
-         Args.filtered(options::OPT_INPUT, options::OPT_primary_file))
+         Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
+      if (A->getOption().matches(options::OPT_primary_file) &&
+          mustPrimaryFilesOnCommandLineAlsoAppearInFileList())
+        continue;
       addFile(A->getValue());
+    }
+  }
+
+  bool doesCommandLineIncludeFilelist() { return FilelistPathArg; }
+  bool mustPrimaryFilesOnCommandLineAlsoAppearInFileList() {
+    return doesCommandLineIncludeFilelist();
   }
 
   bool getFilesFromFilelist() {
-    if (!FilelistPathArg)
+    if (!doesCommandLineIncludeFilelist())
       return false;
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError =
         llvm::MemoryBuffer::getFile(filelistPath());
