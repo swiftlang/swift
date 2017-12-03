@@ -1,9 +1,6 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: tools-release,no_asserts
 
-// FIXME: https://bugs.swift.org/browse/SR-6518
-// REQUIRES: SR6518
-
 class P {
   var x : Int = 0
   var y : Int = 1
