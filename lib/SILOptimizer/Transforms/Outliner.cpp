@@ -361,7 +361,7 @@ BridgedProperty::outline(SILModule &M) {
     return std::make_pair(nullptr, std::prev(StartBB->end()));
   }
 
-  if (OutlinedEntryBB->getParent()->hasUnqualifiedOwnership())
+  if (!OutlinedEntryBB->getParent()->hasQualifiedOwnership())
     Fun->setUnqualifiedOwnership();
 
   Fun->setInlineStrategy(NoInline);
@@ -1045,7 +1045,7 @@ ObjCMethodCall::outline(SILModule &M) {
     return std::make_pair(Fun, I);
   }
 
-  if (ObjCMethod->getFunction()->hasUnqualifiedOwnership())
+  if (!ObjCMethod->getFunction()->hasQualifiedOwnership())
     Fun->setUnqualifiedOwnership();
 
   Fun->setInlineStrategy(NoInline);

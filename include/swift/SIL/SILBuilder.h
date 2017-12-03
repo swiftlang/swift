@@ -540,7 +540,7 @@ public:
   LoadInst *createTrivialLoadOr(SILLocation Loc, SILValue LV,
                                 LoadOwnershipQualifier Qualifier,
                                 bool SupportUnqualifiedSIL = false) {
-    if (SupportUnqualifiedSIL && getFunction().hasUnqualifiedOwnership()) {
+    if (SupportUnqualifiedSIL && !getFunction().hasQualifiedOwnership()) {
       assert(
           Qualifier != LoadOwnershipQualifier::Copy &&
           "In unqualified SIL, a copy must be done separately form the load");
@@ -556,7 +556,7 @@ public:
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
-           getFunction().hasUnqualifiedOwnership() &&
+           !getFunction().hasQualifiedOwnership() &&
                "Unqualified inst in qualified function");
     assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            getFunction().hasQualifiedOwnership() &&
@@ -610,7 +610,7 @@ public:
                                   SILValue DestAddr,
                                   StoreOwnershipQualifier Qualifier,
                                   bool SupportUnqualifiedSIL = false) {
-    if (SupportUnqualifiedSIL && getFunction().hasUnqualifiedOwnership()) {
+    if (SupportUnqualifiedSIL && !getFunction().hasQualifiedOwnership()) {
       assert(
           Qualifier != StoreOwnershipQualifier::Assign &&
           "In unqualified SIL, assigns must be represented via 2 instructions");
@@ -626,7 +626,7 @@ public:
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier) {
     assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
-           getFunction().hasUnqualifiedOwnership() &&
+           !getFunction().hasQualifiedOwnership() &&
                "Unqualified inst in qualified function");
     assert((Qualifier == StoreOwnershipQualifier::Unqualified) ||
            getFunction().hasQualifiedOwnership() &&
@@ -959,21 +959,21 @@ public:
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) RetainValueInst(getSILDebugLocation(Loc),
                                                       operand, atomicity));
   }
 
   RetainValueAddrInst *createRetainValueAddr(SILLocation Loc, SILValue operand,
                                              Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) RetainValueAddrInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
 
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
   }
@@ -981,7 +981,7 @@ public:
   ReleaseValueAddrInst *createReleaseValueAddr(SILLocation Loc,
                                                SILValue operand,
                                                Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) ReleaseValueAddrInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -1449,13 +1449,13 @@ public:
   }
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand,
                                        Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) StrongRetainInst(getSILDebugLocation(Loc),
                                                        Operand, atomicity));
   }
   StrongReleaseInst *createStrongRelease(SILLocation Loc, SILValue Operand,
                                          Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) StrongReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
   }
@@ -1919,7 +1919,7 @@ public:
     assert(!Value->getType().isAddress());
     // If ownership is not enabled in the function, just return our original
     // value.
-    if (getFunction().hasUnqualifiedOwnership())
+    if (!getFunction().hasQualifiedOwnership())
       return Value;
 
     // If we have a trivial value, just return the value. Trivial values have
@@ -1943,7 +1943,7 @@ public:
                               SILValue Original) {
     assert(!Borrowed->getType().isAddress());
     // If ownership is not enabled, just return.
-    if (getFunction().hasUnqualifiedOwnership())
+    if (!getFunction().hasQualifiedOwnership())
       return;
 
     // If we have a trivial value, just return. Trivial values have lifetimes

@@ -633,7 +633,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->isThunk(), ClosureUser->getClassSubclassScope(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
-  if (ClosureUser->hasUnqualifiedOwnership()) {
+  if (!ClosureUser->hasQualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
   for (auto &Attr : ClosureUser->getSemanticsAttrs())
