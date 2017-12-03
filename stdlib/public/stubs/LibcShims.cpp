@@ -120,8 +120,8 @@ int swift::_stdlib_close(int fd) {
 // Windows
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_open(const char *path, int oflag, int mode) {
-  return _open(path, oflag, mode);
+int swift::_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
+  return _open(path, oflag, static_cast<int>(mode));
 }
 
 #else
@@ -183,6 +183,9 @@ char * _Nullable *swift::_stdlib_getEnviron() {
 }
 #endif
 
+// not Windows
+#endif
+
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int swift::_stdlib_getErrno() {
   return errno;
@@ -193,8 +196,6 @@ void swift::_stdlib_setErrno(int value) {
   errno = value;
 }
 
-// not Windows
-#endif
 
 
 #if defined(__APPLE__)
