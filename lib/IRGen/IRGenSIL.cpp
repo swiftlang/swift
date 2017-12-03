@@ -3488,11 +3488,12 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
     return;
 
   bool IsAnonymous = false;
+  bool IsLoadablyByAddress = isa<AllocStackInst>(SILVal);
   StringRef Name = getVarName(i, IsAnonymous);
   auto Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getSwiftRValueType();
-  if (SILTy.isAddress())
+  if (SILTy.isAddress() && !IsLoadablyByAddress)
     RealType = CanInOutType::get(RealType);
   // Unwrap implicitly indirect types and types that are passed by
   // reference only at the SIL level and below.
@@ -3512,7 +3513,8 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   emitDebugVariableDeclaration(
       emitShadowCopy(Addr, i->getDebugScope(), Name, ArgNo, IsAnonymous), DbgTy,
       SILType(), i->getDebugScope(), Decl, Name, ArgNo,
-      DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
+      (IsLoadablyByAddress || DbgTy.isImplicitlyIndirect()) ? DirectValue
+                                                            : IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
