@@ -121,6 +121,17 @@ bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void _bridgeNonVerbatimBoxedValue(const OpaqueValue *, OpaqueValue *,
+                                  const Metadata) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void _bridgeNonVerbatimFromObjectiveCToAny(HeapObject *, OpaqueValue *) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 int _T0s13_getErrorCodeSiSPyxGs0B0RzlF(void *) {
   abort();
 }
@@ -139,3 +150,4 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void *_T0s32_getErrorEmbeddedNSErrorIndirectyXlSgSPyxGs0B0RzlF(void *) {
   abort();
 }
+
