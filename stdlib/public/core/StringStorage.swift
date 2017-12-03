@@ -66,7 +66,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     let storageAddr = UnsafeMutableRawPointer(
       Builtin.bridgeToRawPointer(storage))
     let endAddr = (
-      storageAddr + _swift_stdlib_malloc_size(storageAddr)
+      storageAddr + _stdlib_malloc_size(storageAddr)
     ).assumingMemoryBound(to: CodeUnit.self)
     storage.capacity = endAddr - storage.start
     storage.count = count
