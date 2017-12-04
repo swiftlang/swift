@@ -1,3 +1,4 @@
+
 // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
@@ -3733,12 +3734,12 @@ class TestData : TestDataSuper {
         let ref = d as AnyObject
         let data = ref as! Data
 
-        let cnt = bytes.count - 4
+        let cnt = data.count - 4
         let t = data.dropFirst(4).withUnsafeBytes { (bytes: UnsafePointer<UInt8>) in
             return Data(bytes: bytes, count: cnt)
         }
 
-        expectEqual(t, Data(bytes: [4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]))
+        expectEqual(Data(bytes: [4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]), t)
     }
 }
 
