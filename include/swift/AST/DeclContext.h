@@ -610,9 +610,14 @@ class IterableDeclContext {
   mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
     LastDeclAndKind;
 
-  // The DeclID this IDC was deserialized from, if any. Used for named lazy
-  // member loading, as a key when doing lookup in this IDC.
+  /// The DeclID this IDC was deserialized from, if any. Used for named lazy
+  /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
+
+  /// Lazy member loading has a variety of feedback loops that need to
+  /// switch to pseudo-empty-member behaviour to avoid infinite recursion;
+  /// we use this flag to control them.
+  bool lazyMemberLoadingInProgress = false;
 
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
@@ -634,6 +639,11 @@ public:
   /// Retrieve the set of members in this context.
   DeclRange getMembers() const;
 
+  /// Retrieve the set of members in this context without loading any from the
+  /// associated lazy loader; this should only be used as part of implementing
+  /// abstractions on top of member loading, such as a name lookup table.
+  DeclRange getCurrentMembersWithoutLoading() const;
+
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
@@ -641,6 +651,14 @@ public:
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
     return FirstDeclAndLazyMembers.getInt();
+  }
+
+  bool isLoadingLazyMembers() {
+    return lazyMemberLoadingInProgress;
+  }
+
+  void setLoadingLazyMembers(bool inProgress) {
+    lazyMemberLoadingInProgress = inProgress;
   }
 
   /// Setup the loader for lazily-loaded members.
