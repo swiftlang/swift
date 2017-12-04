@@ -179,9 +179,13 @@ bool CompilerInstance::setupInputs() {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (const InputFile &input :
-       Invocation.getFrontendOptions().Inputs.getAllFiles())
-    if (setUpForInput(input))
-      return true;
+       Invocation.getFrontendOptions().Inputs.getAllFiles()) {
+    bool failed = setUpForInput(input);
+    bool old_failed = old_setUpForInput(input);
+    if (failed) assert(old_failed && "new failed to fail");
+    else assert(!old_failed && "new failed to not fail");
+    if (failed) return true;
+  }
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue())
@@ -271,6 +275,123 @@ CompilerInstance::getInputAndMaybeModuleDocBuffers(const InputFile &input) {
   return std::make_pair(std::move(*inputFileOrErr),
                         std::move(*moduleDocFileOrErr));
 }
+
+bool CompilerInstance::old_setUpForInput(const InputFile &input) {
+  if (llvm::MemoryBuffer *inputBuffer = input.getBuffer()) {
+    old_setUpForBuffer(inputBuffer, input.getIsPrimary());
+    return false;
+  }
+  return old_setUpForFile(input.getFile(), input.getIsPrimary());
+}
+void CompilerInstance::old_setUpForBuffer(llvm::MemoryBuffer *buffer,
+                                      bool isPrimary) {
+  auto copy =
+  std::unique_ptr<llvm::MemoryBuffer>(llvm::MemoryBuffer::getMemBufferCopy(
+                                                                           buffer->getBuffer(), buffer->getBufferIdentifier()));
+  auto a2 = copy.get(); auto p2 = a2->getBufferStart(); auto s2 = a2->getBufferSize();
+  if (serialization::isSerializedAST(copy->getBuffer())) {
+    PartialModuleInputs &pmi = PartialModules.back();
+    auto a1 = pmi.ModuleBuffer.get();
+    auto p1 = a1->getBufferStart();
+    auto s1 = a1->getBufferSize();
+    
+    
+    assert(s1 == s2 && "buffer present, different sizes");
+    assert(!bcmp(p1, p2, s1) && "buffer present, different contents");
+    assert(pmi.ModuleDocBuffer.get() == nullptr && "buffer present module doc?");
+  } else {
+    auto a1 = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(SourceMgr.getLLVMSourceMgr().getNumBuffers() - 1);
+    auto p1 = a1->getBufferStart();
+    auto s1 = a1->getBufferSize();
+    assert(s1 == s2 && "buffer present2, different sizes");
+    assert(!bcmp(p1, p2, s1) && "buffer present2, different contents");
+    
+    unsigned bufferID = SourceMgr.getLLVMSourceMgr().getNumBuffers() - 1;
+    assert(InputSourceCodeBufferIDs.back() == bufferID && "buffer present2, diff IDs");
+    
+    if (isInSILMode()) {
+      assert(MainBufferID == bufferID && "buffer present2, main");
+    }
+   
+    if (isPrimary)
+      assert(PrimaryBufferID == bufferID && "buf present2, pri");
+  }
+}
+
+bool CompilerInstance::old_setUpForFile(StringRef fileName, bool isPrimary) {
+  if (fileName.empty())
+    return false;
+  // FIXME: Working with filenames is fragile, maybe use the real path
+  // or have some kind of FileManager.
+  using namespace llvm::sys::path;
+  if (Optional<unsigned> existingBufferID =
+      SourceMgr.getIDForBufferIdentifier(fileName)) {
+    if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
+      assert(MainBufferID == existingBufferID.getValue() && "file main ex");
+    
+    if (isPrimary)
+      assert(PrimaryBufferID == existingBufferID.getValue() && "file pri ex");
+    
+    return false; // replaced by a memory buffer.
+  }
+  
+  // Open the input file.
+  using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+  FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(fileName);
+  if (!inputFileOrErr) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, fileName,
+                         inputFileOrErr.getError().message());
+    return true;
+  }
+  auto a2 = inputFileOrErr.get().get(); auto p2 = a2->getBufferStart(); auto s2 = a2->getBufferSize();
+  if (serialization::isSerializedAST(inputFileOrErr.get()->getBuffer())) {
+    PartialModuleInputs &pmi = PartialModules.back();
+    auto a1 = pmi.ModuleBuffer.get();
+    auto p1 = a1->getBufferStart();
+    auto s1 = a1->getBufferSize();
+    assert(s1 == s2 && "buffer abs, different sizes");
+    assert(!bcmp(p1, p2, s1) && "buffer abs, different contents");
+    
+    llvm::SmallString<128> ModuleDocFilePath(fileName);
+    llvm::sys::path::replace_extension(ModuleDocFilePath,
+                                       SERIALIZED_MODULE_DOC_EXTENSION);
+    FileOrError moduleDocOrErr =
+    llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
+    if (!moduleDocOrErr &&
+        moduleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, fileName,
+                           moduleDocOrErr.getError().message());
+      return true;
+    }
+    a2 = moduleDocOrErr.get().get();
+    a1 = pmi.ModuleDocBuffer.get();
+    assert( (a1 == nullptr) == (a1 == nullptr));
+    if (a1) {
+      p2 = a2->getBufferStart();  s2 = a2->getBufferSize();
+      p1 = a1->getBufferStart();
+      s1 = a1->getBufferSize();
+      assert(s1 == s2 && "buffer abs, different sizes doc");
+      assert(!bcmp(p1, p2, s1) && "buffer abs, different contents doc");
+    }
+    return false;
+  }
+  // Transfer ownership of the MemoryBuffer to the SourceMgr.
+  unsigned bufferID =
+  SourceMgr.addNewSourceBuffer(std::move(inputFileOrErr.get()));
+  
+  InputSourceCodeBufferIDs.push_back(bufferID);
+  
+  if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
+    MainBufferID = bufferID;
+  
+  if (isPrimary)
+    PrimaryBufferID = bufferID;
+  
+  return false;
+}
+
+
+
 
 ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
