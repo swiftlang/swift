@@ -670,9 +670,6 @@ public:
                             sequence->getLoc());
     if (!genConformance)
       return nullptr;
-    assert(
-        genConformance->getConditionalRequirements().empty() &&
-        "conditionally conforming to IteratorProtocol not currently supported");
 
     Type elementTy = TC.getWitnessType(generatorTy, generatorProto,
                                        *genConformance, TC.Context.Id_Element,
