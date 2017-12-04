@@ -203,9 +203,28 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
           concrete->getDeclContext()
             ->getAsProtocolOrProtocolExtensionContext()) {
       tc.validateDecl(proto);
-      auto subMap = SubstitutionMap::getProtocolSubstitutions(
-                      proto, baseTy, ProtocolConformanceRef(proto));
-      return concrete->getDeclaredInterfaceType().subst(subMap);
+      Type depTy = DependentMemberType::get(baseTy, concrete->getName());
+
+      auto memberEquivClass =
+        builder.resolveEquivalenceClass(
+                          depTy,
+                          ArchetypeResolutionKind::CompleteWellFormed);
+      if (memberEquivClass->concreteType) {
+        return memberEquivClass->concreteType.transformRec(
+                 [&](TypeBase *type) -> Optional<Type> {
+                   if (auto gp = dyn_cast<GenericTypeParamType>(type)) {
+                     auto genericParams = genericSig->getGenericParams();
+                     unsigned index =
+                      GenericParamKey(gp).findIndexIn(genericParams);
+                     return Type(genericParams[index]);
+                   }
+
+                   return None;
+                 });
+      }
+
+      return memberEquivClass->getAnchor(builder,
+                                         genericSig->getGenericParams());
     }
 
     if (auto superclass = baseEquivClass->superclass) {
