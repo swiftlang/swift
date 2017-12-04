@@ -221,6 +221,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-installer-package ""        "The path to installer pkg"
     darwin-sdk-deployment-targets      "xctest-ios-8.0"        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
     darwin-overlay-target              ""        "single overlay target to build, dependencies are computed later"
+    darwin-toolchain-build-symlink     ""        "Build a symlink-based toolchain (rather than a self-contained one)"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
@@ -3384,6 +3385,49 @@ for host in "${ALL_HOSTS[@]}"; do
 done
 # Everything is 'installed', but some products may be awaiting lipo.
 
+function build_symlink_darwin_toolchain() {
+    local host="$1"
+    local host_install_destdir="$(get_host_install_destdir ${host})"
+
+    echo "--- Creating xctoolchain with symlinks ---"
+    echo "-- Create Info.plist --"
+    # FIXME: Duplicated from build_and_test_installable_package
+    PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
+
+    DARWIN_TOOLCHAIN_INFO_PLIST="${host_install_destdir}${TOOLCHAIN_PREFIX}/Info.plist"
+    COMPATIBILITY_VERSION=2
+    COMPATIBILITY_VERSION_DISPLAY_STRING="Xcode 8.0"
+    DARWIN_TOOLCHAIN_CREATED_DATE="$(date -u +'%a %b %d %T GMT %Y')"
+
+    echo "-- Removing: ${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call rm -f ${DARWIN_TOOLCHAIN_INFO_PLIST}
+
+    call ${PLISTBUDDY_BIN} -c "Add DisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add ShortDisplayName string '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add CreatedDate date '${DARWIN_TOOLCHAIN_CREATED_DATE}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add CompatibilityVersion integer ${COMPATIBILITY_VERSION}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add CompatibilityVersionDisplayString string ${COMPATIBILITY_VERSION_DISPLAY_STRING}" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add Version string '${DARWIN_TOOLCHAIN_VERSION}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add CFBundleIdentifier string '${DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings dict" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:ENABLE_BITCODE string 'NO'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_DISABLE_REQUIRED_ARCLITE string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+    call ${PLISTBUDDY_BIN} -c "Add OverrideBuildSettings:SWIFT_LINK_OBJC_RUNTIME string 'YES'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+
+    call mkdir -p "${host_install_destdir}${TOOLCHAIN_PREFIX}/usr/bin"
+    call ln -sf "$(build_directory_bin ${host} swift)/"{swift,swiftc,swift-demangle,swift-stdlib-tool} "${host_install_destdir}${TOOLCHAIN_PREFIX}/usr/bin"
+    call mkdir -p "${host_install_destdir}${TOOLCHAIN_PREFIX}/usr/lib"
+    call ln -sf "$(build_directory_bin ${host} swift)/../lib/"{swift,swift_static,libswiftDemangle.dylib,sourcekitd.framework} "${host_install_destdir}${TOOLCHAIN_PREFIX}/usr/lib"
+
+    set_lldb_build_mode
+    if [[ -x "$(build_directory ${host} lldb)/${LLDB_BUILD_MODE}/lldb" ]]; then
+        call ln -sf "$(build_directory ${host} lldb)/${LLDB_BUILD_MODE}/lldb" "${host_install_destdir}${TOOLCHAIN_PREFIX}/usr/bin"
+        call mkdir -p "${host_install_destdir}${TOOLCHAIN_PREFIX}/System/Library/PrivateFrameworks"
+        call ln -sf "$(build_directory ${host} lldb)/${LLDB_BUILD_MODE}/LLDB.framework" "${host_install_destdir}${TOOLCHAIN_PREFIX}/System/Library/PrivateFrameworks"
+    fi
+
+    # TODO: Playgrounds
+}
 
 function build_and_test_installable_package() {
 
@@ -3492,6 +3536,11 @@ function build_and_test_installable_package() {
         fi
     fi
 }
+
+# Handle the Darwin symlink toolchain case
+if [[ "${DARWIN_TOOLCHAIN_BUILD_SYMLINK}" ]]; then
+    build_symlink_darwin_toolchain ${LOCAL_HOST}
+fi
 
 # Build and test packages.
 for host in "${ALL_HOSTS[@]}"; do
