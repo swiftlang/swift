@@ -1289,7 +1289,9 @@ extension _StringGuts {
       var dst = storage.start + bounds.lowerBound
       if deltaCount != 0 && tailCount > 0 {
         // Move tail to make space for new data
-        (dst + newCount).moveAssign(from: dst + bounds.count, count: tailCount)
+        (dst + newCount).moveInitialize(
+          from: dst + bounds.count,
+          count: tailCount)
       }
       // Copy new elements in place
       let (_, end) = UnsafeMutableBufferPointer(
