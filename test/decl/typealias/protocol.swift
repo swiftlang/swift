@@ -245,3 +245,10 @@ struct CandyEdible : Edible {
 // Edible.Snack is witnessed by 'typealias Snack' inside the
 // constrained extension of CandyWrapper above
 extension CandyBar : Edible {}
+
+protocol P9 {
+  typealias A = Int
+}
+
+func testT9a<T: P9, U>(_: T, _: U) where T.A == U { }
+func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{'T.A' cannot be equal to both 'Float' and 'P9.A' (aka 'Int')}}
