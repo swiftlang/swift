@@ -59,3 +59,7 @@ extension Dictionary {
 
 let dictionary: [String: String] = [:]
 _ = dictionary.first { (column, value) in true }!.value
+
+func doit(_ x: Int) -> Bool { return x > 0 }
+let _: ((String, Int)) -> [String:Bool] = { [$0: doit($1)] }
+func returnClosure() -> ((Int, Int)) -> Bool { return {$1 > $0} }
