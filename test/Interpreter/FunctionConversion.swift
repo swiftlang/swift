@@ -241,4 +241,61 @@ FunctionConversionTestSuite.test("ThrowVariance") {
   do { try print(g()) } catch {}
 }
 
+class A: Quilt {
+  var n: Int8 {
+    return 42
+  }
+}
+
+func rdar35702810_arr<T: Quilt>(type: T.Type, _ fn: ([T]?) -> Int8) -> Int8 {
+  let x: [T] = [A() as! T]
+  return fn(x)
+}
+
+func rdar35702810_map<T: Quilt>(type: T.Type, _ fn: ([String: T]) -> Int8) -> Int8 {
+  let x: [String: T] = ["ultimate question": A() as! T]
+  return fn(x)
+}
+
+FunctionConversionTestSuite.test("CollectionUpCastsInFuncParameters") {
+  let fn_arr: ([Quilt]?) -> Int8 = { v in v![0].n }
+  let fn_map: ([String: Quilt]) -> Int8 = { v in v["ultimate question"]!.n }
+
+  expectEqual(rdar35702810_arr(type: A.self, fn_arr), 42)
+  expectEqual(rdar35702810_map(type: A.self, fn_map), 42)
+}
+
+protocol X: Hashable {}
+class B: X {
+  var hashValue: Int { return 42 }
+  static func == (lhs: B, rhs: B) -> Bool {
+    return lhs.hashValue == rhs.hashValue
+  }
+}
+
+func rdar35702810_arr_hashable<T: X>(type: T.Type, _ fn: ([T]?) -> Int) -> Int {
+  let x: [T] = [B() as! T]
+  return fn(x)
+}
+
+func rdar35702810_map_hashable<T: X>(type: T.Type, _ fn: ([String: T]) -> Int) -> Int {
+  let x: [String: T] = ["ultimate question": B() as! T]
+  return fn(x)
+}
+
+func rdar35702810_set_hashable<T: X>(type: T.Type, _ fn: (Set<T>) -> Int) -> Int {
+  let x: Set<T> = [B() as! T]
+  return fn(x)
+}
+
+FunctionConversionTestSuite.test("CollectionUpCastsWithHashableInFuncParameters") {
+  let fn_arr: ([AnyHashable]?) -> Int = { v in v![0].hashValue }
+  let fn_map: ([String: AnyHashable]) -> Int = { v in v["ultimate question"]!.hashValue }
+  let fn_set: (Set<AnyHashable>) -> Int = { v in v.first!.hashValue }
+
+  expectEqual(rdar35702810_arr_hashable(type: B.self, fn_arr), 42)
+  expectEqual(rdar35702810_map_hashable(type: B.self, fn_map), 42)
+  expectEqual(rdar35702810_set_hashable(type: B.self, fn_set), 42)
+}
+
 runAllTests()

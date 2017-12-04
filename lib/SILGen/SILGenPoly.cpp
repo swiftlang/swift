@@ -467,7 +467,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // Subtype conversions:
 
-  //  - upcasts
+  //  - upcasts for classes
   if (outputSubstType->getClassOrBoundGenericClass() &&
       inputSubstType->getClassOrBoundGenericClass()) {
     auto class1 = inputSubstType->getClassOrBoundGenericClass();
@@ -487,6 +487,32 @@ ManagedValue Transform::transform(ManagedValue v,
       assert(inputSubstType->isExactSuperclassOf(outputSubstType)
              && "should be inheritance relationship between input and output");
       return SGF.B.createUncheckedRefCast(Loc, v, loweredResultTy);
+    }
+  }
+
+  // - upcasts for collections
+  if (outputSubstType->getStructOrBoundGenericStruct() &&
+      inputSubstType->getStructOrBoundGenericStruct()) {
+    auto *inputStruct = inputSubstType->getStructOrBoundGenericStruct();
+    auto *outputStruct = outputSubstType->getStructOrBoundGenericStruct();
+
+    // Attempt collection upcast only if input and output declarations match.
+    if (inputStruct == outputStruct) {
+      FuncDecl *fn = nullptr;
+      auto &ctx = SGF.getASTContext();
+      if (inputStruct == ctx.getArrayDecl()) {
+        fn = SGF.SGM.getArrayForceCast(Loc);
+      } else if (inputStruct == ctx.getDictionaryDecl()) {
+        fn = SGF.SGM.getDictionaryUpCast(Loc);
+      } else if (inputStruct == ctx.getSetDecl()) {
+        fn = SGF.SGM.getSetUpCast(Loc);
+      } else {
+        llvm_unreachable("unsupported collection upcast kind");
+      }
+
+      return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
+                                          outputSubstType, v, ctxt)
+                .getScalarValue();
     }
   }
 
