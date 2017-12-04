@@ -506,10 +506,12 @@ extension String.UTF8View.Iterator : IteratorProtocol {
     self._guts = guts
     self._sourceIndex = 0
     self._buffer = 0
-    self._endIndex = self._guts.count
-    if _fastPath(self._guts._isContiguous && self._guts.isASCII) {
-      self._asciiPointer = self._guts._unmanagedASCIIView.start
+    if _fastPath(guts._isContiguous && guts.isASCII) {
+      let ascii = guts._unmanagedASCIIView
+      self._endIndex = ascii.count
+      self._asciiPointer = ascii.start
     } else {
+      self._endIndex = self._guts.count
       self._asciiPointer = nil
     }
   }
