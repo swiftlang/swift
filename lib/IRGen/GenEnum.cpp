@@ -945,7 +945,7 @@ namespace {
         llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
         SILType T) const override {
       auto canType = T.getSwiftRValueType();
-      assert(!canType->hasArchetype() &&
+      assert(!canType->is<ArchetypeType>() &&
              "collectArchetypeMetadata: no archetype expected here");
     }
 
