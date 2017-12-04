@@ -747,13 +747,13 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     // terms of the specialized types, not the conformance-declaring decl's
     // types.
     auto nominal = GenericConformance->getType()->getAnyNominal();
-    auto subMap =
-      getType()->getContextSubstitutionMap(nominal->getModuleContext(),
-                                           nominal);
+    auto module = nominal->getModuleContext();
+    auto subMap = getType()->getContextSubstitutionMap(module, nominal);
 
     SmallVector<Requirement, 4> newReqs;
     for (auto oldReq : GenericConformance->getConditionalRequirements()) {
-      if (auto newReq = oldReq.subst(subMap))
+      if (auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
+                                     LookUpConformanceInModule(module)))
         newReqs.push_back(*newReq);
     }
     auto &ctxt = getProtocol()->getASTContext();
