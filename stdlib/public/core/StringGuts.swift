@@ -178,7 +178,7 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
+  public // @testable
   var byteWidth: Int {
     @inline(__always) get { return isSingleByte ? 1 : 2 }
   }
@@ -522,8 +522,8 @@ extension _StringGuts {
   }
 
   @_inlineable
-  @_versioned
-  internal var _unmanagedRawStart: UnsafeRawPointer {
+  public // @testable
+  var _unmanagedRawStart: UnsafeRawPointer {
     @inline(__always) get {
       _sanityCheck(_isUnmanaged)
       return UnsafeRawPointer(
@@ -697,8 +697,7 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @_versioned
-  internal
+  public // @testable
   var _underlyingCocoaString: _CocoaString? {
     if _isNative {
       return _nativeRawStorage
@@ -974,8 +973,8 @@ extension _StringGuts {
     return storage
   }
 
-  @_versioned
-  internal
+  @_inlineable
+  public // @testable
   func _extractSlice(_ range: Range<Int>) -> _StringGuts {
     if range == 0..<count { return self }
     switch (isASCII, _isUnmanaged) {
@@ -993,7 +992,7 @@ extension _StringGuts {
 
   @_inlineable
   @inline(__always)
-  public // TODO(StringGuts): for testing only
+  public // @testable
   mutating func isUniqueNative() -> Bool {
     guard _isNative else { return false }
     // Note that the isUnique test must be in a separate statement;
@@ -1104,9 +1103,9 @@ extension _StringGuts {
     @inline(__always) get { return count }
   }
 
-  @_versioned
   @_inlineable
-  internal var count: Int {
+  public // @testable
+  var count: Int {
     if _slowPath(_isSmallCocoa) {
       return _taggedCocoaCount
     } else if _slowPath(_isNonTaggedCocoa) {
@@ -1126,9 +1125,9 @@ extension _StringGuts {
   }
 
   /// Get the UTF-16 code unit stored at the specified position in this string.
-  @_versioned
   @_inlineable // FIXME(sil-serialize-all)
-  internal subscript(position: Int) -> UTF16.CodeUnit {
+  public // @testable
+  subscript(position: Int) -> UTF16.CodeUnit {
     if isASCII {
       return _unmanagedASCIIView[position]
     } else if _slowPath(_isOpaque) {
