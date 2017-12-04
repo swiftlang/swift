@@ -453,7 +453,7 @@ StringTests.test("literalConcatenation") {
   }
 }
 
-StringTests.test("substringDoesNotCopy")
+StringTests.test("substringDoesNotCopy/Swift3")
   .xfail(.always("Swift 3 compatibility: Self-sliced Strings are copied"))
   .code {
 
@@ -471,6 +471,24 @@ StringTests.test("substringDoesNotCopy")
   }
 }
 
+StringTests.test("substringDoesNotCopy/Swift4") {
+
+  let size = 16
+  for sliceStart in [0, 2, 8, size] {
+    for sliceEnd in [0, 2, 8, sliceStart + 1] {
+      if sliceStart > size || sliceEnd > size || sliceEnd < sliceStart {
+        continue
+      }
+      let s0 = String(repeating: "x", count: size)
+      let originalIdentity = s0.bufferID
+      let s1 = Substring(
+        _base: s0,
+        s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd))
+      expectEqual(s1.bufferID, originalIdentity)
+    }
+  }
+}
+
 StringTests.test("appendToSubstring") {
   for initialSize in 1..<16 {
     for sliceStart in [0, 2, 8, initialSize] {
@@ -480,7 +498,6 @@ StringTests.test("appendToSubstring") {
           continue
         }
         var s0 = String(repeating: "x", count: initialSize)
-        let originalIdentity = s0.bufferID
         s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
         s0 += "x"
         if sliceStart == sliceEnd {
@@ -740,7 +757,10 @@ StringTests.test("COW/replaceSubrange/end") {
     expectNotEqual(literalIdentity, str.bufferID)
     let heapStrIdentity1 = str.bufferID
 
-    var slice = str[str.startIndex..<str.index(_nth: 7)]
+    // FIXME: We have to use Swift 4's Substring to get the desired storage
+    // semantics; in Swift 3 mode, self-sliced strings get allocated a new
+    // buffer immediately.
+    var slice = Substring(_base: str, str.startIndex..<str.index(_nth: 7))
     expectEqual(heapStrIdentity1, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
 
@@ -883,8 +903,8 @@ StringTests.test("stringGutsReserve")
 func makeStringGuts(_ base: String) -> _StringGuts {
   var x = _StringGuts()
   // make sure some - but not all - replacements will have to grow the buffer
-  let capacity = base._guts.count * 3 / 2
-  x.reserveCapacity(capacity, of: UInt8.self)
+  x.reserveCapacity(base._guts.count * 3 / 2, of: UInt8.self)
+  let capacity = x.capacity
   x.append(base._guts)
   // Widening the guts should not make it lose its capacity
   expectEqual(x.capacity, capacity)
