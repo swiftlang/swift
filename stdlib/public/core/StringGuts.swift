@@ -169,6 +169,7 @@ extension _StringGuts {
     get { return _twoByteCodeUnitBit }
   }
 
+  @_inlineable
   public // @testable
   var isSingleByte: Bool {
     @inline(__always) get {
@@ -178,11 +179,13 @@ extension _StringGuts {
     }
   }
 
+  @_inlineable
   public // @testable
   var byteWidth: Int {
     @inline(__always) get { return isSingleByte ? 1 : 2 }
   }
 
+  @_inlineable
   @_versioned
   var bitWidth: Int {
     @inline(__always) get { return byteWidth &<< 3 }
