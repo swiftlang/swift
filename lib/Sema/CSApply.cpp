@@ -161,8 +161,6 @@ static DeclTy *findNamedWitnessImpl(
     if (!conformance)
       return nullptr;
   }
-  assert(conformance->getConditionalRequirements().empty() &&
-         "unhandled conditional conformance");
 
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
@@ -6608,8 +6606,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
                                            ConformanceCheckFlags::InExpression);
   assert(conformance && "must conform to literal protocol");
-  assert(conformance->getConditionalRequirements().empty() &&
-         "unexpected conditional requirements");
 
   // Figure out the (non-builtin) argument type if there is one.
   Type argType;
@@ -6752,8 +6748,6 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   auto conformance = tc.conformsToProtocol(type, protocol, cs.DC,
                                            ConformanceCheckFlags::InExpression);
   assert(conformance && "must conform to literal protocol");
-  assert(conformance->getConditionalRequirements().empty() &&
-         "unexpected conditional requirements");
 
   // Dig out the literal type and perform a builtin literal conversion to it.
   if (!literalType.empty()) {
