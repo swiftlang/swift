@@ -587,6 +587,16 @@ public:
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
 
+  enum class ObjCLabelType {
+    ClassName,
+    MethodVarName,
+    MethodVarType,
+    PropertyName,
+  };
+
+  std::string GetObjCSectionName(StringRef Section, StringRef MachOAttributes);
+  void SetCStringLiteralSection(llvm::GlobalVariable *GV, ObjCLabelType Type);
+
 private:
   Size PtrSize;
   Size AtomicBoolSize;

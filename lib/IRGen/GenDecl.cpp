@@ -770,31 +770,82 @@ void IRGenModule::addLazyConformances(NominalTypeDecl *Nominal) {
   }
 }
 
+std::string IRGenModule::GetObjCSectionName(StringRef Section,
+                                            StringRef MachOAttributes) {
+  assert(Section.substr(0, 2) == "__" && "expected the name to begin with __");
+
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("must know the object file format");
+  case llvm::Triple::MachO:
+    return MachOAttributes.empty()
+               ? ("__DATA," + Section).str()
+               : ("__DATA," + Section + "," + MachOAttributes).str();
+  case llvm::Triple::ELF:
+    return Section.substr(2).str();
+  case llvm::Triple::COFF:
+    return ("." + Section.substr(2) + "$B").str();
+  case llvm::Triple::Wasm:
+    error(SourceLoc(), "wasm is not a supported object file format");
+  }
+
+  llvm_unreachable("unexpected object file format");
+}
+
+void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
+                                           ObjCLabelType Type) {
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("must know the object file format");
+  case llvm::Triple::MachO:
+    switch (Type) {
+    case ObjCLabelType::ClassName:
+      GV->setSection("__TEXT,__objc_classname,cstring_literals");
+      return;
+    case ObjCLabelType::MethodVarName:
+      GV->setSection("__TEXT,__objc_methname,cstring_literals");
+      return;
+    case ObjCLabelType::MethodVarType:
+      GV->setSection("__TEXT,__objc_methtype,cstring_literals");
+      return;
+    case ObjCLabelType::PropertyName:
+      GV->setSection("__TEXT,__cstring,cstring_literals");
+      return;
+    }
+  case llvm::Triple::ELF:
+    return;
+  case llvm::Triple::COFF:
+    return;
+  case llvm::Triple::Wasm:
+    error(SourceLoc(), "wasm is not a supported object file format");
+    return;
+  }
+
+  llvm_unreachable("unexpected object file format");
+}
+
 void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
-    assert(TargetInfo.OutputObjectFormat == llvm::Triple::MachO);
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(*this, ObjCClasses, "objc_classes",
-                   "__DATA, __objc_classlist, regular, no_dead_strip",
-                   llvm::GlobalValue::InternalLinkage,
-                   Int8PtrTy,
-                   false);
+                   GetObjCSectionName("__objc_classlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
+
     // So do categories.
     emitGlobalList(*this, ObjCCategories, "objc_categories",
-                   "__DATA, __objc_catlist, regular, no_dead_strip",
-                   llvm::GlobalValue::InternalLinkage,
-                   Int8PtrTy,
-                   false);
+                   GetObjCSectionName("__objc_catlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
     // Emit nonlazily realized class references in a second magic section to make
     // sure they are realized by the Objective-C runtime before any instances
     // are allocated.
     emitGlobalList(*this, ObjCNonLazyClasses, "objc_non_lazy_classes",
-                   "__DATA, __objc_nlclslist, regular, no_dead_strip",
-                   llvm::GlobalValue::InternalLinkage,
-                   Int8PtrTy,
-                   false);
+                   GetObjCSectionName("__objc_nlclslist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
   }
 
   // @llvm.used
@@ -2422,7 +2473,8 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
   // Define it lazily.
   if (auto global = dyn_cast<llvm::GlobalVariable>(addr)) {
     if (global->isDeclaration()) {
-      global->setSection("__DATA,__objc_classrefs,regular,no_dead_strip");
+      global->setSection(GetObjCSectionName("__objc_classrefs",
+                                            "regular,no_dead_strip"));
       global->setLinkage(llvm::GlobalVariable::PrivateLinkage);
       global->setExternallyInitialized(true);
       global->setInitializer(getAddrOfObjCClass(theClass, NotForDefinition));

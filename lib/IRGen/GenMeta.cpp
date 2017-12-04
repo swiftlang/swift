@@ -3939,7 +3939,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   bool isIndirect = false;
 
   StringRef section{};
-  if (classDecl->isObjC())
+  if (classDecl->isObjC() &&
+      IGM.TargetInfo.OutputObjectFormat == llvm::Triple::MachO)
     section = "__DATA,__objc_data, regular";
 
   auto var = IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
