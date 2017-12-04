@@ -2343,23 +2343,11 @@ Optional<syntax::TriviaPiece> Lexer::lexWhitespace(bool StopAtFirstNewline) {
     case '\n':
     case '\r':
       NextToken.setAtStartOfLine(true);
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Newline,
-        Length,
-        OwnedString(Start, Length),
-      };
+      return syntax::TriviaPiece{syntax::TriviaKind::Newline, Length, {}};
     case ' ':
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Space,
-        Length,
-        OwnedString(Start, Length),
-      };
+      return syntax::TriviaPiece{syntax::TriviaKind::Space, Length, {}};
     case '\t':
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Tab,
-        Length,
-        OwnedString(Start, Length),
-      };
+      return syntax::TriviaPiece{syntax::TriviaKind::Tab, Length, {}};
     default:
       return None;
   }
@@ -2374,11 +2362,7 @@ Optional<syntax::TriviaPiece> Lexer::lexSingleLineComment(syntax::TriviaKind Kin
   if (Length == 0)
     return None;
 
-  return Optional<syntax::TriviaPiece>({
-    Kind,
-    Length,
-    OwnedString(Start, Length)
-  });
+  return Optional<syntax::TriviaPiece>({Kind, 1, OwnedString(Start, Length)});
 }
 
 Optional<syntax::TriviaPiece>
@@ -2389,11 +2373,7 @@ Lexer::lexBlockComment(syntax::TriviaKind Kind) {
   if (Length == 0)
     return None;
 
-  return Optional<syntax::TriviaPiece>({
-    Kind,
-    Length,
-    OwnedString(Start, Length)
-  });
+  return Optional<syntax::TriviaPiece>({Kind, 1, OwnedString(Start, Length)});
 }
 
 Optional<syntax::TriviaPiece> Lexer::lexComment() {
