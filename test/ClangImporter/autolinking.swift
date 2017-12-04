@@ -7,9 +7,6 @@
 // RUN: %FileCheck %s < %t/with-adapter.ll
 // RUN: %FileCheck --check-prefix=CHECK-WITH-SWIFT %s < %t/with-adapter.ll
 
-// RUN: %target-swift-frontend %s -sdk %S/Inputs -I %S/Inputs/custom-modules -emit-ir -disable-autolink-framework LinkFramework -o %t/with-disabled.ll
-// RUN: %FileCheck --check-prefix=CHECK-WITH-DISABLED %s < %t/with-disabled.ll
-
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.
 // UNSUPPORTED: OS=linux-gnu
@@ -37,7 +34,3 @@ UsesSubmodule.useSomethingFromSubmodule()
 // CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"HasSubmodule"}
 
 // CHECK-WITH-SWIFT: !{{[0-9]+}} = !{!"-lSwiftAdapter"}
-
-// CHECK-WITH-DISABLED: !{!"-framework", !"Barrel"}
-// CHECK-WITH-DISABLED-NOT: !{!"-framework", !"LinkFramework"}
-// CHECK-WITH-DISABLED: !{!"-framework", !"Indirect"}

@@ -1605,10 +1605,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());
   }
 
-  for (const Arg *A : Args.filtered(OPT_disable_autolink_framework)) {
-    Opts.DisableAutolinkFrameworks.push_back(A->getValue());
-  }
-
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
   Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";

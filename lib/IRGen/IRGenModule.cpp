@@ -936,12 +936,6 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     break;
   }
   case LibraryKind::Framework: {
-    // If we're supposed to disable autolinking of this framework, bail out.
-    auto &frameworks = IRGen.Opts.DisableAutolinkFrameworks;
-    if (std::find(frameworks.begin(), frameworks.end(), linkLib.getName())
-          != frameworks.end())
-      return;
-
     llvm::Metadata *args[] = {
       llvm::MDString::get(ctx, "-framework"),
       llvm::MDString::get(ctx, linkLib.getName())

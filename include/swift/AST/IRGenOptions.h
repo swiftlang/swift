@@ -133,9 +133,6 @@ public:
   /// the given type names.
   SmallVector<StringRef, 1> VerifyTypeLayoutNames;
 
-  /// Frameworks that we should not autolink against.
-  SmallVector<std::string, 1> DisableAutolinkFrameworks;
-
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 
