@@ -368,10 +368,10 @@ public:
     }
 
   private:
-    ParserPosition(Lexer::State LS, SourceLoc PreviousLoc):
+    ParserPosition(LexerState LS, SourceLoc PreviousLoc):
         LS(LS), PreviousLoc(PreviousLoc)
     {}
-    Lexer::State LS;
+    LexerState LS;
     SourceLoc PreviousLoc;
     friend class Parser;
   };

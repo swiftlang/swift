@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/LexerState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Trivia.h"
@@ -59,12 +60,14 @@ enum class ConflictMarkerKind {
   /// separated by 4 "="s, and terminated by 4 "<"s.
   Perforce
 };
-  
+
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
   DiagnosticEngine *Diags;
   const unsigned BufferID;
+
+  using State = LexerState;
 
   /// Pointer to the first character of the buffer, even in a lexer that
   /// scans a subrange of the buffer.
@@ -128,28 +131,6 @@ class Lexer {
   /// `TriviaRetentionMode::WithTrivia`.
   syntax::TriviaList TrailingTrivia;
   
-public:
-  /// \brief Lexer state can be saved/restored to/from objects of this class.
-  class State {
-  public:
-    State() {}
-
-    bool isValid() const {
-      return Loc.isValid();
-    }
-
-    State advance(unsigned Offset) const {
-      assert(isValid());
-      return State(Loc.getAdvancedLoc(Offset));
-    }
-
-  private:
-    explicit State(SourceLoc Loc) : Loc(Loc) {}
-    SourceLoc Loc;
-    friend class Lexer;
-  };
-
-private:
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
