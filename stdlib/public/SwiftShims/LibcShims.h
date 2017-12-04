@@ -53,6 +53,8 @@ typedef      long int __swift_ssize_t;
 typedef __swift_uint32_t __swift_mode_t;
 #elif defined(__APPLE__)
 typedef __swift_uint16_t __swift_mode_t;
+#elif defined(_WIN32)
+typedef __swift_int32_t __swift_mode_t;
 #else  // just guessing
 typedef __swift_uint16_t __swift_mode_t;
 #endif
@@ -128,12 +130,10 @@ char * _Nullable *_stdlib_getEnviron();
 #endif
 
 // System error numbers <errno.h>
-#if !defined(_WIN32) || defined(__CYGWIN__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int _stdlib_getErrno();
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _stdlib_setErrno(int value);
-#endif
 
 // Non-standard extensions
 SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
