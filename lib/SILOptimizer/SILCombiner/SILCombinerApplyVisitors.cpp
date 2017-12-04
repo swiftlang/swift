@@ -937,6 +937,29 @@ static bool isAddressInitializedAtCall(SILValue addr, SILInstruction *AI,
   return true;
 }
 
+/// Scoped registration of opened archetypes.
+class RAIIOpenedArchetypesTracker {
+  SILBuilder &B;
+  // The original tracker may be null.
+  SILOpenedArchetypesTracker *OldOpenedArchetypesTracker;
+  SILOpenedArchetypesTracker OpenedArchetypesTracker;
+
+public:
+  RAIIOpenedArchetypesTracker(SILBuilder &B)
+    : B(B), OldOpenedArchetypesTracker(B.getOpenedArchetypesTracker()),
+    OpenedArchetypesTracker(&B.getFunction()) {
+    B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  }
+
+  SILOpenedArchetypesTracker &getTracker() {
+    return OpenedArchetypesTracker;
+  }
+
+  ~RAIIOpenedArchetypesTracker() {
+    B.setOpenedArchetypesTracker(OldOpenedArchetypesTracker);
+  }
+};
+
 /// Propagate information about a concrete type from init_existential_addr
 /// or init_existential_ref into witness_method conformances and into
 /// apply instructions.
@@ -968,19 +991,14 @@ SILInstruction *SILCombiner::propagateConcreteTypeOfInitExistential(
   if (!CCT.isValid())
     return nullptr;
 
-  SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =
-      Builder.getOpenedArchetypesTracker();
-
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(Apply.getFunction());
-
+  RAIIOpenedArchetypesTracker tempTracker(Builder);
   if (CCT.ConcreteType->isOpenedExistential()) {
     // Temporarily record this opened existential def. Don't permanently record
     // in the Builder's tracker because this opened existential's original
     // dominating def may not have been recorded yet.
     // FIXME: Redesign the tracker. This is not robust.
-    OpenedArchetypesTracker.addOpenedArchetypeDef(
+    tempTracker.getTracker().addOpenedArchetypeDef(
         cast<ArchetypeType>(CCT.ConcreteType), CCT.ConcreteTypeDef);
-    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
   // Propagate the concrete type into the callee-operand if required.
@@ -1000,8 +1018,6 @@ SILInstruction *SILCombiner::propagateConcreteTypeOfInitExistential(
         cast<InitExistentialAddrInst>(InitExistential)->getOperand();
     return isAddressInitializedAtCall(existentialAddr, AI, DT);
   };
-
-  // FIXME: Intentionally preserve this bug to avoid changing functionality.
   if (isCopied && !canReplaceCopiedSelf())
     return nullptr;
 
@@ -1010,9 +1026,6 @@ SILInstruction *SILCombiner::propagateConcreteTypeOfInitExistential(
   auto *NewAI = createApplyWithConcreteType(
       Apply, CCT.NewSelf, Self, CCT.ConcreteType, CCT.ConcreteTypeDef,
       CCT.getConformance(), OpenedArchetype);
-
-  if (CCT.ConcreteType->isOpenedExistential())
-    Builder.setOpenedArchetypesTracker(OldOpenedArchetypesTracker);
 
   return NewAI;
 }
