@@ -2,6 +2,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
+// FIXME: https://bugs.swift.org/browse/SR-6520
+// REQUIRES: SR6520
+
 let derivative = { (t: Double) -> (Double) in
   return -2.0 / (
   (1.0 + t)

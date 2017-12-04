@@ -985,9 +985,9 @@ extension ${Self}: BinaryFloatingPoint {
   public mutating func formRemainder(dividingBy other: ${Self}) {
 %if bits == 80:
     var other = other
-    _swift_stdlib_remainderl(&self, &other)
+    _stdlib_remainderl(&self, &other)
 %else:
-    self = _swift_stdlib_remainder${cFuncSuffix}(self, other)
+    self = _stdlib_remainder${cFuncSuffix}(self, other)
 %end
   }
 
@@ -1032,9 +1032,9 @@ extension ${Self}: BinaryFloatingPoint {
   @_transparent
   public mutating func formSquareRoot( ) {
 %if bits == 80:
-    _swift_stdlib_squareRootl(&self)
+    _stdlib_squareRootl(&self)
 %else:
-    self = _swift_stdlib_squareRoot${cFuncSuffix}(self)
+    self = _stdlib_squareRoot${cFuncSuffix}(self)
 %end
   }
 

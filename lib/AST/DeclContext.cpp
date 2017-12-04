@@ -612,48 +612,23 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
     // FIXME: Pattern initializers at top-level scope end up here.
     return true;
 
-  case DeclContextKind::AbstractFunctionDecl: {
+  case DeclContextKind::AbstractFunctionDecl:
     if (functionsAreNonCascading)
       return false;
-    auto *AFD = cast<AbstractFunctionDecl>(this);
-    if (AFD->hasAccess())
-      return AFD->getFormalAccess() > AccessLevel::FilePrivate;
     break;
-  }
 
-  case DeclContextKind::SubscriptDecl: {
-    auto *SD = cast<SubscriptDecl>(this);
-    if (SD->hasAccess())
-      return SD->getFormalAccess() > AccessLevel::FilePrivate;
+  case DeclContextKind::SubscriptDecl:
     break;
-  }
-      
+
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
     return true;
 
-  case DeclContextKind::GenericTypeDecl: {
-    auto *nominal = cast<GenericTypeDecl>(this);
-    if (nominal->hasAccess())
-      return nominal->getFormalAccess() > AccessLevel::FilePrivate;
+  case DeclContextKind::GenericTypeDecl:
     break;
-  }
 
-  case DeclContextKind::ExtensionDecl: {
-    auto *extension = cast<ExtensionDecl>(this);
-    if (extension->hasDefaultAccessLevel())
-      return extension->getDefaultAccessLevel() > AccessLevel::FilePrivate;
-    // FIXME: duplicated from computeDefaultAccessLevel in TypeCheckDecl.cpp.
-    if (auto *AA = extension->getAttrs().getAttribute<AccessControlAttr>())
-      return AA->getAccess() > AccessLevel::FilePrivate;
-    if (Type extendedTy = extension->getExtendedType()) {
-
-      // Need to check if extendedTy is ErrorType
-      if (extendedTy->getAnyNominal())
-        return extendedTy->getAnyNominal()->isCascadingContextForLookup(true);
-    }
-    break;
-  }
+  case DeclContextKind::ExtensionDecl:
+    return true;
   }
 
   return getParent()->isCascadingContextForLookup(true);
@@ -897,10 +872,14 @@ ASTContext &IterableDeclContext::getASTContext() const {
   return getDecl()->getASTContext();
 }
 
+DeclRange IterableDeclContext::getCurrentMembersWithoutLoading() const {
+  return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
+}
+
 DeclRange IterableDeclContext::getMembers() const {
   loadAllMembers();
 
-  return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
+  return getCurrentMembersWithoutLoading();
 }
 
 /// Add a member to this context.

@@ -12,7 +12,10 @@
 
 /// An iterator that produces one or fewer instances of `Element`.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
+public struct IteratorOverOne<Element> {
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _elements: Element?
+
   /// Construct an instance that generates `_element!`, or an empty
   /// sequence if `_element == nil`.
   @_inlineable // FIXME(sil-serialize-all)
@@ -20,7 +23,9 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
   init(_elements: Element?) {
     self._elements = _elements
   }
+}
 
+extension IteratorOverOne: IteratorProtocol, Sequence {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -34,23 +39,25 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
     _elements = nil
     return result
   }
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _elements: Element?
 }
 
 /// A collection containing a single element of type `Element`.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct CollectionOfOne<Element>
-  : MutableCollection, RandomAccessCollection {
+public struct CollectionOfOne<Element> {
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _element: Element
 
   /// Creates an instance containing just `element`.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ element: Element) {
     self._element = element
   }
+}
+
+extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 
   public typealias Index = Int
+  public typealias Indices = CountableRange<Int>
 
   /// The position of the first element.
   @_inlineable // FIXME(sil-serialize-all)
@@ -81,8 +88,6 @@ public struct CollectionOfOne<Element>
     _precondition(i == endIndex)
     return startIndex
   }
-
-  public typealias Indices = CountableRange<Int>
 
   /// Returns an iterator over the elements of this sequence.
   ///
@@ -129,9 +134,6 @@ public struct CollectionOfOne<Element>
   public var count: Int {
     return 1
   }
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _element: Element
 }
 
 extension CollectionOfOne : CustomDebugStringConvertible {

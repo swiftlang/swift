@@ -26,8 +26,15 @@
 ///     // "Humperdinck"
 ///     // "Humperdinck"
 @_fixed_layout
-public struct Repeated<Element> : RandomAccessCollection {
+public struct Repeated<Element> {
+  /// The number of elements in this collection.
+  public let count: Int
 
+  /// The value of every element in this collection.
+  public let repeatedValue: Element
+}
+
+extension Repeated: RandomAccessCollection {
   public typealias Indices = CountableRange<Int>
 
   /// A type that represents a valid position in the collection.
@@ -75,12 +82,6 @@ public struct Repeated<Element> : RandomAccessCollection {
     _precondition(position >= 0 && position < count, "Index out of range")
     return repeatedValue
   }
-
-  /// The number of elements in this collection.
-  public let count: Int
-
-  /// The value of every element in this collection.
-  public let repeatedValue: Element
 }
 
 /// Creates a collection containing the specified number of the given element.

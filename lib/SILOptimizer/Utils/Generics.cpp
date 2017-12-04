@@ -1863,7 +1863,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
           SpecializedF->getGenericEnvironment()) ||
          (!SpecializedF->getLoweredFunctionType()->isPolymorphic() &&
           !SpecializedF->getGenericEnvironment()));
-  assert(SpecializedF->hasUnqualifiedOwnership());
+  assert(!SpecializedF->hasQualifiedOwnership());
   // Check if this specialization should be linked for prespecialization.
   linkSpecialization(M, SpecializedF);
   // Store the meta-information about how this specialization was created.
@@ -2112,7 +2112,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   // inline qualified into unqualified functions /or/ have the
   // OwnershipModelEliminator run as part of the normal compilation pipeline
   // (which we are not doing yet).
-  if (SpecializedFunc->hasUnqualifiedOwnership()) {
+  if (!SpecializedFunc->hasQualifiedOwnership()) {
     Thunk->setUnqualifiedOwnership();
   }
 
@@ -2348,7 +2348,7 @@ void swift::trySpecializeApplyOfGeneric(
                        << SpecializedF->getName() << "\n"
                        << "Specialized function type: "
                        << SpecializedF->getLoweredFunctionType() << "\n");
-    assert(SpecializedF->hasUnqualifiedOwnership());
+    assert(!SpecializedF->hasQualifiedOwnership());
     NewFunctions.push_back(SpecializedF);
   }
 

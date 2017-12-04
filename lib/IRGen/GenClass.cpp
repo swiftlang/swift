@@ -2108,9 +2108,13 @@ namespace {
                                      IGM.getPointerAlignment(),
                                      /*constant*/ true,
                                      llvm::GlobalVariable::PrivateLinkage);
+
       switch (IGM.TargetInfo.OutputObjectFormat) {
       case llvm::Triple::MachO:
         var->setSection("__DATA, __objc_const");
+        break;
+      case llvm::Triple::COFF:
+        var->setSection(".data");
         break;
       case llvm::Triple::ELF:
         var->setSection(".data");

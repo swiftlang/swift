@@ -155,8 +155,8 @@ def propagate_constraints : Flag<["-"], "propagate-constraints">,
 def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
   HelpText<"Enable the iterative type checker">;
 
-def enable_named_lazy_member_loading : Flag<["-"], "enable-named-lazy-member-loading">,
-  HelpText<"Enable per-name lazy member loading">;
+def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
+  HelpText<"Disable per-name lazy member loading">;
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;

@@ -435,11 +435,23 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
         } while (!shouldSkip(E));
         break;
       case ExprKind::Subscript: {
-        auto Labels = getCallArgLabelRanges(getSourceMgr(),
-                                            cast<SubscriptExpr>(E)->getIndex(),
+        auto SubExpr = cast<SubscriptExpr>(E);
+        // visit and check in source order
+        if (!SubExpr->getBase()->walk(*this))
+          return {false, nullptr};
+
+        auto Labels = getCallArgLabelRanges(getSourceMgr(), SubExpr->getIndex(),
                                             LabelRangeEndAt::BeforeElemStart);
         tryResolve(ASTWalker::ParentTy(E), E->getLoc(), LabelRangeType::CallArg, Labels);
-        break;
+        if (isDone())
+            break;
+        if (!SubExpr->getIndex()->walk(*this))
+          return {false, nullptr};
+
+        // We already visited the children.
+        if (!walkToExprPost(E))
+          return {false, nullptr};
+        return {false, E};
       }
       case ExprKind::Tuple: {
         TupleExpr *T = cast<TupleExpr>(E);

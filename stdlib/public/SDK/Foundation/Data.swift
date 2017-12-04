@@ -12,7 +12,7 @@
 
 #if DEPLOYMENT_RUNTIME_SWIFT
     
-#if os(OSX) || os(iOS)
+#if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux)
 import Glibc
@@ -1377,7 +1377,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
         // Avoid a crash that happens on OS X 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
         if !options.contains(.atomic) {
-            #if os(OSX)
+            #if os(macOS)
                 return NSFoundationVersionNumber <= Double(NSFoundationVersionNumber10_11_Max)
             #else
                 return NSFoundationVersionNumber <= Double(NSFoundationVersionNumber_iOS_9_x_Max)

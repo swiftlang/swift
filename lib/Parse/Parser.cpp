@@ -508,28 +508,26 @@ SourceLoc Parser::getEndOfPreviousLoc() {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
-Parser::ParserPosition Parser::getParserPositionAfterFirstCharacter(Token T) {
-  assert(T.getLength() > 1 && "Token must have more than one character");
-  auto Loc = T.getLoc();
-  auto NewState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(1));
-  return ParserPosition(NewState, Loc);
-}
-
-SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind) {
-  // Consumes one-character token (like '?', '<', '>' or '!') and returns
-  // its location.
+SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
+  // Consumes prefix of token and returns its location.
+  // (like '?', '<', '>' or '!' immediately followed by '<') 
+  assert(Len >= 1);
 
   // Current token can be either one-character token we want to consume...
-  if (Tok.getLength() == 1) {
+  if (Tok.getLength() == Len) {
     Tok.setKind(Kind);
     return consumeToken();
   }
 
-  markSplitToken(Kind, Tok.getText().substr(0, 1));
+  auto Loc = Tok.getLoc();
 
-  // ... or a multi-character token with the first character being the one that
-  // we want to consume as a separate token.
-  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok),
+  // ... or a multi-character token with the first N characters being the one
+  // that we want to consume as a separate token.
+  assert(Tok.getLength() > Len);
+  markSplitToken(Kind, Tok.getText().substr(0, Len));
+
+  auto NewState = L->getStateForBeginningOfTokenLoc(Loc.getAdvancedLoc(Len));
+  restoreParserPosition(ParserPosition(NewState, Loc),
                         /*enableDiagnostics=*/true);
   return PreviousLoc;
 }

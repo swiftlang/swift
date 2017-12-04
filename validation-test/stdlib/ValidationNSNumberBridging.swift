@@ -13,6 +13,10 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// FIXME: rdar://35814988
+// UNSUPPORTED: CPU=armv7
+// UNSUPPORTED: CPU=armv7s
+// UNSUPPORTED: CPU=armv7k
 
 import StdlibUnittest
 import Foundation

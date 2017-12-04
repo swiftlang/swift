@@ -1433,15 +1433,18 @@ extension Sequence {
 ///
 ///     for x in IteratorSequence(i) { ... }
 @_fixed_layout
-public struct IteratorSequence<
-  Base : IteratorProtocol
-> : IteratorProtocol, Sequence {
+public struct IteratorSequence<Base : IteratorProtocol> {
+  @_versioned
+  internal var _base: Base
+
   /// Creates an instance whose iterator is a copy of `base`.
   @_inlineable
   public init(_ base: Base) {
     _base = base
   }
+}
 
+extension IteratorSequence: IteratorProtocol, Sequence {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -1453,7 +1456,4 @@ public struct IteratorSequence<
   public mutating func next() -> Base.Element? {
     return _base.next()
   }
-
-  @_versioned
-  internal var _base: Base
 }
