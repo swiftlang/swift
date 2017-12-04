@@ -44,6 +44,7 @@ import DictionaryBridge
 import DictionaryGroup
 import DictionaryLiteral
 import DictionaryRemove
+import DictionarySubscriptDefault
 import DictionarySwap
 import DropFirst
 import DropLast
@@ -164,6 +165,7 @@ registerBenchmark(DictionaryBridge)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
+registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
