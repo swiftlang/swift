@@ -1,6 +1,6 @@
 // RUN: %swift -target x86_64-unknown-windows-msvc -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-COFF
 // RUN: %swift -target x86_64-unknown-linux-gnu -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -Xcc --sysroot=/var/empty -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-ELF
-// RUN: %swift -target x86_64-apple-ios -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-MACHO
+// RUN: %swift -target x86_64-apple-ios8.0 -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-MACHO
 
 import ObjCInterop
 
