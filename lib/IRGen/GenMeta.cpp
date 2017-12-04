@@ -2752,10 +2752,6 @@ namespace {
   class GenericMetadataBuilderBase : public Base {
     typedef Base super;
 
-    /// The number of generic witnesses in the type we're emitting.
-    /// This is not really something we need to track.
-    unsigned NumGenericWitnesses = 0;
-
     struct FillOp {
       CanType Type;
       Optional<ProtocolConformanceRef> Conformance;
@@ -2982,7 +2978,6 @@ namespace {
 
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
-      NumGenericWitnesses++;
       addFillOp(type, None, /*relative*/ false);
       super::addGenericArgument(type, std::forward<T>(args)...);
     }
@@ -2990,7 +2985,6 @@ namespace {
     template <class... T>
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
                                 T &&...args) {
-      NumGenericWitnesses++;
       addFillOp(type, conf, /*relative*/ false);
       super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
     }
