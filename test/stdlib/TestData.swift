@@ -3722,7 +3722,7 @@ class TestData : TestDataSuper {
         expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
     }
 
-    func test_byte_access_of_discontiguousData {
+    func test_byte_access_of_discontiguousData() {
         var d = DispatchData.empty
         let bytes: [UInt8] = [0, 1, 2, 3, 4, 5]
         for _ in 0..<3 {
