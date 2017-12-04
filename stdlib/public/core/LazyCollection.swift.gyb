@@ -266,6 +266,9 @@ extension ${TraversalCollection} where Self : LazyCollectionProtocol {
 
 % end
 
+extension Slice: LazySequenceProtocol where Base: LazySequenceProtocol { }
+extension Slice: LazyCollectionProtocol where Base: LazyCollectionProtocol { }
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
