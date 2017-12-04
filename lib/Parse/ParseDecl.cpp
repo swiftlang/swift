@@ -2282,16 +2282,27 @@ Parser::parseDecl(ParseDeclOptions Flags,
         StaticLoc = Tok.getLoc();
         StaticSpelling = StaticSpellingKind::KeywordStatic;
       }
+      SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
       consumeToken(tok::kw_static);
+      // Static modifier doesn't have more details.
+      SyntaxParsingContext DetailContext(SyntaxContext, SyntaxKind::TokenList);
       continue;
     }
     // 'class' is a modifier on func, but is also a top-level decl.
     case tok::kw_class: {
-      SourceLoc ClassLoc = consumeToken(tok::kw_class);
-
+      SourceLoc ClassLoc;
+      bool AsModifier;
+      {
+        BacktrackingScope Scope(*this);
+        ClassLoc = consumeToken(tok::kw_class);
+        AsModifier = isStartOfDecl();
+      }
       // If 'class' is a modifier on another decl kind, like var or func,
       // then treat it as a modifier.
-      if (isStartOfDecl()) {
+      if (AsModifier) {
+        SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
+        consumeToken(tok::kw_class);
+        SyntaxParsingContext DetailContext(SyntaxContext, SyntaxKind::TokenList);
         if (StaticLoc.isValid()) {
           diagnose(Tok, diag::decl_already_static,
                    StaticSpellingKind::KeywordClass)
@@ -2303,6 +2314,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         continue;
       }
 
+      consumeToken(tok::kw_class);
       // Otherwise this is the start of a class declaration.
       DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
       break;
@@ -2312,6 +2324,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_fileprivate:
     case tok::kw_internal:
     case tok::kw_public: {
+      SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
       // We still model these specifiers as attributes.
       parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
       continue;
@@ -2356,6 +2369,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         Kind = DAK_Convenience;
       }
       if (Kind) {
+        SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
         parseNewDeclAttribute(Attributes, SourceLoc(), *Kind);
         continue;
       }

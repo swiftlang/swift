@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -322,3 +322,21 @@ let routerFruit = Company(
 //        accident.
 let SR3786a: [Int] = [1, 2, 3]
 let SR3786aa = [SR3786a.reversed(), SR3786a]
+
+// Conditional conformance
+protocol P { }
+
+struct PArray<T> { }
+
+extension PArray : ExpressibleByArrayLiteral where T: P {
+  typealias ArrayLiteralElement = T
+
+  init(arrayLiteral elements: T...) { }
+}
+
+extension Int: P { }
+
+func testConditional(i: Int, s: String) {
+  let _: PArray<Int> = [i, i, i]
+  let _: PArray<String> = [s, s, s] // expected-error{{contextual type 'PArray<String>' cannot be used with array literal}}
+}

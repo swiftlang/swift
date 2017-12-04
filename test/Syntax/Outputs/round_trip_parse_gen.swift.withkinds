@@ -77,10 +77,10 @@ struct foo <MemberDeclBlock>{
 
 struct foo <MemberDeclBlock>{<Attribute>
   @available(*, unavailable)</Attribute>
-  struct foo <MemberDeclBlock>{}</MemberDeclBlock>
-  public class foo {<Attribute>
+  struct foo <MemberDeclBlock>{}</MemberDeclBlock><DeclModifier>
+  public </DeclModifier>class foo {<Attribute>
     @available(*, unavailable)</Attribute><Attribute>
-    @objc(fooObjc)</Attribute>
-    private static func foo() <CodeBlock>{}</CodeBlock>
+    @objc(fooObjc)</Attribute><DeclModifier>
+    private </DeclModifier><DeclModifier>static </DeclModifier>func foo() <CodeBlock>{}</CodeBlock>
   }
 }</MemberDeclBlock>
