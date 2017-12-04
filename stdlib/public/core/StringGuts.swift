@@ -1299,6 +1299,8 @@ extension _StringGuts {
         count: newCount).initialize(from: newElements)
       _precondition(end == newCount, "Collection misreported its count")
       storage.count += deltaCount
+      _nativeCount += deltaCount
+      _invariantCheck()
       _fixLifetime(self)
       return
     }
@@ -1331,6 +1333,7 @@ extension _StringGuts {
       into: UnsafeMutableBufferPointer(start: dst, count: suffixRange.count))
     _sanityCheck(dst + suffixRange.count == storage.end)
     self = _StringGuts(storage)
+    _invariantCheck()
   }
 }
 
