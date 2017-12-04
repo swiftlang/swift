@@ -48,7 +48,7 @@ import Swift
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null,
 // --       field offset placeholders
-// CHECK-SAME:   i64 16, i64 0, i64 0
+// CHECK-SAME:   i64 0, i64 0, i64 0
 // CHECK-SAME: }>
 
 // -- Check that offset vars are emitted for fixed-layout generics
@@ -103,7 +103,7 @@ import Swift
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null,
 // --       RootGeneric field offset placeholders
-// CHECK-SAME:   i64 16, i64 0, i64 0
+// CHECK-SAME:   i64 0, i64 0, i64 0
 // --       GenericInheritsGeneric vtable
 // CHECK-SAME:   i8* null,
 // CHECK-SAME:   i8* null,
