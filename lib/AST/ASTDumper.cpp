@@ -3058,7 +3058,8 @@ namespace {
 
     void visitArchetypeType(ArchetypeType *T, StringRef label) {
       printCommon(label, "archetype_type");
-      if (T->getOpenedExistentialType())
+      auto openedExistential = T->getOpenedExistentialType();
+      if (openedExistential)
         printField("opened_existential_id", T->getOpenedExistentialID());
       else
         printField("name", T->getFullName());
@@ -3068,9 +3069,10 @@ namespace {
         printField("conforms_to", proto->printRef());
       if (auto parent = T->getParent())
         printField("parent", static_cast<void *>(parent));
-      if (auto assocType = T->getAssocType())
-        printField("assoc_type", assocType->printRef());
-
+      if (!openedExistential) {
+        if (auto assocType = T->getAssocType())
+          printField("assoc_type", assocType->printRef());
+      }
       // FIXME: This is ugly.
       OS << "\n";
       if (auto genericEnv = T->getGenericEnvironment()) {
@@ -3081,7 +3083,7 @@ namespace {
 
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
-      if (auto openedExistential = T->getOpenedExistentialType())
+      if (openedExistential)
         printRec("opened_existential", openedExistential);
 
       Indent += 2;

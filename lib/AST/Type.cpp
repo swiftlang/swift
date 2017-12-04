@@ -2687,12 +2687,14 @@ static void collectFullName(const ArchetypeType *Archetype,
 }
 
 AssociatedTypeDecl *ArchetypeType::getAssocType() const {
+  assert(!getOpenedExistentialType());
   if (auto *depMemTy = InterfaceType->getAs<DependentMemberType>())
     return depMemTy->getAssocType();
   return nullptr;
 }
 
 Identifier ArchetypeType::getName() const {
+  assert(!getOpenedExistentialType());
   if (auto assocType = getAssocType())
     return assocType->getName();
 
