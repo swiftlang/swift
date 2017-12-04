@@ -283,28 +283,28 @@ bool CompilerInstance::old_setUpForInput(const InputFile &input) {
   }
   return old_setUpForFile(input.getFile(), input.getIsPrimary());
 }
+
+static void cmpBufs(const llvm::MemoryBuffer *b1, const llvm::MemoryBuffer *b2, const char* msg) {
+  if (b1->getBufferSize() != b2->getBufferSize()) {
+    fprintf(stderr, "***** cmpBufs size %s\n", msg);
+  }
+  if (bcmp(b1->getBufferStart(), b2->getBufferStart(), b1->getBufferSize())) {
+    fprintf(stderr, "***** cmpBufs %s\n", msg);
+  }
+    
+}
 void CompilerInstance::old_setUpForBuffer(llvm::MemoryBuffer *buffer,
                                       bool isPrimary) {
-  auto copy =
-  std::unique_ptr<llvm::MemoryBuffer>(llvm::MemoryBuffer::getMemBufferCopy(
-                                                                           buffer->getBuffer(), buffer->getBufferIdentifier()));
-  auto a2 = copy.get(); auto p2 = a2->getBufferStart(); auto s2 = a2->getBufferSize();
-  if (serialization::isSerializedAST(copy->getBuffer())) {
+  
+  if (serialization::isSerializedAST(buffer->getBuffer())) {
     PartialModuleInputs &pmi = PartialModules.back();
-    auto a1 = pmi.ModuleBuffer.get();
-    auto p1 = a1->getBufferStart();
-    auto s1 = a1->getBufferSize();
-    
-    
-    assert(s1 == s2 && "buffer present, different sizes");
-    assert(!bcmp(p1, p2, s1) && "buffer present, different contents");
+    cmpBufs(buffer, pmi.ModuleBuffer.get(), "301");
+
     assert(pmi.ModuleDocBuffer.get() == nullptr && "buffer present module doc?");
   } else {
-    auto a1 = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(SourceMgr.getLLVMSourceMgr().getNumBuffers() - 1);
-    auto p1 = a1->getBufferStart();
-    auto s1 = a1->getBufferSize();
-    assert(s1 == s2 && "buffer present2, different sizes");
-    assert(!bcmp(p1, p2, s1) && "buffer present2, different contents");
+    cmpBufs(buffer,
+            SourceMgr.getLLVMSourceMgr().getMemoryBuffer(SourceMgr.getLLVMSourceMgr().getNumBuffers() - 1),
+            "306");
     
     unsigned bufferID = SourceMgr.getLLVMSourceMgr().getNumBuffers() - 1;
     assert(InputSourceCodeBufferIDs.back() == bufferID && "buffer present2, diff IDs");
@@ -343,14 +343,10 @@ bool CompilerInstance::old_setUpForFile(StringRef fileName, bool isPrimary) {
                          inputFileOrErr.getError().message());
     return true;
   }
-  auto a2 = inputFileOrErr.get().get(); auto p2 = a2->getBufferStart(); auto s2 = a2->getBufferSize();
+
   if (serialization::isSerializedAST(inputFileOrErr.get()->getBuffer())) {
     PartialModuleInputs &pmi = PartialModules.back();
-    auto a1 = pmi.ModuleBuffer.get();
-    auto p1 = a1->getBufferStart();
-    auto s1 = a1->getBufferSize();
-    assert(s1 == s2 && "buffer abs, different sizes");
-    assert(!bcmp(p1, p2, s1) && "buffer abs, different contents");
+    cmpBufs(inputFileOrErr.get().get(), pmi.ModuleBuffer.get(), "347");
     
     llvm::SmallString<128> ModuleDocFilePath(fileName);
     llvm::sys::path::replace_extension(ModuleDocFilePath,
@@ -363,15 +359,11 @@ bool CompilerInstance::old_setUpForFile(StringRef fileName, bool isPrimary) {
                            moduleDocOrErr.getError().message());
       return true;
     }
-    a2 = moduleDocOrErr.get().get();
-    a1 = pmi.ModuleDocBuffer.get();
-    assert( (a1 == nullptr) == (a1 == nullptr));
+    llvm::MemoryBuffer *a2 = moduleDocOrErr.get().get();
+    llvm::MemoryBuffer *a1 = pmi.ModuleDocBuffer.get();
+    assert( (a1 == nullptr) == (a2 == nullptr) && "file mod docs");
     if (a1) {
-      p2 = a2->getBufferStart();  s2 = a2->getBufferSize();
-      p1 = a1->getBufferStart();
-      s1 = a1->getBufferSize();
-      assert(s1 == s2 && "buffer abs, different sizes doc");
-      assert(!bcmp(p1, p2, s1) && "buffer abs, different contents doc");
+      cmpBufs(a1, a2, "364");
     }
     return false;
   }
