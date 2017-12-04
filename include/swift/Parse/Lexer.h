@@ -140,18 +140,12 @@ public:
 
     State advance(unsigned Offset) const {
       assert(isValid());
-      return State(Loc.getAdvancedLoc(Offset), LeadingTrivia, TrailingTrivia);
+      return State(Loc.getAdvancedLoc(Offset));
     }
 
   private:
-    explicit State(SourceLoc Loc,
-                   syntax::TriviaList LeadingTrivia,
-                   syntax::TriviaList TrailingTrivia)
-      : Loc(Loc), LeadingTrivia(LeadingTrivia),
-        TrailingTrivia(TrailingTrivia) {}
+    explicit State(SourceLoc Loc) : Loc(Loc) {}
     SourceLoc Loc;
-    syntax::TriviaList LeadingTrivia;
-    syntax::TriviaList TrailingTrivia;
     friend class Lexer;
   };
 
@@ -210,10 +204,8 @@ public:
     assert(Offset <= EndOffset && "invalid range");
     initSubLexer(
         *this,
-        State(getLocForStartOfBuffer().getAdvancedLoc(Offset),
-              LeadingTrivia, TrailingTrivia),
-        State(getLocForStartOfBuffer().getAdvancedLoc(EndOffset),
-              LeadingTrivia, TrailingTrivia));
+        State(getLocForStartOfBuffer().getAdvancedLoc(Offset)),
+        State(getLocForStartOfBuffer().getAdvancedLoc(EndOffset)));
   }
 
   /// \brief Create a sub-lexer that lexes from the same buffer, but scans
@@ -271,7 +263,13 @@ public:
   /// \brief Returns the lexer state for the beginning of the given token.
   /// After restoring the state, lexer will return this token and continue from
   /// there.
-  State getStateForBeginningOfToken(const Token &Tok) const {
+  State getStateForBeginningOfToken(const Token &Tok,
+                                    const syntax::Trivia &LeadingTrivia = {}) const {
+    // If trivia parsing mode, start position of trivia is the position we want
+    // to restore.
+    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
+      return State(Tok.getLoc().getAdvancedLoc(-LeadingTrivia.getTextLength()));
+
     // If the token has a comment attached to it, rewind to before the comment,
     // not just the start of the token.  This ensures that we will re-lex and
     // reattach the comment to the token if rewound to this state.
@@ -282,8 +280,7 @@ public:
   }
 
   State getStateForEndOfTokenLoc(SourceLoc Loc) const {
-    return State(getLocForEndOfToken(SourceMgr, Loc), LeadingTrivia,
-                 TrailingTrivia);
+    return State(getLocForEndOfToken(SourceMgr, Loc));
   }
 
   /// \brief Restore the lexer state to a given one, that can be located either
@@ -291,8 +288,8 @@ public:
   void restoreState(State S, bool enableDiagnostics = false) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
-    LeadingTrivia = S.LeadingTrivia;
-    TrailingTrivia = S.TrailingTrivia;
+    LeadingTrivia.clear();
+    TrailingTrivia.clear();
     // Don't reemit diagnostics while readvancing the lexer.
     llvm::SaveAndRestore<DiagnosticEngine*>
       D(Diags, enableDiagnostics ? Diags : nullptr);
