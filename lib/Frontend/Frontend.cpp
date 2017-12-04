@@ -200,6 +200,22 @@ struct SetupInputAction {
   failed(false)
   {}
   
+  void print(std::string msg) const {
+    fprintf(stderr, "%s: copiedFromInput 0x%lx, addedPartialModule1 %d, addedPartialModule2 %d, addedNewSourceBuffer %d, addedInputSourceCodeID %d, setMain %d,"
+            " setPrimary %d, existingBuffer %d, docName %s, failed %d\n",
+            msg.c_str(),
+            (unsigned long)copiedFromInput,
+            addedPartialModule1,
+            addedPartialModule2,
+            addedNewSourceBuffer,
+            addedInputSourceCodeID,
+            setMain,
+            setPrimary,
+            existingBuffer,
+            docName.c_str(),
+            failed);
+  }
+  
   bool operator==(const SetupInputAction &other) const {
   return copiedFromInput == other.copiedFromInput
     && addedPartialModule1 == other.addedPartialModule1
@@ -211,6 +227,13 @@ struct SetupInputAction {
     && existingBuffer == other.existingBuffer
     && docName == other.docName
     && failed == other.failed;
+  }
+  static void check(const SetupInputAction &old, const SetupInputAction &neww, unsigned count) {
+    if (old == neww) return;
+    fprintf(stderr, "OLD!=NEW, count %d\n", count);
+    old.print("OLD");
+    neww.print("NEW");
+    assert(false && "INPUT ERR");
   }
 };
 static SetupInputAction oldResult, newResult;
@@ -231,7 +254,7 @@ bool CompilerInstance::setupInputs() {
        Invocation.getFrontendOptions().Inputs.getAllFiles()) {
     oldResult = old_setUpForInput(Invocation, SourceMgr, input);
     bool failed = setUpForInput(input);
-    assert(oldResult == newResult);
+    SetupInputAction::check(oldResult, newResult, inputCount);
     ++inputCount;
     if (failed)
       return true;
