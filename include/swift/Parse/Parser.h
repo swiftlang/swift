@@ -422,17 +422,11 @@ public:
     llvm::Optional<syntax::SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
-    // Keep track of the original trivia information.
-    syntax::Trivia LeadingTrivia;
-    syntax::Trivia TrailingTrivia;
-
   public:
     BacktrackingScope(Parser &P)
-        : P(P), PP(P.getParserPosition()), DT(P.Diags),
-          LeadingTrivia(P.LeadingTrivia), TrailingTrivia(P.TrailingTrivia) {
+        : P(P), PP(P.getParserPosition()), DT(P.Diags) {
       SynContext.emplace(P.SyntaxContext);
       SynContext->setDiscard();
-
     }
 
     ~BacktrackingScope();
