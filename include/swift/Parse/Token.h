@@ -48,6 +48,7 @@ class Token {
   
   /// Modifiers for string literals
   unsigned MultilineString : 1;
+  unsigned RawString : 1;
 
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
@@ -65,7 +66,7 @@ public:
   Token(tok Kind, StringRef Text, unsigned CommentLength)
           : Kind(Kind), AtStartOfLine(false), CommentLength(CommentLength),
             EscapedIdentifier(false), MultilineString(false),
-            Text(Text) {}
+            RawString(false), Text(Text) {}
 
   Token(tok Kind, StringRef Text): Token(Kind, Text, 0) {};
 
@@ -288,16 +289,21 @@ public:
 
   /// \brief Set the token to the specified kind and source range.
   void setToken(tok K, StringRef T, unsigned CommentLength = 0,
-                bool MultilineString = false) {
+                bool MultilineString = false, bool RawString = false) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
     this->MultilineString = MultilineString;
+    this->RawString = RawString;
   }
 
   bool IsMultilineString() const {
     return MultilineString;
+  }
+
+  bool IsRawString() const {
+    return RawString;
   }
 };
   
