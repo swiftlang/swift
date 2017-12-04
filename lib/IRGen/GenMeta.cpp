@@ -4565,128 +4565,128 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
 namespace {
 
-template<class Impl>
-class EnumMetadataBuilderBase : public EnumMetadataVisitor<Impl> {
-  using super = EnumMetadataVisitor<Impl>;
+  template<class Impl>
+  class EnumMetadataBuilderBase : public EnumMetadataVisitor<Impl> {
+    using super = EnumMetadataVisitor<Impl>;
 
-protected:
-  ConstantStructBuilder &B;
-  using super::IGM;
-  using super::Target;
+  protected:
+    ConstantStructBuilder &B;
+    using super::IGM;
+    using super::Target;
 
-public:
-  EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
-                          ConstantStructBuilder &B)
-  : super(IGM, theEnum), B(B) {
-  }
-  
-  void addMetadataFlags() {
-    auto kind = Target->classifyAsOptionalType()
-                  ? MetadataKind::Optional
-                  : MetadataKind::Enum;
-    B.addInt(IGM.MetadataKindTy, unsigned(kind));
-  }
-
-  void addNominalTypeDescriptor() {
-    auto descriptor = EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
-    B.add(descriptor);
-  }
-
-  void addGenericArgument(CanType type) {
-    B.addNullPointer(IGM.TypeMetadataPtrTy);
-  }
-  
-  void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
-    B.addNullPointer(IGM.WitnessTablePtrTy);
-  }
-};
-  
-class EnumMetadataBuilder
-  : public EnumMetadataBuilderBase<EnumMetadataBuilder> {
-  bool HasUnfilledPayloadSize = false;
-
-public:
-  EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
-                      ConstantStructBuilder &B)
-    : EnumMetadataBuilderBase(IGM, theEnum, B) {}
-  
-  void addValueWitnessTable() {
-    auto type = Target->getDeclaredType()->getCanonicalType();
-    B.add(emitValueWitnessTable(IGM, type));
-  }
-  
-  void addPayloadSize() {
-    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
-    if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
-      B.addInt(IGM.IntPtrTy, 0);
-      HasUnfilledPayloadSize = true;
-      return;
+  public:
+    EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
+                            ConstantStructBuilder &B)
+    : super(IGM, theEnum), B(B) {
     }
 
-    assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
-           "non-generic, non-resilient enums don't need payload size in metadata");
-    auto &strategy = getEnumImplStrategy(IGM, enumTy);
-    B.addInt(IGM.IntPtrTy, strategy.getPayloadSizeForMetadata());
-  }
+    void addMetadataFlags() {
+      auto kind = Target->classifyAsOptionalType()
+                    ? MetadataKind::Optional
+                    : MetadataKind::Enum;
+      B.addInt(IGM.MetadataKindTy, unsigned(kind));
+    }
 
-  bool canBeConstant() {
-    return !HasUnfilledPayloadSize;
-  }
+    void addNominalTypeDescriptor() {
+      auto descriptor = EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
+      B.add(descriptor);
+    }
 
-  void createMetadataAccessFunction() {
-    createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
-  }
-};
-  
-class GenericEnumMetadataBuilder
-  : public GenericMetadataBuilderBase<GenericEnumMetadataBuilder,
-                        EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
-{
-public:
-  GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
-                             ConstantStructBuilder &B)
-    : GenericMetadataBuilderBase(IGM, theEnum, B) {}
+    void addGenericArgument(CanType type) {
+      B.addNullPointer(IGM.TypeMetadataPtrTy);
+    }
 
-  llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
-                                    llvm::Value *metadataPattern,
-                                    llvm::Value *arguments) {
-    return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
-                                  {metadataPattern, arguments});
-  }
+    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
+      B.addNullPointer(IGM.WitnessTablePtrTy);
+    }
+  };
 
-  void addValueWitnessTable() {
-    B.add(getValueWitnessTableForGenericValueType(IGM, Target,
-                                                  HasDependentVWT));
-  }
-  
-  void addDependentValueWitnessTablePattern() {
-    emitDependentValueWitnessTablePattern(IGM, B,
-                        Target->getDeclaredType()->getCanonicalType());
-  }
-  
-  void addPayloadSize() {
-    // In all cases where a payload size is demanded in the metadata, it's
-    // runtime-dependent, so fill in a zero here.
-    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
-    (void) enumTI;
-    assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
-           "non-generic, non-resilient enums don't need payload size in metadata");
-    B.addInt(IGM.IntPtrTy, 0);
-  }
-  
-  void emitInitializeMetadata(IRGenFunction &IGF,
-                              llvm::Value *metadata,
-                              llvm::Value *vwtable) {
-    // Nominal types are always preserved through SIL lowering.
-    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    IGM.getTypeInfoForUnlowered(enumTy)
-      .initializeMetadata(IGF, metadata, vwtable,
-                          IGF.IGM.getLoweredType(enumTy));
-  }
-};
-  
+  class EnumMetadataBuilder
+    : public EnumMetadataBuilderBase<EnumMetadataBuilder> {
+    bool HasUnfilledPayloadSize = false;
+
+  public:
+    EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
+                        ConstantStructBuilder &B)
+      : EnumMetadataBuilderBase(IGM, theEnum, B) {}
+
+    void addValueWitnessTable() {
+      auto type = Target->getDeclaredType()->getCanonicalType();
+      B.add(emitValueWitnessTable(IGM, type));
+    }
+
+    void addPayloadSize() {
+      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
+      if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
+        B.addInt(IGM.IntPtrTy, 0);
+        HasUnfilledPayloadSize = true;
+        return;
+      }
+
+      assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
+             "non-generic, non-resilient enums don't need payload size in metadata");
+      auto &strategy = getEnumImplStrategy(IGM, enumTy);
+      B.addInt(IGM.IntPtrTy, strategy.getPayloadSizeForMetadata());
+    }
+
+    bool canBeConstant() {
+      return !HasUnfilledPayloadSize;
+    }
+
+    void createMetadataAccessFunction() {
+      createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
+    }
+  };
+
+  class GenericEnumMetadataBuilder
+    : public GenericMetadataBuilderBase<GenericEnumMetadataBuilder,
+                          EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
+  {
+  public:
+    GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
+                               ConstantStructBuilder &B)
+      : GenericMetadataBuilderBase(IGM, theEnum, B) {}
+
+    llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
+                                      llvm::Value *metadataPattern,
+                                      llvm::Value *arguments) {
+      return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
+                                    {metadataPattern, arguments});
+    }
+
+    void addValueWitnessTable() {
+      B.add(getValueWitnessTableForGenericValueType(IGM, Target,
+                                                    HasDependentVWT));
+    }
+
+    void addDependentValueWitnessTablePattern() {
+      emitDependentValueWitnessTablePattern(IGM, B,
+                          Target->getDeclaredType()->getCanonicalType());
+    }
+
+    void addPayloadSize() {
+      // In all cases where a payload size is demanded in the metadata, it's
+      // runtime-dependent, so fill in a zero here.
+      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
+      (void) enumTI;
+      assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
+             "non-generic, non-resilient enums don't need payload size in metadata");
+      B.addInt(IGM.IntPtrTy, 0);
+    }
+
+    void emitInitializeMetadata(IRGenFunction &IGF,
+                                llvm::Value *metadata,
+                                llvm::Value *vwtable) {
+      // Nominal types are always preserved through SIL lowering.
+      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      IGM.getTypeInfoForUnlowered(enumTy)
+        .initializeMetadata(IGF, metadata, vwtable,
+                            IGF.IGM.getLoweredType(enumTy));
+    }
+  };
+
 } // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
