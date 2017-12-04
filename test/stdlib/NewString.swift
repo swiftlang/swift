@@ -28,7 +28,7 @@ func repr(_ x: _StringGuts) -> String {
     return "Cocoa("
       + "owner: \(hexAddrVal(x._owner)), "
       + "count: \(x.count))"
-  } else if x._isTaggedCocoa {
+  } else if x._isSmallCocoa {
     return "Cocoa("
       + "owner: <tagged>, "
       + "count: \(x.count))"
@@ -165,13 +165,13 @@ print("--- Literals ---")
 // CHECK-NEXT: true
 let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
-print("  \(asciiLiteral._core.isASCII)")
+print("  \(asciiLiteral._guts.isASCII)")
 
 // CHECK-NEXT: String(Unmanaged(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
 let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")
-print("  \(!asciiLiteral._core.isASCII)")
+print("  \(!asciiLiteral._guts.isASCII)")
 
 // ===------- Appending -------===
 

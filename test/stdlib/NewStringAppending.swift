@@ -45,7 +45,7 @@ func repr(_ x: _StringGuts) -> String {
     return "Cocoa("
       + "owner: \(hexAddrVal(x._owner)), "
       + "count: \(x.count))"
-  } else if x._isTaggedCocoa {
+  } else if x._isSmallCocoa {
     return "Cocoa("
       + "owner: <tagged>, "
       + "count: \(x.count))"
