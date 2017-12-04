@@ -1268,23 +1268,26 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  public mutating func replaceSubrange<C>(
+  @_versioned
+  mutating func _replaceSubrange<C, CodeUnit>(
     _ bounds: Range<Int>,
-    with newElements: C
-  ) where C : Collection, C.Element == UTF16.CodeUnit {
+    with newElements: C,
+    of codeUnit: CodeUnit.Type
+  ) where C : Collection, C.Element == UTF16.CodeUnit,
+  CodeUnit : FixedWidthInteger & UnsignedInteger {
     _precondition(bounds.lowerBound >= 0,
       "replaceSubrange: subrange start precedes String start")
 
     let newCount: Int = numericCast(newElements.count)
     let deltaCount = newCount - bounds.count
     let paramsOpt = allocationParametersForMutableStorage(
-      of: UTF16.CodeUnit.self,
+      of: CodeUnit.self,
       unusedCapacity: Swift.max(0, deltaCount))
 
     if _fastPath(paramsOpt == nil) {
       // We have unique native storage of the correct code unit,
       // with enough capacity to do the replacement inline.
-      unowned(unsafe) let storage = _nativeStorage(of: UTF16.CodeUnit.self)
+      unowned(unsafe) let storage = _nativeStorage(of: CodeUnit.self)
       _sanityCheck(storage.unusedCapacity >= deltaCount)
       let tailCount = storage.count - bounds.upperBound
       _precondition(tailCount >= 0,
@@ -1297,10 +1300,11 @@ extension _StringGuts {
           count: tailCount)
       }
       // Copy new elements in place
-      let (_, end) = UnsafeMutableBufferPointer(
-        start: dst,
-        count: newCount).initialize(from: newElements)
-      _precondition(end == newCount, "Collection misreported its count")
+      var it = newElements.makeIterator()
+      for p in dst ..< (dst + newCount) {
+        p.pointee = CodeUnit(it.next()!)
+      }
+      _precondition(it.next() == nil, "Collection misreported its count")
       storage.count += deltaCount
       _nativeCount += deltaCount
       _invariantCheck()
@@ -1312,7 +1316,7 @@ extension _StringGuts {
     let params = paramsOpt._unsafelyUnwrappedUnchecked
     _precondition(bounds.upperBound <= params.count,
         "replaceSubrange: subrange extends past String end")
-    let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+    let storage = _SwiftStringStorage<CodeUnit>.create(
       capacity: params.capacity,
       count: params.count + deltaCount)
     var dst = storage.start
@@ -1324,9 +1328,11 @@ extension _StringGuts {
     dst += prefixRange.count
 
     // Copy new data
-    let (_, end) = UnsafeMutableBufferPointer(
-      start: dst, count: newCount).initialize(from: newElements)
-    _precondition(end == newCount, "Collection misreported its count")
+    var it = newElements.makeIterator()
+    for p in dst ..< (dst + newCount) {
+      p.pointee = CodeUnit(it.next()!)
+    }
+    _precondition(it.next() == nil, "Collection misreported its count")
     dst += newCount
 
     // Copy suffix from end of replaced range
@@ -1337,6 +1343,17 @@ extension _StringGuts {
     _sanityCheck(dst + suffixRange.count == storage.end)
     self = _StringGuts(storage)
     _invariantCheck()
+  }
+
+  public mutating func replaceSubrange<C>(
+    _ bounds: Range<Int>,
+    with newElements: C
+  ) where C : Collection, C.Element == UTF16.CodeUnit {
+    if isASCII && !newElements.contains(where: {$0 > 0x7f}) {
+      self._replaceSubrange(bounds, with: newElements, of: UInt8.self)
+    } else {
+      self._replaceSubrange(bounds, with: newElements, of: UTF16.CodeUnit.self)
+    }
   }
 }
 
