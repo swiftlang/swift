@@ -47,7 +47,9 @@ public:
   /// string.
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {}
+      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
+    assert(!name.empty() && "Empty strings signify no inptus in other places");
+  }
 
   bool getIsPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *getBuffer() const { return Buffer; }

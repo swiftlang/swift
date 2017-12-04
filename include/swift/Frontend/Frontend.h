@@ -425,16 +425,19 @@ private:
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   Optional<unsigned> setupCodeCompletionBuffer();
-  bool setupInputs(Optional<unsigned> codeCompletionBufferID);
+  bool setupInputs();
+
   bool isInMainMode() {
     return Invocation.getInputKind() == InputFileKind::IFK_Swift;
   }
   bool isInSILMode() {
     return Invocation.getInputKind() == InputFileKind::IFK_SIL;
   }
-  bool setupForInput(const InputFile &input);
-  void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
-  bool setUpForFile(StringRef file, bool isPrimary);
+  bool setUpForInput(const InputFile &input);
+  Optional<unsigned> getBufferID(const InputFile &input);
+  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
+            std::unique_ptr<llvm::MemoryBuffer>>
+  getInputAndMaybeModuleDocBuffers(const InputFile &input);
 
 public:
   /// Parses and type-checks all input files.
