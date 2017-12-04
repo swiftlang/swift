@@ -439,11 +439,6 @@ private:
             std::unique_ptr<llvm::MemoryBuffer>>
   getInputAndMaybeModuleDocBuffers(const InputFile &input);
   
-  bool old_setUpForInput(const InputFile &input);
-  void old_setUpForBuffer(llvm::MemoryBuffer *buffer,
-                                            bool isPrimary);
-  bool old_setUpForFile(StringRef fileName, bool isPrimary);
-  
 
 public:
   /// Parses and type-checks all input files.
