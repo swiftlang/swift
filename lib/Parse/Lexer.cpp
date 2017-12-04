@@ -242,7 +242,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
           CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   Token Result;
   L.lex(Result);
   return Result;
@@ -264,14 +264,9 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
-  if (!MultilineString)
-    lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
+  lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
 
   NextToken.setToken(Kind, TokenText, CommentLength, MultilineString);
-  if (!MultilineString)
-    if (!TrailingTrivia.empty() &&
-        TrailingTrivia.front().Kind == syntax::TriviaKind::Backtick)
-      ++CurPtr;
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -298,7 +293,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
     }
     break;
   }
-  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)), {}, {});
+  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -2309,7 +2304,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   return L.peekNextToken();
 }
 
@@ -2348,23 +2343,11 @@ Optional<syntax::TriviaPiece> Lexer::lexWhitespace(bool StopAtFirstNewline) {
     case '\n':
     case '\r':
       NextToken.setAtStartOfLine(true);
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Newline,
-        Length,
-        OwnedString(Start, Length),
-      };
+      return syntax::TriviaPiece{syntax::TriviaKind::Newline, Length, {}};
     case ' ':
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Space,
-        Length,
-        OwnedString(Start, Length),
-      };
+      return syntax::TriviaPiece{syntax::TriviaKind::Space, Length, {}};
     case '\t':
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Tab,
-        Length,
-        OwnedString(Start, Length),
-      };
+      return syntax::TriviaPiece{syntax::TriviaKind::Tab, Length, {}};
     default:
       return None;
   }
@@ -2379,11 +2362,7 @@ Optional<syntax::TriviaPiece> Lexer::lexSingleLineComment(syntax::TriviaKind Kin
   if (Length == 0)
     return None;
 
-  return Optional<syntax::TriviaPiece>({
-    Kind,
-    Length,
-    OwnedString(Start, Length)
-  });
+  return Optional<syntax::TriviaPiece>({Kind, 1, OwnedString(Start, Length)});
 }
 
 Optional<syntax::TriviaPiece>
@@ -2394,11 +2373,7 @@ Lexer::lexBlockComment(syntax::TriviaKind Kind) {
   if (Length == 0)
     return None;
 
-  return Optional<syntax::TriviaPiece>({
-    Kind,
-    Length,
-    OwnedString(Start, Length)
-  });
+  return Optional<syntax::TriviaPiece>({Kind, 1, OwnedString(Start, Length)});
 }
 
 Optional<syntax::TriviaPiece> Lexer::lexComment() {
@@ -2608,7 +2583,7 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   L.skipToEndOfLine();
   return getSourceLoc(L.CurPtr);
 }
