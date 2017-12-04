@@ -189,12 +189,10 @@ Entities
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
   entity-spec ::= decl-name function-signature generic-signature? 'F'    // function
-  entity-spec ::= storage-spec
+  entity-spec ::= type file-discriminator? 'i' ACCESSOR                  // subscript
+  entity-spec ::= decl-name type 'v' ACCESSOR                            // variable
   entity-spec ::= decl-name type 'fp'                // generic type parameter
   entity-spec ::= decl-name type 'fo'                // enum element (currently not used)
-
-  storage-spec ::= type file-discriminator? 'i' ACCESSOR
-  storage-spec ::= decl-name type 'v' ACCESSOR
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter
