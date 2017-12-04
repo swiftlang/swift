@@ -242,7 +242,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
           CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   Token Result;
   L.lex(Result);
   return Result;
@@ -298,7 +298,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
     }
     break;
   }
-  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)), {}, {});
+  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -2309,7 +2309,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   return L.peekNextToken();
 }
 
@@ -2608,7 +2608,7 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   L.skipToEndOfLine();
   return getSourceLoc(L.CurPtr);
 }

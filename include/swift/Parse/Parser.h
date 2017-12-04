@@ -377,7 +377,7 @@ public:
   };
 
   ParserPosition getParserPosition() {
-    return ParserPosition(L->getStateForBeginningOfToken(Tok),
+    return ParserPosition(L->getStateForBeginningOfToken(Tok, LeadingTrivia),
                           PreviousLoc);
   }
 
