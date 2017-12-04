@@ -78,15 +78,7 @@ DECL_NODES = [
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating',
                    ]),
-             Child('LeftParen', kind='LeftParenToken',
-                   is_optional=True),
-             Child('Argument', kind='IdentifierToken',
-                   is_optional=True,
-                   text_choices=[
-                       'unowned', 'safe', 'unsafe', 'set',
-                   ]),
-             Child('RightParen', kind='RightParenToken',
-                   is_optional=True),
+             Child('Detail', kind='TokenList'),
          ]),
 
     # type-inheritance-clause -> ':' type
