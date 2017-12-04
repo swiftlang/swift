@@ -598,3 +598,59 @@ func convTupleAny(_ f1: @escaping () -> (),
 // CHECK-NEXT:    dealloc_stack [[OPTIONAL_VALUE]]
 // CHECK-NEXT:    dealloc_stack [[ANY_VALUE]]
 // CHECK-NEXT:    return
+
+// ==== Support collection subtyping in function argument position
+
+protocol Z {}
+class A: Z {}
+
+func foo_arr<T: Z>(type: T.Type, _ fn: ([T]?) -> Void) {}
+func foo_map<T: Z>(type: T.Type, _ fn: ([Int: T]) -> Void) {}
+
+func rdar35702810() {
+  let fn_arr: ([Z]?) -> Void = { _ in }
+  let fn_map: ([Int: Z]) -> Void = { _ in }
+
+  // CHECK: function_ref @_T0s15_arrayForceCastSayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+  // CHECK: apply %4<A, Z>(%3) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Array<τ_0_1>
+  foo_arr(type: A.self, fn_arr)
+
+  // CHECK: function_ref @_T0s17_dictionaryUpCasts10DictionaryVyq0_q1_GACyxq_Gs8HashableRzsAFR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: apply %2<Int, A, Int, Z>(%0) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: apply %1(%3) : $@callee_guaranteed (@owned Dictionary<Int, Z>) -> ()
+  foo_map(type: A.self, fn_map)
+}
+
+protocol X: Hashable {}
+class B: X {
+  var hashValue: Int { return 42 }
+  static func == (lhs: B, rhs: B) -> Bool {
+    return lhs.hashValue == rhs.hashValue
+  }
+}
+
+func bar_arr<T: X>(type: T.Type, _ fn: ([T]?) -> Void) {}
+func bar_map<T: X>(type: T.Type, _ fn: ([T: Int]) -> Void) {}
+func bar_set<T: X>(type: T.Type, _ fn: (Set<T>) -> Void) {}
+
+func rdar35702810_anyhashable() {
+  let fn_arr: ([AnyHashable]?) -> Void = { _ in }
+  let fn_map: ([AnyHashable: Int]) -> Void = { _ in }
+  let fn_set: (Set<AnyHashable>) -> Void = { _ in }
+
+
+  // CHECK: function_ref @_T0Says11AnyHashableVGSgIegx_Say19function_conversion1BCGSgIgx_TR : $@convention(thin) (@owned Optional<Array<B>>, @guaranteed @callee_guaranteed (@owned Optional<Array<AnyHashable>>) -> ()) -> ()
+  // CHECK: partial_apply [callee_guaranteed] %12(%11) : $@convention(thin) (@owned Optional<Array<B>>, @guaranteed @callee_guaranteed (@owned Optional<Array<AnyHashable>>) -> ()) -> ()
+  // CHECK: convert_function %13 : $@callee_guaranteed (@owned Optional<Array<B>>) -> () to $@noescape @callee_guaranteed (@owned Optional<Array<B>>) -> ()
+  bar_arr(type: B.self, fn_arr)
+
+  // CHECK: function_ref @_T0s10DictionaryVys11AnyHashableVSiGIegx_ABy19function_conversion1BCSiGIgx_TR : $@convention(thin) (@owned Dictionary<B, Int>, @guaranteed @callee_guaranteed (@owned Dictionary<AnyHashable, Int>) -> ()) -> ()
+  // CHECK: partial_apply [callee_guaranteed] %21(%20) : $@convention(thin) (@owned Dictionary<B, Int>, @guaranteed @callee_guaranteed (@owned Dictionary<AnyHashable, Int>) -> ()) -> ()
+  // CHECK: convert_function %22 : $@callee_guaranteed (@owned Dictionary<B, Int>) -> () to $@noescape @callee_guaranteed (@owned Dictionary<B, Int>) -> ()
+  bar_map(type: B.self, fn_map)
+
+  // CHECK: function_ref @_T0s3SetVys11AnyHashableVGIegx_ABy19function_conversion1BCGIgx_TR : $@convention(thin) (@owned Set<B>, @guaranteed @callee_guaranteed (@owned Set<AnyHashable>) -> ()) -> ()
+  // CHECK: partial_apply [callee_guaranteed] %30(%29) : $@convention(thin) (@owned Set<B>, @guaranteed @callee_guaranteed (@owned Set<AnyHashable>) -> ()) -> ()
+  // CHECK: convert_function %31 : $@callee_guaranteed (@owned Set<B>) -> () to $@noescape @callee_guaranteed (@owned Set<B>) -> ()
+  bar_set(type: B.self, fn_set)
+}
