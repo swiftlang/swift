@@ -158,6 +158,9 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
       if (!RawNode->isPattern())
         return makeUnknownSyntax(SyntaxKind::UnknownPattern, Parts);
       break;
+    case SyntaxContextKind::Syntax:
+      // We don't need to coerce in this case.
+      break;
     }
     return RawNode;
   } else {
@@ -177,6 +180,9 @@ RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
       break;
     case SyntaxContextKind::Pattern:
       UnknownKind = SyntaxKind::UnknownPattern;
+      break;
+    case SyntaxContextKind::Syntax:
+      UnknownKind = SyntaxKind::Unknown;
       break;
     }
     return makeUnknownSyntax(UnknownKind, Parts);

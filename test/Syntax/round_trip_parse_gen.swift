@@ -84,3 +84,5 @@ struct foo {
     private static func foo() {}
   }
 }
+
+struct S<A, B, C, D> where A:B, B==C, A : C, B.C == D.A, A.B: C.D {}
