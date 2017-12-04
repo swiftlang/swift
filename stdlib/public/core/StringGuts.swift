@@ -1213,6 +1213,23 @@ extension _StringGuts {
 
   @_inlineable
   public // TODO(StringGuts): for testing only
+  mutating func append(_ other: _StringGuts) {
+    if _isEmptyLiteral {
+      self = other
+      return
+    }
+    if other.isASCII {
+      self.append(other._unmanagedASCIIView)
+    } else if _slowPath(other._isOpaque) {
+      self.append(other._asOpaque())
+    } else {
+      self.append(other._unmanagedUTF16View)
+    }
+    _fixLifetime(other)
+  }
+
+  @_inlineable
+  public // TODO(StringGuts): for testing only
   mutating func append(_ other: _StringGuts, range: Range<Int>) {
     _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
     guard range.count > 0 else { return }
