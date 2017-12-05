@@ -29,6 +29,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/Basic/CharInfo.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -2028,10 +2029,17 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
+// Provide the ability to turn off the type converter cache to ease debugging.
+static llvm::cl::opt<bool>
+    DisableConstantInfoCache("sil-disable-typelowering-constantinfo-cache",
+                             llvm::cl::init(false));
+
 const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
-  auto found = ConstantTypes.find(constant);
-  if (found != ConstantTypes.end())
-    return *found->second;
+  if (!DisableConstantInfoCache) {
+    auto found = ConstantTypes.find(constant);
+    if (found != ConstantTypes.end())
+      return *found->second;
+  }
 
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
@@ -2071,6 +2079,9 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
                                                   loweredInterfaceType,
                                                   silFnType,
                                                   genericEnv};
+  if (DisableConstantInfoCache)
+    return *result;
+
   auto inserted = ConstantTypes.insert({constant, result});
   assert(inserted.second);
   return *result;
