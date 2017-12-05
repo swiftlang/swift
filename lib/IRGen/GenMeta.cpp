@@ -2758,8 +2758,6 @@ namespace {
     struct FillOp {
       CanType Type;
       Optional<ProtocolConformanceRef> Conformance;
-      Size ToOffset;
-      bool IsRelative;
     };
 
     SmallVector<FillOp, 8> FillOps;
@@ -2836,7 +2834,10 @@ namespace {
       // fill indexes are word-indexed.
       Address metadataWords(IGF.Builder.CreateBitCast(metadataValue, IGM.Int8PtrPtrTy),
                             IGM.getPointerAlignment());
-      
+
+      auto genericReqtOffset = IGM.getMetadataLayout(Target)
+          .getGenericRequirementsOffset(IGF);
+
       for (auto &fillOp : FillOps) {
         llvm::Value *value;
         if (fillOp.Conformance) {
@@ -2846,20 +2847,12 @@ namespace {
         }
 
         auto dest = createPointerSizedGEP(IGF, metadataWords,
-                                          fillOp.ToOffset - AddressPoint);
+                                          genericReqtOffset.getStatic());
+        genericReqtOffset = genericReqtOffset.offsetBy(
+          IGF, IGM.getPointerSize());
 
-        // A far relative indirectable pointer.
-        if (fillOp.IsRelative) {
-          dest = IGF.Builder.CreateElementBitCast(dest,
-                                                  IGM.FarRelativeAddressTy);
-          IGF.emitStoreOfRelativeIndirectablePointer(value, dest,
-                                                     /*isFar*/ true);
-
-        // A direct pointer.
-        } else {
-          value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
-          IGF.Builder.CreateStore(value, dest);
-        }
+        value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
+        IGF.Builder.CreateStore(value, dest);
       }
       
       // Initialize the instantiated dependent value witness table, if we have
@@ -2894,12 +2887,6 @@ namespace {
       return f;
     }
 
-    void addFillOp(CanType type, Optional<ProtocolConformanceRef> conf,
-                   bool isRelative) {
-      FillOps.push_back({type, conf, getNextOffsetFromTemplateHeader(),
-                         isRelative });
-    }
-    
   public:
     void createMetadataAccessFunction() {
       (void) getGenericTypeMetadataAccessFunction(IGM, Target, ForDefinition);
@@ -2981,14 +2968,14 @@ namespace {
 
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
-      addFillOp(type, None, /*relative*/ false);
+      FillOps.push_back({type, None});
       super::addGenericArgument(type, std::forward<T>(args)...);
     }
 
     template <class... T>
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
                                 T &&...args) {
-      addFillOp(type, conf, /*relative*/ false);
+      FillOps.push_back({type, conf});
       super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
     }
     
