@@ -86,11 +86,6 @@ struct Test {
   }
 }
 
-// Legacy test dictionaries.
-public var precommitTests: [BenchmarkInfo] = []
-public var otherTests: [BenchmarkInfo] = []
-public var stringTests: [BenchmarkInfo] = []
-
 // We should migrate to a collection of BenchmarkInfo.
 public var registeredBenchmarks: [BenchmarkInfo] = []
 
@@ -231,22 +226,12 @@ struct TestConfig {
   }
 
   mutating func findTestsToRun() {
-    // Begin by creating a set of our non-legacy registeredBenchmarks
-    var allTests = Set(registeredBenchmarks)
-
-    // Merge legacy benchmark info into allTests. If we already have a
-    // registered benchmark info, formUnion leaves this alone. This allows for
-    // us to perform incremental work.
-    for testList in [precommitTests, otherTests, stringTests] {
-      allTests.formUnion(testList)
-    }
-
     let benchmarkNameFilter = Set(filters)
 
     // t is needed so we don't capture an ivar of a mutable inout self.
     let t = tags
     let st = skipTags
-    let filteredTests = Array(allTests.filter { benchInfo in
+    let filteredTests = Array(registeredBenchmarks.filter { benchInfo in
       if !t.isSubset(of: benchInfo.tags) {
         return false
       }

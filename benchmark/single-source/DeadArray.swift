@@ -16,7 +16,7 @@ import TestsUtils
 public let DeadArray = BenchmarkInfo(
   name: "DeadArray",
   runFunction: run_DeadArray,
-  tags: [.regression])
+  tags: [.regression, .unstable])
 
 @inline(__always)
 func debug(_ m:String) {}
