@@ -7,11 +7,9 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
-import os
-
 from ..utils import TestCase, redirect_stderr
-from ...argparse import (ArgumentParser, ArgumentTypeError, BoolType, Nargs,
-                         PathType, SUPPRESS, actions)
+from ...argparse import (ArgumentParser, BoolType, Nargs, PathType, SUPPRESS,
+                         actions)
 
 
 # -----------------------------------------------------------------------------
@@ -257,13 +255,13 @@ class TestStorePathAction(TestCase):
     def test_exists(self):
         action = actions.StorePathAction(['--foo'], dests=['foo'], exists=True)
 
-        self.assertTrue(action.type.assert_exists)
+        self.assertTrue(action.type._assert_exists)
 
     def test_executable(self):
         action = actions.StorePathAction(['--foo'], dests=['foo'],
                                          executable=True)
 
-        self.assertTrue(action.type.assert_executable)
+        self.assertTrue(action.type._assert_executable)
 
 
 class TestToggleTrueAction(TestCase):
