@@ -255,8 +255,8 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		return ptr!.load(fromByteOffset: index - offset, as: UInt8.self)
 	}
 
-	public subscript(bounds: Range<Int>) -> RandomAccessSlice<DispatchData> {
-		return RandomAccessSlice(base: self, bounds: bounds)
+	public subscript(bounds: Range<Int>) -> Slice<DispatchData> {
+		return Slice(base: self, bounds: bounds)
 	}
 
 	/// Return a new copy of the data in a specified range.

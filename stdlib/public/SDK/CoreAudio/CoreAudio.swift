@@ -163,9 +163,9 @@ extension UnsafeMutableAudioBufferListPointer
   }
 
   public subscript(bounds: Range<Int>)
-    -> MutableRandomAccessSlice<UnsafeMutableAudioBufferListPointer> {
+    -> Slice<UnsafeMutableAudioBufferListPointer> {
     get {
-      return MutableRandomAccessSlice(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
