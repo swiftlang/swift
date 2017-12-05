@@ -184,7 +184,6 @@ struct SetupInputAction {
   bool setPrimary;
   unsigned existingBuffer;
   std::string docName;
-  
   bool failed = false;
   
   SetupInputAction() :
@@ -202,7 +201,7 @@ struct SetupInputAction {
   
   void print(std::string msg) const {
     fprintf(stderr, "%s: copiedFromInput 0x%lx, addedPartialModule1 %d, addedPartialModule2 %d, addedNewSourceBuffer %d, addedInputSourceCodeID %d, setMain %d,"
-            " setPrimary %d, existingBuffer %d, docName %s, failed %d\n",
+            " setPrimary %d, existingBuffer %d, failed %d, docName %s\n",
             msg.c_str(),
             (unsigned long)copiedFromInput,
             addedPartialModule1,
@@ -212,8 +211,8 @@ struct SetupInputAction {
             setMain,
             setPrimary,
             existingBuffer,
-            docName.c_str(),
-            failed);
+            failed,
+            docName.c_str());
   }
   
   bool operator==(const SetupInputAction &other) const {
@@ -352,6 +351,7 @@ CompilerInstance::getInputAndMaybeModuleDocBuffers(const InputFile &input) {
   llvm::SmallString<128> moduleDocFilePath(input.getFile());
   llvm::sys::path::replace_extension(moduleDocFilePath,
                                      SERIALIZED_MODULE_DOC_EXTENSION);
+  newResult.docName = moduleDocFilePath.str();
   FileOrError moduleDocFileOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);
   if (!moduleDocFileOrErr &&
