@@ -72,7 +72,7 @@ namespace swift {
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
 
-  enum class TypeKind {
+  enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
@@ -243,6 +243,10 @@ enum class TypeMatchFlags {
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
+#define NUMBITS(E, V) \
+  enum { Num##E##Bits = V }; \
+  static_assert(Num##E##Bits <= 64, "fits in a uint64_t")
+
 /// TypeBase - Base class for all types in Swift.
 class alignas(1 << TypeAlignInBits) TypeBase {
   
@@ -255,15 +259,13 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
-  /// Kind - The discriminator that indicates what subclass of type this is.
-  const TypeKind Kind;
-
   struct TypeBaseBitfields {
+    /// Kind - The discriminator that indicates what subclass of type this is.
+    const TypeKind Kind; // Naturally sized for speed (it only needs 6 bits).
+
     unsigned Properties : RecursiveTypeProperties::BitWidth;
   };
-
-  enum { NumTypeBaseBits = RecursiveTypeProperties::BitWidth };
-  static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
+  NUMBITS(TypeBase, RecursiveTypeProperties::BitWidth + sizeof(TypeKind) * 8 );
 
   /// Returns true if the given type is a sugared type.
   ///
@@ -281,8 +283,7 @@ protected:
     /// Whether there is an original type.
     unsigned HasOriginalType : 1;
   };
-  enum { NumErrorTypeBits = NumTypeBaseBits + 1 };
-  static_assert(NumErrorTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(ErrorType, NumTypeBaseBits + 1);
 
   struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -292,8 +293,7 @@ protected:
     enum { NumExtInfoBits = 7 };
     unsigned ExtInfo : NumExtInfoBits;
   };
-  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
-  static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(AnyFunctionType, NumTypeBaseBits + 7);
 
   struct ArchetypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -303,17 +303,15 @@ protected:
     unsigned HasLayoutConstraint : 1;
     unsigned NumProtocols : 16;
   };
-  enum { NumArchetypeTypeBitfields = NumTypeBaseBits + 19 };
-  static_assert(NumArchetypeTypeBitfields <= 32, "fits in an unsigned");
+  NUMBITS(ArchetypeType, NumTypeBaseBits + 19);
 
   struct TypeVariableTypeBitfields {
     unsigned : NumTypeBaseBits;
 
     /// \brief The unique number assigned to this type variable.
-    unsigned ID : 32 - NumTypeBaseBits;
+    unsigned ID : 64 - NumTypeBaseBits;
   };
-  enum { NumTypeVariableTypeBits = NumTypeBaseBits + (32 - NumTypeBaseBits) };
-  static_assert(NumTypeVariableTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(TypeVariableType, 64);
 
   struct SILFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -323,8 +321,7 @@ protected:
     unsigned HasErrorResult : 1;
     unsigned CoroutineKind : 2;
   };
-  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 12 };
-  static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(SILFunctionType, NumTypeBaseBits + 12);
 
   struct AnyMetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -334,8 +331,7 @@ protected:
     /// the value is the representation + 1
     unsigned Representation : 2;
   };
-  enum { NumAnyMetatypeTypeBits = NumTypeBaseBits + 2 };
-  static_assert(NumAnyMetatypeTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(AnyMetatypeType, NumTypeBaseBits + 2);
 
   struct ProtocolCompositionTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -343,17 +339,17 @@ protected:
     /// implied by any of our members.
     unsigned HasExplicitAnyObject : 1;
   };
-  enum { NumProtocolCompositionTypeBits = NumTypeBaseBits + 1 };
-  static_assert(NumProtocolCompositionTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(ProtocolCompositionType, NumTypeBaseBits + 1);
+
   struct TupleTypeBitfields {
     unsigned : NumTypeBaseBits;
     
     /// Whether an element of the tuple is inout.
     unsigned HasInOutElement : 1;
   };
-  enum { NumTupleTypeBits = NumTypeBaseBits + 1 };
-  static_assert(NumTupleTypeBits <= 32, "fits in an unsigned");
-  
+  NUMBITS(TupleType, NumTypeBaseBits + 1);
+
+#undef NUMBITS
   union {
     TypeBaseBitfields TypeBaseBits;
     ErrorTypeBitfields ErrorTypeBits;
@@ -369,7 +365,8 @@ protected:
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
            RecursiveTypeProperties properties)
-    : CanonicalType((TypeBase*)nullptr), Kind(kind) {
+    : CanonicalType((TypeBase*)nullptr) {
+    *const_cast<TypeKind *>(&TypeBaseBits.Kind) = kind;
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
@@ -383,7 +380,7 @@ protected:
 
 public:
   /// getKind - Return what kind of type this is.
-  TypeKind getKind() const { return Kind; }
+  TypeKind getKind() const { return TypeBaseBits.Kind; }
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
