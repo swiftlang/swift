@@ -15,6 +15,66 @@ from ...argparse import ArgumentTypeError, types
 
 # -----------------------------------------------------------------------------
 
+class TestCompilerVersion(TestCase):
+
+    def test_init_valid_value(self):
+        version = types.CompilerVersion(1, 0, 0, 1)
+        self.assertEqual(version.components, (1, 0, 0, 1))
+
+    def test_init_list(self):
+        version = types.CompilerVersion([1, 0, 0])
+        self.assertEqual(version.components, (1, 0, 0))
+
+        with self.assertNotRaises(ValueError):
+            types.CompilerVersion([1, 0])
+            types.CompilerVersion([2, 3, 4])
+            types.CompilerVersion([3, 1, 4, 1, 5, 9])
+
+    def test_init_tuple(self):
+        version = types.CompilerVersion((1, 0, 0))
+        self.assertEqual(version.components, (1, 0, 0))
+
+        with self.assertNotRaises(ValueError):
+            types.CompilerVersion((1, 0))
+            types.CompilerVersion((2, 3, 4))
+            types.CompilerVersion((3, 1, 4, 1, 5, 9))
+
+    def test_init_str(self):
+        version = types.CompilerVersion('1.0.0')
+        self.assertEqual(version.components, (1, 0, 0))
+
+        with self.assertNotRaises(ValueError):
+            types.CompilerVersion('1.0')
+            types.CompilerVersion('2.3.4')
+            types.CompilerVersion('3.1.4.1.5.9')
+
+    def test_init_invalid_value(self):
+        with self.assertRaises(ValueError):
+            types.CompilerVersion()
+            types.CompilerVersion([])
+            types.CompilerVersion(())
+            types.CompilerVersion('')
+            types.CompilerVersion(True)
+            types.CompilerVersion('a')
+            types.CompilerVersion(dict())
+
+    def test_eq(self):
+        v1 = types.CompilerVersion('1.0.0')
+        v2 = types.CompilerVersion('1.2.4.8')
+
+        self.assertEqual(v1, v1)
+        self.assertEqual(v2, v2)
+        self.assertNotEqual(v1, v2)
+        self.assertNotEqual(v2, v1)
+
+    def test_str(self):
+        version = types.CompilerVersion('1.0.0')
+        self.assertEqual(str(version), '1.0.0')
+
+        version = types.CompilerVersion('1.0.0.1')
+        self.assertEqual(str(version), '1.0.0.1')
+
+
 class TestBoolType(TestCase):
 
     def test_true_values(self):
@@ -100,8 +160,6 @@ class TestPathType(TestCase):
     def test_assert_executable(self):
         path_type = types.PathType(assert_executable=True)
 
-        self.assertTrue(path_type.assert_exists)
-
         bash_path = '/bin/bash'
         if os.path.isfile(bash_path) and os.access(bash_path, os.X_OK):
             with self.assertNotRaises(ArgumentTypeError):
@@ -135,6 +193,14 @@ class TestClangVersionType(TestCase):
     def test_valid_clang_version(self):
         clang_version_type = types.ClangVersionType()
 
+        version = clang_version_type('1.0.0')
+        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertEqual(version.components, (1, 0, 0))
+
+        version = clang_version_type('1.0.0.1')
+        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertEqual(version.components, (1, 0, 0, 1))
+
         with self.assertNotRaises(ArgumentTypeError):
             clang_version_type('1.0.0')
             clang_version_type('3.0.2.1')
@@ -155,6 +221,14 @@ class TestSwiftVersionType(TestCase):
 
     def test_valid_swift_version(self):
         swift_version_type = types.SwiftVersionType()
+
+        version = swift_version_type('1.0')
+        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertEqual(version.components, (1, 0))
+
+        version = swift_version_type('1.0.1')
+        self.assertIsInstance(version, types.CompilerVersion)
+        self.assertEqual(version.components, (1, 0, 1))
 
         with self.assertNotRaises(ArgumentTypeError):
             swift_version_type('1.0')
