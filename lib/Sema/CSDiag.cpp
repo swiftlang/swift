@@ -5730,10 +5730,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       return true;
 
     if (!lhsType->isEqual(rhsType)) {
-      diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
-               overloadName, lhsType, rhsType)
-      .highlight(lhsExpr->getSourceRange())
+      auto diag = diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
+                           overloadName, lhsType, rhsType);
+      diag.highlight(lhsExpr->getSourceRange())
       .highlight(rhsExpr->getSourceRange());
+      
+      tryIntegerCastFixIts(diag, CS, rhsType, lhsType, rhsExpr);
     } else {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_same_args,
                overloadName, lhsType)
