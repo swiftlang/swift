@@ -1362,6 +1362,41 @@ extension _StringGuts {
 // String API
 //
 
+// UnicodeScalarView operations
+extension _StringGuts {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  func _unicodeScalarWidth(startingAt offset: Int) -> Int {
+    if _slowPath(_isOpaque) {
+      return _asOpaque()._unicodeScalarWidth(startingAt: offset)
+    }
+    if isASCII { return 1 }
+    return _unmanagedUTF16View._unicodeScalarWidth(startingAt: offset)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  func _unicodeScalarWidth(endingAt offset: Int) -> Int {
+    if _slowPath(_isOpaque) {
+      return _asOpaque()._unicodeScalarWidth(endingAt: offset)
+    }
+    if isASCII { return 1 }
+    return _unmanagedUTF16View._unicodeScalarWidth(endingAt: offset)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  func _decodeUnicodeScalar(startingAt offset: Int) -> UnicodeDecodingResult {
+    if _slowPath(_isOpaque) {
+      return _asOpaque()._decodeUnicodeScalar(startingAt: offset)
+    }
+    if isASCII {
+      return _unmanagedASCIIView._decodeUnicodeScalar(startingAt: offset)
+    }
+    return _unmanagedUTF16View._decodeUnicodeScalar(startingAt: offset)
+  }
+}
+
 // Some CharacterView operations
 extension String {
   /// Accesses the character at the given position.

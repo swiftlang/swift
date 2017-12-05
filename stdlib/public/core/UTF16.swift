@@ -37,6 +37,20 @@ extension Unicode.UTF16 : Unicode.Encoding {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal static func _decodeSurrogates(
+    _ lead: CodeUnit,
+    _ trail: CodeUnit
+  ) -> Unicode.Scalar {
+    _sanityCheck(isLeadSurrogate(lead))
+    _sanityCheck(isTrailSurrogate(trail))
+    return Unicode.Scalar(
+      _unchecked: 0x10000 +
+        (UInt32(lead & 0x03ff) &<< 10 | UInt32(trail & 0x03ff)))
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
   public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     let bits = source._storage
     if _fastPath(source._bitCount == 16) {
