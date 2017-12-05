@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name foo -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name foo -emit-ir %s | %FileCheck %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -74,6 +74,7 @@ presentBase(Base(x: 2))
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_SuperDerived(i8*)
 // CHECK:         [[TMP:%.*]] = call %swift.type* @_T03foo7DerivedCMa()
 // CHECK-NEXT:    store %swift.type* [[TMP]], %swift.type** getelementptr inbounds ({{.*}} @_T03foo12SuperDerivedCMf{{.*}}, i32 1), align
-// CHECK:         call void @swift_initClassMetadata_UniversalStrategy(
-// CHECK:         store atomic %swift.type* {{.*}}, %swift.type** @_T03foo12SuperDerivedCML release,
+// CHECK:         [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, [[INT]] {{60|96}}, [[INT]] 0)
+// CHECK:         call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
+// CHECK:         store atomic %swift.type* [[METADATA]], %swift.type** @_T03foo12SuperDerivedCML release,
 // CHECK:         ret void

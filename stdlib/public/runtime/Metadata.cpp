@@ -137,13 +137,23 @@ static GenericMetadataCache &unsafeGetInitializedCache(GenericMetadata *metadata
 ClassMetadata *
 swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                                           const void *arguments,
-                                          ClassMetadata *superclass) {
+                                          ClassMetadata *superclass,
+                                          size_t numImmediateMembers) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   size_t numGenericArguments = pattern->NumKeyArguments;
 
-  size_t metadataSize = pattern->MetadataSize;
+  size_t metadataSize;
   if (superclass && superclass->isTypeMetadata()) {
     assert(superclass->getClassAddressPoint() <= pattern->AddressPoint);
+
+    metadataSize = (superclass->getClassSize() -
+                    superclass->getClassAddressPoint() +
+                    pattern->AddressPoint +
+                    numImmediateMembers * sizeof(void *));
+    assert(pattern->TemplateSize <= metadataSize);
+  } else {
+    metadataSize = (pattern->TemplateSize +
+                    numImmediateMembers * sizeof(void *));
   }
 
   char *bytes = GenericCacheEntry::allocate(
@@ -153,7 +163,11 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                               metadataSize)->getData<char>();
 
   // Copy in the metadata template.
-  memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
+  memcpy(bytes, pattern->getMetadataTemplate(), pattern->TemplateSize);
+
+  // Zero out the rest of the metadata.
+  memset(bytes + pattern->TemplateSize, 0,
+         metadataSize - pattern->TemplateSize);
 
   // Okay, move to the address point.
   bytes += pattern->AddressPoint;
@@ -188,10 +202,10 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
     GenericCacheEntry::allocate(
                               unsafeGetInitializedCache(pattern).getAllocator(),
                               argumentsAsArray, numGenericArguments,
-                              pattern->MetadataSize)->getData<char>();
+                              pattern->TemplateSize)->getData<char>();
 
   // Copy in the metadata template.
-  memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
+  memcpy(bytes, pattern->getMetadataTemplate(), pattern->TemplateSize);
 
   // Okay, move to the address point.
   bytes += pattern->AddressPoint;
@@ -1464,6 +1478,42 @@ static MetadataAllocator &getResilientMetadataAllocator() {
   return allocator;
 }
 #endif
+
+ClassMetadata *
+swift::swift_relocateClassMetadata(ClassMetadata *self,
+                                   size_t templateSize,
+                                   size_t numImmediateMembers) {
+  const ClassMetadata *superclass = self->SuperClass;
+
+  size_t metadataSize;
+  if (superclass && superclass->isTypeMetadata()) {
+    metadataSize = (superclass->getClassSize() -
+                    superclass->getClassAddressPoint() +
+                    self->getClassAddressPoint() +
+                    numImmediateMembers * sizeof(void *));
+  } else {
+    metadataSize = (templateSize +
+                    numImmediateMembers * sizeof(void *));
+  }
+
+  if (templateSize < metadataSize) {
+    auto rawNewClass = (char*) malloc(metadataSize);
+    auto rawOldClass = (const char*) self;
+    rawOldClass -= self->getClassAddressPoint();
+
+    memcpy(rawNewClass, rawOldClass, templateSize);
+    memset(rawNewClass + templateSize, 0,
+           metadataSize - templateSize);
+
+    rawNewClass += self->getClassAddressPoint();
+    auto *newClass = (ClassMetadata *) rawNewClass;
+    assert(newClass->isTypeMetadata());
+
+    return newClass;
+  }
+
+  return self;
+}
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.

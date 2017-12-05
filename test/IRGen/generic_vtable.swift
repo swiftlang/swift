@@ -68,17 +68,13 @@ public class Concrete : Derived<Int> {
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
 //// instantiation time.
 
-// CHECK-LABEL: @_T014generic_vtable7DerivedCMP = internal global
-// -- vtable entry for 'm1()'
-// CHECK-SAME: i8* null,
-// -- vtable entry for 'm2()'
-// CHECK-SAME: i8* null,
-// -- vtable entry for 'init()'
-// CHECK-SAME: i8* null,
-// -- vtable entry for 'm3()'
+// CHECK-LABEL: @_T014generic_vtable7DerivedCMP = internal global <{{.*}}> <{
+// -- nominal type descriptor
+// CHECK-SAME: @_T014generic_vtable7DerivedCMn,
+// -- ivar destroyer
 // CHECK-SAME: i8* null
 // --
-// CHECK-SAME: , align 8
+// CHECK-SAME: }>, align 8
 
 
 //// Nominal type descriptor for 'Concrete' has method descriptors.
@@ -99,37 +95,39 @@ public class Concrete : Derived<Int> {
 // --
 // CHECK-SAME: section "{{.*}}", align 8
 
-//// Type metadata for 'Concrete' has an empty vtable, filled in at
-//// initialization time.
+//// Type metadata for 'Concrete' does not have any vtable entries; the vtable is
+//// filled in at initialization time.
 
-// CHECK-LABEL: @_T014generic_vtable8ConcreteCMf = internal global
-// -- vtable entry for 'm1()'
-// CHECK-SAME: i8* null,
-// -- vtable entry for 'm2()'
-// CHECK-SAME: i8* null,
-// -- vtable entry for 'init()'
-// CHECK-SAME: i8* null,
-// -- vtable entry for 'm3()'
-// CHECK-SAME: i8* null,
-// -- vtable entry for 'm4()'
+// CHECK-LABEL: @_T014generic_vtable8ConcreteCMf = internal global <{{.*}}> <{
+// -- nominal type descriptor
+// CHECK-SAME: @_T014generic_vtable8ConcreteCMn,
+// -- ivar destroyer
 // CHECK-SAME: i8* null
 // --
-// CHECK-SAME: , align 8
+// CHECK-SAME: }>, align 8
 
 
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 
 // CHECK-LABEL: define private %swift.type* @create_generic_metadata_Derived(%swift.type_pattern*, i8**)
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata({{.*}})
-// CHECK: call void @swift_initClassMetadata_UniversalStrategy({{.*}})
+
+// - 2 immediate members:
+//   - type metadata for generic parameter T,
+//   - and vtable entry for 'm3()'
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, {{.*}}, i64 2)
+
+// CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
+
 // -- method override for 'm2()'
 // CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i32 11
 // CHECK: store i8* bitcast (void (%T14generic_vtable7DerivedC*)* @_T014generic_vtable7DerivedC2m2yyF to i8*), i8** [[VTABLE0]], align 8
+
 // -- method override for 'init()'
 // CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i32 12
 // CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @_T014generic_vtable7DerivedCACyxGycfc to i8*), i8** [[VTABLE1]], align 8
+
 // CHECK: ret %swift.type* [[METADATA]]
 
 
@@ -139,9 +137,14 @@ public class Concrete : Derived<Int> {
 // CHECK-LABEL: define private void @initialize_metadata_Concrete(i8*)
 // CHECK: [[SUPERCLASS:%.*]] = call %swift.type* @_T014generic_vtable7DerivedCySiGMa()
 // CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @_T014generic_vtable8ConcreteCMf
-// CHECK: call void @swift_initClassMetadata_UniversalStrategy({{.*}})
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, i64 96, i64 1)
+// CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
+
 // -- method override for 'init()'
 // CHECK: store i8* bitcast (%T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @_T014generic_vtable8ConcreteCACycfc to i8*), i8**
+
 // -- method override for 'm3()'
 // CHECK: store i8* bitcast (void (%T14generic_vtable8ConcreteC*)* @_T014generic_vtable8ConcreteC2m3yyF to i8*), i8**
+
+// CHECK: store atomic %swift.type* [[METADATA]], %swift.type** @_T014generic_vtable8ConcreteCML release, align 8
 // CHECK: ret void
