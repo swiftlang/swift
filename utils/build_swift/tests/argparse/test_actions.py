@@ -255,20 +255,15 @@ class TestStorePathAction(TestCase):
         self.assertIsInstance(action.type, PathType)
 
     def test_exists(self):
-        pass
+        action = actions.StorePathAction(['--foo'], dests=['foo'], exists=True)
+
+        self.assertTrue(action.type.assert_exists)
 
     def test_executable(self):
-        parser = ArgumentParser()
-        parser.add_argument('--foo', action=actions.StorePathAction,
-                            executable=True)
+        action = actions.StorePathAction(['--foo'], dests=['foo'],
+                                         executable=True)
 
-        bash_path = '/bin/bash'
-        if os.path.exists(bash_path) and os.access(bash_path, os.X_OK):
-            with self.assertNotRaises(ArgumentTypeError):
-                parser.parse_args(['--foo', bash_path])
-
-        with self.assertRaises(SystemExit):
-            parser.parse_args(['--foo', __file__])
+        self.assertTrue(action.type.assert_executable)
 
 
 class TestToggleTrueAction(TestCase):
