@@ -4296,6 +4296,9 @@ ParamDecl::ParamDecl(Specifier specifier,
   SpecifierLoc(specifierLoc) {
     assert(specifier != Specifier::Var &&
            "'var' cannot appear on parameters; you meant 'inout'");
+  ParamDeclBits.IsTypeLocImplicit = false;
+  ParamDeclBits.defaultArgumentKind =
+    static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
@@ -4310,9 +4313,9 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
-    IsTypeLocImplicit(PD->IsTypeLocImplicit),
-    defaultArgumentKind(PD->defaultArgumentKind) {
+    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()) {
+  ParamDeclBits.IsTypeLocImplicit = PD->ParamDeclBits.IsTypeLocImplicit;
+  ParamDeclBits.defaultArgumentKind = PD->ParamDeclBits.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
   if (!withTypes && typeLoc.getTypeRepr())
     typeLoc.setType(Type());

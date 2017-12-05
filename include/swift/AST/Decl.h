@@ -332,6 +332,18 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned IsDebuggerVar : 1;
   BITFIELD_END;
 
+  BITFIELD_START(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits);
+    /// True if the type is implicitly specified in the source, but this has an
+    /// apparently valid typeRepr.  This is used in accessors, which look like:
+    ///    set (value) {
+    /// but need to get the typeRepr from the property as a whole so Sema can
+    /// resolve the type.
+    unsigned IsTypeLocImplicit : 1;
+
+    /// Information about a symbolic default argument, like #file.
+    unsigned defaultArgumentKind : NumDefaultArgumentKindBits;
+  BITFIELD_END;
+
   BITFIELD_START(EnumElementDecl, ValueDecl, 3);
     /// \brief Whether or not this element directly or indirectly references
     /// the enum type.
@@ -553,6 +565,7 @@ protected:
     AbstractStorageDeclBitfields AbstractStorageDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
     VarDeclBitfields VarDeclBits;
+    ParamDeclBitfields ParamDeclBits;
     EnumElementDeclBitfields EnumElementDeclBits;
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
@@ -4570,16 +4583,6 @@ class ParamDecl : public VarDecl {
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
   
-  /// True if the type is implicitly specified in the source, but this has an
-  /// apparently valid typeRepr.  This is used in accessors, which look like:
-  ///    set (value) {
-  /// but need to get the typeRepr from the property as a whole so Sema can
-  /// resolve the type.
-  bool IsTypeLocImplicit = false;
-  
-  /// Information about a symbolic default argument, like #file.
-  DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
-  
 public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
@@ -4606,17 +4609,17 @@ public:
   
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
-  bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
-  void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
+  bool isTypeLocImplicit() const { return ParamDeclBits.IsTypeLocImplicit; }
+  void setIsTypeLocImplicit(bool val) { ParamDeclBits.IsTypeLocImplicit = val; }
   
-  bool isDefaultArgument() const {
-    return defaultArgumentKind != DefaultArgumentKind::None;
-  }
   DefaultArgumentKind getDefaultArgumentKind() const {
-    return defaultArgumentKind;
+    return static_cast<DefaultArgumentKind>(ParamDeclBits.defaultArgumentKind);
+  }
+  bool isDefaultArgument() const {
+    return getDefaultArgumentKind() != DefaultArgumentKind::None;
   }
   void setDefaultArgumentKind(DefaultArgumentKind K) {
-    defaultArgumentKind = K;
+    ParamDeclBits.defaultArgumentKind = static_cast<unsigned>(K);
   }
   
   Expr *getDefaultValue() const {
