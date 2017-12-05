@@ -88,47 +88,34 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 
-set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
-  list(REMOVE_ITEM swift_runtime_sources ImageInspectionELF.cpp)
+if(SWIFT_BUILD_STATIC_STDLIB)
   set(static_binary_lnk_file_list)
-  string(TOLOWER "${sdk}" lowercase_sdk)
+  foreach(sdk ${SWIFT_SDKS}) 
+    if(NOT "${sdk}" STREQUAL "LINUX" AND
+       NOT "${sdk}" STREQUAL "FREEBSD" AND
+       NOT "${sdk}" STREQUAL "ANDROID")
+      continue()
+    endif()
 
-  # These two libraries are only used with the static swiftcore
-  add_swift_library(swiftImageInspectionShared STATIC
-    ImageInspectionELF.cpp
-    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
-    LINK_FLAGS ${swift_runtime_linker_flags})
-  set_target_properties(swiftImageInspectionShared PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
+    string(TOLOWER "${sdk}" lowercase_sdk)
+    # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
+    set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
+    add_custom_command_target(swift_static_binary_${sdk}_args
+      COMMAND
+        "${CMAKE_COMMAND}" -E copy
+        "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk"
+        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+      OUTPUT
+        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+      DEPENDS
+        "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
 
-  swift_install_in_component(stdlib
-    TARGETS swiftImageInspectionShared
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
-
-  # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
-  set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
-  add_custom_command_target(swift_static_binary_${sdk}_args
-    COMMAND
-      "${CMAKE_COMMAND}" -E copy
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk"
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    OUTPUT
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DEPENDS
-      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
-
-  list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
-  swift_install_in_component(stdlib
-    FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+    list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
+    swift_install_in_component(stdlib
+      FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
+      DESTINATION "lib/swift_static/${lowercase_sdk}")
+  endforeach()
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
-
-  add_swift_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY
-    ImageInspectionELF.cpp
-    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
-    LINK_FLAGS ${swift_runtime_linker_flags}
-    INSTALL_IN_COMPONENT never_install)
 endif()
 
 add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
