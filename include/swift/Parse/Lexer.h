@@ -517,12 +517,7 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(syntax::TriviaList &T, bool StopAtFirstNewline = false);
-  Optional<syntax::TriviaPiece> lexWhitespace(bool StopAtFirstNewline);
-  Optional<syntax::TriviaPiece> lexComment();
-  Optional<syntax::TriviaPiece> lexSingleLineComment(syntax::TriviaKind Kind);
-  Optional<syntax::TriviaPiece> lexBlockComment(syntax::TriviaKind Kind);
-  Optional<syntax::TriviaPiece> lexDocComment();
+  void lexTrivia(syntax::TriviaList &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
