@@ -695,12 +695,8 @@ internal func _copyCollectionToContiguousArray<
 
   var p = result.firstElementAddress
   var i = source.startIndex
-  for _ in 0..<count {
-    // FIXME(performance): use _copyContents(initializing:).
-    p.initialize(to: source[i])
-    source.formIndex(after: &i)
-    p += 1
-  }
+  var buffer = UnsafeMutableBufferPointer(start: p, count: count)
+  source._copyContents(initializing: buffer)
   _expectEnd(of: source, is: i)
   return ContiguousArray(_buffer: result)
 }
