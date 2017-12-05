@@ -331,6 +331,7 @@ std::pair<std::unique_ptr<llvm::MemoryBuffer>,
           std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::getInputAndMaybeModuleDocBuffers(const InputFile &input) {
   if (auto b = input.getBuffer()) {
+    newResult.copiedFromInput = b;
     return std::make_pair(llvm::MemoryBuffer::getMemBufferCopy(
                               b->getBuffer(), b->getBufferIdentifier()),
                           nullptr);
