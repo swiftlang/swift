@@ -541,7 +541,7 @@ static bool performCompile(CompilerInstance &Instance,
     auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
-    assert(Invocation.getFrontendOptions().Inputs.hasUniqueInputFilename() &&
+    assert(Invocation.getFrontendOptions().Inputs.hasUniqueInput() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
         llvm::MemoryBuffer::getFileOrSTDIN(
@@ -776,11 +776,18 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
-    if (opts.Inputs.hasAPrimaryInputFile()) {
+    if (opts.Inputs.hasPrimaryInputs()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
-        auto Index = opts.Inputs.getRequiredUniquePrimaryInput().Index;
-        PrimaryFile = Instance.getMainModule()->getFiles()[Index];
+        for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
+          if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
+            if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
+                    SASTF->getFilename())) {
+              assert(!PrimaryFile && "Can only handle one primary so far");
+              PrimaryFile = fileUnit;
+            }
+          }
+        }
       }
       astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
@@ -1372,7 +1379,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     auto &FEOpts = Invocation.getFrontendOptions();
     auto &LangOpts = Invocation.getLangOptions();
     auto &SILOpts = Invocation.getSILOptions();
-    StringRef InputName = FEOpts.Inputs.primaryInputFilenameIfAny();
+    StringRef InputName = FEOpts.Inputs.getNameOfUniquePrimaryInputFile();
     StringRef OptType = silOptModeArgStr(SILOpts.OptMode);
     StringRef OutFile = FEOpts.getSingleOutputFilename();
     StringRef OutputType = llvm::sys::path::extension(OutFile);
