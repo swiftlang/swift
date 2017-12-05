@@ -126,36 +126,66 @@ extension _UnmanagedOpaqueString : Sequence {
 }
 
 extension _UnmanagedOpaqueString : RandomAccessCollection {
-  internal typealias Index = Int
   internal typealias IndexDistance = Int
-  internal typealias Indices = CountableRange<Int>
+  internal typealias Indices = CountableRange<Index>
   internal typealias SubSequence = _UnmanagedOpaqueString
 
+  @_fixed_layout
   @_versioned
-  @_inlineable
-  var startIndex: Int {
-    return range.lowerBound
+  struct Index : Strideable {
+    @_versioned
+    internal var _value: Int
+
+    @_versioned
+    @_inlineable
+    @inline(__always)
+    init(_ value: Int) {
+      self._value = value
+    }
+
+    @_versioned
+    @_inlineable
+    @inline(__always)
+    func distance(to other: Index) -> Int {
+      return other._value - self._value
+    }
+
+    @_versioned
+    @_inlineable
+    @inline(__always)
+    func advanced(by n: Int) -> Index {
+      return Index(_value + n)
+    }
   }
 
   @_versioned
   @_inlineable
-  var endIndex: Int {
-    return range.upperBound
+  var startIndex: Index {
+    return Index(range.lowerBound)
+  }
+
+  @_versioned
+  @_inlineable
+  var endIndex: Index {
+    return Index(range.upperBound)
   }
 
   @_versioned
   @_inlineable // FIXME(sil-serialize-all)
-  subscript(position: Int) -> UTF16.CodeUnit {
-    return _cocoaStringSubscript(object, range.lowerBound + position)
+  subscript(position: Index) -> UTF16.CodeUnit {
+    _sanityCheck(position._value >= range.lowerBound)
+    _sanityCheck(position._value < range.upperBound)
+    return _cocoaStringSubscript(object, position._value)
   }
 
   @_versioned
   @_inlineable // FIXME(sil-serialize-all)
-  subscript(bounds: Range<Int>) -> _UnmanagedOpaqueString {
-    _sanityCheck(bounds.lowerBound >= range.lowerBound)
-    _sanityCheck(bounds.upperBound <= range.upperBound)
-    let newSlice = self.isSlice || bounds != range
-    return _UnmanagedOpaqueString(object, range: bounds, isSlice: newSlice)
+  subscript(bounds: Range<Index>) -> _UnmanagedOpaqueString {
+    _sanityCheck(bounds.lowerBound._value >= range.lowerBound)
+    _sanityCheck(bounds.upperBound._value <= range.upperBound)
+    let b: Range<Int> = bounds.lowerBound._value ..< bounds.upperBound._value
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
   }
 }
 
@@ -167,6 +197,25 @@ extension _UnmanagedOpaqueString {
     // FIXME: This usually copies storage; maybe add an NSString subclass
     // for opaque slices?
     return _cocoaStringSlice(object, range)
+  }
+
+  @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
+  subscript(offset: Int) -> UTF16.CodeUnit {
+    _sanityCheck(offset >= 0 && offset < count)
+    return _cocoaStringSubscript(object, range.lowerBound + offset)
+  }
+
+  @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
+  subscript(offsetRange: Range<Int>) -> _UnmanagedOpaqueString {
+    _sanityCheck(offsetRange.lowerBound >= 0)
+    _sanityCheck(offsetRange.upperBound <= range.count)
+    let b: Range<Int> =
+      range.lowerBound + offsetRange.lowerBound ..<
+      range.lowerBound + offsetRange.upperBound
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
