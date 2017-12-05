@@ -1584,11 +1584,6 @@ extension TestSuite {
       .forEach(in: distanceFromToTests) {
       test in
       let c = toCollection(0..<20)
-      let backwards = (test.startOffset > test.endOffset)
-      if backwards && !collectionIsBidirectional {
-        expectCrashLater()
-      }
-
       let d = c.distance(
         from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
       expectEqual(
