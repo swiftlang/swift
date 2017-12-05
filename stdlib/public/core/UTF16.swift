@@ -21,6 +21,12 @@ extension Unicode.UTF16 : Unicode.Encoding {
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
   @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal static var _replacementCodeUnit: CodeUnit {
+    @inline(__always) get { return 0xfffd }
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : EncodedScalar {
     return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
   }
