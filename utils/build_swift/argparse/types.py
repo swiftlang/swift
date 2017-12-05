@@ -26,6 +26,7 @@ __all__ = [
     'RegexType',
     'ClangVersionType',
     'SwiftVersionType',
+    'ShellSplitType',
 ]
 
 
