@@ -33,6 +33,7 @@ enum class SyntaxContextKind {
   Expr,
   Type,
   Pattern,
+  Syntax,
 };
 
 /// Indicates what action should be performed on the destruction of
