@@ -82,7 +82,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto Subsequence = SyntaxFactory::makeIdentifier("MyCollection", {}, {});
     auto ElementName = SyntaxFactory::makeIdentifier("Element", {}, {});
     auto ElementParam =
-      SyntaxFactory::makeGenericParameter(ElementName, None, None, None);
+      SyntaxFactory::makeGenericParameter(None, ElementName, None, None, None);
     auto LeftAngle = SyntaxFactory::makeLeftAngleToken({}, {});
     auto RightAngle = SyntaxFactory::makeRightAngleToken({}, Trivia::spaces(1));
     auto GenericParams = GenericParameterClauseSyntaxBuilder()
@@ -119,7 +119,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto MyCollection = SyntaxFactory::makeIdentifier("MyCollection", {}, {});
   auto ElementName = SyntaxFactory::makeIdentifier("Element", {}, {});
   auto ElementParam =
-      SyntaxFactory::makeGenericParameter(ElementName, None, None, None);
+      SyntaxFactory::makeGenericParameter(None, ElementName, None, None, None);
   auto LeftAngle = SyntaxFactory::makeLeftAngleToken({}, {});
   auto RightAngle =
     SyntaxFactory::makeRightAngleToken({}, { Trivia::spaces(1) });
