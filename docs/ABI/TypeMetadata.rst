@@ -424,12 +424,14 @@ contains:
   describing the conformance itself; the form of this field is determined by the
   **protocol conformance flags** described below.
 - The **protocol conformance flags** is a 32-bit field comprised of:
+
   * **Bits 0-3** contain the type metadata record kind, which indicates how
     the **conforming type** field is encoded.
   * **Bits 4-5** contain the kind of witness table. The value can be one of:
-    0) The **witness table field** is a reference to a witness table.
-    1) The **witness table field** is a reference to a **witness table
+
+    0. The **witness table field** is a reference to a witness table.
+    1. The **witness table field** is a reference to a **witness table
        accessor** function for an unconditional conformance.
-    2) The **witness table field** is a reference to a **witness table
+    2. The **witness table field** is a reference to a **witness table
        accessor** function for a conditional conformance.
 
