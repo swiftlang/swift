@@ -356,6 +356,16 @@ CompilerInstance::getInputAndMaybeModuleDocBuffers(const InputFile &input) {
   }
   if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
     return std::make_pair(std::move(*inputFileOrErr), nullptr);
+  
+  if (input.getFile() == "-") {
+    //hack! Can't read stdin buffer twice.
+    oldResult.addedNewSourceBuffer = false;
+    oldResult.addedInputSourceCodeID = false;
+    oldResult.setMain = oldResult.setPrimary = false;
+    oldResult.docName = "-.swiftdoc";
+    oldResult.addedPartialModule1 = true;
+  }
+  
 
   llvm::SmallString<128> moduleDocFilePath(input.getFile());
   llvm::sys::path::replace_extension(moduleDocFilePath,
