@@ -79,7 +79,7 @@ public let DropLast = [
   BenchmarkInfo(
     name: "DropLastArrayLazy",
     runFunction: run_DropLastArrayLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .Array, .unstable]),
 ]
 
 @inline(never)
