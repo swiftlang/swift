@@ -136,30 +136,13 @@ public:
   bool convert() {
     if (enforceFilelistExclusion())
       return true;
-    bool hadError = getFilesFromCommandLine();
-    if (hadError)
+    if (FilelistPathArg ? readInputFilesFromFilelist()
+                        : readInputFilesFromCommandLine())
       return true;
-    hadError = getFilesFromFilelist();
-    if (hadError)
+    if (readPrimaryFiles())
       return true;
-
-    if (getPrimaries())
-      return true;
-
-    for (auto file : Files) {
-      bool isPrimary = PrimaryFiles.count(file) > 0;
-      Inputs.addInput(InputFile(file, isPrimary));
-      if (isPrimary)
-        PrimaryFiles.erase(file);
-    }
-    for (auto &file : PrimaryFiles) {
-      // Catch "swiftc -frontend -c -filelist foo -primary-file
-      // some-file-not-in-foo".
-      assert(FilelistPathArg && "Missing primary with no filelist");
-      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                     FilelistPathArg->getValue());
-    }
-    return !PrimaryFiles.empty();
+    createInputFiles();
+    return checkForMissingPrimaryFiles();
   }
 
 private:
@@ -169,39 +152,26 @@ private:
                      diag::error_cannot_have_input_files_with_file_list);
       return true;
     }
-    if (Args.hasArg(options::OPT_INPUT) && FilelistPathArg) {
-      Diags.diagnose(
-          SourceLoc(),
-          diag::error_cannot_have_input_files_with_primary_file_list);
-      return true;
-    }
     return false;
   }
 
-  bool getFilesFromCommandLine() {
+  bool readInputFilesFromCommandLine() {
     bool hadDuplicates = false;
     for (const Arg *A :
          Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
-      if (A->getOption().matches(options::OPT_primary_file) &&
-          mustPrimaryFilesOnCommandLineAlsoAppearInFileList())
-        continue;
       hadDuplicates = addFile(A->getValue()) || hadDuplicates;
     }
     return false; // FIXME: Don't bail out for duplicates, too many tests depend
                   // on it.
   }
 
-  bool getFilesFromInputFilelist() {
+  bool readInputFilesFromFilelist() {
     bool hadDuplicates = false;
     if (forAllFilesInFilelist(FilelistPathArg, [&](StringRef file) -> void {
           hadDuplicates = addFile(file) || hadDuplicates;
         }))
       return true;
-    return false; // Don't bail out for duplicates, too many tests depend on it.
-  }
-
-  bool mustPrimaryFilesOnCommandLineAlsoAppearInFileList() const {
-    return FilelistPathArg;
+    return false; // FIXME: Don't bail out for duplicates, too many tests depend on it.
   }
 
   bool forAllFilesInFilelist(Arg const *const pathArg,
@@ -231,7 +201,7 @@ private:
     return true;
   }
 
-  bool getPrimaries() {
+  bool readPrimaryFiles() {
     for (const Arg *A : Args.filtered(options::OPT_primary_file))
       PrimaryFiles.insert(A->getValue());
     if (forAllFilesInFilelist(
@@ -239,6 +209,26 @@ private:
             [&](StringRef file) -> void { PrimaryFiles.insert(file); }))
       return true;
     return false;
+  }
+
+  void createInputFiles() {
+    for (auto &file : Files) {
+      bool isPrimary = PrimaryFiles.count(file) > 0;
+      Inputs.addInput(InputFile(file, isPrimary));
+      if (isPrimary)
+        PrimaryFiles.erase(file);
+    }
+  }
+
+  bool checkForMissingPrimaryFiles() {
+    for (auto &file : PrimaryFiles) {
+      // Catch "swiftc -frontend -c -filelist foo -primary-file
+      // some-file-not-in-foo".
+      assert(FilelistPathArg && "Missing primary with no filelist");
+      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
+                     PrimaryFilelistPathArg->getValue());
+    }
+    return !PrimaryFiles.empty();
   }
 };
 class FrontendArgsToOptionsConverter {
