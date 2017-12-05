@@ -141,31 +141,16 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   size_t numGenericArguments = pattern->NumKeyArguments;
 
-  // Right now, we only worry about there being a difference in prefix matter.
   size_t metadataSize = pattern->MetadataSize;
-  size_t prefixSize = pattern->AddressPoint;
-  size_t extraPrefixSize = 0;
   if (superclass && superclass->isTypeMetadata()) {
-    if (superclass->getClassAddressPoint() > prefixSize) {
-      extraPrefixSize = (superclass->getClassAddressPoint() - prefixSize);
-      prefixSize += extraPrefixSize;
-      metadataSize += extraPrefixSize;
-    }
+    assert(superclass->getClassAddressPoint() == pattern->AddressPoint);
   }
-  assert(metadataSize == pattern->MetadataSize + extraPrefixSize);
-  assert(prefixSize == pattern->AddressPoint + extraPrefixSize);
 
   char *bytes = GenericCacheEntry::allocate(
                               unsafeGetInitializedCache(pattern).getAllocator(),
                               argumentsAsArray,
                               numGenericArguments,
                               metadataSize)->getData<char>();
-
-  // Copy any extra prefix bytes in from the superclass.
-  if (extraPrefixSize) {
-    memcpy(bytes, (const char*) superclass - prefixSize, extraPrefixSize);
-    bytes += extraPrefixSize;
-  }
 
   // Copy in the metadata template.
   memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
@@ -174,7 +159,7 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
   bytes += pattern->AddressPoint;
   ClassMetadata *metadata = reinterpret_cast<ClassMetadata*>(bytes);
   assert(metadata->isTypeMetadata());
-  
+
   // Overwrite the superclass field.
   metadata->SuperClass = superclass;
   // Adjust the relative reference to the nominal type descriptor.
@@ -186,12 +171,7 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
         reinterpret_cast<const ClassMetadata*>(patternBytes)->getDescription());
   }
 
-  // Adjust the class object extents.
-  if (extraPrefixSize) {
-    metadata->setClassSize(metadata->getClassSize() + extraPrefixSize);
-    metadata->setClassAddressPoint(prefixSize);
-  }
-  assert(metadata->getClassAddressPoint() == prefixSize);
+  assert(metadata->getClassAddressPoint() == pattern->AddressPoint);
 
   return metadata;
 }

@@ -651,48 +651,6 @@ struct {
   { &Global2, &Global1, &Global2 }
 };
 
-TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
-  auto metadataTemplate = &GenericSubclass.Header;
-
-  void *args[] = { &Global3 };
-
-  RaceTest_ExpectEqual<const ClassMetadata *>(
-    [&]() -> const ClassMetadata * {
-      auto inst = static_cast<const ClassMetadata*>(
-        swift_getGenericMetadata(metadataTemplate, args));
-      void * const *fields = reinterpret_cast<void * const *>(inst);
-
-      // Assert that we copied the extra prefix data from the superclass.
-      EXPECT_EQ(&Global1, fields[-6]);
-      EXPECT_EQ(&Global3, fields[-5]);
-      EXPECT_EQ(&Global2, fields[-4]);
-      EXPECT_EQ(&Global3, fields[-3]);
-
-      // Assert that we copied the shared prefix data from the subclass.
-      EXPECT_EQ((void*) &destroySubclass, fields[-2]);
-      EXPECT_EQ(&VALUE_WITNESS_SYM(Bo), fields[-1]);
-
-      // Assert that we set the superclass field.
-      EXPECT_EQ(SuperclassWithPrefix_AddressPoint, fields[1]);
-    
-      // Assert that we copied the subclass suffix data.
-      auto suffix = (void * const *) ((char*) inst + sizeof(ClassMetadata));
-      EXPECT_EQ(&Global2, suffix[0]);
-      EXPECT_EQ(&Global1, suffix[1]);
-
-      // This should have been overwritten by the creation function.
-      EXPECT_EQ(&Global3, suffix[2]);
-
-      EXPECT_EQ(7 * sizeof(void*) + sizeof(GenericSubclass.Pattern),
-                inst->getClassSize());
-      EXPECT_EQ(4 * sizeof(void*) + sizeof(HeapMetadataHeader),
-                inst->getClassAddressPoint());
-
-      // These are all expected to be equal.
-      return inst;
-    });
-}
-
 static ProtocolDescriptor OpaqueProto1 = { "OpaqueProto1", nullptr,
   ProtocolDescriptorFlags().withSwift(true)
                           .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
