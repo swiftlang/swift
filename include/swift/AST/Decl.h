@@ -364,12 +364,21 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned DefaultArgumentResilienceExpansion : 1;
   BITFIELD_END;
 
-  BITFIELD_START(FuncDecl, AbstractFunctionDecl, 3);
+  BITFIELD_START(FuncDecl, AbstractFunctionDecl, 7);
     /// Whether this function is a 'static' method.
     unsigned IsStatic : 1;
 
     /// \brief Whether 'static' or 'class' was used.
     unsigned StaticSpelling : 2;
+
+    /// Whether we are statically dispatched even if overridable
+    unsigned ForcedStaticDispatch : 1;
+
+    /// Whether this function has a dynamic Self return type.
+    unsigned HasDynamicSelf : 1;
+
+    /// Backing bits for 'self' access kind.
+    unsigned SelfAccess : 2;
   BITFIELD_END;
 
   BITFIELD_START(ConstructorDecl, AbstractFunctionDecl, 8);
@@ -5157,15 +5166,6 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   TypeLoc FnRetType;
 
-  /// Whether we are statically dispatched even if overridable
-  unsigned ForcedStaticDispatch : 1;
-
-  /// Whether this function has a dynamic Self return type.
-  unsigned HasDynamicSelf : 1;
-
-  /// Backing bits for 'self' access kind.
-  unsigned SelfAccess : 2;
-      
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
@@ -5194,9 +5194,9 @@ class FuncDecl final : public AbstractFunctionDecl,
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
 
-    HasDynamicSelf = false;
-    ForcedStaticDispatch = false;
-    SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
+    FuncDeclBits.HasDynamicSelf = false;
+    FuncDeclBits.ForcedStaticDispatch = false;
+    FuncDeclBits.SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
   }
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -5263,10 +5263,10 @@ public:
   }
   
   SelfAccessKind getSelfAccessKind() const {
-    return static_cast<SelfAccessKind>(SelfAccess);
+    return static_cast<SelfAccessKind>(FuncDeclBits.SelfAccess);
   }
   void setSelfAccessKind(SelfAccessKind mod) {
-    SelfAccess = static_cast<unsigned>(mod);
+    FuncDeclBits.SelfAccess = static_cast<unsigned>(mod);
   }
       
   /// \brief Returns the parameter lists(s) for the function definition.
@@ -5374,11 +5374,11 @@ public:
 
   /// Determine whether this function has a dynamic \c Self return
   /// type.
-  bool hasDynamicSelf() const { return HasDynamicSelf; }
+  bool hasDynamicSelf() const { return FuncDeclBits.HasDynamicSelf; }
 
   /// Set whether this function has a dynamic \c Self return or not.
   void setDynamicSelf(bool hasDynamicSelf) { 
-    HasDynamicSelf = hasDynamicSelf;
+    FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -5427,10 +5427,10 @@ public:
   
   /// Returns true if the function is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const {
-    return ForcedStaticDispatch;
+    return FuncDeclBits.ForcedStaticDispatch;
   }
   void setForcedStaticDispatch(bool flag) {
-    ForcedStaticDispatch = flag;
+    FuncDeclBits.ForcedStaticDispatch = flag;
   }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
