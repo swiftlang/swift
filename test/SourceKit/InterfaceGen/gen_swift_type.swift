@@ -5,8 +5,6 @@
 // RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DCS_2T1_ %s -- %s | %FileCheck -check-prefix=CHECK5 %s
 // RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DSi_ %s -- %s | %FileCheck -check-prefix=CHECK6 %s
 
-// REQUIRES: rdar35799113
-
 public struct A {
 	public func fa() {}
 }
@@ -31,16 +29,16 @@ struct S1 {
     _ = a.count
   }
 }
-// CHECK1: public struct Array<Int> : RandomAccessCollection, MutableCollection {
+// CHECK1: public struct Array<Int>
 
-// CHECK2: public struct Array<String> : RandomAccessCollection, MutableCollection {
+// CHECK2: public struct Array<String>
 
 // CHECK3: public struct A
 // CHECK3: public func fa()
 // CHECK3: public func fea1()
 // CHECK3: public func fea2()
 
-// CHECK4: public struct Array<A> : RandomAccessCollection, MutableCollection {
+// CHECK4: public struct Array<A>
 
 public protocol P1 { }
 public class T1 : P1 { }
