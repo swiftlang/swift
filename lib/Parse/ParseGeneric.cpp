@@ -22,6 +22,7 @@
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
 using namespace swift;
+using namespace swift::syntax;
 
 /// parseGenericParameters - Parse a sequence of generic parameters, e.g.,
 /// < T : Comparable, U : Container> along with an optional requires clause.
@@ -245,11 +246,17 @@ ParserStatus Parser::parseGenericWhereClause(
                SmallVectorImpl<RequirementRepr> &Requirements,
                bool &FirstTypeInComplete,
                bool AllowLayoutConstraints) {
+  SyntaxParsingContext ClauseContext(SyntaxContext,
+                                     SyntaxKind::GenericWhereClause);
   ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
   FirstTypeInComplete = false;
+  SyntaxParsingContext ReqListContext(SyntaxContext,
+                                      SyntaxKind::GenericRequirementList);
+  bool HasNextReq;
   do {
+    SyntaxParsingContext ReqContext(SyntaxContext, SyntaxContextKind::Syntax);
     // Parse the leading type-identifier.
     auto FirstTypeResult = parseTypeIdentifier();
     if (FirstTypeResult.hasSyntax())
@@ -269,7 +276,7 @@ ParserStatus Parser::parseGenericWhereClause(
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
-
+      ReqContext.setCreateSyntax(SyntaxKind::ConformanceRequirement);
       if (Tok.is(tok::identifier) &&
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
@@ -309,6 +316,7 @@ ParserStatus Parser::parseGenericWhereClause(
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
+      ReqContext.setCreateSyntax(SyntaxKind::SameTypeRequirement);
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         diagnose(Tok, diag::requires_single_equal)
@@ -334,8 +342,9 @@ ParserStatus Parser::parseGenericWhereClause(
       Status.setIsParseError();
       break;
     }
+    HasNextReq = consumeIf(tok::comma);
     // If there's a comma, keep parsing the list.
-  } while (consumeIf(tok::comma));
+  } while (HasNextReq);
 
   if (Requirements.empty())
     WhereLoc = SourceLoc();
