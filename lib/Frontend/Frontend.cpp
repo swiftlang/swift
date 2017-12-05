@@ -432,27 +432,28 @@ static SetupInputAction old_setUpForFile(CompilerInvocation &CI, SourceManager &
   
   // Open the input file.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(fileName);
-  if (!inputFileOrErr) {
-    result.failed = true;
-    return result;
-  }
-  
-  if (serialization::isSerializedAST(inputFileOrErr.get()->getBuffer())) {
-    llvm::SmallString<128> ModuleDocFilePath(fileName);
-    llvm::sys::path::replace_extension(ModuleDocFilePath,
-                                       SERIALIZED_MODULE_DOC_EXTENSION);
-    result.docName = ModuleDocFilePath.str();
-    FileOrError moduleDocOrErr =
-    llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
-    if (!moduleDocOrErr &&
-        moduleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
+  if (fileName != "-") {
+    FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(fileName);
+    if (!inputFileOrErr) {
       result.failed = true;
       return result;
     }
-    result.addedPartialModule1 = true;
-    result.addedPartialModule2 = !!moduleDocOrErr;
-    return result;
+    if (serialization::isSerializedAST(inputFileOrErr.get()->getBuffer())) {
+      llvm::SmallString<128> ModuleDocFilePath(fileName);
+      llvm::sys::path::replace_extension(ModuleDocFilePath,
+                                         SERIALIZED_MODULE_DOC_EXTENSION);
+      result.docName = ModuleDocFilePath.str();
+      FileOrError moduleDocOrErr =
+      llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath.str());
+      if (!moduleDocOrErr &&
+          moduleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
+        result.failed = true;
+        return result;
+      }
+      result.addedPartialModule1 = true;
+      result.addedPartialModule2 = !!moduleDocOrErr;
+      return result;
+    }
   }
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
   result.addedNewSourceBuffer = true;
