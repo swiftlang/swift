@@ -372,13 +372,28 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned StaticSpelling : 2;
   BITFIELD_END;
 
-  BITFIELD_START(ConstructorDecl, AbstractFunctionDecl, 3);
+  BITFIELD_START(ConstructorDecl, AbstractFunctionDecl, 8);
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
     /// This value is cached but is not serialized, because it is a property
     /// of the definition of the constructor that is useful only to semantic
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
+
+    /// The kind of initializer we have.
+    unsigned InitKind : 2;
+
+    /// The failability of this initializer, which is an OptionalTypeKind.
+    unsigned Failability : 2;
+
+    /// Whether this initializer is a stub placed into a subclass to
+    /// catch invalid delegations to a designated initializer not
+    /// overridden by the subclass. A stub will always trap at runtime.
+    ///
+    /// Initializer stubs can be invoked from Objective-C or through
+    /// the Objective-C runtime; there is no way to directly express
+    /// an object construction that will invoke a stub.
+    unsigned HasStubImplementation : 1;
   BITFIELD_END;
 
   BITFIELD_START(TypeDecl, ValueDecl, 1);
@@ -5644,21 +5659,6 @@ enum class CtorInitializerKind {
 /// }
 /// \endcode
 class ConstructorDecl : public AbstractFunctionDecl {
-  /// The kind of initializer we have.
-  unsigned InitKind : 2;
-
-  /// The failability of this initializer, which is an OptionalTypeKind.
-  unsigned Failability : 2;
-
-  /// Whether this initializer is a stub placed into a subclass to
-  /// catch invalid delegations to a designated initializer not
-  /// overridden by the subclass. A stub will always trap at runtime.
-  ///
-  /// Initializer stubs can be invoked from Objective-C or through
-  /// the Objective-C runtime; there is no way to directly express
-  /// an object construction that will invoke a stub.
-  unsigned HasStubImplementation : 1;
-
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
@@ -5763,12 +5763,12 @@ public:
 
   /// Determine the kind of initializer this is.
   CtorInitializerKind getInitKind() const {
-    return static_cast<CtorInitializerKind>(InitKind);
+    return static_cast<CtorInitializerKind>(ConstructorDeclBits.InitKind);
   }
 
   /// Set whether this is a convenience initializer.
   void setInitKind(CtorInitializerKind kind) {
-    InitKind = static_cast<unsigned>(kind);
+    ConstructorDeclBits.InitKind = static_cast<unsigned>(kind);
   }
 
   /// Whether this is a designated initializer.
@@ -5812,7 +5812,7 @@ public:
 
   /// Determine the failability of the initializer.
   OptionalTypeKind getFailability() const {
-    return static_cast<OptionalTypeKind>(Failability);
+    return static_cast<OptionalTypeKind>(ConstructorDeclBits.Failability);
   }
 
   /// Retrieve the location of the '!' or '?' in a failable initializer.
@@ -5820,13 +5820,13 @@ public:
 
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {
-    return HasStubImplementation;
+    return ConstructorDeclBits.HasStubImplementation;
   }
 
   /// Set whether the implementation of this method is a stub that
   /// traps at runtime.
   void setStubImplementation(bool stub) {
-    HasStubImplementation = stub;
+    ConstructorDeclBits.HasStubImplementation = stub;
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }

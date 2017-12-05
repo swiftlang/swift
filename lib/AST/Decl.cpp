@@ -5083,9 +5083,9 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   setParameterLists(SelfDecl, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
-  this->HasStubImplementation = 0;
-  this->InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
-  this->Failability = static_cast<unsigned>(Failability);
+  ConstructorDeclBits.HasStubImplementation = 0;
+  ConstructorDeclBits.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
+  ConstructorDeclBits.Failability = static_cast<unsigned>(Failability);
 }
 
 void ConstructorDecl::setParameterLists(ParamDecl *selfDecl,
