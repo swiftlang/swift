@@ -309,7 +309,7 @@ protected:
     unsigned : NumTypeBaseBits;
 
     /// \brief The unique number assigned to this type variable.
-    unsigned ID : 64 - NumTypeBaseBits;
+    uint64_t ID : 64 - NumTypeBaseBits;
   };
   NUMBITS(TypeVariableType, 64);
 
