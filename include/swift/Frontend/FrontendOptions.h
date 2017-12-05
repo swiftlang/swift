@@ -54,8 +54,6 @@ public:
   bool getIsPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *getBuffer() const { return Buffer; }
   StringRef getFile() const { return Filename; }
-
-  void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
 };
 
 /// Information about all the inputs to the frontend.
@@ -186,10 +184,6 @@ public:
   void addPrimaryInputFile(StringRef file,
                            llvm::MemoryBuffer *buffer = nullptr) {
     addInput(InputFile(file.str(), true, buffer));
-  }
-
-  void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
-    AllFiles[index].setBuffer(buffer);
   }
 
   void addInput(const InputFile &input) {
