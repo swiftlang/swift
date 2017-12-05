@@ -43,7 +43,7 @@ private:
   std::vector<std::string> InputFilenames;
 
 public:
-  bool haveUniqueInputFilename() const { return InputFilenames.size() == 1; }
+  bool hasUniqueInputFilename() const { return InputFilenames.size() == 1; }
   const std::string &getFilenameOfFirstInput() const {
     return InputFilenames[0];
   }
@@ -131,7 +131,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
     return 1;
   }
 
-  if (!Invocation.haveUniqueInputFilename()) {
+  if (!Invocation.hasUniqueInputFilename()) {
     Instance.getDiags().diagnose(SourceLoc(),
                                  diag::error_mode_requires_one_input_file);
     return 1;
