@@ -2339,7 +2339,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     auto flags = typeEntity.flags;
     llvm::Constant *witnessTableVar;
     if (!isResilient(conformance->getProtocol(),
-                     ResilienceExpansion::Maximal)) {
+                     ResilienceExpansion::Maximal) &&
+        conformance->getConditionalRequirements().empty()) {
       flags = flags.withConformanceKind(
           ProtocolConformanceReferenceKind::WitnessTable);
 
@@ -2348,8 +2349,13 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
       // it.
       witnessTableVar = getAddrOfWitnessTable(conformance);
     } else {
-      flags = flags.withConformanceKind(
-          ProtocolConformanceReferenceKind::WitnessTableAccessor);
+      if (conformance->getConditionalRequirements().empty()) {
+        flags = flags.withConformanceKind(
+            ProtocolConformanceReferenceKind::WitnessTableAccessor);
+      } else {
+        flags = flags.withConformanceKind(
+            ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor);
+      }
 
       witnessTableVar = getAddrOfWitnessTableAccessFunction(
           conformance, ForDefinition);
