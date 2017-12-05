@@ -15,7 +15,7 @@ from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    sliceTypeName,
+    collectionTypeName,
     protocolsForCollectionFeatures
 )
 }%
@@ -508,8 +508,7 @@ Int64 distances.
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       for StrideableIndex in [ False, True ]:
-%         SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%         Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%         Self = 'Minimal' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
 %         Self += 'WithStrideableIndex' if StrideableIndex else ''
 %         SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 %         Index = 'MinimalStrideableIndex' if StrideableIndex else 'MinimalIndex'
@@ -701,10 +700,10 @@ public struct ${Self}<T> : ${SelfProtocols} {
 %     end
   }
 
-  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<T>> {
+  public subscript(bounds: Range<${Index}>) -> Slice<${Self}<T>> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return ${SelfSlice}(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
 %     if Mutable:
     set {
@@ -853,10 +852,9 @@ public struct DefaultedSequence<Element> : Sequence {
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       for StrideableIndex in [ False, True ]:
-%         SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%         Self = 'Defaulted' + SelfSlice.replace('Slice', 'Collection')
+%         Self = 'Defaulted' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
 %         Self += 'WithStrideableIndex' if StrideableIndex else ''
-%         Base = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%         Base = 'Minimal' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
 %         Base += 'WithStrideableIndex' if StrideableIndex else ''
 %         SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 %         Index = 'MinimalStrideableIndex' if StrideableIndex else 'MinimalIndex'
@@ -973,10 +971,10 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     // FIXME: swift-3-indexing-model: use defaults.
 //     if Self not in ['DefaultedCollection', 'DefaultedBidirectionalCollection', 'DefaultedRandomAccessCollection', 'DefaultedMutableCollection', 'DefaultedRangeReplaceableCollection']:
 
-  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<Base.Element>> {
+  public subscript(bounds: Range<${Index}>) -> Slice<${Self}<Base.Element>> {
     get {
       // FIXME: swift-3-indexing-model: range check.
-      return ${SelfSlice}(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
 %     if Mutable:
     set {
