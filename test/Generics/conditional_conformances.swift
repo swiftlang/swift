@@ -334,3 +334,29 @@ func existential_bad<T>(_: T.Type) {
   _ = Free<T>() as P2 // expected-error{{'Free<T>' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}}
 }
 
+// rdar://problem/35837054
+protocol P7 { }
+
+protocol P8 {
+  associatedtype A
+}
+
+struct X0 { }
+
+struct X1 { }
+
+extension X1: P8 {
+  typealias A = X0
+}
+
+struct X2<T> { }
+
+extension X2: P7 where T: P8, T.A: P7 { }
+
+func takesF7<T: P7>(_: T) { }
+func passesConditionallyNotF7(x21: X2<X1>) {
+  takesF7(x21) // expected-error{{type 'X1.A' (aka 'X0') does not conform to protocol 'P7'}}
+  // expected-error@-1{{'<T where T : P7> (T) -> ()' requires that 'X1.A' (aka 'X0') conform to 'P7'}}
+  // expected-note@-2{{requirement specified as 'X1.A' (aka 'X0') : 'P7'}}
+  // expected-note@-3{{requirement from conditional conformance of 'X2<X1>' to 'P7'}}
+}
