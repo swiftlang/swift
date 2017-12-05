@@ -2906,9 +2906,6 @@ namespace {
       // Lay out the template data.
       super::layout();
       
-      // Save a slot for the field type vector address to be instantiated into.
-      asImpl().addFieldTypeVectorReferenceSlot();
-      
       // If we have a dependent value witness table, emit its template.
       if (HasDependentVWT) {
         // Note the dependent VWT offset.
@@ -2974,10 +2971,6 @@ namespace {
                                 T &&...args) {
       FillOps.push_back({type, conf});
       super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
-    }
-    
-    void addFieldTypeVectorReferenceSlot() {
-      B.addNullPointer(IGM.TypeMetadataPtrTy->getPointerTo());
     }
     
     // Can be overridden by subclassers to emit other dependent metadata.
