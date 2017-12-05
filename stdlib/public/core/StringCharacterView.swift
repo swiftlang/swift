@@ -70,16 +70,10 @@ extension String {
     @_versioned
     internal var _guts: _StringGuts
 
-    @_versioned
-    internal var _core: _LegacyStringCore {
-      get { return _guts._legacyCore }
-      set { self._guts = _StringGuts(newValue) }
-    }
-
-    /// The offset of this view's `_core` from an original core. This works
-    /// around the fact that `_LegacyStringCore` is always zero-indexed.
-    /// `_coreOffset` should be subtracted from `UnicodeScalarIndex.encodedOffset`
-    /// before that value is used as a `_core` index.
+    /// The offset of this view's `_guts` from an original guts. This works
+    /// around the fact that `_StringGuts` is always zero-indexed.
+    /// `_coreOffset` should be subtracted from `Index.encodedOffset` before
+    /// that value is used as a `_guts` index.
     @_versioned
     internal var _coreOffset: Int
 
