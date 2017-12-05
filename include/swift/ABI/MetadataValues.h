@@ -212,6 +212,10 @@ enum class ProtocolConformanceReferenceKind : unsigned {
   /// A function pointer that can be called to access the protocol witness
   /// table.
   WitnessTableAccessor,
+  /// A function pointer that can be called to access the protocol witness
+  /// table whose conformance is conditional on additional requirements that
+  /// must first be evaluated and then provided to the accessor function.
+  ConditionalWitnessTableAccessor,
 };
 
 // Type metadata record discriminant
@@ -245,7 +249,7 @@ public:
 struct ProtocolConformanceFlags : public TypeMetadataRecordFlags {
 private:
   enum : int_type {
-    ConformanceKindMask = 0x00000010U,
+    ConformanceKindMask = 0x00000030U,
     ConformanceKindShift = 4,
   };
 

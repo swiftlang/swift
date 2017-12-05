@@ -2454,8 +2454,7 @@ private:
     RelativeDirectPointer<const WitnessTable> WitnessTable;
     
     /// A function that produces the witness table given an instance of the
-    /// type. The function may return null if a specific instance does not
-    /// conform to the protocol.
+    /// type.
     RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
   };
   
@@ -2560,6 +2559,7 @@ public:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
       assert(false && "not witness table");
     }
     return WitnessTable;
@@ -2568,6 +2568,7 @@ public:
   WitnessTableAccessorFn *getWitnessTableAccessor() const {
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
       break;
         
     case ProtocolConformanceReferenceKind::WitnessTable:
