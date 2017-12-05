@@ -979,6 +979,7 @@ extension _StringGuts {
   @_inlineable
   public // @testable
   func _extractSlice(_ range: Range<Int>) -> _StringGuts {
+    if range.isEmpty { return _StringGuts() }
     if range == 0..<count { return self }
     switch (isASCII, _isUnmanaged) {
     case (true, true):
