@@ -267,7 +267,7 @@ extension _StringGuts {
   @_versioned
   internal
   var _isEmptyLiteral: Bool {
-    return _isUnmanaged && _unmanagedRawStart == _emptyStringBase
+    return _isUnmanaged && _unmanagedCount == 0
   }
 }
 

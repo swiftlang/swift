@@ -489,6 +489,34 @@ StringTests.test("substringDoesNotCopy/Swift4") {
   }
 }
 
+StringTests.test("appendToEmptyString") {
+  let x = "Bumfuzzle"
+  expectNil(x.bufferID)
+
+  // Appending to empty string literal should replace it.
+  var a1 = ""
+  a1 += x
+  expectNil(a1.bufferID)
+
+  // Appending to native string should keep the existing buffer.
+  var b1 = ""
+  b1.reserveCapacity(20)
+  let b1ID = b1.bufferID
+  b1 += x
+  expectEqual(b1.bufferID, b1ID)
+
+  // .append(_:) should have the same behavior as +=
+  var a2 = ""
+  a2.append(x)
+  expectNil(a2.bufferID)
+
+  var b2 = ""
+  b2.reserveCapacity(20)
+  let b2ID = b2.bufferID
+  b2.append(x)
+  expectEqual(b2.bufferID, b2ID)
+}
+
 StringTests.test("appendToSubstring") {
   for initialSize in 1..<16 {
     for sliceStart in [0, 2, 8, initialSize] {
@@ -500,9 +528,6 @@ StringTests.test("appendToSubstring") {
         var s0 = String(repeating: "x", count: initialSize)
         s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
         s0 += "x"
-        if sliceStart == sliceEnd {
-          expectNil(s0.bufferID) // Empty string gets replaced on append
-        }
         expectEqual(
           String(
             repeating: "x",
