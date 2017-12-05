@@ -157,6 +157,9 @@ ERROR(error_primary_file_not_found,none,
 ERROR(error_cannot_have_input_files_with_file_list,none,
 "cannot have input files with file list", ())
 
+ERROR(error_cannot_have_input_files_with_primary_file_list,none,
+"cannot have input files with primary file list", ())
+
 ERROR(error_duplicate_input_file,none,
 "duplicate input file '%0'", (StringRef))
 
