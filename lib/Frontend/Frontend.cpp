@@ -363,15 +363,17 @@ CompilerInstance::getInputAndMaybeModuleDocBuffers(const InputFile &input) {
   newResult.docName = moduleDocFilePath.str();
   FileOrError moduleDocFileOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);
-  if (!moduleDocFileOrErr &&
-      moduleDocFileOrErr.getError() != std::errc::no_such_file_or_directory) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                         moduleDocFilePath,
-                         moduleDocFileOrErr.getError().message());
-    return std::make_pair(nullptr, nullptr);
-  }
-  return std::make_pair(std::move(*inputFileOrErr),
-                        std::move(*moduleDocFileOrErr));
+  if (moduleDocFileOrErr)
+    return std::make_pair(std::move(*inputFileOrErr),
+                          std::move(*moduleDocFileOrErr));
+
+  if (moduleDocFileOrErr.getError() == std::errc::no_such_file_or_directory)
+    return std::make_pair(std::move(*inputFileOrErr), nullptr);
+  
+  Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                       moduleDocFilePath,
+                       moduleDocFileOrErr.getError().message());
+  return std::make_pair(nullptr, nullptr);
 }
 
 static SetupInputAction old_setUpForInput(CompilerInvocation &CI, SourceManager &SourceMgr, const InputFile &input) {
