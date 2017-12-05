@@ -517,6 +517,26 @@ StringTests.test("appendToEmptyString") {
   expectEqual(b2.bufferID, b2ID)
 }
 
+StringTests.test("Swift3Slice/Empty") {
+  let size = 5
+  let s = String(repeating: "x", count: size)
+  for i in 0 ... size {
+    let slice = s[s.index(_nth: i)..<s.index(_nth: i)]
+    // Most Swift 3 substrings are extracted into their own buffer,
+    // but empty substrings get turned into the empty string singleton
+    expectNil(slice.bufferID)
+  }
+}
+
+StringTests.test("Swift3Slice/Full") {
+  let size = 5
+  let s = String(repeating: "x", count: size)
+  let slice = s[s.startIndex..<s.endIndex]
+  // Most Swift 3 substrings are extracted into their own buffer,
+  // but if the substring covers the full original string, it is used instead.
+  expectEqual(slice.bufferID, s.bufferID)
+}
+
 StringTests.test("appendToSubstring") {
   for initialSize in 1..<16 {
     for sliceStart in [0, 2, 8, initialSize] {
