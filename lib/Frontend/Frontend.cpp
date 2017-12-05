@@ -272,11 +272,14 @@ bool CompilerInstance::setupInputs() {
 
 bool CompilerInstance::setUpForInput(const InputFile &input) {
   newResult = SetupInputAction();
-  auto bufferID = getBufferID(input);
-  if (!bufferID) {
+  bool failed;
+  auto bufferID = getBufferID(input, failed);
+  if (failed) {
     newResult.failed = true;
     return true;
   }
+  if (!bufferID)
+    return false;
   if (isInSILMode() ||
       (input.getBuffer() == nullptr && isInMainMode() &&
        llvm::sys::path::filename(input.getFile()) == "main.swift")) {
@@ -291,11 +294,12 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
   return false;
 }
 
-Optional<unsigned> CompilerInstance::getBufferID(const InputFile &input) {
+Optional<unsigned> CompilerInstance::getBufferID(const InputFile &input, bool &failed) {
   if (!input.getBuffer()) {
     if (Optional<unsigned> existingBufferID =
         SourceMgr.getIDForBufferIdentifier(input.getFile())) {
       newResult.existingBuffer = *existingBufferID;
+      failed = false;
       return existingBufferID;
     }
   }
@@ -303,8 +307,10 @@ Optional<unsigned> CompilerInstance::getBufferID(const InputFile &input) {
             std::unique_ptr<llvm::MemoryBuffer>>
       inputAndMaybeModuleDoc = getInputAndMaybeModuleDocBuffers(input);
 
-  if (!inputAndMaybeModuleDoc.first.get())
+  if (!inputAndMaybeModuleDoc.first.get()) {
+    failed = true;
     return None;
+  }
 
   if (serialization::isSerializedAST(
           inputAndMaybeModuleDoc.first.get()->getBuffer())) {
@@ -312,6 +318,7 @@ Optional<unsigned> CompilerInstance::getBufferID(const InputFile &input) {
                               std::move(inputAndMaybeModuleDoc.second)});
     newResult.addedPartialModule1 = true;
     newResult.addedPartialModule2 = (PartialModules.back().ModuleDocBuffer.get() ? true : false);
+    failed = false;
     return None;
   }
   assert(inputAndMaybeModuleDoc.second.get() == nullptr);
@@ -324,6 +331,7 @@ Optional<unsigned> CompilerInstance::getBufferID(const InputFile &input) {
   newResult.addedNewSourceBuffer = true;
   newResult.addedInputSourceCodeID = true;
 
+  failed = false;
   return bufferID;
 }
 

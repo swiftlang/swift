@@ -434,7 +434,7 @@ private:
     return Invocation.getInputKind() == InputFileKind::IFK_SIL;
   }
   bool setUpForInput(const InputFile &input);
-  Optional<unsigned> getBufferID(const InputFile &input);
+  Optional<unsigned> getBufferID(const InputFile &input, bool &failed);
   std::pair<std::unique_ptr<llvm::MemoryBuffer>,
             std::unique_ptr<llvm::MemoryBuffer>>
   getInputAndMaybeModuleDocBuffers(const InputFile &input);
