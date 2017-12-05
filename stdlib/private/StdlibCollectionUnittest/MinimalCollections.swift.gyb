@@ -662,8 +662,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
   public func distance(from start: ${Index}, to end: ${Index})
     -> IndexDistance {
 %     if Traversal == 'Forward':
-    _precondition(start <= end,
-      "Only BidirectionalCollections can have end come before start")
 %     end
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if start != endIndex {
