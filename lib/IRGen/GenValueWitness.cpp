@@ -1397,6 +1397,5 @@ void TypeInfo::collectArchetypeMetadata(
     llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
     SILType T) const {
   auto canType = T.getSwiftRValueType();
-  assert(!canType->getWithoutSpecifierType()->is<ArchetypeType>() &&
-         "Did not expect an ArchetypeType");
+  assert(!canType->is<ArchetypeType>() && "Did not expect an ArchetypeType");
 }
