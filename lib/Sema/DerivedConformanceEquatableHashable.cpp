@@ -1013,10 +1013,10 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   //     case A:
   //       result = 0
   //     case B(let a0):
-  //       result = _mixForSynthesizedHashValue(result, 1)
+  //       result = 1
   //       result = _mixForSynthesizedHashValue(result, a0.hashValue)
   //     case C(let a0, let a1):
-  //       result = _mixForSynthesizedHashValue(result, 2)
+  //       result = 2
   //       result = _mixForSynthesizedHashValue(result, a0.hashValue)
   //       result = _mixForSynthesizedHashValue(result, a1.hashValue)
   //     }
