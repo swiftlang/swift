@@ -13,8 +13,10 @@
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
 #include "swift/SIL/SILArgument.h"
@@ -381,6 +383,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (FID == 0)
     return nullptr;
   assert(FID <= Funcs.size() && "invalid SILFunction ID");
+
+  PrettyStackTraceStringAction trace("deserializing SIL function", name);
 
   auto &cacheEntry = Funcs[FID-1];
   if (cacheEntry.isFullyDeserialized() ||
@@ -2419,6 +2423,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (!GlobalVarList)
     return nullptr;
 
+  PrettyStackTraceStringAction trace("deserializing SIL global", Name);
+
   // If we already deserialized this global variable, just return it.
   if (auto *GV = SILMod.lookUpGlobalVariable(Name))
     return GV;
@@ -2543,6 +2549,9 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   }
 
   ClassDecl *theClass = cast<ClassDecl>(MF->getDecl(ClassID));
+
+  PrettyStackTraceDecl trace("deserializing SIL vtable for", theClass);
+
   // Fetch the next record.
   scratch.clear();
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -2661,6 +2670,11 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   // Deserialize Conformance.
   auto theConformance = cast<NormalProtocolConformance>(
                           MF->readConformance(SILCursor).getConcrete());
+
+  PrettyStackTraceType trace(SILMod.getASTContext(),
+                             "deserializing SIL witness table for",
+                             theConformance->getType());
+  PrettyStackTraceDecl trace2("... to", theConformance->getProtocol());
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false);
@@ -2855,6 +2869,8 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
     MF->error();
     return nullptr;
   }
+
+  PrettyStackTraceDecl trace("deserializing default witness table for", proto);
 
   if (!existingWt)
     existingWt = SILMod.lookUpDefaultWitnessTable(proto, /*deserializeLazily=*/ false);
