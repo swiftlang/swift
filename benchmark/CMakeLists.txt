@@ -213,6 +213,10 @@ set(SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS "" CACHE STRING
 # Options for the default (= empty) configuration
 set(BENCHOPTS "-whole-module-optimization")
 
+option(SWIFT_BENCHMARK_GENERATE_OPT_VIEW
+  "Produce optimization view for benchmarks"
+  FALSE)
+
 # Options for other configurations
 set(BENCHOPTS_MULTITHREADED
     "-whole-module-optimization" "-num-threads" "4")

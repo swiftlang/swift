@@ -200,6 +200,18 @@ function (swift_benchmark_compile_archopts)
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
       "-no-link-objc-runtime"
       "-I" "${srcdir}/utils/ObjectiveCTests")
+
+  set(optview_main_dir)
+  if(SWIFT_BENCHMARK_GENERATE_OPT_VIEW AND LLVM_HAVE_OPT_VIEWER_MODULES)
+    precondition(SWIFT_BENCHMARK_BUILT_STANDALONE NEGATE
+      "Opt-viewer is not supported when running the benchmarks outside the Swift tree")
+
+    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
+      list(APPEND common_options "-save-optimization-record")
+      set(optview_main_dir "${objdir}/opt-view")
+    endif()
+  endif()
+
   set(common_swift3_options ${common_options} "-swift-version" "3")
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
@@ -218,6 +230,7 @@ function (swift_benchmark_compile_archopts)
 
   set(bench_library_objects)
   set(bench_library_sibfiles)
+  set(opt_view_dirs)
   # Build libraries used by the driver and benchmarks.
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
     set(sources "${srcdir}/${module_name_path}.swift")
@@ -322,6 +335,17 @@ function (swift_benchmark_compile_archopts)
             "-emit-sib"
             "-o" "${sibfile}"
             "${source}")
+      endif()
+
+      if(optview_main_dir)
+        set(opt_record "${objdir}/${module_name}.opt.yaml")
+        set(opt_viewer "${LLVM_BUILD_MAIN_SRC_DIR}/tools/opt-viewer/opt-viewer.py")
+        set(opt_view_dir "${optview_main_dir}/${module_name}")
+        add_custom_command(
+            OUTPUT ${opt_view_dir}
+            DEPENDS "${objfile}"
+            COMMAND ${opt_viewer} ${opt_record} "-o" ${opt_view_dir})
+        list(APPEND opt_view_dirs ${opt_view_dir})
       endif()
     endif()
   endforeach()
@@ -435,7 +459,7 @@ function (swift_benchmark_compile_archopts)
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS
         ${bench_library_objects} ${bench_driver_objects} ${SWIFT_BENCH_OBJFILES}
-        "${objcfile}"
+        "${objcfile}" ${opt_view_dirs}
       COMMAND
         "${CLANG_EXEC}"
         "-fno-stack-protector"
