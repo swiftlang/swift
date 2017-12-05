@@ -198,3 +198,104 @@ extension _UnmanagedString {
     }
   }
 }
+
+extension _UnmanagedString {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  func _unicodeScalarWidth(startingAt offset: Int) -> Int {
+    _sanityCheck(offset >= 0 && offset < count)
+    if CodeUnit.bitWidth == 8 {
+      return 1
+    }
+    if _slowPath(UTF16.isLeadSurrogate(self[offset])) {
+      if offset + 1 < self.count &&
+      UTF16.isTrailSurrogate(self[offset + 1]) {
+        return 2
+      }
+    }
+    return 1
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  func _unicodeScalarWidth(endingAt offset: Int) -> Int {
+    _sanityCheck(offset >= 0 && offset < count)
+    if CodeUnit.bitWidth == 8 {
+      return 1
+    }
+    if _slowPath(UTF16.isTrailSurrogate(self[offset])) {
+      if offset >= 1 && UTF16.isLeadSurrogate(self[offset - 1]) {
+        return 2
+      }
+    }
+    return 1
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  func _decodeUnicodeScalar(startingAt offset: Int) -> UnicodeDecodingResult {
+    if CodeUnit.bitWidth == 8 {
+      if _fastPath(offset < count) {
+        return .scalarValue(Unicode.Scalar(_unchecked: UInt32(self[offset])))
+      } else {
+        return .emptyInput
+      }
+    }
+    guard _fastPath(offset < count) else {
+      return .emptyInput
+    }
+    let u0 = self[offset]
+    if _fastPath(UTF16._isScalar(u0)) {
+      return .scalarValue(Unicode.Scalar(_unchecked: UInt32(u0)))
+    }
+    if UTF16.isLeadSurrogate(u0) && offset + 1 < count {
+      let u1 = self[offset + 1]
+      if UTF16.isTrailSurrogate(u1) {
+        return .scalarValue(UTF16._decodeSurrogates(u0, u1))
+      }
+    }
+    return .error
+  }
+
+  @_fixed_layout
+  @_versioned // FIXME(sil-serialize-all)
+  internal struct UnicodeScalarIterator : IteratorProtocol {
+    @_versioned // FIXME(sil-serialize-all)
+    let _base: _UnmanagedString
+    @_versioned // FIXME(sil-serialize-all)
+    var _offset: Int
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    init(_ base: _UnmanagedString) {
+      self._base = base
+      self._offset = 0
+    }
+
+    @_inlineable // FIXME(sil-serialize-all)
+    @_versioned // FIXME(sil-serialize-all)
+    mutating func next() -> Unicode.Scalar? {
+      if _slowPath(_offset == _base.count) { return nil }
+      let u0 = _base[_offset]
+      if _fastPath(CodeUnit.bitWidth == 8 || UTF16._isScalar(u0)) {
+        _offset += 1
+        return Unicode.Scalar(u0)
+      }
+      if UTF16.isLeadSurrogate(u0) && _offset + 1 < _base.count {
+        let u1 = _base[_offset + 1]
+        if UTF16.isTrailSurrogate(u1) {
+          _offset += 2
+          return UTF16._decodeSurrogates(u0, u1)
+        }
+      }
+      _offset += 1
+      return Unicode.Scalar._replacementCharacter
+    }
+  }
+
+  @_versioned // FIXME(sil-serialize-all)
+  @inline(never)
+  func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
+    return UnicodeScalarIterator(self)
+  }
+}

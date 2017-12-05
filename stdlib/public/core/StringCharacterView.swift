@@ -787,8 +787,9 @@ extension String._CharacterView {
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> String.CharacterView {
-    return String._CharacterView(
-      unicodeScalars[bounds]._guts,
-      coreOffset: bounds.lowerBound.encodedOffset)
+    let scalarSlice: String.UnicodeScalarView = unicodeScalars[bounds]
+    return String.CharacterView(
+      scalarSlice._guts,
+      coreOffset: scalarSlice._coreOffset)
   }
 }
