@@ -168,6 +168,9 @@ private:
   /// The start of the field-offset vector.
   StoredOffset FieldOffsetVector;
 
+  /// The number of members to add after superclass metadata.
+  unsigned NumImmediateMembers;
+
   const StoredMethodInfo &getStoredMethodInfo(SILDeclRef method) const {
     auto it = MethodInfos.find(method);
     assert(it != MethodInfos.end());
@@ -221,6 +224,10 @@ public:
   Size getStaticFieldOffsetVectorOffset() const;
 
   Offset getFieldOffsetVectorOffset(IRGenFunction &IGF) const;
+
+  unsigned getNumImmediateMembers() const {
+    return NumImmediateMembers;
+  }
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Class;
