@@ -354,7 +354,7 @@ CompilerInstance::getInputAndMaybeModuleDocBuffers(const InputFile &input) {
                                      SERIALIZED_MODULE_DOC_EXTENSION);
   FileOrError moduleDocFileOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);
-  if (moduleDocFileOrErr &&
+  if (!moduleDocFileOrErr &&
       moduleDocFileOrErr.getError() != std::errc::no_such_file_or_directory) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                          moduleDocFilePath,
