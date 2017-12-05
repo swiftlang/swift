@@ -771,6 +771,40 @@ std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
   return llvm::sys::path::stem(nameToStem).str();
 }
 
+ArrayRef<std::string>
+FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
+  if (cachedOutputFilenamesFromCommandLineOrFilelist) {
+    return *cachedOutputFilenamesFromCommandLineOrFilelist;
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
+    assert(!Args.hasArg(options::OPT_o) &&
+           "don't use -o with -output-filelist");
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
+        readOutputFileList(A->getValue()));
+  } else {
+    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
+        Args.getAllArgValues(options::OPT_o));
+  }
+  return *cachedOutputFilenamesFromCommandLineOrFilelist;
+}
+
+/// Try to read an output file list file.
+std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
+    const StringRef filelistPath) const {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(filelistPath);
+  if (!buffer) {
+    Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
+                   buffer.getError().message());
+  }
+  std::vector<std::string> outputFiles;
+  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
+    outputFiles.push_back(line.str());
+  }
+  return outputFiles;
+}
+
 void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
   using namespace options;
   auto determineOutputFilename =
@@ -882,40 +916,6 @@ void FrontendArgsToOptionsConverter::computeLLVMArgs() {
   for (const Arg *A : Args.filtered(OPT_Xllvm)) {
     Opts.LLVMArgs.push_back(A->getValue());
   }
-}
-
-ArrayRef<std::string>
-FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
-  if (cachedOutputFilenamesFromCommandLineOrFilelist) {
-    return *cachedOutputFilenamesFromCommandLineOrFilelist;
-  }
-
-  if (const Arg *A = Args.getLastArg(options::OPT_output_filelist)) {
-    assert(!Args.hasArg(options::OPT_o) &&
-           "don't use -o with -output-filelist");
-    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
-        readOutputFileList(A->getValue()));
-  } else {
-    cachedOutputFilenamesFromCommandLineOrFilelist.emplace(
-        Args.getAllArgValues(options::OPT_o));
-  }
-  return *cachedOutputFilenamesFromCommandLineOrFilelist;
-}
-
-/// Try to read an output file list file.
-std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
-    const StringRef filelistPath) const {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-      llvm::MemoryBuffer::getFile(filelistPath);
-  if (!buffer) {
-    Diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
-                   buffer.getError().message());
-  }
-  std::vector<std::string> outputFiles;
-  for (StringRef line : make_range(llvm::line_iterator(*buffer.get()), {})) {
-    outputFiles.push_back(line.str());
-  }
-  return outputFiles;
 }
 
 static bool ParseFrontendArgs(FrontendOptions &opts, ArgList &args,
