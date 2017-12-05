@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -num-threads 8 -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-conditional-conformances -primary-file %s -emit-ir -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-conditional-conformances %s -emit-ir -num-threads 8 -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
 
 import resilient_struct
 
@@ -78,10 +78,25 @@ extension Int: Runcible {
 // -- flags 0x04: unique direct metadata
 // CHECK-SAME:           i32 1
 // CHECK-SAME:         }
-// CHECK-SAME:       ]
 
 extension Size: Runcible {
   public func runce() {}
 }
 
 // TODO: conformances that need lazy initialization
+public protocol Spoon { }
+
+// Conditional conformances
+// CHECK: %swift.protocol_conformance {
+// -- protocol descriptor
+// CHECK-SAME:           [[SPOON:@_T028protocol_conformance_records5SpoonMp]]
+// -- nominal type descriptor
+// CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVMn
+// -- witness table accessor
+// CHECK-SAME:           @_T028protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa
+// -- flags 0x04: unique nominal type descriptor + conditional accessor
+// CHECK-SAME:           i32 36
+// CHECK-SAME:         }
+extension NativeGenericType : Spoon where T: Spoon {
+  public func runce() {}
+}

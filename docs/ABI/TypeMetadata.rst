@@ -407,3 +407,29 @@ Objective-C ``Protocol`` objects. The layout is as follows:
   * **Bit 31** is set by the Objective-C runtime when it has done its
     initialization of the protocol record. It is unused by the Swift runtime.
 
+
+Protocol Conformance Records
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A *protocol conformance record* states that a given type conforms to a
+particular protocol. Protocol conformance records are emitted into their own
+section, which is scanned by the Swift runtime when needed (e.g., in response to
+a `swift_conformsToProtocol()` query). Each protocol conformance record
+contains:
+
+- The `protocol descriptor`_ describing the protocol of the conformance.
+- A reference to the metadata for the **conforming type**, whose form is
+  determined by the **protocol conformance flags** described below.
+- The **witness table field** that provides access to the witness table
+  describing the conformance itself; the form of this field is determined by the
+  **protocol conformance flags** described below.
+- The **protocol conformance flags** is a 32-bit field comprised of:
+  * **Bits 0-3** contain the type metadata record kind, which indicates how
+    the **conforming type** field is encoded.
+  * **Bits 4-5** contain the kind of witness table. The value can be one of:
+    0) The **witness table field** is a reference to a witness table.
+    1) The **witness table field** is a reference to a **witness table
+       accessor** function for an unconditional conformance.
+    2) The **witness table field** is a reference to a **witness table
+       accessor** function for a conditional conformance.
+
