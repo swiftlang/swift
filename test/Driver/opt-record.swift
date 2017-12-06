@@ -22,13 +22,13 @@ public func bar() {
   // YAML-NEXT:   Column:          3
   // YAML-NEXT: Function:        'bar()'
   // YAML-NEXT: Args:
-  // YAML-NEXT:   - Callee:          '"foo()"'
+  // YAML-NEXT:   - Callee:          '"optrecordmod.foo()"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}opt-record.swift
   // YAML-NEXT:       Line:            11
   // YAML-NEXT:       Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
-  // YAML-NEXT:   - Caller:          '"bar()"'
+  // YAML-NEXT:   - Caller:          '"optrecordmod.bar()"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}opt-record.swift
   // YAML-NEXT:       Line:            15

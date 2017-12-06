@@ -44,15 +44,18 @@ Argument::Argument(StringRef Key, unsigned long long N)
     : Key(Key), Val(llvm::utostr(N)) {}
 
 Argument::Argument(StringRef Key, SILFunction *F)
-    : Key(Key),
-      Val((Twine("\"") +
-           Demangle::demangleSymbolAsString(
-               F->getName(),
-               Demangle::DemangleOptions::SimplifiedUIDemangleOptions()) +
-           "\"")
-              .str()) {
-  if (F->hasLocation())
-    Loc = F->getLocation().getSourceLoc();
+    : Key(Key) {
+      auto DO = Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
+      // Enable module names so that we have a way of filtering out
+      // stdlib-related remarks.
+      DO.DisplayModuleNames = true;
+
+      Val = (Twine("\"") + Demangle::demangleSymbolAsString(F->getName(), DO) +
+             "\"")
+                .str();
+
+      if (F->hasLocation())
+        Loc = F->getLocation().getSourceLoc();
 }
 
 template <typename DerivedT> std::string Remark<DerivedT>::getMsg() const {
