@@ -44,10 +44,10 @@ ParserResult<GenericParamList> Parser::parseGenericParameters() {
   return parseGenericParameters(consumeStartingLess());
 }
 
-ParserResult<GenericParamList>
+ParserStatus
 Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams) {
-  ParserResult<GenericParamList> Result;
+  ParserStatus Result;
   SyntaxParsingContext GPSContext(SyntaxContext, SyntaxKind::GenericParameterList);
   bool HasNextParam;
   do {
@@ -131,7 +131,7 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Return early if there was code completion token.
   if (Result.hasCodeCompletion())
     return Result;
-  auto Invalid = Result.isParseError();
+  auto Invalid = Result.isError();
 
   // Parse the optional where-clause.
   SourceLoc WhereLoc;

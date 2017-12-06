@@ -1329,7 +1329,7 @@ public:
 
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
-  ParserResult<GenericParamList> parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
+  ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();
   void
