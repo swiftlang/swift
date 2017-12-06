@@ -142,7 +142,7 @@ public:
   /// Return the unique primary input, if one exists.
   const InputFile *getUniquePrimaryInput() const {
     assertMustNotBeMoreThanOnePrimaryInput();
-    const auto &b = PrimaryInputs.begin();
+    const auto b = PrimaryInputs.begin();
     return b == PrimaryInputs.end() ? nullptr : &AllFiles[b->second];
   }
 
