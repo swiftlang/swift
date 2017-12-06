@@ -42,9 +42,7 @@ class CompilerVersion(object):
         if len(components) == 1:
             if isinstance(components[0], str):
                 components = components[0].split('.')
-            elif isinstance(components[0], list):
-                components = tuple(components[0])
-            elif isinstance(components[0], tuple):
+            elif isinstance(components[0], (list, tuple)):
                 components = components[0]
 
         if len(components) == 0:
