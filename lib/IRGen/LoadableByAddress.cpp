@@ -2499,11 +2499,14 @@ void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
 
 /// The entry point to this function transformation.
 void LoadableByAddress::run() {
+  // Set the SIL state before the PassManager has a chance to run
+  // verification.
+  getModule()->setStage(SILStage::Lowered);
+
   for (auto &F : *getModule())
     runOnFunction(&F);
 
   if (modFuncs.empty()) {
-    getModule()->setStage(SILStage::Lowered);
     return;
   }
 
@@ -2642,10 +2645,6 @@ void LoadableByAddress::run() {
 
   // Fix all instructions that rely on block storage type
   fixStoreToBlockStorageInstrs();
-
-  // Set the SIL state before the PassManager has a chance to run
-  // verification.
-  getModule()->setStage(SILStage::Lowered);
 
   // Clean up the data structs:
   modFuncs.clear();
