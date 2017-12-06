@@ -30,6 +30,7 @@
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
+#include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParserResult.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
@@ -357,24 +358,6 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
-
-  class ParserPosition {
-  public:
-    ParserPosition() = default;
-    ParserPosition &operator=(const ParserPosition &) = default;
-
-    bool isValid() const {
-      return LS.isValid();
-    }
-
-  private:
-    ParserPosition(LexerState LS, SourceLoc PreviousLoc):
-        LS(LS), PreviousLoc(PreviousLoc)
-    {}
-    LexerState LS;
-    SourceLoc PreviousLoc;
-    friend class Parser;
-  };
 
   ParserPosition getParserPosition() {
     return ParserPosition(L->getStateForBeginningOfToken(Tok, LeadingTrivia),
