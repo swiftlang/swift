@@ -178,14 +178,13 @@ void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    for (const std::string &OutputFileName : OutputFilenames) {
+    for (const std::string &OutputFileName : OutputPaths.OutputFilenames) {
       fn(OutputFileName);
     }
   }
-  const std::string *outputs[] = {
-      &supplementaryPrimaryDependentPaths.ModuleOutputPath,
-      &supplementaryPrimaryDependentPaths.ModuleDocOutputPath,
-      &supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath};
+  const std::string *outputs[] = {&OutputPaths.ModuleOutputPath,
+                                  &OutputPaths.ModuleDocOutputPath,
+                                  &OutputPaths.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
@@ -266,7 +265,7 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedDependenciesFilePath() const {
-  return !supplementaryPrimaryDependentPaths.DependenciesFilePath.empty() &&
+  return !OutputPaths.DependenciesFilePath.empty() &&
          !canActionEmitDependencies(RequestedAction);
 }
 
@@ -302,7 +301,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
-  return !supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath.empty() &&
+  return !OutputPaths.ObjCHeaderOutputPath.empty() &&
          !canActionEmitHeader(RequestedAction);
 }
 
@@ -338,7 +337,7 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
-  return !supplementaryPrimaryDependentPaths.LoadedModuleTracePath.empty() &&
+  return !OutputPaths.LoadedModuleTracePath.empty() &&
          !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
@@ -374,12 +373,12 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
 }
 
 bool FrontendOptions::hasUnusedModuleOutputPath() const {
-  return !supplementaryPrimaryDependentPaths.ModuleOutputPath.empty() &&
+  return !OutputPaths.ModuleOutputPath.empty() &&
          !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
-  return !supplementaryPrimaryDependentPaths.ModuleDocOutputPath.empty() &&
+  return !OutputPaths.ModuleDocOutputPath.empty() &&
          !canActionEmitModule(RequestedAction);
 }
 

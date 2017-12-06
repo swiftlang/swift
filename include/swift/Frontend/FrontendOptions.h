@@ -207,23 +207,19 @@ public:
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
-  /// The specified output files. If only a single outputfile is generated,
-  /// the name of the last specified file is taken.
-  std::vector<std::string> OutputFilenames;
-
   void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
+    if (OutputPaths.OutputFilenames.size() >= 1)
+      return OutputPaths.OutputFilenames.back();
     return StringRef();
   }
   /// Sets a single filename as output filename.
   void setSingleOutputFilename(const std::string &FileName) {
-    OutputFilenames.clear();
-    OutputFilenames.push_back(FileName);
+    OutputPaths.OutputFilenames.clear();
+    OutputPaths.OutputFilenames.push_back(FileName);
   }
   void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
   bool isOutputFilenameStdout() const {
@@ -231,7 +227,7 @@ public:
   }
   bool isOutputFileDirectory() const;
   bool hasNamedOutputFile() const {
-    return !OutputFilenames.empty() && !isOutputFilenameStdout();
+    return !OutputPaths.OutputFilenames.empty() && !isOutputFilenameStdout();
   }
 
   /// A list of arbitrary modules to import and make implicitly visible.
@@ -248,7 +244,11 @@ public:
 
   // Depends on primary:
 
-  struct SupplementaryPrimaryDependentPaths {
+  struct OutputPaths {
+    /// The specified output files. If only a single outputfile is generated,
+    /// the name of the last specified file is taken.
+    std::vector<std::string> OutputFilenames;
+
     /// The path to which we should emit an Objective-C header for the module.
     std::string ObjCHeaderOutputPath;
 
@@ -274,8 +274,10 @@ public:
     /// The path to which we should output a TBD file.
     std::string TBDPath;
   };
+  /// Keyed by empty string for no-primary case
+  llvm::StringMap<OutputPaths> OutputPathsByPrimary;
 
-  SupplementaryPrimaryDependentPaths supplementaryPrimaryDependentPaths;
+  OutputPaths OutputPaths;
 
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;

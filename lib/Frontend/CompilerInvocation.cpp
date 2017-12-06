@@ -691,7 +691,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 }
 
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
-  assert(Opts.OutputFilenames.empty() &&
+  assert(Opts.OutputPaths.OutputFilenames.empty() &&
          "Output filename should not be set at this point");
   if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
     return false;
@@ -701,7 +701,7 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
 
   if (outputFilenamesFromCommandLineOrFilelist.size() > 1) {
     // WMO, threaded with N files (also someday batch mode).
-    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+    Opts.OutputPaths.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
 
@@ -715,7 +715,7 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
   StringRef outputFilename = outputFilenamesFromCommandLineOrFilelist[0];
   if (!llvm::sys::fs::is_directory(outputFilename)) {
     // Could be -primary-file (1), or -wmo (non-threaded w/ N (input) files)
-    Opts.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+    Opts.OutputPaths.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
   // Only used for testing & when invoking frontend directly.
@@ -763,7 +763,7 @@ void FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
   StringRef suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
       Opts.RequestedAction);
   llvm::sys::path::replace_extension(path, suffix);
-  Opts.OutputFilenames.push_back(path.str());
+  Opts.OutputPaths.OutputFilenames.push_back(path.str());
 }
 
 std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
@@ -829,7 +829,7 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
         if (!Args.hasArg(optWithoutPath))
           return;
 
-        if (useMainOutput && !Opts.OutputFilenames.empty()) {
+        if (useMainOutput && !Opts.OutputPaths.OutputFilenames.empty()) {
           output = Opts.getSingleOutputFilename();
           return;
         }
@@ -842,26 +842,25 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
         output = path.str();
       };
 
+  determineOutputFilename(Opts.OutputPaths.DependenciesFilePath,
+                          OPT_emit_dependencies, OPT_emit_dependencies_path,
+                          "d", false);
+  determineOutputFilename(Opts.OutputPaths.ReferenceDependenciesFilePath,
+                          OPT_emit_reference_dependencies,
+                          OPT_emit_reference_dependencies_path, "swiftdeps",
+                          false);
+  determineOutputFilename(Opts.OutputPaths.SerializedDiagnosticsPath,
+                          OPT_serialize_diagnostics,
+                          OPT_serialize_diagnostics_path, "dia", false);
+  determineOutputFilename(Opts.OutputPaths.ObjCHeaderOutputPath,
+                          OPT_emit_objc_header, OPT_emit_objc_header_path, "h",
+                          false);
   determineOutputFilename(
-      Opts.supplementaryPrimaryDependentPaths.DependenciesFilePath,
-      OPT_emit_dependencies, OPT_emit_dependencies_path, "d", false);
-  determineOutputFilename(
-      Opts.supplementaryPrimaryDependentPaths.ReferenceDependenciesFilePath,
-      OPT_emit_reference_dependencies, OPT_emit_reference_dependencies_path,
-      "swiftdeps", false);
-  determineOutputFilename(
-      Opts.supplementaryPrimaryDependentPaths.SerializedDiagnosticsPath,
-      OPT_serialize_diagnostics, OPT_serialize_diagnostics_path, "dia", false);
-  determineOutputFilename(
-      Opts.supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath,
-      OPT_emit_objc_header, OPT_emit_objc_header_path, "h", false);
-  determineOutputFilename(
-      Opts.supplementaryPrimaryDependentPaths.LoadedModuleTracePath,
-      OPT_emit_loaded_module_trace, OPT_emit_loaded_module_trace_path,
-      "trace.json", false);
+      Opts.OutputPaths.LoadedModuleTracePath, OPT_emit_loaded_module_trace,
+      OPT_emit_loaded_module_trace_path, "trace.json", false);
 
-  determineOutputFilename(Opts.supplementaryPrimaryDependentPaths.TBDPath,
-                          OPT_emit_tbd, OPT_emit_tbd_path, "tbd", false);
+  determineOutputFilename(Opts.OutputPaths.TBDPath, OPT_emit_tbd,
+                          OPT_emit_tbd_path, "tbd", false);
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
@@ -877,15 +876,13 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
   auto sibOpt = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB
                     ? OPT_emit_sib
                     : OPT_emit_sibgen;
-  determineOutputFilename(
-      Opts.supplementaryPrimaryDependentPaths.ModuleOutputPath,
-      isSIB ? sibOpt : OPT_emit_module, OPT_emit_module_path, ext,
-      canUseMainOutputForModule);
+  determineOutputFilename(Opts.OutputPaths.ModuleOutputPath,
+                          isSIB ? sibOpt : OPT_emit_module,
+                          OPT_emit_module_path, ext, canUseMainOutputForModule);
 
-  determineOutputFilename(
-      Opts.supplementaryPrimaryDependentPaths.ModuleDocOutputPath,
-      OPT_emit_module_doc, OPT_emit_module_doc_path,
-      SERIALIZED_MODULE_DOC_EXTENSION, false);
+  determineOutputFilename(Opts.OutputPaths.ModuleDocOutputPath,
+                          OPT_emit_module_doc, OPT_emit_module_doc_path,
+                          SERIALIZED_MODULE_DOC_EXTENSION, false);
 }
 
 bool FrontendArgsToOptionsConverter::checkForUnusedOutputPaths() const {
@@ -917,9 +914,8 @@ void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.hasPrimaryInputs() &&
-        !Opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |= !Opts.Inputs.hasPrimaryInputs() &&
+                                    !Opts.OutputPaths.ModuleOutputPath.empty();
   }
 }
 void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
@@ -1672,7 +1668,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (FrontendOpts.Inputs.hasUniqueInput()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
-  Opts.OutputFilenames = FrontendOpts.OutputFilenames;
+  Opts.OutputFilenames = FrontendOpts.OutputPaths.OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))
