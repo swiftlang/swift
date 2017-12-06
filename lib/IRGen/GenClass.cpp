@@ -258,6 +258,14 @@ namespace {
         auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
 
+        // If the superclass came from another module, we may have dropped
+        // stored properties due to the Swift language version availability of
+        // their types. In these cases we can't precisely lay out the ivars in
+        // the class object at compile time so we need to do runtime layout.
+        if (classHasIncompleteLayout(IGM, superclass)) {
+          ClassMetadataRequiresDynamicInitialization = true;
+        }
+
         if (superclass->hasClangNode()) {
           // If the superclass was imported from Objective-C, its size is
           // not known at compile time. However, since the field offset
