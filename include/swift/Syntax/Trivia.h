@@ -152,6 +152,17 @@ struct TriviaPiece {
     return TriviaPiece {TriviaKind::Tab, Count, OwnedString{}};
   }
 
+  /// Return a piece of trivia for some number of vertical tab characters in a
+  /// row.
+  static TriviaPiece verticalTabs(unsigned Count) {
+    return TriviaPiece {TriviaKind::VerticalTab, Count, OwnedString{}};
+  }
+
+  /// Return a piece of trivia for some number of form-feed characters in a row.
+  static TriviaPiece formfeeds(unsigned Count) {
+    return TriviaPiece {TriviaKind::Formfeed, Count, OwnedString{}};
+  }
+
   /// Return a piece of trivia for some number of newline characters
   /// in a row.
   static TriviaPiece newlines(unsigned Count) {

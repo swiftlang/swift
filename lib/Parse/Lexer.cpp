@@ -2324,7 +2324,9 @@ Restart:
     NextToken.setAtStartOfLine(true);
     LLVM_FALLTHROUGH;
   case ' ':
-  case '\t': {
+  case '\t':
+  case '\v':
+  case '\f': {
     auto Char = CurPtr[-1];
     // Consume consective same characters.
     while (*CurPtr == Char)
@@ -2341,6 +2343,12 @@ Restart:
       break;
     case '\t':
       Pieces.push_back(TriviaPiece::tabs(Length));
+      break;
+    case '\v':
+      Pieces.push_back(TriviaPiece::verticalTabs(Length));
+      break;
+    case '\f':
+      Pieces.push_back(TriviaPiece::formfeeds(Length));
       break;
     default:
       llvm_unreachable("Invalid character for whitespace trivia");
