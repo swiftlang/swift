@@ -134,7 +134,11 @@ public:
   bool convert() {
     if (enforceFilelistExclusion())
       return true;
-    if (getFilesFromCommandLine() || getFilesFromFilelist())
+    bool hadError = getFilesFromCommandLine();
+    if (hadError)
+      return true;
+    hadError = getFilesFromFilelist();
+    if (hadError)
       return true;
 
     std::set<StringRef> PrimaryFiles = getPrimaries();
