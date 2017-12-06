@@ -98,8 +98,8 @@ SWIFT_RUNTIME_EXPORT
 void swift_verifyEndOfLifetime(HeapObject *object);
 
 struct BoxPair {
-  HeapObject *first;
-  OpaqueValue *second;
+  HeapObject *object;
+  OpaqueValue *buffer;
 };
 
 /// Allocates a heap object that can contain a value of the given type.
