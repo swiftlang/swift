@@ -149,7 +149,7 @@ public:
   const InputFile &getRequiredUniquePrimaryInput() const {
     if (const auto *input = getUniquePrimaryInput())
       return *input;
-    assert(false);
+    llvm_unreachable("No primary when one is required");
   }
 
   /// Return the name of the unique primary input, or an empty StrinRef if there
