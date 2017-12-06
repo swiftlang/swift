@@ -50,7 +50,7 @@ bool FrontendInputs::shouldTreatAsSIL() const {
     return false;
   if (silPrimaryCount == primaryInputCount())
     return true;
-  assert(false && "Either all primaries or none must end with .sil");
+  llvm_unreachable("Either all primaries or none must end with .sil");
 }
 
 unsigned
