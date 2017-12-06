@@ -24,6 +24,7 @@
 #include "swift/Basic/OptimizationMode.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
+#include "swift/Basic/InputFile.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include <string>
 #include <vector>
@@ -66,7 +67,25 @@ class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
   std::string MainInputFilename;
-  std::vector<std::string> OutputFilenames;
+  std::vector<std::string> OutputFilesForThreadedWMO;
+  std::vector<OutputPaths> OutputsForBatchMode;
+  std::string OutputForSingleThreadedWMO;
+  
+  /// Gets the name of the specified output filename.
+  /// If multiple files are specified, the last one is returned.
+  /// I don't know why it needs the last one, but lldb needs this for now:
+  /// SwiftASTContext.cpp:4603 --  dmu
+  // FIXME: try the first one someday
+  StringRef getSingleOutputFilename() const {
+    if (!OutputForSingleThreadedWMO.empty())
+      return OutputForSingleThreadedWMO;
+    // FIXME for batch mode
+    if (OutputsForBatchMode.empty())
+      return StringRef();
+    assert(OutputsForBatchMode.size() == 1);
+    return OutputsForBatchMode[0].OutputFilename;
+  }
+  
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -187,14 +206,6 @@ public:
         EnableReflectionNames(true), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
-
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
-    return StringRef();
-  }
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.

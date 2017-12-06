@@ -58,7 +58,7 @@ void CompilerInstance::createSILModule() {
   // Assume WMO if a -primary-file option was not provided.
   TheSILModule = SILModule::createEmptyModule(
       getMainModule(), Invocation.getSILOptions(),
-      Invocation.getFrontendOptions().Inputs.isWholeModule());
+      Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -79,7 +79,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
-  if (!Invocation.getFrontendOptions().ModuleDocOutputPath.empty())
+  if (!Invocation.getFrontendOptions()
+           .InputsAndOutputs.pathsForAtMostOnePrimary()
+           .ModuleDocOutputPath.empty())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
 
   // If we are doing index-while-building, configure lexing and parsing to
@@ -180,9 +182,10 @@ bool CompilerInstance::setUpInputs() {
   const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
 
   for (const InputFile &input :
-       Invocation.getFrontendOptions().Inputs.getAllFiles())
+       Invocation.getFrontendOptions().InputsAndOutputs.getAllFiles()) {
     if (setUpForInput(input))
       return true;
+  }
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
@@ -190,6 +193,11 @@ bool CompilerInstance::setUpInputs() {
     assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
     PrimaryBufferID = *codeCompletionBufferID;
   }
+
+  if (PrimaryBufferID != NO_SUCH_BUFFER)
+    Invocation.getFrontendOptions()
+        .InputsAndOutputs
+        .assertMustNotBeMoreThanOnePrimaryInput(); // not impl yet
 
   if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
       InputSourceCodeBufferIDs.size() == 1)
