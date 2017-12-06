@@ -19,5 +19,4 @@ add_swift_library(swiftSILOptimizer STATIC
   ${MANDATORY_SOURCES}
   ${TRANSFORMS_SOURCES}
   ${IPO_SOURCES}
-  DEPENDS swift-syntax-generated-headers
   LINK_LIBRARIES swiftSIL)

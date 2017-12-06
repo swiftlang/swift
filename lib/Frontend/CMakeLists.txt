@@ -7,7 +7,6 @@ add_swift_library(swiftFrontend STATIC
   SerializedDiagnosticConsumer.cpp
   DEPENDS
     SwiftOptions
-    swift-syntax-generated-headers
   LINK_LIBRARIES
     swiftSIL
     swiftMigrator
