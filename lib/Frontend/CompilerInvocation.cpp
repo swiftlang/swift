@@ -757,7 +757,7 @@ std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
   } else if (auto UserSpecifiedModuleName =
                  Args.getLastArg(options::OPT_module_name)) {
     nameToStem = UserSpecifiedModuleName->getValue();
-  } else if (Opts.Inputs.hasUniqueInput()) {
+  } else if (Opts.Inputs.hasSingleInput()) {
     nameToStem = Opts.Inputs.getFilenameOfFirstInput();
   } else
     nameToStem = "";
@@ -1646,7 +1646,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (const InputFile *input =
                  FrontendOpts.Inputs.getUniquePrimaryInput()) {
     Opts.MainInputFilename = input->getFile();
-  } else if (FrontendOpts.Inputs.hasUniqueInput()) {
+  } else if (FrontendOpts.Inputs.hasSingleInput()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
   Opts.OutputFilenames = FrontendOpts.OutputFilenames;

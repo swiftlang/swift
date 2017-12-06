@@ -28,7 +28,7 @@ using namespace swift;
 using namespace llvm::opt;
 
 bool FrontendInputs::shouldTreatAsLLVM() const {
-  if (hasUniqueInput()) {
+  if (hasSingleInput()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
            llvm::sys::path::extension(Input).endswith(LLVM_IR_EXTENSION);
@@ -37,7 +37,7 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
 }
 
 bool FrontendInputs::shouldTreatAsSIL() const {
-  if (hasUniqueInput()) {
+  if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
     StringRef Input(getFilenameOfFirstInput());

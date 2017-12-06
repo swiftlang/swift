@@ -541,7 +541,7 @@ static bool performCompile(CompilerInstance &Instance,
     auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
-    assert(Invocation.getFrontendOptions().Inputs.hasUniqueInput() &&
+    assert(Invocation.getFrontendOptions().Inputs.hasSingleInput() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
         llvm::MemoryBuffer::getFileOrSTDIN(

@@ -99,7 +99,7 @@ public:
 
   bool hasInputs() const { return !AllFiles.empty(); }
 
-  bool hasUniqueInput() const { return inputCount() == 1; }
+  bool hasSingleInput() const { return inputCount() == 1; }
 
   const StringRef getFilenameOfFirstInput() const {
     assert(hasInputs());
@@ -110,7 +110,7 @@ public:
   }
 
   bool isReadingFromStdin() const {
-    return hasUniqueInput() && getFilenameOfFirstInput() == "-";
+    return hasSingleInput() && getFilenameOfFirstInput() == "-";
   }
 
   // If we have exactly one input filename, and its extension is "bc" or "ll",
@@ -488,7 +488,7 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift && Inputs.hasUniqueInput();
+    return InputKind == InputFileKind::IFK_Swift && Inputs.hasSingleInput();
   }
 
 private:
