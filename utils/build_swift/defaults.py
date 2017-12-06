@@ -6,9 +6,14 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+
 """
 Default option value definitions.
 """
+
+
+from .argparse import CompilerVersion
+
 
 __all__ = [
     # Command line configuarable
@@ -35,8 +40,8 @@ BUILD_VARIANT = 'Debug'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'
-SWIFT_USER_VISIBLE_VERSION = '4.1'
-CLANG_USER_VISIBLE_VERSION = '5.0.0'
+SWIFT_USER_VISIBLE_VERSION = CompilerVersion('4.1')
+CLANG_USER_VISIBLE_VERSION = CompilerVersion('5.0.0')
 SWIFT_ANALYZE_CODE_COVERAGE = 'false'
 
 DARWIN_XCRUN_TOOLCHAIN = 'default'
