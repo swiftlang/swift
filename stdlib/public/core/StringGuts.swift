@@ -337,7 +337,8 @@ extension _StringGuts {
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _sanityCheck(_isNative)
     _sanityCheck(CodeUnit.bitWidth == self.bitWidth)
-    return _bridgeObject(toNative: _object) as! _SwiftStringStorage<CodeUnit>
+    return Builtin.castReference(_bridgeObject(toNative: _object))
+
   }
 
   @_inlineable
