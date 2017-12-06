@@ -54,11 +54,11 @@ bool FrontendInputs::shouldTreatAsSIL() const {
 }
 
 unsigned
-FrontendInputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
+FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
   unsigned N = 0;
   for (const auto &iter : PrimaryInputs) {
     StringRef filename = AllFiles[iter.second].getFile();
-    if (llvm::sys::path::extension(filename).endswith(suffix))
+    if (llvm::sys::path::extension(filename).endswith(extension))
       ++N;
   }
   return N;

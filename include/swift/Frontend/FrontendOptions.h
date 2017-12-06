@@ -166,7 +166,7 @@ public:
            AllFiles[iterator->second].getIsPrimary();
   }
 
-  unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
+  unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
 
   // Multi-facet readers
 
