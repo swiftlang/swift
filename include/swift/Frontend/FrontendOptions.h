@@ -101,7 +101,7 @@ public:
 
   bool hasSingleInput() const { return inputCount() == 1; }
 
-  const StringRef getFilenameOfFirstInput() const {
+  StringRef getFilenameOfFirstInput() const {
     assert(hasInputs());
     const InputFile &inp = getAllFiles()[0];
     StringRef f = inp.getFile();
