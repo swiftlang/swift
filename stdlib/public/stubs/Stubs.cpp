@@ -443,8 +443,6 @@ __mulodi4(di_int a, di_int b, int* overflow)
 
 #if defined(_WIN64)
 
-#define CHAR_BIT      8         // number of bits in a char
-
 typedef union
 {
     tu_int all;
