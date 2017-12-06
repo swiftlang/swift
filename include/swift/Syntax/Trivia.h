@@ -118,6 +118,9 @@ enum class TriviaKind {
   /// A documentation block comment, starting with '/**' and ending with '*/.
   DocBlockComment,
 
+  /// Any skipped garbage text.
+  GarbageText,
+
   /// A backtick '`' character, used to escape identifiers.
   Backtick,
 };
@@ -189,6 +192,11 @@ struct TriviaPiece {
     return TriviaPiece {TriviaKind::DocBlockComment, 1, Text};
   }
 
+  /// Return a piece of trivia for any skipped garbage text.
+  static TriviaPiece garbageText(const OwnedString Text) {
+    return TriviaPiece {TriviaKind::GarbageText, 1, Text};
+  }
+
   /// Return a piece of trivia for a single backtick '`' for escaping
   /// an identifier.
   static TriviaPiece backtick() {
@@ -201,6 +209,7 @@ struct TriviaPiece {
       case TriviaKind::BlockComment:
       case TriviaKind::DocBlockComment:
       case TriviaKind::DocLineComment:
+      case TriviaKind::GarbageText:
         return Text.size();
       case TriviaKind::Newline:
       case TriviaKind::Space:
@@ -397,6 +406,12 @@ struct Trivia {
     assert(Text.str().startswith("/**"));
     assert(Text.str().endswith("*/"));
     return {{ TriviaPiece {TriviaKind::DocBlockComment, 1, Text} }};
+  }
+
+  /// Return a collection of trivia with any skipped garbage text.
+  static Trivia garbageText(const OwnedString Text) {
+    assert(Text.size() > 0);
+    return {{ TriviaPiece {TriviaKind::GarbageText, 1, Text} }};
   }
 
   /// Return a piece of trivia for a single backtick '`' for escaping

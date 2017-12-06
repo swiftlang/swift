@@ -77,6 +77,9 @@ void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     OS << "doc_block_comment" << Text.str();
     break;
   }
+  case TriviaKind::GarbageText:
+    OS << "garbage_text " << Text.str();
+    break;
   case TriviaKind::Backtick:
     OS << "backtick " << Count;
     break;
@@ -90,6 +93,7 @@ void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   case TriviaKind::BlockComment:
   case TriviaKind::DocBlockComment:
   case TriviaKind::DocLineComment:
+  case TriviaKind::GarbageText:
     Pos.addText(Text.str());
     break;
   case TriviaKind::Newline:
@@ -126,6 +130,7 @@ void TriviaPiece::print(llvm::raw_ostream &OS) const {
   case TriviaKind::BlockComment:
   case TriviaKind::DocLineComment:
   case TriviaKind::DocBlockComment:
+  case TriviaKind::GarbageText:
     OS << Text.str();
     break;
   case TriviaKind::Backtick:

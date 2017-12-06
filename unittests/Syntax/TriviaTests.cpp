@@ -49,6 +49,12 @@ TEST(TriviaTests, Empty) {
     Trivia::docBlockComment("").print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }, "");
+  ASSERT_DEATH({
+    llvm::SmallString<1> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Trivia::garbageText("").print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }, "");
 #endif
   {
     llvm::SmallString<1> Scratch;
@@ -166,6 +172,7 @@ TEST(TriviaTests, Contains) {
   ASSERT_FALSE(Trivia().contains(TriviaKind::DocBlockComment));
   ASSERT_FALSE(Trivia().contains(TriviaKind::DocLineComment));
   ASSERT_FALSE(Trivia().contains(TriviaKind::Formfeed));
+  ASSERT_FALSE(Trivia().contains(TriviaKind::GarbageText));
   ASSERT_FALSE(Trivia().contains(TriviaKind::LineComment));
   ASSERT_FALSE(Trivia().contains(TriviaKind::Newline));
   ASSERT_FALSE(Trivia().contains(TriviaKind::Space));
@@ -176,6 +183,7 @@ TEST(TriviaTests, Contains) {
               .contains(TriviaKind::DocBlockComment));
   ASSERT_TRUE(Trivia::docLineComment("///")
               .contains(TriviaKind::DocLineComment));
+  ASSERT_TRUE(Trivia::garbageText("#!swift").contains(TriviaKind::GarbageText));
   ASSERT_TRUE(Trivia::lineComment("//").contains(TriviaKind::LineComment));
   ASSERT_TRUE(Trivia::newlines(1).contains(TriviaKind::Newline));
   ASSERT_TRUE(Trivia::spaces(1).contains(TriviaKind::Space));

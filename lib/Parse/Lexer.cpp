@@ -2383,6 +2383,18 @@ Restart:
       goto Restart;
     }
     break;
+  case '#':
+    if (TriviaStart == BufferStart && *CurPtr == '!') {
+      // Hashbang '#!/path/to/swift'.
+      if (BufferID != SourceMgr.getHashbangBufferID())
+        diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
+      skipUpToEndOfLine(); // NOTE: Don't use skipHashbang() here because it
+                           // consumes trailing newline.
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      goto Restart;
+    }
+    break;
   default:
     break;
   }
