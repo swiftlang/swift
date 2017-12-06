@@ -1726,17 +1726,19 @@ extension ${Self} {
 
 % if bits == 80:
 #else
+
 ${SelfDocComment}
 @_fixed_layout
 @available(*, unavailable, message: "available only #if !os(Windows) && (arch(i386) || arch(x86_64))")
 public struct ${Self} {
-/// Creates a value initialized to zero.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public init() {
-fatalError("${Self} is not available")
+  /// Creates a value initialized to zero.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public init() {
+    fatalError("${Self} is not available")
+  }
 }
-}
+
 #endif
 % end
 % end # for bits in all_floating_point_types
