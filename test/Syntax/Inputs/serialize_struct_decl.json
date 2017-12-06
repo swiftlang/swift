@@ -14,8 +14,22 @@
                   "kind": "DeclarationStmt",
                   "layout": [
                     {
-                      "kind": "UnknownDecl",
+                      "kind": "StructDecl",
                       "layout": [
+                        {
+                          "kind": "AttributeList",
+                          "layout": [
+
+                          ],
+                          "presence": "Missing"
+                        },
+                        {
+                          "kind": "DeclModifier",
+                          "layout": [
+
+                          ],
+                          "presence": "Missing"
+                        },
                         {
                           "tokenKind": {
                             "kind": "kw_struct"
@@ -61,6 +75,27 @@
                             }
                           ],
                           "presence": "Present"
+                        },
+                        {
+                          "kind": "GenericParameterClause",
+                          "layout": [
+
+                          ],
+                          "presence": "Missing"
+                        },
+                        {
+                          "kind": "TypeInheritanceClause",
+                          "layout": [
+
+                          ],
+                          "presence": "Missing"
+                        },
+                        {
+                          "kind": "GenericWhereClause",
+                          "layout": [
+
+                          ],
+                          "presence": "Missing"
                         },
                         {
                           "kind": "MemberDeclBlock",
