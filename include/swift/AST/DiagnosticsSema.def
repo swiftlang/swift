@@ -1873,6 +1873,8 @@ ERROR(override_property_type_mismatch,none,
       (Identifier, Type, Type))
 ERROR(override_with_stored_property,none,
       "cannot override with a stored property %0", (Identifier))
+WARNING(override_with_stored_property_warn,none,
+      "cannot override with a stored property %0", (Identifier))
 ERROR(observing_readonly_property,none,
       "cannot observe read-only property %0; it can't change", (Identifier))
 ERROR(override_mutable_with_readonly_property,none,

@@ -6629,7 +6629,15 @@ public:
       
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
-        TC.diagnose(overrideASD, diag::override_with_stored_property,
+        auto diagID = diag::override_with_stored_property;
+        if (!TC.Context.isSwiftVersionAtLeast(5) &&
+            overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
+          // Swift 4.0 had a bug where lazy properties were considered
+          // computed by the time of this check. Downgrade this diagnostic to
+          // a warning.
+          diagID = diag::override_with_stored_property_warn;
+        }
+        TC.diagnose(overrideASD, diagID,
                     overrideASD->getBaseName().getIdentifier());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
