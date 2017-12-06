@@ -1174,6 +1174,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
+  Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   return false;
 }
 
