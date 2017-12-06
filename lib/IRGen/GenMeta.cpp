@@ -2633,11 +2633,14 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   // instantiated with every generic metadata instance.
   } else {
     auto size = IGM.getMetadataLayout(type).getSize();
-    Size offset = size.getOffsetToEnd();
+    auto index = -(size.AddressPoint.getValue() /
+                   int64_t(IGM.getPointerSize().getValue())) - 1;
+    auto offset = IGM.getSize(Size(index));
+
     vectorPtr = IGF.Builder.CreateBitCast(metadata,
                                           metadataArrayPtrTy->getPointerTo());
-    vectorPtr = IGF.Builder.CreateConstInBoundsGEP1_32(
-        /*Ty=*/nullptr, vectorPtr, IGM.getOffsetInWords(offset));
+    vectorPtr = IGF.Builder.CreateInBoundsGEP(
+        /*Ty=*/nullptr, vectorPtr, offset);
   }
   
   // First, see if the field type vector has already been populated. This
@@ -2917,12 +2920,12 @@ namespace {
         B.addPlaceholderWithSize(privateDataInit->getType());
 
       asImpl().addDependentData();
-
-      // Lay out the template data.
-      super::layout();
       
       // Save a slot for the field type vector address to be instantiated into.
       asImpl().addFieldTypeVectorReferenceSlot();
+
+      // Lay out the template data.
+      super::layout();
       
       // If we have a dependent value witness table, emit its template.
       if (HasDependentVWT) {

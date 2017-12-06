@@ -341,20 +341,20 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK-objc:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 0
 // CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to %objc_class**
-// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -25
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -26
 // CHECK-objc:   [[METACLASS:%.*]] = bitcast i8** [[T0]] to %objc_class*
 // CHECK-objc:   store %objc_class* [[METACLASS]], %objc_class** [[T1]], align 8
 //   Set up the instance rodata pointer.
 // CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 4
 // CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK-objc:   [[RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -20
+// CHECK-objc:   [[RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -21
 // CHECK-objc:   [[T2:%.*]] = ptrtoint i8** [[RODATA]] to i64
 // CHECK-objc:   [[T3:%.*]] = or i64 [[T2]], 1
 // CHECK-objc:   store i64 [[T3]], i64* [[T1]], align 8
 //   Set up the class rodata pointer.
-// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -21
+// CHECK-objc:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -22
 // CHECK-objc:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK-objc:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -11
+// CHECK-objc:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 -12
 // CHECK-objc:   [[T2:%.*]] = ptrtoint i8** [[META_RODATA]] to i64
 // CHECK-objc:   store i64 [[T2]], i64* [[T1]], align 8
 //   Initialize our own dependent field offsets.
