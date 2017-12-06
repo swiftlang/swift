@@ -15,6 +15,7 @@
 
 #include "swift/AST/Module.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/MapVector.h"
 
 #include <string>
 #include <vector>
@@ -61,7 +62,7 @@ class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllFiles;
-  typedef llvm::StringMap<unsigned> InputFileMap;
+  typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
   InputFileMap PrimaryInputs;
 
 public:
@@ -120,13 +121,15 @@ public:
   // Primary input readers
 
 private:
+  
+  bool doAllNonPrimariesEndWithSIB() const;
+
+public:
   void assertMustNotBeMoreThanOnePrimaryInput() const {
     assert(primaryInputCount() < 2 &&
            "have not implemented >1 primary input yet");
   }
-  bool doAllNonPrimariesEndWithSIB() const;
-
-public:
+  
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
   // Primary count readers:
@@ -136,6 +139,23 @@ public:
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
   bool isWholeModule() const { return !hasPrimaryInputs(); }
+  
+  void forEachPrimaryOrEmpty(llvm::function_ref<void(StringRef)> fn) const{
+    if (!hasPrimaryInputs())
+      fn("");
+    else
+      for (const auto &p: PrimaryInputs)
+        fn(p.first);
+  }
+  
+  bool forEachPrimaryOrEmptyWithErrors(llvm::function_ref<bool(StringRef)> fn) const{
+    if (!hasPrimaryInputs())
+      return fn("");
+    for (const auto &p: PrimaryInputs)
+      if (fn(p.first))
+        return true;
+    return false;
+  }
 
   // Count-dependend readers:
 
@@ -152,7 +172,7 @@ public:
     assert(false);
   }
 
-  /// Return the name of the unique primary input, or an empty StrinRef if there
+  /// Return the name of the unique primary input, or an empty StringRef if there
   /// isn't one.
   StringRef getNameOfUniquePrimaryInputFile() const {
     const auto *input = getUniquePrimaryInput();
@@ -211,23 +231,24 @@ public:
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (OutputPaths.OutputFilenames.size() >= 1)
-      return OutputPaths.OutputFilenames.back();
+  StringRef getSingleOutputFilename(StringRef primaryOrEmpty) const {
+    auto &OutputFilenames = pathsForPrimary(primaryOrEmpty).OutputFilenames;
+    if (OutputFilenames.size() >= 1)
+      return OutputFilenames.back();
     return StringRef();
   }
   /// Sets a single filename as output filename.
-  void setSingleOutputFilename(const std::string &FileName) {
-    OutputPaths.OutputFilenames.clear();
-    OutputPaths.OutputFilenames.push_back(FileName);
+  void setSingleOutputFilename(StringRef primaryOrEmpty, const std::string &FileName) {
+    pathsForPrimary(primaryOrEmpty).OutputFilenames.clear();
+    pathsForPrimary(primaryOrEmpty).OutputFilenames.push_back(FileName);
   }
-  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
-  bool isOutputFilenameStdout() const {
-    return getSingleOutputFilename() == "-";
+  void setOutputFilenameToStdout(StringRef primaryOrEmpty) { setSingleOutputFilename(primaryOrEmpty, "-"); }
+  bool isOutputFilenameStdout(StringRef primaryOrEmpty) const {
+    return getSingleOutputFilename(primaryOrEmpty) == "-";
   }
-  bool isOutputFileDirectory() const;
-  bool hasNamedOutputFile() const {
-    return !OutputPaths.OutputFilenames.empty() && !isOutputFilenameStdout();
+  bool isOutputFileDirectory(StringRef primaryOrEmpty) const;
+  bool hasNamedOutputFile(StringRef primaryOrEmpty) const {
+    return !pathsForPrimary(primaryOrEmpty).OutputFilenames.empty() && !isOutputFilenameStdout(primaryOrEmpty);
   }
 
   /// A list of arbitrary modules to import and make implicitly visible.
@@ -274,10 +295,30 @@ public:
     /// The path to which we should output a TBD file.
     std::string TBDPath;
   };
+private:
   /// Keyed by empty string for no-primary case
   llvm::StringMap<OutputPaths> OutputPathsByPrimary;
-
-  OutputPaths OutputPaths;
+public:
+  const OutputPaths &pathsForPrimary(StringRef primaryName) const {
+    auto iter = OutputPathsByPrimary.find(primaryName);
+    assert(iter != OutputPathsByPrimary.end());
+    return iter->second;
+  }
+  OutputPaths &pathsForPrimary(StringRef primaryName) {
+    auto iter = OutputPathsByPrimary.find(primaryName);
+    assert(iter != OutputPathsByPrimary.end());
+    return iter->second;
+  }
+  const OutputPaths &pathsForAtMostOnePrimary() const {
+    Inputs.assertMustNotBeMoreThanOnePrimaryInput();
+    const auto iter = OutputPathsByPrimary.find(Inputs.getNameOfUniquePrimaryInputFile());
+    return iter->getValue();
+  }
+  OutputPaths &pathsForAtMostOnePrimary() {
+    Inputs.assertMustNotBeMoreThanOnePrimaryInput();
+    auto iter =  OutputPathsByPrimary.find(Inputs.getNameOfUniquePrimaryInputFile());
+    return iter->getValue();
+  }
 
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
@@ -487,7 +528,7 @@ public:
     return llvm::hash_value(0);
   }
 
-  StringRef originalPath() const;
+  StringRef originalPath(StringRef primaryOrEmpty) const;
 
   StringRef determineFallbackModuleName() const;
 
@@ -498,15 +539,15 @@ public:
 private:
   static const char *suffixForPrincipalOutputFileForAction(ActionType);
 
-  bool hasUnusedDependenciesFilePath() const;
+  bool hasUnusedDependenciesFilePath(StringRef primaryOrEmpty) const;
   static bool canActionEmitDependencies(ActionType);
-  bool hasUnusedObjCHeaderOutputPath() const;
+  bool hasUnusedObjCHeaderOutputPath(StringRef primaryOrEmpty) const;
   static bool canActionEmitHeader(ActionType);
-  bool hasUnusedLoadedModuleTracePath() const;
+  bool hasUnusedLoadedModuleTracePath(StringRef primaryOrEmpty) const;
   static bool canActionEmitLoadedModuleTrace(ActionType);
-  bool hasUnusedModuleOutputPath() const;
+  bool hasUnusedModuleOutputPath(StringRef primaryOrEmpty) const;
   static bool canActionEmitModule(ActionType);
-  bool hasUnusedModuleDocOutputPath() const;
+  bool hasUnusedModuleDocOutputPath(StringRef primaryOrEmpty) const;
   static bool canActionEmitModuleDoc(ActionType);
 
   static bool doesActionProduceOutput(ActionType);

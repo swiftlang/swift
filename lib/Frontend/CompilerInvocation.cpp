@@ -253,6 +253,7 @@ private:
   bool computeFallbackModuleName();
   bool computeModuleName();
   bool computeOutputFilenames();
+  bool computeOutputFilenamesForPrimary(StringRef primaryOrEmpty, StringRef correspondingOutputFile);
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
   void computeImplicitImportModuleNames();
@@ -275,27 +276,28 @@ private:
   /// without the driver,
   /// because the driver will always pass -o with an appropriate filename
   /// if output is required for the requested action.
-  bool deriveOutputFilenameFromInputFile();
+  /// rgument is primary file name or empty if none.
+  bool deriveOutputFilenameFromInputFile(StringRef primaryOrEmpty, std::string &result);
 
   /// Determine the correct output filename when a directory was specified.
   ///
   /// Such a specification should only occur when invoking the frontend
   /// directly, because the driver will always pass -o with an appropriate
   /// filename if output is required for the requested action.
-  bool deriveOutputFilenameForDirectory(StringRef outputDir);
+  bool deriveOutputFilenameForDirectory(StringRef primaryOrEmpty, StringRef outputDir, std::string &result);
 
-  std::string determineBaseNameOfOutput() const;
+  std::string determineBaseNameOfOutput(StringRef primaryOrEmpty) const;
 
-  void deriveOutputFilenameFromParts(StringRef dir, StringRef base);
+  std::string deriveOutputFilenameFromParts(StringRef dir, StringRef base);
 
-  void determineSupplementaryOutputFilenames();
+  void determineSupplementaryOutputFilenamesForPrimary(StringRef primaryOrEmpty);
 
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
   ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
 
-  bool checkForUnusedOutputPaths() const;
+  bool checkForUnusedOutputPaths(StringRef primaryOrEmtpy) const;
 
   std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
 
@@ -374,9 +376,10 @@ bool FrontendArgsToOptionsConverter::convert() {
 
   if (computeOutputFilenames())
     return true;
-  determineSupplementaryOutputFilenames();
+  Opts.Inputs.forEachPrimaryOrEmpty([&] (StringRef pri)->void {determineSupplementaryOutputFilenamesForPrimary(pri); });
 
-  if (checkForUnusedOutputPaths())
+  if (Opts.Inputs.forEachPrimaryOrEmptyWithErrors([&] (StringRef pri) -> bool {
+    return checkForUnusedOutputPaths(pri); }))
     return true;
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
@@ -691,44 +694,62 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 }
 
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
-  assert(Opts.OutputPaths.OutputFilenames.empty() &&
-         "Output filename should not be set at this point");
   if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
     return false;
   }
   ArrayRef<std::string> outputFilenamesFromCommandLineOrFilelist =
-      getOutputFilenamesFromCommandLineOrFilelist();
-
+  getOutputFilenamesFromCommandLineOrFilelist();
+  if (Opts.Inputs.hasPrimaryInputs()) {
+    if (!outputFilenamesFromCommandLineOrFilelist.empty() && outputFilenamesFromCommandLineOrFilelist.size() != Opts.Inputs.primaryInputCount()) {
+      Diags.diagnose(SourceLoc(), diag::error_output_files_must_correspond_to_primaries);
+      return true;
+    }
+    unsigned index = 0;
+    return Opts.Inputs.forEachPrimaryOrEmptyWithErrors([&](StringRef primary) -> bool {
+      StringRef correspondingOutputFile = outputFilenamesFromCommandLineOrFilelist.empty() ? "" : outputFilenamesFromCommandLineOrFilelist[index++];
+      return computeOutputFilenamesForPrimary(primary, correspondingOutputFile);
+    });
+  }
   if (outputFilenamesFromCommandLineOrFilelist.size() > 1) {
     // WMO, threaded with N files (also someday batch mode).
-    Opts.OutputPaths.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+    Opts.pathsForPrimary("").OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
+  return computeOutputFilenamesForPrimary("", outputFilenamesFromCommandLineOrFilelist.empty() ? "" : outputFilenamesFromCommandLineOrFilelist[0]);
+}
 
-  if (outputFilenamesFromCommandLineOrFilelist.empty()) {
+bool FrontendArgsToOptionsConverter::computeOutputFilenamesForPrimary(StringRef primaryOrEmpty, StringRef correspondingOutput) {
+  std::string result;
+  if (correspondingOutput.empty()) {
     // When the Frontend is invoked without going through the driver
     // (e.g. for testing), it is convenient to derive output filenames from
     // input.
-    return deriveOutputFilenameFromInputFile();
+    if (deriveOutputFilenameFromInputFile(primaryOrEmpty, result))
+      return true;
   }
-
-  StringRef outputFilename = outputFilenamesFromCommandLineOrFilelist[0];
-  if (!llvm::sys::fs::is_directory(outputFilename)) {
+  else if (!llvm::sys::fs::is_directory(correspondingOutput)) {
     // Could be -primary-file (1), or -wmo (non-threaded w/ N (input) files)
-    Opts.OutputPaths.OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
-    return false;
+    result = correspondingOutput;
   }
-  // Only used for testing & when invoking frontend directly.
-  return deriveOutputFilenameForDirectory(outputFilename);
+  else {
+    // Only used for testing & when invoking frontend directly.
+    if (deriveOutputFilenameForDirectory(primaryOrEmpty, correspondingOutput, result))
+      return true;
+  }
+  std::vector<std::string> &OutputFilenames = Opts.pathsForPrimary(primaryOrEmpty).OutputFilenames;
+  assert(OutputFilenames.empty() &&
+         "Output filename should not be set at this point");
+  OutputFilenames.push_back(result);
+  return false;
 }
 
-bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
+bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile(StringRef primaryOrEmpty, std::string &result) {
   if (Opts.Inputs.isReadingFromStdin() ||
       FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction)) {
-    Opts.setOutputFilenameToStdout();
+    result = "-";
     return false;
   }
-  std::string baseName = determineBaseNameOfOutput();
+  std::string baseName = determineBaseNameOfOutput(primaryOrEmpty);
   if (baseName.empty()) {
     if (Opts.RequestedAction != FrontendOptions::ActionType::REPL &&
         Opts.RequestedAction != FrontendOptions::ActionType::Immediate &&
@@ -736,26 +757,27 @@ bool FrontendArgsToOptionsConverter::deriveOutputFilenameFromInputFile() {
       Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
       return true;
     }
+    result = "";
     return false;
   }
-  deriveOutputFilenameFromParts("", baseName);
+  result = deriveOutputFilenameFromParts("", baseName);
   return false;
 }
 
 bool FrontendArgsToOptionsConverter::deriveOutputFilenameForDirectory(
-    StringRef outputDir) {
+    StringRef primaryOrEmpty, StringRef outputDir, std::string &result) {
 
-  std::string baseName = determineBaseNameOfOutput();
+  std::string baseName = determineBaseNameOfOutput(primaryOrEmpty);
   if (baseName.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
                    outputDir);
     return true;
   }
-  deriveOutputFilenameFromParts(outputDir, baseName);
+  result = deriveOutputFilenameFromParts(outputDir, baseName);
   return false;
 }
 
-void FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
+std::string FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
     StringRef dir, StringRef base) {
   assert(!base.empty());
   llvm::SmallString<128> path(dir);
@@ -763,13 +785,13 @@ void FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
   StringRef suffix = FrontendOptions::suffixForPrincipalOutputFileForAction(
       Opts.RequestedAction);
   llvm::sys::path::replace_extension(path, suffix);
-  Opts.OutputPaths.OutputFilenames.push_back(path.str());
+  return path.str();
 }
 
-std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
+std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput(StringRef primaryOrEmpty) const {
   std::string nameToStem;
-  if (Opts.Inputs.hasPrimaryInputs()) {
-    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().getFile();
+  if (!primaryOrEmpty.empty()) {
+    nameToStem = primaryOrEmpty;
   } else if (auto UserSpecifiedModuleName =
                  Args.getLastArg(options::OPT_module_name)) {
     nameToStem = UserSpecifiedModuleName->getValue();
@@ -815,7 +837,7 @@ std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
   return outputFiles;
 }
 
-void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
+void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenamesForPrimary(StringRef primaryOrEmpty) {
   using namespace options;
   auto determineOutputFilename =
       [&](std::string &output, OptSpecifier optWithoutPath,
@@ -829,37 +851,38 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
         if (!Args.hasArg(optWithoutPath))
           return;
 
-        if (useMainOutput && !Opts.OutputPaths.OutputFilenames.empty()) {
-          output = Opts.getSingleOutputFilename();
+        if (useMainOutput && !Opts.pathsForPrimary(primaryOrEmpty).OutputFilenames.empty()) {
+          output = Opts.getSingleOutputFilename(primaryOrEmpty);
           return;
         }
 
         if (!output.empty())
           return;
 
-        llvm::SmallString<128> path(Opts.originalPath());
+        llvm::SmallString<128> path(Opts.originalPath(primaryOrEmpty));
         llvm::sys::path::replace_extension(path, extension);
         output = path.str();
       };
 
-  determineOutputFilename(Opts.OutputPaths.DependenciesFilePath,
+  auto &OutputPaths = Opts.pathsForPrimary(primaryOrEmpty);
+  determineOutputFilename(OutputPaths.DependenciesFilePath,
                           OPT_emit_dependencies, OPT_emit_dependencies_path,
                           "d", false);
-  determineOutputFilename(Opts.OutputPaths.ReferenceDependenciesFilePath,
+  determineOutputFilename(OutputPaths.ReferenceDependenciesFilePath,
                           OPT_emit_reference_dependencies,
                           OPT_emit_reference_dependencies_path, "swiftdeps",
                           false);
-  determineOutputFilename(Opts.OutputPaths.SerializedDiagnosticsPath,
+  determineOutputFilename(OutputPaths.SerializedDiagnosticsPath,
                           OPT_serialize_diagnostics,
                           OPT_serialize_diagnostics_path, "dia", false);
-  determineOutputFilename(Opts.OutputPaths.ObjCHeaderOutputPath,
+  determineOutputFilename(OutputPaths.ObjCHeaderOutputPath,
                           OPT_emit_objc_header, OPT_emit_objc_header_path, "h",
                           false);
   determineOutputFilename(
-      Opts.OutputPaths.LoadedModuleTracePath, OPT_emit_loaded_module_trace,
+      OutputPaths.LoadedModuleTracePath, OPT_emit_loaded_module_trace,
       OPT_emit_loaded_module_trace_path, "trace.json", false);
 
-  determineOutputFilename(Opts.OutputPaths.TBDPath, OPT_emit_tbd,
+  determineOutputFilename(OutputPaths.TBDPath, OPT_emit_tbd,
                           OPT_emit_tbd_path, "tbd", false);
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
@@ -876,34 +899,34 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
   auto sibOpt = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB
                     ? OPT_emit_sib
                     : OPT_emit_sibgen;
-  determineOutputFilename(Opts.OutputPaths.ModuleOutputPath,
+  determineOutputFilename(OutputPaths.ModuleOutputPath,
                           isSIB ? sibOpt : OPT_emit_module,
                           OPT_emit_module_path, ext, canUseMainOutputForModule);
 
-  determineOutputFilename(Opts.OutputPaths.ModuleDocOutputPath,
+  determineOutputFilename(OutputPaths.ModuleDocOutputPath,
                           OPT_emit_module_doc, OPT_emit_module_doc_path,
                           SERIALIZED_MODULE_DOC_EXTENSION, false);
 }
 
-bool FrontendArgsToOptionsConverter::checkForUnusedOutputPaths() const {
-  if (Opts.hasUnusedDependenciesFilePath()) {
+bool FrontendArgsToOptionsConverter::checkForUnusedOutputPaths(StringRef primaryOrEmpty) const {
+  if (Opts.hasUnusedDependenciesFilePath(primaryOrEmpty)) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
   }
-  if (Opts.hasUnusedObjCHeaderOutputPath()) {
+  if (Opts.hasUnusedObjCHeaderOutputPath(primaryOrEmpty)) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
     return true;
   }
-  if (Opts.hasUnusedLoadedModuleTracePath()) {
+  if (Opts.hasUnusedLoadedModuleTracePath(primaryOrEmpty)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_loaded_module_trace);
     return true;
   }
-  if (Opts.hasUnusedModuleOutputPath()) {
+  if (Opts.hasUnusedModuleOutputPath(primaryOrEmpty)) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
     return true;
   }
-  if (Opts.hasUnusedModuleDocOutputPath()) {
+  if (Opts.hasUnusedModuleDocOutputPath(primaryOrEmpty)) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
     return true;
   }
@@ -915,7 +938,7 @@ void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |= !Opts.Inputs.hasPrimaryInputs() &&
-                                    !Opts.OutputPaths.ModuleOutputPath.empty();
+                                    !Opts.pathsForPrimary("").ModuleOutputPath.empty();
   }
 }
 void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
@@ -1517,7 +1540,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.getSingleOutputFilename();
+    StringRef BaseName = FEOpts.getSingleOutputFilename(FEOpts.Inputs.getRequiredUniquePrimaryInput().getFile());
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -1668,7 +1691,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (FrontendOpts.Inputs.hasUniqueInput()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
-  Opts.OutputFilenames = FrontendOpts.OutputPaths.OutputFilenames;
+  Opts.OutputFilenames = FrontendOpts.pathsForAtMostOnePrimary().OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))

@@ -173,11 +173,11 @@ public:
     return SearchPathOpts.SDKPath;
   }
 
-  void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.OutputPaths.SerializedDiagnosticsPath = Path;
+  void setSerializedDiagnosticsPath(StringRef primaryOrEmpty, StringRef Path) {
+    FrontendOpts.pathsForPrimary(primaryOrEmpty).SerializedDiagnosticsPath = Path;
   }
-  StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.OutputPaths.SerializedDiagnosticsPath;
+  StringRef getSerializedDiagnosticsPath(StringRef primaryOrEmpty) const {
+    return FrontendOpts.pathsForPrimary(primaryOrEmpty).SerializedDiagnosticsPath;
   }
 
   LangOptions &getLangOptions() {
@@ -243,8 +243,8 @@ public:
   }
 
 
-  StringRef getOutputFilename() const {
-    return FrontendOpts.getSingleOutputFilename();
+  StringRef getOutputFilename(StringRef primaryOrEmpty) const {
+    return FrontendOpts.getSingleOutputFilename(primaryOrEmpty);
   }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
