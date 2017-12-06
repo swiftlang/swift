@@ -15,6 +15,5 @@ endif()
 
 add_sourcekit_library(SourceKitSupport
   ${SourceKitSupport_sources}
-  DEPENDS swift-syntax-generated-headers
   LINK_LIBS ${SOURCEKIT_SUPPORT_DEPEND}
 )
