@@ -76,6 +76,15 @@ extension _StringGuts {
   @inline(never) // Hide the CF/ICU dependency
   public  // @testable
   static func _compareDeterministicUnicodeCollation(
+    _ left: _StringGuts, to right: _StringGuts) -> Int {
+    return _compareDeterministicUnicodeCollation(
+      left, 0..<left.count, to: right, 0..<right.count)
+  }
+
+  /// Compares two slices of strings with the Unicode Collation Algorithm.
+  @inline(never) // Hide the CF/ICU dependency
+  public  // @testable
+  static func _compareDeterministicUnicodeCollation(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     to right: _StringGuts, _ rightRange: Range<Int>) -> Int {
     // Note: this operation should be consistent with equality comparison of
@@ -132,6 +141,18 @@ extension _StringGuts {
   @_inlineable
   @_versioned
   internal static func isEqual(
+    _ left: _StringGuts, to right: _StringGuts
+  ) -> Bool {
+    // Bitwise equality implies string equality
+    if left._bitwiseEqualTo(right) {
+      return true
+    }
+    return compare(left, to: right) == 0
+  }
+
+  @_inlineable
+  @_versioned
+  internal static func isEqual(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     to right: _StringGuts, _ rightRange: Range<Int>
   ) -> Bool {
@@ -140,6 +161,14 @@ extension _StringGuts {
       return true
     }
     return compare(left, leftRange, to: right, rightRange) == 0
+  }
+
+  @_inlineable
+  @_versioned
+  internal static func isLess(
+    _ left: _StringGuts, than right: _StringGuts
+  ) -> Bool {
+    return compare(left, to: right) == -1
   }
 
   @_inlineable
@@ -178,6 +207,31 @@ extension _StringGuts {
     return _compareDeterministicUnicodeCollation(
       left, leftRange,
       to: right, rightRange)
+#endif
+  }  
+
+  @_inlineable
+  @_versioned
+  internal static func compare(
+    _ left: _StringGuts, to right: _StringGuts
+  ) -> Int {
+#if _runtime(_ObjC)
+    // We only want to perform this optimization on objc runtimes. Elsewhere,
+    // we will make it follow the unicode collation algorithm even for ASCII.
+    // This is consistent with Foundation, but incorrect as defined by Unicode.
+    //
+    // FIXME: String ordering should be consistent across all platforms.
+    if left.isASCII && right.isASCII {
+      let leftASCII = left._unmanagedASCIIView
+      let rightASCII = right._unmanagedASCIIView
+      let result = leftASCII.compareASCII(to: rightASCII)
+      _fixLifetime(left)
+      _fixLifetime(right)
+      return result
+    }
+    return _compareDeterministicUnicodeCollation(left, to: right)
+#else
+    return _compareDeterministicUnicodeCollation(left, to: right)
 #endif
   }
 }
@@ -222,9 +276,7 @@ extension String : Equatable {
   // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
   @_inlineable // FIXME(sil-serialize-all)
   public static func ==(lhs: String, rhs: String) -> Bool {
-    return _StringGuts.isEqual(
-      lhs._guts, 0..<lhs._guts.count,
-      to: rhs._guts, 0..<rhs._guts.count)
+    return _StringGuts.isEqual(lhs._guts, to: rhs._guts)
   }
 }
 
@@ -232,9 +284,7 @@ extension String : Comparable {
   // FIXME: Why do I need this? If I drop it, I get "ambiguous use of operator"
   @_inlineable // FIXME(sil-serialize-all)
   public static func < (lhs: String, rhs: String) -> Bool {
-    return _StringGuts.isLess(
-      lhs._guts, 0..<lhs._guts.count,
-      than: rhs._guts, 0..<rhs._guts.count)
+    return _StringGuts.isLess(lhs._guts, than: rhs._guts)
   }
 }
 
