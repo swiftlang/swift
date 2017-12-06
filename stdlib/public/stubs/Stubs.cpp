@@ -348,6 +348,10 @@ typedef unsigned du_int SWIFT_MODE_DI;
     (defined(__linux__) && defined(__s390x__)) || \
     (defined(__ANDROID__) && defined(__arm64__))
 
+#if !(__has_attribute(__mode__))
+#error "The __mode__ attribute is required."
+#endif    
+
 SWIFT_RUNTIME_STDLIB_INTERFACE
 ti_int
 __muloti4(ti_int a, ti_int b, int* overflow)
@@ -401,6 +405,10 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 // missing.  Perhaps relevant bug report:
 // FIXME: https://llvm.org/bugs/show_bug.cgi?id=14469
 
+#if !(__has_attribute(__mode__))
+#error "The __mode__ attribute is required."
+#endif
+
 SWIFT_RUNTIME_STDLIB_INTERFACE
 di_int
 __mulodi4(di_int a, di_int b, int* overflow)
@@ -442,6 +450,10 @@ __mulodi4(di_int a, di_int b, int* overflow)
 }
 
 #if defined(_WIN64)
+
+#if !(__has_attribute(__mode__))
+#error "The __mode__ attribute is required."
+#endif
 
 typedef union
 {
