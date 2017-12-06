@@ -121,7 +121,7 @@
 // convention.
 #define SWIFT_LLVM_CC(CC) SWIFT_LLVM_CC_##CC
 
-// Currently, RuntimeFunction.def uses the following calling conventions:
+// Currently, RuntimeFunctions.def uses the following calling conventions:
 // DefaultCC, RegisterPreservingCC, SwiftCC.
 // If new runtime calling conventions are added later, they need to be mapped
 // here to something appropriate.
