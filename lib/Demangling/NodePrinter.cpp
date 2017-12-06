@@ -291,6 +291,7 @@ private:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
+    case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
     case Node::Kind::CurryThunk:
@@ -1370,6 +1371,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " : ";
     print(Node->getChild(2));
     Printer << " in ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ClassMetadataBaseOffset:
+    Printer << "class metadata base offset for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NominalTypeDescriptor:
