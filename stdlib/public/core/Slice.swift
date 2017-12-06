@@ -264,7 +264,8 @@ extension Slice: MutableCollection where Base: MutableCollection {
 
 extension Slice: RandomAccessCollection where Base: RandomAccessCollection { }
 
-extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollection {
+extension Slice: RangeReplaceableCollection
+  where Base: RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
     self._base = Base()
@@ -354,7 +355,7 @@ extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollecti
 }
 
 extension Slice
-where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
+  where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C>(
@@ -476,27 +477,25 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
 }
 
 @available(*, deprecated, renamed: "Slice")
-public typealias BidirectionalSlice<T> = Slice<T> where T: BidirectionalCollection
+public typealias BidirectionalSlice<T> = Slice<T> where T : BidirectionalCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias RandomAccessSlice<T> = Slice<T> where T: RandomAccessCollection
+public typealias RandomAccessSlice<T> = Slice<T> where T : RandomAccessCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias RangeReplaceableSlice<T> = Slice<T> where T: RangeReplaceableCollection
+public typealias RangeReplaceableSlice<T> = Slice<T> where T : RangeReplaceableCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias RangeReplaceableBidirectionalSlice<T> = Slice<T> where T: RangeReplaceableCollection, T: BidirectionalCollection
+public typealias RangeReplaceableBidirectionalSlice<T> = Slice<T> where T : RangeReplaceableCollection & BidirectionalCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias RangeReplaceableRandomAccessSlice<T> = Slice<T> where T: RangeReplaceableCollection, T: RandomAccessCollection
+public typealias RangeReplaceableRandomAccessSlice<T> = Slice<T> where T : RangeReplaceableCollection & RandomAccessCollection
 
 @available(*, deprecated, renamed: "Slice")
-public typealias MutableSlice<T: MutableCollection> = Slice<T>
+public typealias MutableSlice<T> = Slice<T> where T : MutableCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias MutableBidirectionalSlice<T: MutableCollection> = Slice<T> where T: BidirectionalCollection
+public typealias MutableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & BidirectionalCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias MutableRandomAccessSlice<T: MutableCollection> = Slice<T> where T: RandomAccessCollection
+public typealias MutableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RandomAccessCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias MutableRangeReplaceableSlice<T: MutableCollection> = Slice<T> where T: RangeReplaceableCollection
+public typealias MutableRangeReplaceableSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias MutableRangeReplaceableBidirectionalSlice<T: MutableCollection> = Slice<T> where T: RangeReplaceableCollection, T: BidirectionalCollection
+public typealias MutableRangeReplaceableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & BidirectionalCollection
 @available(*, deprecated, renamed: "Slice")
-public typealias MutableRangeReplaceableRandomAccessSlice<T: MutableCollection> = Slice<T> where T: RangeReplaceableCollection, T: RandomAccessCollection
-
-
+public typealias MutableRangeReplaceableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & RandomAccessCollection
