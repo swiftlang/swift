@@ -101,12 +101,14 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
                                  DependencyTracker &depTracker,
                                  const FrontendOptions &opts) {
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.DependenciesFilePath, EC,
-                           llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(
+      opts.supplementaryPrimaryDependentPaths.DependenciesFilePath, EC,
+      llvm::sys::fs::F_None);
 
   if (out.has_error() || EC) {
     diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   opts.DependenciesFilePath, EC.message());
+                   opts.supplementaryPrimaryDependentPaths.DependenciesFilePath,
+                   EC.message());
     out.clear_error();
     return true;
   }
@@ -174,12 +176,15 @@ static bool emitLoadedModuleTrace(ASTContext &ctxt,
                                   DependencyTracker &depTracker,
                                   const FrontendOptions &opts) {
   std::error_code EC;
-  llvm::raw_fd_ostream out(opts.LoadedModuleTracePath, EC,
-                           llvm::sys::fs::F_Append);
+  llvm::raw_fd_ostream out(
+      opts.supplementaryPrimaryDependentPaths.LoadedModuleTracePath, EC,
+      llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        opts.LoadedModuleTracePath, EC.message());
+    ctxt.Diags.diagnose(
+        SourceLoc(), diag::error_opening_output,
+        opts.supplementaryPrimaryDependentPaths.LoadedModuleTracePath,
+        EC.message());
     out.clear_error();
     return true;
   }
@@ -576,7 +581,8 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   ReferencedNameTracker nameTracker;
-  bool shouldTrackReferences = !opts.ReferenceDependenciesFilePath.empty();
+  bool shouldTrackReferences = !opts.supplementaryPrimaryDependentPaths
+                                    .ReferenceDependenciesFilePath.empty();
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
@@ -709,7 +715,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
 
-  if (!opts.DependenciesFilePath.empty())
+  if (!opts.supplementaryPrimaryDependentPaths.DependenciesFilePath.empty())
     (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
                                opts);
 
@@ -717,7 +723,7 @@ static bool performCompile(CompilerInstance &Instance,
     emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
                               *Instance.getDependencyTracker(), opts);
 
-  if (!opts.LoadedModuleTracePath.empty())
+  if (!opts.supplementaryPrimaryDependentPaths.LoadedModuleTracePath.empty())
     (void)emitLoadedModuleTrace(Context, *Instance.getDependencyTracker(),
                                 opts);
 
@@ -741,9 +747,11 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    if (!opts.ObjCHeaderOutputPath.empty())
-      return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                         opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    if (!opts.supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath.empty())
+      return printAsObjC(
+          opts.supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath,
+          Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+          moduleIsPublic);
     if (shouldIndex) {
       if (emitIndexData(PrimarySourceFile, Invocation, Instance))
         return true;
@@ -752,14 +760,14 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   const auto &SILOpts = Invocation.getSILOptions();
-  if (!opts.TBDPath.empty()) {
+  if (!opts.supplementaryPrimaryDependentPaths.TBDPath.empty()) {
     auto hasMultipleIRGenThreads = SILOpts.NumThreads > 1;
     auto installName = opts.TBDInstallName.empty()
                            ? "lib" + Invocation.getModuleName().str() + ".dylib"
                            : opts.TBDInstallName;
 
     if (writeTBD(Instance.getMainModule(), hasMultipleIRGenThreads,
-                 opts.TBDPath, installName))
+                 opts.supplementaryPrimaryDependentPaths.TBDPath, installName))
       return true;
   }
 
@@ -824,9 +832,10 @@ static bool performCompile(CompilerInstance &Instance,
 
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    if (!opts.ModuleOutputPath.empty()) {
+    if (!opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
-      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+      serializationOpts.OutputPath =
+          opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
@@ -878,13 +887,16 @@ static bool performCompile(CompilerInstance &Instance,
   // done, depending on the compiler setting.
 
   auto SerializeSILModuleAction = [&]() {
-    if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
+    if (!opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.empty() ||
+        !opts.supplementaryPrimaryDependentPaths.ModuleDocOutputPath.empty()) {
       auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile)
                                   : Instance.getMainModule();
-      if (!opts.ModuleOutputPath.empty()) {
+      if (!opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.empty()) {
         SerializationOptions serializationOpts;
-        serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
-        serializationOpts.DocOutputPath = opts.ModuleDocOutputPath.c_str();
+        serializationOpts.OutputPath =
+            opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.c_str();
+        serializationOpts.DocOutputPath =
+            opts.supplementaryPrimaryDependentPaths.ModuleDocOutputPath.c_str();
         serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
         if (opts.SerializeBridgingHeader)
           serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -957,17 +969,19 @@ static bool performCompile(CompilerInstance &Instance,
       IRGenOpts.DWARFDebugFlags += (" -private-discriminator "+PD.str()).str();
   }
 
-  if (!opts.ObjCHeaderOutputPath.empty()) {
-    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
-                      opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  if (!opts.supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath.empty()) {
+    (void)printAsObjC(
+        opts.supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath,
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIB) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    if (!opts.ModuleOutputPath.empty()) {
+    if (!opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
-      serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
+      serializationOpts.OutputPath =
+          opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
@@ -976,7 +990,8 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
   }
 
-  if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
+  if (!opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.empty() ||
+      !opts.supplementaryPrimaryDependentPaths.ModuleDocOutputPath.empty()) {
     // Serialize the SILModule if it was not serialized yet.
     if (!SM.get()->isSerialized())
       SM.get()->serialize();
@@ -1135,7 +1150,8 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
       return true;
     }
   } else {
-    StringRef moduleToken = opts.ModuleOutputPath;
+    StringRef moduleToken =
+        opts.supplementaryPrimaryDependentPaths.ModuleOutputPath;
     if (moduleToken.empty())
       moduleToken = opts.getSingleOutputFilename();
 
@@ -1343,7 +1359,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<DiagnosticConsumer> SerializedConsumer;
   {
     const std::string &SerializedDiagnosticsPath =
-      Invocation.getFrontendOptions().SerializedDiagnosticsPath;
+        Invocation.getFrontendOptions()
+            .supplementaryPrimaryDependentPaths.SerializedDiagnosticsPath;
     if (!SerializedDiagnosticsPath.empty()) {
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(SerializedDiagnosticsPath));
@@ -1403,10 +1420,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   DependencyTracker depTracker;
-  if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
-      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty() ||
+  if (!Invocation.getFrontendOptions()
+           .supplementaryPrimaryDependentPaths.DependenciesFilePath.empty() ||
+      !Invocation.getFrontendOptions()
+           .supplementaryPrimaryDependentPaths.ReferenceDependenciesFilePath
+           .empty() ||
       !Invocation.getFrontendOptions().IndexStorePath.empty() ||
-      !Invocation.getFrontendOptions().LoadedModuleTracePath.empty()) {
+      !Invocation.getFrontendOptions()
+           .supplementaryPrimaryDependentPaths.LoadedModuleTracePath.empty()) {
     Instance->setDependencyTracker(&depTracker);
   }
 

@@ -842,22 +842,26 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
         output = path.str();
       };
 
-  determineOutputFilename(Opts.DependenciesFilePath, OPT_emit_dependencies,
-                          OPT_emit_dependencies_path, "d", false);
   determineOutputFilename(
-      Opts.ReferenceDependenciesFilePath, OPT_emit_reference_dependencies,
-      OPT_emit_reference_dependencies_path, "swiftdeps", false);
-  determineOutputFilename(Opts.SerializedDiagnosticsPath,
-                          OPT_serialize_diagnostics,
-                          OPT_serialize_diagnostics_path, "dia", false);
-  determineOutputFilename(Opts.ObjCHeaderOutputPath, OPT_emit_objc_header,
-                          OPT_emit_objc_header_path, "h", false);
+      Opts.supplementaryPrimaryDependentPaths.DependenciesFilePath,
+      OPT_emit_dependencies, OPT_emit_dependencies_path, "d", false);
   determineOutputFilename(
-      Opts.LoadedModuleTracePath, OPT_emit_loaded_module_trace,
-      OPT_emit_loaded_module_trace_path, "trace.json", false);
+      Opts.supplementaryPrimaryDependentPaths.ReferenceDependenciesFilePath,
+      OPT_emit_reference_dependencies, OPT_emit_reference_dependencies_path,
+      "swiftdeps", false);
+  determineOutputFilename(
+      Opts.supplementaryPrimaryDependentPaths.SerializedDiagnosticsPath,
+      OPT_serialize_diagnostics, OPT_serialize_diagnostics_path, "dia", false);
+  determineOutputFilename(
+      Opts.supplementaryPrimaryDependentPaths.ObjCHeaderOutputPath,
+      OPT_emit_objc_header, OPT_emit_objc_header_path, "h", false);
+  determineOutputFilename(
+      Opts.supplementaryPrimaryDependentPaths.LoadedModuleTracePath,
+      OPT_emit_loaded_module_trace, OPT_emit_loaded_module_trace_path,
+      "trace.json", false);
 
-  determineOutputFilename(Opts.TBDPath, OPT_emit_tbd, OPT_emit_tbd_path, "tbd",
-                          false);
+  determineOutputFilename(Opts.supplementaryPrimaryDependentPaths.TBDPath,
+                          OPT_emit_tbd, OPT_emit_tbd_path, "tbd", false);
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
@@ -873,13 +877,15 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames() {
   auto sibOpt = Opts.RequestedAction == FrontendOptions::ActionType::EmitSIB
                     ? OPT_emit_sib
                     : OPT_emit_sibgen;
-  determineOutputFilename(Opts.ModuleOutputPath,
-                          isSIB ? sibOpt : OPT_emit_module,
-                          OPT_emit_module_path, ext, canUseMainOutputForModule);
+  determineOutputFilename(
+      Opts.supplementaryPrimaryDependentPaths.ModuleOutputPath,
+      isSIB ? sibOpt : OPT_emit_module, OPT_emit_module_path, ext,
+      canUseMainOutputForModule);
 
-  determineOutputFilename(Opts.ModuleDocOutputPath, OPT_emit_module_doc,
-                          OPT_emit_module_doc_path,
-                          SERIALIZED_MODULE_DOC_EXTENSION, false);
+  determineOutputFilename(
+      Opts.supplementaryPrimaryDependentPaths.ModuleDocOutputPath,
+      OPT_emit_module_doc, OPT_emit_module_doc_path,
+      SERIALIZED_MODULE_DOC_EXTENSION, false);
 }
 
 bool FrontendArgsToOptionsConverter::checkForUnusedOutputPaths() const {
@@ -912,7 +918,8 @@ void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |=
-        !Opts.Inputs.hasPrimaryInputs() && !Opts.ModuleOutputPath.empty();
+        !Opts.Inputs.hasPrimaryInputs() &&
+        !Opts.supplementaryPrimaryDependentPaths.ModuleOutputPath.empty();
   }
 }
 void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
