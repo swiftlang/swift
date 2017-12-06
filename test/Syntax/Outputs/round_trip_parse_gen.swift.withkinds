@@ -63,26 +63,32 @@ typealias B = (<MemberTypeIdentifier><SimpleTypeIdentifier>Array<GenericArgument
 typealias C = <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>
 typealias D = <DictionaryType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier>]</DictionaryType>
 typealias E = <MetatypeType><OptionalType><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>?</OptionalType>.Protocol</MetatypeType>
-typealias F = <MetatypeType><ImplicitlyUnwrappedOptionalType><ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>!</ImplicitlyUnwrappedOptionalType>.Type</MetatypeType>
+typealias F = <MetatypeType><ImplicitlyUnwrappedOptionalType><ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>!</ImplicitlyUnwrappedOptionalType>.Type</MetatypeType><StructDecl>
 
-struct foo <MemberDeclBlock>{
-  struct foo <MemberDeclBlock>{
+struct foo <MemberDeclBlock>{<StructDecl>
+  struct foo <MemberDeclBlock>{<StructDecl>
     struct foo <MemberDeclBlock>{
       func foo() <CodeBlock>{
       }</CodeBlock>
-    }</MemberDeclBlock>
-  }</MemberDeclBlock>
-  struct foo <MemberDeclBlock>{}</MemberDeclBlock>
-}</MemberDeclBlock>
+    }</MemberDeclBlock></StructDecl>
+  }</MemberDeclBlock></StructDecl><StructDecl>
+  struct foo <MemberDeclBlock>{}</MemberDeclBlock></StructDecl>
+}</MemberDeclBlock></StructDecl><StructDecl>
 
-struct foo <MemberDeclBlock>{<Attribute>
+struct foo <MemberDeclBlock>{<StructDecl><Attribute>
   @available(*, unavailable)</Attribute>
-  struct foo <MemberDeclBlock>{}</MemberDeclBlock><DeclModifier>
+  struct foo <MemberDeclBlock>{}</MemberDeclBlock></StructDecl><DeclModifier>
   public </DeclModifier>class foo {<Attribute>
     @available(*, unavailable)</Attribute><Attribute>
     @objc(fooObjc)</Attribute><DeclModifier>
     private </DeclModifier><DeclModifier>static </DeclModifier>func foo() <CodeBlock>{}</CodeBlock>
   }
-}</MemberDeclBlock>
+}</MemberDeclBlock></StructDecl><StructDecl>
 
-struct S<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B, </GenericParameter><GenericParameter>C, </GenericParameter><GenericParameter><Attribute>@objc </Attribute>D</GenericParameter>> </GenericParameterClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><SimpleTypeIdentifier>B</SimpleTypeIdentifier>==<SimpleTypeIdentifier>C</SimpleTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><SimpleTypeIdentifier>A </SimpleTypeIdentifier>: <SimpleTypeIdentifier>C</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>B</SimpleTypeIdentifier>.C </MemberTypeIdentifier>== <MemberTypeIdentifier><SimpleTypeIdentifier>D</SimpleTypeIdentifier>.A</MemberTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>A</SimpleTypeIdentifier>.B</MemberTypeIdentifier>: <MemberTypeIdentifier><SimpleTypeIdentifier>C</SimpleTypeIdentifier>.D </MemberTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock>
+struct S<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B, </GenericParameter><GenericParameter>C, </GenericParameter><GenericParameter><Attribute>@objc </Attribute>D</GenericParameter>> </GenericParameterClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><SimpleTypeIdentifier>B</SimpleTypeIdentifier>==<SimpleTypeIdentifier>C</SimpleTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><SimpleTypeIdentifier>A </SimpleTypeIdentifier>: <SimpleTypeIdentifier>C</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>B</SimpleTypeIdentifier>.C </MemberTypeIdentifier>== <MemberTypeIdentifier><SimpleTypeIdentifier>D</SimpleTypeIdentifier>.A</MemberTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>A</SimpleTypeIdentifier>.B</MemberTypeIdentifier>: <MemberTypeIdentifier><SimpleTypeIdentifier>C</SimpleTypeIdentifier>.D </MemberTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></StructDecl><StructDecl><DeclModifier>
+
+private </DeclModifier>struct S<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B</GenericParameter>></GenericParameterClause><TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Base </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>: <SimpleTypeIdentifier>B </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{<StructDecl><DeclModifier>
+  private </DeclModifier>struct S<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>A</SimpleTypeIdentifier>, </InheritedType><InheritedType><SimpleTypeIdentifier>B </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></StructDecl>
+}</MemberDeclBlock></StructDecl>
+
+protocol P<TypeInheritanceClause>: <InheritedType>class </InheritedType></TypeInheritanceClause>{}
