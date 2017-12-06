@@ -55,13 +55,11 @@ bool FrontendInputs::shouldTreatAsSIL() const {
 
 unsigned
 FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
-  unsigned N = 0;
-  for (const auto &iter : PrimaryInputs) {
-    StringRef filename = AllFiles[iter.second].getFile();
-    if (llvm::sys::path::extension(filename).endswith(extension))
-      ++N;
-  }
-  return N;
+  return count_if(
+      PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
+        StringRef filename = AllFiles[elem.second].getFile();
+        return llvm::sys::path::extension(filename).endswith(extension);
+      });
 }
 
 bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
