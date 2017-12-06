@@ -64,7 +64,7 @@ static const FullMetadata<HeapMetadata> ErrorMetadata{
   Metadata{MetadataKind::ErrorObject},
 };
 
-BoxPair::Return
+BoxPair
 swift::swift_allocError(const swift::Metadata *type,
                         const swift::WitnessTable *errorConformance,
                         OpaqueValue *initialValue,

@@ -50,7 +50,7 @@
 #endif
 
 FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
-         _swift_allocBox, _swift_allocBox_, DefaultCC,
+         _swift_allocBox, _swift_allocBox_, SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
@@ -58,7 +58,7 @@ FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
 //  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
 FUNCTION(MakeBoxUnique,
          swift_makeBoxUnique,
-         DefaultCC,
+         SwiftCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
          ATTRS(NoUnwind))
@@ -1332,7 +1332,7 @@ FUNCTION(DeletedMethodError, swift_deletedMethodError, C_CC,
         ARGS(),
         ATTRS(NoUnwind))
 
-FUNCTION(AllocError, swift_allocError, C_CC,
+FUNCTION(AllocError, swift_allocError, SwiftCC,
          RETURNS(ErrorPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
          ATTRS(NoUnwind))

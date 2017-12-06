@@ -113,9 +113,9 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-TwoWordPair<const char *, uintptr_t>::Return
+TypeNamePair
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
-  using Pair = TwoWordPair<const char *, uintptr_t>;
+  using Pair = TypeNamePair;
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
 
   static StaticReadWriteLock TypeNameCacheLock;
