@@ -124,7 +124,7 @@ private:
     assert(primaryInputCount() < 2 &&
            "have not implemented >1 primary input yet");
   }
-  bool doAllNonPrimariesEndWithSIB() const;
+  bool areAllNonPrimariesSIB() const;
 
 public:
   unsigned primaryInputCount() const { return PrimaryInputs.size(); }

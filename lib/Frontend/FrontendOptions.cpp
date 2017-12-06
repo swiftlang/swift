@@ -82,7 +82,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
       assertMustNotBeMoreThanOnePrimaryInput();
       // If we have the SIL as our primary input, we can waive the one file
       // requirement as long as all the other inputs are SIBs.
-      if (!doAllNonPrimariesEndWithSIB()) {
+      if (!areAllNonPrimariesSIB()) {
         diags.diagnose(SourceLoc(),
                        diag::error_mode_requires_one_sil_multi_sib);
         return true;
@@ -95,7 +95,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
   return false;
 }
 
-bool FrontendInputs::doAllNonPrimariesEndWithSIB() const {
+bool FrontendInputs::areAllNonPrimariesSIB() const {
   for (const InputFile &input : getAllFiles()) {
     assert(!input.getFile().empty() && "all files have (perhaps pseudo) names");
     if (input.getIsPrimary())
