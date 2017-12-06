@@ -166,7 +166,7 @@ void Trivia::print(llvm::raw_ostream &OS) const {
 TriviaList::const_iterator Trivia::find(const TriviaKind DesiredKind) const {
   return std::find_if(Pieces.begin(), Pieces.end(),
                       [=](const TriviaPiece &Piece) -> bool {
-                        return Piece.Kind == DesiredKind;
+                        return Piece.getKind() == DesiredKind;
                       });
 }
 
