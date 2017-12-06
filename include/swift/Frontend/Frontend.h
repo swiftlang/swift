@@ -424,7 +424,7 @@ private:
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
-  Optional<unsigned> setupCodeCompletionBuffer();
+  Optional<unsigned> setUpCodeCompletionBuffer();
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInMainMode() {
     return Invocation.getInputKind() == InputFileKind::IFK_Swift;

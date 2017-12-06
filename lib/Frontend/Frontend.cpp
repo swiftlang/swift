@@ -97,7 +97,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
-  const Optional<unsigned> codeCompletionBufferID = setupCodeCompletionBuffer();
+  const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
 
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
@@ -161,7 +161,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   return false;
 }
 
-Optional<unsigned> CompilerInstance::setupCodeCompletionBuffer() {
+Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
   Optional<unsigned> codeCompletionBufferID;
   auto codeCompletePoint = Invocation.getCodeCompletionPoint();
   if (codeCompletePoint.first) {
