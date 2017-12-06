@@ -2916,6 +2916,8 @@ namespace {
       auto privateDataField =
         B.addPlaceholderWithSize(privateDataInit->getType());
 
+      asImpl().addDependentData();
+
       // Lay out the template data.
       super::layout();
       
@@ -2929,8 +2931,6 @@ namespace {
         asImpl().addDependentValueWitnessTablePattern();
       }
       
-      asImpl().addDependentData();
-
       // Fill in the header:
 
       //   Metadata *(*CreateFunction)(GenericMetadata *, const void*);
