@@ -134,7 +134,7 @@ template <typename KindT> struct MappingTraits<Remark<KindT>> {
     // them.
     StringRef PassName = R.getPassName();
     io.mapRequired("Pass", PassName);
-    StringRef Id = R.getIdentifier();
+    std::string Id = (Twine("sil.") + R.getIdentifier()).str();
     io.mapRequired("Name", Id);
 
     SourceLoc Loc = R.getLocation();
