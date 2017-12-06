@@ -141,7 +141,7 @@ public:
     if (hadError)
       return true;
 
-    std::set<StringRef> PrimaryFiles = getPrimaries();
+    llvm::StringSet<> PrimaryFiles = getPrimaries();
 
     for (auto file : Files) {
       bool isPrimary = PrimaryFiles.count(file) > 0;
@@ -149,13 +149,13 @@ public:
       if (isPrimary)
         PrimaryFiles.erase(file);
     }
-    for (auto file : PrimaryFiles) {
+    for (auto &file : PrimaryFiles) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
       assert(doesCommandLineIncludeFilelist() &&
              "Missing primary with no filelist");
-      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                     filelistPath());
+      Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found,
+                     file.getKey(), filelistPath());
     }
     return !PrimaryFiles.empty();
   }
@@ -215,11 +215,11 @@ private:
     return true;
   }
 
-  std::set<StringRef> getPrimaries() const {
-    std::set<StringRef> PrimaryFiles;
+  llvm::StringSet<> getPrimaries() const {
+    llvm::StringSet<> primaryFiles;
     for (const Arg *A : Args.filtered(options::OPT_primary_file))
-      PrimaryFiles.insert(A->getValue());
-    return PrimaryFiles;
+      primaryFiles.insert(A->getValue());
+    return primaryFiles;
   }
 };
 class FrontendArgsToOptionsConverter {
