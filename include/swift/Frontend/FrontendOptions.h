@@ -71,10 +71,7 @@ public:
     for (InputFile input : other.getAllFiles())
       addInput(input);
   }
-  FrontendInputs(FrontendInputs &&other) {
-    AllFiles = std::move(other.AllFiles);
-    PrimaryInputs = std::move(other.PrimaryInputs);
-  }
+  
   FrontendInputs &operator=(const FrontendInputs &other) {
     clearInputs();
     for (InputFile input : other.getAllFiles())
