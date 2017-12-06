@@ -2752,10 +2752,6 @@ namespace {
   class GenericMetadataBuilderBase : public Base {
     typedef Base super;
 
-    /// The number of generic witnesses in the type we're emitting.
-    /// This is not really something we need to track.
-    unsigned NumGenericWitnesses = 0;
-
     struct FillOp {
       CanType Type;
       Optional<ProtocolConformanceRef> Conformance;
@@ -2982,7 +2978,6 @@ namespace {
 
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
-      NumGenericWitnesses++;
       addFillOp(type, None, /*relative*/ false);
       super::addGenericArgument(type, std::forward<T>(args)...);
     }
@@ -2990,7 +2985,6 @@ namespace {
     template <class... T>
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
                                 T &&...args) {
-      NumGenericWitnesses++;
       addFillOp(type, conf, /*relative*/ false);
       super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
     }
@@ -3154,10 +3148,8 @@ namespace {
     }
 
     void addDestructorFunction() {
-      auto expansion = ResilienceExpansion::Minimal;
       auto dtorRef = SILDeclRef(Target->getDestructor(),
-                                SILDeclRef::Kind::Deallocator,
-                                expansion);
+                                SILDeclRef::Kind::Deallocator);
       SILFunction *dtorFunc = IGM.getSILModule().lookUpFunction(dtorRef);
       if (dtorFunc) {
         B.add(IGM.getAddrOfSILFunction(dtorFunc, NotForDefinition));
@@ -3291,7 +3283,7 @@ namespace {
 
     void addFieldOffset(VarDecl *var) {
       assert(var->hasStorage());
-      
+
       unsigned fieldIndex = FieldLayout.getFieldIndex(var);
       llvm::Constant *fieldOffsetOrZero;
       auto &element = Layout.getElement(fieldIndex);
@@ -3304,53 +3296,6 @@ namespace {
         fieldOffsetOrZero = IGM.getSize(Size(0));
       }
       B.add(fieldOffsetOrZero);
-
-      if (var->getDeclContext() == Target) {
-        auto access = FieldLayout.AllFieldAccesses[fieldIndex];
-        switch (access) {
-        case FieldAccess::ConstantDirect:
-        case FieldAccess::NonConstantDirect: {
-          // Emit a global variable storing the constant field offset.
-          // If the superclass was imported from Objective-C, the offset
-          // does not include the superclass size; we rely on the
-          // Objective-C runtime sliding it down.
-          //
-          // TODO: Don't emit the symbol if field has a fixed offset and size
-          // in all resilience domains
-          auto offsetAddr = IGM.getAddrOfFieldOffset(var, /*indirect*/ false,
-                                                     ForDefinition);
-          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-          offsetVar->setInitializer(fieldOffsetOrZero);
-
-          // If we know the offset won't change, make it a constant.
-          offsetVar->setConstant(access == FieldAccess::ConstantDirect);
-
-          break;
-        }
-
-        case FieldAccess::ConstantIndirect:
-          // No global variable is needed.
-          break;
-
-        case FieldAccess::NonConstantIndirect:
-          // Emit a global variable storing an offset into the field offset
-          // vector within the class metadata. This access pattern is used
-          // when the field offset depends on generic parameters. As above,
-          // the Objective-C runtime will slide the field offsets within the
-          // class metadata to adjust for the superclass size.
-          //
-          // TODO: This isn't plumbed through all the way yet.
-          auto offsetAddr = IGM.getAddrOfFieldOffset(var, /*indirect*/ true,
-                                                     ForDefinition);
-          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-          offsetVar->setConstant(false);
-          auto offset = getClassFieldOffsetOffset(IGM, Target, var).getValue();
-          auto offsetVal = llvm::ConstantInt::get(IGM.IntPtrTy, offset);
-          offsetVar->setInitializer(offsetVal);
-
-          break;
-        }
-      }
     }
     
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
@@ -3410,16 +3355,6 @@ namespace {
     }
 
   protected:
-    bool isFinishInitializationIdempotent() {
-      if (!Layout.isFixedLayout())
-        return false;
-
-      if (doesClassMetadataRequireDynamicInitialization(IGM, Target))
-        return false;
-
-      return true;
-    }
-
     llvm::Value *emitFinishIdempotentInitialization(IRGenFunction &IGF,
                                                     llvm::Value *metadata) {
       if (IGF.IGM.ObjCInterop) {
@@ -3458,8 +3393,12 @@ namespace {
                                                    metadata,
                                                    /*vwtable=*/nullptr);
 
-      // TODO: do something intermediate when e.g. all we needed to do was
-      // set parent metadata pointers.
+        // Realizing the class with the ObjC runtime will copy back to the
+        // field offset globals for us; but if ObjC interop is disabled, we
+        // have to do that ourselves, assuming we didn't just emit them all
+        // correctly in the first place.
+        if (!IGF.IGM.ObjCInterop)
+          emitInitializeFieldOffsets(IGF, metadata);
 
       // Otherwise, all we need to do is register with the ObjC runtime.
       } else {
@@ -3467,14 +3406,9 @@ namespace {
         assert(Overrides.empty());
       }
 
-      emitInitializeMethodOverrides(IGF, metadata);
+      emitFieldOffsetGlobals();
 
-      // Realizing the class with the ObjC runtime will copy back to the
-      // field offset globals for us; but if ObjC interop is disabled, we
-      // have to do that ourselves, assuming we didn't just emit them all
-      // correctly in the first place.
-      if (!Layout.isFixedLayout() && !IGF.IGM.ObjCInterop)
-        emitInitializeFieldOffsets(IGF, metadata);
+      emitInitializeMethodOverrides(IGF, metadata);
 
       return metadata;
     }
@@ -3507,10 +3441,9 @@ namespace {
     // Objective-C runtime, we have to do this ourselves.
     void emitInitializeFieldOffsets(IRGenFunction &IGF,
                                     llvm::Value *metadata) {
-      unsigned index = FieldLayout.InheritedStoredProperties.size();
-
       for (auto prop : Target->getStoredProperties()) {
-        auto access = FieldLayout.AllFieldAccesses[index];
+        unsigned fieldIndex = FieldLayout.getFieldIndex(prop);
+        auto access = FieldLayout.AllFieldAccesses[fieldIndex];
         if (access == FieldAccess::NonConstantDirect) {
           Address offsetA = IGF.IGM.getAddrOfFieldOffset(prop,
                                                          /*indirect*/ false,
@@ -3524,8 +3457,67 @@ namespace {
           auto offsetVal = IGF.emitInvariantLoad(slot);
           IGF.Builder.CreateStore(offsetVal, offsetA);
         }
+      }
+    }
 
-        index++;
+    void emitFieldOffsetGlobals() {
+      for (auto prop : Target->getStoredProperties()) {
+        unsigned fieldIndex = FieldLayout.getFieldIndex(prop);
+        llvm::Constant *fieldOffsetOrZero;
+        auto &element = Layout.getElement(fieldIndex);
+
+        if (element.getKind() == ElementLayout::Kind::Fixed) {
+          // Use a fixed offset if we have one.
+          fieldOffsetOrZero = IGM.getSize(element.getByteOffset());
+        } else {
+          // Otherwise, leave a placeholder for the runtime to populate at runtime.
+          fieldOffsetOrZero = IGM.getSize(Size(0));
+        }
+
+        auto access = FieldLayout.AllFieldAccesses[fieldIndex];
+        switch (access) {
+        case FieldAccess::ConstantDirect:
+        case FieldAccess::NonConstantDirect: {
+          // Emit a global variable storing the constant field offset.
+          // If the superclass was imported from Objective-C, the offset
+          // does not include the superclass size; we rely on the
+          // Objective-C runtime sliding it down.
+          //
+          // TODO: Don't emit the symbol if field has a fixed offset and size
+          // in all resilience domains
+          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, /*indirect*/ false,
+                                                     ForDefinition);
+          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
+          offsetVar->setInitializer(fieldOffsetOrZero);
+
+          // If we know the offset won't change, make it a constant.
+          offsetVar->setConstant(access == FieldAccess::ConstantDirect);
+
+          break;
+        }
+
+        case FieldAccess::ConstantIndirect:
+          // No global variable is needed.
+          break;
+
+        case FieldAccess::NonConstantIndirect:
+          // Emit a global variable storing an offset into the field offset
+          // vector within the class metadata. This access pattern is used
+          // when the field offset depends on generic parameters. As above,
+          // the Objective-C runtime will slide the field offsets within the
+          // class metadata to adjust for the superclass size.
+          //
+          // TODO: This isn't plumbed through all the way yet.
+          auto offsetAddr = IGM.getAddrOfFieldOffset(prop, /*indirect*/ true,
+                                                     ForDefinition);
+          auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
+          offsetVar->setConstant(false);
+          auto offset = getClassFieldOffsetOffset(IGM, Target, prop).getValue();
+          auto offsetVal = llvm::ConstantInt::get(IGM.IntPtrTy, offset);
+          offsetVar->setInitializer(offsetVal);
+
+          break;
+        }
       }
     }
   };
@@ -3580,15 +3572,6 @@ namespace {
                                       /*allowUninit*/ false)) {
         HasUnfilledSuperclass = true;
       }
-      
-      // If the superclass came from another module, we may have dropped
-      // stored properties due to the Swift language version availability of
-      // their types. In these cases we can't precisely lay out the ivars in
-      // the class object at compile time so we need to do runtime layout.
-      if (classHasIncompleteLayout(IGM,
-                                 superclassTy->getClassOrBoundGenericClass())) {
-        HasUnfilledSuperclass = true;
-      }
     }
 
     bool canBeConstant() {
@@ -3608,7 +3591,9 @@ namespace {
         // There's an interesting special case where we can do the
         // initialization idempotently and thus avoid the need for a lock.
         if (!HasUnfilledSuperclass &&
-            isFinishInitializationIdempotent()) {
+            !doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
+          emitFieldOffsetGlobals();
+
           auto type = Target->getDeclaredType()->getCanonicalType();
           auto metadata =
             IGF.IGM.getAddrOfTypeMetadata(type, /*pattern*/ false);
@@ -3749,9 +3734,7 @@ namespace {
       llvm_unreachable("classes should never have dependent vwtables");
     }
 
-    void noteStartOfFieldOffsets(ClassDecl *whichClass) {
-      HasDependentMetadata = true;
-    }
+    void noteStartOfFieldOffsets(ClassDecl *whichClass) {}
     
     void noteEndOfFieldOffsets(ClassDecl *whichClass) {}
     
@@ -3766,7 +3749,6 @@ namespace {
       } else {
         // Lay out the field, but don't fill it in, we will copy it from
         // the superclass.
-        HasDependentMetadata = true;
         ClassMetadataBuilderBase::addGenericArgument(type, forClass);
       }
     }
@@ -3779,7 +3761,6 @@ namespace {
       } else {
         // Lay out the field, but don't provide the fill op, which we'll get
         // from the superclass.
-        HasDependentMetadata = true;
         ClassMetadataBuilderBase::addGenericWitnessTable(type, conf, forClass);
       }
     }
@@ -4584,128 +4565,128 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
 namespace {
 
-template<class Impl>
-class EnumMetadataBuilderBase : public EnumMetadataVisitor<Impl> {
-  using super = EnumMetadataVisitor<Impl>;
+  template<class Impl>
+  class EnumMetadataBuilderBase : public EnumMetadataVisitor<Impl> {
+    using super = EnumMetadataVisitor<Impl>;
 
-protected:
-  ConstantStructBuilder &B;
-  using super::IGM;
-  using super::Target;
+  protected:
+    ConstantStructBuilder &B;
+    using super::IGM;
+    using super::Target;
 
-public:
-  EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
-                          ConstantStructBuilder &B)
-  : super(IGM, theEnum), B(B) {
-  }
-  
-  void addMetadataFlags() {
-    auto kind = Target->classifyAsOptionalType()
-                  ? MetadataKind::Optional
-                  : MetadataKind::Enum;
-    B.addInt(IGM.MetadataKindTy, unsigned(kind));
-  }
-
-  void addNominalTypeDescriptor() {
-    auto descriptor = EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
-    B.add(descriptor);
-  }
-
-  void addGenericArgument(CanType type) {
-    B.addNullPointer(IGM.TypeMetadataPtrTy);
-  }
-  
-  void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
-    B.addNullPointer(IGM.WitnessTablePtrTy);
-  }
-};
-  
-class EnumMetadataBuilder
-  : public EnumMetadataBuilderBase<EnumMetadataBuilder> {
-  bool HasUnfilledPayloadSize = false;
-
-public:
-  EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
-                      ConstantStructBuilder &B)
-    : EnumMetadataBuilderBase(IGM, theEnum, B) {}
-  
-  void addValueWitnessTable() {
-    auto type = Target->getDeclaredType()->getCanonicalType();
-    B.add(emitValueWitnessTable(IGM, type));
-  }
-  
-  void addPayloadSize() {
-    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
-    if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
-      B.addInt(IGM.IntPtrTy, 0);
-      HasUnfilledPayloadSize = true;
-      return;
+  public:
+    EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
+                            ConstantStructBuilder &B)
+    : super(IGM, theEnum), B(B) {
     }
 
-    assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
-           "non-generic, non-resilient enums don't need payload size in metadata");
-    auto &strategy = getEnumImplStrategy(IGM, enumTy);
-    B.addInt(IGM.IntPtrTy, strategy.getPayloadSizeForMetadata());
-  }
+    void addMetadataFlags() {
+      auto kind = Target->classifyAsOptionalType()
+                    ? MetadataKind::Optional
+                    : MetadataKind::Enum;
+      B.addInt(IGM.MetadataKindTy, unsigned(kind));
+    }
 
-  bool canBeConstant() {
-    return !HasUnfilledPayloadSize;
-  }
+    void addNominalTypeDescriptor() {
+      auto descriptor = EnumNominalTypeDescriptorBuilder(IGM, Target).emit();
+      B.add(descriptor);
+    }
 
-  void createMetadataAccessFunction() {
-    createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
-  }
-};
-  
-class GenericEnumMetadataBuilder
-  : public GenericMetadataBuilderBase<GenericEnumMetadataBuilder,
-                        EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
-{
-public:
-  GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
-                             ConstantStructBuilder &B)
-    : GenericMetadataBuilderBase(IGM, theEnum, B) {}
+    void addGenericArgument(CanType type) {
+      B.addNullPointer(IGM.TypeMetadataPtrTy);
+    }
 
-  llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
-                                    llvm::Value *metadataPattern,
-                                    llvm::Value *arguments) {
-    return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
-                                  {metadataPattern, arguments});
-  }
+    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
+      B.addNullPointer(IGM.WitnessTablePtrTy);
+    }
+  };
 
-  void addValueWitnessTable() {
-    B.add(getValueWitnessTableForGenericValueType(IGM, Target,
-                                                  HasDependentVWT));
-  }
-  
-  void addDependentValueWitnessTablePattern() {
-    emitDependentValueWitnessTablePattern(IGM, B,
-                        Target->getDeclaredType()->getCanonicalType());
-  }
-  
-  void addPayloadSize() {
-    // In all cases where a payload size is demanded in the metadata, it's
-    // runtime-dependent, so fill in a zero here.
-    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
-    (void) enumTI;
-    assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
-           "non-generic, non-resilient enums don't need payload size in metadata");
-    B.addInt(IGM.IntPtrTy, 0);
-  }
-  
-  void emitInitializeMetadata(IRGenFunction &IGF,
-                              llvm::Value *metadata,
-                              llvm::Value *vwtable) {
-    // Nominal types are always preserved through SIL lowering.
-    auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    IGM.getTypeInfoForUnlowered(enumTy)
-      .initializeMetadata(IGF, metadata, vwtable,
-                          IGF.IGM.getLoweredType(enumTy));
-  }
-};
-  
+  class EnumMetadataBuilder
+    : public EnumMetadataBuilderBase<EnumMetadataBuilder> {
+    bool HasUnfilledPayloadSize = false;
+
+  public:
+    EnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
+                        ConstantStructBuilder &B)
+      : EnumMetadataBuilderBase(IGM, theEnum, B) {}
+
+    void addValueWitnessTable() {
+      auto type = Target->getDeclaredType()->getCanonicalType();
+      B.add(emitValueWitnessTable(IGM, type));
+    }
+
+    void addPayloadSize() {
+      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
+      if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
+        B.addInt(IGM.IntPtrTy, 0);
+        HasUnfilledPayloadSize = true;
+        return;
+      }
+
+      assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
+             "non-generic, non-resilient enums don't need payload size in metadata");
+      auto &strategy = getEnumImplStrategy(IGM, enumTy);
+      B.addInt(IGM.IntPtrTy, strategy.getPayloadSizeForMetadata());
+    }
+
+    bool canBeConstant() {
+      return !HasUnfilledPayloadSize;
+    }
+
+    void createMetadataAccessFunction() {
+      createInPlaceValueTypeMetadataAccessFunction(IGM, Target);
+    }
+  };
+
+  class GenericEnumMetadataBuilder
+    : public GenericMetadataBuilderBase<GenericEnumMetadataBuilder,
+                          EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
+  {
+  public:
+    GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
+                               ConstantStructBuilder &B)
+      : GenericMetadataBuilderBase(IGM, theEnum, B) {}
+
+    llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
+                                      llvm::Value *metadataPattern,
+                                      llvm::Value *arguments) {
+      return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
+                                    {metadataPattern, arguments});
+    }
+
+    void addValueWitnessTable() {
+      B.add(getValueWitnessTableForGenericValueType(IGM, Target,
+                                                    HasDependentVWT));
+    }
+
+    void addDependentValueWitnessTablePattern() {
+      emitDependentValueWitnessTablePattern(IGM, B,
+                          Target->getDeclaredType()->getCanonicalType());
+    }
+
+    void addPayloadSize() {
+      // In all cases where a payload size is demanded in the metadata, it's
+      // runtime-dependent, so fill in a zero here.
+      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
+      (void) enumTI;
+      assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
+             "non-generic, non-resilient enums don't need payload size in metadata");
+      B.addInt(IGM.IntPtrTy, 0);
+    }
+
+    void emitInitializeMetadata(IRGenFunction &IGF,
+                                llvm::Value *metadata,
+                                llvm::Value *vwtable) {
+      // Nominal types are always preserved through SIL lowering.
+      auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
+      IGM.getTypeInfoForUnlowered(enumTy)
+        .initializeMetadata(IGF, metadata, vwtable,
+                            IGF.IGM.getLoweredType(enumTy));
+    }
+  };
+
 } // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {

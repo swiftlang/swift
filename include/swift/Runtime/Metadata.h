@@ -1275,7 +1275,7 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
              ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> superClass,
              StoredPointer data,
              ClassFlags flags,
-             ClassIVarDestroyer ivarDestroyer,
+             StoredPointer ivarDestroyer,
              StoredPointer size, StoredPointer addressPoint,
              StoredPointer alignMask,
              StoredPointer classSize, StoredPointer classAddressPoint)
@@ -1362,7 +1362,7 @@ private:
 
   /// A function for destroying instance variables, used to clean up
   /// after an early return from a constructor.
-  ClassIVarDestroyer IVarDestroyer; // TODO: Make target-agnostic size
+  StoredPointer IVarDestroyer;
 
   // After this come the class members, laid out as follows:
   //   - class members for the superclass (recursively)
@@ -1383,9 +1383,10 @@ public:
     Description = description;
   }
 
+  /// Only valid if the target is in-process.
   ClassIVarDestroyer getIVarDestroyer() const {
     assert(isTypeMetadata());
-    return IVarDestroyer;
+    return reinterpret_cast<ClassIVarDestroyer>(IVarDestroyer);
   }
 
   /// Is this class an artificial subclass, such as one dynamically
