@@ -644,7 +644,7 @@ __udivmodti4(tu_int a, tu_int b, tu_int* rem)
      * r.all = n.all >> sr;
      * 1 <= sr <= n_utword_bits - 1
      */
-    su_int carry = 0;
+    unsigned int carry = 0;
     for (; sr > 0; --sr)
     {
         /* r:q = ((r:q)  << 1) | carry */
@@ -707,7 +707,8 @@ __modti3(ti_int a, ti_int b)
 
 /* Returns: a / b */
 
-COMPILER_RT_ABI ti_int
+SWIFT_RUNTIME_STDLIB_INTERFACE
+ti_int
 __divti3(ti_int a, ti_int b)
 {
     const int bits_in_tword_m1 = (int)(sizeof(ti_int) * CHAR_BIT) - 1;
