@@ -10,13 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  Three generic, mutable array-like types with value semantics.
+//  Two generic, mutable array-like types with value semantics.
 //
 //  - `ContiguousArray<Element>` is a fast, contiguous array of `Element` with
 //    a known backing store.
-//
-//  - `ArraySlice<Element>` presents an arbitrary subsequence of some
-//    contiguous sequence of `Element`s.
 //
 //  - `Array<Element>` is like `ContiguousArray<Element>` when `Element` is not
 //    a reference type or an Objective-C existential.  Otherwise, it may use
@@ -36,7 +33,6 @@ public struct _DependenceToken {
 %{
   arrayTypes = [
     ('ContiguousArray', 'a `ContiguousArray` instance'),
-    ('ArraySlice', 'an `ArraySlice` instance'),
     ('Array', 'an array'),
   ]
 }%
@@ -65,109 +61,8 @@ if True:
 /// struct or enumeration, `Array` and `ContiguousArray` should have similar
 /// efficiency.
 ///
-/// For more information about using arrays, see `Array` and `ArraySlice`, with
+/// For more information about using arrays, see `Array`, with
 /// which `ContiguousArray` shares most properties and methods."""
-  elif Self == 'ArraySlice':
-    SelfDocComment = """\
-/// A slice of an `Array`, `ContiguousArray`, or `ArraySlice` instance.
-///
-/// The `ArraySlice` type makes it fast and efficient for you to perform
-/// operations on sections of a larger array. Instead of copying over the
-/// elements of a slice to new storage, an `ArraySlice` instance presents a
-/// view onto the storage of a larger array. And because `ArraySlice`
-/// presents the same interface as `Array`, you can generally perform the
-/// same operations on a slice as you could on the original array.
-///
-/// For more information about using arrays, see `Array` and `ContiguousArray`,
-/// with which `ArraySlice` shares most properties and methods.
-///
-/// Slices Are Views onto Arrays
-/// ============================
-///
-/// For example, suppose you have an array holding the number of absences
-/// from each class during a session.
-///
-///     let absences = [0, 2, 0, 4, 0, 3, 1, 0]
-///
-/// You want to compare the absences in the first half of the session with
-/// those in the second half. To do so, start by creating two slices of the
-/// `absences` array.
-///
-///     let midpoint = absences.count / 2
-///
-///     let firstHalf = absences[..<midpoint]
-///     let secondHalf = absences[midpoint...]
-///
-/// Neither the `firstHalf` nor `secondHalf` slices allocate any new storage
-/// of their own. Instead, each presents a view onto the storage of the
-/// `absences` array.
-///
-/// You can call any method on the slices that you might have called on the
-/// `absences` array. To learn which half had more absences, use the
-/// `reduce(_:_:)` method to calculate each sum.
-///
-///     let firstHalfSum = firstHalf.reduce(0, +)
-///     let secondHalfSum = secondHalf.reduce(0, +)
-///
-///     if firstHalfSum > secondHalfSum {
-///         print("More absences in the first half.")
-///     } else {
-///         print("More absences in the second half.")
-///     }
-///     // Prints "More absences in the first half."
-///
-/// - Important: Long-term storage of `ArraySlice` instances is discouraged. A
-///   slice holds a reference to the entire storage of a larger array, not
-///   just to the portion it presents, even after the original array's lifetime
-///   ends. Long-term storage of a slice may therefore prolong the lifetime of
-///   elements that are no longer otherwise accessible, which can appear to be
-///   memory and object leakage.
-///
-/// Slices Maintain Indices
-/// =======================
-///
-/// Unlike `Array` and `ContiguousArray`, the starting index for an
-/// `ArraySlice` instance isn't always zero. Slices maintain the same
-/// indices of the larger array for the same elements, so the starting
-/// index of a slice depends on how it was created, letting you perform
-/// index-based operations on either a full array or a slice.
-///
-/// Sharing indices between collections and their subsequences is an important
-/// part of the design of Swift's collection algorithms. Suppose you are
-/// tasked with finding the first two days with absences in the session. To
-/// find the indices of the two days in question, follow these steps:
-///
-/// 1) Call `index(where:)` to find the index of the first element in the
-///    `absences` array that is greater than zero.
-/// 2) Create a slice of the `absences` array starting after the index found in
-///    step 1.
-/// 3) Call `index(where:)` again, this time on the slice created in step 2.
-///    Where in some languages you might pass a starting index into an
-///    `indexOf` method to find the second day, in Swift you perform the same
-///    operation on a slice of the original array.
-/// 4) Print the results using the indices found in steps 1 and 3 on the
-///    original `absences` array.
-///
-/// Here's an implementation of those steps:
-///
-///     if let i = absences.index(where: { $0 > 0 }) {                      // 1
-///         let absencesAfterFirst = absences[(i + 1)...]                   // 2
-///         if let j = absencesAfterFirst.index(where: { $0 > 0 }) {        // 3
-///             print("The first day with absences had \(absences[i]).")    // 4
-///             print("The second day with absences had \(absences[j]).")
-///         }
-///     }
-///     // Prints "The first day with absences had 2."
-///     // Prints "The second day with absences had 4."
-///
-/// In particular, note that `j`, the index of the second day with absences,
-/// was found in a slice of the original array and then used to access a value
-/// in the original `absences` array itself.
-///
-/// - Note: To safely reference the starting and ending indices of a slice,
-///   always use the `startIndex` and `endIndex` properties instead of
-///   specific values.
-"""
   elif Self == 'Array':
     SelfDocComment = """\
 /// An ordered, random-access collection.
@@ -445,7 +340,7 @@ if True:
 /// further bridging is required when accessing elements of the `Array`
 /// instance.
 ///
-/// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
+/// - Note: The `ContiguousArray` type is not bridged;
 ///   instances of those types always have a contiguous block of memory as
 ///   their storage."""
   # FIXME: Write about Array up/down-casting.
@@ -462,8 +357,6 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
   #else
     internal typealias _Buffer = _ContiguousArrayBuffer<Element>
   #endif
-  %elif Self == 'ArraySlice':
-    internal typealias _Buffer = _SliceBuffer<Element>
   %else:
     internal typealias _Buffer = _${Self.strip('_')}Buffer<Element>
   %end
@@ -478,16 +371,6 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
   internal init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
-
-  %if Self == 'ArraySlice':
-  /// Initialization from an existing buffer does not have "array.init"
-  /// semantics because the caller may retain an alias to buffer.
-  @_inlineable
-  @_versioned
-  internal init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
-    self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
-  }
-  %end
 }
 
 extension ${Self}: RandomAccessCollection, MutableCollection {
@@ -495,23 +378,13 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   public typealias Indices = Range<Int>
   public typealias Iterator = IndexingIterator<${Self}>
 
-%if Self == 'ArraySlice':
-  /// The position of the first element in a nonempty array.
-  ///
-  /// If the array is empty, `startIndex` is equal to `endIndex`.
-%else:
   /// The position of the first element in a nonempty array.
   ///
   /// For an instance of `${Self}`, `startIndex` is always zero. If the array
   /// is empty, `startIndex` is equal to `endIndex`.
-%end
   @_inlineable
   public var startIndex: Int {
-%if Self == 'ArraySlice':
-    return _buffer.startIndex
-%else:
     return 0
-%end
   }
 
   /// The array's "past the end" position---that is, the position one greater
@@ -531,14 +404,10 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   /// If the array is empty, `endIndex` is equal to `startIndex`.
   @_inlineable // FIXME(sil-serialize-all)
   public var endIndex: Int {
-%if Self == 'ArraySlice':
-    return _buffer.endIndex
-%else:
     @_inlineable
     get {
       return _getCount()
     }
-%end
   }
 
   @_inlineable
@@ -735,49 +604,6 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
       _makeMutableAndUniqueOrPinned() // makes the array native, too
       _checkSubscript_native(index)
       return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
-    }
-  }
-
-  /// Accesses a contiguous subrange of the array's elements.
-  ///
-  /// The returned `ArraySlice` instance uses the same indices for the same
-  /// elements as the original array. In particular, that slice, unlike an
-  /// array, may have a nonzero `startIndex` and an `endIndex` that is not
-  /// equal to `count`. Always use the slice's `startIndex` and `endIndex`
-  /// properties instead of assuming that its indices start or end at a
-  /// particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let i = streetsSlice.index(of: "Evarts")    // 4
-  ///     print(streets[i!])
-  ///     // Prints "Evarts"
-  ///
-  /// - Parameter bounds: A range of integers. The bounds of the range must be
-  ///   valid indices of the array.
-  @_inlineable
-  public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
-    get {
-      _checkIndex(bounds.lowerBound)
-      _checkIndex(bounds.upperBound)
-      return ArraySlice(_buffer: _buffer[bounds])
-    }
-    set(rhs) {
-      _checkIndex(bounds.lowerBound)
-      _checkIndex(bounds.upperBound)
-      // If the replacement buffer has same identity, and the ranges match,
-      // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity
-      || bounds != rhs.startIndex..<rhs.endIndex {
-        self.replaceSubrange(bounds, with: rhs)
-      }
     }
   }
 }
@@ -1136,7 +962,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
 %if Self == 'Array':
-
   /// Returns an Array of `count` uninitialized elements using the
   /// given `storage`, and a pointer to uninitialized memory for the
   /// first element.
@@ -1477,47 +1302,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
       : newCount)
   }
 
-%if Self == 'ArraySlice':
-  @_inlineable
-  public mutating func _customRemoveLast() -> Element? {
-    _precondition(count > 0, "Can't removeLast from an empty ${Self}")
-    // FIXME(performance): if `self` is uniquely referenced, we should remove
-    // the element as shown below (this will deallocate the element and
-    // decrease memory use).  If `self` is not uniquely referenced, the code
-    // below will make a copy of the storage, which is wasteful.  Instead, we
-    // should just shrink the view without allocating new storage.
-    let i = endIndex
-    // We don't check for overflow in `i - 1` because `i` is known to be
-    // positive.
-    let result = self[i &- 1]
-    self.replaceSubrange((i &- 1)..<i, with: EmptyCollection())
-    return result
-  }
-  
-  /// Removes and returns the element at the specified position.
-  ///
-  /// All the elements following the specified position are moved up to
-  /// close the gap.
-  ///
-  ///     var measurements: [Double] = [1.1, 1.5, 2.9, 1.2, 1.5, 1.3, 1.2]
-  ///     let removed = measurements.remove(at: 2)
-  ///     print(measurements)
-  ///     // Prints "[1.1, 1.5, 1.2, 1.5, 1.3, 1.2]"
-  ///
-  /// - Parameter index: The position of the element to remove. `index` must
-  ///   be a valid index of the array.
-  /// - Returns: The element at the specified index.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the array.
-  @_inlineable
-  @discardableResult
-  public mutating func remove(at index: Int) -> Element {
-    let result = self[index]
-    self.replaceSubrange(index..<(index + 1), with: EmptyCollection())
-    return result
-  }
-
-%else:
   @_inlineable
   public mutating func _customRemoveLast() -> Element? {
     let newCount = _getCount() - 1
@@ -1557,7 +1341,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
     _buffer.count = newCount
     return result
   }
-%end
 
   /// Inserts a new element at the specified position.
   ///
@@ -1633,7 +1416,7 @@ extension ${Self} : CustomReflectable {
   }
 }
 
-extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
+extension ${Self}: CustomStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
     return _makeCollectionDescription(for: self, withTypeName: nil)
@@ -1664,7 +1447,7 @@ extension ${Self} {
   }
 }
 
-extension ${Self} {
+extension ${Self}: _ContiguouslyStored {
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array
@@ -2213,22 +1996,6 @@ extension ${Self} : Equatable where Element : Equatable {
       return true
     }
 
-  %if Self == 'ArraySlice':
-
-    var streamLHS = lhs.makeIterator()
-    var streamRHS = rhs.makeIterator()
-
-    var nextLHS = streamLHS.next()
-    while nextLHS != nil {
-      let nextRHS = streamRHS.next()
-      if nextLHS != nextRHS {
-        return false
-      }
-      nextLHS = streamLHS.next()
-    }
-
-  %else:
-
     _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
     _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
 
@@ -2238,15 +2005,8 @@ extension ${Self} : Equatable where Element : Equatable {
         return false
       }
     }
-  %end
 
     return true
-  }
-
-  /// Returns `true` if the arrays do not contain the same elements.
-  @_inlineable
-  public static func !=(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
-    return !(lhs == rhs)
   }
 }
 
@@ -2373,16 +2133,24 @@ extension Array {
 }
 #endif
 
-extension ArraySlice {
-  @_inlineable
-  public // @testable
-  init(_startIndex: Int) {
-    self.init(
-      _buffer: _Buffer(
-        _buffer: ContiguousArray()._buffer,
-        shiftedToStartIndex: _startIndex))
+extension Array: CustomDebugStringConvertible {
+  /// A textual representation of the array and its elements, suitable for
+  /// debugging.
+  public var debugDescription: String {
+    // Always show sugared representation for Arrays.
+    return _makeCollectionDescription(for: self, withTypeName: nil)
   }
 }
+
+extension ContiguousArray: CustomDebugStringConvertible {
+  /// A textual representation of the array and its elements, suitable for
+  /// debugging.
+  public var debugDescription: String {
+    // Always show sugared representation for Arrays.
+    return _makeCollectionDescription(for: self, withTypeName: nil)
+  }
+}
+
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
