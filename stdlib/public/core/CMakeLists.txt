@@ -173,7 +173,6 @@ set(SWIFTLIB_SOURCES
   ExistentialCollection.swift.gyb
   Mirror.swift
   CommandLine.swift
-  SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
   VarArgs.swift

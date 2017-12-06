@@ -50,6 +50,10 @@ extension Slice: Equatable where Base: _ContiguouslyStored, Base.Element: Equata
   }
 }
 
+extension Slice: ArrayLiteralConvertible where Base: ExpressibleByArrayLiteral {
+  
+}
+
 // %if Self == 'ArraySlice':
 // /// Initialization from an existing buffer does not have "array.init"
 // /// semantics because the caller may retain an alias to buffer.
