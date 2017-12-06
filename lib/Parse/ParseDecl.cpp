@@ -270,7 +270,7 @@ bool Parser::parseTopLevel() {
 
   // Next time start relexing from the beginning of the comment so that we can
   // attach it to the token.
-  State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc,
+  State->markParserPosition(getParserPosition(),
                             InPoundLineEnvironment);
 
   // If we are done parsing the whole file, finalize the token receiver.

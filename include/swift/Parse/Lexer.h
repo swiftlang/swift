@@ -261,6 +261,10 @@ public:
     return State(getLocForEndOfToken(SourceMgr, Loc));
   }
 
+  bool isStateForCurrentBuffer(LexerState State) const {
+    return SourceMgr.findBufferContainingLoc(State.Loc) == getBufferID();
+  }
+
   /// \brief Restore the lexer state to a given one, that can be located either
   /// before or after the current position.
   void restoreState(State S, bool enableDiagnostics = false) {
