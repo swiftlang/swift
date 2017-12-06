@@ -21,7 +21,7 @@ import Swift
 
 // YAML:      --- !Passed
 // YAML-NEXT: Pass:            sil-generic-specializer
-// YAML-NEXT: Name:            Specialized
+// YAML-NEXT: Name:            sil.Specialized
 // YAML-NEXT: DebugLoc:
 // YAML-NEXT:   File:            {{.*}}/specialize.sil
 // YAML-NEXT:   Line:            132
@@ -39,7 +39,7 @@ import Swift
 // YAML-NEXT: ...
 // YAML-NEXT: --- !Passed
 // YAML-NEXT: Pass:            sil-generic-specializer
-// YAML-NEXT: Name:            Specialized
+// YAML-NEXT: Name:            sil.Specialized
 // YAML-NEXT: DebugLoc:
 // YAML-NEXT:   File:            {{.*}}/specialize.sil
 // YAML-NEXT:   Line:            142

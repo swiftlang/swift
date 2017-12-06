@@ -15,7 +15,7 @@ func foo() {
 public func bar() {
   // YAML:      --- !Passed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            Inlined
+  // YAML-NEXT: Name:            sil.Inlined
   // YAML-NEXT: DebugLoc:
   // YAML-NEXT:   File:            {{.*}}opt-record.swift
   // YAML-NEXT:   Line:            42

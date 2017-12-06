@@ -196,7 +196,7 @@ bb0:
   // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: "update_global" inlined into "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
   // YAML:      --- !Passed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            Inlined
+  // YAML-NEXT: Name:            sil.Inlined
   // YAML-NEXT: DebugLoc:
   // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
   // YAML-NEXT:   Line:            223
@@ -236,7 +236,7 @@ bb0:
   // REMARKS_MISSED: inliner_coldblocks.sil:258:8: remark: Not profitable to inline function "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
   // YAML:      --- !Missed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            NoInlinedCost
+  // YAML-NEXT: Name:            sil.NoInlinedCost
   // YAML-NEXT: DebugLoc:
   // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
   // YAML-NEXT:   Line:            258
