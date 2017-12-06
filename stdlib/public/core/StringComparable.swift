@@ -57,14 +57,14 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   internal func compareASCII(to other: _UnmanagedString<UInt8>) -> Int {
     // FIXME Results should be the same across all platforms.
     if self.start == other.start {
-      return (self.count - other.count).signum()
+      return (self.count &- other.count).signum()
     }
     var cmp = Int(truncatingIfNeeded:
       _stdlib_memcmp(
         self.rawStart, other.rawStart,
         Swift.min(self.count, other.count)))
     if cmp == 0 {
-      cmp = self.count - other.count
+      cmp = self.count &- other.count
     }
     return cmp.signum()
   }
