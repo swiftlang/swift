@@ -21,6 +21,8 @@ from . import ArgumentTypeError
 
 
 __all__ = [
+    'CompilerVersion',
+
     'BoolType',
     'PathType',
     'RegexType',
@@ -31,6 +33,42 @@ __all__ = [
 
 
 # -----------------------------------------------------------------------------
+
+class CompilerVersion(object):
+    """Wrapper type around compiler version strings.
+    """
+
+    def __init__(self, *components):
+        if len(components) == 1:
+            if isinstance(components[0], str):
+                components = components[0].split('.')
+            elif isinstance(components[0], (list, tuple)):
+                components = components[0]
+
+        if len(components) == 0:
+            raise ValueError('compiler version cannot be empty')
+
+        self.components = tuple(int(part) for part in components)
+
+    def __eq__(self, other):
+        return self.components == other.components
+
+    def __str__(self):
+        return '.'.join([str(part) for part in self.components])
+
+
+# -----------------------------------------------------------------------------
+
+def _repr(cls, args):
+    """Helper function for implementing __repr__ methods on *Type classes.
+    """
+
+    _args = []
+    for key, value in args.viewitems():
+        _args.append('{}={}'.format(key, repr(value)))
+
+    return '{}({})'.format(type(cls).__name__, ', '.join(_args))
+
 
 class BoolType(object):
     """Argument type used to validate an input string as a bool-like type.
@@ -55,6 +93,12 @@ class BoolType(object):
         else:
             raise ArgumentTypeError('{} is not a boolean value'.format(value))
 
+    def __repr__(self):
+        return _repr(self, {
+            'true_values': self._true_values,
+            'false_values': self._false_values,
+        })
+
 
 class PathType(object):
     """PathType denotes a valid path-like object. When called paths will be
@@ -62,18 +106,32 @@ class PathType(object):
     by the path exists.
     """
 
-    def __init__(self, assert_exists=False):
-        self.assert_exists = assert_exists
+    def __init__(self, assert_exists=False, assert_executable=False):
+        self._assert_exists = assert_exists
+        self._assert_executable = assert_executable
 
     def __call__(self, path):
         path = os.path.expanduser(path)
         path = os.path.abspath(path)
         path = os.path.realpath(path)
 
-        if self.assert_exists:
-            assert os.path.exists(path)
+        if self._assert_exists and not os.path.exists(path):
+            raise ArgumentTypeError('{} does not exists'.format(path))
+
+        if self._assert_executable and not PathType._is_executable(path):
+            raise ArgumentTypeError('{} is not an executable'.format(path))
 
         return path
+
+    def __repr__(self):
+        return _repr(self, {
+            'assert_exists': self._assert_exists,
+            'assert_executable': self._assert_executable,
+        })
+
+    @staticmethod
+    def _is_executable(path):
+        return os.path.isfile(path) and os.access(path, os.X_OK)
 
 
 class RegexType(object):
@@ -90,7 +148,13 @@ class RegexType(object):
         if matches is None:
             raise ArgumentTypeError(self._error_message, value)
 
-        return value
+        return matches
+
+    def __repr__(self):
+        return _repr(self, {
+            'regex': self._regex,
+            'error_message': self._error_message,
+        })
 
 
 class ClangVersionType(RegexType):
@@ -107,6 +171,12 @@ class ClangVersionType(RegexType):
             ClangVersionType.VERSION_REGEX,
             ClangVersionType.ERROR_MESSAGE)
 
+    def __call__(self, value):
+        matches = super(ClangVersionType, self).__call__(value)
+        components = filter(lambda x: x is not None, matches.group(1, 2, 3, 5))
+
+        return CompilerVersion(components)
+
 
 class SwiftVersionType(RegexType):
     """Argument type used to validate Swift version strings.
@@ -120,6 +190,12 @@ class SwiftVersionType(RegexType):
         super(SwiftVersionType, self).__init__(
             SwiftVersionType.VERSION_REGEX,
             SwiftVersionType.ERROR_MESSAGE)
+
+    def __call__(self, value):
+        matches = super(SwiftVersionType, self).__call__(value)
+        components = filter(lambda x: x is not None, matches.group(1, 2, 4))
+
+        return CompilerVersion(components)
 
 
 class ShellSplitType(object):
@@ -140,3 +216,6 @@ class ShellSplitType(object):
         lex.whitespace_split = True
         lex.whitespace += ','
         return list(lex)
+
+    def __repr__(self):
+        return _repr(self, {})

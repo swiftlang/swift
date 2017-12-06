@@ -180,7 +180,7 @@ class StoreAction(Action):
 
         if 'choices' in kwargs:
             kwargs['nargs'] = Nargs.OPTIONAL
-        if 'const' in kwargs:
+        elif 'const' in kwargs:
             kwargs['nargs'] = Nargs.ZERO
 
         super(StoreAction, self).__init__(
@@ -242,8 +242,11 @@ class StorePathAction(StoreAction):
     """
 
     def __init__(self, option_strings, **kwargs):
+        assert_exists = kwargs.pop('exists', False)
+        assert_executable = kwargs.pop('executable', False)
+
         kwargs['nargs'] = Nargs.SINGLE
-        kwargs['type'] = PathType()
+        kwargs['type'] = PathType(assert_exists, assert_executable)
         kwargs.setdefault('metavar', 'PATH')
 
         super(StorePathAction, self).__init__(
