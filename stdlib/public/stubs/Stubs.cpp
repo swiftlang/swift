@@ -26,10 +26,10 @@
 #define NOMINMAX
 #include <windows.h>
 #else
-#if !defined(__HAIKU__)
-#include <sys/errno.h>
-#else
+#if defined(__HAIKU__) || defined(__Fuchsia__)
 #include <errno.h>
+#else
+#include <sys/errno.h>
 #endif
 #include <sys/resource.h>
 #include <unistd.h>

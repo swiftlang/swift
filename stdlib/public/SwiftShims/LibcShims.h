@@ -55,6 +55,8 @@ typedef __swift_uint32_t __swift_mode_t;
 typedef __swift_uint16_t __swift_mode_t;
 #elif defined(_WIN32)
 typedef __swift_int32_t __swift_mode_t;
+#elif defined(__Fuchsia__)
+typedef __swift_uint32_t __swift_mode_t;
 #else  // just guessing
 typedef __swift_uint16_t __swift_mode_t;
 #endif
