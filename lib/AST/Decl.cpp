@@ -4296,6 +4296,9 @@ ParamDecl::ParamDecl(Specifier specifier,
   SpecifierLoc(specifierLoc) {
     assert(specifier != Specifier::Var &&
            "'var' cannot appear on parameters; you meant 'inout'");
+  ParamDeclBits.IsTypeLocImplicit = false;
+  ParamDeclBits.defaultArgumentKind =
+    static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
@@ -4310,9 +4313,9 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
-    IsTypeLocImplicit(PD->IsTypeLocImplicit),
-    defaultArgumentKind(PD->defaultArgumentKind) {
+    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()) {
+  ParamDeclBits.IsTypeLocImplicit = PD->ParamDeclBits.IsTypeLocImplicit;
+  ParamDeclBits.defaultArgumentKind = PD->ParamDeclBits.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
   if (!withTypes && typeLoc.getTypeRepr())
     typeLoc.setType(Type());
@@ -5083,9 +5086,9 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   setParameterLists(SelfDecl, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
-  this->HasStubImplementation = 0;
-  this->InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
-  this->Failability = static_cast<unsigned>(Failability);
+  ConstructorDeclBits.HasStubImplementation = 0;
+  ConstructorDeclBits.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
+  ConstructorDeclBits.Failability = static_cast<unsigned>(Failability);
 }
 
 void ConstructorDecl::setParameterLists(ParamDecl *selfDecl,

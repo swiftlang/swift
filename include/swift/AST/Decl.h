@@ -228,10 +228,19 @@ struct OverloadSignature {
 /// Determine whether two overload signatures conflict.
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 
+#define BITFIELD_START(D, PD, C) \
+  enum { Num##D##Bits = Num##PD##Bits + C }; \
+  static_assert(Num##D##Bits <= 64, "fits in a uint64_t"); \
+  class D##Bitfields { \
+    friend class D; \
+    uint64_t : Num##PD##Bits
+
+#define BITFIELD_END }
+
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
-  class DeclBitfields {
-    friend class Decl;
+  enum { Num_DeclBits = 0 };
+  BITFIELD_START(Decl, _Decl, 13);
     unsigned Kind : 6;
 
     /// \brief Whether this declaration is invalid.
@@ -260,14 +269,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
     unsigned EscapedFromIfConfig : 1;
-  };
-  enum { NumDeclBits = 13 };
-  static_assert(NumDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class PatternBindingDeclBitfields {
-    friend class PatternBindingDecl;
-    unsigned : NumDeclBits;
-    
+  BITFIELD_START(PatternBindingDecl, Decl, 19);
     /// \brief Whether this pattern binding declares static variables.
     unsigned IsStatic : 1;
 
@@ -276,14 +280,11 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief The number of pattern binding declarations.
     unsigned NumPatternEntries : 16;
-  };
-  enum { NumPatternBindingDeclBits = NumDeclBits + 19 };
-  static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
   
-  class ValueDeclBitfields {
-    friend class ValueDecl;
+  BITFIELD_START(ValueDecl, Decl, 3);
     friend class MemberLookupTable;
-    unsigned : NumDeclBits;
+
     unsigned AlreadyInLookupTable : 1;
 
     /// Whether we have already checked whether this declaration is a 
@@ -293,14 +294,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
     unsigned IsUserAccessible : 1;
-  };
-  enum { NumValueDeclBits = NumDeclBits + 3 };
-  static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class AbstractStorageDeclBitfields {
-    friend class AbstractStorageDecl;
-    unsigned : NumValueDeclBits;
-
+  BITFIELD_START(AbstractStorageDecl, ValueDecl, 7);
     /// Whether we are overridden later
     unsigned Overridden : 1;
 
@@ -312,14 +308,9 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// The storage kind.
     unsigned StorageKind : 4;
-  };
-  enum { NumAbstractStorageDeclBits = NumValueDeclBits + 7 };
-  static_assert(NumAbstractStorageDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class VarDeclBitfields {
-    friend class VarDecl;
-    unsigned : NumAbstractStorageDeclBits;
-
+  BITFIELD_START(VarDecl, AbstractStorageDecl, 6);
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     unsigned IsStatic : 1;
@@ -339,29 +330,30 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
+  BITFIELD_END;
 
-  };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
-  static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_START(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits);
+    /// True if the type is implicitly specified in the source, but this has an
+    /// apparently valid typeRepr.  This is used in accessors, which look like:
+    ///    set (value) {
+    /// but need to get the typeRepr from the property as a whole so Sema can
+    /// resolve the type.
+    unsigned IsTypeLocImplicit : 1;
 
-  class EnumElementDeclBitfields {
-    friend class EnumElementDecl;
-    unsigned : NumValueDeclBits;
-    
+    /// Information about a symbolic default argument, like #file.
+    unsigned defaultArgumentKind : NumDefaultArgumentKindBits;
+  BITFIELD_END;
+
+  BITFIELD_START(EnumElementDecl, ValueDecl, 3);
     /// \brief Whether or not this element directly or indirectly references
     /// the enum type.
     unsigned Recursiveness : 2;
 
     /// \brief Whether or not this element has an associated value.
     unsigned HasArgumentType : 1;
-  };
-  enum { NumEnumElementDeclBits = NumValueDeclBits + 3 };
-  static_assert(NumEnumElementDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
   
-  class AbstractFunctionDeclBitfields {
-    friend class AbstractFunctionDecl;
-    unsigned : NumValueDeclBits;
-
+  BITFIELD_START(AbstractFunctionDecl, ValueDecl, 13);
     /// \see AbstractFunctionDecl::BodyKind
     unsigned BodyKind : 3;
 
@@ -382,72 +374,65 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// The ResilienceExpansion to use for default arguments.
     unsigned DefaultArgumentResilienceExpansion : 1;
-  };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 13 };
-  static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class FuncDeclBitfields {
-    friend class FuncDecl;
-    unsigned : NumAbstractFunctionDeclBits;
-
+  BITFIELD_START(FuncDecl, AbstractFunctionDecl, 7);
     /// Whether this function is a 'static' method.
     unsigned IsStatic : 1;
 
     /// \brief Whether 'static' or 'class' was used.
     unsigned StaticSpelling : 2;
-  };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 3 };
-  static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
-  class ConstructorDeclBitfields {
-    friend class ConstructorDecl;
-    unsigned : NumAbstractFunctionDeclBits;
+    /// Whether we are statically dispatched even if overridable
+    unsigned ForcedStaticDispatch : 1;
 
+    /// Whether this function has a dynamic Self return type.
+    unsigned HasDynamicSelf : 1;
+
+    /// Backing bits for 'self' access kind.
+    unsigned SelfAccess : 2;
+  BITFIELD_END;
+
+  BITFIELD_START(ConstructorDecl, AbstractFunctionDecl, 8);
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
     /// This value is cached but is not serialized, because it is a property
     /// of the definition of the constructor that is useful only to semantic
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
-  };
-  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 3 };
-  static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
 
-  class TypeDeclBitfields {
-    friend class TypeDecl;
-    unsigned : NumValueDeclBits;
+    /// The kind of initializer we have.
+    unsigned InitKind : 2;
 
+    /// The failability of this initializer, which is an OptionalTypeKind.
+    unsigned Failability : 2;
+
+    /// Whether this initializer is a stub placed into a subclass to
+    /// catch invalid delegations to a designated initializer not
+    /// overridden by the subclass. A stub will always trap at runtime.
+    ///
+    /// Initializer stubs can be invoked from Objective-C or through
+    /// the Objective-C runtime; there is no way to directly express
+    /// an object construction that will invoke a stub.
+    unsigned HasStubImplementation : 1;
+  BITFIELD_END;
+
+  BITFIELD_START(TypeDecl, ValueDecl, 1);
     /// Whether we have already checked the inheritance clause.
     ///
     /// FIXME: Is this too fine-grained?
     unsigned CheckedInheritanceClause : 1;
-  };
+  BITFIELD_END;
 
-  enum { NumTypeDeclBits = NumValueDeclBits + 1 };
-  static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_START(GenericTypeDecl, TypeDecl, 0);
+  BITFIELD_END;
 
-  class GenericTypeDeclBitfields {
-    friend class GenericTypeDecl;
-    unsigned : NumTypeDeclBits;
-  };
-
-  enum { NumGenericTypeDeclBits = NumTypeDeclBits };
-  static_assert(NumGenericTypeDeclBits <= 32, "fits in an unsigned");
-
-  class TypeAliasDeclBitfields {
-    friend class TypeAliasDecl;
-    unsigned : NumGenericTypeDeclBits;
-
+  BITFIELD_START(TypeAliasDecl, GenericTypeDecl, 1);
     /// Whether the typealias forwards perfectly to its underlying type.
     unsigned IsCompatibilityAlias : 1;
-  };
-  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
-  static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class NominalTypeDeclBitFields {
-    friend class NominalTypeDecl;
-    unsigned : NumGenericTypeDeclBits;
-    
+  BITFIELD_START(NominalTypeDecl, GenericTypeDecl, 4);
     /// Whether or not the nominal type decl has delayed protocol or member
     /// declarations.
     unsigned HasDelayedMembers : 1;
@@ -462,14 +447,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether we have already validated all members of the type that
     /// affect layout.
     unsigned HasValidatedLayout : 1;
-  };
-  enum { NumNominalTypeDeclBits = NumGenericTypeDeclBits + 4 };
-  static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class ProtocolDeclBitfields {
-    friend class ProtocolDecl;
-    unsigned : NumNominalTypeDeclBits;
-
+  BITFIELD_START(ProtocolDecl, NominalTypeDecl, 8);
     /// Whether the \c RequiresClass bit is valid.
     unsigned RequiresClassValid : 1;
 
@@ -490,14 +470,9 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;
-  };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 8 };
-  static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class ClassDeclBitfields {
-    friend class ClassDecl;
-    unsigned : NumNominalTypeDeclBits;
-
+  BITFIELD_START(ClassDecl, NominalTypeDecl, 8);
     /// The stage of the inheritance circularity check for this class.
     unsigned Circularity : 2;
 
@@ -520,70 +495,40 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// it is implicit. This bit is used during parsing and type-checking to
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
+  BITFIELD_END;
 
-  };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
-  static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
-
-  class StructDeclBitfields {
-    friend class StructDecl;
-    unsigned : NumNominalTypeDeclBits;
-    
+  BITFIELD_START(StructDecl, NominalTypeDecl, 1);
     /// True if this struct has storage for fields that aren't accessible in
     /// Swift.
     unsigned HasUnreferenceableStorage : 1;
-  };
-  enum { NumStructDeclBits = NumNominalTypeDeclBits + 1 };
-  static_assert(NumStructDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
   
-  class EnumDeclBitfields {
-    friend class EnumDecl;
-    unsigned : NumNominalTypeDeclBits;
-    
+  BITFIELD_START(EnumDecl, NominalTypeDecl, 4);
     /// The stage of the raw type circularity check for this class.
     unsigned Circularity : 2;
 
     /// True if the enum has cases and at least one case has associated values.
     mutable unsigned HasAssociatedValues : 2;
-  };
-  enum { NumEnumDeclBits = NumNominalTypeDeclBits + 4 };
-  static_assert(NumEnumDeclBits <= 32, "fits in an unsigned");
-  
-  class PrecedenceGroupDeclBitfields {
-    friend class PrecedenceGroupDecl;
-    unsigned : NumDeclBits;
+  BITFIELD_END;
 
+  BITFIELD_START(PrecedenceGroupDecl, Decl, 11);
     /// The group's associativity.  A value of the Associativity enum.
     unsigned Associativity : 2;
 
     /// Is this an assignment operator?
     unsigned IsAssignment : 1;
-  };
-  enum { NumPrecedenceGroupDeclBits = NumDeclBits + 11 };
-  static_assert(NumPrecedenceGroupDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class AssociatedTypeDeclBitfields {
-    friend class AssociatedTypeDecl;
-    unsigned : NumTypeDeclBits;
+  BITFIELD_START(AssociatedTypeDecl, TypeDecl, 2);
     unsigned ComputedOverridden : 1;
     unsigned HasOverridden : 1;
-  };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
-  static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class ImportDeclBitfields {
-    friend class ImportDecl;
-    unsigned : NumDeclBits;
-
+  BITFIELD_START(ImportDecl, Decl, 3);
     unsigned ImportKind : 3;
-  };
-  enum { NumImportDeclBits = NumDeclBits + 3 };
-  static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class ExtensionDeclBitfields {
-    friend class ExtensionDecl;
-    unsigned : NumDeclBits;
-
+  BITFIELD_START(ExtensionDecl, Decl, 5);
     /// Whether we have already checked the inheritance clause.
     ///
     /// FIXME: Is this too fine-grained?
@@ -598,30 +543,20 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// Whether there is are lazily-loaded conformances for this extension.
     unsigned HasLazyConformances : 1;
-  };
-  enum { NumExtensionDeclBits = NumDeclBits + 5 };
-  static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class IfConfigDeclBitfields {
-    friend class IfConfigDecl;
-    unsigned : NumDeclBits;
-
+  BITFIELD_START(IfConfigDecl, Decl, 1);
     /// Whether this decl is missing its closing '#endif'.
     unsigned HadMissingEnd : 1;
-  };
-  enum { NumIfConfigDeclBits = NumDeclBits + 1 };
-  static_assert(NumIfConfigDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
-  class MissingMemberDeclBitfields {
-    friend class MissingMemberDecl;
-    unsigned : NumDeclBits;
-
+  BITFIELD_START(MissingMemberDecl, Decl, 3);
     unsigned NumberOfVTableEntries : 2;
     unsigned NumberOfFieldOffsetVectorEntries : 1;
-  };
-  enum { NumMissingMemberDeclBits = NumDeclBits + 3 };
-  static_assert(NumMissingMemberDeclBits <= 32, "fits in an unsigned");
+  BITFIELD_END;
 
+#undef BITFIELD_START
+#undef BITFIELD_END
 protected:
   union {
     DeclBitfields DeclBits;
@@ -630,13 +565,14 @@ protected:
     AbstractStorageDeclBitfields AbstractStorageDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
     VarDeclBitfields VarDeclBits;
+    ParamDeclBitfields ParamDeclBits;
     EnumElementDeclBitfields EnumElementDeclBits;
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
     GenericTypeDeclBitfields GenericTypeDeclBits;
     TypeAliasDeclBitfields TypeAliasDeclBits;
-    NominalTypeDeclBitFields NominalTypeDeclBits;
+    NominalTypeDeclBitfields NominalTypeDeclBits;
     ProtocolDeclBitfields ProtocolDeclBits;
     ClassDeclBitfields ClassDeclBits;
     StructDeclBitfields StructDeclBits;
@@ -647,10 +583,8 @@ protected:
     ExtensionDeclBitfields ExtensionDeclBits;
     IfConfigDeclBitfields IfConfigDeclBits;
     MissingMemberDeclBitfields MissingMemberDeclBits;
-    uint32_t OpaqueBits;
+    uint64_t OpaqueBits;
   };
-
-  // FIXME: Unused padding here.
 
   // Storage for the declaration attributes.
   DeclAttributes Attrs;
@@ -4649,16 +4583,6 @@ class ParamDecl : public VarDecl {
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
   
-  /// True if the type is implicitly specified in the source, but this has an
-  /// apparently valid typeRepr.  This is used in accessors, which look like:
-  ///    set (value) {
-  /// but need to get the typeRepr from the property as a whole so Sema can
-  /// resolve the type.
-  bool IsTypeLocImplicit = false;
-  
-  /// Information about a symbolic default argument, like #file.
-  DefaultArgumentKind defaultArgumentKind = DefaultArgumentKind::None;
-  
 public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
@@ -4685,17 +4609,17 @@ public:
   
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
-  bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
-  void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
+  bool isTypeLocImplicit() const { return ParamDeclBits.IsTypeLocImplicit; }
+  void setIsTypeLocImplicit(bool val) { ParamDeclBits.IsTypeLocImplicit = val; }
   
-  bool isDefaultArgument() const {
-    return defaultArgumentKind != DefaultArgumentKind::None;
-  }
   DefaultArgumentKind getDefaultArgumentKind() const {
-    return defaultArgumentKind;
+    return static_cast<DefaultArgumentKind>(ParamDeclBits.defaultArgumentKind);
+  }
+  bool isDefaultArgument() const {
+    return getDefaultArgumentKind() != DefaultArgumentKind::None;
   }
   void setDefaultArgumentKind(DefaultArgumentKind K) {
-    defaultArgumentKind = K;
+    ParamDeclBits.defaultArgumentKind = static_cast<unsigned>(K);
   }
   
   Expr *getDefaultValue() const {
@@ -5245,15 +5169,6 @@ class FuncDecl final : public AbstractFunctionDecl,
 
   TypeLoc FnRetType;
 
-  /// Whether we are statically dispatched even if overridable
-  unsigned ForcedStaticDispatch : 1;
-
-  /// Whether this function has a dynamic Self return type.
-  unsigned HasDynamicSelf : 1;
-
-  /// Backing bits for 'self' access kind.
-  unsigned SelfAccess : 2;
-      
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
@@ -5282,9 +5197,9 @@ class FuncDecl final : public AbstractFunctionDecl,
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
 
-    HasDynamicSelf = false;
-    ForcedStaticDispatch = false;
-    SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
+    FuncDeclBits.HasDynamicSelf = false;
+    FuncDeclBits.ForcedStaticDispatch = false;
+    FuncDeclBits.SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
   }
 
   static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
@@ -5351,10 +5266,10 @@ public:
   }
   
   SelfAccessKind getSelfAccessKind() const {
-    return static_cast<SelfAccessKind>(SelfAccess);
+    return static_cast<SelfAccessKind>(FuncDeclBits.SelfAccess);
   }
   void setSelfAccessKind(SelfAccessKind mod) {
-    SelfAccess = static_cast<unsigned>(mod);
+    FuncDeclBits.SelfAccess = static_cast<unsigned>(mod);
   }
       
   /// \brief Returns the parameter lists(s) for the function definition.
@@ -5462,11 +5377,11 @@ public:
 
   /// Determine whether this function has a dynamic \c Self return
   /// type.
-  bool hasDynamicSelf() const { return HasDynamicSelf; }
+  bool hasDynamicSelf() const { return FuncDeclBits.HasDynamicSelf; }
 
   /// Set whether this function has a dynamic \c Self return or not.
   void setDynamicSelf(bool hasDynamicSelf) { 
-    HasDynamicSelf = hasDynamicSelf;
+    FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -5515,10 +5430,10 @@ public:
   
   /// Returns true if the function is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const {
-    return ForcedStaticDispatch;
+    return FuncDeclBits.ForcedStaticDispatch;
   }
   void setForcedStaticDispatch(bool flag) {
-    ForcedStaticDispatch = flag;
+    FuncDeclBits.ForcedStaticDispatch = flag;
   }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
@@ -5747,21 +5662,6 @@ enum class CtorInitializerKind {
 /// }
 /// \endcode
 class ConstructorDecl : public AbstractFunctionDecl {
-  /// The kind of initializer we have.
-  unsigned InitKind : 2;
-
-  /// The failability of this initializer, which is an OptionalTypeKind.
-  unsigned Failability : 2;
-
-  /// Whether this initializer is a stub placed into a subclass to
-  /// catch invalid delegations to a designated initializer not
-  /// overridden by the subclass. A stub will always trap at runtime.
-  ///
-  /// Initializer stubs can be invoked from Objective-C or through
-  /// the Objective-C runtime; there is no way to directly express
-  /// an object construction that will invoke a stub.
-  unsigned HasStubImplementation : 1;
-
   /// The location of the '!' or '?' for a failable initializer.
   SourceLoc FailabilityLoc;
 
@@ -5866,12 +5766,12 @@ public:
 
   /// Determine the kind of initializer this is.
   CtorInitializerKind getInitKind() const {
-    return static_cast<CtorInitializerKind>(InitKind);
+    return static_cast<CtorInitializerKind>(ConstructorDeclBits.InitKind);
   }
 
   /// Set whether this is a convenience initializer.
   void setInitKind(CtorInitializerKind kind) {
-    InitKind = static_cast<unsigned>(kind);
+    ConstructorDeclBits.InitKind = static_cast<unsigned>(kind);
   }
 
   /// Whether this is a designated initializer.
@@ -5915,7 +5815,7 @@ public:
 
   /// Determine the failability of the initializer.
   OptionalTypeKind getFailability() const {
-    return static_cast<OptionalTypeKind>(Failability);
+    return static_cast<OptionalTypeKind>(ConstructorDeclBits.Failability);
   }
 
   /// Retrieve the location of the '!' or '?' in a failable initializer.
@@ -5923,13 +5823,13 @@ public:
 
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {
-    return HasStubImplementation;
+    return ConstructorDeclBits.HasStubImplementation;
   }
 
   /// Set whether the implementation of this method is a stub that
   /// traps at runtime.
   void setStubImplementation(bool stub) {
-    HasStubImplementation = stub;
+    ConstructorDeclBits.HasStubImplementation = stub;
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
