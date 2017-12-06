@@ -143,6 +143,10 @@ struct SyntaxFactory {
   /// Creates an `==` operator token.
   static TokenSyntax makeEqualityOperator(
     const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {});
+
+  /// Whether a node `Member` can serve as a member in a syntax collection of
+  /// the given syntax collection kind.
+  static bool canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member);
 };
 }
 }

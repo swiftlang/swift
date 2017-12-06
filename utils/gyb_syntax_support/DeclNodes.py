@@ -81,11 +81,20 @@ DECL_NODES = [
              Child('Detail', kind='TokenList'),
          ]),
 
+    Node('InheritedType', kind='Syntax',
+         children=[
+            Child('TypeName', kind='Type'),
+            Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    Node('InheritedTypeList', kind='SyntaxCollection',
+         element='InheritedType'),
+
     # type-inheritance-clause -> ':' type
     Node('TypeInheritanceClause', kind='Syntax',
          children=[
              Child('Colon', kind='ColonToken'),
-             Child('InheritedType', kind='Type'),
+             Child('InheritedTypeCollection', kind='InheritedTypeList'),
          ]),
 
     # struct-declaration -> attributes? access-level-modifier?
@@ -99,7 +108,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='AccessLevelModifier',
+             Child('AccessLevelModifier', kind='DeclModifier',
                    is_optional=True),
              Child('StructKeyword', kind='StructToken'),
              Child('Identifier', kind='IdentifierToken'),

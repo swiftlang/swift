@@ -126,6 +126,21 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
   }
 }
 
+void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind) {
+  assert(isCollectionKind(ColletionKind));
+  assert(isTopOfContextStack());
+  if (!Enabled)
+    return;
+  auto Count = std::count_if(Parts.rbegin(), Parts.rend(),
+                             [&](const RC<RawSyntax> &Raw) {
+    return SyntaxFactory::canServeAsCollectionMember(ColletionKind,
+                                                     make<Syntax>(Raw));
+  });
+  if (Count) {
+    createNodeInPlace(ColletionKind, Count);
+  }
+}
+
 namespace {
 RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts) {
   if (Parts.size() == 1) {

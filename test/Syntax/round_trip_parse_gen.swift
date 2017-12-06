@@ -86,3 +86,9 @@ struct foo {
 }
 
 struct S<A, B, C, @objc D> where A:B, B==C, A : C, B.C == D.A, A.B: C.D {}
+
+private struct S<A, B>: Base where A: B {
+  private struct S: A, B {}
+}
+
+protocol P: class {}
