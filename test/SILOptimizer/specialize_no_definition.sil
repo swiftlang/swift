@@ -8,7 +8,7 @@ sil_stage canonical
 
 // CHECK:      --- !Missed
 // CHECK-NEXT: Pass:            sil-generic-specializer
-// CHECK-NEXT: Name:            NoDef
+// CHECK-NEXT: Name:            sil.NoDef
 // CHECK-NEXT: DebugLoc:
 // CHECK-NEXT:   File:            {{.*}}/specialize_no_definition.sil
 // CHECK-NEXT:   Line:            36
