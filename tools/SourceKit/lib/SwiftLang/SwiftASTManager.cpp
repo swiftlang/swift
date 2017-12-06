@@ -370,7 +370,7 @@ static void setModuleName(CompilerInvocation &Invocation) {
   if (!Invocation.getModuleName().empty())
     return;
 
-  StringRef Filename = Invocation.getOutputFilename();
+  StringRef Filename = Invocation.getOutputFilename(Invocation.getFrontendOptions().Inputs.getRequiredUniquePrimaryInput().getFile());
   if (Filename.empty()) {
     if (!Invocation.getFrontendOptions().Inputs.hasInputs()) {
       Invocation.setModuleName("__main__");
@@ -473,7 +473,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   ImporterOpts.DetailedPreprocessingRecord = true;
 
   setModuleName(Invocation);
-  Invocation.setSerializedDiagnosticsPath(StringRef());
+  Invocation.setSerializedDiagnosticsPath(Invocation.getFrontendOptions().Inputs.getRequiredUniquePrimaryInput().getFile(), StringRef());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
   Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
