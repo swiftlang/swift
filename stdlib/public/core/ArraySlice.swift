@@ -59,6 +59,16 @@ extension Slice: ExpressibleByArrayLiteral
   }
 }
 
+extension Slice where Base: RangeReplaceableCollection {
+  @_inlineable
+  @available(swift, introduced: 4.0)
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> Base {
+    return try Base(base[_startIndex..<_endIndex].lazy.filter(isIncluded))
+  }
+}
+
 // %if Self == 'ArraySlice':
 // /// Initialization from an existing buffer does not have "array.init"
 // /// semantics because the caller may retain an alias to buffer.

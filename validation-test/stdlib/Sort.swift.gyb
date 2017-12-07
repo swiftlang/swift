@@ -52,7 +52,7 @@ func expectSortedCollection(
   expectSortedCollection(sortedAry, Array(originalAry))
 }
 
-func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySlice<Int>) {
+func expectSortedCollection<C: Collection>(_ sortedAry: Slice<C>, _ originalAry: Slice<C>) where C.Element == Int {
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
 }
 
