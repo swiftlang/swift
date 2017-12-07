@@ -4131,6 +4131,19 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
                                       diagnoseMismatch);
 }
 
+/// Determine whether the given type has a type parameter or directly
+/// references a deprecated typealias.
+static bool hasTypeParameterOrIsDeprecatedTypealias(Type type){
+  if (type->hasTypeParameter()) return true;
+
+  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer())) {
+    return typeAlias->getDecl()->getAttrs().getDeprecated(
+                                                      type->getASTContext());
+  }
+
+  return false;
+}
+
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
     ResolvedType type1, ResolvedType type2,
     FloatingRequirementSource source,
@@ -4286,9 +4299,9 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
 
   case RequirementReprKind::SameType: {
     // Require that at least one side of the requirement contain a type
-    // parameter.
-    if (!Req->getFirstType()->hasTypeParameter() &&
-        !Req->getSecondType()->hasTypeParameter()) {
+    // parameter or directly reference a deprecated declaration.
+    if (!hasTypeParameterOrIsDeprecatedTypealias(Req->getFirstType()) &&
+        !hasTypeParameterOrIsDeprecatedTypealias(Req->getSecondType())) {
       if (!Req->getFirstType()->hasError() &&
           !Req->getSecondType()->hasError()) {
         Impl->HadAnyError = true;
