@@ -618,12 +618,7 @@ void Remangler::mangleClass(Node *node) {
 }
 
 void Remangler::mangleAnyConstructor(Node *node, char kindOp) {
-  mangleChildNode(node, 0);
-  if (node->getNumChildren() > 2) {
-    assert(node->getNumChildren() == 3);
-    mangleChildNode(node, 2);
-  }
-  mangleChildNode(node, 1);
+  mangleChildNodes(node);
   Buffer << "f" << kindOp;
 }
 
@@ -860,13 +855,20 @@ void Remangler::mangleFullTypeMetadata(Node *node) {
 void Remangler::mangleFunction(Node *node) {
   mangleChildNode(node, 0); // context
   mangleChildNode(node, 1); // name
-  Node *FuncType = getSingleChild(node->getChild(2));
+
+  bool hasLabels = node->getChild(2)->getKind() == Node::Kind::LabelList;
+  Node *FuncType = getSingleChild(node->getChild(hasLabels ? 3 : 2));
+
+  if (hasLabels)
+    mangleChildNode(node, 2); // parameter labels
+
   if (FuncType->getKind() == Node::Kind::DependentGenericType) {
     mangleFunctionSignature(getSingleChild(FuncType->getChild(1)));
     mangleChildNode(FuncType, 0); // generic signature
   } else {
     mangleFunctionSignature(FuncType);
   }
+
   Buffer << "F";
 }
 
@@ -1612,6 +1614,13 @@ void Remangler::mangleTypeList(Node *node) {
     mangleListSeparator(FirstElem);
   }
   mangleEndOfList(FirstElem);
+}
+
+void Remangler::mangleLabelList(Node *node) {
+  if (node->getNumChildren() == 0)
+    Buffer << 'y';
+  else
+    mangleChildNodes(node);
 }
 
 void Remangler::mangleTypeMangling(Node *node) {

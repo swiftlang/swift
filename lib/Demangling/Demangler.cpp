@@ -355,6 +355,20 @@ NodePointer Demangler::createWithChildren(Node::Kind kind,
   return Nd;
 }
 
+NodePointer Demangler::createWithChildren(Node::Kind kind, NodePointer Child1,
+                                          NodePointer Child2,
+                                          NodePointer Child3,
+                                          NodePointer Child4) {
+  if (!Child1 || !Child2 || !Child3 || !Child4)
+    return nullptr;
+  NodePointer Nd = createNode(kind);
+  Nd->addChild(Child1, *this);
+  Nd->addChild(Child2, *this);
+  Nd->addChild(Child3, *this);
+  Nd->addChild(Child4, *this);
+  return Nd;
+}
+
 NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
   if (!Node)
     return nullptr;
@@ -812,12 +826,19 @@ NodePointer Demangler::demangleExtensionContext() {
 NodePointer Demangler::demanglePlainFunction() {
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   NodePointer Type = popFunctionType(Node::Kind::FunctionType);
+  NodePointer LabelList = popFunctionParamLabels(Type);
+
   if (GenSig) {
     Type = createType(createWithChildren(Node::Kind::DependentGenericType,
                                          GenSig, Type));
   }
-  NodePointer Name = popNode(isDeclName);
-  NodePointer Ctx = popContext();
+
+  auto Name = popNode(isDeclName);
+  auto Ctx = popContext();
+
+  if (LabelList)
+    return createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type);
+
   return createWithChildren(Node::Kind::Function, Ctx, Name, Type);
 }
 
@@ -838,6 +859,41 @@ NodePointer Demangler::popFunctionParams(Node::Kind kind) {
     ParamsType = popNode(Node::Kind::Type);
   }
   return createWithChild(kind, ParamsType);
+}
+
+NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
+  if (popNode(Node::Kind::EmptyList))
+    return createNode(Node::Kind::LabelList);
+
+  assert(Type->getKind() == Node::Kind::Type);
+
+  auto FuncType = Type->getFirstChild();
+  if (FuncType->getKind() == Node::Kind::DependentGenericType)
+    FuncType = FuncType->getChild(1)->getFirstChild();
+
+  if (FuncType->getKind() != Node::Kind::FunctionType)
+    return nullptr;
+
+  auto ParameterType = FuncType->getFirstChild();
+  if (ParameterType->getKind() == Node::Kind::ThrowsAnnotation)
+    ParameterType = FuncType->getChild(1);
+
+  assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
+
+  auto Parameters = ParameterType->getFirstChild()->getFirstChild();
+  if (Parameters->getKind() != Node::Kind::Tuple)
+    return nullptr;
+
+  auto LabelList = createNode(Node::Kind::LabelList);
+  for (unsigned i = 0, n = Parameters->getNumChildren(); i != n; ++i) {
+    auto Label = popNode();
+    assert(Label && (Label->getKind() == Node::Kind::Identifier ||
+                     Label->getKind() == Node::Kind::FirstElementMarker));
+    LabelList->addChild(Label, *this);
+  }
+
+  LabelList->reverseChildren();
+  return LabelList;
 }
 
 NodePointer Demangler::popTuple() {
@@ -1900,20 +1956,21 @@ NodePointer Demangler::demangleFunctionEntity() {
     default: return nullptr;
   }
 
-  NodePointer Child1 = nullptr, Child2 = nullptr;
+  NodePointer NameOrIndex = nullptr, ParamType = nullptr, LabelList = nullptr;
   switch (Args) {
     case None:
       break;
     case TypeAndMaybePrivateName:
-      Child1 = popNode(Node::Kind::PrivateDeclName);
-      Child2 = popNode(Node::Kind::Type);
+      NameOrIndex = popNode(Node::Kind::PrivateDeclName);
+      ParamType = popNode(Node::Kind::Type);
+      LabelList = popFunctionParamLabels(ParamType);
       break;
     case TypeAndIndex:
-      Child1 = demangleIndexAsNode();
-      Child2 = popNode(Node::Kind::Type);
+      NameOrIndex = demangleIndexAsNode();
+      ParamType = popNode(Node::Kind::Type);
       break;
     case Index:
-      Child1 = demangleIndexAsNode();
+      NameOrIndex = demangleIndexAsNode();
       break;
   }
   NodePointer Entity = createWithChild(Kind, popContext());
@@ -1921,16 +1978,16 @@ NodePointer Demangler::demangleFunctionEntity() {
     case None:
       break;
     case Index:
-      Entity = addChild(Entity, Child1);
+      addChild(Entity, NameOrIndex);
       break;
     case TypeAndMaybePrivateName:
-      if (Child1)
-        Entity = addChild(Entity, Child1);
-      Entity = addChild(Entity, Child2);
+      addChild(Entity, LabelList);
+      addChild(Entity, ParamType);
+      addChild(Entity, NameOrIndex);
       break;
     case TypeAndIndex:
-      Entity = addChild(Entity, Child1);
-      Entity = addChild(Entity, Child2);
+      addChild(Entity, NameOrIndex);
+      addChild(Entity, ParamType);
       break;
   }
   return Entity;
@@ -1938,9 +1995,13 @@ NodePointer Demangler::demangleFunctionEntity() {
 
 NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   NodePointer Type = popNode(Node::Kind::Type);
+  NodePointer LabelList = popFunctionParamLabels(Type);
   NodePointer Name = popNode(isDeclName);
   NodePointer Context = popContext();
-  return createWithChildren(Kind, Context, Name, Type);
+  return LabelList
+             ? createWithChildren(Node::Kind::Variable, Context, Name,
+                                  LabelList, Type)
+             : createWithChildren(Node::Kind::Variable, Context, Name, Type);
 }
 
 NodePointer Demangler::demangleVariable() {
@@ -1951,13 +2012,14 @@ NodePointer Demangler::demangleVariable() {
 NodePointer Demangler::demangleSubscript() {
   NodePointer PrivateName = popNode(Node::Kind::PrivateDeclName);
   NodePointer Type = popNode(Node::Kind::Type);
+  NodePointer LabelList = popFunctionParamLabels(Type);
   NodePointer Context = popContext();
 
   NodePointer Subscript = createNode(Node::Kind::Subscript);
-  Subscript->addChild(Context, *this);
-  Subscript->addChild(Type, *this);
-  if (PrivateName)
-    Subscript->addChild(PrivateName, *this);
+  addChild(Subscript, Context);
+  addChild(Subscript, LabelList);
+  addChild(Subscript, Type);
+  addChild(Subscript, PrivateName);
 
   return demangleAccessor(Subscript);
 }

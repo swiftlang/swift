@@ -277,6 +277,7 @@ private:
     case Node::Kind::Type:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
+    case Node::Kind::LabelList:
       return true;
 
     case Node::Kind::ProtocolList:
@@ -1603,6 +1604,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::TypeList:
     printChildren(Node);
     return nullptr;
+  case Node::Kind::LabelList:
+    return nullptr;
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
     return nullptr;
@@ -1903,6 +1906,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
     NodePointer type = Entity->getChild(1);
     if (type->getKind() != Node::Kind::Type)
       type = Entity->getChild(2);
+    if (type->getKind() == Node::Kind::LabelList)
+      type = Entity->getChild(3);
     assert(type->getKind() == Node::Kind::Type);
     type = type->getChild(0);
     if (TypePr == TypePrinting::FunctionStyle) {

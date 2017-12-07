@@ -1500,7 +1500,7 @@ void ASTMangler::appendFunctionInputType(
     // it as a single type dropping sugar.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
-      appendTypeListElement(param.getLabel(), type, param.getParameterFlags());
+      appendTypeListElement(Identifier(), type, param.getParameterFlags());
       break;
     }
 
@@ -1512,7 +1512,7 @@ void ASTMangler::appendFunctionInputType(
   default:
     bool isFirstParam = true;
     for (auto &param : params) {
-      appendTypeListElement(param.getLabel(), param.getType(),
+      appendTypeListElement(Identifier(), param.getType(),
                             param.getParameterFlags());
       appendListSeparator(isFirstParam);
     }
@@ -1849,6 +1849,24 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
   auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
+    // Append parameter labels right before the signature/type.
+    auto parameters = FuncTy->getParams();
+    auto firstLabel = std::find_if(
+        parameters.begin(), parameters.end(),
+        [&](AnyFunctionType::Param param) { return param.hasLabel(); });
+
+    if (firstLabel != parameters.end()) {
+      for (auto param : parameters) {
+        auto label = param.getLabel();
+        if (!label.empty())
+          appendIdentifier(label.str());
+        else
+          appendOperator("_");
+      }
+    } else {
+      appendOperator("y");
+    }
+
     if (isFunctionMangling) {
       appendFunctionSignature(FuncTy);
     } else {

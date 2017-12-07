@@ -1649,6 +1649,13 @@ void Remangler::mangleTypeList(Node *node) {
   Out << '_';
 }
 
+void Remangler::mangleLabelList(Node *node) {
+  if (node->getNumChildren() == 0)
+    Out << 'y';
+  else
+    mangleChildNodes(node);
+}
+
 void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node) {
   Out << "MRb";
 }
