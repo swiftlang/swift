@@ -256,4 +256,10 @@ EXPR_NODES = [
                    ]),
              Child("TypeName", kind='Type')
          ]),
+
+    # Type
+    Node('TypeExpr', kind='Expr',
+         children=[
+             Child('Type', kind='Type'),
+         ]),
 ]

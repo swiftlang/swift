@@ -49,6 +49,7 @@ class C {
   }
 
   func foo3() {
+    _ = [Any]()
     _ = a.a.a
     _ = a.b
     _ = 1.a
