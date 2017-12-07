@@ -93,3 +93,11 @@ private struct S<A, B>: Base where A: B {
 }
 
 protocol P: class {}
+
+func foo(_ _: Int,
+         a b: Int = 3 + 2,
+         _ c: Int = 2,
+         d _: Int = true ? 2: 3,
+         @objc e: X = true,
+         f: inout Int,
+         g: Int...) {}
