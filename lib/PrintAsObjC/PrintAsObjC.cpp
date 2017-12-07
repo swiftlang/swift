@@ -500,6 +500,12 @@ private:
       return M.getASTContext().TheEmptyTupleType;
     return result;
   }
+
+  /// Returns true if \p sel is the no-argument selector 'init'.
+  static bool selectorIsInit(ObjCSelector sel) {
+    return sel.getNumArgs() == 0 &&
+           sel.getSelectorPieces().front().str() == "init";
+  }
                                           
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
@@ -605,6 +611,7 @@ private:
 
     bool skipAvailability = false;
     bool makeNewUnavailable = false;
+    bool makeNewExplicitlyAvailable = false;
     // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
       if (ctor->hasStubImplementation()
@@ -614,12 +621,34 @@ private:
         os << " SWIFT_UNAVAILABLE";
         skipAvailability = true;
         // If -init is unavailable, then +new should be, too:
-        const bool selectorIsInit = selector.getNumArgs() == 0 && selectorPieces.front().str() == "init";
-        makeNewUnavailable = selectorIsInit;
-      } else if (ctor->isDesignatedInit() &&
-          !isa<ProtocolDecl>(ctor->getDeclContext())) {
-        os << " OBJC_DESIGNATED_INITIALIZER";
+        makeNewUnavailable = selectorIsInit(selector);
+      } else {
+        if (ctor->isDesignatedInit() &&
+            !isa<ProtocolDecl>(ctor->getDeclContext())) {
+          os << " OBJC_DESIGNATED_INITIALIZER";
+        }
+
+        // If -init is newly available, +new should be as well if the class
+        // inherits from NSObject.
+        if (selectorIsInit(selector) && !ctor->getOverriddenDecl()) {
+          auto container = ctor->getDeclContext();
+          auto *classDecl = container->getAsClassOrClassExtensionContext();
+          if (!classDecl) {
+            assert(container->getAsProtocolOrProtocolExtensionContext());
+          } else {
+            while (classDecl->hasSuperclass()) {
+              classDecl = classDecl->getSuperclassDecl();
+              assert(classDecl &&
+                     "shouldn't PrintAsObjC with invalid superclasses");
+            }
+            if (classDecl->hasClangNode() &&
+                classDecl->getNameStr() == "NSObject") {
+              makeNewExplicitlyAvailable = true;
+            }
+          }
+        }
       }
+
       if (!looksLikeInitMethod(AFD->getObjCSelector())) {
         os << " SWIFT_METHOD_FAMILY(init)";
       }
@@ -649,7 +678,10 @@ private:
     os << ";\n";
 
     if (makeNewUnavailable) {
-        os << "+ (nonnull instancetype)new SWIFT_UNAVAILABLE;\n";
+      assert(!makeNewExplicitlyAvailable);
+      os << "+ (nonnull instancetype)new SWIFT_UNAVAILABLE;\n";
+    } else if (makeNewExplicitlyAvailable) {
+      os << "+ (nonnull instancetype)new;\n";
     }
   }
 
