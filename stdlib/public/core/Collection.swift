@@ -784,9 +784,10 @@ public protocol Collection : Sequence
   /// Returns a random element from this collection.
   ///
   /// This uses the default random number generator provided by the standard library.
-  /// A good example of this is getting a random number from 1 to 10:
+  /// A good example of this is getting a random greeting from an array:
   ///
-  ///     let randomToTen = (1 ... 10).random
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let randomGreeting = greetings.random
   ///
   /// If the collection is empty, the value of this function is `nil`.
   ///
@@ -803,9 +804,10 @@ public protocol Collection : Sequence
   ///   a random element.
   /// - Returns: A random element from this collection.
   ///
-  /// A good example of this is getting a random number from 1 to 10:
+  /// A good example of this is getting a random greeting from an array:
   ///
-  ///     let randomToTen = (1 ... 10).random
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let randomGreeting = greetings.random
   ///
   /// If the collection is empty, the value of this function is `nil`.
   ///
@@ -1029,9 +1031,10 @@ extension Collection {
   /// Returns a random element from this collection.
   ///
   /// This uses the default random number generator provided by the standard library.
-  /// A good example of this is getting a random number from 1 to 10:
+  /// A good example of this is getting a random greeting from an array:
   ///
-  ///     let randomToTen = (1 ... 10).random
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let randomGreeting = greetings.random
   ///
   /// If the collection is empty, the value of this function is `nil`.
   ///
@@ -1051,9 +1054,10 @@ extension Collection {
   ///   a random element.
   /// - Returns: A random element from this collection.
   ///
-  /// A good example of this is getting a random number from 1 to 10:
+  /// A good example of this is getting a random greeting from an array:
   ///
-  ///     let randomToTen = (1 ... 10).random
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let randomGreeting = greetings.random
   ///
   /// If the collection is empty, the value of this function is `nil`.
   ///
@@ -1079,6 +1083,12 @@ extension Collection {
   /// - Parameter n: Number of elements to randomly sample without replacement
   ///   from this collection.
   /// - Returns: An array of randomly sampled elements from this collection.
+  ///
+  /// If n is greater than the collection's count, this returns the whole collection.
+  ///
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let greetingSamples = greetings.sampling(5)
+  ///     print(greetingSamples) // Prints ["hi", "hey", "hello", "hola"]
   @_inlineable
   public func sampling(_ n: Int) -> [Element] {
     return self.sampling(n, using: Random.default)
@@ -1091,6 +1101,12 @@ extension Collection {
   /// - Parameter generator: The random number generator to use when getting
   ///   random elements.
   /// - Returns: An array of randomly sampled elements from this collection.
+  ///
+  /// If n is greater than the collection's count, this returns the whole collection.
+  ///
+  ///     let greetings = ["hi", "hey", "hello", "hola"]
+  ///     let greetingSamples = greetings.sampling(5)
+  ///     print(greetingSamples) // Prints ["hi", "hey", "hello", "hola"]
   @_inlineable
   public func sampling<T: RandomNumberGenerator>(
     _ n: Int,

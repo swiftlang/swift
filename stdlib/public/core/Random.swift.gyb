@@ -125,7 +125,6 @@ public struct Random : RandomNumberGenerator {
 
   /// Produces the next randomly generated number
   ///
-  /// - Parameter type: The `FixedWidthInteger` type to generate
   /// - Returns: A number that was randomly generated
   @_inlineable
   public func next() -> UInt {
@@ -170,7 +169,6 @@ public struct Random : RandomNumberGenerator {
 /// Make sure to do this for custom types as it allows developers the ability
 /// to use their own random number generators on custom types.
 public protocol Randomizable {
-
   /// Returns a random representation of this type.
   ///
   /// - Parameter generator: The random number generator to use when getting
