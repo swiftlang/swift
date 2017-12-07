@@ -21,7 +21,7 @@ entry(%e : $Error):
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Error)
 sil @alloc_boxed_existential : $@convention(thin) <T: Error> (@in T) -> @owned Error {
 entry(%x : $*T):
-  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T.Error, %swift.opaque* null, i1 false)
+  // CHECK: [[BOX_PAIR:%.*]] = call swiftcc { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T.Error, %swift.opaque* null, i1 false)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   %b = alloc_existential_box $Error, $T
