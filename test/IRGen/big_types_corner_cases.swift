@@ -34,7 +34,7 @@ class OptionalInoutFuncType {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} i32 @main(i32, i8**) #0 {
+// CHECK-LABEL: define{{( protected)?}} i32 @main(i32, i8**)
 // CHECK: call void @llvm.lifetime.start
 // CHECK: call void @llvm.memcpy
 // CHECK: call void @llvm.lifetime.end
@@ -43,7 +43,7 @@ let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]
 
-// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases21OptionalInoutFuncTypeC7executeys5Error_pSgFyycfU_(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIexcx_Sg* nocapture dereferenceable({{.*}})
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases21OptionalInoutFuncTypeC7executeys5Error_pSgFyycfU_(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcx_Sg* nocapture dereferenceable({{.*}})
 // CHECK: call void @_T0SqWy
 // CHECK: call void @_T0SqWe
 // CHECK: ret void
@@ -93,7 +93,7 @@ public class BigClass {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases8BigClassC03useE6StructyAA0eH0V0aH0_tF(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself) #0 {
+// CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases8BigClassC03useE6StructyAA0eH0V0aH0_tF(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself)
 // CHECK: getelementptr inbounds %T22big_types_corner_cases8BigClassC, %T22big_types_corner_cases8BigClassC*
 // CHECK: call void @_T0SqWy
 // CHECK: [[BITCAST:%.*]] = bitcast i8* {{.*}} to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
@@ -147,7 +147,7 @@ public func enumCallee(_ x: LargeEnum) {
 // CHECK-64: _T0s5printyypd_SS9separatorSS10terminatortF
 // CHECK-64: ret void
 
-// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*) #0 {
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @_T022big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*)
 // CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
@@ -171,7 +171,7 @@ class SuperSub : SuperBase {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}})) #0 {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}}))
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: [[LOAD:%.*]] = load %swift.refcounted*, %swift.refcounted** %.callInternalLet.data
 // CHECK: call swiftcc void %7(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
@@ -200,7 +200,7 @@ func bigStructGet() -> BigStruct {
   return BigStruct()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases11testGetFuncyyF() #0 {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T022big_types_corner_cases11testGetFuncyyF()
 // CHECK: ret void
 public func testGetFunc() {
   let testGetPtr: @convention(thin) () -> BigStruct = bigStructGet

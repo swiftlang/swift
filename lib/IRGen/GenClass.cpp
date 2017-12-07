@@ -194,19 +194,19 @@ namespace {
     {
       // Start by adding a heap header.
       switch (refcounting) {
-      case swift::irgen::ReferenceCounting::Native:
+      case ReferenceCounting::Native:
         // For native classes, place a full object header.
         addHeapHeader();
         break;
-      case swift::irgen::ReferenceCounting::ObjC:
+      case ReferenceCounting::ObjC:
         // For ObjC-inheriting classes, we don't reliably know the size of the
         // base class, but NSObject only has an `isa` pointer at most.
         addNSObjectHeader();
         break;
-      case swift::irgen::ReferenceCounting::Block:
-      case swift::irgen::ReferenceCounting::Unknown:
-      case swift::irgen::ReferenceCounting::Bridge:
-      case swift::irgen::ReferenceCounting::Error:
+      case ReferenceCounting::Block:
+      case ReferenceCounting::Unknown:
+      case ReferenceCounting::Bridge:
+      case ReferenceCounting::Error:
         llvm_unreachable("not a class refcounting kind");
       }
       
@@ -257,6 +257,14 @@ namespace {
         SILType superclassType = classType.getSuperclass();
         auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
+
+        // If the superclass came from another module, we may have dropped
+        // stored properties due to the Swift language version availability of
+        // their types. In these cases we can't precisely lay out the ivars in
+        // the class object at compile time so we need to do runtime layout.
+        if (classHasIncompleteLayout(IGM, superclass)) {
+          ClassMetadataRequiresDynamicInitialization = true;
+        }
 
         if (superclass->hasClangNode()) {
           // If the superclass was imported from Objective-C, its size is
@@ -316,6 +324,14 @@ namespace {
           // Count the fields we got from the superclass.
           NumInherited = Elements.size();
         }
+      }
+      
+      // If this class was imported from another module, assume that we may
+      // not know its exact layout.
+      if (theClass->getModuleContext() != IGM.getSwiftModule()) {
+        ClassHasFixedSize = false;
+        if (classHasIncompleteLayout(IGM, theClass))
+          ClassMetadataRequiresDynamicInitialization = true;
       }
 
       // Access strategies should be set by the abstract class layout,
@@ -2100,9 +2116,13 @@ namespace {
                                      IGM.getPointerAlignment(),
                                      /*constant*/ true,
                                      llvm::GlobalVariable::PrivateLinkage);
+
       switch (IGM.TargetInfo.OutputObjectFormat) {
       case llvm::Triple::MachO:
         var->setSection("__DATA, __objc_const");
+        break;
+      case llvm::Triple::COFF:
+        var->setSection(".data");
         break;
       case llvm::Triple::ELF:
         var->setSection(".data");
@@ -2295,6 +2315,26 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
 
   return IGM.getObjCRuntimeBaseClass(IGM.Context.Id_SwiftObject,
                                      IGM.Context.Id_SwiftObject);
+}
+
+/// If the superclass came from another module, we may have dropped
+/// stored properties due to the Swift language version availability of
+/// their types. In these cases we can't precisely lay out the ivars in
+/// the class object at compile time so we need to do runtime layout.
+bool irgen::classHasIncompleteLayout(IRGenModule &IGM,
+                                     ClassDecl *theClass) {
+  do {
+    if (theClass->getParentModule() != IGM.getSwiftModule()) {
+      for (auto field :
+          theClass->getStoredPropertiesAndMissingMemberPlaceholders()){
+        if (isa<MissingMemberDecl>(field)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  } while ((theClass = theClass->getSuperclassDecl()));
+  return false;
 }
 
 bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,

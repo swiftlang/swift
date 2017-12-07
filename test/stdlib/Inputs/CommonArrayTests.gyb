@@ -102,8 +102,6 @@ ${Suite}.test("${ArrayType}/Sliceable/Enums") {
 }
 
 ${Suite}.test("${ArrayType}/appendNonUnique")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var x: ${ArrayType}<Int> = []
   x.reserveCapacity(10002)
@@ -269,8 +267,6 @@ let withUnsafeMutableBufferPointerIfSupportedTests = [
 ]
 
 ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   for test in withUnsafeMutableBufferPointerIfSupportedTests {
     var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
@@ -306,8 +302,6 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
 }
 
 ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
@@ -320,8 +314,6 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 }
 
 ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
   var result = a._withUnsafeMutableBufferPointerIfSupported {
@@ -339,8 +331,6 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 
 // Test the uniqueness of the raw buffer.
 ${Suite}.test("${ArrayType}/withUnsafeMutableBytes")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var a = getFresh${ArrayType}([UInt8](repeating: 10, count: 1))
   let b = a
@@ -365,8 +355,6 @@ ${Suite}.test(
 
 ${Suite}.test(
   "${ArrayType}/mutationDoesNotAffectIterator/subscript/append")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${ArrayType}" == "ArraySlice"},
-                 reason: "rdar://33358110"))
   .code {
   var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
   var iter = arr.makeIterator()

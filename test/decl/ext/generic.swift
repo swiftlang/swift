@@ -20,6 +20,10 @@ extension Double : P2 {
 
 extension X<Int, Double, String> { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
 
+typealias GGG = X<Int, Double, String>
+
+extension GGG { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
   let x = 0
@@ -134,7 +138,7 @@ func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
 
 extension Array where Element == String { }
 
-extension GenericClass : P3 where T : P3 { }
+extension GenericClass : P3 where T : P3 { } // expected-error{{conditional conformance of 'GenericClass<T>' to 'P3' depends on an experimental feature (SE-0143)}}
 
 extension GenericClass where Self : P3 { }
 // expected-error@-1{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}} {{30-34=GenericClass}}

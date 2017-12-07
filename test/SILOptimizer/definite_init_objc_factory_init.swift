@@ -26,8 +26,8 @@ extension Hive {
     // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack $Hive
     // CHECK: store [[OLD_SELF:%[0-9]+]] to [[SELF_ADDR]]
     // CHECK: [[META:%[0-9]+]] = value_metatype $@thick Hive.Type, [[OLD_SELF]] : $Hive
-    // CHECK: [[FACTORY:%[0-9]+]] = objc_method [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
     // CHECK: [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+    // CHECK: [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
     // CHECK: apply [[FACTORY]]([[QUEEN:%[0-9]+]], [[OBJC_META]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
     // CHECK: store [[NEW_SELF:%[0-9]+]] to [[SELF_ADDR]]
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[OLD_SELF]] : $Hive
@@ -58,8 +58,8 @@ class SubHive : Hive {
   convenience init(delegatesToInherited: ()) {
     // CHECK: [[UPCAST:%.*]] = upcast %0 : $SubHive to $Hive
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[UPCAST]] : $Hive
-    // CHECK: [[METHOD:%.*]] = objc_method [[METATYPE]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!
     // CHECK: [[OBJC:%.*]] = thick_to_objc_metatype [[METATYPE]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+    // CHECK: [[METHOD:%.*]] = objc_method [[OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!
     // CHECK: apply [[METHOD]]({{.*}}, [[OBJC]])
 
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick SubHive.Type, %0 : $SubHive

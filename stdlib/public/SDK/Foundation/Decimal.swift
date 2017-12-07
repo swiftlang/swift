@@ -312,6 +312,7 @@ extension Decimal {
         } else if value == 0.0 {
             self = Decimal(_exponent: 0, _length: 0, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
         } else {
+            self.init() // zero-initialize everything
             let negative = value < 0
             var val = negative ? -1 * value : value
             var exponent = 0
@@ -327,7 +328,6 @@ extension Decimal {
             
             var i = UInt32(0)
             // this is a bit ugly but it is the closest approximation of the C initializer that can be expressed here.
-            _mantissa = (0, 0, 0, 0, 0, 0, 0, 0)
             while mantissa != 0 && i < 8 /* NSDecimalMaxSize */ {
                 switch i {
                     case 0:

@@ -21,10 +21,10 @@ extension NSRect {
   /// - precondition: There must be a set current NSGraphicsContext.
   @available(swift 4)
   public func fill(using operation: NSCompositingOperation =
-    NSGraphicsContext.current()?.compositingOperation ?? .sourceOver) {
-    precondition(NSGraphicsContext.current() != nil,
+    NSGraphicsContext.current?.compositingOperation ?? .sourceOver) {
+    precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
-    NSRectFillUsingOperation(self, operation)
+    __NSRectFillUsingOperation(self, operation)
   }
     
   /// Draws a frame around the inside of this rect in the current
@@ -35,10 +35,10 @@ extension NSRect {
   @available(swift 4)
   public func frame(withWidth width: CGFloat = 1.0,
                     using operation: NSCompositingOperation =
-    NSGraphicsContext.current()?.compositingOperation ?? .sourceOver) {
-    precondition(NSGraphicsContext.current() != nil,
+    NSGraphicsContext.current?.compositingOperation ?? .sourceOver) {
+    precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
-    NSFrameRectWithWidthUsingOperation(self, width, operation)
+    __NSFrameRectWithWidthUsingOperation(self, width, operation)
   }
     
   /// Modifies the current graphics context clipping path by intersecting it
@@ -48,9 +48,9 @@ extension NSRect {
   /// - precondition: There must be a set current NSGraphicsContext.
   @available(swift 4)
   public func clip() {
-    precondition(NSGraphicsContext.current() != nil,
+    precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
-    NSRectClip(self)
+    __NSRectClip(self)
   }
 }
 
@@ -62,15 +62,15 @@ extension Sequence where Iterator.Element == NSRect {
   /// - precondition: There must be a set current NSGraphicsContext.
   @available(swift 4)
   public func fill(using operation: NSCompositingOperation =
-    NSGraphicsContext.current()?.compositingOperation ?? .sourceOver) {
-    precondition(NSGraphicsContext.current() != nil,
+    NSGraphicsContext.current?.compositingOperation ?? .sourceOver) {
+    precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
     let rects = Array(self)
     let count = rects.count
     guard count > 0 else { return }
     rects.withUnsafeBufferPointer { rectBufferPointer in
       guard let rectArray = rectBufferPointer.baseAddress else { return }
-      NSRectFillListUsingOperation(rectArray, count, operation)
+      __NSRectFillListUsingOperation(rectArray, count, operation)
     }
   }
     
@@ -81,14 +81,14 @@ extension Sequence where Iterator.Element == NSRect {
   /// - precondition: There must be a set current NSGraphicsContext.
   @available(swift 4)
   public func clip() {
-    precondition(NSGraphicsContext.current() != nil,
+    precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
     let rects = Array(self)
     let count = rects.count
     guard count > 0 else { return }
     rects.withUnsafeBufferPointer { rectBufferPointer in
       guard let rectArray = rectBufferPointer.baseAddress else { return }
-      NSRectClipList(rectArray, count)
+      __NSRectClipList(rectArray, count)
     }
   }
 }
@@ -101,8 +101,8 @@ extension Sequence where Iterator.Element == (CGRect, NSColor) {
   /// - precondition: There must be a set current NSGraphicsContext.
   @available(swift 4)
   public func fill(using operation: NSCompositingOperation =
-    NSGraphicsContext.current()?.compositingOperation ?? .sourceOver) {
-    precondition(NSGraphicsContext.current() != nil,
+    NSGraphicsContext.current?.compositingOperation ?? .sourceOver) {
+    precondition(NSGraphicsContext.current != nil,
                  "There must be a set current NSGraphicsContext")
     let rects = map { $0.0 }
     let colors = map { $0.1 }
@@ -112,7 +112,7 @@ extension Sequence where Iterator.Element == (CGRect, NSColor) {
       colors.withUnsafeBufferPointer { colorBufferPointer in
         guard let rectArray = rectBufferPointer.baseAddress else { return }
         guard let colorArray = colorBufferPointer.baseAddress else { return }
-        NSRectFillListWithColorsUsingOperation(
+        __NSRectFillListWithColorsUsingOperation(
             rectArray, colorArray, count, operation)
       }
     }
@@ -128,10 +128,10 @@ extension Sequence where Iterator.Element == (CGRect, gray: CGFloat) {
   /// - precondition: There must be a set current NSGraphicsContext.
   @available(swift 4)
   public func fill(using operation: NSCompositingOperation =
-    NSGraphicsContext.current()?.compositingOperation ?? .sourceOver) {
+    NSGraphicsContext.current?.compositingOperation ?? .sourceOver) {
     // NSRectFillListWithGrays does not have a variant taking an operation, but
     // is added here for consistency with the other drawing operations.
-    guard let graphicsContext = NSGraphicsContext.current() else {
+    guard let graphicsContext = NSGraphicsContext.current else {
       fatalError("There must be a set current NSGraphicsContext")
     }
     let cgContext: CGContext
@@ -144,31 +144,31 @@ extension Sequence where Iterator.Element == (CGRect, gray: CGFloat) {
     cgContext.saveGState()
     forEach {
       cgContext.setFillColor(gray: $0.gray, alpha: 1.0)
-      NSRectFillUsingOperation($0.0, operation)
+      __NSRectFillUsingOperation($0.0, operation)
     }
     cgContext.restoreGState()
   }
 }
 
-extension NSWindowDepth {
+extension NSWindow.Depth {
   @available(swift 4)
   public static func bestDepth(
     colorSpaceName: NSColorSpaceName,
     bitsPerSample: Int,
     bitsPerPixel: Int,
     isPlanar: Bool
-    ) -> (NSWindowDepth, isExactMatch: Bool) {
+    ) -> (NSWindow.Depth, isExactMatch: Bool) {
     var isExactMatch: ObjCBool = false
-    let depth = NSBestDepth(
-        colorSpaceName as String,
+    let depth = __NSBestDepth(
+        colorSpaceName,
         bitsPerSample, bitsPerPixel, isPlanar, &isExactMatch)
     return (depth, isExactMatch: isExactMatch.boolValue)
   }
   @available(swift 4)
-  public static var availableDepths: [NSWindowDepth] {
+  public static var availableDepths: [NSWindow.Depth] {
     // __NSAvailableWindowDepths is NULL terminated, the length is not known up front
-    let depthsCArray = NSAvailableWindowDepths()
-    var depths: [NSWindowDepth] = []
+    let depthsCArray = __NSAvailableWindowDepths()
+    var depths: [NSWindow.Depth] = []
     var length = 0
     var depth = depthsCArray[length]
     while depth.rawValue != 0 {
@@ -194,7 +194,7 @@ extension NSAnimationEffect {
     delegate.completionHandler = completionHandler
     // Note that the delegate of `__NSShowAnimationEffect` is retained for the
     // duration of the animation.
-    NSShowAnimationEffect(
+    __NSShowAnimationEffect(
         self,
         centerLocation,
         size,
@@ -207,6 +207,6 @@ extension NSAnimationEffect {
 extension NSSound {
   @available(swift 4)
   public static func beep() {
-    NSBeep()
+    __NSBeep()
   }
 }

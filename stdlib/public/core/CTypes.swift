@@ -42,17 +42,19 @@ public typealias CShort = Int16
 /// The C 'int' type.
 public typealias CInt = Int32
 
-/// The C 'long' type.
 #if os(Windows) && arch(x86_64)
+/// The C 'long' type.
 public typealias CLong = Int32
 #else
+/// The C 'long' type.
 public typealias CLong = Int
 #endif
 
-/// The C 'long long' type.
 #if os(Windows) && arch(x86_64)
+/// The C 'long long' type.
 public typealias CLongLong = Int
 #else
+/// The C 'long long' type.
 public typealias CLongLong = Int64
 #endif
 
@@ -85,7 +87,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @_fixed_layout
-public struct OpaquePointer : Hashable {
+public struct OpaquePointer {
   @_versioned
   internal var _rawValue: Builtin.RawPointer
 
@@ -145,7 +147,16 @@ public struct OpaquePointer : Hashable {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
+}
 
+extension OpaquePointer: Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+}
+
+extension OpaquePointer: Hashable {
   /// The pointer's hash value.
   ///
   /// The hash value is not guaranteed to be stable across different
@@ -193,14 +204,7 @@ extension UInt {
   }
 }
 
-extension OpaquePointer : Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-
-/// The corresponding Swift type to `va_list` in imported C APIs.
+/// A wrapper around a C `va_list` pointer.
 @_fixed_layout
 public struct CVaListPointer {
   @_versioned // FIXME(sil-serialize-all)

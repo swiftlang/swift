@@ -29,6 +29,10 @@ internal var _LF: UInt8 { return 0x0a }
 import SwiftShims
 
 extension String {
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  public typealias CharacterView = _CharacterView
+  
   /// A view of a string's contents as a collection of characters.
   ///
   /// In Swift, every string provides a view of its contents as characters. In
@@ -62,9 +66,7 @@ extension String {
   ///     }
   ///     // Prints "Marie"
   @_fixed_layout // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  public struct CharacterView {
+  public struct _CharacterView {
     @_versioned
     internal var _core: _StringCore
 
@@ -89,6 +91,17 @@ extension String {
       self._coreOffset = coreOffset
     }
   }
+  
+  /// A view of the string's contents as a collection of characters.
+  @_transparent // FIXME(sil-serialize-all)
+  public var _characters: _CharacterView {
+    get {
+      return CharacterView(self)
+    }
+    set {
+      self = String(newValue)
+    }
+  }
 
   /// A view of the string's contents as a collection of characters.
   @_inlineable // FIXME(sil-serialize-all)
@@ -96,10 +109,10 @@ extension String {
     "Please use String or Substring directly")
   public var characters: CharacterView {
     get {
-      return CharacterView(self)
+      return _characters
     }
     set {
-      self = String(newValue)
+      _characters = newValue
     }
   }
 
@@ -141,7 +154,7 @@ extension String {
     // Naively mutating self.characters forces multiple references to
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.
-    var tmp = CharacterView("")
+    var tmp = _CharacterView("")
     (_core, tmp._core) = (tmp._core, _core)
     let r = body(&tmp)
     (_core, tmp._core) = (tmp._core, _core)
@@ -165,12 +178,14 @@ extension String {
   ///
   /// - Parameter characters: A character view to convert to a string.
   @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
   public init(_ characters: CharacterView) {
     self.init(characters._core)
   }
 }
 
-extension String.CharacterView : _SwiftStringView {
+extension String._CharacterView : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
@@ -187,7 +202,7 @@ extension String.CharacterView : _SwiftStringView {
 
 
 /// `String.CharacterView` is a collection of `Character`.
-extension String.CharacterView : BidirectionalCollection {
+extension String._CharacterView : BidirectionalCollection {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
@@ -397,7 +412,7 @@ extension String.CharacterView : BidirectionalCollection {
     }
     
     // Perform a quick single-code-unit grapheme check.
-    if _fastPath(String.CharacterView._quickCheckGraphemeBreakBetween(
+    if _fastPath(String._CharacterView._quickCheckGraphemeBreakBetween(
         _core[startOffset],
         _core[startOffset+1])
     ) {
@@ -537,7 +552,7 @@ extension String.CharacterView : BidirectionalCollection {
     }
     
     // Perform a quick single-code-unit grapheme check
-    if _fastPath(String.CharacterView._quickCheckGraphemeBreakBetween(
+    if _fastPath(String._CharacterView._quickCheckGraphemeBreakBetween(
       _core[lastOffset-1], _core[lastOffset])
     ) {
       return 1
@@ -674,7 +689,7 @@ extension String.CharacterView : BidirectionalCollection {
   }
 }
 
-extension String.CharacterView : RangeReplaceableCollection {
+extension String._CharacterView : RangeReplaceableCollection {
   /// Creates an empty character view.
   @_inlineable // FIXME(sil-serialize-all)
   public init() {
@@ -757,7 +772,7 @@ extension String.CharacterView : RangeReplaceableCollection {
 }
 
 // Algorithms
-extension String.CharacterView {
+extension String._CharacterView {
   /// Accesses the characters in the given range.
   ///
   /// The example below uses this subscript to access the characters up to, but
@@ -772,8 +787,8 @@ extension String.CharacterView {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> String.CharacterView {
-    return String.CharacterView(
+  public subscript(bounds: Range<Index>) -> String._CharacterView {
+    return String._CharacterView(
       unicodeScalars[bounds]._core,
       coreOffset: bounds.lowerBound.encodedOffset)
   }

@@ -147,7 +147,7 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   EXPECT_NE(F4, F1);
 
   // Test parameter with and without inout/shared/variadic and/or label.
-  ParameterTypeFlags paramFlags;
+  ParameterFlags paramFlags;
   auto inoutFlags = paramFlags.withInOut(true);
   auto variadicFlags = paramFlags.withVariadic(true);
   auto sharedFlags = paramFlags.withShared(true);

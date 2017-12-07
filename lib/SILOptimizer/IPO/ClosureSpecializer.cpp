@@ -614,8 +614,9 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 
   auto ClonedTy = SILFunctionType::get(
       ClosureUserFunTy->getGenericSignature(), ExtInfo,
+      ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
-      ClosureUserFunTy->getResults(),
+      ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
       ClosureUserFunTy->getOptionalErrorResult(), M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
@@ -632,7 +633,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->isThunk(), ClosureUser->getClassSubclassScope(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
-  if (ClosureUser->hasUnqualifiedOwnership()) {
+  if (!ClosureUser->hasQualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
   for (auto &Attr : ClosureUser->getSemanticsAttrs())

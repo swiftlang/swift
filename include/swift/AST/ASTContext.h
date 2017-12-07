@@ -573,6 +573,7 @@ public:
   const CanType TheUnknownObjectType;     /// Builtin.UnknownObject
   const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
+  const CanType TheSILTokenType;          /// Builtin.SILToken
   
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
@@ -750,10 +751,11 @@ public:
   /// \param substitutions The set of substitutions required to produce the
   /// specialized conformance from the generic conformance. This list is
   /// copied so passing a temporary is permitted.
-  SpecializedProtocolConformance *
+  ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            SubstitutionList substitutions);
+                            SubstitutionList substitutions,
+                            bool alreadyCheckedCollapsed = false);
 
   /// \brief Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic
@@ -767,7 +769,7 @@ public:
   /// specialized conformance from the generic conformance. The keys must
   /// be generic parameters, not archetypes, so for example passing in
   /// TypeBase::getContextSubstitutionMap() is OK.
-  SpecializedProtocolConformance *
+  ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
                             const SubstitutionMap &substitutions);
@@ -883,15 +885,6 @@ public:
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
                                        GenericSignatureBuilder *builder,
                                        GenericSignature *sig);
-
-  /// Retrieve the inherited name set for the given class.
-  const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
-                                              bool forInstance);
-
-  /// Retrieve the inherited name set for the given Objective-C class.
-  const InheritedNameSet *getAllPropertyNames(
-                            clang::ObjCInterfaceDecl *classDecl,
-                            bool forInstance);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.

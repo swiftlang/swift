@@ -1,6 +1,7 @@
 func foo() {
   var aa = 3
   aa = aa + 1
+  _ = "before \(aa) after"
   return 1
 }
 

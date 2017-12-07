@@ -19,7 +19,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/SourceEntityWalker.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
@@ -242,6 +242,7 @@ private:
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               Optional<AccessKind> AccKind,
                                bool IsOpenBracket) override;
 };
 
@@ -254,6 +255,7 @@ enum class LabelRangeType {
   None,
   CallArg,    // foo([a: ]2) or .foo([a: ]String)
   Param,  // func([a b]: Int)
+  NoncollapsibleParam, // subscript([a a]: Int)
   Selector,   // #selector(foo.func([a]:))
 };
 
@@ -316,7 +318,7 @@ public:
   std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
 };
 
-enum class RangeKind : int8_t{
+enum class RangeKind : int8_t {
   Invalid = -1,
   SingleExpression,
   SingleStatement,
@@ -324,6 +326,8 @@ enum class RangeKind : int8_t{
 
   MultiStatement,
   PartOfExpression,
+
+  MultiTypeMemberDecl,
 };
 
 struct DeclaredDecl {
@@ -497,14 +501,15 @@ enum class RegionType {
 };
 
 enum class RefactoringRangeKind {
-  BaseName,              // func [foo](a b: Int)
-  KeywordBaseName,       // [init](a: Int)
-  ParameterName,         // func foo(a [b]: Int)
-  DeclArgumentLabel,     // func foo([a] b: Int)
-  CallArgumentLabel,     // foo([a]: 1)
-  CallArgumentColon,     // foo(a[: ]1)
-  CallArgumentCombined,  // foo([]1) could expand to foo([a: ]1)
-  SelectorArgumentLabel, // foo([a]:)
+  BaseName,                    // func [foo](a b: Int)
+  KeywordBaseName,             // [init](a: Int)
+  ParameterName,               // func foo(a[ b]: Int)
+  NoncollapsibleParameterName, // subscript(a[ a]: Int)
+  DeclArgumentLabel,           // func foo([a] b: Int)
+  CallArgumentLabel,           // foo([a]: 1)
+  CallArgumentColon,           // foo(a[: ]1)
+  CallArgumentCombined,        // foo([]1) could expand to foo([a: ]1)
+  SelectorArgumentLabel,       // foo([a]:)
 };
 
 struct NoteRegion {

@@ -1,0 +1,45 @@
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %target-swift-frontend -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 4 %S/Inputs/mixed_mode/UsingObjCStuff.swift
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 3 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import UsingObjCStuff
+
+class SubButtHolder: ButtHolder {
+  var w: Double = 0
+}
+
+class SubSubButtHolder: SubButtHolder {
+  var v: Double = 0
+}
+
+sil_vtable SubButtHolder {}
+sil_vtable SubSubButtHolder {}
+
+// CHECK-LABEL: define {{.*}} @getHolder
+sil @getHolder: $@convention(thin) () -> @owned ButtHolder {
+entry:
+  // We should load the dimensions of the class instance from metadata, not try
+  // to hardcode constants.
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T014UsingObjCStuff10ButtHolderCMa()
+  // CHECK-64: [[SIZE32:%.*]] = load i32
+  // CHECK-64: [[SIZE:%.*]] = zext i32 [[SIZE32]] to
+  // CHECK-32: [[SIZE:%.*]] = load i32
+  // CHECK: [[ALIGN16:%.*]] = load i16
+  // CHECK: [[ALIGN:%.*]] = zext i16 [[ALIGN16]] to [[WORD:i32|i64]]
+  // CHECK: call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[METADATA]], [[WORD]] [[SIZE]], [[WORD]] [[ALIGN]])
+  %x = alloc_ref $ButtHolder
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T04main13SubButtHolderCMa()
+  // CHECK: call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[METADATA]], [[WORD]] %{{.*}}, [[WORD]] %{{.*}})
+  %y = alloc_ref $SubButtHolder
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T04main03SubB10ButtHolderCMa()
+  // CHECK: call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[METADATA]], [[WORD]] %{{.*}}, [[WORD]] %{{.*}})
+  %z = alloc_ref $SubSubButtHolder
+  return %x : $ButtHolder
+}

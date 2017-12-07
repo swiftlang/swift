@@ -1146,10 +1146,8 @@ namespace {
 
       // If the declaration is in a different resilience domain, we have
       // to use materializeForSet.
-      //
-      // FIXME: Use correct ResilienceExpansion if SGF is @transparent
       if (!decl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
-                                ResilienceExpansion::Maximal))
+                                SGF.F.getResilienceExpansion()))
         return true;
 
       // If the declaration is dynamically dispatched through a class,
@@ -3360,7 +3358,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
       std::move(component.asPhysical()).offset(*this, loc, destAddr,
                                                AccessKind::Write);
 
-    auto value = std::move(src).getAsRValue(*this);
+    auto value = std::move(src).getAsRValue(*this).ensurePlusOne(*this, loc);
     std::move(value).assignInto(*this, loc, finalDestAddr.getValue());
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);

@@ -17,9 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 @_fixed_layout
-public struct _ValidUTF8Buffer<
-  Storage: UnsignedInteger & FixedWidthInteger
-> {
+public struct _ValidUTF8Buffer<Storage: UnsignedInteger & FixedWidthInteger> {
   public typealias Element = Unicode.UTF8.CodeUnit
   internal typealias _Storage = Storage
   
@@ -42,7 +40,7 @@ public struct _ValidUTF8Buffer<
 }
 
 extension _ValidUTF8Buffer : Sequence {
-  public typealias SubSequence = RangeReplaceableRandomAccessSlice<_ValidUTF8Buffer>
+  public typealias SubSequence = Slice<_ValidUTF8Buffer>
   
 
   @_fixed_layout // FIXME(sil-serialize-all)

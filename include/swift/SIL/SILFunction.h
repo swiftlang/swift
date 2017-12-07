@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -170,6 +171,10 @@ private:
   /// pre-specialization.
   unsigned KeepAsPublic : 1;
 
+  /// If != OptimizationMode::NotSet, the optimization mode specified with an
+  /// function attribute.
+  OptimizationMode OptMode;
+
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
@@ -313,10 +318,6 @@ public:
   /// Returns true if this function has qualified ownership instructions in it.
   bool hasQualifiedOwnership() const { return HasQualifiedOwnership; }
 
-  /// Returns true if this function has unqualified ownership instructions in
-  /// it.
-  bool hasUnqualifiedOwnership() const { return !HasQualifiedOwnership; }
-
   /// Sets the HasQualifiedOwnership flag to false. This signals to SIL that no
   /// ownership instructions should be in this function any more.
   void setUnqualifiedOwnership() {
@@ -326,6 +327,12 @@ public:
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
     return getLoweredFunctionType()->getRepresentation();
+  }
+
+  ResilienceExpansion getResilienceExpansion() const {
+    return (isSerialized()
+            ? ResilienceExpansion::Minimal
+            : ResilienceExpansion::Maximal);
   }
 
   /// Returns true if this function has a calling convention that has a self
@@ -472,9 +479,25 @@ public:
 
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
+
+  /// Get this function's optimization mode or OptimizationMode::NotSet if it is
+  /// not set for this specific function.
+  OptimizationMode getOptimizationMode() const { return OptMode; }
+
+  /// Returns the optimization mode for the function. If no mode is set for the
+  /// function, returns the global mode, i.e. the mode of the module's options.
+  OptimizationMode getEffectiveOptimizationMode() const;
+
+  void setOptimizationMode(OptimizationMode mode) { OptMode = mode; }
+
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
   ///          or is raw SIL (so that the mandatory passes still run).
   bool shouldOptimize() const;
+
+  /// Returns true if this function should be optimized for size.
+  bool optimizeForSize() const {
+    return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
+  }
 
   /// Returns true if this is a function that should have its ownership
   /// verified.
@@ -620,10 +643,6 @@ public:
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
   SILType mapTypeIntoContext(SILType type) const;
-
-  /// Map the given type, which is based on a contextual SILFunctionType and may
-  /// therefore contain context archetypes, to an interface type.
-  Type mapTypeOutOfContext(Type type) const;
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration();

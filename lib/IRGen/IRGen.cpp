@@ -158,7 +158,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   // Set up a pipeline.
   PassManagerBuilderWrapper PMBuilder(Opts);
 
-  if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
+  if (Opts.shouldOptimize() && !Opts.DisableLLVMOptzns) {
     PMBuilder.OptLevel = 2; // -Os
     PMBuilder.SizeLevel = 1; // -Os
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
@@ -455,7 +455,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.Optimize && !DisableObjCARCContract)
+  if (Opts.shouldOptimize() && !DisableObjCARCContract)
     EmitPasses.add(createObjCARCContractPass());
 
   // Set up the final emission passes.
@@ -524,8 +524,9 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
     return nullptr;
   }
 
-  CodeGenOpt::Level OptLevel = Opts.Optimize ? CodeGenOpt::Default // -Os
-                                             : CodeGenOpt::None;
+  CodeGenOpt::Level OptLevel = (Opts.shouldOptimize() ?
+                                  CodeGenOpt::Default // -Os
+                                  : CodeGenOpt::None);
 
   // Set up TargetOptions and create the target features string.
   TargetOptions TargetOpts;
@@ -684,7 +685,7 @@ void swift::irgen::deleteIRGenModule(
 /// IRGenModule.
 static void runIRGenPreparePasses(SILModule &Module,
                                   irgen::IRGenModule &IRModule) {
-  SILPassManager PM(&Module, &IRModule);
+  SILPassManager PM(&Module, &IRModule, "irgen", /*isMandatoryPipeline=*/ true);
   bool largeLoadable = Module.getOptions().EnableLargeLoadableTypes;
 #define PASS(ID, Tag, Name)
 #define IRGEN_PASS(ID, Tag, Name)                                              \

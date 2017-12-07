@@ -2339,7 +2339,10 @@ public:
 
   SourceLoc getLoc() const { return Index->getStartLoc(); }
   SourceLoc getStartLoc() const { return Base->getStartLoc(); }
-  SourceLoc getEndLoc() const { return Index->getEndLoc(); }
+  SourceLoc getEndLoc() const {
+    auto end = Index->getEndLoc();
+    return end.isValid() ? end : Base->getEndLoc();
+  }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Subscript;
@@ -2396,7 +2399,7 @@ public:
                                : SubExpr->getStartLoc());
   }
   SourceLoc getEndLoc() const {
-    return NameLoc.getSourceRange().End ;
+    return NameLoc.getSourceRange().End;
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }

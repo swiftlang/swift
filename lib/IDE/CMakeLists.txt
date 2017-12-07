@@ -12,8 +12,7 @@ add_swift_library(swiftIDE STATIC
   Utils.cpp
   IDETypeChecking.cpp
   APIDigesterData.cpp
-  DEPENDS
-    swift-syntax-generated-headers
+  SourceEntityWalker.cpp
   LINK_LIBRARIES
     swiftFrontend
     swiftClangImporter

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 @override // expected-error {{'override' can only be specified on class members}} {{1-11=}} expected-error {{'override' is a declaration modifier, not an attribute}} {{1-2=}}
 func virtualAttributeCanNotBeUsedInSource() {}
@@ -38,6 +38,7 @@ class A {
   }
   var v8: Int = 0  // expected-note {{attempt to override property here}}
   var v9: Int { return 5 } // expected-note{{attempt to override property here}}
+  var v10: Int { return 5 } // expected-note{{attempt to override property here}}
 
   subscript (i: Int) -> String { // expected-note{{potential overridden subscript 'subscript' here}}
     get {
@@ -94,6 +95,7 @@ class B : A {
   // Stored properties
   override var v8: Int { return 5 } // expected-error {{cannot override mutable property with read-only property 'v8'}}
   override var v9: Int // expected-error{{cannot override with a stored property 'v9'}}
+  lazy override var v10: Int = 5 // expected-error{{cannot override with a stored property 'v10'}}
 
   override subscript (i: Int) -> String {
     get {

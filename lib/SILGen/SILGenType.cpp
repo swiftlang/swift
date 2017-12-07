@@ -170,6 +170,7 @@ class SILGenVTable : public SILVTableVisitor<SILGenVTable> {
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
+  bool hasFixedLayout;
 
   // Map a base SILDeclRef to the corresponding element in vtableMethods.
   llvm::DenseMap<SILDeclRef, unsigned> baseToIndexMap;
@@ -178,8 +179,9 @@ public:
   SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> vtableMethods;
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
-    : SILVTableVisitor(SGM.Types), SGM(SGM), theClass(theClass)
-  { }
+    : SILVTableVisitor(SGM.Types), SGM(SGM), theClass(theClass) {
+    hasFixedLayout = theClass->hasFixedLayout();
+  }
 
   void emitVTable() {
     // Imported types don't have vtables right now.
@@ -260,9 +262,22 @@ public:
     auto result = baseToIndexMap.insert(std::make_pair(member, index));
     assert(result.second);
     (void) result;
+
+    // Emit a method dispatch thunk if the method is public and the
+    // class is resilient.
+    auto *func = cast<AbstractFunctionDecl>(member.getDecl());
+    if (func->getDeclContext() == theClass) {
+      if (!hasFixedLayout &&
+          func->getEffectiveAccess() >= AccessLevel::Public) {
+        SGM.emitDispatchThunk(member);
+      }
+    }
   }
 
-  void addPlaceholder(MissingMemberDecl *) {}
+  void addPlaceholder(MissingMemberDecl *m) {
+    assert(m->getNumberOfVTableEntries() == 0
+           && "Should not be emitting class with missing members");
+  }
 };
 
 } // end anonymous namespace
@@ -367,6 +382,7 @@ public:
   SILGenModule &SGM;
   NormalProtocolConformance *Conformance;
   std::vector<SILWitnessTable::Entry> Entries;
+  std::vector<SILWitnessTable::ConditionalConformance> ConditionalConformances;
   SILLinkage Linkage;
   IsSerialized_t Serialized;
 
@@ -398,6 +414,8 @@ public:
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
 
+    addConditionalRequirements();
+
     // Check if we already have a declaration or definition for this witness
     // table.
     if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false)) {
@@ -410,7 +428,7 @@ public:
 
       // If we have a declaration, convert the witness table to a definition.
       if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries, Serialized);
+        wt->convertToDefinition(Entries, ConditionalConformances, Serialized);
 
         // Since we had a declaration before, its linkage should be external,
         // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
@@ -427,8 +445,8 @@ public:
     }
 
     // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage, Serialized,
-                                   Conformance, Entries);
+    return SILWitnessTable::create(SGM.M, Linkage, Serialized, Conformance,
+                                   Entries, ConditionalConformances);
   }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
@@ -517,6 +535,22 @@ public:
     Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         req.getAssociation(), req.getAssociatedRequirement(),
         assocConformance});
+  }
+
+  void addConditionalRequirements() {
+    SILWitnessTable::enumerateWitnessTableConditionalConformances(
+        Conformance, [&](unsigned, CanType type, ProtocolDecl *protocol) {
+          auto conformance =
+              Conformance->getGenericSignature()->lookupConformance(type,
+                                                                    protocol);
+          assert(conformance &&
+                 "unable to find conformance that should be known");
+
+          ConditionalConformances.push_back(
+              SILWitnessTable::ConditionalConformance{type, *conformance});
+
+          return /*finished?*/ false;
+        });
   }
 };
 

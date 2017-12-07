@@ -395,8 +395,6 @@ public:
                      const llvm::Twine &name = "") const;
 };
 
-Size getHeapHeaderSize(IRGenModule &IGM);
-
 /// Different policies for accessing a physical field.
 enum class FieldAccess : uint8_t {
   /// Instance variable offsets are constant.

@@ -78,6 +78,7 @@ Rename with a non-`stdlib` naming scheme.
 000000000001cd30 T _swift_deallocBox
 000000000001d490 T _swift_deallocClassInstance
 000000000001cd60 T _swift_deallocObject
+000000000001cd60 T _swift_deallocUninitializedObject
 000000000001d4c0 T _swift_deallocPartialClassInstance
 000000000001d400 T _swift_rootObjCDealloc
 000000000001c960 T _swift_slowAlloc

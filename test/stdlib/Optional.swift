@@ -16,12 +16,6 @@ extension Optional where Wrapped : TestProtocol1 {
   }
 }
 
-extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
-  var _wrappedIsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
 OptionalTests.test("nil comparison") {
   var x: Int? = nil
   expectFalse(x != nil)
@@ -222,31 +216,31 @@ OptionalTests.test("flatMap") {
 // FIXME: @inline(never) does not inhibit specialization
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAny<T, U>(_ a: T, _ : U.Type) -> U {
   return a as! U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAnyIs<T, U>(_ a: T, _ : U.Type) -> Bool {
   return a is U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAnyIsOptional<T, U>(_ a: T?, _ : U.Type) -> Bool {
   return a is U?
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAnyOrNil<T, U>(_ a: T, _ : U.Type) -> U? {
   return a as? U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func canGenericCast<T, U>(_ a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }

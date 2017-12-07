@@ -671,7 +671,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
                                     FunctionType::ExtInfo());
   }
   eqDecl->setInterfaceType(interfaceTy);
-  copyFormalAccess(eqDecl, typeDecl);
+  eqDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -1013,10 +1013,10 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   //     case A:
   //       result = 0
   //     case B(let a0):
-  //       result = _mixForSynthesizedHashValue(result, 1)
+  //       result = 1
   //       result = _mixForSynthesizedHashValue(result, a0.hashValue)
   //     case C(let a0, let a1):
-  //       result = _mixForSynthesizedHashValue(result, 2)
+  //       result = 2
   //       result = _mixForSynthesizedHashValue(result, a0.hashValue)
   //       result = _mixForSynthesizedHashValue(result, a1.hashValue)
   //     }
@@ -1090,7 +1090,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
                                       AnyFunctionType::ExtInfo());
 
   getterDecl->setInterfaceType(interfaceType);
-  copyFormalAccess(getterDecl, typeDecl);
+  getterDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -1106,7 +1106,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
-  copyFormalAccess(hashValueDecl, typeDecl);
+  hashValueDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
   hashValuePat->setType(intType);

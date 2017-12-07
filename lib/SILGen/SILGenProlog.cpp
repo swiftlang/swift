@@ -114,10 +114,12 @@ public:
 
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Constant:
       // An owned or 'in' parameter is passed in at +1. We can claim ownership
       // of the parameter and clean it up when it goes out of scope.
       return SGF.emitManagedRValueWithCleanup(arg);
+
+    case ParameterConvention::Indirect_In_Constant:
+      break;
     }
     llvm_unreachable("bad parameter convention");
   }
@@ -390,12 +392,17 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILType ty = lowering.getLoweredType();
     SILValue val = SGF.F.begin()->createFunctionArgument(ty, VD);
 
+    bool NeedToDestroyValueAtExit = false;
+
     // If the original variable was settable, then Sema will have treated the
     // VarDecl as an lvalue, even in the closure's use.  As such, we need to
     // allow formation of the address for this captured value.  Create a
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
       auto addr = SGF.emitTemporaryAllocation(VD, ty);
+      // We have created a copy that needs to be destroyed.
+      val = SGF.B.createCopyValue(Loc, val);
+      NeedToDestroyValueAtExit = true;
       lowering.emitStore(SGF.B, VD, val, addr, StoreOwnershipQualifier::Init);
       val = addr;
     }
@@ -407,8 +414,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       SGF.B.createDebugValue(Loc, val, {/*Constant*/true, ArgNo});
 
     // TODO: Closure contexts should always be guaranteed.
-    if (!SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts
-        && !lowering.isTrivial())
+    if (NeedToDestroyValueAtExit && !lowering.isTrivial())
       SGF.enterDestroyCleanup(val);
     break;
   }
@@ -425,8 +431,6 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     SGF.B.createDebugValueAddr(Loc, addr, {/*Constant*/false, ArgNo});
-    if (!SGF.SGM.M.getOptions().EnableGuaranteedClosureContexts)
-      SGF.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
   case CaptureKind::StorageAddress: {

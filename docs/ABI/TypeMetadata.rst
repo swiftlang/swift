@@ -121,20 +121,22 @@ Function Metadata
 In addition to the `common metadata layout`_ fields, function metadata records
 contain the following fields:
 
-- The function flags are stored at **offset 1**, information contained by flags
-  includes 'throws' indicator (8 bits), metadata convention (8 bits)
-  and number of arguments (remaining N bits).
-- The **argument vector** begins at **offset 2** and consists of pointers to
-  metadata records of the function's arguments.
-- A reference to the **result type** metadata record is stored after the end
-  of **argument vector**. If the function has multiple returns, this references a
-  `tuple metadata`_ record.
+- The function flags are stored at **offset 1**, information contained by function
+  flags includes flags (8 bits) which _currently_ consists of 'throws' bit and
+  'parameter flags' bit, function convention (8 bits), and number of parameters (16 bits).
+- A reference to the **result type** metadata record is stored after function
+  flags. If the function has multiple returns, this references a `tuple metadata`_
+  record.
+- The **parameter type vector** follows the result type and consists of
+  NumParameters type metadata pointers corresponding to the types of the parameters.
+- The optional **parameter flags vector** begins after the end of **parameter type vector**
+  and consists of NumParameters unsigned 32-bit integer values representing flags
+  for each parameter such as inout, __shared, variadic and possibly others. This
+  vector is present only if the hasParameterFlags() function flag is set; otherwise
+  all of the parameter flags are assumed to be zero.
 
-  A pointer to each argument's metadata record will be appended separately,
-  the lowest bit being set if it is **inout**. Because of pointer alignment,
-  the lowest bit will always be free to hold this tag.
-
-  If the function takes no arguments, **argument vector** is going to be empty.
+  If the function takes no arguments, **parameter type vector** as well as
+  **parameter flags vector** are going to be empty.
 
 Protocol Metadata
 ~~~~~~~~~~~~~~~~~
@@ -404,4 +406,32 @@ Objective-C ``Protocol`` objects. The layout is as follows:
     a value of conforming type.
   * **Bit 31** is set by the Objective-C runtime when it has done its
     initialization of the protocol record. It is unused by the Swift runtime.
+
+
+Protocol Conformance Records
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A *protocol conformance record* states that a given type conforms to a
+particular protocol. Protocol conformance records are emitted into their own
+section, which is scanned by the Swift runtime when needed (e.g., in response to
+a `swift_conformsToProtocol()` query). Each protocol conformance record
+contains:
+
+- The `protocol descriptor`_ describing the protocol of the conformance.
+- A reference to the metadata for the **conforming type**, whose form is
+  determined by the **protocol conformance flags** described below.
+- The **witness table field** that provides access to the witness table
+  describing the conformance itself; the form of this field is determined by the
+  **protocol conformance flags** described below.
+- The **protocol conformance flags** is a 32-bit field comprised of:
+
+  * **Bits 0-3** contain the type metadata record kind, which indicates how
+    the **conforming type** field is encoded.
+  * **Bits 4-5** contain the kind of witness table. The value can be one of:
+
+    0. The **witness table field** is a reference to a witness table.
+    1. The **witness table field** is a reference to a **witness table
+       accessor** function for an unconditional conformance.
+    2. The **witness table field** is a reference to a **witness table
+       accessor** function for a conditional conformance.
 

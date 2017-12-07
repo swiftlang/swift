@@ -361,6 +361,15 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
   llvm_unreachable("Unknown decl kind");
 }
 
+SourceRange Decl::getSourceRangeIncludingAttrs() const {
+  auto Range = getSourceRange();
+  for (auto Attr : getAttrs()) {
+    if (Attr->getRange().isValid())
+      Range.widen(Attr->getRange());
+  }
+  return Range;
+}
+
 SourceLoc Decl::getLoc() const {
   switch (getKind()) {
 #define DECL(ID, X) \
@@ -1187,10 +1196,10 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr) {
 
 // @NSManaged properties never get default initialized, nor do debugger
 // variables and immutable properties.
-bool isNeverDefaultInitializable(const Pattern *p) {
+bool Pattern::isNeverDefaultInitializable() const {
   bool result = false;
 
-  p->forEachVariable([&](const VarDecl *var) {
+  forEachVariable([&](const VarDecl *var) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>())
       return;
 
@@ -1209,7 +1218,7 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   if (entry.getInit())
     return true;
 
-  if (isNeverDefaultInitializable(entry.getPattern()))
+  if (entry.getPattern()->isNeverDefaultInitializable())
     return false;
 
   // If the pattern is typed as optional (or tuples thereof), it is
@@ -2175,6 +2184,19 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   llvm_unreachable("unknown access level");
 }
 
+void ValueDecl::copyFormalAccessAndVersionedAttrFrom(ValueDecl *source) {
+  if (!hasAccess()) {
+    setAccess(source->getFormalAccess());
+  }
+
+  // Inherit the @_versioned attribute.
+  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+    auto &ctx = getASTContext();
+    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    getAttrs().add(clonedAttr);
+  }
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -2481,7 +2503,7 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
   if (underlying->hasArchetype() && isGenericContext())
-    underlying = mapTypeOutOfContext(underlying);
+    underlying = underlying->mapTypeOutOfContext();
   UnderlyingTy.setType(underlying);
 
   // FIXME -- if we already have an interface type, we're changing the
@@ -2679,6 +2701,49 @@ DestructorDecl *ClassDecl::getDestructor() {
   assert(results.size() == 1 && "More than one destructor?");
   return cast<DestructorDecl>(results.front());
 }
+
+void ClassDecl::addImplicitDestructor() {
+  if (hasDestructor() || isInvalid())
+    return;
+
+  auto *selfDecl = ParamDecl::createSelf(getLoc(), this);
+
+  auto &ctx = getASTContext();
+  auto *DD = new (ctx) DestructorDecl(getLoc(), selfDecl, this);
+
+  DD->setImplicit();
+  DD->setValidationStarted();
+
+  // Create an empty body for the destructor.
+  DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
+  addMember(DD);
+  setHasDestructor();
+
+  // Propagate access control and versioned-ness.
+  DD->copyFormalAccessAndVersionedAttrFrom(this);
+
+  // Wire up generic environment of DD.
+  DD->setGenericEnvironment(getGenericEnvironmentOfContext());
+
+  // Mark DD as ObjC, as all dtors are.
+  DD->setIsObjC(true);
+  recordObjCMethod(DD);
+
+  // Assign DD the interface type (Self) -> () -> ()
+  ArrayRef<AnyFunctionType::Param> noParams;
+  AnyFunctionType::ExtInfo info;
+  Type selfTy = selfDecl->getInterfaceType();
+  Type voidTy = TupleType::getEmpty(ctx);
+  Type funcTy = FunctionType::get(noParams, voidTy, info);
+  if (auto *sig = DD->getGenericSignature()) {
+    DD->setInterfaceType(
+      GenericFunctionType::get(sig, {selfTy}, funcTy, info));
+  } else {
+    DD->setInterfaceType(
+      FunctionType::get({selfTy}, funcTy, info));
+  }
+}
+
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
@@ -3908,7 +3973,12 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 }
 
 Type VarDecl::getType() const {
-  assert(!typeInContext.isNull() && "no contextual type set yet");
+  if (!typeInContext) {
+    const_cast<VarDecl *>(this)->typeInContext =
+      getDeclContext()->mapTypeIntoContext(
+        getInterfaceType())->getInOutObjectType();
+  }
+
   // FIXME(Remove InOutType): This grossness will go away when Sema is weaned
   // off of InOutType.  Until then we should respect our parameter flags and
   // return the type it expects.
@@ -4226,6 +4296,9 @@ ParamDecl::ParamDecl(Specifier specifier,
   SpecifierLoc(specifierLoc) {
     assert(specifier != Specifier::Var &&
            "'var' cannot appear on parameters; you meant 'inout'");
+  ParamDeclBits.IsTypeLocImplicit = false;
+  ParamDeclBits.defaultArgumentKind =
+    static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
 /// Clone constructor, allocates a new ParamDecl identical to the first.
@@ -4240,9 +4313,9 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
-    IsTypeLocImplicit(PD->IsTypeLocImplicit),
-    defaultArgumentKind(PD->defaultArgumentKind) {
+    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()) {
+  ParamDeclBits.IsTypeLocImplicit = PD->ParamDeclBits.IsTypeLocImplicit;
+  ParamDeclBits.defaultArgumentKind = PD->ParamDeclBits.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
   if (!withTypes && typeLoc.getTypeRepr())
     typeLoc.setType(Type());
@@ -4301,22 +4374,20 @@ ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
 ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
                                  bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = DC->getSelfTypeInContext();
   auto selfInterfaceType = DC->getSelfInterfaceType();
   auto specifier = VarDecl::Specifier::Owned;
-  assert(selfType && selfInterfaceType);
+  assert(selfInterfaceType);
 
   if (isStaticMethod) {
-    selfType = MetatypeType::get(selfType);
     selfInterfaceType = MetatypeType::get(selfInterfaceType);
   }
-    
+
   if (isInOut) {
     specifier = VarDecl::Specifier::InOut;
   }
 
   auto *selfDecl = new (C) ParamDecl(specifier, SourceLoc(),SourceLoc(),
-                                     Identifier(), loc, C.Id_self, selfType,DC);
+                                     Identifier(), loc, C.Id_self, Type(), DC);
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);
   selfDecl->setValidationStarted();
@@ -5015,9 +5086,9 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   setParameterLists(SelfDecl, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
-  this->HasStubImplementation = 0;
-  this->InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
-  this->Failability = static_cast<unsigned>(Failability);
+  ConstructorDeclBits.HasStubImplementation = 0;
+  ConstructorDeclBits.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
+  ConstructorDeclBits.Failability = static_cast<unsigned>(Failability);
 }
 
 void ConstructorDecl::setParameterLists(ParamDecl *selfDecl,
@@ -5120,7 +5191,7 @@ bool EnumElementDecl::computeType() {
 
   // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto inputTy = getArgumentTypeLoc().getType()) {
-    resultTy = FunctionType::get(ED->mapTypeOutOfContext(inputTy), resultTy);
+    resultTy = FunctionType::get(inputTy->mapTypeOutOfContext(), resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignatureOfContext())
@@ -5327,15 +5398,21 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // Struct initializers that cannot see the layout of the struct type are
   // always delegating. This occurs if the struct type is not fixed layout,
   // and the constructor is either inlinable or defined in another module.
-  //
-  // FIXME: Figure out the right condition to use here that does not depend
-  // on the -enable-resilience flag, and make it conditional on
-  // -swift-version 5 instead, once the "disallow memberwise cross-module
-  // initializer" proposal lands.
-  if (Kind == BodyInitKind::None) {
-    if (isa<StructDecl>(NTD) &&
-        !NTD->hasFixedLayout(getParentModule(), getResilienceExpansion())) {
+  if (Kind == BodyInitKind::None && isa<StructDecl>(NTD)) {
+    if (getResilienceExpansion() == ResilienceExpansion::Minimal &&
+        !NTD->hasFixedLayout()) {
       Kind = BodyInitKind::Delegating;
+
+    } else if (isa<ExtensionDecl>(getDeclContext())) {
+      const ModuleDecl *containingModule = getParentModule();
+      // Prior to Swift 5, cross-module initializers were permitted to be
+      // non-delegating. However, if the struct isn't fixed-layout, we have to
+      // be delegating because, well, we don't know the layout.
+      if (!NTD->hasFixedLayout() ||
+          containingModule->getASTContext().isSwiftVersionAtLeast(5)) {
+        if (containingModule != NTD->getParentModule())
+          Kind = BodyInitKind::Delegating;
+      }
     }
   }
 

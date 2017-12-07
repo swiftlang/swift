@@ -451,6 +451,8 @@ getUIDForRangeKind(swift::ide::RangeKind Kind) {
     case swift::ide::RangeKind::SingleStatement: return KindRangeSingleStatement;
     case swift::ide::RangeKind::SingleDecl: return KindRangeSingleDeclaration;
     case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
+    case swift::ide::RangeKind::MultiTypeMemberDecl:
+      return KindRangeMultiTypeMemberDeclaration;
     case swift::ide::RangeKind::PartOfExpression: return KindRangeInvalid;
     case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
   }
@@ -480,6 +482,8 @@ getUIDForRefactoringRangeKind(ide::RefactoringRangeKind Kind) {
     return KindRenameRangeKeywordBase;
   case ide::RefactoringRangeKind::ParameterName:
     return KindRenameRangeParam;
+  case ide::RefactoringRangeKind::NoncollapsibleParameterName:
+    return KindRenameRangeNoncollapsibleParam;
   case ide::RefactoringRangeKind::DeclArgumentLabel:
     return KindRenameRangeDeclArgLabel;
   case ide::RefactoringRangeKind::CallArgumentLabel:

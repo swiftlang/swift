@@ -57,7 +57,11 @@ class MetadataPath {
 
       /// Type metadata at requirement index P of a generic nominal type.
       NominalTypeArgument,
-      LastWithPrimaryIndex = NominalTypeArgument,
+
+      /// Conditional conformance at index P (i.e. the P'th element) of a
+      /// conformance.
+      ConditionalConformance,
+      LastWithPrimaryIndex = ConditionalConformance,
 
       // Everything past this point has no index.
 
@@ -99,6 +103,7 @@ class MetadataPath {
       case Kind::OutOfLineBaseProtocol:
       case Kind::NominalTypeArgumentConformance:
       case Kind::NominalTypeArgument:
+      case Kind::ConditionalConformance:
         return OperationCost::Load;
 
       case Kind::AssociatedConformance:
@@ -167,6 +172,10 @@ public:
     assert(!index.isPrefix());
     Path.push_back(Component(Component::Kind::AssociatedConformance,
                              index.getValue()));
+  }
+
+  void addConditionalConformanceComponent(unsigned index) {
+    Path.push_back(Component(Component::Kind::ConditionalConformance, index));
   }
 
   /// Return an abstract measurement of the cost of this path.

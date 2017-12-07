@@ -88,8 +88,8 @@ public:
     emitDeallocateDynamicAlloca(IGF, stackAddress);
   }
 
-  void destroyStack(IRGenFunction &IGF, StackAddress stackAddress,
-                    SILType T) const override {
+  void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
+                    bool isOutlined) const override {
     emitDestroyCall(IGF, T, stackAddress.getAddress());
     deallocateStack(IGF, stackAddress, T);
   }

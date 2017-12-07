@@ -331,12 +331,11 @@ class ConformanceLookupTable {
   bool VisitingSuperclass = false;
 
   /// Add a protocol.
-  bool addProtocol(NominalTypeDecl *nominal,
-                   ProtocolDecl *protocol, SourceLoc loc,
+  bool addProtocol(ProtocolDecl *protocol, SourceLoc loc,
                    ConformanceSource source);
 
   /// Add the protocols from the given list.
-  void addProtocols(NominalTypeDecl *nominal, ArrayRef<TypeLoc> inherited,
+  void addProtocols(ArrayRef<TypeLoc> inherited,
                     ConformanceSource source, LazyResolver *resolver);
 
   /// Expand the implied conformances for the given DeclContext.
@@ -363,8 +362,7 @@ class ConformanceLookupTable {
   ///
   /// \returns true if any conformance entries were superseded by this
   /// operation.
-  bool resolveConformances(NominalTypeDecl *nominal,
-                           ProtocolDecl *protocol);
+  bool resolveConformances(ProtocolDecl *protocol);
 
   /// Retrieve the declaration context that provides the
   /// (non-inherited) conformance described by the given conformance
@@ -419,14 +417,12 @@ class ConformanceLookupTable {
 
   /// Load all of the protocol conformances for the given (serialized)
   /// declaration context.
-  void loadAllConformances(NominalTypeDecl *nominal,
-                           DeclContext *dc,
+  void loadAllConformances(DeclContext *dc,
                            ArrayRef<ProtocolConformance *> conformances);
 
 public:
   /// Create a new conformance lookup table.
-  ConformanceLookupTable(ASTContext &ctx, NominalTypeDecl *nominal,
-                         LazyResolver *resolver);
+  ConformanceLookupTable(ASTContext &ctx, LazyResolver *resolver);
 
   /// Destroy the conformance table.
   void destroy();

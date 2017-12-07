@@ -67,6 +67,13 @@ extension String.Index : Comparable {
   }
 }
 
+extension String.Index : Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _compoundOffset.hashValue
+  }
+}
+
 extension String.Index {
   internal typealias _Self = String.Index
   

@@ -18,6 +18,7 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -96,7 +97,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      HasCReferences(false), KeepAsPublic(false), EffectsKindAttr(E),
+      HasCReferences(false), KeepAsPublic(false),
+      OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
       EntryCount(entryCount) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
@@ -168,10 +170,15 @@ ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();
 }
 
+OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
+  if (OptMode != OptimizationMode::NotSet)
+    return OptMode;
+
+  return getModule().getOptions().OptMode;
+}
+
 bool SILFunction::shouldOptimize() const {
-  if (Module.getStage() == SILStage::Raw)
-    return true;
-  return !hasSemanticsAttr("optimize.sil.never");
+  return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
@@ -194,11 +201,6 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                     QueryInterfaceTypeSubstitutions(this),
                     LookUpConformanceInSignature(*genericSig),
                     genericSig);
-}
-
-Type SILFunction::mapTypeOutOfContext(Type type) const {
-  return GenericEnvironment::mapTypeOutOfContext(
-      getGenericEnvironment(), type);
 }
 
 bool SILFunction::isNoReturnFunction() const {

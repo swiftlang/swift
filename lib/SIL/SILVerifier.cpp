@@ -247,7 +247,6 @@ public:
   void requireABICompatibleFunctionTypes(CanSILFunctionType type1,
                                          CanSILFunctionType type2,
                                          const Twine &what) {
-    
     auto complain = [=](const char *msg) -> std::function<void()> {
       return [=]{
         llvm::dbgs() << "  " << msg << '\n'
@@ -261,162 +260,18 @@ public:
         llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
       };
     };
-    
-    // The calling convention and function representation can't be changed.
-    _require(type1->getRepresentation() == type2->getRepresentation(), what,
-             complain("Different function representations"));
 
-    // TODO: We should compare generic signatures. Class and witness methods
-    // allow variance in "self"-fulfilled parameters; other functions must
-    // match exactly.
+    // If we didn't have a failure, return.
+    auto Result = type1->isABICompatibleWith(type2);
+    if (Result.isCompatible())
+      return;
 
-    // TODO: More sophisticated param and return ABI compatibility rules could
-    // diverge.
-    std::function<bool (SILType, SILType)>
-    areABICompatibleParamsOrReturns = [&](SILType a, SILType b) -> bool {
-      // Address parameters are all ABI-compatible, though the referenced
-      // values may not be. Assume whoever's doing this knows what they're
-      // doing.
-      if (a.isAddress() && b.isAddress())
-        return true;
-      // Addresses aren't compatible with values.
-      // TODO: An exception for pointerish types?
-      else if (a.isAddress() || b.isAddress())
-        return false;
-      
-      // Tuples are ABI compatible if their elements are.
-      // TODO: Should destructure recursively.
-      SmallVector<CanType, 1> aElements, bElements;
-      if (auto tup = a.getAs<TupleType>()) {
-        auto types = tup.getElementTypes();
-        aElements.append(types.begin(), types.end());
-      } else {
-        aElements.push_back(a.getSwiftRValueType());
-      }
-      if (auto tup = b.getAs<TupleType>()) {
-        auto types = tup.getElementTypes();
-        bElements.append(types.begin(), types.end());
-      } else {
-        bElements.push_back(b.getSwiftRValueType());
-      }
-      
-      if (aElements.size() != bElements.size())
-        return false;
-
-      for (unsigned i : indices(aElements)) {
-        auto aa = SILType::getPrimitiveObjectType(aElements[i]),
-             bb = SILType::getPrimitiveObjectType(bElements[i]);
-        // Equivalent types are always ABI-compatible.
-        if (aa == bb)
-          continue;
-        
-        // FIXME: If one or both types are dependent, we can't accurately assess
-        // whether they're ABI-compatible without a generic context. We can
-        // do a better job here when dependent types are related to their
-        // generic signatures.
-        if (aa.hasTypeParameter() || bb.hasTypeParameter())
-          continue;
-        
-        // Bridgeable object types are interchangeable.
-        if (aa.isBridgeableObjectType() && bb.isBridgeableObjectType())
-          continue;
-        
-        // Optional and IUO are interchangeable if their elements are.
-        auto aObject = aa.getAnyOptionalObjectType();
-        auto bObject = bb.getAnyOptionalObjectType();
-        if (aObject && bObject
-            && areABICompatibleParamsOrReturns(aObject, bObject))
-          continue;
-        // Optional objects are ABI-interchangeable with non-optionals;
-        // None is represented by a null pointer.
-        if (aObject && aObject.isBridgeableObjectType()
-            && bb.isBridgeableObjectType())
-          continue;
-        if (bObject && bObject.isBridgeableObjectType()
-            && aa.isBridgeableObjectType())
-          continue;
-        
-        // Optional thick metatypes are ABI-interchangeable with non-optionals
-        // too.
-        if (aObject)
-          if (auto aObjMeta = aObject.getAs<MetatypeType>())
-            if (auto bMeta = bb.getAs<MetatypeType>())
-              if (aObjMeta->getRepresentation() == bMeta->getRepresentation()
-                  && bMeta->getRepresentation() != MetatypeRepresentation::Thin)
-                continue;
-        if (bObject)
-          if (auto aMeta = aa.getAs<MetatypeType>())
-            if (auto bObjMeta = bObject.getAs<MetatypeType>())
-              if (aMeta->getRepresentation() == bObjMeta->getRepresentation()
-                  && aMeta->getRepresentation() != MetatypeRepresentation::Thin)
-                continue;
-        
-        // Function types are interchangeable if they're also ABI-compatible.
-        if (auto aFunc = aa.getAs<SILFunctionType>())
-          if (auto bFunc = bb.getAs<SILFunctionType>()) {
-            // FIXME
-            requireABICompatibleFunctionTypes(aFunc, bFunc, what);
-            return true;
-          }
-        
-        // Metatypes are interchangeable with metatypes with the same
-        // representation.
-        if (auto aMeta = aa.getAs<MetatypeType>())
-          if (auto bMeta = bb.getAs<MetatypeType>())
-            if (aMeta->getRepresentation() == bMeta->getRepresentation())
-              continue;
-        
-        // Other types must match exactly.
-        return false;
-      }
-      return true;
-    };
-    
-    // Check the results.
-    _require(type1->getNumResults() == type2->getNumResults(), what,
-             complain("different number of results"));
-    for (unsigned i : indices(type1->getResults())) {
-      auto result1 = type1->getResults()[i];
-      auto result2 = type2->getResults()[i];
-
-      _require(result1.getConvention() == result2.getConvention(), what,
-               complain("Different return value conventions"));
-      _require(areABICompatibleParamsOrReturns(result1.getSILStorageType(),
-                                               result2.getSILStorageType()),
-               what, complain("ABI-incompatible return values"));
-    }
-
-    // Our error result conventions are designed to be ABI compatible
-    // with functions lacking error results.  Just make sure that the
-    // actual conventions match up.
-    if (type1->hasErrorResult() && type2->hasErrorResult()) {
-      auto error1 = type1->getErrorResult();
-      auto error2 = type2->getErrorResult();
-      _require(error1.getConvention() == error2.getConvention(), what,
-               complain("Different error result conventions"));
-      _require(areABICompatibleParamsOrReturns(error1.getSILStorageType(),
-                                               error2.getSILStorageType()),
-               what, complain("ABI-incompatible error results"));
-    }
-
-    // Check the parameters.
-    // TODO: Could allow known-empty types to be inserted or removed, but SIL
-    // doesn't know what empty types are yet.
-    
-    _require(type1->getParameters().size() == type2->getParameters().size(),
-             what, complain("different number of parameters"));
-    for (unsigned i : indices(type1->getParameters())) {
-      auto param1 = type1->getParameters()[i];
-      auto param2 = type2->getParameters()[i];
-      
-      _require(param1.getConvention() == param2.getConvention(), what,
-               complainBy([=] {
-                 llvm::dbgs() << "Different conventions for parameter " << i;
-               }));
-      _require(areABICompatibleParamsOrReturns(param1.getSILStorageType(),
-                                               param2.getSILStorageType()),
-               what, complainBy([=] {
-                 llvm::dbgs() << "ABI-incompatible types for parameter " << i;
+    if (!Result.hasPayload()) {
+      _require(false, what, complain(Result.getMessage().data()));
+    } else {
+      _require(false, what, complainBy([=] {
+                 llvm::dbgs() << " " << Result.getMessage().data()
+                              << ".\nParameter: " << Result.getPayload();
                }));
     }
   }
@@ -671,9 +526,24 @@ public:
   /// Check that the types of this value producer are all legal in the function
   /// context in which it exists.
   void checkLegalType(SILFunction *F, ValueBase *value, SILInstruction *I) {
-    if (SILType type = value->getType()) {
-      checkLegalType(F, type, I);
+    SILType type = value->getType();
+    if (type.is<SILTokenType>()) {
+      require(isLegalSILTokenProducer(value),
+              "SIL tokens can only be produced as the results of specific "
+              "instructions");
+      return;
     }
+
+    checkLegalType(F, type, I);
+  }
+
+  static bool isLegalSILTokenProducer(SILValue value) {
+    if (auto beginApply = dyn_cast<BeginApplyResult>(value))
+      return beginApply->isTokenResult();
+
+    // Add more token cases here as they arise.
+
+    return false;
   }
 
   /// Check that the given type is a legal SIL value type.
@@ -918,9 +788,9 @@ public:
     // Check that the arguments and result match.
     SILFunctionConventions substConv(substTy, F.getModule());
     //require(site.getArguments().size() == substTy->getNumSILArguments(),
-    require(site.getNumCallArguments() == substConv.getNumSILArguments(),
+    require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
-    for (size_t i = 0, size = site.getNumCallArguments(); i < size; ++i) {
+    for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
       requireSameType(site.getArguments()[i]->getType(),
                       substConv.getSILArgumentType(i),
                       "operand of 'apply' doesn't match function input type");
@@ -941,6 +811,9 @@ public:
               "apply instruction cannot call function with error result");
     }
 
+    require(!calleeConv.funcTy->isCoroutine(),
+            "cannot call coroutine with normal apply");
+
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.
     if (AI->getModule().getStage() == SILStage::Raw ||
@@ -954,6 +827,9 @@ public:
     checkFullApplySite(AI);
 
     SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+
+    require(!calleeConv.funcTy->isCoroutine(),
+            "cannot call coroutine with normal apply");
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
@@ -972,6 +848,43 @@ public:
                     calleeConv.getSILErrorType(),
                     "error destination of try_apply must take argument "
                     "of error result type");
+  }
+
+  void checkBeginApplyInst(BeginApplyInst *AI) {
+    checkFullApplySite(AI);
+
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    auto yieldResults = AI->getYieldedValues();
+    auto yields = calleeConv.getYields();
+    require(yields.size() == yieldResults.size(),
+            "length mismatch in callee yields vs. begin_apply results");
+    for (auto i : indices(yields)) {
+      require(yieldResults[i]->getType() == calleeConv.getSILType(yields[i]),
+              "callee yield type does not match begin_apply result type");
+    }
+
+    if (AI->isNonThrowing()) {
+      require(calleeConv.funcTy->hasErrorResult(),
+              "nothrow flag used for callee without error result");
+    } else {
+      require(!calleeConv.funcTy->hasErrorResult(),
+              "begin_apply instruction cannot call function with error result");
+    }
+
+    require(calleeConv.funcTy->getCoroutineKind() == SILCoroutineKind::YieldOnce,
+            "must call yield_once coroutine with begin_apply");
+  }
+
+  void checkAbortApplyInst(AbortApplyInst *AI) {
+    require(isa<BeginApplyResult>(AI->getOperand()) &&
+            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+            "operand of abort_apply must be a begin_apply");
+  }
+
+  void checkEndApplyInst(EndApplyInst *AI) {
+    require(isa<BeginApplyResult>(AI->getOperand()) &&
+            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+            "operand of end_apply must be a begin_apply");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
@@ -1248,7 +1161,7 @@ public:
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(F.hasUnqualifiedOwnership(),
+      require(!F.hasQualifiedOwnership(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
@@ -1365,7 +1278,7 @@ public:
     case StoreOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(F.hasUnqualifiedOwnership(),
+      require(!F.hasQualifiedOwnership(),
               "Qualified store in function with unqualified ownership?!");
       break;
     case StoreOwnershipQualifier::Init:
@@ -1535,14 +1448,14 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
   void checkRetainValueAddrInst(RetainValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
@@ -1575,14 +1488,14 @@ public:
   void checkReleaseValueInst(ReleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
   void checkReleaseValueAddrInst(ReleaseValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
@@ -1847,12 +1760,12 @@ public:
 
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "strong_retain is only in functions with unqualified ownership");
   }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "strong_release is only in functions with unqualified ownership");
   }
   void checkStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
@@ -1860,16 +1773,16 @@ public:
                                          "Operand of strong_retain_unowned");
     require(unownedType->isLoadable(ResilienceExpansion::Maximal),
             "strong_retain_unowned requires unowned type to be loadable");
-    require(F.hasUnqualifiedOwnership(), "strong_retain_unowned is only in "
-                                         "functions with unqualified "
-                                         "ownership");
+    require(!F.hasQualifiedOwnership(), "strong_retain_unowned is only in "
+                                        "functions with unqualified "
+                                        "ownership");
   }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
     auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
                                           "Operand of unowned_retain");
     require(unownedType->isLoadable(ResilienceExpansion::Maximal),
             "unowned_retain requires unowned type to be loadable");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "unowned_retain is only in functions with unqualified ownership");
   }
   void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
@@ -1877,7 +1790,7 @@ public:
                                          "Operand of unowned_release");
     require(unownedType->isLoadable(ResilienceExpansion::Maximal),
             "unowned_release requires unowned type to be loadable");
-    require(F.hasUnqualifiedOwnership(),
+    require(!F.hasQualifiedOwnership(),
             "unowned_release is only in functions with unqualified ownership");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
@@ -2164,6 +2077,8 @@ public:
     auto constantInfo = F.getModule().Types.getConstantInfo(method);
     auto methodTy = constantInfo.SILFnType;
 
+    assert(!methodTy->isCoroutine());
+
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
       auto subs = env->getForwardingSubstitutions();
@@ -2196,8 +2111,10 @@ public:
 
     auto fnTy = SILFunctionType::get(nullptr,
                                      methodTy->getExtInfo(),
+                                     methodTy->getCoroutineKind(),
                                      methodTy->getCalleeConvention(),
                                      dynParams,
+                                     methodTy->getYields(),
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
                                      F.getASTContext());
@@ -2267,22 +2184,24 @@ public:
                                         "result of objc_method");
     require(!methodType->getExtInfo().hasContext(),
             "result method must be of a context-free function type");
+    require(methodType->getRepresentation()
+            == SILFunctionTypeRepresentation::ObjCMethod,
+            "wrong function type representation");
 
-    auto methodSelfType = getMethodSelfType(methodType);
     auto operandType = OMI->getOperand()->getType();
+    auto operandInstanceType = operandType.getSwiftRValueType();
+    if (auto metatypeType = dyn_cast<MetatypeType>(operandInstanceType))
+      operandInstanceType = metatypeType.getInstanceType();
 
-    if (methodSelfType.isClassOrClassMetatype()) {
+    if (operandInstanceType.getClassOrBoundGenericClass()) {
       auto overrideTy = TC.getConstantOverrideType(member);
       requireSameType(
           OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of objc_method must match abstracted type of method");
-      require(operandType.isClassOrClassMetatype(),
-              "operand must be of a class type");
     } else {
-      require(getDynamicMethodType(operandType, OMI->getMember())
-                .getSwiftRValueType()
-                ->isBindableTo(OMI->getType().getSwiftRValueType()),
-              "result must be of the method's type");
+      require(isa<ArchetypeType>(operandInstanceType) ||
+              operandInstanceType->isObjCExistentialType(),
+              "operand type must be an archetype or self-conforming existential");
       verifyOpenedArchetype(OMI, OMI->getType().getSwiftRValueType());
     }
 
@@ -3240,8 +3159,8 @@ public:
                                    "convert_function result");
 
     // convert_function is required to be an ABI-compatible conversion.
-    requireABICompatibleFunctionTypes(opTI, resTI,
-                                 "convert_function cannot change function ABI");
+    requireABICompatibleFunctionTypes(
+        opTI, resTI, "convert_function cannot change function ABI");
   }
 
   void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -3309,6 +3228,35 @@ public:
             "throw operand type does not match error result type of function");
   }
   
+  void checkUnwindInst(UnwindInst *UI) {
+    require(F.getLoweredFunctionType()->isCoroutine(),
+            "unwind in non-coroutine function");
+  }
+
+  void checkYieldInst(YieldInst *YI) {
+    CanSILFunctionType fnType = F.getLoweredFunctionType();
+    require(fnType->isCoroutine(),
+            "yield in non-coroutine function");
+
+    auto yieldedValues = YI->getYieldedValues();
+    auto yieldInfos = fnType->getYields();
+    require(yieldedValues.size() == yieldInfos.size(),
+            "wrong number of yielded values for function");
+    for (auto i : indices(yieldedValues)) {
+      SILType yieldType =
+        F.mapTypeIntoContext(fnConv.getSILType(yieldInfos[i]));
+      require(yieldedValues[i]->getType() == yieldType,
+              "yielded value does not match yield type of coroutine");
+    }
+
+    // We require the resume and unwind destinations to be unique in order
+    // to prevent either edge from becoming critical.
+    require(YI->getResumeBB()->getSinglePredecessorBlock(),
+            "resume dest of 'yield' must be uniquely used");
+    require(YI->getUnwindBB()->getSinglePredecessorBlock(),
+            "unwind dest of 'yield' must be uniquely used");
+  }
+
   void checkSelectEnumCases(SelectEnumInstBase *I) {
     EnumDecl *eDecl = I->getEnumOperand()->getType().getEnumOrBoundGenericEnum();
     require(eDecl, "select_enum operand must be an enum");
@@ -3517,7 +3465,7 @@ public:
                     SOI->getOperand()->getType(),
                 "Switch enum default block should have one argument that is "
                 "the same as the input type");
-      } else if (F.hasUnqualifiedOwnership()) {
+      } else if (!F.hasQualifiedOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
       }
@@ -4147,9 +4095,21 @@ public:
   /// - accesses must be uniquely ended
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
+    enum CFGState {
+      /// No special rules are in play.
+      Normal,
+      /// We've followed the resume edge of a yield in a yield_once coroutine.
+      YieldOnceResume,
+      /// We've followed the unwind edge of a yield.
+      YieldUnwind
+    };
     struct BBState {
       std::vector<SingleValueInstruction*> Stack;
-      std::set<BeginAccessInst*> Accesses;
+
+      /// Contents: BeginAccessInst*, BeginApplyInst*.
+      std::set<SILInstruction*> ActiveOps;
+
+      CFGState CFG = Normal;
     };
 
     // Do a breath-first search through the basic blocks.
@@ -4176,25 +4136,47 @@ public:
                   "stack dealloc does not match most recent stack alloc");
           state.Stack.pop_back();
 
-        } else if (auto access = dyn_cast<BeginAccessInst>(&i)) {
-          bool notAlreadyPresent = state.Accesses.insert(access).second;
+        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i)) {
+          bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
           require(notAlreadyPresent,
-                  "access was not ended before re-beginning it");
+                  "operation was not ended before re-beginning it");
 
-        } else if (auto endAccess = dyn_cast<EndAccessInst>(&i)) {
-          // We don't call getBeginAccess() because this isn't the right
-          // place to assert on malformed SIL.
-          if (auto access = dyn_cast<BeginAccessInst>(endAccess->getOperand())){
-            bool present = state.Accesses.erase(access);
-            require(present, "access has already been ended");
+        } else if (isa<EndAccessInst>(i) || isa<AbortApplyInst>(i) ||
+                   isa<EndApplyInst>(i)) {
+          if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
+            bool present = state.ActiveOps.erase(beginOp);
+            require(present, "operation has already been ended");
           }
 
         } else if (auto term = dyn_cast<TermInst>(&i)) {
           if (term->isFunctionExiting()) {
             require(state.Stack.empty(),
                     "return with stack allocs that haven't been deallocated");
-            require(state.Accesses.empty(),
-                    "return with accesses that haven't been ended");
+            require(state.ActiveOps.empty(),
+                    "return with operations still active");
+
+            if (isa<UnwindInst>(term)) {
+              require(state.CFG == YieldUnwind,
+                      "encountered 'unwind' when not on unwind path");
+            } else {
+              require(state.CFG != YieldUnwind,
+                      "encountered 'return' or 'throw' when on unwind path");
+              if (isa<ReturnInst>(term) &&
+                  F->getLoweredFunctionType()->getCoroutineKind() ==
+                    SILCoroutineKind::YieldOnce &&
+                  F->getModule().getStage() != SILStage::Raw) {
+                require(state.CFG == YieldOnceResume,
+                        "encountered 'return' before yielding a value in "
+                        "yield_once coroutine");
+              }
+            }
+          }
+
+          if (isa<YieldInst>(term)) {
+            require(state.CFG != YieldOnceResume,
+                    "encountered multiple 'yield's along single path");
+            require(state.CFG == Normal,
+                    "encountered 'yield' on abnormal CFG path");
           }
 
           auto successors = term->getSuccessors();
@@ -4215,8 +4197,29 @@ public:
             // worklist and continue.
             if (insertResult.second) {
               Worklist.push_back(succBB);
+
+              // If we're following a 'yield', update the CFG state:
+              if (isa<YieldInst>(term)) {
+                // Enforce that the unwind logic is segregated in all stages.
+                if (i == 1) {
+                  insertResult.first->second.CFG = YieldUnwind;
+
+                // We check the yield_once rule in the mandatory analyses,
+                // so we can't assert it yet in the raw stage.
+                } else if (F->getLoweredFunctionType()->getCoroutineKind()
+                             == SILCoroutineKind::YieldOnce && 
+                           F->getModule().getStage() != SILStage::Raw) {
+                  insertResult.first->second.CFG = YieldOnceResume;
+                }
+              }
+
               continue;
             }
+
+            // This rule is checked elsewhere, but we'd want to assert it
+            // here anyway.
+            require(!isa<YieldInst>(term),
+                    "successor of 'yield' should not be encountered twice");
 
             // Check that the stack height is consistent coming from all entry
             // points into this BB. We only care about consistency if there is
@@ -4231,8 +4234,10 @@ public:
             const auto &foundState = insertResult.first->second;
             require(state.Stack == foundState.Stack || isUnreachable(),
                     "inconsistent stack heights entering basic block");
-            require(state.Accesses == foundState.Accesses || isUnreachable(),
-                    "inconsistent access sets entering basic block");
+            require(state.ActiveOps == foundState.ActiveOps || isUnreachable(),
+                    "inconsistent active-operations sets entering basic block");
+            require(state.CFG == foundState.CFG,
+                    "inconsistent coroutine states entering basic block");
           }
         }
       }

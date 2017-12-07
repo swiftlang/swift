@@ -233,6 +233,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         if (auto *IOE = dyn_cast<InOutExpr>(SE->getBase()))
           if (IOE->isImplicit())
             AcceptableInOutExprs.insert(IOE);
+
+        visitIndices(SE, [&](unsigned argIndex, Expr *arg) {
+          arg = lookThroughArgument(arg);
+          if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
+            checkNoEscapeParameterUse(DRE, SE, OperandKind::Argument);
+        });
       }
 
       // Check decl refs in withoutActuallyEscaping blocks.
@@ -261,19 +267,44 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         unsigned uncurryLevel = 0;
         while (auto conv = dyn_cast<ImplicitConversionExpr>(base))
           base = conv->getSubExpr();
+
+        const auto findDynamicMemberRefExpr =
+            [](Expr *e) -> DynamicMemberRefExpr* {
+          if (auto open = dyn_cast<OpenExistentialExpr>(e)) {
+            return dyn_cast<DynamicMemberRefExpr>(open->getSubExpr());
+          }
+          return nullptr;
+        };
+
+        if (auto force = dyn_cast<ForceValueExpr>(base)) {
+          if (auto ref = findDynamicMemberRefExpr(force->getSubExpr()))
+            base = ref;
+        } else if (auto bind = dyn_cast<BindOptionalExpr>(base)) {
+          if (auto ref = findDynamicMemberRefExpr(bind->getSubExpr()))
+            base = ref;
+        }
+
         while (auto ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(base))
           base = ignoredBase->getRHS();
-        auto *calleeDRE = dyn_cast<DeclRefExpr>(base);
-        if (calleeDRE) {
+
+        ConcreteDeclRef callee;
+        if (auto *calleeDRE = dyn_cast<DeclRefExpr>(base)) {
           checkNoEscapeParameterUse(calleeDRE, Call, OperandKind::Callee);
           checkForSuspiciousBitCasts(calleeDRE, Call);
+          callee = calleeDRE->getDeclRef();
 
         // Otherwise, try to drill down through member calls for the purposes
         // of argument-matching code below.
         } else if (auto selfApply = dyn_cast<SelfApplyExpr>(base)) {
           uncurryLevel++;
           base = selfApply->getSemanticFn();
-          calleeDRE = dyn_cast<DeclRefExpr>(base);
+          if (auto calleeDRE = dyn_cast<DeclRefExpr>(base))
+            callee = calleeDRE->getDeclRef();
+
+        // Otherwise, check for a dynamic member.
+        } else if (auto dynamicMRE = dyn_cast<DynamicMemberRefExpr>(base)) {
+          uncurryLevel++;
+          callee = dynamicMRE->getMember();
         }
 
         visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
@@ -299,9 +330,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
             // Also do some additional work based on how the function uses
             // the argument.
-            if (calleeDRE) {
-              checkConvertedPointerArgument(calleeDRE->getDeclRef(),
-                                            uncurryLevel, argIndex,
+            if (callee) {
+              checkConvertedPointerArgument(callee, uncurryLevel, argIndex,
                                             unwrapped, operand);
             }
           }
@@ -352,10 +382,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       return { true, E };
     }
 
-    static void visitArguments(ApplyExpr *apply,
-                               llvm::function_ref<void(unsigned, Expr*)> fn) {
-      auto *arg = apply->getArg();
-
+    /// Visit the argument/s represented by either a ParenExpr or TupleExpr,
+    /// unshuffling if needed. If any other kind of expression, will pass it
+    /// straight back.
+    static void argExprVisitArguments(Expr* arg,
+                                      llvm::function_ref
+                                        <void(unsigned, Expr*)> fn) {
       // The argument could be shuffled if it includes default arguments,
       // label differences, or other exciting things like that.
       if (auto *TSE = dyn_cast<TupleShuffleExpr>(arg))
@@ -371,6 +403,18 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       } else {
         fn(0, arg);
       }
+    }
+
+    static void visitIndices(SubscriptExpr *subscript,
+                             llvm::function_ref<void(unsigned, Expr*)> fn) {
+      auto *indexArgs = subscript->getIndex();
+      argExprVisitArguments(indexArgs, fn);
+    }
+
+    static void visitArguments(ApplyExpr *apply,
+                               llvm::function_ref<void(unsigned, Expr*)> fn) {
+      auto *arg = apply->getArg();
+      argExprVisitArguments(arg, fn);
     }
 
     static Expr *lookThroughArgument(Expr *arg) {
@@ -654,6 +698,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         if (auto apply = dyn_cast<ApplyExpr>(parent)) {
           if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
             checkNoEscapeParameterCall(apply);
+          return;
+        } else if (isa<SubscriptExpr>(parent)
+                   && useKind == OperandKind::Argument) {
           return;
         } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
           return;
@@ -1395,7 +1442,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     ///       x == nil    // also !=
     ///
     void checkOptionalPromotions(ApplyExpr *call) {
-      auto DRE = dyn_cast<DeclRefExpr>(call->getSemanticFn());
+      // We only care about binary expressions.
+      if (!isa<BinaryExpr>(call)) return;
+
+      // Dig out the function we're calling.
+      auto fnExpr = call->getSemanticFn();
+      if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(fnExpr))
+        fnExpr = dotSyntax->getSemanticFn();
+
+      auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
       auto args = dyn_cast<TupleExpr>(call->getArg());
       if (!DRE || !DRE->getDecl()->isOperator() ||
           !args || args->getNumElements() != 2)
@@ -3701,21 +3756,12 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   if (params->size() != 0 && !params->get(0)->getName().empty())
     firstParamName = params->get(0)->getName().str();
 
-  // Find the set of property names.
-  const InheritedNameSet *allPropertyNames = nullptr;
-  if (contextType) {
-    if (auto classDecl = contextType->getClassOrBoundGenericClass()) {
-      allPropertyNames = Context.getAllPropertyNames(classDecl,
-                                                     afd->isInstanceMember());
-    }
-  }
-
   StringScratchSpace scratch;
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs, firstParamName,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
                                 paramTypes, returnsSelf, false,
-                                allPropertyNames, scratch))
+                                /*allPropertyNames=*/nullptr, scratch))
     return None;
 
   /// Retrieve a replacement identifier.
@@ -3767,23 +3813,13 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
-  // Find the set of property names.
-  const InheritedNameSet *allPropertyNames = nullptr;
-  if (contextType) {
-    if (auto classDecl = contextType->getClassOrBoundGenericClass()) {
-      allPropertyNames = Context.getAllPropertyNames(classDecl,
-                                                     var->isInstanceMember());
-    }
-  }
-
-
   // Omit needless words.
   StringScratchSpace scratch;
   OmissionTypeName typeName = getTypeNameForOmission(var->getInterfaceType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (::omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
-                          /*returnsSelf=*/false, true, allPropertyNames,
-                          scratch)) {
+                          /*returnsSelf=*/false, true,
+                          /*allPropertyNames=*/nullptr, scratch)) {
     return Context.getIdentifier(name);
   }
 

@@ -12,10 +12,10 @@ hasNoPrototype()
 
 // CHECK-LABEL: sil @main
 // -- Foreign function is referenced with C calling conv and ownership semantics
-// CHECK:   [[NSANSE:%.*]] = function_ref @NSAnse : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>
-// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_T0So7AnsibleC{{[_0-9a-zA-Z]*}}fC
 // CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_T0So8NSObjectC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick NSObject.Type) -> @owned NSObject
+// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_T0So7AnsibleC{{[_0-9a-zA-Z]*}}fC
 // CHECK:   [[ANSIBLE:%.*]] = apply [[ANSIBLE_CTOR]]
+// CHECK:   [[NSANSE:%.*]] = function_ref @NSAnse : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>
 // CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
 // CHECK:   destroy_value [[ANSIBLE]] : $Optional<Ansible>
 // -- Referencing unapplied C function goes through a thunk
@@ -24,12 +24,11 @@ hasNoPrototype()
 // CHECK:   [[NOPROTO:%.*]] = function_ref @hasNoPrototype : $@convention(c) () -> ()
 // CHECK:   apply [[NOPROTO]]()
 
-// -- Constructors for imported Ansible
-// CHECK-LABEL: sil shared [serializable] @_T0So7AnsibleC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@in Optional<Any>, @thick Ansible.Type) -> @owned Optional<Ansible>
-
-
 // -- Constructors for imported NSObject
 // CHECK-LABEL: sil shared [serializable] @_T0So8NSObjectC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick NSObject.Type) -> @owned NSObject
+
+// -- Constructors for imported Ansible
+// CHECK-LABEL: sil shared [serializable] @_T0So7AnsibleC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@in Optional<Any>, @thick Ansible.Type) -> @owned Optional<Ansible>
 
 // -- Native Swift thunk for NSAnse
 // CHECK: sil shared [serialized] [thunk] @_T0SC6NSAnseSQySo7AnsibleCGADFTO : $@convention(thin) (@owned Optional<Ansible>) -> @owned Optional<Ansible> {

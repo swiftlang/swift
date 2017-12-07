@@ -47,7 +47,7 @@ struct Lunch<T : Pizza> where T.Topping : CuredMeat {
 // CHECK-LABEL: sil private @_T015nested_generics5LunchV6DinnerV15coolCombinationy7ToppingQz1t_AA4DeliC7MustardOyAA6PepperV_G1utF0A7GenericL_qd0___qd0_0_tqd0__1x_qd0_0_1ytAA5PizzaRzAA6HotDogRd__AA9CuredMeatAHRQAP9CondimentRtd__r__0_lF : $@convention(thin) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard><X, Y> (@in X, @in Y) -> (@out X, @out Y)
 
 // CHECK-LABEL: // nested_generics.Lunch.Dinner.init(firstCourse: A, secondCourse: Swift.Optional<A1>, leftovers: A, transformation: (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1>
-// CHECK-LABEL: sil hidden @_T015nested_generics5LunchV6DinnerVAEyx_qd__Gx11firstCourse_qd__Sg06secondF0x9leftoversqd__xc14transformationtcfC : $@convention(method) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard> (@owned T, @in Optional<U>, @owned T, @owned @callee_owned (@owned T) -> @out U, @thin Lunch<T>.Dinner<U>.Type) -> @out Lunch<T>.Dinner<U>
+// CHECK-LABEL: sil hidden @_T015nested_generics5LunchV6DinnerVAEyx_qd__Gx11firstCourse_qd__Sg06secondF0x9leftoversqd__xc14transformationtcfC : $@convention(method) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard> (@owned T, @in Optional<U>, @owned T, @owned @callee_guaranteed (@owned T) -> @out U, @thin Lunch<T>.Dinner<U>.Type) -> @out Lunch<T>.Dinner<U>
 
 // Non-generic nested inside generic
 
@@ -153,8 +153,8 @@ func eatDinnerConcrete(d: inout Lunch<Pizzas<ChiliFlakes>.NewYork>.Dinner<HotDog
   _ = d.transformation(d.leftovers)
 }
 
-// CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_owned (@owned nested_generics.Pizzas<nested_generics.ChiliFlakes>.NewYork) -> (@out nested_generics.HotDogs.American) to @escaping @callee_owned (@owned nested_generics.Pizzas<nested_generics.ChiliFlakes>.NewYork) -> (@unowned nested_generics.HotDogs.American)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T015nested_generics6PizzasV7NewYorkCyAA11ChiliFlakesV_GAA7HotDogsC8AmericanVIexxr_AhLIexxd_TR : $@convention(thin) (@owned Pizzas<ChiliFlakes>.NewYork, @owned @callee_owned (@owned Pizzas<ChiliFlakes>.NewYork) -> @out HotDogs.American) -> HotDogs.American
+// CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_guaranteed (@owned nested_generics.Pizzas<nested_generics.ChiliFlakes>.NewYork) -> (@out nested_generics.HotDogs.American) to @escaping @callee_guaranteed (@owned nested_generics.Pizzas<nested_generics.ChiliFlakes>.NewYork) -> (@unowned nested_generics.HotDogs.American)
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T015nested_generics6PizzasV7NewYorkCyAA11ChiliFlakesV_GAA7HotDogsC8AmericanVIegxr_AhLIegxd_TR : $@convention(thin) (@owned Pizzas<ChiliFlakes>.NewYork, @guaranteed @callee_guaranteed (@owned Pizzas<ChiliFlakes>.NewYork) -> @out HotDogs.American) -> HotDogs.American
 
 // CHECK-LABEL: // nested_generics.eatDinnerConcrete(d: inout nested_generics.Lunch<nested_generics.Pizzas<nested_generics.Pepper>.NewYork>.Dinner<nested_generics.HotDogs.American>, t: nested_generics.Deli<nested_generics.Pepper>.Pepperoni, u: nested_generics.Deli<nested_generics.Pepper>.Mustard) -> ()
 // CHECK-LABEL: sil hidden @_T015nested_generics17eatDinnerConcreteyAA5LunchV0D0VyAA6PizzasV7NewYorkCyAA6PepperV_G_AA7HotDogsC8AmericanVGz1d_AA4DeliC9PepperoniCyAL_G1tAU7MustardOyAL_G1utF : $@convention(thin) (@inout Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDogs.American>, @owned Deli<Pepper>.Pepperoni, Deli<Pepper>.Mustard) -> ()
@@ -175,8 +175,8 @@ func eatDinnerConcrete(d: inout Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDogs.Ame
   _ = d.transformation(d.leftovers)
 }
 
-// CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_owned (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@out nested_generics.HotDogs.American) to @escaping @callee_owned (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@unowned nested_generics.HotDogs.American)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T015nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIexxr_AhLIexxd_TR : $@convention(thin) (@owned Pizzas<Pepper>.NewYork, @owned @callee_owned (@owned Pizzas<Pepper>.NewYork) -> @out HotDogs.American) -> HotDogs.American
+// CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_guaranteed (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@out nested_generics.HotDogs.American) to @escaping @callee_guaranteed (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@unowned nested_generics.HotDogs.American)
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T015nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIegxr_AhLIegxd_TR : $@convention(thin) (@owned Pizzas<Pepper>.NewYork, @guaranteed @callee_guaranteed (@owned Pizzas<Pepper>.NewYork) -> @out HotDogs.American) -> HotDogs.American
 
 // CHECK-LABEL: // closure #1 (nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> nested_generics.HotDogs.American in nested_generics.calls() -> ()
 // CHECK-LABEL: sil private @_T015nested_generics5callsyyFAA7HotDogsC8AmericanVAA6PizzasV7NewYorkCyAA6PepperV_GcfU_ : $@convention(thin) (@owned Pizzas<Pepper>.NewYork) -> HotDogs.American
@@ -222,21 +222,16 @@ class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
   }
 }
 
-// CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_owned (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@unowned nested_generics.HotDogs.American) to @escaping @callee_owned (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@out nested_generics.HotDogs.American)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T015nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIexxd_AhLIexxr_TR : $@convention(thin) (@owned Pizzas<Pepper>.NewYork, @owned @callee_owned (@owned Pizzas<Pepper>.NewYork) -> HotDogs.American) -> @out HotDogs.American
+// CHECK-LABEL: // reabstraction thunk helper from @escaping @callee_guaranteed (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@unowned nested_generics.HotDogs.American) to @escaping @callee_guaranteed (@owned nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> (@out nested_generics.HotDogs.American)
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T015nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIegxd_AhLIegxr_TR : $@convention(thin) (@owned Pizzas<Pepper>.NewYork, @guaranteed @callee_guaranteed (@owned Pizzas<Pepper>.NewYork) -> HotDogs.American) -> @out HotDogs.American
 
 // CHECK-LABEL: sil private [transparent] [thunk] @_T015nested_generics9OuterRingC05InnerD0Cyx_qd__GAA30ProtocolWithGenericRequirementA2aGP6method1TQz_1UQzqd__tAK1t_AM1uqd__1vtlFTW : $@convention(witness_method: ProtocolWithGenericRequirement) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @in_guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0) {
 // CHECK: bb0([[T:%[0-9]+]] : @trivial $*τ_0_0, [[U:%[0-9]+]] : @trivial $*τ_1_0, [[V:%[0-9]+]] : @trivial $*τ_2_0, [[TOut:%[0-9]+]] : @trivial $*τ_0_0, [[UOut:%[0-9]+]] : @trivial $*τ_1_0, [[VOut:%[0-9]+]] : @trivial $*τ_2_0, [[SELF:%[0-9]+]] : @trivial $*OuterRing<τ_0_0>.InnerRing<τ_1_0>):
-// CHECK:   [[SELF_COPY:%[0-9]+]] = alloc_stack $OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   copy_addr [[SELF]] to [initialization] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load [take] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   [[BORROWED_SELF_COPY_VAL:%.*]] = begin_borrow [[SELF_COPY_VAL]]
-// CHECK:   [[METHOD:%[0-9]+]] = class_method [[BORROWED_SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>, #OuterRing.InnerRing.method!1 : <T><U><V> (OuterRing<T>.InnerRing<U>) -> (T, U, V) -> (T, U, V), $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
-// CHECK:   apply [[METHOD]]<τ_0_0, τ_1_0, τ_2_0>([[T]], [[U]], [[V]], [[TOut]], [[UOut]], [[VOut]], [[BORROWED_SELF_COPY_VAL]]) : $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load_borrow [[SELF]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   [[METHOD:%[0-9]+]] = class_method [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>, #OuterRing.InnerRing.method!1 : <T><U><V> (OuterRing<T>.InnerRing<U>) -> (T, U, V) -> (T, U, V), $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   apply [[METHOD]]<τ_0_0, τ_1_0, τ_2_0>([[T]], [[U]], [[V]], [[TOut]], [[UOut]], [[VOut]], [[SELF_COPY_VAL]]) : $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
-// CHECK:   end_borrow [[BORROWED_SELF_COPY_VAL]] from [[SELF_COPY_VAL]]
-// CHECK:   destroy_value [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   dealloc_stack [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
+// CHECK:   end_borrow [[SELF_COPY_VAL]] from [[SELF]]
 // CHECK:   return [[RESULT]] : $()
 
 // CHECK: sil_witness_table hidden <Spices> Deli<Spices>.Pepperoni: CuredMeat module nested_generics {

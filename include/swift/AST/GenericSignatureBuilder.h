@@ -802,6 +802,16 @@ public:
   /// Determine whether the two given types are in the same equivalence class.
   bool areInSameEquivalenceClass(Type type1, Type type2);
 
+  /// Verify the correctness of the given generic signature.
+  ///
+  /// This routine will test that the given generic signature is both minimal
+  /// and canonical, emitting errors if it is not.
+  static void verifyGenericSignature(ASTContext &context,
+                                     GenericSignature *sig);
+
+  /// Verify all of the generic sigantures in the given module.
+  static void verifyGenericSignaturesInModule(ModuleDecl *module);
+
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
@@ -1743,6 +1753,9 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
     return false;
   }
 }
+
+/// Canonical ordering for dependent types.
+int compareDependentTypes(Type type1, Type type2);
 
 } // end namespace swift
 

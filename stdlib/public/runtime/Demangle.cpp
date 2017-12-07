@@ -319,13 +319,19 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     
     std::vector<NodePointer> inputs;
-    for (unsigned i = 0, e = func->getNumArguments(); i < e; ++i) {
-      auto arg = func->getArguments()[i];
-      auto input = _swift_buildDemanglingForMetadata(arg.getPointer(), Dem);
-      if (arg.getFlag()) {
+    for (unsigned i = 0, e = func->getNumParameters(); i < e; ++i) {
+      auto param = func->getParameter(i);
+      auto flags = func->getParameterFlags(i);
+      auto input = _swift_buildDemanglingForMetadata(param, Dem);
+
+      if (flags.isInOut()) {
         NodePointer inout = Dem.createNode(Node::Kind::InOut);
         inout->addChild(input, Dem);
         input = inout;
+      } else if (flags.isShared()) {
+        NodePointer shared = Dem.createNode(Node::Kind::Shared);
+        shared->addChild(input, Dem);
+        input = shared;
       }
       inputs.push_back(input);
     }

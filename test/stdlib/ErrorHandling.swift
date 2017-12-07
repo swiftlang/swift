@@ -60,10 +60,10 @@ ErrorHandlingTests.test("ErrorHandling/withUnsafeBufferPointer extends lifetime"
 }
 
 ErrorHandlingTests.test("ErrorHandling/Optional.map and .flatMap") {
-  var x: Int? = 222
+  let x: Int? = 222
 
   do {
-    let y: String? = try x.map {(n: Int) -> String in
+    let _: String? = try x.map {(n: Int) -> String in
       throw SillyError.JazzHands
       return "\(n)"
     }
@@ -71,7 +71,7 @@ ErrorHandlingTests.test("ErrorHandling/Optional.map and .flatMap") {
   } catch {}
 
   do {
-    let y: String? = try x.flatMap {(n: Int) -> String? in
+    let _: String? = try x.flatMap {(n: Int) -> String? in
       throw SillyError.JazzHands
       return .some("\(n)")
     }
@@ -107,7 +107,7 @@ ErrorHandlingTests.test("ErrorHandling/index(where:)") {
 
 ErrorHandlingTests.test("ErrorHandling/split") {
   do {
-    let _: [String.CharacterView] = try "foo".characters.split { _ in
+    let _: [Substring] = try "foo".split { _ in
       throw SillyError.JazzHands
       return false
     }
@@ -116,7 +116,7 @@ ErrorHandlingTests.test("ErrorHandling/split") {
 
   do {
     let _: [AnySequence<Character>]
-      = try AnySequence("foo".characters).split { _ in
+      = try AnySequence("foo").split { _ in
         throw SillyError.JazzHands
         return false
       }
@@ -192,7 +192,7 @@ ErrorHandlingTests.test("ErrorHandling/min") {
 
 ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
   do {
-    let x: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
+    let _: Bool = try [1, 2, 3].starts(with: [1, 2]) { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -202,7 +202,7 @@ ErrorHandlingTests.test("ErrorHandling/starts(with:)") {
 
 ErrorHandlingTests.test("ErrorHandling/elementsEqual") {
   do {
-    let x: Bool = try [1, 2, 3].elementsEqual([1, 2, 3]) { _, _ in
+    let _: Bool = try [1, 2, 3].elementsEqual([1, 2, 3]) { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -212,7 +212,7 @@ ErrorHandlingTests.test("ErrorHandling/elementsEqual") {
 
 ErrorHandlingTests.test("ErrorHandling/lexicographicallyPrecedes(_:)") {
   do {
-    let x: Bool = try [1, 2, 3].lexicographicallyPrecedes([0, 2, 3]) { _, _ in
+    let _: Bool = try [1, 2, 3].lexicographicallyPrecedes([0, 2, 3]) { _, _ in
       throw SillyError.JazzHands
       return false
     }
@@ -222,7 +222,7 @@ ErrorHandlingTests.test("ErrorHandling/lexicographicallyPrecedes(_:)") {
 
 ErrorHandlingTests.test("ErrorHandling/contains") {
   do {
-    let x: Bool = try [1, 2, 3].contains { _ in
+    let _: Bool = try [1, 2, 3].contains { _ in
       throw SillyError.JazzHands
       return false
     }
@@ -233,11 +233,11 @@ ErrorHandlingTests.test("ErrorHandling/contains") {
 ErrorHandlingTests.test("ErrorHandling/reduce") {
   var loopCount = 0
   do {
-    let x: Int = try [1, 2, 3, 4, 5].reduce(0) {
+    let _: Int = try [1, 2, 3, 4, 5].reduce(0) {
       (x: Int, y: Int) -> Int
     in
       loopCount += 1
-      var total = x + y
+      let total = x + y
       if total > 5 {
         throw SillyError.JazzHands
       }
@@ -341,7 +341,7 @@ ErrorHandlingTests.test("ErrorHandling/Collection map") {
 }
 
 ErrorHandlingTests.test("ErrorHandling/sort") {
-  var collection = Array(1...5)
+  let collection = Array(1...5)
   forAllPermutations(collection) { sequence in
     for i in 0..<sequence.count {
       var s = sequence
@@ -361,10 +361,10 @@ ErrorHandlingTests.test("ErrorHandling/sort") {
 }
 
 ErrorHandlingTests.test("ErrorHandling/sorted") {
-  var collection = Array(1...5)
+  let collection = Array(1...5)
   forAllPermutations(collection) { sequence in
     for i in 0..<sequence.count {
-      var s = sequence
+      let s = sequence
       var thrown = false
       let throwElment = sequence[i]
       var result: [Int] = []
@@ -391,7 +391,7 @@ ErrorHandlingTests.test("ErrorHandling/sorted") {
 }
  
 ErrorHandlingTests.test("ErrorHandling/sort") {
-  var collection = Array(1...5)
+  let collection = Array(1...5)
   forAllPermutations(collection) { sequence in
     for i in 0..<sequence.count {
       var s = sequence
@@ -411,10 +411,10 @@ ErrorHandlingTests.test("ErrorHandling/sort") {
 }
  
 ErrorHandlingTests.test("ErrorHandling/sorted") {
-  var collection = Array(1...5)
+  let collection = Array(1...5)
   forAllPermutations(collection) { sequence in
     for i in 0..<sequence.count {
-      var s = sequence
+      let s = sequence
       var thrown = false
       let throwElment = sequence[i]
       var result: [Int] = []

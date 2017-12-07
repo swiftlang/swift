@@ -21,9 +21,8 @@
 // LINUX: -sdk {{.*}}/Inputs/clang-importer-sdk
 // LINUX-NEXT: bin/swift
 // LINUX: -sdk {{.*}}/Inputs/clang-importer-sdk
-// LINUX: bin/{{.+}} {{.*}}swift_begin.o
+// LINUX: bin/{{.+}} {{.*}}swiftrt.o
 // LINUX: {{-syslibroot|--sysroot}} {{.*}}/Inputs/clang-importer-sdk
-// LINUX: {{.*}}swift_end.o
 
 // FREEBSD-NOT: warning: no such SDK:
 // FREEBSD: bin/swift
@@ -31,9 +30,8 @@
 // FREEBSD: -sdk {{.*}}/Inputs/clang-importer-sdk
 // FREEBSD-NEXT: bin/swift
 // FREEBSD: -sdk {{.*}}/Inputs/clang-importer-sdk
-// FREEBSD: bin/{{.+}} {{.*}}swift_begin.o
+// FREEBSD: bin/{{.+}} {{.*}}swiftrt.o
 // FREEBSD: {{-syslibroot|--sysroot}} {{.*}}/Inputs/clang-importer-sdk
-// FREEBSD: {{.*}}swift_end.o
 
 // RUN: %swift_driver -driver-print-jobs -repl -sdk %S/Inputs/nonexistent-sdk 2>&1 | %FileCheck %s --check-prefix=SDKWARNING
 // RUN: %swift_driver -driver-print-jobs -sdk %S/Inputs/nonexistent-sdk 2>&1 | %FileCheck %s --check-prefix=SDKWARNING

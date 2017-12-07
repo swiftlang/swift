@@ -432,8 +432,9 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   };
 
   CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
+                                   SILCoroutineKind::None,
                                    ParameterConvention::Direct_Unowned,
-                                   params,
+                                   params, /*yields*/ {},
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
@@ -1251,23 +1252,19 @@ public:
 
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->getName();
-      sgm.TopLevelSGF->prepareEpilog(Type(), false,
-                                 CleanupLocation::getModuleCleanupLocation());
-
-      sgm.TopLevelSGF->prepareRethrowEpilog(
-                                 CleanupLocation::getModuleCleanupLocation());
+      auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
+      sgm.TopLevelSGF->prepareEpilog(Type(), true, moduleCleanupLoc);
 
       // Create the argc and argv arguments.
-      auto PrologueLoc = RegularLocation::getModuleLocation();
-      PrologueLoc.markAsPrologue();
+      auto prologueLoc = RegularLocation::getModuleLocation();
+      prologueLoc.markAsPrologue();
       auto entry = sgm.TopLevelSGF->B.getInsertionBB();
       auto paramTypeIter =
           sgm.TopLevelSGF->F.getConventions().getParameterSILTypes().begin();
       entry->createFunctionArgument(*paramTypeIter);
       entry->createFunctionArgument(*std::next(paramTypeIter));
 
-      scope.emplace(sgm.TopLevelSGF->Cleanups,
-                    CleanupLocation::getModuleCleanupLocation());
+      scope.emplace(sgm.TopLevelSGF->Cleanups, moduleCleanupLoc);
     }
   }
 
@@ -1323,8 +1320,8 @@ public:
         SGF.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
-        SavedInsertionPoint savedIP(SGF, rethrowBB,
-                                    FunctionSection::Postmatter);
+        SILGenSavedInsertionPoint savedIP(SGF, rethrowBB,
+                                          FunctionSection::Postmatter);
 
         // Log the error.
         SILValue error = rethrowBB->getArgument(0);

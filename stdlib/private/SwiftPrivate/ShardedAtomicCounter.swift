@@ -43,7 +43,7 @@ public struct _stdlib_ShardedAtomicCounter {
 
   public func `deinit`() {
     self._shardsPtr.deinitialize(count: self._shardsCount)
-    self._shardsPtr.deallocate(capacity: self._shardsCount)
+    self._shardsPtr.deallocate()
   }
 
   public func add(_ operand: Int, randomInt: Int) {

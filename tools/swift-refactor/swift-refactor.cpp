@@ -50,6 +50,8 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "strings-concatenation-to-interpolation", "Perform strings concatenation to interpolation refactoring"),
            clEnumValN(RefactoringKind::ExtractFunction,
                       "extract-function", "Perform extract function refactoring"),
+           clEnumValN(RefactoringKind::MoveMembersToExtension,
+                      "move-to-extension", "Move selected members to an extension"),
            clEnumValN(RefactoringKind::GlobalRename,
                       "syntactic-rename", "Perform syntactic rename"),
            clEnumValN(RefactoringKind::FindGlobalRenameRanges,
@@ -229,7 +231,7 @@ int main(int argc, char *argv[]) {
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   Invocation.addInputFilename(options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().KeepTokensInSourceFile = true;
+  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.addInputFilename(FileName);

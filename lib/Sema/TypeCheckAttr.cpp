@@ -79,6 +79,7 @@ public:
   IGNORED_ATTR(FixedLayout)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inline)
+  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Inlineable)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
@@ -108,6 +109,7 @@ public:
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(DowngradeExhaustivityCheck)
+  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -278,7 +280,9 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Stored properties and variables can't be transparent.
     if (VD->hasStorage())
-      return diagnoseAndRemoveAttr(attr, diag::transparent_stored_property);
+      return diagnoseAndRemoveAttr(attr,
+                                   diag::attribute_invalid_on_stored_property,
+                                   attr->getAttrName());
   }
 }
 
@@ -826,6 +830,7 @@ public:
     IGNORED_ATTR(ObjCMembers)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
     IGNORED_ATTR(DowngradeExhaustivityCheck)
+    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -864,7 +869,8 @@ public:
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitVersionedAttr(VersionedAttr *attr);
   void visitInlineableAttr(InlineableAttr *attr);
-  
+  void visitOptimizeAttr(OptimizeAttr *attr);
+
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
 };
@@ -1663,7 +1669,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   DeclContext *DC = D->getDeclContext();
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto *genericSig = FD->getGenericSignature();
-  auto *genericEnv = FD->getGenericEnvironment();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
   if (!trailingWhereClause) {
@@ -1715,9 +1720,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
       // Map types to their interface types.
       if (firstType)
-        interfaceFirstType = genericEnv->mapTypeOutOfContext(firstType);
+        interfaceFirstType = firstType->mapTypeOutOfContext();
       if (secondType)
-        interfaceSecondType = genericEnv->mapTypeOutOfContext(secondType);
+        interfaceSecondType = secondType->mapTypeOutOfContext();
 
       collectUsedGenericParameters(interfaceFirstType,
                                    constrainedGenericParams);
@@ -1764,7 +1769,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
       // Map types to their interface types.
       if (subjectType)
-        interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+        interfaceSubjectType = subjectType->mapTypeOutOfContext();
 
       collectUsedGenericParameters(interfaceSubjectType,
                                    constrainedGenericParams);
@@ -1803,7 +1808,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
       // Map types to their interface types.
       if (subjectType)
-        interfaceSubjectType = genericEnv->mapTypeOutOfContext(subjectType);
+        interfaceSubjectType = subjectType->mapTypeOutOfContext();
 
       collectUsedGenericParameters(interfaceSubjectType,
                                    constrainedGenericParams);
@@ -1814,8 +1819,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         continue;
 
 
-      auto interfaceLayoutConstraint =
-          genericEnv->mapTypeOutOfContext(constraint);
+      auto interfaceLayoutConstraint = constraint->mapTypeOutOfContext();
 
       // Re-create a requirement using the resolved interface types.
       auto resolvedReq = RequirementRepr::getTypeConstraint(
@@ -1912,7 +1916,8 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->hasStorage() || VD->getAttrs().hasAttribute<LazyAttr>()) {
       TC.diagnose(attr->getLocation(),
-                  diag::inlineable_stored_property)
+                  diag::attribute_invalid_on_stored_property,
+                  attr->getAttrName())
         .fixItRemove(attr->getRangeWithAt());
       attr->setInvalid();
       return;
@@ -1945,6 +1950,19 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
   }
 }
 
+void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (VD->hasStorage()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::attribute_invalid_on_stored_property,
+                  attr->getAttrName())
+      .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+      return;
+    }
+  }
+}
+
 void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
     if (auto result = FD->getResultInterfaceType()) {
@@ -1961,8 +1979,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   TypeLoc &ProtoTypeLoc = attr->getProtocolType();
-  TypeResolutionOptions options;
-  options |= TR_AllowUnboundGenerics;
+  auto options = TypeResolutionFlags::AllowUnboundGenerics;
 
   DeclContext *DC = D->getDeclContext();
   Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),

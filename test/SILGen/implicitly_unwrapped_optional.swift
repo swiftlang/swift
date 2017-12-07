@@ -4,15 +4,15 @@ func foo(f f: (() -> ())!) {
   var f: (() -> ())! = f
   f?()
 }
-// CHECK: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<@callee_owned () -> ()>) -> () {
-// CHECK: bb0([[T0:%.*]] : @owned $Optional<@callee_owned () -> ()>):
-// CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_owned () -> ()> }
+// CHECK: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@owned Optional<@callee_guaranteed () -> ()>) -> () {
+// CHECK: bb0([[T0:%.*]] : @owned $Optional<@callee_guaranteed () -> ()>):
+// CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
 // CHECK:   [[PF:%.*]] = project_box [[F]]
 // CHECK:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK:   [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]
 // CHECK:   end_borrow [[BORROWED_T0]] from [[T0]]
-// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PF]] : $*Optional<@callee_owned () -> ()>
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PF]] : $*Optional<@callee_guaranteed () -> ()>
 // CHECK:   [[T1:%.*]] = select_enum_addr [[READ]]
 // CHECK:   cond_br [[T1]], bb2, bb1
 //   If it does, project and load the value out of the implicitly unwrapped
@@ -21,7 +21,9 @@ func foo(f f: (() -> ())!) {
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[READ]]
 // CHECK-NEXT: [[FN0:%.*]] = load [copy] [[FN0_ADDR]]
 //   .... then call it
-// CHECK:   apply [[FN0]]() : $@callee_owned () -> ()
+// CHECK:   [[B:%.*]] = begin_borrow [[FN0]]
+// CHECK:   apply [[B]]() : $@callee_guaranteed () -> ()
+// CHECK:   end_borrow [[B]]
 // CHECK:   br bb3
 // CHECK: bb3(
 // CHECK:   destroy_value [[F]]
@@ -67,10 +69,13 @@ func bind_any() {
 func sr3758() {
   // Verify that there are no additional reabstractions introduced.
   // CHECK: [[CLOSURE:%.+]] = function_ref @_T029implicitly_unwrapped_optional6sr3758yyFySQyypGcfU_ : $@convention(thin) (@in Optional<Any>) -> ()
-  // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in Optional<Any>) -> () to $@callee_owned (@in Optional<Any>) -> ()
+  // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in Optional<Any>) -> () to $@callee_guaranteed (@in Optional<Any>) -> ()
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
-  // CHECK: [[CALLEE:%.+]] = copy_value [[BORROWED_F]] : $@callee_owned (@in Optional<Any>) -> ()
-  // CHECK: = apply [[CALLEE]]({{%.+}}) : $@callee_owned (@in Optional<Any>) -> ()
+  // CHECK: [[CALLEE:%.+]] = copy_value [[BORROWED_F]] : $@callee_guaranteed (@in Optional<Any>) -> ()
+  // CHECK: [[BORROWED_CALLEE:%.*]] = begin_borrow [[CALLEE]]
+  // CHECK: = apply [[BORROWED_CALLEE]]({{%.+}}) : $@callee_guaranteed (@in Optional<Any>) -> ()
+  // CHECK: end_borrow [[BORROWED_CALLEE]]
+  // destroy_value [[CALLEE]]
   // CHECK: end_borrow [[BORROWED_F]] from [[F]]
   // CHECK: destroy_value [[F]]
   let f: ((Any?) -> Void) = { (arg: Any!) in }

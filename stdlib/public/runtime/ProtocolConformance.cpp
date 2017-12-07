@@ -84,6 +84,10 @@ template<> void ProtocolConformanceRecord::dump() const {
       printf("witness table accessor %s\n",
              symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
+    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+      printf("conditional witness table accessor %s\n",
+             symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
+      break;
   }
 }
 #endif
@@ -108,14 +112,14 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
     if (auto *ClassMetadata = *getIndirectClass())
-      return swift_getObjCClassMetadata(ClassMetadata);
+      return getMetadataForClass(ClassMetadata);
     return nullptr;
       
   case TypeMetadataRecordKind::UniqueDirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
     if (auto *ClassMetadata = getDirectClass())
-      return swift_getObjCClassMetadata(ClassMetadata);
+      return getMetadataForClass(ClassMetadata);
     return nullptr;
       
   case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
@@ -136,7 +140,12 @@ const {
     return getStaticWitnessTable();
 
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-    return getWitnessTableAccessor()(type);
+    return getWitnessTableAccessor()(type, nullptr, 0);
+
+  case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    // FIXME: this needs to query the conditional requirements to form the
+    // array of witness tables to pass along to the accessor.
+    return nullptr;
   }
 
   swift_runtime_unreachable(
@@ -272,8 +281,8 @@ _registerProtocolConformances(ConformanceState &C,
 
 void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
                                                    uintptr_t conformancesSize) {
-  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
-         && "weird-sized conformances section?!");
+  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0 &&
+         "conformances section not a multiple of ProtocolConformanceRecord");
 
   // If we have a section, enqueue the conformances for lookup.
   auto conformanceBytes = reinterpret_cast<const char *>(conformances);
@@ -394,7 +403,7 @@ recur:
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (classHasSuperclass(classType)) {
-      type = swift_getObjCClassMetadata(classType->SuperClass);
+      type = getMetadataForClass(classType->SuperClass);
       goto recur;
     }
   }
@@ -433,7 +442,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
       if (classHasSuperclass(classType)) {
-        type = swift_getObjCClassMetadata(classType->SuperClass);
+        type = getMetadataForClass(classType->SuperClass);
         continue;
       }
     }
@@ -557,6 +566,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
           break;
 
         case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+        case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
           // If the record provides a dependent witness table accessor,
           // cache the result for the instantiated type metadata.
           C.cacheSuccess(type, P, record.getWitnessTable(type));

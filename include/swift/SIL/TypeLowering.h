@@ -44,7 +44,7 @@ namespace Lowering {
 /// The default convention for handling the callee object on thick
 /// callees.
 const ParameterConvention DefaultThickCalleeConvention =
-  ParameterConvention::Direct_Owned;
+    ParameterConvention::Direct_Guaranteed;
 
 /// Given an AST function type, return a type that is identical except
 /// for using the given ExtInfo.
@@ -82,11 +82,12 @@ adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
                    Optional<ProtocolConformanceRef> witnessMethodConformance) {
   if (t->getRepresentation() == rep) return t;
   auto extInfo = t->getExtInfo().withRepresentation(rep);
-
-  return adjustFunctionType(
-      t, extInfo, extInfo.hasContext() ? DefaultThickCalleeConvention
-                                       : ParameterConvention::Direct_Unowned,
-      witnessMethodConformance);
+  auto contextConvention = DefaultThickCalleeConvention;
+  return adjustFunctionType(t, extInfo,
+                            extInfo.hasContext()
+                                ? contextConvention
+                                : ParameterConvention::Direct_Unowned,
+                            witnessMethodConformance);
 }
 inline CanSILFunctionType
 adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep) {
@@ -271,7 +272,11 @@ public:
     return TypeLowering::LoweringStyle::Shallow;
   }
 
-  /// Emit a lowered 'release_value' operation.
+  //===--------------------------------------------------------------------===//
+  // DestroyValue
+  //===--------------------------------------------------------------------===//
+
+  /// Emit a lowered destroy value operation.
   ///
   /// This type must be loadable.
   virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
@@ -286,7 +291,7 @@ public:
     return emitDestroyValue(B, loc, value);
   }
 
-  /// Emit a lowered 'release_value' operation.
+  /// Emit a lowered destroy value operation.
   ///
   /// This type must be loadable.
   void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
@@ -294,7 +299,7 @@ public:
     emitLoweredDestroyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
-  /// Emit a lowered 'release_value' operation.
+  /// Emit a lowered destroy_value operation.
   ///
   /// This type must be loadable.
   void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
@@ -313,14 +318,18 @@ public:
   virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
                                 SILValue value) const = 0;
 
-  /// Emit a lowered 'retain_value' operation.
+  //===--------------------------------------------------------------------===//
+  // CopyValue
+  //===--------------------------------------------------------------------===//
+
+  /// Emit a lowered copy value operation.
   ///
   /// This type must be loadable.
   virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
                                         SILValue value,
                                         LoweringStyle style) const = 0;
 
-  /// Emit a lowered 'retain_value' operation.
+  /// Emit a lowered copy value operation.
   ///
   /// This type must be loadable.
   SILValue emitLoweredCopyValueShallow(SILBuilder &B, SILLocation loc,
@@ -328,7 +337,7 @@ public:
     return emitLoweredCopyValue(B, loc, value, LoweringStyle::Shallow);
   }
 
-  /// Emit a lowered 'retain_value' operation.
+  /// Emit a lowered copy value operation.
   ///
   /// This type must be loadable.
   SILValue emitLoweredCopyValueDeep(SILBuilder &B, SILLocation loc,

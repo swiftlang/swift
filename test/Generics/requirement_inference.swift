@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances -typecheck %s -verify
+// RUN: %target-typecheck-verify-swift -enable-experimental-conditional-conformances -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 { 
@@ -167,9 +167,9 @@ func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3
 // Note: a standard-library-based stress test to make sure we don't inject
 // any additional requirements.
 // CHECK-LABEL: RangeReplaceableCollection
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == MutableRangeReplaceableSlice<τ_0_0>>
-extension RangeReplaceableCollection where
-  Self.SubSequence == MutableRangeReplaceableSlice<Self>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == Slice<τ_0_0>>
+extension RangeReplaceableCollection
+  where Self: MutableCollection, Self.SubSequence == Slice<Self>
 {
 	func f() { }
 }

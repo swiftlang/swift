@@ -531,6 +531,19 @@ DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
   return id;
 }
 
+GenericSignatureID Serializer::addGenericSignatureRef(
+                                                const GenericSignature *env) {
+  if (!env) return 0;
+
+  auto &id = GenericSignatureIDs[env];
+  if (id != 0)
+    return id;
+
+  id = ++LastGenericSignatureID;
+  GenericSignaturesToWrite.push(env);
+  return id;
+}
+
 GenericEnvironmentID Serializer::addGenericEnvironmentRef(
                                                 const GenericEnvironment *env) {
   if (!env) return 0;
@@ -759,10 +772,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, OBJC_METHODS);
   BLOCK_RECORD(index_block, ENTRY_POINT);
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
+  BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_ENVIRONMENT_OFFSETS);
   BLOCK_RECORD(index_block, DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
-  BLOCK_RECORD(index_block, GENERIC_ENVIRONMENT_OFFSETS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
@@ -794,6 +807,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_WITNESS_BASE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_PROTOCOL);
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_WITNESS_CONDITIONAL_CONFORMANCE);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
@@ -1173,10 +1187,8 @@ void Serializer::writePattern(const Pattern *pattern, DeclContext *owningDC) {
 
     // If we have an owning context and a contextual type, map out to an
     // interface type.
-    if (owningDC && type->hasArchetype()) {
-      type = owningDC->getGenericEnvironmentOfContext()
-                     ->mapTypeOutOfContext(type);
-    }
+    if (owningDC && type->hasArchetype())
+      type = type->mapTypeOutOfContext();
 
     return type;
   };
@@ -1349,6 +1361,31 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   return true;
 }
 
+void Serializer::writeGenericSignature(const GenericSignature *sig) {
+  using namespace decls_block;
+
+  // Record the offset of this generic environment.
+  auto id = GenericSignatureIDs[sig];
+  assert(id != 0 && "generic signature not referenced properly");
+  (void)id;
+
+  assert((id - 1) == GenericSignatureOffsets.size());
+  GenericSignatureOffsets.push_back(Out.GetCurrentBitNo());
+
+  assert(sig != nullptr);
+
+  // Record the generic parameters.
+  SmallVector<uint64_t, 4> rawParamIDs;
+  for (auto *paramTy : sig->getGenericParams()) {
+    rawParamIDs.push_back(addTypeRef(paramTy));
+  }
+
+  auto abbrCode = DeclTypeAbbrCodes[GenericSignatureLayout::Code];
+  GenericSignatureLayout::emitRecord(Out, ScratchRecord, abbrCode, rawParamIDs);
+
+  writeGenericRequirements(sig->getRequirements(), DeclTypeAbbrCodes);
+}
+
 void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
   using namespace decls_block;
 
@@ -1358,10 +1395,7 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
   (void)id;
 
   assert((id - 1) == GenericEnvironmentOffsets.size());
-  GenericEnvironmentOffsets.push_back(Out.GetCurrentBitNo());
-
-  if (env == nullptr)
-    return;
+  assert(env != nullptr);
 
   // Determine whether we must use SIL mode, because one of the generic
   // parameters has a declaration with module context.
@@ -1375,33 +1409,36 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
     }
   }
 
+  // If not in SIL mode, generic environments just contain a reference to
+  // the generic signature.
+  if (!SILMode) {
+    // Record the generic signature directly.
+    auto genericSigID = addGenericSignatureRef(env->getGenericSignature());
+    GenericEnvironmentOffsets.push_back((genericSigID << 1) | 0x01);
+    return;
+  }
+
+  // Record the current bit.
+  GenericEnvironmentOffsets.push_back((Out.GetCurrentBitNo() << 1));
+
   // Record the generic parameters.
   SmallVector<uint64_t, 4> rawParamIDs;
   for (auto *paramTy : env->getGenericParams()) {
     auto *decl = paramTy->getDecl();
 
     // In SIL mode, add the name and canonicalize the parameter type.
-    if (SILMode) {
-      if (decl)
-        rawParamIDs.push_back(addDeclBaseNameRef(decl->getName()));
-      else
-        rawParamIDs.push_back(addDeclBaseNameRef(Identifier()));
+    if (decl)
+      rawParamIDs.push_back(addDeclBaseNameRef(decl->getName()));
+    else
+      rawParamIDs.push_back(addDeclBaseNameRef(Identifier()));
 
-      paramTy = paramTy->getCanonicalType()->castTo<GenericTypeParamType>();
-    }
-
+    paramTy = paramTy->getCanonicalType()->castTo<GenericTypeParamType>();
     rawParamIDs.push_back(addTypeRef(paramTy));
   }
 
-  if (SILMode) {
-    auto envAbbrCode = DeclTypeAbbrCodes[SILGenericEnvironmentLayout::Code];
-    SILGenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
-                                            rawParamIDs);
-  } else {
-    auto envAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
-    GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
-                                         rawParamIDs);
-  }
+  auto envAbbrCode = DeclTypeAbbrCodes[SILGenericEnvironmentLayout::Code];
+  SILGenericEnvironmentLayout::emitRecord(Out, ScratchRecord, envAbbrCode,
+                                          rawParamIDs);
 
   writeGenericRequirements(env->getGenericSignature()->getRequirements(),
                            DeclTypeAbbrCodes);
@@ -1425,22 +1462,14 @@ void Serializer::writeSILLayout(SILLayout *layout) {
     data.push_back(typeRef);
   }
   
-  // Save generic params.
-  if (auto sig = layout->getGenericSignature()) {
-    for (auto param : sig->getGenericParams()) {
-      data.push_back(addTypeRef(param));
-    }
-  }
-  
   unsigned abbrCode
     = DeclTypeAbbrCodes[SILLayoutLayout::Code];
 
-  SILLayoutLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                              layout->getFields().size(),
-                              data);
-  // Emit requirements.
-  if (auto sig = layout->getGenericSignature())
-    writeGenericRequirements(sig->getRequirements(), DeclTypeAbbrCodes);
+  SILLayoutLayout::emitRecord(
+                        Out, ScratchRecord, abbrCode,
+                        addGenericSignatureRef(layout->getGenericSignature()),
+                        layout->getFields().size(),
+                        data);
 }
 
 void Serializer::writeNormalConformance(
@@ -1477,19 +1506,14 @@ void Serializer::writeNormalConformance(
       if (auto genericEnv = witness.requiresSubstitution() 
                               ? witness.getSyntheticEnvironment()
                               : nullptr) {
+        // Generic signature.
         auto *genericSig = genericEnv->getGenericSignature();
-
-        // Generic parameters.
-        data.push_back(genericSig->getGenericParams().size());
-        for (auto gp : genericSig->getGenericParams())
-          data.push_back(addTypeRef(gp));
+        data.push_back(addGenericSignatureRef(genericSig));
 
         auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
         data.push_back(reqToSyntheticSubs.size());
-
-        // Requirements come at the end.
       } else {
-        data.push_back(/*number of generic parameters*/0);
+        data.push_back(/*null generic signature*/0);
       }
 
       data.push_back(witness.getSubstitutions().size());
@@ -1528,15 +1552,7 @@ void Serializer::writeNormalConformance(
    // Bail out early for simple witnesses.
    if (!witness.getDecl()) return;
 
-   if (auto genericEnv = witness.requiresSubstitution() 
-                           ? witness.getSyntheticEnvironment()
-                           : nullptr) {
-     auto *genericSig = genericEnv->getGenericSignature();
-
-     // Write the generic requirements of the synthetic environment.
-     writeGenericRequirements(genericSig->getRequirements(),
-                              DeclTypeAbbrCodes);
-
+   if (witness.requiresSubstitution()) {
      // Write requirement-to-synthetic substitutions.
      writeSubstitutions(witness.getRequirementToSyntheticSubs(),
                         DeclTypeAbbrCodes,
@@ -1601,7 +1617,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
-      type = genericEnv->mapTypeOutOfContext(type);
+      type = type->mapTypeOutOfContext();
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
                                                      addTypeRef(type),
@@ -1619,7 +1635,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
-      type = genericEnv->mapTypeOutOfContext(type);
+      type = type->mapTypeOutOfContext();
 
     InheritedProtocolConformanceLayout::emitRecord(
       Out, ScratchRecord, abbrCode, addTypeRef(type));
@@ -1658,8 +1674,7 @@ Serializer::writeSubstitutions(SubstitutionList substitutions,
   for (auto &sub : substitutions) {
     auto replacementType = sub.getReplacement();
     if (genericEnv && replacementType->hasArchetype()) {
-      replacementType =
-        genericEnv->mapTypeOutOfContext(replacementType);
+      replacementType = replacementType->mapTypeOutOfContext();
     }
 
     BoundGenericSubstitutionLayout::emitRecord(
@@ -1866,21 +1881,13 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     writeCrossReference(baseTy->getAnyNominal(), pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
-    SmallVector<TypeID, 4> genericParams;
     CanGenericSignature genericSig(nullptr);
     if (ext->isConstrainedExtension()) {
       genericSig = ext->getGenericSignature()->getCanonicalSignature();
-      for (auto param : genericSig->getGenericParams())
-        genericParams.push_back(addTypeRef(param));
     }
     XRefExtensionPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addModuleRef(DC->getParentModule()),
-        genericParams);
-
-    if (genericSig) {
-      writeGenericRequirements(genericSig->getRequirements(),
-                               DeclTypeAbbrCodes);
-    }
+        addGenericSignatureRef(genericSig));
     break;
   }
 
@@ -2224,6 +2231,14 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  case DAK_Optimize: {
+    auto *theAttr = cast<OptimizeAttr>(DA);
+    auto abbrCode = DeclTypeAbbrCodes[OptimizeDeclAttrLayout::Code];
+    OptimizeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       (unsigned)theAttr->getMode());
+    return;
+  }
+
   case DAK_Effects: {
     auto *theAttr = cast<EffectsAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
@@ -2555,6 +2570,15 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
   });
 }
 
+static void
+collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
+                                   const Requirement &req,
+                                   const ModuleDecl *excluding) {
+  collectDependenciesFromType(seen, req.getFirstType(), excluding);
+  if (req.getKind() != RequirementKind::Layout)
+    collectDependenciesFromType(seen, req.getSecondType(), excluding);
+}
+
 static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
   llvm::SmallSetVector<Type, 4> result;
   collectDependenciesFromType(result, ty, /*excluding*/nullptr);
@@ -2816,6 +2840,18 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
 
+    llvm::SmallSetVector<Type, 4> dependencies;
+    collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
+                                /*excluding*/nullptr);
+    for (Requirement req : typeAlias->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencies, req,
+                                         /*excluding*/nullptr);
+    }
+
+    SmallVector<TypeID, 4> dependencyIDs;
+    for (Type dep : dependencies)
+      dependencyIDs.push_back(addTypeRef(dep));
+
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(typeAlias->getFormalAccess());
 
@@ -2828,7 +2864,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit(),
                                 addGenericEnvironmentRef(
                                              typeAlias->getGenericEnvironment()),
-                                rawAccessLevel);
+                                rawAccessLevel,
+                                dependencyIDs);
     writeGenericParams(typeAlias->getGenericParams());
     break;
   }
@@ -2926,6 +2963,10 @@ void Serializer::writeDecl(const Decl *D) {
       collectDependenciesFromType(dependencyTypes,
                                   nextElt->getArgumentInterfaceType(),
                                   /*excluding*/theEnum->getParentModule());
+    }
+    for (Requirement req : theEnum->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencyTypes, req,
+                                         /*excluding*/nullptr);
     }
     for (Type ty : dependencyTypes)
       inheritedAndDependencyTypes.push_back(addTypeRef(ty));
@@ -3129,7 +3170,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasDynamicSelf(),
                            fn->hasForcedStaticDispatch(),
                            fn->hasThrows(),
-                           fn->getParameterLists().size(),
                            addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                            addTypeRef(ty),
@@ -3147,8 +3187,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(fn->getGenericParams());
 
     // Write the body parameters.
-    for (auto pattern : fn->getParameterLists())
-      writeParameterList(pattern);
+    writeParameterList(fn->getParameterLists().back());
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
@@ -3286,10 +3325,10 @@ void Serializer::writeDecl(const Decl *D) {
                                   nameComponentsAndDependencies);
 
     writeGenericParams(ctor->getGenericParams());
+
     assert(ctor->getParameterLists().size() == 2);
-    // Why is this writing out the param list for self?
-    for (auto paramList : ctor->getParameterLists())
-      writeParameterList(paramList);
+    writeParameterList(ctor->getParameterLists().back());
+
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
     break;
@@ -3309,9 +3348,6 @@ void Serializer::writeDecl(const Decl *D) {
                                  addGenericEnvironmentRef(
                                                 dtor->getGenericEnvironment()),
                                  addTypeRef(dtor->getInterfaceType()));
-    assert(dtor->getParameterLists().size() == 1);
-    // Why is this writing out the param list for self?
-    writeParameterList(dtor->getParameterLists()[0]);
     break;
   }
 
@@ -3352,6 +3388,18 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   SIMPLE_CASE(SILFunctionTypeRepresentation, Closure)
   }
   llvm_unreachable("bad calling convention");
+}
+
+/// Translate from the AST coroutine-kind enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableSILCoroutineKind(
+                                    swift::SILCoroutineKind kind) {
+  switch (kind) {
+  SIMPLE_CASE(SILCoroutineKind, None)
+  SIMPLE_CASE(SILCoroutineKind, YieldOnce)
+  SIMPLE_CASE(SILCoroutineKind, YieldMany)
+  }
+  llvm_unreachable("bad kind");
 }
 
 /// Translate from the AST ownership enum to the Serialization enum
@@ -3398,12 +3446,11 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
 #undef SIMPLE_CASE
 
 /// Find the typealias given a builtin type.
-static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx,
-                                              BuiltinType *Bt) {
+static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   /// Get the type name by chopping off "Builtin.".
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
-  Bt->print(OS);
+  T->print(OS);
   assert(FullName.startswith("Builtin."));
   StringRef TypeName = FullName.substr(8);
 
@@ -3439,9 +3486,10 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinUnsafeValueBuffer:
-  case TypeKind::BuiltinVector: {
+  case TypeKind::BuiltinVector:
+  case TypeKind::SILToken: {
     TypeAliasDecl *typeAlias =
-      findTypeAliasForBuiltin(M->getASTContext(), ty->castTo<BuiltinType>());
+      findTypeAliasForBuiltin(M->getASTContext(), ty);
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3616,19 +3664,12 @@ void Serializer::writeType(Type ty) {
   case TypeKind::GenericFunction: {
     auto fnTy = cast<GenericFunctionType>(ty.getPointer());
     unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-    SmallVector<TypeID, 4> genericParams;
-    for (auto param : fnTy->getGenericParams())
-      genericParams.push_back(addTypeRef(param));
     GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
             addTypeRef(fnTy->getInput()),
             addTypeRef(fnTy->getResult()),
             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
             fnTy->throws(),
-            genericParams);
-
-    // Write requirements.
-    writeGenericRequirements(fnTy->getRequirements(),
-                             DeclTypeAbbrCodes);
+            addGenericSignatureRef(fnTy->getGenericSignature()));
     break;
   }
       
@@ -3674,6 +3715,11 @@ void Serializer::writeType(Type ty) {
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       variableData.push_back(TypeID(conv));
     }
+    for (auto yield : fnTy->getYields()) {
+      variableData.push_back(addTypeRef(yield.getType()));
+      unsigned conv = getRawStableParameterConvention(yield.getConvention());
+      variableData.push_back(TypeID(conv));
+    }
     for (auto result : fnTy->getResults()) {
       variableData.push_back(addTypeRef(result.getType()));
       unsigned conv = getRawStableResultConvention(result.getConvention());
@@ -3687,27 +3733,25 @@ void Serializer::writeType(Type ty) {
     }
 
     auto sig = fnTy->getGenericSignature();
-    if (sig) {
-      for (auto param : sig->getGenericParams())
-        variableData.push_back(addTypeRef(param));
-    }
+
+    auto stableCoroutineKind = 
+      getRawStableSILCoroutineKind(fnTy->getCoroutineKind());
 
     auto stableCalleeConvention =
       getRawStableParameterConvention(fnTy->getCalleeConvention());
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, stableCalleeConvention,
+        Out, ScratchRecord, abbrCode,
+        stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         fnTy->hasErrorResult(), fnTy->getParameters().size(),
-        fnTy->getNumResults(), variableData);
+        fnTy->getNumYields(), fnTy->getNumResults(),
+        addGenericSignatureRef(sig), variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
       writeConformance(*conformance, DeclTypeAbbrCodes);
 
-    if (sig)
-      writeGenericRequirements(sig->getRequirements(),
-                               DeclTypeAbbrCodes);
     break;
   }
       
@@ -3891,7 +3935,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
   registerDeclTypeAbbr<LayoutRequirementLayout>();
-  registerDeclTypeAbbr<GenericEnvironmentLayout>();
+  registerDeclTypeAbbr<GenericSignatureLayout>();
   registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
@@ -3951,6 +3995,12 @@ void Serializer::writeAllDeclsAndTypes() {
       writeDeclContext(next);
     }
 
+    while (!GenericSignaturesToWrite.empty()) {
+      auto next = GenericSignaturesToWrite.front();
+      GenericSignaturesToWrite.pop();
+      writeGenericSignature(next);
+    }
+
     while (!GenericEnvironmentsToWrite.empty()) {
       auto next = GenericEnvironmentsToWrite.front();
       GenericEnvironmentsToWrite.pop();
@@ -3972,6 +4022,7 @@ void Serializer::writeAllDeclsAndTypes() {
            !LocalDeclContextsToWrite.empty() ||
            !DeclContextsToWrite.empty() ||
            !SILLayoutsToWrite.empty() ||
+           !GenericSignaturesToWrite.empty() ||
            !GenericEnvironmentsToWrite.empty() ||
            !NormalConformancesToWrite.empty());
 }
@@ -4668,8 +4719,7 @@ static void collectInterestingNestedDeclarations(
 }
 
 void Serializer::writeAST(ModuleOrSourceFile DC,
-                          bool enableNestedTypeLookupTable,
-                          bool enableDeclMemberNamesTable) {
+                          bool enableNestedTypeLookupTable) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
@@ -4770,6 +4820,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     writeOffsets(Offsets, IdentifierOffsets);
     writeOffsets(Offsets, DeclContextOffsets);
     writeOffsets(Offsets, LocalDeclContextOffsets);
+    writeOffsets(Offsets, GenericSignatureOffsets);
     writeOffsets(Offsets, GenericEnvironmentOffsets);
     writeOffsets(Offsets, NormalConformanceOffsets);
     writeOffsets(Offsets, SILLayoutOffsets);
@@ -4804,24 +4855,22 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
       EntryPoint.emit(ScratchRecord, entryPointClassID.getValue());
     }
 
-    if (enableDeclMemberNamesTable) {
-      {
-        // Write sub-tables to a skippable sub-block.
-        BCBlockRAII restoreBlock(Out, DECL_MEMBER_TABLES_BLOCK_ID, 4);
-        decl_member_tables_block::DeclMembersLayout DeclMembersTable(Out);
-        for (auto &entry : DeclMemberNames) {
-          // Save BitOffset we're writing sub-table to.
-          static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
-          assert(Out.GetCurrentBitNo() < (1ull << 32));
-          entry.second.first = Out.GetCurrentBitNo();
-          // Write sub-table.
-          writeDeclMembersTable(DeclMembersTable, *entry.second.second);
-        }
+    {
+      // Write sub-tables to a skippable sub-block.
+      BCBlockRAII restoreBlock(Out, DECL_MEMBER_TABLES_BLOCK_ID, 4);
+      decl_member_tables_block::DeclMembersLayout DeclMembersTable(Out);
+      for (auto &entry : DeclMemberNames) {
+        // Save BitOffset we're writing sub-table to.
+        static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
+        assert(Out.GetCurrentBitNo() < (1ull << 32));
+        entry.second.first = Out.GetCurrentBitNo();
+        // Write sub-table.
+        writeDeclMembersTable(DeclMembersTable, *entry.second.second);
       }
-      // Write top-level table mapping names to sub-tables.
-      index_block::DeclMemberNamesLayout DeclMemberNamesTable(Out);
-      writeDeclMemberNamesTable(DeclMemberNamesTable, DeclMemberNames);
     }
+    // Write top-level table mapping names to sub-tables.
+    index_block::DeclMemberNamesLayout DeclMemberNamesTable(Out);
+    writeDeclMemberNamesTable(DeclMemberNamesTable, DeclMemberNames);
   }
 }
 
@@ -4854,8 +4903,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
-    S.writeAST(DC, options.EnableNestedTypeLookupTable,
-               options.EnableDeclMemberNamesTable);
+    S.writeAST(DC, options.EnableNestedTypeLookupTable);
   }
 
   S.writeToStream(os);

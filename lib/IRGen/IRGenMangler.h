@@ -13,7 +13,9 @@
 #ifndef SWIFT_IRGEN_IRGENMANGLER_H
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
+#include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
@@ -173,28 +175,73 @@ public:
     return finalize();
   }
 
-  std::string mangleOutlinedInitializeWithTakeFunction(const Type t) {
+  std::string mangleOutlinedInitializeWithTakeFunction(const CanType t,
+                                                       IRGenModule *mod) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wb");
+    if (!t->hasArchetype()) {
+      appendType(t);
+      appendOperator("Wb", Index(1));
+    } else {
+      appendModule(mod->getSwiftModule());
+      appendOperator("y");
+      appendOperator("t");
+      appendOperator("Wb", Index(mod->getCanTypeID(t)));
+    }
     return finalize();
   }
-  std::string mangleOutlinedInitializeWithCopyFunction(const Type t) {
+  std::string mangleOutlinedInitializeWithCopyFunction(const CanType t,
+                                                       IRGenModule *mod) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wc");
+    if (!t->hasArchetype()) {
+      appendType(t);
+      appendOperator("Wc", Index(1));
+    } else {
+      appendModule(mod->getSwiftModule());
+      appendOperator("y");
+      appendOperator("t");
+      appendOperator("Wc", Index(mod->getCanTypeID(t)));
+    }
     return finalize();
   }
-  std::string mangleOutlinedAssignWithTakeFunction(const Type t) {
+  std::string mangleOutlinedAssignWithTakeFunction(const CanType t,
+                                                   IRGenModule *mod) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wd");
+    if (!t->hasArchetype()) {
+      appendType(t);
+      appendOperator("Wd", Index(1));
+    } else {
+      appendModule(mod->getSwiftModule());
+      appendOperator("y");
+      appendOperator("t");
+      appendOperator("Wd", Index(mod->getCanTypeID(t)));
+    }
     return finalize();
   }
-  std::string mangleOutlinedAssignWithCopyFunction(const Type t) {
+  std::string mangleOutlinedAssignWithCopyFunction(const CanType t,
+                                                   IRGenModule *mod) {
     beginMangling();
-    appendType(t);
-    appendOperator("Wf");
+    if (!t->hasArchetype()) {
+      appendType(t);
+      appendOperator("Wf", Index(1));
+    } else {
+      appendModule(mod->getSwiftModule());
+      appendOperator("y");
+      appendOperator("t");
+      appendOperator("Wf", Index(mod->getCanTypeID(t)));
+    }
+    return finalize();
+  }
+  std::string mangleOutlinedDestroyFunction(const CanType t, IRGenModule *mod) {
+    beginMangling();
+    if (!t->hasArchetype()) {
+      appendType(t);
+      appendOperator("Wh", Index(1));
+    } else {
+      appendModule(mod->getSwiftModule());
+      appendOperator("y");
+      appendOperator("t");
+      appendOperator("Wh", Index(mod->getCanTypeID(t)));
+    }
     return finalize();
   }
 

@@ -294,6 +294,7 @@ private:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
     case Node::Kind::CurryThunk:
+    case Node::Kind::DispatchThunk:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
@@ -424,6 +425,7 @@ private:
     case Node::Kind::OutlinedInitializeWithCopy:
     case Node::Kind::OutlinedAssignWithTake:
     case Node::Kind::OutlinedAssignWithCopy:
+    case Node::Kind::OutlinedDestroy:
     case Node::Kind::OutlinedVariable:
     case Node::Kind::AssocTypePath:
       return false;
@@ -798,6 +800,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "curry thunk of ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::DispatchThunk:
+    Printer << "dispatch thunk of ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
     Printer << "outlined bridged method (" << Node->getText() << ") of ";
     return nullptr;
@@ -831,6 +837,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::OutlinedAssignWithCopy:
     Printer << "outlined assign with copy of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OutlinedDestroy:
+    Printer << "outlined destroy of ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedVariable:

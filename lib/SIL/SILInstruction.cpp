@@ -807,8 +807,6 @@ namespace {
 
     bool visitWitnessMethodInst(const WitnessMethodInst *RHS) {
       auto *X = cast<WitnessMethodInst>(LHS);
-      if (X->isVolatile() != RHS->isVolatile())
-        return false;
       if (X->getMember() != RHS->getMember())
         return false;
       if (X->getLookupType() != RHS->getLookupType())
@@ -1335,8 +1333,23 @@ SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
   return iterator(*this, getEndOffset());
 }
 
+SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rbegin() const {
+  return llvm::make_reverse_iterator(end());
+}
+
+SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rend() const {
+  return llvm::make_reverse_iterator(begin());
+}
+
 SILInstructionResultArray::range SILInstructionResultArray::getValues() const {
   return {begin(), end()};
+}
+
+SILInstructionResultArray::reverse_range
+SILInstructionResultArray::getReversedValues() const {
+  return {rbegin(), rend()};
 }
 
 const ValueBase *SILInstructionResultArray::front() const {

@@ -281,6 +281,11 @@ def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
 
+def enable_experimental_conditional_conformances : Flag<["-"],
+  "enable-experimental-conditional-conformances">,
+  Flags<[FrontendOption]>,
+HelpText<"Enable experimental implementation of SE-0143: Conditional Conformances">;
+
 def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Enable automatic generation of bridging PCH files">;
@@ -403,6 +408,9 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
+  Flags<[FrontendOption]>,
+  HelpText<"Remove runtime safety checks.">;
 def AssumeSingleThreaded : Flag<["-"], "assume-single-threaded">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Assume that code will be executed in a single-threaded "

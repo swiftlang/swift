@@ -75,10 +75,6 @@ extension Sub {
     // CHECK:   destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
-    // CHECK:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]] : $Base
-    // CHECK:   [[SUPERREF_DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Base to $Sub
-    // CHECK:   [[SET_SUPER_METHOD:%.*]] = objc_super_method [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
-    // CHECK:    end_borrow [[BORROWED_UPCAST_SELF]]
     // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [[NEW_VALUE]]
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
     // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -86,14 +82,17 @@ extension Sub {
     // CHECK: bb4([[OLD_STRING:%.*]] : @owned $String):
     // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : @owned $Optional<NSString>):
     // CHECK:    end_borrow [[BORROWED_NEW_VALUE]]
+    // CHECK:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF_COPY]] : $Base
+    // CHECK:   [[SUPERREF_DOWNCAST:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Base to $Sub
+    // CHECK:   [[SET_SUPER_METHOD:%.*]] = objc_super_method [[SUPERREF_DOWNCAST]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[UPCAST_SELF_COPY]]
-    // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGvW : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
     // CHECK:    [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED:%.*]] = copy_value [[BORROWED_OLD_NSSTRING_BRIDGED]]
     // CHECK:    end_borrow [[BORROWED_OLD_NSSTRING_BRIDGED]] from [[OLD_NSSTRING_BRIDGED]]
     // This is an identity cast that should be eliminated by SILGen peepholes.
+    // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGvW : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
     // CHECK:    apply [[DIDSET_NOTIFIER]]([[COPIED_OLD_NSSTRING_BRIDGED]], [[SELF]])
     // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    destroy_value [[NEW_VALUE]]

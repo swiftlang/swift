@@ -35,12 +35,12 @@ class B : A, Barrable {}
 // CHECK-NOT: sil private [transparent] [thunk] @_T021witnesses_inheritance1BCAA7FooableA2aDP3foo{{[_0-9a-zA-Z]*}}FTW
 // CHECK-NOT: sil private [transparent] [thunk] @_T021witnesses_inheritance1BCAA7FooableA2aDP9class_foo{{[_0-9a-zA-Z]*}}FZTW
 // CHECK-LABEL: sil private [transparent] [thunk] @_T021witnesses_inheritance1BCAA8BarrableA2aDP3bar{{[_0-9a-zA-Z]*}}FTW
-// CHECK:         [[B:%.*]] = load [take] {{%.*}} : $*B
+// CHECK:         [[B:%.*]] = load_borrow {{%.*}} : $*B
 // CHECK-NEXT:    [[A:%.*]] = upcast [[B]] : $B to $A
-// CHECK-NEXT:    [[BORROWED_A:%.*]] = begin_borrow [[A]]
-// CHECK-NEXT:    [[METH:%.*]] = class_method [[BORROWED_A]] : $A, #A.bar!1
-// CHECK-NEXT:    apply [[METH]]([[BORROWED_A]]) : $@convention(method) (@guaranteed A) -> ()
-// CHECK:         end_borrow [[BORROWED_A]] from [[A]]
+// CHECK-NEXT:    [[METH:%.*]] = class_method [[A]] : $A, #A.bar!1
+// CHECK-NEXT:    apply [[METH]]([[A]]) : $@convention(method) (@guaranteed A) -> ()
+// CHECK:         end_borrow [[B]] from {{.*}}
+
 // CHECK-LABEL: sil private [transparent] [thunk] @_T021witnesses_inheritance1BCAA8BarrableA2aDP9class_bar{{[_0-9a-zA-Z]*}}FZTW
 // CHECK:         upcast {{%.*}} : $@thick B.Type to $@thick A.Type
 

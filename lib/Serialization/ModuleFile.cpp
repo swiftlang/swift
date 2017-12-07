@@ -16,8 +16,10 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -841,6 +843,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
         LocalDeclContexts.assign(scratch.begin(), scratch.end());
+        break;
+      case index_block::GENERIC_SIGNATURE_OFFSETS:
+        assert(blobData.empty());
+        GenericSignatures.assign(scratch.begin(), scratch.end());
         break;
       case index_block::GENERIC_ENVIRONMENT_OFFSETS:
         assert(blobData.empty());
@@ -1789,15 +1795,15 @@ void ModuleFile::loadObjCMethods(
 Optional<TinyPtrVector<ValueDecl *>>
 ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
                              uint64_t contextData) {
+  PrettyStackTraceDecl trace("loading members for", IDC->getDecl());
 
   assert(IDC->wasDeserialized());
+  assert(DeclMemberNames);
 
-  if (!DeclMemberNames)
-    return None;
-
+  TinyPtrVector<ValueDecl *> results;
   auto i = DeclMemberNames->find(N.getBaseName());
   if (i == DeclMemberNames->end())
-    return None;
+    return results;
 
   BitOffset subTableOffset = *i;
   std::unique_ptr<SerializedDeclMembersTable> &subTable =
@@ -1820,7 +1826,6 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclName N,
   }
 
   assert(subTable);
-  TinyPtrVector<ValueDecl *> results;
   auto j = subTable->find(IDC->getDeclID());
   if (j != subTable->end()) {
     for (DeclID d : *j) {
@@ -2168,6 +2173,17 @@ void ModuleFile::verify() const {
 
 bool SerializedASTFile::hasEntryPoint() const {
   return File.Bits.HasEntryPoint;
+}
+
+bool SerializedASTFile::getAllGenericSignatures(
+                       SmallVectorImpl<GenericSignature*> &genericSignatures) {
+  genericSignatures.clear();
+  for (unsigned index : indices(File.GenericSignatures)) {
+    if (auto genericSig = File.getGenericSignature(index + 1))
+      genericSignatures.push_back(genericSig);
+  }
+
+  return true;
 }
 
 ClassDecl *SerializedASTFile::getMainClass() const {

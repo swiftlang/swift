@@ -22,22 +22,13 @@ class Phoûx : NSObject, Fooable {
 // CHECK-LABEL: sil private [transparent] [thunk] @_T0So3FooC14objc_witnesses7FooableA2cDP3foo{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         function_ref @_T0So3FooC3foo{{[_0-9a-zA-Z]*}}FTO
 
-// *NOTE* We have an extra copy here for the time being right
-// now. This will change once we teach SILGen how to not emit the
-// extra copy.
-//
 // witness for Phoûx.foo uses the Swift vtable
 // CHECK-LABEL: _T014objc_witnesses008Phox_xraC3foo{{[_0-9a-zA-Z]*}}F
 // CHECK:      bb0([[IN_ADDR:%.*]] : 
-// CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
-// CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]
-// CHECK:         [[VALUE:%.*]] = load [take] [[STACK_SLOT]]
-// CHECK:         [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
-// CHECK:         [[CLS_METHOD:%.*]] = class_method [[BORROWED_VALUE]] : $Phoûx, #Phoûx.foo!1
-// CHECK:         apply [[CLS_METHOD]]([[BORROWED_VALUE]])
-// CHECK:         end_borrow [[BORROWED_VALUE]] from [[VALUE]]
-// CHECK:         destroy_value [[VALUE]]
-// CHECK:         dealloc_stack [[STACK_SLOT]]
+// CHECK:         [[VALUE:%.*]] = load_borrow [[IN_ADDR]]
+// CHECK:         [[CLS_METHOD:%.*]] = class_method [[VALUE]] : $Phoûx, #Phoûx.foo!1
+// CHECK:         apply [[CLS_METHOD]]([[VALUE]])
+// CHECK:         end_borrow [[VALUE]] from [[IN_ADDR]]
 
 protocol Bells {
   init(bellsOn: Int)

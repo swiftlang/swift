@@ -134,27 +134,10 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
   return DbgTy;
 }
 
-static bool typesEqual(Type A, Type B) {
-  if (A.getPointer() == B.getPointer())
-    return true;
-
-  // nullptr.
-  if (A.isNull() || B.isNull())
-    return false;
-
-  // Tombstone.
-  auto Tombstone =
-      llvm::DenseMapInfo<swift::Type>::getTombstoneKey().getPointer();
-  if ((A.getPointer() == Tombstone) || (B.getPointer() == Tombstone))
-    return false;
-
-  // Pointers are safe, do the real comparison.
-  return A->isSpelledLike(B.getPointer());
-}
-
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
-  return typesEqual(getType(), T.getType()) && size == T.size &&
-         align == T.align;
+  return (getType() == T.getType() &&
+          size == T.size &&
+          align == T.align);
 }
 
 bool DebugTypeInfo::operator!=(DebugTypeInfo T) const { return !operator==(T); }

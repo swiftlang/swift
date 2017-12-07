@@ -358,6 +358,10 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
       || context->getText() != STDLIB_NAME)
     return false;
 
+  // Ignore private stdlib names
+  if (node->getChild(1)->getKind() != Node::Kind::Identifier)
+    return false;
+
   if (char Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
     if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
       Buffer << 'S' << Subst;
@@ -579,6 +583,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'o';
   } else if (text == "Builtin.RawPointer") {
     Buffer << 'p';
+  } else if (text == "Builtin.SILToken") {
+    Buffer << 't';
   } else if (text == "Builtin.Word") {
     Buffer << 'w';
   } else if (stripPrefix(text, "Builtin.Int")) {
@@ -1711,6 +1717,11 @@ void Remangler::mangleCurryThunk(Node *node) {
   Buffer << "Tc";
 }
 
+void Remangler::mangleDispatchThunk(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Tj";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
@@ -1748,23 +1759,33 @@ void Remangler::mangleOutlinedRelease(Node *node) {
 }
 
 void Remangler::mangleOutlinedInitializeWithTake(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wb";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedInitializeWithCopy(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wc";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedAssignWithTake(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wd";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedAssignWithCopy(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNode(node, 0);
   Buffer << "Wf";
+  mangleChildNode(node, 1);
+}
+
+void Remangler::mangleOutlinedDestroy(Node *node) {
+  mangleChildNode(node, 0);
+  Buffer << "Wh";
+  mangleChildNode(node, 1);
 }
 
 void Remangler::mangleOutlinedVariable(Node *node) {

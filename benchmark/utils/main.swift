@@ -44,6 +44,7 @@ import DictionaryBridge
 import DictionaryGroup
 import DictionaryLiteral
 import DictionaryRemove
+import DictionarySubscriptDefault
 import DictionarySwap
 import DropFirst
 import DropLast
@@ -106,6 +107,7 @@ import StaticArray
 import StrComplexWalk
 import StrToInt
 import StringBuilder
+import StringComparison
 import StringEdits
 import StringEnum
 import StringInterpolation
@@ -163,6 +165,7 @@ registerBenchmark(DictionaryBridge)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
+registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
@@ -225,6 +228,7 @@ registerBenchmark(StaticArrayTest)
 registerBenchmark(StrComplexWalk)
 registerBenchmark(StrToInt)
 registerBenchmark(StringBuilder)
+registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
 registerBenchmark(StringInterpolation)

@@ -77,6 +77,13 @@ DictionaryTestSuite.test("sizeof") {
 #endif
 }
 
+DictionaryTestSuite.test("Index.Hashable") {
+  let d = [1: "meow", 2: "meow", 3: "meow"]
+  let e = Dictionary(uniqueKeysWithValues: zip(d.indices, d))
+  expectEqual(d.count, e.count)
+  expectNotNil(e[d.startIndex])
+}
+
 DictionaryTestSuite.test("valueDestruction") {
   var d1 = Dictionary<Int, TestValueTy>()
   for i in 100...110 {
@@ -117,6 +124,14 @@ func getCOWFastDictionary() -> Dictionary<Int, Int> {
   d[10] = 1010
   d[20] = 1020
   d[30] = 1030
+  return d
+}
+
+func getCOWFastDictionaryWithCOWValues() -> Dictionary<Int, TestValueCOWTy> {
+  var d = Dictionary<Int, TestValueCOWTy>(minimumCapacity: 10)
+  d[10] = TestValueCOWTy(1010)
+  d[20] = TestValueCOWTy(1020)
+  d[30] = TestValueCOWTy(1030)
   return d
 }
 
@@ -216,8 +231,6 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   var d = getCOWFastDictionary()
   var identity1 = d._rawIdentifier()
@@ -273,8 +286,6 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
 }
 
 DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   var d = getCOWSlowDictionary()
@@ -485,8 +496,6 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
 }
 
 DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   do {
@@ -610,8 +619,6 @@ DictionaryTestSuite.test("COW.Fast.MergeSequenceDoesNotReallocate")
 }
 
 DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   do {
@@ -805,6 +812,32 @@ DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
   }
 }
 
+DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotCopyValue") {
+  do {
+    var d = getCOWFastDictionaryWithCOWValues()
+    let identityValue30 = d[30]!.baseAddress
+
+    // Increment the value without having to reallocate the underlying Base
+    // instance, as uniquely referenced.
+    d[30, default: TestValueCOWTy()].value += 1
+    assert(identityValue30 == d[30]!.baseAddress)
+    assert(d[30]!.value == 1031)
+
+    let value40 = TestValueCOWTy()
+    let identityValue40 = value40.baseAddress
+
+    // Increment the value, reallocating the underlying Base, as not uniquely
+    // referenced.
+    d[40, default: value40].value += 1
+    assert(identityValue40 != d[40]!.baseAddress)
+    assert(d[40]!.value == 1)
+
+    // Keep variables alive.
+    _fixLifetime(d)
+    _fixLifetime(value40)
+  }
+}
+
 DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = d._rawIdentifier()
@@ -881,8 +914,6 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
 
 
 DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d = getCOWFastDictionary()
@@ -927,8 +958,6 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
 }
 
 DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d = getCOWSlowDictionary()
@@ -972,8 +1001,6 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
 
 
 DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d1 = getCOWFastDictionary()
@@ -1013,8 +1040,6 @@ DictionaryTestSuite.test("COW.Fast.RemoveValueForKeyDoesNotReallocate")
 }
 
 DictionaryTestSuite.test("COW.Slow.RemoveValueForKeyDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d1 = getCOWSlowDictionary()
@@ -2431,8 +2456,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   var d = getBridgedNonverbatimDictionary()
   var identity1 = d._rawIdentifier()
@@ -2513,8 +2536,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveValueForKey") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var d = getBridgedNonverbatimDictionary()

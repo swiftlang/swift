@@ -190,6 +190,14 @@ static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
          V.getOwnershipKind() == ValueOwnershipKind::Any;
 }
 
+static bool isUnsafeGuaranteedBuiltin(SILInstruction *I) {
+  auto *BI = dyn_cast<BuiltinInst>(I);
+  if (!BI)
+    return false;
+  auto BuiltinKind = BI->getBuiltinKind();
+  return BuiltinKind == BuiltinValueKind::UnsafeGuaranteed;
+}
+
 // These operations forward both owned and guaranteed ownership.
 static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   switch (K) {
@@ -231,15 +239,22 @@ static bool isGuaranteedForwardingValueKind(SILNodeKind K) {
 }
 
 static bool isGuaranteedForwardingValue(SILValue V) {
+  if (auto *SVI = dyn_cast<SingleValueInstruction>(V))
+    if (isUnsafeGuaranteedBuiltin(SVI))
+      return true;
   return isGuaranteedForwardingValueKind(
       V->getKindOfRepresentativeSILNodeInObject());
 }
 
 static bool isGuaranteedForwardingInst(SILInstruction *I) {
+  if (isUnsafeGuaranteedBuiltin(I))
+    return true;
   return isGuaranteedForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
 static bool isOwnershipForwardingInst(SILInstruction *I) {
+  if (isUnsafeGuaranteedBuiltin(I))
+    return true;
   return isOwnershipForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
@@ -448,6 +463,7 @@ NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(StrongRetainUnowned)
 NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
+NO_OPERAND_INST(Unwind)
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -478,6 +494,7 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
+CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, BeginAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, BeginUnpairedAccess)
@@ -490,6 +507,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DebugValueAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeinitExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DestroyAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndAccess)
+CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndApply)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndUnpairedAccess)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IndexAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IndexRawPointer)
@@ -1088,6 +1106,11 @@ visitFullApply(FullApplySite apply) {
 }
 
 OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitBeginApplyInst(BeginApplyInst *I) {
+  return visitFullApply(I);
+}
+
+OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
   return visitFullApply(I);
 }
@@ -1106,6 +1129,35 @@ OwnershipCompatibilityUseChecker::visitPartialApplyInst(PartialApplyInst *I) {
   }
   return {compatibleWithOwnership(ValueOwnershipKind::Owned),
           UseLifetimeConstraint::MustBeInvalidated};
+}
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
+  // Indirect return arguments are address types.
+  if (isAddressOrTrivialType())
+    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
+            UseLifetimeConstraint::MustBeLive};
+
+  auto fnType = I->getFunction()->getLoweredFunctionType();
+  auto yieldInfo = fnType->getYields()[getOperandIndex()];
+  switch (yieldInfo.getConvention()) {
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Direct_Owned:
+    return visitApplyParameter(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::MustBeInvalidated);
+  case ParameterConvention::Indirect_In_Constant:
+  case ParameterConvention::Direct_Unowned:
+    // We accept unowned, owned, and guaranteed in unowned positions.
+    return {true, UseLifetimeConstraint::MustBeLive};
+  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Direct_Guaranteed:
+    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+                               UseLifetimeConstraint::MustBeLive);
+  // The following conventions should take address types.
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    llvm_unreachable("Unexpected non-trivial parameter convention.");
+  }
 }
 
 OwnershipUseCheckerResult
@@ -1209,6 +1261,16 @@ public:
 
 } // end anonymous namespace
 
+OwnershipUseCheckerResult
+OwnershipCompatibilityBuiltinUseChecker::visitUnsafeGuaranteed(BuiltinInst *BI,
+                                                               StringRef Attr) {
+  // We accept owned or guaranteed values here.
+  if (compatibleWithOwnership(ValueOwnershipKind::Guaranteed))
+    return {true, UseLifetimeConstraint::MustBeLive};
+  return {compatibleWithOwnership(ValueOwnershipKind::Owned),
+          UseLifetimeConstraint::MustBeInvalidated};
+}
+
 // This is correct today since we do not have any builtins which return
 // @guaranteed parameters. This means that we can only have a lifetime ending
 // use with our builtins if it is owned.
@@ -1222,7 +1284,6 @@ public:
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, UnexpectedError)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, WillThrow)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Alignof)
@@ -2157,7 +2218,7 @@ void SILInstruction::verifyOperandOwnership() const {
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
-  if (getFunction()->hasUnqualifiedOwnership() ||
+  if (!getFunction()->hasQualifiedOwnership() ||
       !getFunction()->shouldVerifyOwnership())
     return;
 
@@ -2205,7 +2266,7 @@ void SILValue::verifyOwnership(SILModule &Mod, DeadEndBlocks *DEBlocks) const {
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
-  if (F->hasUnqualifiedOwnership() || !F->shouldVerifyOwnership())
+  if (!F->hasQualifiedOwnership() || !F->shouldVerifyOwnership())
     return;
 
   ErrorBehaviorKind ErrorBehavior;
@@ -2243,7 +2304,7 @@ bool OwnershipChecker::checkValue(SILValue Value) {
 
   // If the given function has unqualified ownership, there is nothing further
   // to verify.
-  if (F->hasUnqualifiedOwnership())
+  if (!F->hasQualifiedOwnership())
     return false;
 
   ErrorBehaviorKind ErrorBehavior(ErrorBehaviorKind::ReturnFalse);

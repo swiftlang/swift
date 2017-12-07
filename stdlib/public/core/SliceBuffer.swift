@@ -105,7 +105,8 @@ internal struct _SliceBuffer<Element>
     _invariantCheck()
     _sanityCheck(insertCount <= numericCast(newValues.count))
 
-    _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
+    _sanityCheck(_hasNativeBuffer)
+    _sanityCheck(isUniquelyReferenced())
 
     let eraseCount = subrange.count
     let growth = insertCount - eraseCount
@@ -167,7 +168,17 @@ internal struct _SliceBuffer<Element>
     minimumCapacity: Int
   ) -> NativeBuffer? {
     _invariantCheck()
-    if _fastPath(_hasNativeBuffer && isUniquelyReferenced()) {
+    // This is a performance optimization that was put in to ensure that at
+    // -Onone, copy of self we make to call _hasNativeBuffer is destroyed before
+    // we call isUniquelyReferenced. Otherwise, isUniquelyReferenced will always
+    // fail causing us to always copy.
+    //
+    // if _fastPath(_hasNativeBuffer && isUniquelyReferenced) {
+    //
+    // SR-6437
+    let native = _hasNativeBuffer
+    let unique = isUniquelyReferenced()
+    if _fastPath(native && unique) {
       if capacity >= minimumCapacity {
         // Since we have the last reference, drop any inaccessible
         // trailing elements in the underlying storage.  That will
@@ -195,13 +206,33 @@ internal struct _SliceBuffer<Element>
   @_inlineable
   @_versioned
   internal mutating func isMutableAndUniquelyReferenced() -> Bool {
-    return _hasNativeBuffer && isUniquelyReferenced()
+    // This is a performance optimization that ensures that the copy of self
+    // that occurs at -Onone is destroyed before we call
+    // isUniquelyReferencedOrPinned. This code used to be:
+    //
+    //   return _hasNativeBuffer && isUniquelyReferenced()
+    //
+    // SR-6437
+    if !_hasNativeBuffer {
+      return false
+    }
+    return isUniquelyReferenced()
   }
 
   @_inlineable
   @_versioned
   internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
-    return _hasNativeBuffer && isUniquelyReferencedOrPinned()
+    // This is a performance optimization that ensures that the copy of self
+    // that occurs at -Onone is destroyed before we call
+    // isUniquelyReferencedOrPinned. This code used to be:
+    //
+    //   return _hasNativeBuffer && isUniquelyReferencedOrPinned()
+    //
+    // SR-6437
+    if !_hasNativeBuffer {
+      return false
+    }
+    return isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`

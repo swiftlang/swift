@@ -720,6 +720,9 @@ handleSemanticRequest(RequestDict Req,
 
   llvm::SmallString<64> ErrBuf;
 
+  if (isSemanticEditorDisabled())
+      return Rec(createErrorRequestFailed("semantic editor is disabled"));
+
   if (ReqUID == RequestCodeComplete) {
     std::unique_ptr<llvm::MemoryBuffer>
     InputBuf = getInputBufForRequest(SourceFile, SourceText, ErrBuf);
@@ -766,9 +769,6 @@ handleSemanticRequest(RequestDict Req,
     if (HashOpt.hasValue()) Hash = *HashOpt;
     return Rec(indexSource(*SourceFile, Args, Hash));
   }
-
-  if (isSemanticEditorDisabled())
-      return Rec(createErrorRequestFailed("semantic editor is disabled"));
 
   if (ReqUID == RequestCursorInfo) {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();

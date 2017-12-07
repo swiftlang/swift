@@ -148,7 +148,7 @@ StringTests.test("unicodeScalars") {
   checkUnicodeScalarViewIteration([ 0x10ffff ], "\u{0010ffff}")
 }
 
-StringTests.test("indexComparability") {
+StringTests.test("Index/Comparable") {
   let empty = ""
   expectTrue(empty.startIndex == empty.endIndex)
   expectFalse(empty.startIndex != empty.endIndex)
@@ -164,6 +164,13 @@ StringTests.test("indexComparability") {
   expectFalse(nonEmpty.startIndex >= nonEmpty.endIndex)
   expectFalse(nonEmpty.startIndex > nonEmpty.endIndex)
   expectTrue(nonEmpty.startIndex < nonEmpty.endIndex)
+}
+
+StringTests.test("Index/Hashable") {
+  let s = "abcdef"
+  let t = Set(s.indices)
+  expectEqual(s.count, t.count)
+  expectTrue(t.contains(s.startIndex))
 }
 
 StringTests.test("ForeignIndexes/Valid") {
@@ -728,7 +735,7 @@ StringTests.test("stringCoreExtensibility")
       for boundary in 0..<count {
         
         var x = (
-            k == 0 ? asciiString("b".characters)
+            k == 0 ? asciiString("b")
           : k == 1 ? ("b" as NSString as String)
           : ("b" as NSMutableString as String)
         )._core
@@ -768,7 +775,7 @@ StringTests.test("stringCoreReserve")
 
     switch k {
     case 0: (base, startedNative) = (String(), true)
-    case 1: (base, startedNative) = (asciiString("x".characters), true)
+    case 1: (base, startedNative) = (asciiString("x"), true)
     case 2: (base, startedNative) = ("Ξ", true)
     case 3: (base, startedNative) = ("x" as NSString as String, false)
     case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
@@ -854,12 +861,12 @@ StringTests.test("CharacterViewReplace") {
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
       checkRangeReplaceable(
-        { String.CharacterView(makeStringCore(s1)) },
-        { String.CharacterView(makeStringCore(s2 + s2)[0..<$0]) }
+        { String(makeStringCore(s1)) },
+        { String(makeStringCore(s2 + s2)[0..<$0]) }
       )
       checkRangeReplaceable(
-        { String.CharacterView(makeStringCore(s1)) },
-        { Array(String.CharacterView(makeStringCore(s2 + s2)[0..<$0])) }
+        { String(makeStringCore(s1)) },
+        { Array(String(makeStringCore(s2 + s2)[0..<$0])) }
       )
     }
   }
@@ -1274,12 +1281,12 @@ StringTests.test("String.append(_: Character)") {
     for prefix in ["", " "] {
       let base = baseStrings[baseIdx]
       for inputIdx in baseCharacters.indices {
-        let input = (prefix + String(baseCharacters[inputIdx])).characters.last!
+        let input = (prefix + String(baseCharacters[inputIdx])).last!
         var s = base
         s.append(input)
         expectEqualSequence(
-          Array(base.characters) + [input],
-          Array(s.characters),
+          Array(base) + [input],
+          Array(s),
           "baseIdx=\(baseIdx) inputIdx=\(inputIdx)")
       }
     }
@@ -1488,9 +1495,9 @@ let removeSubrangeTests = [
 StringTests.test("String.replaceSubrange()/characters/range") {
   for test in replaceSubrangeTests {
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.range(in: c)
-    let newCharacters : [Character] = Array(test.newElements.characters)
+    let newCharacters : [Character] = Array(test.newElements)
     theString.replaceSubrange(rangeToReplace, with: newCharacters)
     expectEqual(
       test.expected,
@@ -1502,7 +1509,7 @@ StringTests.test("String.replaceSubrange()/characters/range") {
 StringTests.test("String.replaceSubrange()/string/range") {
   for test in replaceSubrangeTests {
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.range(in: c)
     theString.replaceSubrange(rangeToReplace, with: test.newElements)
     expectEqual(
@@ -1518,9 +1525,9 @@ StringTests.test("String.replaceSubrange()/characters/closedRange") {
       continue
     }
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.closedRange(in: c)
-    let newCharacters = Array(test.newElements.characters)
+    let newCharacters = Array(test.newElements)
     theString.replaceSubrange(rangeToReplace, with: newCharacters)
     expectEqual(
       closedExpected,
@@ -1535,7 +1542,7 @@ StringTests.test("String.replaceSubrange()/string/closedRange") {
       continue
     }
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.closedRange(in: c)
     theString.replaceSubrange(rangeToReplace, with: test.newElements)
     expectEqual(
@@ -1548,7 +1555,7 @@ StringTests.test("String.replaceSubrange()/string/closedRange") {
 StringTests.test("String.removeSubrange()/range") {
   for test in removeSubrangeTests {
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToRemove = test.rangeSelection.range(in: c)
     theString.removeSubrange(rangeToRemove)
     expectEqual(
@@ -1565,7 +1572,7 @@ StringTests.test("String.removeSubrange()/closedRange") {
       default: break
     }
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToRemove = test.rangeSelection.closedRange(in: c)
     theString.removeSubrange(rangeToRemove)
     expectEqual(
@@ -1582,7 +1589,7 @@ StringTests.test("String.removeSubrange()/closedRange") {
 public let testSuffix = "z"
 StringTests.test("COW.Smoke") {
   var s1 = "Cypseloides" + testSuffix
-  var identity1 = s1._rawIdentifier()
+  let identity1 = s1._rawIdentifier()
   
   var s2 = s1
   expectEqual(identity1, s2._rawIdentifier())
@@ -1610,11 +1617,11 @@ var testCases: [COWStringTest] {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).IndexesDontAffectUniquenessCheck") {
-    var s = test.test + testSuffix
+    let s = test.test + testSuffix
     let identity1 = s._rawIdentifier()
   
-    var startIndex = s.startIndex
-    var endIndex = s.endIndex
+    let startIndex = s.startIndex
+    let endIndex = s.endIndex
     expectNotEqual(startIndex, endIndex)
     expectLT(startIndex, endIndex)
     expectLE(startIndex, endIndex)
@@ -1631,10 +1638,10 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).SubscriptWithIndexDoesNotReallocate") {
-    var s = test.test + testSuffix
-    var identity1 = s._rawIdentifier()
+    let s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
 
-    var startIndex = s.startIndex
+    let startIndex = s.startIndex
     let empty = startIndex == s.endIndex
     expectNotEqual((s.startIndex < s.endIndex), empty)
     expectLE(s.startIndex, s.endIndex)
@@ -1648,7 +1655,7 @@ for test in testCases {
   StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
     do {
       var s = test.test + testSuffix
-      var identity1 = s._rawIdentifier()
+      let identity1 = s._rawIdentifier()
 
       let index1 = s.startIndex
       expectEqual(identity1, s._rawIdentifier())
@@ -1658,18 +1665,18 @@ for test in testCases {
     }
 
     do {
-      var s1 = test.test + testSuffix
-      var identity1 = s1._rawIdentifier()
+      let s1 = test.test + testSuffix
+      let identity1 = s1._rawIdentifier()
 
       var s2 = s1
       expectEqual(identity1, s1._rawIdentifier())
       expectEqual(identity1, s2._rawIdentifier())
 
-      var index1 = s1.startIndex
+      let index1 = s1.startIndex
       expectEqual(identity1, s1._rawIdentifier())
       expectEqual(identity1, s2._rawIdentifier())
 
-      let removed = s2.remove(at: index1)
+      let _ = s2.remove(at: index1)
 
       expectEqual(identity1, s1._rawIdentifier())
       expectTrue(identity1 == s2._rawIdentifier())
@@ -1684,14 +1691,14 @@ for test in testCases {
       expectGT(s.count, 0)
 
       s.removeAll()
-      var identity1 = s._rawIdentifier()
+      let identity1 = s._rawIdentifier()
       expectEqual(0, s.count)
       expectEqual(identity1, s._rawIdentifier())
     }
 
     do {
       var s = test.test + testSuffix
-      var identity1 = s._rawIdentifier()
+      let identity1 = s._rawIdentifier()
       expectGT(s.count, 3)
 
       s.removeAll(keepingCapacity: true)
@@ -1700,13 +1707,13 @@ for test in testCases {
     }
 
     do {
-      var s1 = test.test + testSuffix
-      var identity1 = s1._rawIdentifier()
+      let s1 = test.test + testSuffix
+      let identity1 = s1._rawIdentifier()
       expectGT(s1.count, 0)
 
       var s2 = s1
       s2.removeAll()
-      var identity2 = s2._rawIdentifier()
+      let identity2 = s2._rawIdentifier()
       expectEqual(identity1, s1._rawIdentifier())
       expectTrue(identity2 != identity1)
       expectGT(s1.count, 0)
@@ -1718,13 +1725,13 @@ for test in testCases {
     }
 
     do {
-      var s1 = test.test + testSuffix
-      var identity1 = s1._rawIdentifier()
+      let s1 = test.test + testSuffix
+      let identity1 = s1._rawIdentifier()
       expectGT(s1.count, 0)
 
       var s2 = s1
       s2.removeAll(keepingCapacity: true)
-      var identity2 = s2._rawIdentifier()
+      let identity2 = s2._rawIdentifier()
       expectEqual(identity1, s1._rawIdentifier())
       expectTrue(identity2 != identity1)
       expectGT(s1.count, 0)
@@ -1739,8 +1746,8 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).CountDoesNotReallocate") {
-    var s = test.test + testSuffix
-    var identity1 = s._rawIdentifier()
+    let s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
 
     expectGT(s.count, 0)
     expectEqual(identity1, s._rawIdentifier())
@@ -1749,8 +1756,8 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).GenerateDoesNotReallocate") {
-    var s = test.test + testSuffix
-    var identity1 = s._rawIdentifier()
+    let s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
 
     var iter = s.makeIterator()
     var copy = String()
@@ -1764,11 +1771,11 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).EqualityTestDoesNotReallocate") {
-    var s1 = test.test + testSuffix
-    var identity1 = s1._rawIdentifier()
+    let s1 = test.test + testSuffix
+    let identity1 = s1._rawIdentifier()
 
     var s2 = test.test + testSuffix
-    var identity2 = s2._rawIdentifier()
+    let identity2 = s2._rawIdentifier()
 
     expectEqual(s1, s2)
     expectEqual(identity1, s1._rawIdentifier())

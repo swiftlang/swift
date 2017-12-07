@@ -290,7 +290,8 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false, /*noescape*/ false);
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, ParameterConvention::Direct_Unowned, Parameters,
+      nullptr, ExtInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, Parameters, /*yields*/ {},
       Results, None, M.getASTContext());
   return FunctionType;
 }
@@ -360,7 +361,7 @@ BridgedProperty::outline(SILModule &M) {
     return std::make_pair(nullptr, std::prev(StartBB->end()));
   }
 
-  if (OutlinedEntryBB->getParent()->hasUnqualifiedOwnership())
+  if (!OutlinedEntryBB->getParent()->hasQualifiedOwnership())
     Fun->setUnqualifiedOwnership();
 
   Fun->setInlineStrategy(NoInline);
@@ -426,7 +427,8 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
   SILValue Instance =
       FirstInst != ObjCMethod ? FirstInst : ObjCMethod->getOperand();
   if (!ObjCMethod || !ObjCMethod->hasOneUse() ||
-      ObjCMethod->getOperand() != Instance)
+      ObjCMethod->getOperand() != Instance ||
+      ObjCMethod->getFunction()->getLoweredFunctionType()->isPolymorphic())
     return false;
 
   // Don't outline in the outlined function.
@@ -567,7 +569,7 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
   if (!Load) {
     // Try to match without the load/strong_retain prefix.
     auto *CMI = dyn_cast<ObjCMethodInst>(It);
-    if (!CMI)
+    if (!CMI || CMI->getFunction()->getLoweredFunctionType()->isPolymorphic())
       return false;
     FirstInst = CMI;
   } else
@@ -697,6 +699,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   if (!Enum)
     return BridgedArgument();
 
+  if (SILBasicBlock::iterator(Enum) == Enum->getParent()->begin())
+    return BridgedArgument();
   auto *BridgeCall =
       dyn_cast<ApplyInst>(std::prev(SILBasicBlock::iterator(Enum)));
   if (!BridgeCall || BridgeCall->getNumArguments() != 1 ||
@@ -704,11 +708,16 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
     return BridgedArgument();
 
   auto BridgedValue = BridgeCall->getArgument(0);
+  auto Next = std::next(SILBasicBlock::iterator(Enum));
+  if (Next == Enum->getParent()->end())
+    return BridgedArgument();
   auto *BridgedValueRelease =
       dyn_cast<ReleaseValueInst>(std::next(SILBasicBlock::iterator(Enum)));
   if (!BridgedValueRelease || BridgedValueRelease->getOperand() != BridgedValue)
     return BridgedArgument();
 
+  if (SILBasicBlock::iterator(BridgeCall) == BridgeCall->getParent()->begin())
+    return BridgedArgument();
   auto *FunRef =
       dyn_cast<FunctionRefInst>(std::prev(SILBasicBlock::iterator(BridgeCall)));
   if (!FunRef || !FunRef->hasOneUse() || BridgeCall->getCallee() != FunRef)
@@ -1036,7 +1045,7 @@ ObjCMethodCall::outline(SILModule &M) {
     return std::make_pair(Fun, I);
   }
 
-  if (ObjCMethod->getFunction()->hasUnqualifiedOwnership())
+  if (!ObjCMethod->getFunction()->hasQualifiedOwnership())
     Fun->setUnqualifiedOwnership();
 
   Fun->setInlineStrategy(NoInline);
@@ -1096,7 +1105,8 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
   clearState();
 
   ObjCMethod = dyn_cast<ObjCMethodInst>(I);
-  if (!ObjCMethod)
+  if (!ObjCMethod ||
+      ObjCMethod->getFunction()->getLoweredFunctionType()->isPolymorphic())
     return false;
   auto *Use = ObjCMethod->getSingleUse();
   if (!Use)
@@ -1197,7 +1207,8 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
         SILResultInfo(BridgedReturn.getReturnType(), ResultConvention::Owned));
   }
   auto FunctionType = SILFunctionType::get(
-      nullptr, ExtInfo, ParameterConvention::Direct_Unowned, Parameters,
+      nullptr, ExtInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, Parameters, {},
       Results, None, M.getASTContext());
   return FunctionType;
 }
@@ -1280,8 +1291,7 @@ public:
     auto *Fun = getFunction();
 
     // Only outline if we optimize for size.
-    if (Fun->getModule().getOptions().Optimization !=
-        SILOptions::SILOptMode::OptimizeForSize)
+    if (!Fun->optimizeForSize())
       return;
 
     // Dump function if requested.

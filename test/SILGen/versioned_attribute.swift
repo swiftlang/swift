@@ -1,5 +1,14 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
+// Check that @_versioned entities have public linkage.
+// CHECK-LABEL: sil @_T019versioned_attribute25referencedFromTransparentyyF : $@convention(thin) () -> () {
+@_versioned func referencedFromTransparent() {}
+
+// CHECK-LABEL: sil [serialized] @_T019versioned_attribute23referencesVersionedFuncyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
+@_inlineable public func referencesVersionedFunc() -> () -> () {
+  return referencedFromTransparent
+}
+
 @_versioned class Horse {
   var mouth: AnyObject?
 }

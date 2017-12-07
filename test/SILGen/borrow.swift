@@ -16,7 +16,6 @@ func useD(_ d: D) {}
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var C }, var, name "c"
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
-// CHECK:   [[FUNC:%.*]] = function_ref @_T06borrow4useD{{.*}} : $@convention(thin) (@owned D) -> ()
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PB_BOX]] : $*C
 // CHECK:   [[CLASS:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   [[BORROWED_CLASS:%.*]] = begin_borrow [[CLASS]]
@@ -24,6 +23,7 @@ func useD(_ d: D) {}
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[OFFSET]] : $*D
 // CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[ACCESS]]
 // CHECK:   end_borrow [[BORROWED_CLASS]] from [[CLASS]]
+// CHECK:   [[FUNC:%.*]] = function_ref @_T06borrow4useD{{.*}} : $@convention(thin) (@owned D) -> ()
 // CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
 // CHECK:   destroy_value [[CLASS]]
 // CHECK:   destroy_value [[BOX]]

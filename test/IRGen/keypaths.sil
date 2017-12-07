@@ -75,7 +75,7 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x4000_000c> }>
+// CHECK-32-SAME: <i32 0x4000_0008> }>
 // CHECK-64-SAME: <i32 0x4000_0010> }>
 
 // -- %e: C.y
@@ -87,7 +87,7 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.y
-// CHECK-32-SAME: <i32 0x4000_0010> }>
+// CHECK-32-SAME: <i32 0x4000_000c> }>
 // CHECK-64-SAME: <i32 0x4000_0018> }>
 
 // -- %f: C.z
@@ -99,7 +99,7 @@ sil_vtable C {}
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_001c> }>
+// CHECK-32-SAME: <i32 0x4000_0018> }>
 // CHECK-64-SAME: <i32 0x4000_0030> }>
 
 // -- %g: S.z.x
@@ -118,7 +118,7 @@ sil_vtable C {}
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- 0x4000_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x4000_000c> }>
+// CHECK-32-SAME: <i32 0x4000_0008> }>
 // CHECK-64-SAME: <i32 0x4000_0010> }>
 
 // -- %h: C.z.x
@@ -132,7 +132,7 @@ sil_vtable C {}
 // CHECK-64-SAME: <i32 0x8000_0014>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x4000_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x4000_001c>,
+// CHECK-32-SAME: <i32 0x4000_0018>,
 // CHECK-64-SAME: <i32 0x4000_0030>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
@@ -240,7 +240,7 @@ entry:
 
   %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(thin) (@in S) -> @out Int)
   %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in C) -> @out Int, setter @l_set : $@convention(thin) (@in Int, @in C) -> ())
-  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in S) -> @out @callee_owned (@in ()) -> @out (), setter @m_set : $@convention(thin) (@in @callee_owned (@in ()) -> @out (), @inout S) -> ())
+  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in S) -> @out @callee_guaranteed (@in ()) -> @out (), setter @m_set : $@convention(thin) (@in @callee_guaranteed (@in ()) -> @out (), @inout S) -> ())
 
   return undef : $()
 }
@@ -251,8 +251,8 @@ sil @k_get : $@convention(thin) (@in S) -> @out Int
 sil @l_get : $@convention(thin) (@in C) -> @out Int
 sil @l_set : $@convention(thin) (@in Int, @in C) -> ()
 
-sil @m_get : $@convention(thin) (@in S) -> @out @callee_owned (@in ()) -> @out ()
-sil @m_set : $@convention(thin) (@in @callee_owned (@in ()) -> @out (), @inout S) -> ()
+sil @m_get : $@convention(thin) (@in S) -> @out @callee_guaranteed (@in ()) -> @out ()
+sil @m_set : $@convention(thin) (@in @callee_guaranteed (@in ()) -> @out (), @inout S) -> ()
 
 struct Gen<T, U> {
   var x: T

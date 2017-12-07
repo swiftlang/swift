@@ -120,25 +120,13 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
   return env->mapTypeIntoContext(type);
 }
 
-Type
-GenericEnvironment::mapTypeOutOfContext(GenericEnvironment *env,
-                                        Type type) {
-  assert(!type->hasTypeParameter() && "already have an interface type");
-
-  if (!env)
-    return type.substDependentTypesWithErrorTypes();
-
-  return env->mapTypeOutOfContext(type);
-}
-
-Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
-  type = type.subst([&](SubstitutableType *t) -> Type {
-                      return cast<ArchetypeType>(t)->getInterfaceType();
-                    },
-                    MakeAbstractConformanceForGenericType(),
-                    SubstFlags::AllowLoweredTypes);
-  assert(!type->hasArchetype() && "not fully substituted");
-  return type;
+Type TypeBase::mapTypeOutOfContext() {
+  assert(!hasTypeParameter() && "already have an interface type");
+  return Type(this).subst([&](SubstitutableType *t) -> Type {
+      return cast<ArchetypeType>(t)->getInterfaceType();
+    },
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::AllowLoweredTypes);
 }
 
 Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
@@ -239,47 +227,4 @@ GenericEnvironment::getForwardingSubstitutions() const {
   SmallVector<Substitution, 4> result;
   genericSig->getSubstitutions(subMap, result);
   return genericSig->getASTContext().AllocateCopy(result);
-}
-
-SubstitutionMap
-GenericEnvironment::
-getSubstitutionMap(TypeSubstitutionFn subs,
-                   LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap(const_cast<GenericEnvironment *>(this));
-
-  getGenericSignature()->enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
-      auto canTy = depTy->getCanonicalType();
-
-      // Map the interface type to a context type.
-      auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
-                                   MakeAbstractConformanceForGenericType());
-
-      // Compute the replacement type.
-      Type currentReplacement = contextTy.subst(subs, lookupConformance,
-                                                SubstFlags::UseErrorType);
-
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
-        subMap.addSubstitution(paramTy, currentReplacement);
-
-      // Collect the conformances.
-      for (auto req: reqs) {
-        assert(req.getKind() == RequirementKind::Conformance);
-        auto protoType = req.getSecondType()->castTo<ProtocolType>();
-        auto conformance = lookupConformance(canTy,
-                                             currentReplacement,
-                                             protoType);
-        if (conformance) {
-          assert(conformance->getConditionalRequirements().empty() &&
-                 "unhandled conditional requirements");
-
-          subMap.addConformance(canTy, *conformance);
-        }
-      }
-
-      return false;
-    });
-
-  subMap.verify();
-  return subMap;
 }

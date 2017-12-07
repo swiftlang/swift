@@ -522,7 +522,7 @@ mapInterfaceTypes(SILFunction *F,
     if (!Param.getType()->hasArchetype())
       continue;
     Param = SILParameterInfo(
-      F->mapTypeOutOfContext(Param.getType())->getCanonicalType(),
+      Param.getType()->mapTypeOutOfContext()->getCanonicalType(),
       Param.getConvention());
   }
 
@@ -530,14 +530,14 @@ mapInterfaceTypes(SILFunction *F,
     if (!Result.getType()->hasArchetype())
       continue;
     auto InterfaceResult = Result.getWithType(
-        F->mapTypeOutOfContext(Result.getType())->getCanonicalType());
+      Result.getType()->mapTypeOutOfContext()->getCanonicalType());
     Result = InterfaceResult;
   }
 
   if (InterfaceErrorResult.hasValue()) {
     if (InterfaceErrorResult.getValue().getType()->hasArchetype()) {
       InterfaceErrorResult = SILResultInfo(
-          F->mapTypeOutOfContext(InterfaceErrorResult.getValue().getType())
+          InterfaceErrorResult.getValue().getType()->mapTypeOutOfContext()
               ->getCanonicalType(),
           InterfaceErrorResult.getValue().getConvention());
     }
@@ -575,6 +575,12 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
     }
 
     InterfaceResults.push_back(InterfaceResult);
+  }
+
+  llvm::SmallVector<SILYieldInfo, 8> InterfaceYields;
+  for (SILYieldInfo InterfaceYield : FTy->getYields()) {
+    // For now, don't touch the yield types.
+    InterfaceYields.push_back(InterfaceYield);
   }
 
   bool UsesGenerics = false;
@@ -630,9 +636,9 @@ CanSILFunctionType FunctionSignatureTransform::createOptimizedSILFunctionType() 
       UsesGenerics ? FTy->getGenericSignature() : nullptr;
 
   return SILFunctionType::get(
-      GenericSig, ExtInfo, FTy->getCalleeConvention(), InterfaceParams,
-      InterfaceResults, InterfaceErrorResult, F->getModule().getASTContext(),
-      witnessMethodConformance);
+      GenericSig, ExtInfo, FTy->getCoroutineKind(), FTy->getCalleeConvention(),
+      InterfaceParams, InterfaceYields, InterfaceResults, InterfaceErrorResult,
+      F->getModule().getASTContext(), witnessMethodConformance);
 }
 
 void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
@@ -656,7 +662,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
                           F->isSerialized(), F->getEntryCount(), F->isThunk(),
                           F->getClassSubclassScope(), F->getInlineStrategy(),
                           F->getEffectsKind(), nullptr, F->getDebugScope());
-  if (F->hasUnqualifiedOwnership()) {
+  if (!F->hasQualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
 
@@ -1142,8 +1148,7 @@ public:
     auto *F = getFunction();
 
     // Don't run function signature optimizations at -Os.
-    if (F->getModule().getOptions().Optimization ==
-        SILOptions::SILOptMode::OptimizeForSize)
+    if (F->optimizeForSize())
       return;
 
     // Don't optimize callees that should not be optimized.

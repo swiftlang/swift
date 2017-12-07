@@ -778,6 +778,9 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                "Builtin.RawPointer");
       break;
+    case 't':
+      Ty = createNode(Node::Kind::BuiltinTypeName, "Builtin.SILToken");
+      break;
     case 'w':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                "Builtin.Word");
@@ -1247,6 +1250,7 @@ NodePointer Demangler::popProtocolConformance() {
 NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
+    case 'j': return createWithChild(Node::Kind::DispatchThunk, popNode(isEntity));
     case 'o': return createNode(Node::Kind::ObjCAttribute);
     case 'O': return createNode(Node::Kind::NonObjCAttribute);
     case 'D': return createNode(Node::Kind::DynamicAttribute);
@@ -1688,20 +1692,29 @@ NodePointer Demangler::demangleWitness() {
                              popNode(Node::Kind::Type));
     }
     case 'b': {
-      return createWithChild(Node::Kind::OutlinedInitializeWithTake,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedInitializeWithTake,
+                                popNode(Node::Kind::Type), IndexChild);
     }
     case 'c': {
-      return createWithChild(Node::Kind::OutlinedInitializeWithCopy,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedInitializeWithCopy,
+                                popNode(Node::Kind::Type), IndexChild);
     }
     case 'd': {
-      return createWithChild(Node::Kind::OutlinedAssignWithTake,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedAssignWithTake,
+                                popNode(Node::Kind::Type), IndexChild);
     }
     case 'f': {
-      return createWithChild(Node::Kind::OutlinedAssignWithCopy,
-                             popNode(Node::Kind::Type));
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedAssignWithCopy,
+                                popNode(Node::Kind::Type), IndexChild);
+    }
+    case 'h': {
+      NodePointer IndexChild = demangleIndexAsNode();
+      return createWithChildren(Node::Kind::OutlinedDestroy,
+                                popNode(Node::Kind::Type), IndexChild);
     }
 
     default:

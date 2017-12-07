@@ -25,6 +25,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
@@ -193,18 +194,6 @@ void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
 }
 
 #pragma mark GraphViz visualization
-static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb,
-                                 bool outermost);
-
-static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb) {
-  return compareDependentTypes(pa, pb, /*outermost=*/true);
-}
-
-static int compareDependentTypes(Type type1, Type type2,
-                                 bool outermost = true);
-
 namespace {
   /// A node in the equivalence class, used for visualization.
   struct EquivalenceClassVizNode {
@@ -1967,13 +1956,14 @@ Type EquivalenceClass::getAnchor(
   // within that equivalence class.
   llvm::SmallDenseMap<EquivalenceClass *, AssociatedTypeDecl *> nestedTypes;
 
-  PotentialArchetype *bestGenericParam = nullptr;
+  Type bestGenericParam;
   for (auto member : members) {
     // If the member is a generic parameter, keep the best generic parameter.
     if (member->isGenericParam()) {
+      Type genericParamType = member->getDependentType(genericParams);
       if (!bestGenericParam ||
-          compareDependentTypes(&member, &bestGenericParam) < 0)
-        bestGenericParam = member;
+          compareDependentTypes(genericParamType, bestGenericParam) < 0)
+        bestGenericParam = genericParamType;
       continue;
     }
 
@@ -2003,7 +1993,7 @@ Type EquivalenceClass::getAnchor(
 
   // If we found a generic parameter, return that.
   if (bestGenericParam)
-    return bestGenericParam->getDependentType(genericParams);
+    return bestGenericParam;
 
   // Determine the best anchor among the parent equivalence classes.
   Type bestParentAnchor;
@@ -2486,34 +2476,10 @@ auto PotentialArchetype::getRepresentative() const -> PotentialArchetype * {
   return result;
 }
 
-/// Whether there are any concrete type declarations in the potential archetype.
-static bool hasConcreteDecls(const PotentialArchetype *pa) {
-  auto parent = pa->getParent();
-  if (!parent) return false;
-
-  if (pa->getConcreteTypeDecl())
-    return true;
-
-  return hasConcreteDecls(parent);
-}
-
 /// Canonical ordering for dependent types.
-static int compareDependentTypes(Type type1, Type type2,
-                                 bool outermost) {
+int swift::compareDependentTypes(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
-
-  if (outermost) {
-    // If there are any unresolved dependent member types in a type,
-    // it's an indication of a reference to a concrete, non-associated-type
-    // declaration. We prefer the type without such declarations.
-    bool hasConcreteDecls1 =
-      static_cast<bool>(type1->findUnresolvedDependentMemberType());
-    bool hasConcreteDecls2 =
-      static_cast<bool>(type2->findUnresolvedDependentMemberType());
-    if (hasConcreteDecls1 != hasConcreteDecls2)
-      return hasConcreteDecls1 ? +1 : -1;
-  }
 
   // Ordering is as follows:
   // - Generic params
@@ -2532,8 +2498,7 @@ static int compareDependentTypes(Type type1, Type type2,
 
   // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
   if (int compareBases =
-        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase(),
-                              /*outermost=*/false))
+        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
@@ -2556,86 +2521,6 @@ static int compareDependentTypes(Type type1, Type type2,
   }
 
   return 0;
-}
-
-/// Canonical ordering for dependent types in generic signatures.
-static int compareDependentTypes(PotentialArchetype * const* pa,
-                                 PotentialArchetype * const* pb,
-                                 bool outermost) {
-  auto a = *pa, b = *pb;
-
-  // Fast-path check for equality.
-  if (a == b)
-    return 0;
-
-  // If one has concrete declarations somewhere but the other does not,
-  // prefer the one without concrete declarations.
-  if (outermost) {
-    bool aHasConcreteDecls = hasConcreteDecls(a);
-    bool bHasConcreteDecls = hasConcreteDecls(b);
-    if (aHasConcreteDecls != bHasConcreteDecls)
-      return aHasConcreteDecls ? +1 : -1;
-  }
-
-  // Ordering is as follows:
-  // - Generic params
-  if (a->isGenericParam() && b->isGenericParam())
-    return a->getGenericParamKey() < b->getGenericParamKey() ? -1 : +1;
-
-  // A generic parameter is always ordered before a nested type.
-  if (a->isGenericParam() != b->isGenericParam())
-    return a->isGenericParam() ? -1 : +1;
-
-  // - Dependent members
-  auto ppa = a->getParent();
-  auto ppb = b->getParent();
-
-  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
-  if (int compareBases = compareDependentTypes(&ppa, &ppb, /*outermost=*/false))
-    return compareBases;
-
-  // Types that are equivalent to concrete types follow types that are still
-  // type parameters.
-  if (a->isConcreteType() != b->isConcreteType())
-    return a->isConcreteType() ? +1 : -1;
-
-  // Concrete types must be ordered *after* everything else, to ensure they
-  // don't become representatives in the case where a concrete type is equated
-  // with an associated type.
-  if (a->getParent() && b->getParent() &&
-      !!a->getConcreteTypeDecl() != !!b->getConcreteTypeDecl())
-    return a->getConcreteTypeDecl() ? +1 : -1;
-
-  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
-  if (int compareNames = a->getNestedName().str().compare(
-                                                      b->getNestedName().str()))
-    return compareNames;
-
-  if (auto *aa = a->getResolvedAssociatedType()) {
-    if (auto *ab = b->getResolvedAssociatedType()) {
-      if (int result = compareAssociatedTypes(aa, ab))
-        return result;
-    } else {
-      // A resolved archetype is always ordered before an unresolved one.
-      return -1;
-    }
-  } else {
-    // A resolved archetype is always ordered before an unresolved one.
-    if (b->getResolvedAssociatedType())
-      return +1;
-  }
-
-  // Make sure concrete type declarations are properly ordered, to avoid
-  // crashers.
-  if (auto *aa = a->getConcreteTypeDecl()) {
-    auto *ab = b->getConcreteTypeDecl();
-    assert(ab != nullptr && "Should have handled this case above");
-
-    if (int result = TypeDecl::compare(aa, ab))
-      return result;
-  }
-
-  llvm_unreachable("potential archetype total order failure");
 }
 
 namespace {
@@ -3070,36 +2955,30 @@ LazyResolver *GenericSignatureBuilder::getLazyResolver() const {
 
 /// Resolve any unresolved dependent member types using the given builder.
 static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
-                                        Type type,
-                                        ArchetypeResolutionKind kind) {
+                                        Type type) {
   if (!type->hasTypeParameter()) return type;
 
-  return type.transformRec([&builder,kind](TypeBase *type) -> Optional<Type> {
-    if (auto depTy = dyn_cast<DependentMemberType>(type)) {
-      if (depTy->getAssocType()) return None;
+  return type.transformRec([&builder](TypeBase *type) -> Optional<Type> {
+    if (!type->isTypeParameter())
+      return None;
 
-      Type newBase =
-        resolveDependentMemberTypes(builder, depTy->getBase(), kind);
-      if (newBase->is<ErrorType>())
-        return ErrorType::get(depTy);
+    // Map the type parameter to an equivalence class.
+    auto equivClass =
+      builder.resolveEquivalenceClass(Type(type),
+                                      ArchetypeResolutionKind::WellFormed);
+    if (!equivClass)
+      return ErrorType::get(Type(type));
 
-      auto parentEquivClass = builder.resolveEquivalenceClass(newBase, kind);
-      if (!parentEquivClass)
-        return ErrorType::get(depTy);
+    // If there is a concrete type in this equivalence class, use that.
+    if (equivClass->concreteType) {
+      // .. unless it's recursive.
+      if (equivClass->recursiveConcreteType)
+        return ErrorType::get(Type(type));
 
-      auto memberType =
-        parentEquivClass->lookupNestedType(builder, depTy->getName());
-      if (!memberType)
-        return ErrorType::get(depTy);
-
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(memberType))
-        return Type(DependentMemberType::get(newBase, assocType));
-
-      // FIXME: Need to substitute here.
-      return Type(type);
+      return resolveDependentMemberTypes(builder, equivClass->concreteType);
     }
 
-    return None;
+    return equivClass->getAnchor(builder, builder.getGenericParams());
   });
 }
 
@@ -3210,9 +3089,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
   // FIXME: Generic typealiases contradict the assumption above.
   // If there is a type parameter somewhere in this type, resolve it.
   if (type->hasTypeParameter()) {
-    Type resolved =
-    resolveDependentMemberTypes(*this, type,
-                                ArchetypeResolutionKind::WellFormed);
+    Type resolved = resolveDependentMemberTypes(*this, type);
     if (resolved->hasError() && !type->hasError())
       return ResolvedType::forUnresolved(nullptr);
 
@@ -6067,10 +5944,9 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
 
-  // Resolve any this-far-unresolved dependent types.
+  // Resolve any thus-far-unresolved dependent types.
   equivClass->concreteType =
-    resolveDependentMemberTypes(*this, equivClass->concreteType,
-                                ArchetypeResolutionKind::CompleteWellFormed);
+    resolveDependentMemberTypes(*this, equivClass->concreteType);
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
@@ -6112,8 +5988,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
   // Resolve any this-far-unresolved dependent types.
   equivClass->superclass =
-    resolveDependentMemberTypes(*this, equivClass->superclass,
-                                ArchetypeResolutionKind::CompleteWellFormed);
+    resolveDependentMemberTypes(*this, equivClass->superclass);
 
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.
@@ -6490,7 +6365,7 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   // over-minimizing.
   if (allowBuilderToMove && !Impl->HadAnyError &&
       !Impl->HadAnyRedundantConstraints) {
-    // Register this generic signature builer as the canonical builder for the
+    // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));
   }
@@ -6527,4 +6402,78 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
            /*allowConcreteGenericPArams=*/false,
            /*allowBuilderToMove=*/false);
 }
+
+#pragma mark Generic signature verification
+
+void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
+                                                     GenericSignature *sig) {
+  llvm::errs() << "Validating generic signature: ";
+  sig->print(llvm::errs());
+  llvm::errs() << "\n";
+
+  // Try removing each requirement in turn.
+  auto genericParams = sig->getGenericParams();
+  auto requirements = sig->getRequirements();
+  for (unsigned victimIndex : indices(requirements)) {
+    PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
+
+    // Form a new generic signature builder.
+    GenericSignatureBuilder builder(context);
+
+    // Add the generic parameters.
+    for (auto gp : genericParams)
+      builder.addGenericParameter(gp);
+
+    // Add the requirements *except* the victim.
+    auto source = FloatingRequirementSource::forAbstract();
+    for (unsigned i : indices(requirements)) {
+      if (i != victimIndex)
+        builder.addRequirement(requirements[i], source, nullptr);
+    }
+
+    // Finalize the generic signature. If there were any errors, we formed
+    // an invalid signature, so just continue.
+    if (builder.Impl->HadAnyError) continue;
+
+    // Form a generic signature from the result.
+    auto newSig =
+      std::move(builder).computeGenericSignature(
+                                      SourceLoc(),
+                                      /*allowConcreteGenericParams=*/true,
+                                      /*allowBuilderToMove=*/true);
+
+    // Check whether the removed requirement
+    assert(!newSig->isRequirementSatisfied(requirements[victimIndex]) &&
+           "Generic signature is not minimal");
+
+    // Canonicalize the signature to check that it is canonical.
+    (void)newSig->getCanonicalSignature();
+  }
+}
+
+void GenericSignatureBuilder::verifyGenericSignaturesInModule(
+                                                        ModuleDecl *module) {
+  LoadedFile *loadedFile = nullptr;
+  for (auto fileUnit : module->getFiles()) {
+    loadedFile = dyn_cast<LoadedFile>(fileUnit);
+    if (loadedFile) break;
+  }
+
+  if (!loadedFile) return;
+
+  // Check all of the (canonical) generic signatures.
+  SmallVector<GenericSignature *, 8> allGenericSignatures;
+  SmallPtrSet<CanGenericSignature, 4> knownGenericSignatures;
+  (void)loadedFile->getAllGenericSignatures(allGenericSignatures);
+  ASTContext &context = module->getASTContext();
+  for (auto genericSig : allGenericSignatures) {
+    // Check whether this is the first time we've checked this (canonical)
+    // signature.
+    auto canGenericSig = genericSig->getCanonicalSignature();
+    if (!knownGenericSignatures.insert(canGenericSig).second) continue;
+
+    verifyGenericSignature(context, canGenericSig);
+  }
+}
+
 

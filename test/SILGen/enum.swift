@@ -33,8 +33,8 @@ enum Optionable {
 // CHECK-LABEL: sil hidden @_T0s16Optionable_casesySiF
 func Optionable_cases(_ x: Int) {
 
+  // CHECK:       [[METATYPE:%.*]] = metatype $@thin Optionable.Type
   // CHECK:       [[FN:%.*]] = function_ref @_T0s10OptionableO4mereABSicABmF
-  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin Optionable.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
   // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = Optionable.mere
@@ -46,7 +46,7 @@ func Optionable_cases(_ x: Int) {
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T0s10OptionableO4mereABSicABmF
 // CHECK:        [[FN:%.*]] = function_ref @_T0s10OptionableO4mereABSicABmF
-// CHECK-NEXT:   [[METHOD:%.*]] = partial_apply [[FN]](%0)
+// CHECK-NEXT:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
 // CHECK-NEXT:   return [[METHOD]]
 // CHECK-NEXT: }
 
@@ -67,8 +67,8 @@ enum AddressOnly {
 // CHECK-LABEL: sil hidden @_T0s17AddressOnly_casesys1SVF
 func AddressOnly_cases(_ s: S) {
 
+  // CHECK:       [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK:       [[FN:%.*]] = function_ref @_T0s11AddressOnlyO4mereABs1P_pcABmF
-  // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
   // CHECK-NEXT:  [[CTOR:%.*]] = apply [[FN]]([[METATYPE]])
   // CHECK-NEXT:  destroy_value [[CTOR]]
   _ = AddressOnly.mere
@@ -106,8 +106,8 @@ func AddressOnly_cases(_ s: S) {
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T0s11AddressOnlyO4mereABs1P_pcABmF
 // CHECK:       [[FN:%.*]] = function_ref @_T0s11AddressOnlyO4mereABs1P_pcABmF
-// CHECK-NEXT:  [[METHOD:%.*]] = partial_apply [[FN]](%0)
-// CHECK-NEXT:  return [[METHOD]] : $@callee_owned (@in P) -> @out AddressOnly
+// CHECK-NEXT:  [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
+// CHECK-NEXT:  return [[METHOD]] : $@callee_guaranteed (@in P) -> @out AddressOnly
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil shared [transparent] @_T0s11AddressOnlyO4mereABs1P_pcABmF
@@ -173,7 +173,7 @@ enum Foo { case A(P, String) }
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T0s3FooO1AABs1P_p_SStcABmF
 // CHECK:         [[FN:%.*]] = function_ref @_T0s3FooO1AABs1P_p_SStcABmF
-// CHECK-NEXT:    [[METHOD:%.*]] = partial_apply [[FN]](%0)
+// CHECK-NEXT:    [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
 // CHECK-NEXT:    return [[METHOD]]
 // CHECK-NEXT:  }
 

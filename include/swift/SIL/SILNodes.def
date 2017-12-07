@@ -215,9 +215,10 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
   VALUE_RANGE(SILArgument, SILPHIArgument, SILFunctionArgument)
 
 ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
+  MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
-  VALUE_RANGE(MultipleValueInstructionResult, DestructureStructResult, DestructureTupleResult)
+  VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, DestructureTupleResult)
 
 VALUE(SILUndef, ValueBase)
 
@@ -498,6 +499,10 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   TERMINATOR(ThrowInst, throw,
              TermInst, None, DoesNotRelease)
+  TERMINATOR(YieldInst, yield,
+             TermInst, MayHaveSideEffects, MayRelease)
+  TERMINATOR(UnwindInst, unwind,
+             TermInst, None, DoesNotRelease)
   TERMINATOR(TryApplyInst, try_apply,
              TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(BranchInst, br,
@@ -628,6 +633,10 @@ NON_VALUE_INST(UncheckedRefCastAddrInst, unchecked_ref_cast_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(AllocGlobalInst, alloc_global,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(EndApplyInst, end_apply,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(AbortApplyInst, abort_apply,
+               SILInstruction, MayHaveSideEffects, MayRelease)
 
 // Runtime failure
 // FIXME: Special MemBehavior for runtime failure?
@@ -637,11 +646,13 @@ NON_VALUE_INST(CondFailInst, cond_fail,
 NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
+MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
+                    SILInstruction, MayHaveSideEffects, MayRelease)
 MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
                     SILInstruction, None, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
                     SILInstruction, None, DoesNotRelease)
-INST_RANGE(MultipleValueInstruction, DestructureStructInst, DestructureTupleInst)
+INST_RANGE(MultipleValueInstruction, BeginApplyInst, DestructureTupleInst)
 
 NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
 NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)

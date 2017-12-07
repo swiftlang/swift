@@ -2302,6 +2302,8 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::ThrowInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
+    case TermKind::UnwindInst:
+    case TermKind::YieldInst:
       break;
     }
     // If the block has a cond_fail, try to move it to the predecessors.
@@ -2369,8 +2371,8 @@ static SILBasicBlock *isObjCMethodCallBlock(SILBasicBlock &Block) {
     auto *Apply = dyn_cast<ApplyInst>(&Inst);
     if (!Apply)
       continue;
-    auto *Callee = dyn_cast<WitnessMethodInst>(Apply->getCallee());
-    if (!Callee || !Callee->getMember().isForeign)
+    auto *Callee = dyn_cast<ObjCMethodInst>(Apply->getCallee());
+    if (!Callee)
       continue;
 
     return Branch->getDestBB();

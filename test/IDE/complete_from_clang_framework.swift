@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=SWIFT_COMPLETIONS | %FileCheck %s -check-prefix=SWIFT_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=SWIFT_COMPLETIONS | %FileCheck %s -check-prefix=SWIFT_COMPLETIONS
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FW_UNQUAL_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FW_UNQUAL_1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO_HELPER < %t.compl.txt
@@ -8,27 +8,25 @@
 // RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_BOTH_FOO_BAR < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_FOO_1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_FOO_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_BAR_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_BAR_1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_1 < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_2 | %FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_FOO_2 | %FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_1 | %FileCheck %s -check-prefix=FUNCTION_CALL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_2 | %FileCheck %s -check-prefix=FUNCTION_CALL_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FUNCTION_CALL_1 | %FileCheck %s -check-prefix=FUNCTION_CALL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FUNCTION_CALL_2 | %FileCheck %s -check-prefix=FUNCTION_CALL_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_STRUCT_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_STRUCT_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_2 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
-
-// XFAIL: linux
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_STRUCT_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_STRUCT_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_CLASS_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_CLASS_MEMBERS_2 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
 
 import Foo
 // Don't import FooHelper directly in this test!

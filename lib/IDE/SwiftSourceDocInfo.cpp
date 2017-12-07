@@ -111,10 +111,11 @@ bool CursorInfoResolver::tryResolve(Stmt *St) {
 }
 
 bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                                              bool IsOpenBracket) {
+                                                 Optional<AccessKind> AccKind,
+                                                 bool IsOpenBracket) {
   // We should treat both open and close brackets equally
   return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                    ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
+                    ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
 }
 
 ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
@@ -348,7 +349,7 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::Param,
                LabelRanges);
   } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
-    tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::Param,
+    tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::NoncollapsibleParam,
                getLabelRanges(SD->getIndices(), getSourceMgr()));
   } else if (EnumElementDecl *EED = dyn_cast<EnumElementDecl>(D)) {
     if (TupleTypeRepr *TTR = dyn_cast_or_null<TupleTypeRepr>(EED->getArgumentTypeLoc().getTypeRepr())) {
@@ -433,6 +434,25 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
           tryResolve(ASTWalker::ParentTy(E), nextLoc());
         } while (!shouldSkip(E));
         break;
+      case ExprKind::Subscript: {
+        auto SubExpr = cast<SubscriptExpr>(E);
+        // visit and check in source order
+        if (!SubExpr->getBase()->walk(*this))
+          return {false, nullptr};
+
+        auto Labels = getCallArgLabelRanges(getSourceMgr(), SubExpr->getIndex(),
+                                            LabelRangeEndAt::BeforeElemStart);
+        tryResolve(ASTWalker::ParentTy(E), E->getLoc(), LabelRangeType::CallArg, Labels);
+        if (isDone())
+            break;
+        if (!SubExpr->getIndex()->walk(*this))
+          return {false, nullptr};
+
+        // We already visited the children.
+        if (!walkToExprPost(E))
+          return {false, nullptr};
+        return {false, E};
+      }
       case ExprKind::Tuple: {
         TupleExpr *T = cast<TupleExpr>(E);
         // Handle arg label locations (the index reports property occurrences
@@ -563,35 +583,21 @@ void NameMatcher::skipLocsBefore(SourceLoc Start) {
 }
 
 bool NameMatcher::shouldSkip(Expr *E) {
-  if (!isa<StringLiteralExpr>(E) || !Parent.getAsExpr() ||
-      !isa<InterpolatedStringLiteralExpr>(Parent.getAsExpr()))
-    return shouldSkip(E->getSourceRange());
+  if (isa<StringLiteralExpr>(E) && Parent.getAsExpr()) {
+    // Attempting to get the CharSourceRange from the SourceRange of a
+    // StringLiteralExpr that is a segment of an interpolated string gives
+    // incorrect ranges. Use the CharSourceRange of the corresponding token
+    // instead.
 
-  // The lexer treats interpolated strings as a single token when computing the
-  // CharSourceRange, so when we try to get the CharSourceRange of its first
-  // child StringLiteralExpr (at the same SourceLoc) it goes beyond any
-  // interpolated values. Use the StartLoc of the next sibling to bound it.
+    auto ExprStart = E->getStartLoc();
+    auto RemaingTokens = TokensToCheck.drop_while([&](const Token &tok) -> bool {
+      return getSourceMgr().isBeforeInBuffer(tok.getRange().getStart(), ExprStart);
+    });
 
-  StringLiteralExpr *SL = cast<StringLiteralExpr>(E);
-  InterpolatedStringLiteralExpr *ISL =
-    cast<InterpolatedStringLiteralExpr>(Parent.getAsExpr());
-
-  SourceLoc Start = SL->getStartLoc();
-  ArrayRef<Expr*> Segments = ISL->getSegments();
-  Segments = Segments.drop_until([&](Expr *Item){ return Item == SL; })
-    .drop_front();
-
-  CharSourceRange Range;
-  if (Segments.empty()) {
-    Range = Lexer::getCharSourceRangeFromSourceRange(getSourceMgr(),
-                                                     SourceRange(Start));
-  } else {
-    SourceLoc NextSiblingLoc = Segments.front()->getStartLoc();
-    unsigned Length = getSourceMgr().getByteDistance(Start, NextSiblingLoc);
-    Range = CharSourceRange(Start, Length);
+    if (!RemaingTokens.empty() && RemaingTokens.front().getLoc() == ExprStart)
+      return shouldSkip(RemaingTokens.front().getRange());
   }
-
-  return shouldSkip(Range);
+  return shouldSkip(E->getSourceRange());
 }
 
 bool NameMatcher::shouldSkip(SourceRange Range) {
@@ -698,6 +704,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   switch (Kind) {
   case RangeKind::SingleExpression: OS << "SingleExpression"; break;
   case RangeKind::SingleDecl: OS << "SingleDecl"; break;
+  case RangeKind::MultiTypeMemberDecl: OS << "MultiTypeMemberDecl"; break;
   case RangeKind::MultiStatement: OS << "MultiStatement"; break;
   case RangeKind::PartOfExpression: OS << "PartOfExpression"; break;
   case RangeKind::SingleStatement: OS << "SingleStatement"; break;
@@ -824,7 +831,7 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
 
   return Nodes.end() != std::find_if(Nodes.begin(), Nodes.end(), [](ASTNode N) {
     ThrowingEntityAnalyzer Analyzer;
-    N.walk(Analyzer);
+    Analyzer.walk(N);
     return Analyzer.isThrowing();
   });
 }
@@ -883,6 +890,17 @@ private:
       return llvm::any_of(StartMatches, IsCase) &&
           llvm::any_of(EndMatches, IsCase);
     }
+
+    bool isMultiTypeMemberDecl() {
+      if (StartMatches.empty() || EndMatches.empty())
+        return false;
+
+      // Multi-decls should have the same nominal type as a common parent
+      if (auto ParentDecl = Parent.dyn_cast<Decl *>())
+        return isa<NominalTypeDecl>(ParentDecl);
+
+      return false;
+    }
   };
 
 
@@ -911,6 +929,7 @@ private:
     switch(Kind) {
     case RangeKind::Invalid:
     case RangeKind::SingleDecl:
+    case RangeKind::MultiTypeMemberDecl:
     case RangeKind::PartOfExpression:
       llvm_unreachable("cannot get type.");
 
@@ -1181,7 +1200,7 @@ public:
   void postAnalysis(ASTNode EndNode) {
     // Visit the content of this node thoroughly, because the walker may
     // abort early.
-    EndNode.walk(CompleteWalker(this));
+    CompleteWalker(this).walk(EndNode);
 
     // Analyze whether declared decls in the range is referenced outside of it.
     FurtherReferenceWalker(this).walk(getImmediateContext());
@@ -1227,7 +1246,7 @@ public:
     };
     for (auto N : Nodes) {
       ControlFlowStmtSelector TheWalker;
-      N.walk(TheWalker);
+      TheWalker.walk(N);
       for (auto Pair : TheWalker.Ranges) {
 
         // If the entire range does not include the target's range, we find
@@ -1247,7 +1266,15 @@ public:
     Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
-    switch (getRangeMatchKind(Node.getSourceRange())) {
+
+    auto NodeRange = Node.getSourceRange();
+
+    // Widen the node's source range to include all attributes to get a range
+    // match if a function with its attributes has been selected.
+    if (auto D = Node.dyn_cast<Decl *>())
+      NodeRange = D->getSourceRangeIncludingAttrs();
+
+    switch (getRangeMatchKind(NodeRange)) {
     case RangeMatchKind::NoneMatch: {
       // PatternBindingDecl is not visited; we need to explicitly analyze here.
       if (auto *VA = dyn_cast_or_null<VarDecl>(D))
@@ -1288,6 +1315,21 @@ public:
                 TokensInRange,
                 getImmediateContext(), nullptr,
                 hasSingleEntryPoint(ContainedASTNodes),
+                hasUnhandledError(ContainedASTNodes),
+                getOrphanKind(ContainedASTNodes),
+                llvm::makeArrayRef(ContainedASTNodes),
+                llvm::makeArrayRef(DeclaredDecls),
+                llvm::makeArrayRef(ReferencedDecls)};
+    }
+
+    if (DCInfo.isMultiTypeMemberDecl()) {
+      postAnalysis(DCInfo.EndMatches.back());
+      Result = {RangeKind::MultiTypeMemberDecl,
+                ReturnInfo(),
+                TokensInRange,
+                getImmediateContext(),
+                /*Common Parent Expr*/ nullptr,
+                /*SinleEntry*/ true,
                 hasUnhandledError(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),

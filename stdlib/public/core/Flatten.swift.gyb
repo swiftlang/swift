@@ -14,7 +14,6 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    sliceTypeName
 )
 }%
 
@@ -157,7 +156,6 @@ extension LazySequenceProtocol where Element : Sequence {
 %   if traversal == 'Bidirectional':
 %     constraints = '%(Base)sIterator.Element : BidirectionalCollection'
 %   Index = Collection + 'Index'
-%   Slice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=False)
 /// A position in a `${Collection}`.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Index}<BaseElements>
@@ -217,6 +215,14 @@ extension ${Index} : Comparable {
     _precondition(lhs._inner == nil && rhs._inner == nil)
 
     return false
+  }
+}
+
+extension ${Index} : Hashable
+  where BaseElements.Index : Hashable, BaseElements.Element.Index : Hashable
+{
+  public var hashValue: Int {
+    return _mixInt(_inner?.hashValue ?? 0) ^ _outer.hashValue
   }
 }
 
@@ -354,8 +360,8 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
 
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>)
-    -> ${Slice}<${Collection}> {
-    return ${Slice}(base: self, bounds: bounds)
+    -> Slice<${Collection}> {
+    return Slice(base: self, bounds: bounds)
   }
 
   // To return any estimate of the number of elements, we have to start

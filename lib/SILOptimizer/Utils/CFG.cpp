@@ -307,9 +307,25 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
+  case TermKind::YieldInst: {
+    auto *YI = cast<YieldInst>(T);
+    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
+    auto *resumeBB = !EdgeIdx ? NewDest : YI->getResumeBB();
+    auto *unwindBB = EdgeIdx ? NewDest : YI->getUnwindBB();
+    SmallVector<SILValue, 4> yieldedValues;
+    for (auto value : YI->getYieldedValues())
+      yieldedValues.push_back(value);
+
+    B.createYield(YI->getLoc(), yieldedValues, resumeBB, unwindBB);
+
+    YI->eraseFromParent();
+    return;
+  }
+
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
   case TermKind::UnreachableInst:
+  case TermKind::UnwindInst:
     llvm_unreachable("Branch target cannot be changed for this terminator instruction!");
   }
   llvm_unreachable("Not yet implemented!");
@@ -469,6 +485,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   case TermKind::ThrowInst:
   case TermKind::TryApplyInst:
   case TermKind::UnreachableInst:
+  case TermKind::UnwindInst:
+  case TermKind::YieldInst:
     llvm_unreachable("Branch target cannot be replaced for this terminator instruction!");
   }
   llvm_unreachable("Not yet implemented!");
@@ -829,4 +847,124 @@ SILBasicBlock *swift::splitIfCriticalEdge(SILBasicBlock *From,
       return splitCriticalEdge(T, i, DT, LI);
   }
   llvm_unreachable("Destination block not found");
+}
+
+void swift::completeJointPostDominanceSet(
+    ArrayRef<SILBasicBlock *> UserBlocks, ArrayRef<SILBasicBlock *> DefBlocks,
+    llvm::SmallVectorImpl<SILBasicBlock *> &Result) {
+  assert(!UserBlocks.empty() && "Must have at least 1 user block");
+  assert(!DefBlocks.empty() && "Must have at least 1 def block");
+
+  // If we have only one def block and one user block and they are the same
+  // block, then just return.
+  if (DefBlocks.size() == 1 && UserBlocks.size() == 1 &&
+      UserBlocks[0] == DefBlocks[0]) {
+    return;
+  }
+
+  // Some notes on the algorithm:
+  //
+  // 1. Our VisitedBlocks set just states that a value has been added to the
+  // worklist and should not be added to the worklist.
+  // 2. Our targets of the CFG block are DefBlockSet.
+  // 3. We find the missing post-domination blocks by finding successors of
+  // blocks on our walk that we have not visited by the end of the walk. For
+  // joint post-dominance to be true, no such successors should exist.
+
+  // Our set of target blocks where we stop walking.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> DefBlockSet(DefBlocks.begin(),
+                                                    DefBlocks.end());
+
+  // The set of successor blocks of blocks that we visit. Any blocks still in
+  // this set at the end of the walk act as a post-dominating closure around our
+  // UserBlock set.
+  llvm::SmallSetVector<SILBasicBlock *, 16> MustVisitSuccessorBlocks;
+
+  // Add our user and def blocks to the VisitedBlock set. We never want to find
+  // these in our worklist.
+  llvm::SmallPtrSet<SILBasicBlock *, 32> VisitedBlocks(UserBlocks.begin(),
+                                                       UserBlocks.end());
+
+  // Finally setup our worklist by adding our user block predecessors. We only
+  // add the predecessors to the worklist once.
+  llvm::SmallVector<SILBasicBlock *, 32> Worklist;
+  for (auto *Block : UserBlocks) {
+    copy_if(Block->getPredecessorBlocks(), std::back_inserter(Worklist),
+            [&](SILBasicBlock *PredBlock) -> bool {
+              return VisitedBlocks.insert(PredBlock).second;
+            });
+  }
+
+  // Then until we reach a fix point.
+  while (!Worklist.empty()) {
+    // Grab the next block from the worklist.
+    auto *Block = Worklist.pop_back_val();
+    assert(VisitedBlocks.count(Block) && "All blocks from worklist should be "
+                                         "in the visited blocks set.");
+
+    // Since we are visiting this block now, we know that this block can not be
+    // apart of a the post-dominance closure of our UseBlocks.
+    MustVisitSuccessorBlocks.remove(Block);
+
+    // Then add each successor block of Block that has not been visited yet to
+    // the MustVisitSuccessorBlocks set.
+    for (auto *SuccBlock : Block->getSuccessorBlocks()) {
+      if (!VisitedBlocks.count(SuccBlock)) {
+        MustVisitSuccessorBlocks.insert(SuccBlock);
+      }
+    }
+
+    // If this is a def block, then do not add its predecessors to the
+    // worklist.
+    if (DefBlockSet.count(Block))
+      continue;
+
+    // Otherwise add all unvisited predecessors to the worklist.
+    copy_if(Block->getPredecessorBlocks(), std::back_inserter(Worklist),
+            [&](SILBasicBlock *Block) -> bool {
+              return VisitedBlocks.insert(Block).second;
+            });
+  }
+
+  // Now that we are done, add all remaining must visit blocks to our result
+  // list. These are the remaining parts of our joint post-dominance closure.
+  copy(MustVisitSuccessorBlocks, std::back_inserter(Result));
+}
+
+bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
+                                                          DominanceInfo *DT,
+                                                          SILLoopInfo *LI) {
+  // Find our targets.
+  llvm::SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> Targets;
+  for (auto &Block : Fn) {
+    auto *CBI = dyn_cast<CondBranchInst>(Block.getTerminator());
+    if (!CBI)
+      continue;
+
+    // See if our true index is a critical edge. If so, add block to the list
+    // and continue. If the false edge is also critical, we will handle it at
+    // the same time.
+    if (isCriticalEdge(CBI, CondBranchInst::TrueIdx)) {
+      Targets.emplace_back(&Block, CondBranchInst::TrueIdx);
+    }
+
+    if (!isCriticalEdge(CBI, CondBranchInst::FalseIdx)) {
+      continue;
+    }
+
+    Targets.emplace_back(&Block, CondBranchInst::FalseIdx);
+  }
+
+  if (Targets.empty())
+    return false;
+
+  for (auto P : Targets) {
+    SILBasicBlock *Block = P.first;
+    unsigned Index = P.second;
+    auto *Result = splitCriticalEdge(Block->getTerminator(), Index, DT, LI);
+    (void)Result;
+    assert(Result);
+  }
+
+  return true;
 }

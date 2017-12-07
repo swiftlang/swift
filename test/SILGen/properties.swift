@@ -123,8 +123,7 @@ func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
   // CHECK: [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]] : $RefSubclass
   // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
-  // CHECK: [[BORROWED_R_SUP:%.*]] = begin_borrow [[R_SUP]]
-  // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
+  // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
   // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
   // CHECK: destroy_value [[R_SUP]]
   // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
@@ -160,8 +159,7 @@ func physical_class_rvalue() -> Int {
   return class_rvalue().y
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T010properties12class_rvalueAA3RefCyF
   // CHECK: [[CLASS:%[0-9]+]] = apply [[FUNC]]()
-  // CHECK: [[BORROWED_CLASS:%.*]] = begin_borrow [[CLASS]]
-  // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_CLASS]] : $Ref, #Ref.y!getter.1
+  // CHECK: [[FN:%[0-9]+]] = class_method [[CLASS]] : $Ref, #Ref.y!getter.1
   // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[CLASS]])
   // CHECK: return [[RET]]
 }
@@ -180,8 +178,8 @@ func logical_struct_get() -> Int {
 func logical_struct_set(_ value: inout Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
-  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}vs
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
+  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}vs
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[WRITE]])
   // CHECK: return
 }
@@ -190,9 +188,9 @@ func logical_struct_set(_ value: inout Val, z: Int) {
 func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
-  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}vs
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[WRITE]] : {{.*}}, 1
+  // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}vs
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[VAL_1]])
   // CHECK: return
 }
@@ -221,9 +219,9 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load_borrow [[VAL_REF_VAL_PROP_MAT]]
-  // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[A0:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
+  // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
   // CHECK: [[T0:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
@@ -268,9 +266,9 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[VAL1:%[0-9]+]] = load_borrow [[WRITE]]
-  // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[A0:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
+  // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
   // CHECK: [[T0:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 0
   // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
@@ -371,8 +369,8 @@ func physical_inout(_ x: Int) {
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
-  // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @_T010properties9inout_arg{{[_0-9a-zA-Z]*}}F
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
+  // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @_T010properties9inout_arg{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[INOUT_ARG]]([[WRITE]])
 }
 
@@ -399,8 +397,8 @@ func val_subscript_set(_ v: Val, i: Int, x: Float) {
   v[i] = x
   // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var Val }
   // CHECK: [[PB:%.*]] = project_box [[VADDR]]
-  // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV{{[_0-9a-zA-Z]*}}is
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
+  // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV{{[_0-9a-zA-Z]*}}is
   // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[WRITE]])
 }
 
@@ -515,12 +513,11 @@ struct DidSetWillSetTests: ForceAccessors {
 
       takeInt(a)
 
-      // CHECK-NEXT: // function_ref properties.takeInt
-      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1
       // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [trivial] [[FIELDPTR]] : $*Int
       // CHECK-NEXT: end_access [[READ]]
+      // CHECK: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       takeInt(newA)
@@ -539,12 +536,12 @@ struct DidSetWillSetTests: ForceAccessors {
 
       takeInt(a)
 
-      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
-      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
       // CHECK-NEXT: end_access [[READ]]
+      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
+      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       a = zero  // reassign, but don't infinite loop.
@@ -589,18 +586,18 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: end_access [[READ]]
   // CHECK-NEXT: debug_value [[OLDVAL]] : $Int, let, name "tmp"
 
+  // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.willset : Swift.Int
   // CHECK-NEXT: [[WILLSETFN:%.*]] = function_ref @_T010properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
-  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
   // CHECK-NEXT:  apply [[WILLSETFN]](%0, [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   // CHECK-NEXT: end_access [[WRITE]]
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
   // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT: assign %0 to [[AADDR]] : $*Int
   // CHECK-NEXT: end_access [[WRITE]]
+  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
   // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @_T010properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
   // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
 
   // CHECK-LABEL: sil hidden @_T010properties010DidSetWillC5TestsV{{[_0-9a-zA-Z]*}}fC
@@ -734,9 +731,7 @@ class rdar16151899Derived : rdar16151899Base {
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK: load{{.*}}Int
         // CHECK-NEXT: end_access {{.*}} : $*Int
-        // CHECK-NEXT: begin_borrow {{.*}} : $rdar16151899Base
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : (rdar16151899Base)
-        // CHECK-NEXT: end_borrow
         // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
     }
 }
@@ -768,13 +763,11 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  assign [[ARG1]] to [[WRITE]] : $*Int
 // CHECK-NEXT:  end_access [[WRITE]]
-// CHECK-NEXT:  [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : ${ var Int }
 // SEMANTIC ARC TODO: Another case where we need to put the mark_function_escape on a new projection after a copy.
 // CHECK-NEXT:  mark_function_escape [[ARG2_PB]]
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @owned { var Int }) -> ()
-// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2_COPY]]) : $@convention(thin) (Int, @owned { var Int }) -> ()
-// CHECK-NEXT:  destroy_value [[ARG2]] : ${ var Int }
+// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
 // CHECK-NEXT:  %{{.*}} = tuple ()
 // CHECK-NEXT:  return %{{.*}} : $()
 // CHECK-NEXT:} // end sil function '_T010properties32propertyWithDidSetTakingOldValue{{[_0-9a-zA-Z]*}}'
@@ -1191,9 +1184,7 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[C:%.*]] = load [copy] [[C_INOUT:%.*]] : $*ReferenceType
 // CHECK-NEXT:   end_access [[C_INOUT]] : $*ReferenceType
 // CHECK-NEXT:   [[C_FIELD_BOX:%.*]] = alloc_stack $NonmutatingProtocol
-// CHECK-NEXT:   [[BORROWED_C:%.*]] = begin_borrow [[C]]
-// CHECK-NEXT:   [[GETTER:%.*]] = class_method [[BORROWED_C]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
-// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   [[GETTER:%.*]] = class_method [[C]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
 // CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C]]) : $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*NonmutatingProtocol to $*@opened("{{.*}}") NonmutatingProtocol

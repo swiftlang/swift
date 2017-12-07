@@ -12,8 +12,7 @@ func align<T>(_ offset: Int, to: T.Type) -> Int {
   return (offset + alignMask) & ~alignMask
 }
 
-// FIXME: Object header size will eventually be MemoryLayout<Int>.size * 2
-let classHeaderSize = MemoryLayout<Int>.size + 8
+let classHeaderSize = MemoryLayout<Int>.size * 2
 
 class C<T> {
   var x: Int
@@ -244,7 +243,7 @@ struct TestKeyPathBuilder {
     pushWord(args.count)
     pushWord(witnesses)
 
-    buffer.copyBytes(from: args)
+    buffer.copyMemory(from: args)
     buffer = .init(start: buffer.baseAddress! + args.count,
                    count: buffer.count - args.count)
 
@@ -953,7 +952,7 @@ func testCopy(from: UnsafeRawPointer,
               to: UnsafeMutableRawPointer,
               count: Int) {
   numberOfCopyOperations += 1
-  to.copyBytes(from: from, count: count)
+  to.copyMemory(from: from, byteCount: count)
 }
 
 var numberOfEqualsOperations = 0

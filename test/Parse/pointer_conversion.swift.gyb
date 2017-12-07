@@ -291,8 +291,10 @@ struct NotEquatable {}
 func arrayComparison(_ x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePointer<NotEquatable>) {
   var x = x
   // Don't allow implicit array-to-pointer conversions in operators.
-  let a: Bool = x == y // expected-error{{binary operator '==' cannot be applied to two '[NotEquatable]' operands}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists:}}
+  let a: Bool = x == y // expected-error{{'<Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool' requires that 'NotEquatable' conform to 'Equatable'}}
+  // expected-error @-1 {{type 'NotEquatable' does not conform to protocol 'Equatable'}}
+  // expected-note @-2 {{requirement from conditional conformance of '[NotEquatable]' to 'Equatable'}}
+  // expected-note @-3 {{requirement specified as 'NotEquatable' : 'Equatable'}}
 
   let _: Bool = p == &x  // Allowed!
 }
@@ -341,5 +343,5 @@ func takesRawBuffer(_ b: UnsafeRawBufferPointer) {}
 func f29586888(b: UnsafeRawBufferPointer) {
   takesRawBuffer(b[1..<2]) // expected-error {{'subscript' is unavailable: use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.}}
   let slice = b[1..<2]
-  takesRawBuffer(slice) // expected-error {{cannot convert value of type 'RandomAccessSlice<UnsafeRawBufferPointer>' to expected argument type 'UnsafeRawBufferPointer'}}
+  takesRawBuffer(slice) // expected-error {{cannot convert value of type 'UnsafeRawBufferPointer.SubSequence' (aka 'Slice<UnsafeRawBufferPointer>') to expected argument type 'UnsafeRawBufferPointer'}}
 }

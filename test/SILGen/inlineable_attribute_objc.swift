@@ -15,11 +15,11 @@ public class Horse : NSObject {
 // from inlineable scopes
 
 // CHECK-LABEL: sil [serialized] @_T025inlineable_attribute_objc15talkAboutAHorseyAA5HorseC1h_tF : $@convention(thin) (@owned Horse) -> () {
-// CHECK: function_ref @_T025inlineable_attribute_objc5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_owned () -> ()
+// CHECK: function_ref @_T025inlineable_attribute_objc5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_guaranteed () -> ()
 // CHECK: return
 // CHECK: }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T025inlineable_attribute_objc5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_owned () -> ()
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T025inlineable_attribute_objc5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_guaranteed () -> ()
 // CHECK:   %1 = function_ref @_T025inlineable_attribute_objc5HorseC6gallopyyFTD
 // CHECK: return
 // CHECK: }

@@ -228,7 +228,7 @@ func checkCharacterComparison(
 }
 
 for test in comparisonTests {
-  if test.lhs.characters.count == 1 && test.rhs.characters.count == 1 {
+  if test.lhs.count == 1 && test.rhs.count == 1 {
     StringTests.test("Character.{Equatable,Hashable,Comparable}: line \(test.loc.line)")
     .xfail(test.xfail)
     .code {
@@ -262,11 +262,11 @@ func checkHasPrefixHasSuffix(
   // To determine the expected results, compare grapheme clusters,
   // scalar-to-scalar, of the NFD form of the strings.
   let lhsNFDGraphemeClusters =
-    lhs.decomposedStringWithCanonicalMapping.characters.map {
+    lhs.decomposedStringWithCanonicalMapping.map {
       Array(String($0).unicodeScalars)
     }
   let rhsNFDGraphemeClusters =
-    rhs.decomposedStringWithCanonicalMapping.characters.map {
+    rhs.decomposedStringWithCanonicalMapping.map {
       Array(String($0).unicodeScalars)
     }
   let expectHasPrefix = lhsNFDGraphemeClusters.starts(
@@ -507,7 +507,7 @@ func getASCIIUTF8() -> (UnsafeMutablePointer<UInt8>, dealloc: () -> ()) {
   up[0] = 0x61
   up[1] = 0x62
   up[2] = 0
-  return (up, { up.deallocate(capacity: 100) })
+  return (up, { up.deallocate() })
 }
 
 func getNonASCIIUTF8() -> (UnsafeMutablePointer<UInt8>, dealloc: () -> ()) {
@@ -517,7 +517,7 @@ func getNonASCIIUTF8() -> (UnsafeMutablePointer<UInt8>, dealloc: () -> ()) {
   up[2] = 0xd0
   up[3] = 0xb1
   up[4] = 0
-  return (UnsafeMutablePointer(up), { up.deallocate(capacity: 100) })
+  return (UnsafeMutablePointer(up), { up.deallocate() })
 }
 
 func getIllFormedUTF8String1(
@@ -529,7 +529,7 @@ func getIllFormedUTF8String1(
   up[3] = 0x80
   up[4] = 0x41
   up[5] = 0
-  return (UnsafeMutablePointer(up), { up.deallocate(capacity: 100) })
+  return (UnsafeMutablePointer(up), { up.deallocate() })
 }
 
 func getIllFormedUTF8String2(
@@ -542,7 +542,7 @@ func getIllFormedUTF8String2(
   up[3] = 0x81
   up[4] = 0x41
   up[5] = 0
-  return (UnsafeMutablePointer(up), { up.deallocate(capacity: 100) })
+  return (UnsafeMutablePointer(up), { up.deallocate() })
 }
 
 func asCCharArray(_ a: [UInt8]) -> [CChar] {
@@ -677,4 +677,3 @@ CStringTests.test("String.utf8CString") {
 }
 
 runAllTests()
-

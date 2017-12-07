@@ -126,7 +126,7 @@ extension Bool {
 protocol ExpressibleByExtraFloatLiteral
     : ExpressibleByOtherFileAliasForFloatLiteral {
 }
-// CHECK-DAG: !private "ExpressibleByUnicodeScalarLiteral"
+// CHECK-DAG: - "ExpressibleByUnicodeScalarLiteral"
 private protocol ExpressibleByExtraCharLiteral : ExpressibleByUnicodeScalarLiteral {
 }
 
@@ -341,8 +341,8 @@ struct StructForDeclaringProperties {
 
 // CHECK-DAG: !private "privateTopLevel1"
 func private1(_ a: Int = privateTopLevel1()) {}
-// CHECK-DAG: !private "privateTopLevel2"
-// CHECK-DAG: !private "PrivateProto1"
+// CHECK-DAG: - "privateTopLevel2"
+// CHECK-DAG: - "PrivateProto1"
 private struct Private2 : PrivateProto1 {
   var private2 = privateTopLevel2()
 }
@@ -351,11 +351,11 @@ func outerPrivate3() {
   let _ = { privateTopLevel3() }
 }
 
-// CHECK-DAG: !private "PrivateTopLevelTy1"
+// CHECK-DAG: - "PrivateTopLevelTy1"
 private extension Use4 {
   var privateTy1: PrivateTopLevelTy1? { return nil }
 } 
-// CHECK-DAG: !private "PrivateTopLevelTy2"
+// CHECK-DAG: - "PrivateTopLevelTy2"
 // CHECK-DAG: "PrivateProto2"
 extension Private2 : PrivateProto2 {
   // FIXME: This test is supposed to check that we get this behavior /without/
@@ -367,21 +367,21 @@ func outerPrivateTy3() {
   func inner(_ a: PrivateTopLevelTy3?) {}
   inner(nil)
 }
-// CHECK-DAG: !private "PrivateTopLevelStruct3"
+// CHECK-DAG: - "PrivateTopLevelStruct3"
 private typealias PrivateTy4 = PrivateTopLevelStruct3.ValueType
-// CHECK-DAG: !private "PrivateTopLevelStruct4"
+// CHECK-DAG: - "PrivateTopLevelStruct4"
 private func privateTy5(_ x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelStruct4.ValueType {
   return x
 }
 
 // Deliberately empty.
 private struct PrivateTy6 {}
-// CHECK-DAG: !private "PrivateProto3"
+// CHECK-DAG: - "PrivateProto3"
 extension PrivateTy6 : PrivateProto3 {}
 
 // CHECK-DAG: - "ProtoReferencedOnlyInGeneric"
 func genericTest<T: ProtoReferencedOnlyInGeneric>(_: T) {}
-// CHECK-DAG: !private "ProtoReferencedOnlyInPrivateGeneric"
+// CHECK-DAG: - "ProtoReferencedOnlyInPrivateGeneric"
 private func privateGenericTest<T: ProtoReferencedOnlyInPrivateGeneric>(_: T) {}
 
 struct PrivateStoredProperty {
@@ -436,8 +436,8 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["4main15TopLevelStruct5V", "ValueType"]
 // CHECK-DAG: - !private ["4main21PrivateTopLevelStructV", "ValueType"]
 // CHECK-DAG: - !private ["4main22PrivateTopLevelStruct2V", "ValueType"]
-// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct3V", "ValueType"]
-// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct4V", "ValueType"]
+// CHECK-DAG: - ["4main22PrivateTopLevelStruct3V", "ValueType"]
+// CHECK-DAG: - ["4main22PrivateTopLevelStruct4V", "ValueType"]
 
 // CHECK-DAG: - ["4main14TopLevelProto1P", ""]
 // CHECK-DAG: - ["4main14TopLevelProto2P", ""]
@@ -463,13 +463,13 @@ struct Sentinel2 {}
 // CHECK: - !private "4main18OtherFileOuterTypeV"
 // CHECK: - !private "4main25OtherFileProtoImplementorV"
 // CHECK: - !private "4main26OtherFileProtoImplementor2V"
-// CHECK: - !private "4main13PrivateProto1P"
-// CHECK: - !private "4main13PrivateProto2P"
+// CHECK: - "4main13PrivateProto1P"
+// CHECK: - "4main13PrivateProto2P"
 // CHECK: - !private "4main13PrivateProto3P"
 // CHECK: - !private "4main21PrivateTopLevelStructV"
 // CHECK: - !private "4main22PrivateTopLevelStruct2V"
-// CHECK: - !private "4main22PrivateTopLevelStruct3V"
-// CHECK: - !private "4main22PrivateTopLevelStruct4V"
+// CHECK: - "4main22PrivateTopLevelStruct3V"
+// CHECK: - "4main22PrivateTopLevelStruct4V"
 // CHECK: - !private "4main26OtherFileSecretTypeWrapperV0dE0V"
 // CHECK: - !private "s10StrideableP"
 // CHECK: - "4main23TopLevelForMemberLookupV"

@@ -390,14 +390,12 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
                                               OpenedTypeMap &replacements) {
   auto unboundDecl = unbound->getDecl();
-  if (unboundDecl->isInvalid())
-    return ErrorType::get(getASTContext());
 
   // If the unbound decl hasn't been validated yet, we have a circular
   // dependency that isn't being diagnosed properly.
   if (!unboundDecl->getGenericSignature()) {
     TC.diagnose(unboundDecl, diag::circular_reference);
-    return ErrorType::get(unbound);
+    return Type();
   }
 
   auto parentTy = unbound->getParent();
@@ -458,7 +456,7 @@ Type ConstraintSystem::openUnboundGenericType(
   if (!type->hasUnboundGenericType())
     return type;
 
-  return type.transform([&](Type type) -> Type {
+  type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         OpenedTypeMap replacements;
         return openUnboundGenericType(unbound, locator, replacements);
@@ -466,6 +464,11 @@ Type ConstraintSystem::openUnboundGenericType(
 
       return type;
     });
+
+  if (!type)
+    return ErrorType::get(getASTContext());
+
+  return type;
 }
 
 Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
@@ -572,6 +575,18 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
   }
 
   return None;
+}
+
+bool ConstraintSystem::isCollectionType(Type type) {
+  auto &ctx = type->getASTContext();
+  if (auto *structType = type->getAs<BoundGenericStructType>()) {
+    auto *decl = structType->getDecl();
+    if (decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
+        decl == ctx.getSetDecl())
+      return true;
+  }
+
+  return false;
 }
 
 bool ConstraintSystem::isAnyHashableType(Type type) {
@@ -714,7 +729,7 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
   if (!wantInterfaceType && requestedType->hasArchetype()) {
     auto valueDC = value->getDeclContext();
     if (valueDC != UseDC) {
-      Type mapped = valueDC->mapTypeOutOfContext(requestedType);
+      Type mapped = requestedType->mapTypeOutOfContext();
       requestedType = UseDC->mapTypeIntoContext(mapped);
     }
   }
@@ -890,7 +905,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
     auto type = TC.resolveTypeInContext(typeDecl, nullptr, DC,
-                                        TR_InExpression,
+                                        TypeResolutionFlags::InExpression,
                                         /*isSpecialized=*/false);
 
     // Open the type.
@@ -1048,7 +1063,10 @@ void ConstraintSystem::openGeneric(
   bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
 
   // Add the requirements as constraints.
-  for (auto req : sig->getRequirements()) {
+  auto requirements = sig->getRequirements();
+  for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
+    const auto &req = requirements[pos];
+
     Optional<Requirement> openedReq;
     auto openedFirst = openType(req.getFirstType(), replacements);
 
@@ -1075,7 +1093,11 @@ void ConstraintSystem::openGeneric(
       openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
       break;
     }
-    addConstraint(*openedReq, locatorPtr);
+
+    addConstraint(
+        *openedReq,
+        locator.withPathElement(ConstraintLocator::OpenedGeneric)
+            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos)));
   }
 }
 
@@ -1745,7 +1767,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
             assocType->getDeclContext());
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
-        if (result)
+        if (result && !result->hasError())
           return result;
       }
 

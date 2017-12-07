@@ -223,3 +223,12 @@ func curry<F, S, T, R>(_ f: @escaping (F, S, T) -> R) -> (F) -> (S) -> (T) -> R 
 let _ = curry(+)(1)
 let _ = [0].reduce(0, +)
 let _ = curry(+)("string vs. pointer")
+
+
+func autoclosure1<T>(_: T, _: @autoclosure () -> X) { }
+
+func autoclosure1<T>(_: [T], _: X) { }
+
+func test_autoclosure1(ia: [Int]) {
+  autoclosure1(ia, X()) // okay: resolves to the second function
+}

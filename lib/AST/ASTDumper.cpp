@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/QuotedString.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -24,12 +23,14 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1175,6 +1176,16 @@ void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
 
 void Decl::dump() const {
   dump(llvm::errs(), 0);
+}
+
+void Decl::dump(const char *filename) const {
+  std::error_code ec;
+  llvm::raw_fd_ostream stream(filename, ec, llvm::sys::fs::F_RW);
+  // In assert builds, we blow up. Otherwise, we just return.
+  assert(!ec && "Failed to open file for dumping?!");
+  if (ec)
+    return;
+  dump(stream, 0);
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
@@ -2926,6 +2937,7 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnknownObject, builtin_unknown_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
+    TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
     void visitBuiltinVectorType(BuiltinVectorType *T, StringRef label) {
       printCommon(label, "builtin_vector_type");
@@ -3046,7 +3058,8 @@ namespace {
 
     void visitArchetypeType(ArchetypeType *T, StringRef label) {
       printCommon(label, "archetype_type");
-      if (T->getOpenedExistentialType())
+      auto openedExistential = T->getOpenedExistentialType();
+      if (openedExistential)
         printField("opened_existential_id", T->getOpenedExistentialID());
       else
         printField("name", T->getFullName());
@@ -3056,9 +3069,10 @@ namespace {
         printField("conforms_to", proto->printRef());
       if (auto parent = T->getParent())
         printField("parent", static_cast<void *>(parent));
-      if (auto assocType = T->getAssocType())
-        printField("assoc_type", assocType->printRef());
-
+      if (!openedExistential) {
+        if (auto assocType = T->getAssocType())
+          printField("assoc_type", assocType->printRef());
+      }
       // FIXME: This is ugly.
       OS << "\n";
       if (auto genericEnv = T->getGenericEnvironment()) {
@@ -3069,7 +3083,7 @@ namespace {
 
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
-      if (auto openedExistential = T->getOpenedExistentialType())
+      if (openedExistential)
         printRec("opened_existential", openedExistential);
 
       Indent += 2;

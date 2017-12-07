@@ -1798,7 +1798,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       // property is in a non-type context.
       Type behaviorSelf;
       if (dc->isTypeContext()) {
-        behaviorSelf = dc->getSelfTypeInContext();
+        behaviorSelf = dc->getSelfInterfaceType();
         assert(behaviorSelf && "type context doesn't have self type?!");
         if (var->isStatic())
           behaviorSelf = MetatypeType::get(behaviorSelf);
@@ -2085,7 +2085,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
       // Map it to an interface type in terms of the derived class
       // generic signature.
-      decl->setInterfaceType(classDecl->mapTypeOutOfContext(paramSubstTy));
+      decl->setInterfaceType(paramSubstTy->mapTypeOutOfContext());
     }
   } else {
     for (auto *decl : *bodyParams) {
@@ -2204,23 +2204,4 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                   /*implicit=*/true));
 
   return ctor;
-}
-
-void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
-  if (CD->hasDestructor() || CD->isInvalid())
-    return;
-
-  auto *selfDecl = ParamDecl::createSelf(CD->getLoc(), CD);
-
-  auto *DD = new (Context) DestructorDecl(CD->getLoc(), selfDecl, CD);
-
-  DD->setImplicit();
-
-  // Type-check the destructor declaration.
-  typeCheckDecl(DD, /*isFirstPass=*/true);
-
-  // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc(), true));
-  CD->addMember(DD);
-  CD->setHasDestructor();
 }

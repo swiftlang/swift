@@ -33,7 +33,6 @@ add_swift_library(swiftAST STATIC
   GenericSignatureBuilder.cpp
   Identifier.cpp
   LayoutConstraint.cpp
-  LegacyASTTransformer.cpp
   LookupVisibleDecls.cpp
   Module.cpp
   ModuleLoader.cpp
@@ -48,7 +47,6 @@ add_swift_library(swiftAST STATIC
   SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
-  SourceEntityWalker.cpp
   Substitution.cpp
   SubstitutionList.cpp
   SubstitutionMap.cpp
@@ -59,8 +57,6 @@ add_swift_library(swiftAST STATIC
   TypeRepr.cpp
   TypeWalker.cpp
   USRGeneration.cpp
-  DEPENDS
-    swift-syntax-generated-headers
 
   LINK_LIBRARIES
     swiftMarkup

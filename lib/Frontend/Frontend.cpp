@@ -111,31 +111,33 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
                                SourceMgr, Diagnostics));
 
   if (Invocation.getFrontendOptions().EnableSourceImport) {
-    bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
+    bool immediate = FrontendOptions::isActionImmediate(
+        Invocation.getFrontendOptions().RequestedAction);
     bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
                                                   enableResilience,
                                                   DepTracker));
   }
-  
-  auto SML = SerializedModuleLoader::create(*Context, DepTracker);
-  this->SML = SML.get();
-  Context->addModuleLoader(std::move(SML));
-
-  // Wire up the Clang importer. If the user has specified an SDK, use it.
-  // Otherwise, we just keep it around as our interface to Clang's ABI
-  // knowledge.
-  auto clangImporter =
-    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getPCHHash(),
-                          DepTracker);
-  if (!clangImporter) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
-    return true;
+  {
+    auto SML = SerializedModuleLoader::create(*Context, DepTracker);
+    this->SML = SML.get();
+    Context->addModuleLoader(std::move(SML));
   }
+  {
+    // Wire up the Clang importer. If the user has specified an SDK, use it.
+    // Otherwise, we just keep it around as our interface to Clang's ABI
+    // knowledge.
+    auto clangImporter =
+        ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                              Invocation.getPCHHash(), DepTracker);
+    if (!clangImporter) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+      return true;
+    }
 
-  Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
+    Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
+  }
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
@@ -157,7 +159,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().EnableAccessControl = false;
 
   const Optional<SelectedInput> &PrimaryInput =
-      Invocation.getFrontendOptions().Inputs.getPrimaryInput();
+      Invocation.getFrontendOptions().Inputs.getOptionalPrimaryInput();
 
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
@@ -187,7 +189,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   for (unsigned i = 0,
                 e = Invocation.getFrontendOptions().Inputs.inputFilenameCount();
        i != e; ++i) {
-    bool hasError = setupForFileAt(i);
+    bool hasError = setUpForFileAt(i);
     if (hasError) {
       return true;
     }
@@ -257,14 +259,14 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   if (Invocation.getImplicitModuleImportKind() !=
       SourceFile::ImplicitModuleImportKind::Stdlib)
     return false;
-  SILOptions::SILOptMode optimization = Invocation.getSILOptions().Optimization;
-  if (optimization <= SILOptions::SILOptMode::None &&
-      shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
+  if (Invocation.getSILOptions().shouldOptimize())
+    return false;
+
+  if (shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
           Invocation.getFrontendOptions().RequestedAction)) {
     return true;
   }
-  return optimization == SILOptions::SILOptMode::None &&
-         Invocation.getFrontendOptions().isCreatingSIL();
+  return Invocation.getFrontendOptions().isCreatingSIL();
 }
 
 void CompilerInstance::performSema() {
@@ -272,6 +274,7 @@ void CompilerInstance::performSema() {
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
   if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
+    assert(!InputSourceCodeBufferIDs.empty());
     assert(InputSourceCodeBufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
     createSILModule();
@@ -389,19 +392,19 @@ void CompilerInstance::getImplicitlyImportedModules(
 
 void CompilerInstance::createREPLFile(
     const ImplicitImports &implicitImports) const {
-  auto *SingleInputFile = new (*Context) SourceFile(
+  auto *singleInputFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), None, implicitImports.kind,
-      Invocation.getLangOptions().KeepTokensInSourceFile);
-  MainModule->addFile(*SingleInputFile);
-  addAdditionalInitialImportsTo(SingleInputFile, implicitImports);
+      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
+  MainModule->addFile(*singleInputFile);
+  addAdditionalInitialImportsTo(singleInputFile, implicitImports);
 }
 
 std::unique_ptr<DelayedParsingCallbacks>
-CompilerInstance::computeDelayedParsingCallback() {
+CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
   if (Invocation.isCodeCompletion())
     return llvm::make_unique<CodeCompleteDelayedCallbacks>(
         SourceMgr.getCodeCompletionLoc());
-  if (Invocation.isDelayedFunctionBodyParsing())
+  if (!isPrimary)
     return llvm::make_unique<AlwaysDelayedCallbacks>();
   return nullptr;
 }
@@ -416,7 +419,7 @@ void CompilerInstance::addMainFileToModule(
 
   auto *MainFile = new (*Context) SourceFile(
       *MainModule, Invocation.getSourceFileKind(), MainBufferID,
-      implicitImports.kind, Invocation.getLangOptions().KeepTokensInSourceFile);
+      implicitImports.kind, Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
   MainModule->addFile(*MainFile);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 
@@ -427,13 +430,22 @@ void CompilerInstance::addMainFileToModule(
 void CompilerInstance::parseAndCheckTypes(
     const ImplicitImports &implicitImports) {
   SharedTimer timer("performSema-parseAndCheckTypes");
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
-      computeDelayedParsingCallback()};
+  // Delayed parsing callback for the primary file, or all files
+  // in non-WMO mode.
+  std::unique_ptr<DelayedParsingCallbacks> PrimaryDelayedCB{
+      computeDelayedParsingCallback(true)};
+
+  // Delayed parsing callback for non-primary files. Not used in
+  // WMO mode.
+  std::unique_ptr<DelayedParsingCallbacks> SecondaryDelayedCB{
+      computeDelayedParsingCallback(false)};
 
   PersistentParserState PersistentState;
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
-      implicitImports, PersistentState, DelayedCB.get());
+      implicitImports, PersistentState,
+      PrimaryDelayedCB.get(),
+      SecondaryDelayedCB.get());
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
     // diagnostic, so that ASTContext is marked as erroneous.  In this case
@@ -446,12 +458,12 @@ void CompilerInstance::parseAndCheckTypes(
 
   OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
 
-    // Type-check main file after parsing all other files so that
-    // it can use declarations from other files.
-    // In addition, the main file has parsing and type-checking
-    // interwined.
+  // Type-check main file after parsing all other files so that
+  // it can use declarations from other files.
+  // In addition, the main file has parsing and type-checking
+  // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFile(PersistentState, DelayedCB.get(),
+    parseAndTypeCheckMainFile(PersistentState, PrimaryDelayedCB.get(),
                               TypeCheckOptions);
   }
 
@@ -469,7 +481,7 @@ void CompilerInstance::parseAndCheckTypes(
   if (auto *stdlib = Context->getStdlibModule())
     Context->recordKnownProtocols(stdlib);
 
-  if (DelayedCB.get()) {
+  if (Invocation.isCodeCompletion()) {
     performDelayedParsing(MainModule, PersistentState,
                           Invocation.getCodeCompletionFactory());
   }
@@ -479,17 +491,23 @@ void CompilerInstance::parseAndCheckTypes(
 void CompilerInstance::parseLibraryFile(
     unsigned BufferID, const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
-    DelayedParsingCallbacks *DelayedParseCB) {
+    DelayedParsingCallbacks *PrimaryDelayedCB,
+    DelayedParsingCallbacks *SecondaryDelayedCB) {
   SharedTimer timer("performSema-parseLibraryFile");
 
   auto *NextInput = new (*Context) SourceFile(
       *MainModule, SourceFileKind::Library, BufferID, implicitImports.kind,
-      Invocation.getLangOptions().KeepTokensInSourceFile);
+      Invocation.getLangOptions().KeepSyntaxInfoInSourceFile);
   MainModule->addFile(*NextInput);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  if (BufferID == PrimaryBufferID)
+  auto *DelayedCB = SecondaryDelayedCB;
+  if (BufferID == PrimaryBufferID) {
     setPrimarySourceFile(NextInput);
+    DelayedCB = PrimaryDelayedCB;
+  }
+  if (isWholeModuleCompilation())
+    DelayedCB = PrimaryDelayedCB;
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
@@ -501,7 +519,7 @@ void CompilerInstance::parseLibraryFile(
     // Parser may stop at some erroneous constructions like #else, #endif
     // or '}' in some cases, continue parsing until we are done
     parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr, &PersistentState,
-                        DelayedParseCB);
+                        DelayedCB);
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
@@ -518,7 +536,7 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   if (options.DebugTimeFunctionBodies) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
   }
-  if (options.actionIsImmediate()) {
+  if (FrontendOptions::isActionImmediate(options.RequestedAction)) {
     TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
   }
   if (options.DebugTimeExpressionTypeChecking) {
@@ -530,7 +548,8 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     const ImplicitImports &implicitImports,
     PersistentParserState &PersistentState,
-    DelayedParsingCallbacks *DelayedParseCB) {
+    DelayedParsingCallbacks *PrimaryDelayedCB,
+    DelayedParsingCallbacks *SecondaryDelayedCB) {
   SharedTimer timer("performSema-parsePartialModulesAndLibraryFiles");
   bool hadLoadError = false;
   // Parse all the partial modules first.
@@ -545,7 +564,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID != MainBufferID) {
       parseLibraryFile(BufferID, implicitImports, PersistentState,
-                       DelayedParseCB);
+                       PrimaryDelayedCB, SecondaryDelayedCB);
     }
   }
   return hadLoadError;
@@ -610,8 +629,8 @@ void CompilerInstance::parseAndTypeCheckMainFile(
 static void
 forEachSourceFileIn(ModuleDecl *module,
                     llvm::function_ref<void(SourceFile &)> fn) {
-  for (auto File : module->getFiles()) {
-    if (auto SF = dyn_cast<SourceFile>(File))
+  for (auto file : module->getFiles()) {
+    if (auto SF = dyn_cast<SourceFile>(file))
       fn(*SF);
   }
 }
@@ -639,7 +658,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
-  bool KeepTokens = Invocation.getLangOptions().KeepTokensInSourceFile;
+  bool KeepSyntaxInfo = Invocation.getLangOptions().KeepSyntaxInfoInSourceFile;
 
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
@@ -656,7 +675,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
 
     auto *MainFile = new (*Context)
         SourceFile(*MainModule, Invocation.getSourceFileKind(), MainBufferID,
-                   implicitModuleImportKind, KeepTokens);
+                   implicitModuleImportKind, KeepSyntaxInfo);
     MainModule->addFile(*MainFile);
 
     if (MainBufferID == PrimaryBufferID)
@@ -672,7 +691,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
 
     auto *NextInput = new (*Context)
         SourceFile(*MainModule, SourceFileKind::Library, BufferID,
-                   implicitModuleImportKind, KeepTokens);
+                   implicitModuleImportKind, KeepSyntaxInfo);
     MainModule->addFile(*NextInput);
     if (BufferID == PrimaryBufferID)
       setPrimarySourceFile(NextInput);
@@ -710,7 +729,7 @@ void CompilerInstance::freeContextAndSIL() {
   PrimarySourceFile = nullptr;
 }
 
-bool CompilerInstance::setupForFileAt(unsigned i) {
+bool CompilerInstance::setUpForFileAt(unsigned i) {
   bool MainMode = (Invocation.getInputKind() == InputFileKind::IFK_Swift);
   bool SILMode = (Invocation.getInputKind() == InputFileKind::IFK_SIL);
 
@@ -724,7 +743,7 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
     if (SILMode || (MainMode && filename(File) == "main.swift"))
       MainBufferID = ExistingBufferID.getValue();
 
-    if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+    if (Invocation.getFrontendOptions().Inputs.isInputPrimary(i))
       PrimaryBufferID = ExistingBufferID.getValue();
 
     return false; // replaced by a memory buffer.
@@ -766,7 +785,7 @@ bool CompilerInstance::setupForFileAt(unsigned i) {
   if (SILMode || (MainMode && filename(File) == "main.swift"))
     MainBufferID = BufferID;
 
-  if (Invocation.getFrontendOptions().Inputs.isPrimaryInputAFileAt(i))
+  if (Invocation.getFrontendOptions().Inputs.isInputPrimary(i))
     PrimaryBufferID = BufferID;
 
   return false;

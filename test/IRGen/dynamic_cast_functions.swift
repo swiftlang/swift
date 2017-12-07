@@ -48,3 +48,72 @@ let t2: Any.Type = (((Int, Int)) -> ()).self
 
 // CHECK: ok
 print((t1 == t2) ? "fail" : "ok")
+
+let i: (inout Int) -> Void = { _ in }
+let j: (__shared Int) -> Void = { _ in }
+let k: (Int, inout Int) -> Void = { _,_ in }
+let l: (inout Int, Float, inout String) -> Void = { _,_,_ in }
+let m: (__shared Int, String, inout Float, Double) -> Void = { _,_,_,_ in }
+
+let i_any: Any = i
+let j_any: Any = j
+let k_any: Any = k
+let l_any: Any = l
+let m_any: Any = m
+
+// CHECK: ok
+print((i_any as? (Int) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((i_any as? (__shared Int) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((i_any as? (inout Int) -> Void) != nil ? "ok" : "fail")
+
+// CHECK: ok
+print((j_any as? (Int) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((j_any as? (inout Int) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((j_any as? (__shared Int) -> Void) != nil ? "ok" : "fail")
+
+// CHECK: ok
+print((k_any as? (Int, Int) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((k_any as? (Int, inout Int) -> Void) != nil ? "ok" : "fail")
+// CHECK: ok
+print((k_any as? (inout Int, Int) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((k_any as? (inout Int, __shared Int) -> Void) != nil ? "fail" : "ok")
+
+// CHECK: ok
+print((l_any as? (Int, Float, String) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((l_any as? (Int, Float, inout String) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((l_any as? (Int, inout Float, String) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((l_any as? (inout Int, Float, String) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((l_any as? (inout Int, inout Float, String) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((l_any as? (inout Int, Float, __shared String) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((l_any as? (inout Int, Float, inout String) -> Void) != nil ? "ok" : "fail")
+
+// CHECK: ok
+print((m_any as? (Int, String, Float, Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (Int, String, Float, inout Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (Int, String, Float, __shared Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (Int, String, inout Float, Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (Int, __shared String, Float, Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (inout Int, String, __shared Float, Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (__shared Int, String, Float, inout Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (Int, __shared String, inout Float, Double) -> Void) != nil ? "fail" : "ok")
+// CHECK: ok
+print((m_any as? (__shared Int, String, inout Float, Double) -> Void) != nil ? "ok" : "fail")

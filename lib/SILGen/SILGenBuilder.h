@@ -191,6 +191,9 @@ public:
                         bool objc, ArrayRef<SILType> elementTypes,
                         ArrayRef<ManagedValue> elementCountOperands);
 
+  using SILBuilder::createTuple;
+  ManagedValue createTuple(SILLocation loc, SILType type,
+                           ArrayRef<ManagedValue> elements);
   using SILBuilder::createTupleExtract;
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index, SILType type);
@@ -299,6 +302,10 @@ public:
   ManagedValue createOpenExistentialBoxValue(SILLocation loc,
                                           ManagedValue original, SILType type);
 
+  /// Convert a @convention(block) value to AnyObject.
+  ManagedValue createBlockToAnyObject(SILLocation loc, ManagedValue block,
+                                      SILType type);
+
   using SILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
   ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);
@@ -323,6 +330,17 @@ public:
   using SILBuilder::createValueMetatype;
   ManagedValue createValueMetatype(SILLocation loc, SILType metatype,
                                    ManagedValue base);
+
+  using SILBuilder::createBridgeObjectToRef;
+  ManagedValue createBridgeObjectToRef(SILLocation loc, ManagedValue mv,
+                                       SILType destType);
+
+  using SILBuilder::createBranch;
+  BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
+                           ArrayRef<ManagedValue> Args);
+
+  using SILBuilder::createReturn;
+  ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
 };
 
 class SwitchCaseFullExpr;

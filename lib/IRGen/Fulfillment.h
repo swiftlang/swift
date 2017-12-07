@@ -93,6 +93,11 @@ public:
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
+  bool searchConformance(IRGenModule &IGM,
+                         const ProtocolConformance *conformance,
+                         unsigned sourceIndex, MetadataPath &&path,
+                         const InterestingKeysCallback &interestingKeys);
+
   /// Search the given witness table for useful fulfillments.
   ///
   /// \return true if any fulfillments were added by this search.
@@ -140,12 +145,10 @@ private:
   /// Search the given witness table for useful fulfillments.
   ///
   /// \return true if any fulfillments were added by this search.
-  bool searchWitnessTable(IRGenModule &IGM, CanType type, ProtocolDecl *protocol,
-                          unsigned sourceIndex, MetadataPath &&path,
-                          const InterestingKeysCallback &interestingKeys,
-                          const llvm::SmallPtrSetImpl<ProtocolDecl*> *
-                            interestingConformances);
-
+  bool searchWitnessTable(
+      IRGenModule &IGM, CanType type, ProtocolDecl *protocol, unsigned source,
+      MetadataPath &&path, const InterestingKeysCallback &keys,
+      llvm::SmallPtrSetImpl<ProtocolDecl *> *interestingConformances);
 };
 
 }

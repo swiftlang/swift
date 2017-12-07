@@ -15,13 +15,13 @@ struct D {
 }
 
 // CHECK-LABEL: sil hidden [transparent] @_T019default_constructor1DV1iSivpfi : $@convention(thin) () -> (Int, Double)
-// CHECK:      [[FN:%.*]] = function_ref @_T0S2iBi2048_22_builtinIntegerLiteral_tcfC : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int.Type
+// CHECK:      [[METATYPE:%.*]] = metatype $@thin Int.Type
 // CHECK-NEXT: [[VALUE:%.*]] = integer_literal $Builtin.Int2048, 2
+// CHECK:      [[FN:%.*]] = function_ref @_T0S2iBi2048_22_builtinIntegerLiteral_tcfC : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK-NEXT: [[LEFT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:      [[FN:%.*]] = function_ref @_T0S2dBf{{64|80}}_20_builtinFloatLiteral_tcfC : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Double.Type
 // CHECK-NEXT: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x400C000000000000|0x4000E000000000000000}}
+// CHECK:      [[FN:%.*]] = function_ref @_T0S2dBf{{64|80}}_20_builtinFloatLiteral_tcfC : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[RIGHT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ([[LEFT]] : $Int, [[RIGHT]] : $Double)
 // CHECK-NEXT: return [[RESULT]] : $(Int, Double)

@@ -54,3 +54,11 @@ printType(Tuple2.self)
 typealias Tuple3 = (x: Int, Float, y: Int.Type)
 printType(Tuple3.self)
 // CHECK: found type: (x: Int, Float, y: Int.Type)
+
+func foo<T>(_: T) {
+  var f = T.self
+  printType(f)
+}
+
+foo() { (x: Int) -> Int in return x }
+// CHECK: found type: (Int) -> Int

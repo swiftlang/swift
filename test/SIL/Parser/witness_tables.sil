@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=witness_tables | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-conditional-conformances -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables | %target-sil-opt -enable-experimental-conditional-conformances -assume-parsing-unqualified-ownership-sil -module-name=witness_tables | %FileCheck %s
 
 protocol AssocReqt {
   func requiredMethod()
@@ -96,3 +96,22 @@ sil_witness_table DeadMethodClass: Proto module witness_tables {
   method #Proto.abc!1: nil
 }
 
+protocol P {
+}
+
+struct ConditionalStruct<T> {
+  init()
+}
+
+extension ConditionalStruct : P where T : P {
+}
+
+// CHECK-LABEL: sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module witness_tables {
+// CHECK-NEXT:    conditional_conformance (T: P): dependent
+// CHECL-NEXT:   }
+sil_witness_table hidden <T where T : P> ConditionalStruct<T>: P module t4 {
+  conditional_conformance (T: P): dependent
+}
+
+sil_default_witness_table hidden P {
+}

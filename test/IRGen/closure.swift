@@ -40,8 +40,6 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // CHECK:   [[WITNESS:%.*]] = load i8**, i8*** [[WITNESSADDR]], align 8
 // CHECK:   [[BOXADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>, <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>* [[CONTEXT]], i32 0, i32 2
 // CHECK:   [[BOX:%.*]] = load %swift.refcounted*, %swift.refcounted** [[BOXADDR]], align 8
-// CHECK:   call %swift.refcounted* @swift_rt_swift_retain(%swift.refcounted* returned [[BOX]])
-// CHECK:   call void @swift_rt_swift_release(%swift.refcounted* %1)
 // CHECK:   [[RES:%.*]] = tail call swiftcc i64 @_T07closure1bS2icx3seq_tAA9OrdinableRzlFS2icfU_(i64 %0, %swift.refcounted* [[BOX]], %swift.type* [[TYPE]], i8** [[WITNESS]])
 // CHECK:   ret i64 [[RES]]
 // CHECK: }

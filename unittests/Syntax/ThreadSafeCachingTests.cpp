@@ -82,7 +82,8 @@ TEST(ThreadSafeCachingTests, ReturnGetExpression) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
   auto Minus = SyntaxFactory::makePrefixOperator("-", {}, {});
   auto One = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, One);
+  auto MinusOne = SyntaxFactory::makePrefixOperatorExpr(Minus,
+    SyntaxFactory::makeIntegerLiteralExpr(One));
 
   Pool P;
 

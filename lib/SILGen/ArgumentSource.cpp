@@ -21,25 +21,6 @@
 using namespace swift;
 using namespace Lowering;
 
-RValue &ArgumentSource::forceAndPeekRValue(SILGenFunction &SGF) & {
-  if (isRValue()) {
-    return peekRValue();
-  }
-
-  // Extract an r-value.
-  SILLocation loc = getLocation();
-  RValue value = std::move(*this).getAsRValue(SGF);
-
-  // Destroy the current state.
-  Storage.destruct(StoredKind);
-
-  // Emplace the r-value back into the source.
-  StoredKind = Kind::RValue;
-  Storage.emplaceAggregate<RValueStorage>(StoredKind, std::move(value), loc);
-
-  return peekRValue();
-}
-
 RValue &ArgumentSource::peekRValue() & {
   assert(isRValue() && "Undefined behavior to call this method without the "
          "ArgumentSource actually being an RValue");
@@ -55,7 +36,6 @@ void ArgumentSource::rewriteType(CanType newType) & {
   case Kind::Tuple:
     llvm_unreachable("cannot rewrite type of tuple");
   case Kind::RValue:
-  case Kind::DelayedBorrowedRValue:
     Storage.get<RValueStorage>(StoredKind).Value.rewriteType(newType);
     return;
   case Kind::Expr:
@@ -89,7 +69,6 @@ bool ArgumentSource::requiresCalleeToEvaluate() const {
   case Kind::Invalid:
     llvm_unreachable("argument source is invalid");
   case Kind::RValue:
-  case Kind::DelayedBorrowedRValue:
   case Kind::LValue:
     return false;
   case Kind::Expr:
@@ -138,9 +117,6 @@ RValue ArgumentSource::getAsRValue(SILGenFunction &SGF, SGFContext C) && {
     llvm_unreachable("argument source is invalid");
   case Kind::LValue:
     llvm_unreachable("cannot get l-value as r-value");
-  case Kind::DelayedBorrowedRValue:
-    return std::move(*this).asKnownRValue(SGF).borrow(SGF,
-                                                      getKnownRValueLocation());
   case Kind::RValue:
     return std::move(*this).asKnownRValue(SGF);
   case Kind::Expr:
@@ -195,15 +171,6 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
     return SGF.emitAddressOfLValue(loc, std::move(*this).asKnownLValue(),
                                    AccessKind::ReadWrite);
   }
-  case Kind::DelayedBorrowedRValue: {
-    assert(!C.getEmitInto() &&
-           "Can not put a delayed borrowed rvalue into an initialization");
-    auto loc = getKnownRValueLocation();
-    return std::move(*this)
-        .asKnownRValue(SGF)
-        .getAsSingleValue(SGF, loc)
-        .borrow(SGF, loc);
-  }
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
     if (auto init = C.getEmitInto()) {
@@ -250,9 +217,6 @@ ManagedValue ArgumentSource::getConverted(SILGenFunction &SGF,
     llvm_unreachable("argument source is invalid");
   case Kind::LValue:
     llvm_unreachable("cannot get converted l-value");
-  case Kind::DelayedBorrowedRValue:
-    // TODO: We probably can, but we would need to introduce a copy.
-    llvm_unreachable("cannot get converted borrowed r-value");
   case Kind::RValue:
   case Kind::Expr:
   case Kind::Tuple:
@@ -270,8 +234,6 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
     llvm_unreachable("argument source is invalid");
   case Kind::LValue:
     llvm_unreachable("cannot forward an l-value");
-  case Kind::DelayedBorrowedRValue:
-    llvm_unreachable("cannot forward a delayed borrowed r-value");
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
     std::move(*this).asKnownRValue(SGF).forwardInto(SGF, loc, dest);
@@ -299,26 +261,12 @@ ArgumentSource::ArgumentSource(SILLocation loc, RValue &&rv, Kind kind)
   Storage.emplaceAggregate<RValueStorage>(StoredKind, std::move(rv), loc);
 }
 
-ArgumentSource ArgumentSource::delayedBorrow(SILGenFunction &SGF) const & {
-  assert(isRValue() && "Can only perform a delayed borrow on an rvalue");
-  // We are doing something evil here since we know that we are going to perform
-  // a borrow.
-  //
-  // Once uncurrying is removed from the compiler, we will no longer need to
-  // perform delayed borrows and this evilness can be expunged.
-  const RValue &rv = asKnownRValue();
-  return ArgumentSource(getKnownRValueLocation(),
-                        RValue(&SGF, rv.values, rv.type),
-                        Kind::DelayedBorrowedRValue);
-}
-
 ArgumentSource ArgumentSource::borrow(SILGenFunction &SGF) const & {
   switch (StoredKind) {
   case Kind::Invalid:
     llvm_unreachable("argument source is invalid");
   case Kind::LValue:
     llvm_unreachable("cannot borrow an l-value");
-  case Kind::DelayedBorrowedRValue:
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
     return ArgumentSource(loc, asKnownRValue().borrow(SGF, loc));
@@ -449,7 +397,6 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
     return;
   }
   case Kind::RValue:
-  case Kind::DelayedBorrowedRValue:
     out << "RValue\n";
     Storage.get<RValueStorage>(StoredKind).Value.dump(out, indent + 2);
     return;

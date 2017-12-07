@@ -260,7 +260,8 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, Results, None,
+      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
+      /*params*/ {}, /*yields*/ {}, Results, None,
       Store->getModule().getASTContext());
   auto *GetterF = Store->getModule().getOrCreateFunction(
       Store->getLoc(),
@@ -268,7 +269,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsSerialized_t::IsSerialized);
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
-  if (Store->getFunction()->hasUnqualifiedOwnership())
+  if (!Store->getFunction()->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
   auto *EntryBB = GetterF->createBasicBlock();
   // Copy instructions into GetterF
@@ -514,14 +515,15 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
-      ParameterConvention::Direct_Owned, { }, Results, None,
+      SILCoroutineKind::None, ParameterConvention::Direct_Owned,
+      /*params*/ {}, /*yields*/ {}, Results, None,
       InitF->getASTContext());
   auto *GetterF = InitF->getModule().getOrCreateFunction(
       InitF->getLocation(),
       getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsSerialized_t::IsSerialized);
-  if (InitF->hasUnqualifiedOwnership())
+  if (!InitF->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
 
   auto *EntryBB = GetterF->createBasicBlock();

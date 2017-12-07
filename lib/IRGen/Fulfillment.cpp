@@ -18,11 +18,13 @@
 #include "Fulfillment.h"
 #include "IRGenModule.h"
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/SIL/TypeLowering.h"
 #include "GenericRequirement.h"
 #include "ProtocolInfo.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace irgen;
@@ -145,18 +147,38 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   return false;
 }
 
-/// Given that we have a source for a witness table that the given type
-/// conforms to the given protocol, check to see if it fulfills anything.
+bool FulfillmentMap::searchConformance(
+    IRGenModule &IGM, const ProtocolConformance *conformance,
+    unsigned sourceIndex, MetadataPath &&path,
+    const InterestingKeysCallback &interestingKeys) {
+  bool hadFulfillment = false;
+
+  SILWitnessTable::enumerateWitnessTableConditionalConformances(
+      conformance, [&](unsigned index, CanType type, ProtocolDecl *protocol) {
+        MetadataPath conditionalPath = path;
+        conditionalPath.addConditionalConformanceComponent(index);
+        hadFulfillment |=
+            searchWitnessTable(IGM, type, protocol, sourceIndex,
+                               std::move(conditionalPath), interestingKeys);
+
+        return /*finished?*/ false;
+      });
+
+  return hadFulfillment;
+}
+
 bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
                                         CanType type, ProtocolDecl *protocol,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
+  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+
   llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
-  llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
+  llvm::SmallPtrSetImpl<ProtocolDecl *> *interestingConformances = nullptr;
 
   // If the interesting-keys set is limiting the set of interesting
   // conformances, collect that filter.
-  if (keys.isInterestingType(type) &&
+  if (keys.hasInterestingType(type) &&
       keys.hasLimitedInterestingConformances(type)) {
     // Bail out immediately if the set is empty.
     // This only makes sense because we're not trying to fulfill
@@ -173,13 +195,10 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
                             interestingConformances);
 }
 
-bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
-                                        CanType type, ProtocolDecl *protocol,
-                                        unsigned source, MetadataPath &&path,
-                                        const InterestingKeysCallback &keys,
-                                  const llvm::SmallPtrSetImpl<ProtocolDecl*> *
-                                          interestingConformances) {
-  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+bool FulfillmentMap::searchWitnessTable(
+    IRGenModule &IGM, CanType type, ProtocolDecl *protocol, unsigned source,
+    MetadataPath &&path, const InterestingKeysCallback &keys,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> *interestingConformances) {
 
   bool hadFulfillment = false;
 
@@ -252,24 +271,8 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
     MetadataPath argPath = path;
     argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
 
-    llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
-    llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
-
-    // If the interesting-keys set is limiting the set of interesting
-    // conformances, collect that filter.
-    if (keys.hasLimitedInterestingConformances(arg)) {
-      // Bail out immediately if the set is empty.
-      auto requiredConformances = keys.getInterestingConformances(arg);
-      if (requiredConformances.empty()) return;
-
-      interestingConformancesBuffer.insert(requiredConformances.begin(),
-                                           requiredConformances.end());
-      interestingConformances = &interestingConformancesBuffer;
-    }
-
-    hadFulfillment |=
-      searchWitnessTable(IGM, arg, conf->getRequirement(), source,
-                         std::move(argPath), keys, interestingConformances);
+    hadFulfillment |= searchWitnessTable(IGM, arg, conf->getRequirement(),
+                                         source, std::move(argPath), keys);
   });
 
   return hadFulfillment;

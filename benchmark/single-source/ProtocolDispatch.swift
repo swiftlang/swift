@@ -15,7 +15,7 @@ import TestsUtils
 public let ProtocolDispatch = BenchmarkInfo(
   name: "ProtocolDispatch",
   runFunction: run_ProtocolDispatch,
-  tags: [.validation, .abstraction])
+  tags: [.validation, .abstraction, .unstable])
 
 @inline(never)
 public func run_ProtocolDispatch(_ N: Int) {

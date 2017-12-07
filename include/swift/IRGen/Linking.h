@@ -577,16 +577,6 @@ public:
     return reinterpret_cast<SILFunction*>(Pointer);
   }
 
-  /// Returns true if this function is only serialized, but not necessarily
-  /// code-gen'd. These are fragile transparent functions.
-  bool isSILOnly() const {
-    if (getKind() != Kind::SILFunction)
-      return false;
-
-    SILFunction *F = getSILFunction();
-    return F->isTransparent() && F->isDefinition() && F->isSerialized();
-  }
-
   SILGlobalVariable *getSILGlobalVariable() const {
     assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
@@ -681,7 +671,6 @@ public:
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       StringRef name,
                       SILLinkage linkage,
-                      bool isSILOnly,
                       ForDefinition_t isDefinition,
                       bool isWeakImported);
 

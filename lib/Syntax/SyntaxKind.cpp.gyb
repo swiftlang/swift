@@ -80,7 +80,9 @@ bool isUnknownKind(SyntaxKind Kind) {
   return Kind == SyntaxKind::Unknown ||
          Kind == SyntaxKind::UnknownDecl ||
          Kind == SyntaxKind::UnknownExpr ||
-         Kind == SyntaxKind::UnknownStmt;
+         Kind == SyntaxKind::UnknownStmt ||
+         Kind == SyntaxKind::UnknownType ||
+         Kind == SyntaxKind::UnknownPattern;
 }
 } // end namespace syntax
 } // end namespace swift

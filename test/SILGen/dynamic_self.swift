@@ -43,9 +43,9 @@ class GY<T> : GX<[T]> { }
 // CHECK:   [[BORROWED_Y_AS_X:%[0-9]+]] = upcast [[BORROWED_Y]] : $Y to $X
 // CHECK:   [[X_F:%[0-9]+]] = class_method [[BORROWED_Y_AS_X]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[BORROWED_Y_AS_X]]) : $@convention(method) (@guaranteed X) -> @owned X
+// CHECK:   end_borrow [[BORROWED_Y]] from [[Y]]
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   destroy_value [[Y_RESULT]] : $Y
-// CHECK:   end_borrow [[BORROWED_Y]] from [[Y]]
 // CHECK:   destroy_value [[Y]] : $Y
 func testDynamicSelfDispatch(y: Y) {
   _ = y.f()
@@ -58,9 +58,9 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK:   [[BORROWED_GY_AS_GX:%[0-9]+]] = upcast [[BORROWED_GY]] : $GY<Int> to $GX<Array<Int>>
   // CHECK:   [[GX_F:%[0-9]+]] = class_method [[BORROWED_GY_AS_GX]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[BORROWED_GY_AS_GX]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   end_borrow [[BORROWED_GY]] from [[GY]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
-  // CHECK:   end_borrow [[BORROWED_GY]] from [[GY]]
   // CHECK:   destroy_value [[GY]]
   _ = gy.f()
 }
@@ -68,8 +68,8 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
 // CHECK-LABEL: sil hidden @_T012dynamic_self21testArchetypeDispatch{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P> (@in T) -> ()
 func testArchetypeDispatch<T: P>(t: T) {
   // CHECK: bb0([[T:%[0-9]+]] : $*T):
-  // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : {{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
+  // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : {{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[ARCHETYPE_F]]<T>([[T_RESULT]], [[T]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   _ = t.f()
 }
@@ -112,7 +112,7 @@ func testAnyObjectDispatch(o: AnyObject) {
 
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject):
   // CHECK:   [[O_OBJ_COPY:%.*]] = copy_value [[O_OBJ]]
-  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
+  // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
   var _ = o.method
 }
 // CHECK: } // end sil function '_T012dynamic_self21testAnyObjectDispatchyyXl1o_tF'
@@ -128,8 +128,7 @@ func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
-// CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-// CHECK:   [[INIT:%[0-9]+]] = objc_method [[BORROWED_OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
+// CHECK:   [[INIT:%[0-9]+]] = objc_method [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
@@ -162,6 +161,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK:      [[CAST_BORROWED_ARG:%.*]] = upcast [[BORROWED_ARG]]
 // CHECK:      [[T0:%.*]] = class_method [[CAST_BORROWED_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_BORROWED_ARG]])
+// CHECK-NEXT: end_borrow [[BORROWED_ARG]]
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[RES]] : $Optional<OptionalResult> to $Optional<OptionalResultInheritor>
 
 func id<T>(_ t: T) -> T { return t }
@@ -176,18 +176,18 @@ class Z {
 
     // Single capture of 'self' type
 
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU_ : $@convention(thin) (@owned Z) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU_ : $@convention(thin) (@guaranteed Z) -> ()
     // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Z
-    // CHECK-NEXT: partial_apply [[FN]]([[SELF_COPY]])
+    // CHECK-NEXT: partial_apply [callee_guaranteed] [[FN]]([[SELF_COPY]])
     let fn1 = { _ = self }
     fn1()
 
     // Capturing 'self', but it's not the last capture. Make sure it ends
     // up at the end of the list anyway
 
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU0_ : $@convention(thin) (Int, @owned Z) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU0_ : $@convention(thin) (Int, @guaranteed Z) -> ()
     // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Z
-    // CHECK-NEXT: partial_apply [[FN]]({{.*}}, [[SELF_COPY]])
+    // CHECK-NEXT: partial_apply [callee_guaranteed] [[FN]]({{.*}}, [[SELF_COPY]])
     let fn2 = {
       _ = self
       _ = x
@@ -198,10 +198,10 @@ class Z {
     // so that IRGen can recover metadata.
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU1_ : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
-    // CHECK:      partial_apply [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
+    // CHECK:      partial_apply [callee_guaranteed] [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     let fn3 = {
       [weak self] in
       _ = self
@@ -210,7 +210,7 @@ class Z {
 
     // Capturing a value with a complex type involving self
 
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU2_ : $@convention(thin) (@owned (Z, Z), @thick @dynamic_self Z.Type) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU2_ : $@convention(thin) (@guaranteed (Z, Z), @thick @dynamic_self Z.Type) -> ()
     let xx = (self, self)
     let fn4 = {
       _ = xx
@@ -261,26 +261,26 @@ class Factory {
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self22partialApplySelfReturnyAA7FactoryC1c_ADm1ttF : $@convention(thin) (@owned Factory, @thick Factory.Type) -> ()
 func partialApplySelfReturn(c: Factory, t: Factory.Type) {
-  // CHECK: function_ref @_T012dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@owned Factory) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@owned Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = c.newInstance
-  // CHECK: function_ref @_T012dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@owned Factory) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@owned Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.newInstance
-  // CHECK: function_ref @_T012dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@owned Factory) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC11newInstanceACXDyFTc : $@convention(thin) (@owned Factory) -> @owned @callee_guaranteed () -> @owned Factory
   _ = t.newInstance
   _ = type(of: c).newInstance
 
-  // CHECK: function_ref @_T012dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = t.classNewInstance
-  // CHECK: function_ref @_T012dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = type(of: c).classNewInstance
-  // CHECK: function_ref @_T012dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC16classNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.classNewInstance
 
-  // CHECK: function_ref @_T012dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = t.staticNewInstance
-  // CHECK: function_ref @_T012dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = type(of: c).staticNewInstance
-  // CHECK: function_ref @_T012dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
+  // CHECK: function_ref @_T012dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_guaranteed () -> @owned Factory
   _ = Factory.staticNewInstance
 }
 
@@ -358,20 +358,20 @@ class Derived : Base {
 class Generic<T> {
   // Examples where we have to add a special argument to capture Self's metadata
   func t1() -> Self {
-    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t1ACyxGXDyFAEXDSgycfU_ : $@convention(thin) <T> (@owned <τ_0_0> { var @sil_weak Optional<Generic<τ_0_0>> } <T>, @thick @dynamic_self Generic<T>.Type) -> @owned Optional<Generic<T>>
+    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t1ACyxGXDyFAEXDSgycfU_ : $@convention(thin) <T> (@guaranteed <τ_0_0> { var @sil_weak Optional<Generic<τ_0_0>> } <T>, @thick @dynamic_self Generic<T>.Type) -> @owned Optional<Generic<T>>
     _ = {[weak self] in self }
     return self
   }
 
   func t2() -> Self {
-    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t2ACyxGXDyFAEXD_AEXDtycfU_ : $@convention(thin) <T> (@owned (Generic<T>, Generic<T>), @thick @dynamic_self Generic<T>.Type) -> (@owned Generic<T>, @owned Generic<T>)
+    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t2ACyxGXDyFAEXD_AEXDtycfU_ : $@convention(thin) <T> (@guaranteed (Generic<T>, Generic<T>), @thick @dynamic_self Generic<T>.Type) -> (@owned Generic<T>, @owned Generic<T>)
     let selves = (self, self)
     _ = { selves }
     return self
   }
 
   func t3() -> Self {
-    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@owned @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
+    // CHECK-LABEL: sil private @_T012dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@guaranteed @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
     _ = {[unowned self] in self }
     return self
   }

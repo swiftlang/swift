@@ -40,6 +40,10 @@ DRIVER_STATISTIC(NumDriverJobsRun)
 /// run-over-run.
 DRIVER_STATISTIC(NumDriverJobsSkipped)
 
+/// Total number of driver processes that exited with EXIT_FAILURE / not with
+/// EXIT_SUCCESS.
+DRIVER_STATISTIC(NumProcessFailures)
+
 /// Next 10 statistics count dirtying-events in the driver's dependency graph,
 /// which it uses to decide which files are invalid (and thus which files to
 /// build). There are two dimensions to each dirtying event:
@@ -68,6 +72,10 @@ DRIVER_STATISTIC(ChildrenMaxRSS)
 
 /// Driver statistics are collected for frontend processes
 #ifdef FRONTEND_STATISTIC
+
+/// Total number of frontend processes that exited with EXIT_FAILURE / not with
+/// EXIT_SUCCESS.
+FRONTEND_STATISTIC(Frontend, NumProcessFailures)
 
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)

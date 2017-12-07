@@ -20,7 +20,7 @@ struct X<T> {
 func generic<T>(_: T) {}
 
 // We don't want the metadata allocation to be optimized away
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func main() {
   generic(X<()>())
 }

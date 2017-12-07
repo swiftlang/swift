@@ -144,8 +144,13 @@ internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
-/// Returns `true` iff `t0` is identical to `t1`; i.e. if they are both
-/// `nil` or they both represent the same type.
+/// Returns a Boolean value indicating whether two types are identical.
+///
+/// - Parameters:
+///   - t0: A type to compare.
+///   - t1: Another type to compare.
+/// - Returns: `true` if both `t0` and `t1` are `nil` or if they represent the
+///   same type; otherwise, `false`.
 @_inlineable
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   switch (t0, t1) {
@@ -156,8 +161,13 @@ public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   }
 }
 
-/// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both
-/// `nil` or they both represent the same type.
+/// Returns a Boolean value indicating whether two types are not identical.
+///
+/// - Parameters:
+///   - t0: A type to compare.
+///   - t1: Another type to compare.
+/// - Returns: `true` if one, but not both, of `t0` and `t1` are `nil`, or if
+///   they represent different types; otherwise, `false`.
 @_inlineable
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
@@ -312,7 +322,7 @@ public func _onFastPath() {
 // when using RuntimeShims.h
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
-@_silgen_name("swift_objc_class_usesNativeSwiftReferenceCounting")
+@_silgen_name("_objcClassUsesNativeSwiftReferenceCounting")
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
 #else
 @_inlineable // FIXME(sil-serialize-all)
@@ -325,14 +335,14 @@ internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_class_getInstanceExtents")
-internal func swift_class_getInstanceExtents(_ theClass: AnyClass)
+@_silgen_name("_getSwiftClassInstanceExtents")
+internal func getSwiftClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_objc_class_unknownGetInstanceExtents")
-internal func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
+@_silgen_name("_getObjCClassInstanceExtents")
+internal func getObjCClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @_inlineable // FIXME(sil-serialize-all)
@@ -340,9 +350,9 @@ internal func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
-  return Int(swift_objc_class_unknownGetInstanceExtents(theClass).positive)
+  return Int(getObjCClassInstanceExtents(theClass).positive)
 #else
-  return Int(swift_class_getInstanceExtents(theClass).positive)
+  return Int(getSwiftClassInstanceExtents(theClass).positive)
 #endif
 }
 
@@ -478,16 +488,12 @@ internal func _makeBridgeObject(
   )
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
 @_silgen_name("_swift_class_getSuperclass")
 internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
-@_inlineable // FIXME(sil-serialize-all)
-@inline(__always)
-public // @testable
+public
 func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return _swift_class_getSuperclass(t)
 }

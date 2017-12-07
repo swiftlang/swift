@@ -24,7 +24,7 @@ from cmpcodesize.compare import \
 
 SHORTCUTS = {
     "O": "bin/Benchmark_O",
-    "Ounchecked": "bin/Benchmark_Ounchecked",
+    "Osize": "bin/Benchmark_Osize",
     "Onone": "bin/Benchmark_Onone",
     "dylib": "lib/swift/macosx/x86_64/libswiftCore.dylib",
 }
@@ -53,7 +53,7 @@ How to specify files:
     Compares the files in the new and old build-dirs.
     Aliases:
         O          => bin/Benchmark_O
-        Ounchecked => bin/Benchmark_Ounchecked
+        Osize      => bin/Benchmark_Osize
         Onone      => bin/Benchmark_Onone
         dylib      => lib/swift/macosx/x86_64/libswiftCore.dylib
     Examples:

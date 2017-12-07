@@ -90,8 +90,10 @@ class ConstraintLocator;
 
 /// Describes a conversion restriction or a fix.
 struct RestrictionOrFix {
-  ConversionRestrictionKind Restriction;
-  Fix TheFix;
+  union {
+    ConversionRestrictionKind Restriction;
+    Fix TheFix;
+  };
   bool IsRestriction;
 
 public:
@@ -849,9 +851,9 @@ struct MemberLookupResult {
     UR_Inaccessible,
   };
   
-  /// This is a list of considered, but rejected, candidates, along with a
+  /// This is a list of considered (but rejected) candidates, along with a
   /// reason for their rejection.
-  SmallVector<std::pair<ValueDecl*, UnviableReason>, 4> UnviableCandidates;
+  SmallVector<std::pair<OverloadChoice, UnviableReason>, 4> UnviableCandidates;
 
 
   /// Mark this as being an already-diagnosed error and return itself.
@@ -864,8 +866,8 @@ struct MemberLookupResult {
     ViableCandidates.push_back(candidate);
   }
   
-  void addUnviable(ValueDecl *VD, UnviableReason reason) {
-    UnviableCandidates.push_back({VD, reason});
+  void addUnviable(OverloadChoice candidate, UnviableReason reason) {
+    UnviableCandidates.push_back({candidate, reason});
   }
   
   OverloadChoice *getFavoredChoice() {
@@ -1100,8 +1102,10 @@ private:
 
   /// \brief Describes the current solver state.
   struct SolverState {
-    SolverState(ConstraintSystem &cs);
+    SolverState(Expr *const expr, ConstraintSystem &cs);
     ~SolverState();
+
+    llvm::DenseMap<Expr *, unsigned> ExprWeights;
 
     /// The constraint system.
     ConstraintSystem &CS;
@@ -1364,7 +1368,7 @@ public:
   ///
   /// This will be non-null when we're actively solving the constraint
   /// system, and carries temporary state related to the current path
-  /// we're exploring. 
+  /// we're exploring.
   SolverState *solverState = nullptr;
 
   struct ArgumentLabelState {
@@ -1500,11 +1504,12 @@ private:
   /// no single best solution, see `findBestSolution` for
   /// more details.
   void filterSolutions(SmallVectorImpl<Solution> &solutions,
+                       llvm::DenseMap<Expr *, unsigned> &weights,
                        bool minimize = false) {
     if (solutions.size() < 2)
       return;
 
-    if (auto best = findBestSolution(solutions, minimize)) {
+    if (auto best = findBestSolution(solutions, weights, minimize)) {
       if (*best != 0)
         solutions[0] = std::move(solutions[*best]);
       solutions.erase(solutions.begin() + 1, solutions.end());
@@ -1992,6 +1997,9 @@ public:
   /// Determine if the type in question is a Set<T> and, if so, provide the
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
+
+  /// Determine if the type in question is one of the known collection types.
+  static bool isCollectionType(Type t);
 
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
@@ -2547,6 +2555,9 @@ private:
     /// The kind of bindings permitted.
     AllowedBindingKind Kind;
 
+    /// The kind of the constraint this binding came from.
+    ConstraintKind BindingSource;
+
     /// The defaulted protocol associated with this binding.
     Optional<ProtocolDecl *> DefaultedProtocol;
 
@@ -2555,9 +2566,11 @@ private:
     ConstraintLocator *DefaultableBinding = nullptr;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
+                     ConstraintKind bindingSource,
                      Optional<ProtocolDecl *> defaultedProtocol = None,
                      ConstraintLocator *defaultableBinding = nullptr)
-        : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
+        : BindingType(type), Kind(kind), BindingSource(bindingSource),
+          DefaultedProtocol(defaultedProtocol),
           DefaultableBinding(defaultableBinding) {}
 
     bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
@@ -2817,9 +2830,9 @@ public:
   /// \returns true if an error occurred, false otherwise.  Note that multiple
   /// ambiguous solutions for the same constraint system are considered to be
   /// success by this API.
-  bool solve(SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables
-               = FreeTypeVariableBinding::Disallow);
+  bool solve(Expr *const expr, SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables =
+                 FreeTypeVariableBinding::Disallow);
 
   /// \brief Solve the system of constraints.
   ///
@@ -2850,10 +2863,11 @@ private:
   /// \param diff The differences among the solutions.
   /// \param idx1 The index of the first solution.
   /// \param idx2 The index of the second solution.
-  static SolutionCompareResult compareSolutions(ConstraintSystem &cs,
-                                                ArrayRef<Solution> solutions,
-                                                const SolutionDiff &diff,
-                                                unsigned idx1, unsigned idx2);
+  /// \param weights The weights of the sub-expressions used for ranking.
+  static SolutionCompareResult
+  compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
+                   const SolutionDiff &diff, unsigned idx1, unsigned idx2,
+                   llvm::DenseMap<Expr *, unsigned> &weights);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
@@ -2868,6 +2882,7 @@ public:
   /// solution.
   ///
   /// \param solutions The set of viable solutions to consider.
+  /// \param weights The weights of the sub-expressions used for ranking.
   ///
   /// \param minimize If true, then in the case where there is no single
   /// best solution, minimize the set of solutions by removing any solutions
@@ -2877,6 +2892,7 @@ public:
   /// \returns The index of the best solution, or nothing if there was no
   /// best solution.
   Optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
+                                      llvm::DenseMap<Expr *, unsigned> &weights,
                                       bool minimize);
 
   /// \brief Apply a given solution to the expression, producing a fully

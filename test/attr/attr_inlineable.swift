@@ -2,7 +2,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-testing
 
 @_inlineable struct TestInlineableStruct {}
-// expected-error@-1 {{@_inlineable cannot be applied to this declaration}}
+// expected-error@-1 {{'@_inlineable' attribute cannot be applied to this declaration}}
 
 private func privateFunction() {}
 // expected-note@-1{{global function 'privateFunction()' is not '@_versioned' or public}}

@@ -52,3 +52,30 @@ func resilientSwitch(_ m: Medium) {
 
 // CHECK-LABEL: sil hidden @_T015enum_resilience21indirectResilientEnumy010resilient_A016IndirectApproachOF : $@convention(thin) (@in IndirectApproach) -> ()
 func indirectResilientEnum(_ ia: IndirectApproach) {}
+
+public enum MyResilientEnum {
+  case kevin
+  case loki
+}
+
+// CHECK-LABEL: sil @_T015enum_resilience15resilientSwitchyAA15MyResilientEnumOF : $@convention(thin) (@in MyResilientEnum) -> ()
+// CHECK:      switch_enum_addr %2 : $*MyResilientEnum, case #MyResilientEnum.kevin!enumelt: bb1, case #MyResilientEnum.loki!enumelt: bb2 //
+// CHECK:      return
+public func resilientSwitch(_ e: MyResilientEnum) {
+  switch e {
+  case .kevin: ()
+  case .loki: ()
+  }
+}
+
+// Inlineable functions must lower the switch as if it came from outside the module
+
+// CHECK-LABEL: sil [serialized] @_T015enum_resilience16inlineableSwitchyAA15MyResilientEnumOF : $@convention(thin) (@in MyResilientEnum) -> ()
+// CHECK:      switch_enum_addr %2 : $*MyResilientEnum, case #MyResilientEnum.kevin!enumelt: bb1, case #MyResilientEnum.loki!enumelt: bb2, default bb3
+// CHECK:      return
+@_inlineable public func inlineableSwitch(_ e: MyResilientEnum) {
+  switch e {
+  case .kevin: ()
+  case .loki: ()
+  }
+}

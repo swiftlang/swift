@@ -31,7 +31,7 @@ fileprivate class filePrivateClass {
 }
 
 @_versioned extension S {}
-// expected-error@-1 {{@_versioned cannot be applied to this declaration}}
+// expected-error@-1 {{'@_versioned' attribute cannot be applied to this declaration}}
 
 @_versioned
 protocol VersionedProtocol {

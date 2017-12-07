@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/SourceEntityWalker.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Basic/SourceManager.h"

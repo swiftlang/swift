@@ -168,6 +168,14 @@ void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
                          {object, size, alignMask});
 }
 
+void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
+                                           llvm::Value *object,
+                                           llvm::Value *size,
+                                           llvm::Value *alignMask) {
+  IGF.Builder.CreateCall(IGF.IGM.getDeallocUninitializedObjectFn(),
+                         {object, size, alignMask});
+}
+
 void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
                                         llvm::Value *object,
                                         llvm::Value *size,
@@ -227,7 +235,8 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
       continue;
 
     field.getType().destroy(IGF, field.project(IGF, structAddr, offsets),
-                            fieldTy);
+                            fieldTy,
+                            false /*not outlined in heap's code paths*/);
   }
 
   emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
@@ -486,26 +495,29 @@ namespace {
         ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitNativeWeakCopyInit(destAddr, srcAddr);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitNativeWeakTakeInit(destAddr, srcAddr);
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitNativeWeakCopyAssign(destAddr, srcAddr);
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitNativeWeakTakeAssign(destAddr, srcAddr);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       IGF.emitNativeWeakDestroy(addr);
     }
 
@@ -641,28 +653,28 @@ namespace {
                          IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, SILType type) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedCopyAssign(dest, src);
     }
 
-    void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                            Address src, SILType type) const override {
+    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                            SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedCopyInit(dest, src);
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address dest,
-                        Address src, SILType type) const override {
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedTakeAssign(dest, src);
     }
 
-    void initializeWithTake(IRGenFunction &IGF, Address dest,
-                            Address src, SILType type) const override {
+    void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                            SILType type, bool isOutlined) const override {
       IGF.emitUnknownUnownedTakeInit(dest, src);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr,
-                 SILType type) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType type,
+                 bool isOutlined) const override {
       IGF.emitUnknownUnownedDestroy(addr);
     }
 
@@ -714,26 +726,29 @@ namespace {
         ValueType(valueType) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitUnknownWeakCopyInit(destAddr, srcAddr);
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       IGF.emitUnknownWeakTakeInit(destAddr, srcAddr);
     }
 
-    void assignWithCopy(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitUnknownWeakCopyAssign(destAddr, srcAddr);
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address destAddr,
-                        Address srcAddr, SILType T) const override {
+    void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                        SILType T, bool isOutlined) const override {
       IGF.emitUnknownWeakTakeAssign(destAddr, srcAddr);
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
       IGF.emitUnknownWeakDestroy(addr);
     }
                                 
@@ -1286,7 +1301,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
   // If we aren't running the LLVM ARC optimizer, we don't need to emit this.
-  if (!IGM.IRGen.Opts.Optimize || IGM.IRGen.Opts.DisableLLVMARCOpts)
+  if (!IGM.IRGen.Opts.shouldOptimize() || IGM.IRGen.Opts.DisableLLVMARCOpts)
     return;
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);
@@ -1522,7 +1537,7 @@ public:
     auto boxedInterfaceType = boxedType;
     if (env) {
       boxedInterfaceType = SILType::getPrimitiveType(
-        env->mapTypeOutOfContext(boxedType.getSwiftRValueType())
+        boxedType.getSwiftRValueType()->mapTypeOutOfContext()
            ->getCanonicalType(),
          boxedType.getCategory());
     }
@@ -1541,8 +1556,7 @@ public:
     auto size = layout.emitSize(IGF.IGM);
     auto alignMask = layout.emitAlignMask(IGF.IGM);
 
-    IGF.emitNativeSetDeallocating(box);
-    emitDeallocateHeapObject(IGF, box, size, alignMask);
+    emitDeallocateUninitializedHeapObject(IGF, box, size, alignMask);
   }
 
   Address
@@ -1680,11 +1694,9 @@ Address irgen::emitProjectBox(IRGenFunction &IGF,
                        boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
-Address irgen::emitAllocateExistentialBoxInBuffer(IRGenFunction &IGF,
-                                                  SILType boxedType,
-                                                  Address destBuffer,
-                                                  GenericEnvironment *env,
-                                                  const llvm::Twine &name) {
+Address irgen::emitAllocateExistentialBoxInBuffer(
+    IRGenFunction &IGF, SILType boxedType, Address destBuffer,
+    GenericEnvironment *env, const llvm::Twine &name, bool isOutlined) {
   // Get a box for the boxed value.
   auto boxType = SILBoxType::get(boxedType.getSwiftRValueType());
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
@@ -1695,7 +1707,8 @@ Address irgen::emitAllocateExistentialBoxInBuffer(IRGenFunction &IGF,
                    Address(IGF.Builder.CreateBitCast(
                                destBuffer.getAddress(),
                                owned.getOwner()->getType()->getPointerTo()),
-                           destBuffer.getAlignment()));
+                           destBuffer.getAlignment()),
+                   isOutlined);
   return owned.getAddress();
 }
 

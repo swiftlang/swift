@@ -354,20 +354,22 @@ public:
   virtual void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                                 Size offset) const = 0;
   virtual void getSchema(ExplosionSchema &schema) const = 0;
-  virtual void destroy(IRGenFunction &IGF, Address addr, SILType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                       bool isOutlined) const = 0;
 
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                    Address dest, SILType T) const;
-  
-  virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
-  virtual void assignWithTake(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
-  virtual void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                                  Address src, SILType T) const = 0;
-  virtual void initializeWithTake(IRGenFunction &IGF, Address dest,
-                                  Address src, SILType T) const = 0;
-  
+                                    Address dest, SILType T,
+                                    bool isOutlined) const;
+
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
+  virtual void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                                  SILType T, bool isOutlined) const = 0;
+  virtual void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                                  SILType T, bool isOutlined) const = 0;
+
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
                                   llvm::Value *vwtable,
@@ -402,10 +404,10 @@ public:
                           Explosion &e) const = 0;
   virtual void loadAsTake(IRGenFunction &IGF, Address addr,
                           Explosion &e) const = 0;
-  virtual void assign(IRGenFunction &IGF, Explosion &e,
-                      Address addr) const = 0;
-  virtual void initialize(IRGenFunction &IGF, Explosion &e,
-                          Address addr) const = 0;
+  virtual void assign(IRGenFunction &IGF, Explosion &e, Address addr,
+                      bool isOutlined) const = 0;
+  virtual void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                          bool isOutlined) const = 0;
   virtual void reexplode(IRGenFunction &IGF, Explosion &src,
                          Explosion &dest) const = 0;
   virtual void copy(IRGenFunction &IGF, Explosion &src,
@@ -428,6 +430,11 @@ public:
   
   virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                          Address addr) const;
+
+  virtual void collectArchetypeMetadata(
+      IRGenFunction &IGF,
+      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
+      SILType T) const = 0;
 
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;

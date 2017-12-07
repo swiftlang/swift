@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 public protocol PublicProto {
   func publicReq()
@@ -426,6 +426,25 @@ class DefaultSubclassPublic : PublicClass {}
 class DefaultSubclassInternal : InternalClass {}
 class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared private or fileprivate because its superclass is private}}
 
+public class PublicGenericClass<T> {}
+// expected-note@+2 * {{type declared here}}
+// expected-note@+1 * {{superclass is declared here}}
+internal class InternalGenericClass<T> {}
+// expected-note@+1 * {{type declared here}}
+private class PrivateGenericClass<T> {}
+
+open class OpenConcreteSubclassInternal : InternalGenericClass<Int> {} // expected-error {{class cannot be declared open because its superclass is internal}} expected-error {{superclass 'InternalGenericClass<Int>' of open class must be open}}
+public class PublicConcreteSubclassPublic : PublicGenericClass<Int> {}
+public class PublicConcreteSubclassInternal : InternalGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is internal}}
+public class PublicConcreteSubclassPrivate : PrivateGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is private}}
+public class PublicConcreteSubclassPublicPrivateArg : PublicGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared public because its superclass is private}}
+
+open class OpenGenericSubclassInternal<T> : InternalGenericClass<T> {} // expected-error {{class cannot be declared open because its superclass is internal}} expected-error {{superclass 'InternalGenericClass<T>' of open class must be open}}
+public class PublicGenericSubclassPublic<T> : PublicGenericClass<T> {}
+public class PublicGenericSubclassInternal<T> : InternalGenericClass<T> {} // expected-error {{class cannot be declared public because its superclass is internal}}
+public class PublicGenericSubclassPrivate<T> : PrivateGenericClass<T> {} // expected-error {{class cannot be declared public because its superclass is private}}
+
+
 
 public enum PublicEnumPrivate {
   case A(PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
@@ -647,3 +666,24 @@ internal struct AssocTypeOuterProblem2 {
     fileprivate typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{5-16=internal}}
   }
 }
+
+internal typealias InternalComposition = PublicClass & PublicProto // expected-note {{declared here}}
+public class DerivedFromInternalComposition : InternalComposition { // expected-error {{class cannot be declared public because its superclass is internal}}
+  public func publicReq() {}
+}
+
+internal typealias InternalGenericComposition<T> = PublicGenericClass<T> & PublicProto // expected-note {{declared here}}
+public class DerivedFromInternalGenericComposition : InternalGenericComposition<Int> { // expected-error {{class cannot be declared public because its superclass is internal}}
+  public func publicReq() {}
+}
+
+internal typealias InternalConcreteGenericComposition = PublicGenericClass<Int> & PublicProto // expected-note {{declared here}}
+public class DerivedFromInternalConcreteGenericComposition : InternalConcreteGenericComposition { // expected-error {{class cannot be declared public because its superclass is internal}}
+  public func publicReq() {}
+}
+
+public typealias BadPublicComposition1 = InternalClass & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition2 = PublicClass & InternalProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition3<T> = InternalGenericClass<T> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition4 = InternalGenericClass<Int> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition5 = PublicGenericClass<InternalStruct> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}

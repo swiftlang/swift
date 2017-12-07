@@ -57,6 +57,49 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
   return make<UnknownSyntax>(Raw);
 }
 
+Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+%   if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}: return makeBlank${node.syntax_kind}();
+%   end
+% end
+  default: break;
+  }
+  llvm_unreachable("not collection kind.");
+}
+
+std::pair<unsigned, unsigned>
+SyntaxFactory::countChildren(SyntaxKind Kind){
+  switch(Kind) {
+% for node in SYNTAX_NODES:
+%   if not node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}:
+%     child_count = len(node.children)
+%     non_optional_child_count = sum(0 if child.is_optional else 1 for child in node.children)
+    return {${non_optional_child_count}, ${child_count}};
+%   end
+% end
+  default:
+  llvm_unreachable("bad syntax kind.");
+  }
+}
+
+bool SyntaxFactory::
+canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
+  switch (CollectionKind) {
+% for node in SYNTAX_NODES:
+%     if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}: {
+    return Member.is<${node.collection_element_type}>();
+  }
+%     end
+% end
+  default:
+    llvm_unreachable("Not collection kind.");
+  }
+}
+
 Optional<Syntax>
 SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
   switch(Kind) {
@@ -278,23 +321,23 @@ TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
 }
 
 GenericParameterSyntax
-SyntaxFactory::makeGenericParameter(TypeIdentifierSyntax Type,
+SyntaxFactory::makeGenericParameter(TokenSyntax Name,
   llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeGenericParameter(Type, None, None, TrailingComma);
+  return makeGenericParameter(None, Name, None, None, TrailingComma);
 }
 
-TypeIdentifierSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
+TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   auto identifier = makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia);
-  return makeTypeIdentifier(identifier, None, None, None);
+  return makeSimpleTypeIdentifier(identifier, None);
 }
 
-TypeIdentifierSyntax SyntaxFactory::makeAnyTypeIdentifier(
+TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia);
 }
 
-TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier(
+TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(
     const Trivia &LeadingTrivia, const Trivia &TrailingTrivia) {
   return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia);
 }

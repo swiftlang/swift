@@ -51,7 +51,7 @@ public let DropWhile = [
   BenchmarkInfo(
     name: "DropWhileArray",
     runFunction: run_DropWhileArray,
-    tags: [.validation, .api, .Array]),
+    tags: [.validation, .api, .Array, .unstable]),
   BenchmarkInfo(
     name: "DropWhileCountableRangeLazy",
     runFunction: run_DropWhileCountableRangeLazy,

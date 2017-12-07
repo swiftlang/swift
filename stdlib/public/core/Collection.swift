@@ -82,9 +82,11 @@ public typealias Indexable = Collection
 ///     // Prints "15.0"
 ///     // Prints "20.0"
 @_fixed_layout
-public struct IndexingIterator<
-  Elements : Collection
-> : IteratorProtocol, Sequence {
+public struct IndexingIterator<Elements : Collection> {
+  @_versioned
+  internal let _elements: Elements
+  @_versioned
+  internal var _position: Elements.Index
 
   @_inlineable
   @inline(__always)
@@ -103,6 +105,12 @@ public struct IndexingIterator<
     self._elements = _elements
     self._position = _position
   }
+}
+
+extension IndexingIterator: IteratorProtocol, Sequence {
+  public typealias Element = Elements.Element
+  public typealias Iterator = IndexingIterator<Elements>
+  public typealias SubSequence = AnySequence<Element>
 
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -136,11 +144,6 @@ public struct IndexingIterator<
     _elements.formIndex(after: &_position)
     return element
   }
-  
-  @_versioned
-  internal let _elements: Elements
-  @_versioned
-  internal var _position: Elements.Index
 }
 
 /// A sequence whose elements can be traversed multiple times,
@@ -345,8 +348,7 @@ public struct IndexingIterator<
 /// or bidirectional collection must traverse the entire collection to count
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
-public protocol Collection : Sequence
-{
+public protocol Collection: Sequence where SubSequence: Collection {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
@@ -403,7 +405,7 @@ public protocol Collection : Sequence
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence : Collection = Slice<Self>
+  associatedtype SubSequence = Slice<Self>
     where SubSequence.Index == Index,
           SubSequence.IndexDistance == IndexDistance
 
@@ -705,16 +707,11 @@ public protocol Collection : Sequence
 
   /// Returns the distance between two indices.
   ///
-  /// Unless the collection conforms to the `BidirectionalCollection` protocol,
-  /// `start` must be less than or equal to `end`.
-  ///
   /// - Parameters:
   ///   - start: A valid index of the collection.
   ///   - end: Another valid index of the collection. If `end` is equal to
   ///     `start`, the result is zero.
-  /// - Returns: The distance between `start` and `end`. The result can be
-  ///   negative only if the collection conforms to the
-  ///   `BidirectionalCollection` protocol.
+  /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
@@ -1000,30 +997,34 @@ extension Collection {
 
   /// Returns the distance between two indices.
   ///
-  /// Unless the collection conforms to the `BidirectionalCollection` protocol,
-  /// `start` must be less than or equal to `end`.
-  ///
   /// - Parameters:
   ///   - start: A valid index of the collection.
   ///   - end: Another valid index of the collection. If `end` is equal to
   ///     `start`, the result is zero.
-  /// - Returns: The distance between `start` and `end`. The result can be
-  ///   negative only if the collection conforms to the
-  ///   `BidirectionalCollection` protocol.
+  /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   @_inlineable
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    _precondition(start <= end,
-      "Only BidirectionalCollections can have end come before start")
-
-    var start = start
+    var _start: Index
+    let _end: Index
+    let step: IndexDistance
+    if start > end {
+      _start = end
+      _end = start
+      step = -1
+    }
+    else {
+      _start = start
+      _end = end
+      step = 1
+    }
     var count: IndexDistance = 0
-    while start != end {
-      count = count + 1
-      formIndex(after: &start)
+    while _start != _end {
+      count += step
+      formIndex(after: &_start)
     }
     return count
   }

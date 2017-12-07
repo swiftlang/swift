@@ -106,6 +106,7 @@ namespace {
       ConformanceCheckOptions conformanceOptions;
       if (Options.contains(NameLookupFlags::KnownPrivate))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
+      conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
 
       DeclContext *foundDC = found->getDeclContext();
 
@@ -430,6 +431,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     ConformanceCheckOptions conformanceOptions;
     if (options.contains(NameLookupFlags::KnownPrivate))
       conformanceOptions |= ConformanceCheckFlags::InExpression;
+    conformanceOptions |= ConformanceCheckFlags::SkipConditionalRequirements;
 
     for (AssociatedTypeDecl *assocType : inferredAssociatedTypes) {
       // If the type does not actually conform to the protocol, skip this

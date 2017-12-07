@@ -23,13 +23,13 @@ bb0(%i: $Int, %b: $<τ_0_0> { var τ_0_0 } <Int>, %m: $@thin Int.Type, %p: $@thi
   return %12 : $()
 }
 
-sil @concrete_caller1 : $@convention(thin) (Int, @thick P.Type) -> @owned @callee_owned () -> () {
+sil @concrete_caller1 : $@convention(thin) (Int, @thick P.Type) -> @owned @callee_guaranteed () -> () {
 bb0(%i: $Int, %p: $@thick P.Type):
   %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> ()
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %m = metatype $@thin Int.Type
-  %c = partial_apply %f(%i, %b, %m, %p) : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> ()
-  return %c : $@callee_owned () -> ()
+  %c = partial_apply [callee_guaranteed] %f(%i, %b, %m, %p) : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> ()
+  return %c : $@callee_guaranteed () -> ()
 }
 
 // This is the descriptor for '<τ_0_0> { var τ_0_0 } <Int>' above
@@ -56,14 +56,14 @@ bb0(%i: $*T, %b: $<τ_0_0> { var τ_0_0 } <U>):
   return %12 : $()
 }
 
-sil @concrete_caller2 : $@convention(thin) () -> @owned @callee_owned () -> () {
+sil @concrete_caller2 : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
 bb0:
   %f = function_ref @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   %i = alloc_stack $Int
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <String>
-  %c = partial_apply %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
+  %c = partial_apply [callee_guaranteed] %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   dealloc_stack %i : $*Int
-  return %c : $@callee_owned () -> ()
+  return %c : $@callee_guaranteed () -> ()
 }
 
 // This is the descriptor for '<τ_0_0> { var τ_0_0 } <String>' above
@@ -90,13 +90,13 @@ bb0(%t: $*T):
   return %12 : $()
 }
 
-sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
+sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_guaranteed () -> () {
 bb0:
   %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in T) -> ()
-  %t = alloc_stack $Optional<@callee_owned (@in A) -> @out B>
-  %c = partial_apply %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
-  dealloc_stack %t : $*Optional<@callee_owned (@in A) -> @out B>
-  return %c : $@callee_owned () -> ()
+  %t = alloc_stack $Optional<@callee_guaranteed (@in A) -> @out B>
+  %c = partial_apply [callee_guaranteed] %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
+  dealloc_stack %t : $*Optional<@callee_guaranteed (@in A) -> @out B>
+  return %c : $@callee_guaranteed () -> ()
 }
 
 // CHECK:      - Capture types:
@@ -128,12 +128,12 @@ bb0(%t: $@thick Optional<T>.Type):
   return %12 : $()
 }
 
-sil @generic_caller4 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
+sil @generic_caller4 : $@convention(thin) <A, B, C> () -> @owned @callee_guaranteed () -> () {
 bb0:
   %f = function_ref @generic_callee4 : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
   %t = metatype $@thick Optional<(B) -> C>.Type
-  %c = partial_apply %f<(B) -> C, Int>(%t) : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
-  return %c : $@callee_owned () -> ()
+  %c = partial_apply [callee_guaranteed] %f<(B) -> C, Int>(%t) : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> ()
+  return %c : $@callee_guaranteed () -> ()
 }
 
 // CHECK:      - Capture types:
@@ -165,11 +165,11 @@ bb0(%t: $GenericClass<T, U>):
   return %12 : $()
 }
 
-sil @generic_caller5 : $@convention(thin) <A, B, C> (@owned GenericClass<(A, B), (B, C)>) -> @owned @callee_owned () -> () {
+sil @generic_caller5 : $@convention(thin) <A, B, C> (@owned GenericClass<(A, B), (B, C)>) -> @owned @callee_guaranteed () -> () {
 bb0(%g: $GenericClass<(A, B), (B, C)>):
   %f = function_ref @generic_callee5 : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> ()
-  %c = partial_apply %f<(A, B), (B, C), (C, A)>(%g) : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> ()
-  return %c : $@callee_owned () -> ()
+  %c = partial_apply [callee_guaranteed] %f<(A, B), (B, C), (C, A)>(%g) : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> ()
+  return %c : $@callee_guaranteed () -> ()
 }
 
 sil_vtable GenericClass {}
@@ -208,11 +208,11 @@ bb0(%t: $T, %u: $U):
   return %12 : $()
 }
 
-sil @pseudogeneric_caller : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject, C : AnyObject> (@owned A, @owned B) -> @owned @pseudogeneric @callee_owned () -> () {
+sil @pseudogeneric_caller : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject, C : AnyObject> (@owned A, @owned B) -> @owned @pseudogeneric @callee_guaranteed () -> () {
 bb0(%a: $A, %b: $B):
   %f = function_ref @pseudogeneric_callee : $@convention(thin) @pseudogeneric <T : AnyObject, U : AnyObject> (@owned T, @owned U) -> ()
-  %c = partial_apply %f<A, B>(%a, %b) : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject> (@owned A, @owned B) -> ()
-  return %c : $@pseudogeneric @callee_owned () -> ()
+  %c = partial_apply [callee_guaranteed] %f<A, B>(%a, %b) : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject> (@owned A, @owned B) -> ()
+  return %c : $@pseudogeneric @callee_guaranteed () -> ()
 }
 
 // CHECK:      - Capture types:
@@ -229,11 +229,11 @@ bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@
   return %12 : $()
 }
 
-sil @function_caller : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> @owned @callee_owned () -> () {
+sil @function_caller : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> @owned @callee_guaranteed () -> () {
 bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method: P) (Int) -> ()):
   %f = function_ref @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> ()
-  %result = partial_apply %f(%thin, %c, %block, %thick, %method, %witness_method) : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> ()
-  return %result : $@callee_owned () -> ()
+  %result = partial_apply [callee_guaranteed] %f(%thin, %c, %block, %thick, %method, %witness_method) : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> ()
+  return %result : $@callee_guaranteed () -> ()
 }
 
 // CHECK:      - Capture types:
@@ -280,8 +280,8 @@ sil @existential_caller : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   %payload = open_existential_addr immutable_access %0 : $*P to $*@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P
   %f = function_ref @existential_callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
-  %result = partial_apply %f<@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P>() : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
-  destroy_value %result : $@callee_owned () -> @out P
+  %result = partial_apply [callee_guaranteed] %f<@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P>() : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
+  destroy_value %result : $@callee_guaranteed () -> @out P
   destroy_addr %0 : $*P
   %tuple = tuple ()
   return %tuple : $()

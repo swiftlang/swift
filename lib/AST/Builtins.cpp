@@ -80,6 +80,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheUnknownObjectType;
   if (Name == "BridgeObject")
     return Context.TheBridgeObjectType;
+  if (Name == "SILToken")
+    return Context.TheSILTokenType;
   if (Name == "UnsafeValueBuffer")
     return Context.TheUnsafeValueBufferType;
   

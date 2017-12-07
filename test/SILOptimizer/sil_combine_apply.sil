@@ -437,3 +437,85 @@ bb99:
   %empty = tuple ()
   return %empty : $()
 }
+
+class C {}
+
+sil @guaranteed_closure : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil @test_guaranteed_closure
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK: strong_retain [[ARG]]
+// CHECK: [[F:%.*]] = function_ref @guaranteed_closure
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]])
+// CHECK: strong_retain [[ARG]]
+// CHECK: apply [[F]]
+// Don't release the closure context -- it is @callee_guaranteed.
+// CHECK-NOT: strong_release [[C]] : $@callee_guaranteed () -> ()
+// CHECK: strong_release [[ARG]]
+// CHECK-NOT: strong_release [[C]] : $@callee_guaranteed () -> ()
+// CHECK: return [[C]]
+
+sil @test_guaranteed_closure : $@convention(thin) (@guaranteed C) -> @owned @callee_guaranteed () -> () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  apply %closure() : $@callee_guaranteed () -> ()
+  return %closure : $@callee_guaranteed () -> ()
+}
+
+sil @guaranteed_closure_throws : $@convention(thin) (@guaranteed C, Builtin.Int32) -> @error Error
+
+// CHECK: sil @test_guaranteed_closure_try_apply
+// CHECK: bb0(%0 : $C, %1 : $Builtin.Int32):
+// CHECK:   strong_retain %0 : $C
+// CHECK:   [[FUN:%.*]] = function_ref @guaranteed_closure_throws
+// CHECK:   [[CL:%.*]] = partial_apply [callee_guaranteed] [[FUN]](%1)
+// CHECK:   try_apply [[FUN]](%0, %1)
+// CHECK: bb1({{.*}}):
+// CHECK-NOT:   strong_release
+// CHECK:   br bb3
+// CHECK: bb2({{.*}}):
+// CHECK-NOT:   strong_release
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK:   return [[CL]]
+
+sil @test_guaranteed_closure_try_apply : $@convention(thin) (@guaranteed C, Builtin.Int32) -> @owned @callee_guaranteed (@guaranteed C) -> @error Error {
+bb0(%0: $C, %1: $Builtin.Int32):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_throws : $@convention(thin) (@guaranteed C, Builtin.Int32) -> @error Error
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%1) : $@convention(thin) (@guaranteed C, Builtin.Int32) -> @error Error
+  try_apply %closure(%0) : $@callee_guaranteed (@guaranteed C) -> @error Error, normal bb7, error bb11
+
+bb7(%callret : $()):
+  br bb99
+
+bb11(%128 : $Error):
+  br bb99
+
+bb99:
+  return %closure : $@callee_guaranteed (@guaranteed C) -> @error Error
+}
+
+// Make sure convert_function -> apply does the right thing with metatypes
+class Base {}
+class Derived {}
+
+sil @takesMetatype : $@convention(thin) (@thick Base.Type) -> ()
+
+// CHECK-LABEL: sil @passesMetatype
+// CHECK: [[METATYPE:%.*]] = metatype $@thick Derived.Type
+// CHECK: [[FN:%.*]] = function_ref @takesMetatype
+// CHECK: [[CONVERTED:%.*]] = unchecked_trivial_bit_cast [[METATYPE]] : $@thick Derived.Type to $@thick Base.Type
+// CHECK: [[RESULT:%.*]] = apply [[FN]]([[CONVERTED]])
+
+sil @passesMetatype : $@convention(thin) () -> () {
+bb0:
+  %metatype = metatype $@thick Derived.Type
+  %fn = function_ref @takesMetatype : $@convention(thin) (@thick Base.Type) -> ()
+  %converted = convert_function %fn : $@convention(thin) (@thick Base.Type) -> () to $@convention(thin) (@thick Derived.Type) -> ()
+  %result = apply %converted(%metatype) : $@convention(thin) (@thick Derived.Type) -> ()
+  %return = tuple ()
+  return %return : $()
+}

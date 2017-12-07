@@ -12,8 +12,8 @@ class SwiftGizmo : Gizmo {
   var x = X()
 
   // CHECK-LABEL: sil hidden [transparent] @_T012objc_dealloc10SwiftGizmoC1xAA1XCvpfi : $@convention(thin) () -> @owned X
+  // CHECK:      [[METATYPE:%.*]] = metatype $@thick X.Type
   // CHECK:      [[FN:%.*]] = function_ref @_T012objc_dealloc1XCACycfC : $@convention(method) (@thick X.Type) -> @owned X
-  // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick X.Type
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thick X.Type) -> @owned X
   // CHECK-NEXT: return [[RESULT]] : $X
 

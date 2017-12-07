@@ -23,12 +23,15 @@ using namespace swift::syntax;
 
 namespace {
 static bool isTrivialSyntaxKind(SyntaxKind Kind) {
+  if (isUnknownKind(Kind))
+    return true;
   if (isCollectionKind(Kind))
     return true;
   switch(Kind) {
   case SyntaxKind::SourceFile:
   case SyntaxKind::TopLevelCodeDecl:
   case SyntaxKind::ExpressionStmt:
+  case SyntaxKind::DeclarationStmt:
     return true;
   default:
     return false;
@@ -50,8 +53,12 @@ static void printSyntaxKind(SyntaxKind Kind, llvm::raw_ostream &OS,
 
 } // end of anonymous namespace
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
+  if (isMissing())
+    return;
+
   const bool PrintKind = Opts.PrintSyntaxKind && !isToken() &&
-    !isTrivialSyntaxKind(Kind);
+    (Opts.PrintTrivialNodeKind || !isTrivialSyntaxKind(Kind));
+
   if (PrintKind) {
     printSyntaxKind(Kind, OS, Opts, true);
   }

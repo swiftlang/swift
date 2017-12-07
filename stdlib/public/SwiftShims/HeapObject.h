@@ -16,8 +16,7 @@
 #include "System.h"
 
 #define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64 16
-// TODO: Should be 8
-#define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32 12
+#define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32 8
 
 #ifdef __cplusplus
 #include <type_traits>
@@ -39,12 +38,12 @@ typedef struct HeapMetadata HeapMetadata;
   InlineRefCounts refCounts
 
 /// The Swift heap-object header.
+/// This must match RefCountedStructTy in IRGen.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
   HeapMetadata const *metadata;
 
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
-  // FIXME: allocate two words of metadata on 32-bit platforms
 
 #ifdef __cplusplus
   HeapObject() = default;
@@ -75,15 +74,8 @@ static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 
-// FIXME: small header for 32-bit
-//static_assert(sizeof(HeapObject) == 2*sizeof(void*),
-//              "HeapObject must be two pointers long");
-//
-static_assert(sizeof(HeapObject) ==
-  (sizeof(void*) == 8 ? SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64 :
-   sizeof(void*) == 4 ? SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32 :
-   0 && "unexpected pointer size"),
-  "HeapObject must match ABI heap object header size");
+static_assert(sizeof(HeapObject) == 2*sizeof(void*),
+              "HeapObject must be two pointers long");
 
 static_assert(alignof(HeapObject) == alignof(void*),
               "HeapObject must be pointer-aligned");

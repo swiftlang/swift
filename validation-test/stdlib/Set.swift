@@ -201,10 +201,7 @@ func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by native storage
 func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<NSObject> {
-  // SR-4724: Should not need to be split out but if it is not it
-  // is considered ambiguous.
-  let temp = members.map({ TestObjCKeyTy($0) })
-  let result: Set<NSObject> = Set(temp)
+  let result: Set<NSObject> = Set(members.map({ TestObjCKeyTy($0) }))
   expectTrue(isNativeSet(result))
   return result
 }
@@ -334,6 +331,13 @@ SetTestSuite.test("sizeof") {
 #endif
 }
 
+SetTestSuite.test("Index.Hashable") {
+  let s: Set = [1, 2, 3, 4, 5]
+  let t = Set(s.indices)
+  expectEqual(s.count, t.count)
+  expectTrue(t.contains(s.startIndex))
+}
+
 SetTestSuite.test("COW.Smoke") {
   var s1 = Set<TestKeyTy>(minimumCapacity: 10)
   for i in [1010, 2020, 3030]{ s1.insert(TestKeyTy(i)) }
@@ -450,8 +454,6 @@ SetTestSuite.test("COW.Fast.ContainsDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   var s = getCOWSlowSet()
   var identity1 = s._rawIdentifier()
@@ -665,8 +667,6 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
 }
 
 SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var s = getCOWFastSet()
@@ -707,8 +707,6 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
 }
 
 SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var s = getCOWSlowSet()
@@ -749,8 +747,6 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
 }
 
 SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var s1 = getCOWFastSet()
@@ -790,8 +786,6 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate")
 }
 
 SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   do {
     var s1 = getCOWSlowSet()
@@ -1663,8 +1657,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   var s = getBridgedNonverbatimSet()
   let identity1 = s._rawIdentifier()
@@ -1743,8 +1735,6 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   do {
@@ -2961,8 +2951,6 @@ SetTestSuite.test("formUnion") {
 }
 
 SetTestSuite.test("subtract")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   let s1 = Set([1010, 2020, 3030])
   let s2 = Set([4040, 5050, 6060])
@@ -2990,8 +2978,6 @@ SetTestSuite.test("subtract")
 }
 
 SetTestSuite.test("subtract")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
@@ -3082,8 +3068,6 @@ SetTestSuite.test("symmetricDifference") {
 }
 
 SetTestSuite.test("formSymmetricDifference")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
   // Overlap with 4040, 5050, 6060
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
@@ -3122,8 +3106,6 @@ SetTestSuite.test("removeFirst") {
 }
 
 SetTestSuite.test("remove(member)")
-  .xfail(.custom({ _isStdlibDebugConfiguration() },
-                 reason: "rdar://33358110"))
   .code {
 
   let s1 : Set<TestKeyTy> = [1010, 2020, 3030]

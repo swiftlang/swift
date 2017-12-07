@@ -22,16 +22,16 @@
 import Foundation
 
 class C { 
-  @objc func cInstanceMethod() { }
-  @objc class func cClassMethod() { }
-  @objc func cInstanceOverride() { }
-  @objc class func cClassOverride() { }
+  @objc func cInstanceMethod() -> Int { return 1 }
+  @objc class func cClassMethod() -> Int { return 2 }
+  @objc func cInstanceOverride() -> Int { return 3 }
+  @objc class func cClassOverride() -> Int { return 4 }
 }
 class D : C {
-  @objc func dInstanceMethod() { }
-  @objc class func dClassMethod() { }
-  @objc override func cInstanceOverride() { }
-  @objc override class func cClassOverride() { }
+  @objc func dInstanceMethod() -> Int { return 5 }
+  @objc class func dClassMethod() -> Int { return 6 }
+  @objc override func cInstanceOverride() -> Int { return 7 }
+  @objc override class func cClassOverride() -> Int { return 8 }
 }
 
 @_silgen_name("TestSwiftObjectNSObject") 

@@ -57,6 +57,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryGroup
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
+    single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
     single-source/DropFirst
     single-source/DropLast
@@ -118,6 +119,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StrComplexWalk
     single-source/StrToInt
     single-source/StringBuilder
+    single-source/StringComparison
     single-source/StringEdits
     single-source/StringEnum
     single-source/StringInterpolation
@@ -210,6 +212,10 @@ set(SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS "" CACHE STRING
 
 # Options for the default (= empty) configuration
 set(BENCHOPTS "-whole-module-optimization")
+
+option(SWIFT_BENCHMARK_GENERATE_OPT_VIEW
+  "Produce optimization view for benchmarks"
+  FALSE)
 
 # Options for other configurations
 set(BENCHOPTS_MULTITHREADED

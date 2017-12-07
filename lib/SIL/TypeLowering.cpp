@@ -211,6 +211,7 @@ namespace {
     IMPL(BuiltinUnknownObject, Reference)
     IMPL(BuiltinUnsafeValueBuffer, AddressOnly)
     IMPL(BuiltinVector, Trivial)
+    IMPL(SILToken, Trivial)
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
     IMPL(AnyMetatype, Trivial)
@@ -1750,7 +1751,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      VarDecl *VD) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-      DC->mapTypeOutOfContext(VD->getParentPattern()->getType())
+    VD->getParentPattern()->getType()->mapTypeOutOfContext()
           ->getCanonicalType();
   auto sig = TC.getEffectiveGenericSignature(DC);
 
@@ -1870,7 +1871,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
       // FIXME: Closures could have an interface type computed by Sema.
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
-          ACE->mapTypeOutOfContext(funcTy)
+          funcTy->mapTypeOutOfContext()
               ->getCanonicalType());
       return getFunctionInterfaceTypeWithCaptures(funcTy, ACE);
     }
@@ -2107,9 +2108,9 @@ CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
   if (genericSig && genericSig->areAllParamsConcrete())
     genericSig = nullptr;
 
-  return SILFunctionType::get(genericSig, extInfo,
+  return SILFunctionType::get(genericSig, extInfo, SILCoroutineKind::None,
                               /*callee*/ ParameterConvention::Direct_Unowned,
-                              params, results, None, ctx,
+                              params, {}, results, None, ctx,
                               witnessMethodConformance);
 }
 
@@ -2501,7 +2502,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
     auto homeSig = captured->getDeclContext()
         ->getGenericSignatureOfContext();
     loweredInterfaceType =
-      env->mapTypeOutOfContext(loweredInterfaceType)
+      loweredInterfaceType->mapTypeOutOfContext()
         ->getCanonicalType(homeSig);
   }
   

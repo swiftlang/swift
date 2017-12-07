@@ -232,10 +232,6 @@ enum RememberChoice_t : bool {
 /// Describes the kind of fix to apply to the given constraint before
 /// visiting it.
 enum class FixKind : uint8_t {
-  /// No fix, which is used as a placeholder indicating that future processing
-  /// of this constraint should not attempt fixes.
-  None,
-
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
     
@@ -264,9 +260,7 @@ class Fix {
   friend class Constraint;
 
 public:
-  Fix() : Kind(FixKind::None), Data(0) { }
-  
-  Fix(FixKind kind) : Kind(kind), Data(0) { 
+  Fix(FixKind kind) : Kind(kind), Data(0) {
     assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
   }
 
@@ -503,6 +497,11 @@ public:
   void setDisabled() {
     assert(!isActive() && "Cannot disable constraint marked as active!");
     IsDisabled = true;
+  }
+
+  void setEnabled() {
+    assert(isDisabled() && "Can't re-enable already active constraint!");
+    IsDisabled = false;
   }
 
   /// Mark or retrieve whether this constraint should be favored in the system.

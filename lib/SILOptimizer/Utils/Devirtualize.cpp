@@ -39,14 +39,7 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
-/// Compute all subclasses of a given class.
-///
-/// \p CHA class hierarchy analysis
-/// \p CD class declaration
-/// \p ClassType type of the instance
-/// \p M SILModule
-/// \p Subs a container to be used for storing the set of subclasses
-static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
+void swift::getAllSubclasses(ClassHierarchyAnalysis *CHA,
                              ClassDecl *CD,
                              SILType ClassType,
                              SILModule &M,
@@ -61,7 +54,6 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
   auto &IndirectSubs = CHA->getIndirectSubClasses(CD);
 
   Subs.append(DirectSubs.begin(), DirectSubs.end());
-  //SmallVector<ClassDecl *, 8> Subs(DirectSubs);
   Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
   if (ClassType.is<BoundGenericClassType>()) {
@@ -69,13 +61,10 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
     // specific bound class.
     auto RemovedIt = std::remove_if(Subs.begin(), Subs.end(),
         [&ClassType](ClassDecl *Sub){
-          auto SubCanTy = Sub->getDeclaredType()->getCanonicalType();
-          // Unbound generic type can override a method from
-          // a bound generic class, but this unbound generic
-          // class is not considered to be a subclass of a
-          // bound generic class in a general case.
-          if (isa<UnboundGenericType>(SubCanTy))
+          // FIXME: Add support for generic subclasses.
+          if (Sub->isGenericContext())
             return false;
+          auto SubCanTy = Sub->getDeclaredInterfaceType()->getCanonicalType();
           // Handle the usual case here: the class in question
           // should be a real subclass of a bound generic class.
           return !ClassType.isBindableToSuperclassOf(
@@ -94,10 +83,10 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
 /// \p ClassType type of the instance
 /// \p CD  static class of the instance whose method is being invoked
 /// \p CHA class hierarchy analysis
-bool isEffectivelyFinalMethod(FullApplySite AI,
-                              SILType ClassType,
-                              ClassDecl *CD,
-                              ClassHierarchyAnalysis *CHA) {
+static bool isEffectivelyFinalMethod(FullApplySite AI,
+                                     SILType ClassType,
+                                     ClassDecl *CD,
+                                     ClassHierarchyAnalysis *CHA) {
   if (CD && CD->isFinal())
     return true;
 
@@ -528,7 +517,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     return false;
   }
 
-  if (!F->shouldOptimize()) {
+  // Mandatory inlining does class method devirtualization. I'm not sure if this
+  // is really needed, but some test rely on this.
+  // So even for Onone functions we have to do it if the SILStage is raw.
+  if (F->getModule().getStage() != SILStage::Raw && !F->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
     DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
                        << " because it is marked no-opt: " << F->getName()
@@ -712,48 +704,6 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //                        Witness Method Optimization
 //===----------------------------------------------------------------------===//
 
-static SubstitutionMap
-getSubstitutionsForProtocolConformance(ModuleDecl *M,
-                                       ProtocolConformanceRef CRef) {
-  auto C = CRef.getConcrete();
-
-  // Walk down to the base NormalProtocolConformance.
-  SubstitutionList Subs;
-  const ProtocolConformance *ParentC = C;
-  while (!isa<NormalProtocolConformance>(ParentC)) {
-    switch (ParentC->getKind()) {
-    case ProtocolConformanceKind::Normal:
-      llvm_unreachable("should have exited the loop?!");
-    case ProtocolConformanceKind::Inherited:
-      ParentC = cast<InheritedProtocolConformance>(ParentC)
-        ->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized: {
-      auto SC = cast<SpecializedProtocolConformance>(ParentC);
-      ParentC = SC->getGenericConformance();
-      assert(Subs.empty() && "multiple conformance specializations?!");
-      Subs = SC->getGenericSubstitutions();
-      break;
-    }
-    }
-  }
-  const NormalProtocolConformance *NormalC
-    = cast<NormalProtocolConformance>(ParentC);
-
-  // If the normal conformance is for a generic type, and we didn't hit a
-  // specialized conformance, collect the substitutions from the generic type.
-  // FIXME: The AST should do this for us.
-  if (!NormalC->getType()->isSpecialized())
-    return SubstitutionMap();
-
-  if (Subs.empty()) {
-    auto *DC = NormalC->getDeclContext();
-    return NormalC->getType()->getContextSubstitutionMap(M, DC);
-  }
-
-  return NormalC->getGenericSignature()->getSubstitutionMap(Subs);
-}
-
 /// Compute substitutions for making a direct call to a SIL function with
 /// @convention(witness_method) convention.
 ///
@@ -823,7 +773,7 @@ getWitnessMethodSubstitutions(
 
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
-  auto baseSubMap = getSubstitutionsForProtocolConformance(mod, conformanceRef);
+  auto baseSubMap = conformance->getSubstitutions(mod);
 
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootNormalConformance();

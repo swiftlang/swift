@@ -330,7 +330,6 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     
     auto linkInfo = LinkInfo::get(IGM, "swift_keyPathGenericWitnessTable",
                                   SILLinkage::PublicExternal,
-                                  /*sil only*/ false,
                                   NotForDefinition,
                                   /*weak imported*/ false);
     
@@ -395,7 +394,8 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto elt = IGF.Builder.CreateInBoundsGEP(componentArgsBuf, offset);
         auto eltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(elt, ti.getStorageType()->getPointerTo()));
-        ti.destroy(IGF, eltAddr, ty);
+        ti.destroy(IGF, eltAddr, ty,
+                   true /*witness table: need it to be fast*/);
         auto size = ti.getSize(IGF, ty);
         offset = IGF.Builder.CreateAdd(offset, size);
       }
@@ -448,8 +448,8 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto destEltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(destElt,
                                     ti.getStorageType()->getPointerTo()));
-        
-        ti.initializeWithCopy(IGF, destEltAddr, sourceEltAddr, ty);
+
+        ti.initializeWithCopy(IGF, destEltAddr, sourceEltAddr, ty, false);
         auto size = ti.getSize(IGF, ty);
         offset = IGF.Builder.CreateAdd(offset, size);
       }
@@ -591,9 +591,11 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       // The last component using an operand can move the value out of the
       // buffer.
       if (&component == operands[index.Operand].LastUser) {
-        ti.initializeWithTake(IGF, destAddr, srcAddresses[index.Operand], ty);
+        ti.initializeWithTake(IGF, destAddr, srcAddresses[index.Operand], ty,
+                              false);
       } else {
-        ti.initializeWithCopy(IGF, destAddr, srcAddresses[index.Operand], ty);
+        ti.initializeWithCopy(IGF, destAddr, srcAddresses[index.Operand], ty,
+                              false);
       }
       auto size = ti.getSize(IGF, ty);
       offset = IGF.Builder.CreateAdd(offset, size);
@@ -699,11 +701,6 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // the final object.
   fields.add(emitMetadataGenerator(rootTy));
   fields.add(emitMetadataGenerator(valueTy));
-  
-  // TODO: 32-bit heap object header still has an extra word
-  if (SizeTy == Int32Ty) {
-    fields.addInt32(0);
-  }
   
 #ifndef NDEBUG
   auto endOfObjectHeader = fields.getNextOffsetFromGlobal();
@@ -911,10 +908,16 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
             auto declaringClass =
               cast<ClassDecl>(overridden.getDecl()->getDeclContext());
             auto &metadataLayout = getMetadataLayout(declaringClass);
+            // FIXME: Resilience. We don't want vtable layout to be ABI, so this
+            // should be encoded as a reference to the method dispatch thunk
+            // instead.
             auto offset = metadataLayout.getStaticMethodOffset(overridden);
             idValue = llvm::ConstantInt::get(SizeTy, offset.getValue());
             idResolved = true;
           } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
+            // FIXME: Resilience. We don't want witness table layout to be ABI,
+            // so this should be encoded as a reference to the method dispatch
+            // thunk instead.
             auto &protoInfo = getProtocolInfo(methodProto);
             auto index = protoInfo.getFunctionIndex(
                                  cast<AbstractFunctionDecl>(declRef.getDecl()));

@@ -25,14 +25,14 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Syntax/RawTokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
+#include "swift/Parse/SyntaxParserResult.h"
+#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -55,6 +55,13 @@ namespace swift {
   
   struct EnumElementInfo;
   
+  namespace syntax {
+    class AbsolutePosition;
+    struct RawTokenSyntax;
+    enum class SyntaxKind;
+    class TypeSyntax;
+  }// end of syntax namespace
+
   /// Different contexts in which BraceItemList are parsed.
   enum class BraceItemListKind {
     /// A statement list terminated by a closing brace. The default.
@@ -191,6 +198,14 @@ public:
 
   /// \brief This is the current token being considered by the parser.
   Token Tok;
+
+  /// \brief leading trivias for \c Tok.
+  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  syntax::Trivia LeadingTrivia;
+
+  /// \brief trailing trivias for \c Tok.
+  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  syntax::Trivia TrailingTrivia;
 
   /// \brief The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -362,7 +377,7 @@ public:
   };
 
   ParserPosition getParserPosition() {
-    return ParserPosition(L->getStateForBeginningOfToken(Tok),
+    return ParserPosition(L->getStateForBeginningOfToken(Tok, LeadingTrivia),
                           PreviousLoc);
   }
 
@@ -370,9 +385,6 @@ public:
     return ParserPosition(L->getStateForBeginningOfTokenLoc(Pos.Loc),
                           Pos.PrevLoc);
   }
-
-  /// \brief Return parser position after the first character of token T
-  ParserPosition getParserPositionAfterFirstCharacter(Token T);
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
     L->restoreState(PP.LS, enableDiagnostics);
@@ -405,21 +417,24 @@ public:
     Parser &P;
     ParserPosition PP;
     DiagnosticTransaction DT;
+    /// This context immediately deconstructed with transparent accumulation
+    /// on cancelBacktrack().
+    llvm::Optional<syntax::SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
   public:
     BacktrackingScope(Parser &P)
-      : P(P), PP(P.getParserPosition()), DT(P.Diags) {}
-
-    ~BacktrackingScope() {
-      if (Backtrack) {
-        P.backtrackToPosition(PP);
-        DT.abort();
-      }
+        : P(P), PP(P.getParserPosition()), DT(P.Diags) {
+      SynContext.emplace(P.SyntaxContext);
+      SynContext->setDiscard();
     }
+
+    ~BacktrackingScope();
 
     void cancelBacktrack() {
       Backtrack = false;
+      SynContext->setTransparent();
+      SynContext.reset();
       DT.commit();
     }
   };
@@ -575,7 +590,9 @@ public:
 
   /// \brief Consume the starting character of the current token, and split the
   /// remainder of the token into a new token (or tokens).
-  SourceLoc consumeStartingCharacterOfCurrentToken();
+  SourceLoc
+  consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
+                                         size_t Len = 1);
 
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
@@ -669,6 +686,7 @@ public:
   /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
+                         syntax::SyntaxKind Kind,
                          std::function<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
@@ -913,12 +931,10 @@ public:
                                    bool HandleCodeCompletion = true,
                                    bool IsSILFuncDecl = false);
 
-  ParserResult<TypeRepr> parseTypeSimpleOrComposition();
   ParserResult<TypeRepr>
     parseTypeSimpleOrComposition(Diag<> MessageID,
                                  bool HandleCodeCompletion = true);
 
-  ParserResult<TypeRepr> parseTypeSimple();
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
                                          bool HandleCodeCompletion = true);
 
@@ -929,9 +945,9 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
 
-  ParserResult<TypeRepr> parseTypeIdentifier();
+  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
-  ParserResult<CompositionTypeRepr> parseAnyType();
+  SyntaxParserResult<syntax::TypeSyntax, CompositionTypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
                                          const TypeAttributes &attrs,
                                          Optional<Scope> &GenericsScope);
@@ -943,11 +959,13 @@ public:
   ///   type-simple:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
-  ParserResult<TypeRepr> parseTypeCollection();
-  ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
+  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeCollection();
 
-  ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
-    parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
+  SyntaxParserResult<syntax::TypeSyntax, OptionalTypeRepr>
+  parseTypeOptional(TypeRepr *Base);
+
+  SyntaxParserResult<syntax::TypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
+  parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
   bool isOptionalToken(const Token &T) const;
   SourceLoc consumeOptionalToken();
@@ -1164,6 +1182,7 @@ public:
                                             bool periodHasKeyPathBehavior,
                                             bool &hasBindOptional);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
@@ -1242,7 +1261,8 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
+                                   syntax::SyntaxKind Kind);
 
   /// Parse an expression list, keeping all of the pieces separated.
   ParserStatus parseExprList(tok leftTok, tok rightTok,
@@ -1253,7 +1273,8 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             Expr *&trailingClosure);
+                             Expr *&trailingClosure,
+                             syntax::SyntaxKind Kind);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 
@@ -1271,10 +1292,8 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc,
-                                    ParserResult<Expr> FirstExpr);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc,
-                                         ParserResult<Expr> FirstKey);
+  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
@@ -1310,6 +1329,8 @@ public:
 
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
+                        SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
@@ -1424,12 +1445,6 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
                    unsigned BufferID,
                    unsigned Offset = 0,
                    unsigned EndOffset = 0);
-
-
-void populateTokenSyntaxMap(const LangOptions &LangOpts,
-                            const SourceManager &SM,
-                            unsigned BufferID,
-                            std::vector<syntax::RawTokenInfo> &Result);
 } // end namespace swift
 
 #endif

@@ -214,9 +214,7 @@ sil public_external @indirect_consumed_captured_class_pair_param : $@convention(
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
 // CHECK:         [[X_TMP:%.*]] = alloca
-// CHECK:         retain
-// CHECK:         retain
-// CHECK-NOT:     retain
+// CHECK:         call %T13partial_apply14SwiftClassPairV* @_T013partial_apply14SwiftClassPairVWc0_
 // CHECK:         release{{.*}}%1)
 // CHECK:         [[RESULT:%.*]] = call swiftcc i64 @indirect_consumed_captured_class_pair_param(i64 %0, %T13partial_apply14SwiftClassPairV* noalias nocapture dereferenceable({{.*}}) [[X_TMP]])
 // CHECK:         ret i64 [[RESULT]]
@@ -474,7 +472,7 @@ sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> 
 // CHECK-LABEL: define{{.*}} @partial_apply_generic_indirect_return2
 // CHECK: insertvalue {{.*}}_T024generic_indirect_return2TA
 
-// CHECK-LABEL: define internal swiftcc void @_T024generic_indirect_return2TA(%T13partial_apply12GenericEnum2OySiG* noalias nocapture sret, %swift.refcounted* swiftself) #0 {
+// CHECK-LABEL: define internal swiftcc void @_T024generic_indirect_return2TA(%T13partial_apply12GenericEnum2OySiG* noalias nocapture sret, %swift.refcounted* swiftself)
 // CHECK:  [[CASTED_ADDR:%.*]] = bitcast %T13partial_apply12GenericEnum2OySiG* %0 to %T13partial_apply12GenericEnum2O*
 // CHECK: call swiftcc void @generic_indirect_return2(%T13partial_apply12GenericEnum2O* noalias nocapture sret [[CASTED_ADDR]]
 // CHECK:  ret void

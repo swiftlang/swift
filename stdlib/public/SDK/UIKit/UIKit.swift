@@ -57,6 +57,52 @@ public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
 
 extension UIOffset : Equatable {}
 
+//===----------------------------------------------------------------------===//
+// Numeric backed types
+//===----------------------------------------------------------------------===//
+
+@available(swift 4)
+public protocol _UIKitNumericRawRepresentable : RawRepresentable, Comparable where RawValue: Comparable & Numeric {}
+
+extension _UIKitNumericRawRepresentable {
+
+  public static func <(lhs: Self, rhs: Self) -> Bool {
+    return lhs.rawValue < rhs.rawValue
+  }
+
+  public static func +(lhs: Self, rhs: RawValue) -> Self {
+    return Self(rawValue: lhs.rawValue + rhs)!
+  }
+
+  public static func +(lhs: RawValue, rhs: Self) -> Self {
+    return Self(rawValue: lhs + rhs.rawValue)!
+  }
+
+  public static func -(lhs: Self, rhs: RawValue) -> Self {
+    return Self(rawValue: lhs.rawValue - rhs)!
+  }
+
+  public static func -(lhs: Self, rhs: Self) -> RawValue {
+    return lhs.rawValue - rhs.rawValue
+  }
+
+  public static func +=(lhs: inout Self, rhs: RawValue) {
+    lhs = Self(rawValue: lhs.rawValue + rhs)!
+  }
+
+  public static func -=(lhs: inout Self, rhs: RawValue) {
+    lhs = Self(rawValue: lhs.rawValue - rhs)!
+  }
+}
+
+@available(swift 4)
+extension UIFont.Weight : _UIKitNumericRawRepresentable {}
+
+#if !os(watchOS)
+@available(swift 4)
+extension UILayoutPriority : _UIKitNumericRawRepresentable {}
+#endif
+
 // These are un-imported macros in UIKit.
 
 //===----------------------------------------------------------------------===//
@@ -247,6 +293,7 @@ extension UIFontTextStyle {
 
 #if !os(watchOS) // UIContentSizeCategory not available on watchOS
 extension UIContentSizeCategory {
+
     @available(iOS 11.0, tvOS 11.0,  *)
     public var isAccessibilityCategory: Bool {
         return __UIContentSizeCategoryIsAccessibilityCategory(self)

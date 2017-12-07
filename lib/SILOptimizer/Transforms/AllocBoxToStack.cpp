@@ -629,7 +629,8 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   // the parameters promoted.
   auto ClonedTy = SILFunctionType::get(
       OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
-      OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
+      OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
+      ClonedInterfaceArgTys, OrigFTI->getYields(),
       OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
       M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
 
@@ -647,7 +648,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
-  if (Orig->hasUnqualifiedOwnership()) {
+  if (!Orig->hasQualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
   return Fn;

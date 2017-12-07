@@ -21,10 +21,6 @@
 
 namespace llvm {
   class MemoryBuffer;
-  namespace opt {
-  class ArgList;
-  class Arg;
-  } // namespace opt
 }
 
 namespace swift {
@@ -68,6 +64,8 @@ enum class InputFileKind {
 
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
+  friend class ArgsToFrontendInputsConverter;
+
 private:
   /// The names of input files to the frontend.
   std::vector<std::string> InputFilenames;
@@ -75,9 +73,11 @@ private:
   /// Input buffers which may override the file contents of input files.
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
-  /// The input for which output should be generated. If not set, output will
-  /// be generated for the whole module.
-  Optional<SelectedInput> PrimaryInput;
+  /// The inputs for which output should be generated. If empty, output will
+  /// be generated for the whole module, in other words, whole-module mode.
+  /// Even if every input file is mentioned here, it is not the same as
+  /// whole-module mode.
+  std::vector<SelectedInput> PrimaryInputs;
 
 public:
   // Readers:
@@ -93,7 +93,7 @@ public:
     return getInputFilenames()[0];
   }
 
-  bool isReadingFromStdin() {
+  bool isReadingFromStdin() const {
     return hasUniqueInputFilename() && getFilenameOfFirstInput() == "-";
   }
 
@@ -110,21 +110,64 @@ public:
 
   // Primary input readers
 
-  Optional<SelectedInput> getPrimaryInput() const { return PrimaryInput; }
-  bool hasPrimaryInput() const { return getPrimaryInput().hasValue(); }
-
-  bool isWholeModule() { return !hasPrimaryInput(); }
-
-  bool isPrimaryInputAFileAt(unsigned i) {
-    return hasPrimaryInput() && getPrimaryInput()->isFilename() &&
-           getPrimaryInput()->Index == i;
+private:
+  void assertMustNotBeMoreThanOnePrimaryInput() const {
+    assert(PrimaryInputs.size() < 2 &&
+           "have not implemented >1 primary input yet");
   }
-  bool haveAPrimaryInputFile() const {
-    return hasPrimaryInput() && getPrimaryInput()->isFilename();
+
+public:
+  ArrayRef<SelectedInput> getPrimaryInputs() const { return PrimaryInputs; }
+
+  unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+
+  // Primary count readers:
+
+  bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
+
+  bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
+
+  bool isWholeModule() const { return !hasPrimaryInputs(); }
+
+  // Count-dependend readers:
+
+  Optional<SelectedInput> getOptionalPrimaryInput() const {
+    return hasPrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
+                              : Optional<SelectedInput>();
   }
+
+  SelectedInput getRequiredUniquePrimaryInput() const {
+    assert(hasUniquePrimaryInput());
+    return getPrimaryInputs()[0];
+  }
+
+  Optional<SelectedInput> getOptionalUniquePrimaryInput() const {
+    return hasUniquePrimaryInput()
+               ? Optional<SelectedInput>(getPrimaryInputs()[0])
+               : Optional<SelectedInput>();
+  }
+
+  bool hasAPrimaryInputFile() const {
+    return hasPrimaryInputs() && getOptionalPrimaryInput()->isFilename();
+  }
+
+  Optional<StringRef> getOptionalUniquePrimaryInputFilename() const {
+    Optional<SelectedInput> primaryInput = getOptionalUniquePrimaryInput();
+    return (primaryInput && primaryInput->isFilename())
+               ? Optional<StringRef>(getInputFilenames()[primaryInput->Index])
+               : Optional<StringRef>();
+  }
+
+  bool isInputPrimary(unsigned i) const {
+    assertMustNotBeMoreThanOnePrimaryInput();
+    if (Optional<SelectedInput> primaryInput = getOptionalPrimaryInput())
+      return primaryInput->isFilename() && primaryInput->Index == i;
+    return false;
+  }
+
   Optional<unsigned> primaryInputFileIndex() const {
-    return haveAPrimaryInputFile()
-               ? Optional<unsigned>(getPrimaryInput()->Index)
+    return hasAPrimaryInputFile()
+               ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
                : None;
   }
 
@@ -135,13 +178,12 @@ public:
     return StringRef();
   }
 
+public:
   // Multi-facet readers
-  StringRef baseNameOfOutput(const llvm::opt::ArgList &Args,
-                             StringRef ModuleName) const;
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
-  bool verifyInputs(DiagnosticEngine &Diags, bool TreatAsSIL,
+  bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
   // Input filename writers
@@ -158,8 +200,31 @@ public:
 
   // Primary input writers
 
-  void setPrimaryInput(SelectedInput si) { PrimaryInput = si; }
-  void clearPrimaryInput() { PrimaryInput = 0; }
+private:
+  std::vector<SelectedInput> &getMutablePrimaryInputs() {
+    assertMustNotBeMoreThanOnePrimaryInput();
+    return PrimaryInputs;
+  }
+
+public:
+  void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
+
+  void setPrimaryInputToFirstFile() {
+    clearPrimaryInputs();
+    addPrimaryInput(SelectedInput(0, SelectedInput::InputKind::Filename));
+  }
+
+  void addPrimaryInput(SelectedInput si) { PrimaryInputs.push_back(si); }
+
+  void setPrimaryInput(SelectedInput si) {
+    clearPrimaryInputs();
+    getMutablePrimaryInputs().push_back(si);
+  }
+
+  void addPrimaryInputFilename(unsigned index) {
+    addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
+  }
+
   void setPrimaryInputForInputFilename(const std::string &inputFilename) {
     setPrimaryInput(!inputFilename.empty() && inputFilename != "-"
                         ? SelectedInput(inputFilenameCount(),
@@ -174,16 +239,12 @@ public:
     InputFilenames.clear();
     InputBuffers.clear();
   }
-
-  void setInputFilenamesAndPrimaryInput(DiagnosticEngine &Diags,
-                                        llvm::opt::ArgList &Args);
-
-  void readInputFileList(DiagnosticEngine &diags, llvm::opt::ArgList &Args,
-                         const llvm::opt::Arg *filelistPath);
 };
 
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
+  friend class FrontendArgsToOptionsConverter;
+
 public:
   FrontendInputs Inputs;
 
@@ -213,12 +274,9 @@ public:
     return getSingleOutputFilename() == "-";
   }
   bool isOutputFileDirectory() const;
-  bool isOutputFilePlainFile() const;
   bool hasNamedOutputFile() const {
     return !OutputFilenames.empty() && !isOutputFilenameStdout();
   }
-  void setOutputFileList(DiagnosticEngine &Diags,
-                         const llvm::opt::ArgList &Args);
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
@@ -296,15 +354,18 @@ public:
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
 
-  enum ActionType {
-    NoneAction, ///< No specific action
-    Parse, ///< Parse only
-    Typecheck, ///< Parse and type-check only
-    DumpParse, ///< Parse only and dump AST
+  /// The module for which we should verify all of the generic signatures.
+  std::string VerifyGenericSignaturesInModule;
+
+  enum class ActionType {
+    NoneAction,        ///< No specific action
+    Parse,             ///< Parse only
+    Typecheck,         ///< Parse and type-check only
+    DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
-    EmitSyntax, ///< Parse and dump Syntax tree as JSON
-    DumpAST, ///< Parse, type-check, and dump AST
-    PrintAST, ///< Parse, type-check, and pretty-print AST
+    EmitSyntax,        ///< Parse and dump Syntax tree as JSON
+    DumpAST,           ///< Parse, type-check, and dump AST
+    PrintAST,          ///< Parse, type-check, and pretty-print AST
 
     /// Parse and dump scope map.
     DumpScopeMaps,
@@ -313,30 +374,30 @@ public:
     DumpTypeRefinementContexts,
 
     EmitImportedModules, ///< Emit the modules that this one imports
-    EmitPCH, ///< Emit PCH of imported bridging header
+    EmitPCH,             ///< Emit PCH of imported bridging header
 
     EmitSILGen, ///< Emit raw SIL
-    EmitSIL, ///< Emit canonical SIL
+    EmitSIL,    ///< Emit canonical SIL
 
     EmitModuleOnly, ///< Emit module only
-    MergeModules, ///< Merge modules only
+    MergeModules,   ///< Merge modules only
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
-    EmitSIB, ///< Emit serialized AST + canonical SIL
+    EmitSIB,    ///< Emit serialized AST + canonical SIL
 
     Immediate, ///< Immediate mode
-    REPL, ///< REPL mode
+    REPL,      ///< REPL mode
 
     EmitAssembly, ///< Emit assembly
-    EmitIR, ///< Emit LLVM IR
-    EmitBC, ///< Emit LLVM BC
-    EmitObject, ///< Emit object file
+    EmitIR,       ///< Emit LLVM IR
+    EmitBC,       ///< Emit LLVM BC
+    EmitObject,   ///< Emit object file
   };
 
-  bool isCreatingSIL() { return RequestedAction >= EmitSILGen; }
+  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
 
   /// Indicates the action the user requested that the frontend perform.
-  ActionType RequestedAction = NoneAction;
+  ActionType RequestedAction = ActionType::NoneAction;
 
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
@@ -362,10 +423,6 @@ public:
 
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
-
-  /// Indicates whether function body parsing should be delayed
-  /// until the end of all files.
-  bool DelayedFunctionBodyParsing = false;
 
   /// If true, serialization encodes an extra lookup table for use in module-
   /// merging when emitting partial modules (the per-file modules in a non-WMO
@@ -457,11 +514,8 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
-  /// Indicates whether the RequestedAction has output.
-  bool actionHasOutput() const;
-
-  /// Indicates whether the RequestedAction will immediately run code.
-  bool actionIsImmediate() const;
+  /// Indicates whether the action will immediately run code.
+  static bool isActionImmediate(ActionType);
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -478,7 +532,23 @@ public:
            Inputs.hasUniqueInputFilename();
   }
 
-  void setModuleName(DiagnosticEngine &Diags, const llvm::opt::ArgList &Args);
+private:
+  static const char *suffixForPrincipalOutputFileForAction(ActionType);
+
+  bool hasUnusedDependenciesFilePath() const;
+  static bool canActionEmitDependencies(ActionType);
+  bool hasUnusedObjCHeaderOutputPath() const;
+  static bool canActionEmitHeader(ActionType);
+  bool hasUnusedLoadedModuleTracePath() const;
+  static bool canActionEmitLoadedModuleTrace(ActionType);
+  bool hasUnusedModuleOutputPath() const;
+  static bool canActionEmitModule(ActionType);
+  bool hasUnusedModuleDocOutputPath() const;
+  static bool canActionEmitModuleDoc(ActionType);
+
+  static bool doesActionProduceOutput(ActionType);
+  static bool doesActionProduceTextualOutput(ActionType);
+  static bool needsProperModuleName(ActionType);
 };
 
 }

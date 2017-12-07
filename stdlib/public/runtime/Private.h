@@ -116,11 +116,6 @@ namespace swift {
   LLVM_LIBRARY_VISIBILITY
   const ClassMetadata *_swift_getClass(const void *object);
 
-  static inline
-  const ClassMetadata *_swift_getSuperclass(const ClassMetadata *theClass) {
-    return theClass->SuperClass;
-  }
-
   LLVM_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
 
@@ -189,6 +184,14 @@ namespace swift {
   void _swift_once_f(uintptr_t *predicate, void *context,
                      void (*function)(void *));
 #endif
+
+  static inline const Metadata *getMetadataForClass(const ClassMetadata *c) {
+#if SWIFT_OBJC_INTEROP
+    return swift_getObjCClassMetadata(c);
+#else
+    return c;
+#endif
+  }
 
 } // end namespace swift
 

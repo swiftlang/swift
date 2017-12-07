@@ -105,6 +105,8 @@ public:
   };
 
 private:
+  bool currentProcessExitStatusSet;
+  int currentProcessExitStatus;
   SmallString<128> StatsFilename;
   SmallString<128> TraceFilename;
   llvm::TimeRecord StartedTime;
@@ -140,6 +142,7 @@ public:
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
   AlwaysOnFrontendRecursiveSharedTimers &getFrontendRecursiveSharedTimers();
+  void noteCurrentProcessExitStatus(int);
   FrontendStatsTracer getStatsTracer(StringRef N,
                                      SourceRange const &R);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const& T,

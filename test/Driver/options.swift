@@ -117,3 +117,11 @@
 // RUN: %swiftc_driver -driver-print-jobs -enforce-exclusivity=checked %s | %FileCheck -check-prefix=EXCLUSIVITY_CHECKED %s
 // EXCLUSIVITY_CHECKED: swift
 // EXCLUSIVITY_CHECKED: -enforce-exclusivity=checked
+
+// RUN: %swiftc_driver -driver-print-jobs -remove-runtime-asserts %s | %FileCheck -check-prefix=REMOVE_RUNTIME_ASSERTS %s
+// REMOVE_RUNTIME_ASSERTS: swift
+// REMOVE_RUNTIME_ASSERTS: -frontend {{.*}} -remove-runtime-asserts
+
+// RUN: %swiftc_driver -driver-print-jobs -assume-single-threaded %s | %FileCheck -check-prefix=ASSUME_SINGLE_THREADED %s
+// ASSUME_SINGLE_THREADED: swift
+// ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded

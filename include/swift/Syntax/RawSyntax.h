@@ -188,6 +188,7 @@ enum class SourcePresence {
 struct SyntaxPrintOptions {
   bool Visual = false;
   bool PrintSyntaxKind = false;
+  bool PrintTrivialNodeKind = false;
 };
 
 /// RawSyntax - the strictly immutable, shared backing nodes for all syntax.
@@ -211,6 +212,8 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
   RawSyntax(const SyntaxKind Kind, const std::vector<RC<RawSyntax>> Layout,
             const SourcePresence Presence)
       : Kind(Kind), Layout(Layout), Presence(Presence) {}
+
+  virtual ~RawSyntax() = default;
 
   /// Returns a raw syntax node of the given Kind, specified Layout,
   /// and source presence.

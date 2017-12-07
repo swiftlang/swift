@@ -242,15 +242,15 @@ public struct EnumIter<Base : IP> : IP, Seq {
 // ---
 // CHECK-LABEL: sil @_T0s7EnumSeqV12makeIterators0A4IterVy0D0QzGyF : $@convention(method) <Base where Base : Seq> (@in_guaranteed EnumSeq<Base>) -> @out EnumIter<Base.Iterator> {
 // CHECK: bb0(%0 : @guaranteed $EnumSeq<Base>):
-// CHECK: [[FN:%.*]] = function_ref @_T0s8EnumIterVAByxGx5_base_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  [[MT:%.*]] = metatype $@thin EnumIter<Base.Iterator>.Type
-// CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator!1 : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  [[FIELD:%.*]] = struct_extract %0 : $EnumSeq<Base>, #EnumSeq._base
 // CHECK:  [[COPY:%.*]] = copy_value [[FIELD]] : $Base
 // CHECK:  [[BORROW:%.*]] = begin_borrow [[COPY]] : $Base
+// CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator!1 : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[BORROW]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  end_borrow [[BORROW]] from [[COPY]] : $Base, $Base
 // CHECK:  destroy_value [[COPY]] : $Base
+// CHECK: [[FN:%.*]] = function_ref @_T0s8EnumIterVAByxGx5_base_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  [[RET:%.*]] = apply [[FN]]<Base.Iterator>([[ITER]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  return [[RET]] : $EnumIter<Base.Iterator>
 // CHECK-LABEL: } // end sil function '_T0s7EnumSeqV12makeIterators0A4IterVy0D0QzGyF'

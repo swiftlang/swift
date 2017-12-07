@@ -13,7 +13,7 @@ SymbolicReferenceExprSyntax getCannedSymbolicRef() {
   // First, make a symbolic reference to an 'Array<Int>'
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto IntArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder
@@ -32,7 +32,8 @@ FunctionCallExprSyntax getCannedFunctionCall() {
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto One = SyntaxFactory::makePrefixOperatorExpr(NoSign,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 
   auto Arg = SyntaxFactory::makeFunctionCallArgument(Label, Colon, One,

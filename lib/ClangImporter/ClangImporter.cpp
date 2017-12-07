@@ -430,49 +430,61 @@ static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
                              const ClangImporterOptions &importerOpts) {
-  const llvm::Triple &triple = ctx.LangOpts.Target;
+  const auto &LangOpts = ctx.LangOpts;
+  const llvm::Triple &triple = LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
-  if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
-        PCH_EXTENSION)) {
-    invocationArgStrs.insert(
-      invocationArgStrs.end(),
-        { "-include-pch", importerOpts.BridgingHeader }
-    );
+  if (llvm::sys::path::extension(importerOpts.BridgingHeader)
+          .endswith(PCH_EXTENSION)) {
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-include-pch", importerOpts.BridgingHeader
+    });
   }
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  invocationArgStrs.insert(
-      invocationArgStrs.end(),
-      {
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+      // Don't emit LLVM IR.
+      "-fsyntax-only",
 
-          // Enable modules
-          "-fmodules",
-          "-Werror=non-modular-include-in-framework-module",
-          "-Xclang", "-fmodule-feature", "-Xclang", "swift",
+      // Enable block support.
+      "-fblocks",
 
-          // Don't emit LLVM IR.
-          "-fsyntax-only",
+      languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
 
-          // Enable block support.
-          "-fblocks",
+      "-fretain-comments-from-system-headers",
 
-          languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
+      SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+  });
 
-          "-fretain-comments-from-system-headers",
+  // Enable modules.
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-fmodules",
+      "-Xclang", "-fmodule-feature", "-Xclang", "swift"
+  });
+  // Don't enforce strict rules when inside the debugger to work around search
+  // path problems caused by a module existing in both the build/install
+  // directory and the source directory.
+  if (!importerOpts.DebuggerSupport)
+    invocationArgStrs.push_back(
+        "-Werror=non-modular-include-in-framework-module");
 
-          SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
-      });
+  if (LangOpts.EnableObjCInterop) {
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-x", "objective-c", "-std=gnu11", "-fobjc-arc"});
+    // TODO: Investigate whether 7.0 is a suitable default version.
+    if (!triple.isOSDarwin())
+      invocationArgStrs.insert(invocationArgStrs.end(),
+                               {"-fobjc-runtime=ios-7.0"});
+  } else {
+    invocationArgStrs.insert(invocationArgStrs.end(), {"-x", "c", "-std=gnu11"});
+  }
 
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
-      // Darwin uses Objective-C ARC.
-      "-x", "objective-c", "-std=gnu11", "-fobjc-arc",
-
       // Define macros that Swift bridging headers use.
       "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
         SWIFT_NATIVE_ANNOTATION_STRING "\")))",
@@ -518,23 +530,27 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-DSWIFT_SDK_OVERLAY_UIKIT_EPOCH=2",
     });
 
-    // Get the version of this compiler and pass it to
-    // C/Objective-C declarations.
+    // Get the version of this compiler and pass it to C/Objective-C
+    // declarations.
     auto V = version::Version::getCurrentCompilerVersion();
     if (!V.empty()) {
       invocationArgStrs.insert(invocationArgStrs.end(), {
         V.preprocessorDefinition("__SWIFT_COMPILER_VERSION",
-                                 {1000000000, /*ignored*/0, 1000000, 1000, 1}),
+                                 {1000000000, /*ignored*/ 0, 1000000, 1000, 1}),
       });
     }
   } else {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      // Non-Darwin platforms don't use the Objective-C runtime, so they can
-      // not import Objective-C modules.
-      //
-      // Just use the most feature-rich C language mode.
-      "-x", "c", "-std=gnu11",
-    });
+    // Ideally we should turn this on for all Glibc targets that are actually
+    // using Glibc or a libc that respects that flag. This will cause some
+    // source breakage however (specifically with strerror_r()) on Linux
+    // without a workaround.
+    if (triple.isOSFuchsia()) {
+      // Many of the modern libc features are hidden behind feature macros like
+      // _GNU_SOURCE or _XOPEN_SOURCE.
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-D_GNU_SOURCE",
+      });
+    }
 
     // The module map used for Glibc depends on the target we're compiling for,
     // and is not included in the resource directory with the other implicit
@@ -3281,7 +3297,33 @@ ClangImporter::Implementation::loadNamedMembers(
   auto *D = IDC->getDecl();
   auto *DC = cast<DeclContext>(D);
   auto *CD = D->getClangDecl();
+  auto *CDC = cast<clang::DeclContext>(CD);
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
+
+  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto effectiveClangContext = getEffectiveClangContext(nominal);
+
+  // FIXME: The legacy of mirroring protocol members rears its ugly head,
+  // and as a result we have to bail on any @interface or @category that
+  // has a declared protocol conformance.
+  if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(CD)) {
+    if (ID->protocol_begin() != ID->protocol_end())
+      return None;
+  }
+  if (auto *CCD = dyn_cast<clang::ObjCCategoryDecl>(CD)) {
+    if (CCD->protocol_begin() != CCD->protocol_end())
+      return None;
+  }
+
+  // Also bail out if there are any global-as-member mappings for this type; we
+  // can support some of them lazily but the full set of idioms seems
+  // prohibitively complex (also they're not stored in by-name lookup, for
+  // reasons unclear).
+  if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+        return (table.lookupGlobalsAsMembers(
+                  effectiveClangContext).size() > 0);
+      }))
+    return None;
 
   // There are 3 cases:
   //
@@ -3306,29 +3348,30 @@ ClangImporter::Implementation::loadNamedMembers(
 
   clang::ASTContext &clangCtx = getClangASTContext();
 
+  assert(isa<clang::ObjCContainerDecl>(CD));
+
   TinyPtrVector<ValueDecl *> Members;
-  if (auto *CCD = dyn_cast<clang::ObjCContainerDecl>(CD)) {
-    for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()), CCD)) {
-      if (!entry.is<clang::NamedDecl *>()) continue;
-      auto member = entry.get<clang::NamedDecl *>();
-      if (!isVisibleClangEntry(clangCtx, member)) continue;
-      SmallVector<Decl*, 4> tmp;
-      insertMembersAndAlternates(member, tmp);
-      for (auto *TD : tmp) {
-        if (auto *V = dyn_cast<ValueDecl>(TD)) {
-          // Skip ValueDecls if they import into different DeclContexts
-          // or under different names than the one we asked about.
-          if (V->getDeclContext() == DC &&
-              V->getFullName().matchesRef(N)) {
-            Members.push_back(V);
-          }
+  for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()),
+                                  effectiveClangContext)) {
+    if (!entry.is<clang::NamedDecl *>()) continue;
+    auto member = entry.get<clang::NamedDecl *>();
+    if (!isVisibleClangEntry(clangCtx, member)) continue;
+
+    // Skip Decls from different clang::DeclContexts
+    if (member->getDeclContext() != CDC) continue;
+
+    SmallVector<Decl*, 4> tmp;
+    insertMembersAndAlternates(member, tmp);
+    for (auto *TD : tmp) {
+      if (auto *V = dyn_cast<ValueDecl>(TD)) {
+        // Skip ValueDecls if they import under different names.
+        if (V->getFullName().matchesRef(N)) {
+          Members.push_back(V);
         }
       }
     }
-    return Members;
   }
-
-  return None;
+  return Members;
 }
 
 

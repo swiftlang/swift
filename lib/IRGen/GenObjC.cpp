@@ -143,7 +143,7 @@ llvm::InlineAsm *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // If we're emitting optimized code, record the string in the module
   // and let the late ARC pass insert it, but don't generate any calls
   // right now.
-  if (IRGen.Opts.Optimize) {
+  if (IRGen.Opts.shouldOptimize()) {
     llvm::NamedMDNode *metadata =
       Module.getOrInsertNamedMetadata(
                             "clang.arc.retainAutoreleasedReturnValueMarker");
@@ -187,6 +187,17 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
 
   auto call = IGF.Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
+
+  const llvm::Triple &triple = IGF.IGM.Context.LangOpts.Target;
+  if (triple.getArch() == llvm::Triple::x86_64) {
+    // Don't tail call objc_retainAutoreleasedReturnValue. This blocks the
+    // autoreleased return optimization.
+    // callq  0x01ec08 ; symbol stub for: objc_msgSend
+    // movq   %rax, %rdi
+    // popq   %rbp  ;<== Blocks the handshake from objc_autoreleaseReturnValue
+    // jmp    0x01ec20 ; symbol stub for: objc_retainAutoreleasedReturnValue
+    call->setTailCallKind(llvm::CallInst::TCK_NoTail);
+  }
 
   llvm::Value *result = call;
   if (isa<llvm::PointerType>(valueType)) {
@@ -318,7 +329,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
                                          llvm::GlobalValue::PrivateLinkage,
                                          init,
                           llvm::Twine("\01L_selector_data(") + selector + ")");
-  global->setSection("__TEXT,__objc_methname,cstring_literals");
+  SetCStringLiteralSection(global, ObjCLabelType::MethodVarName);
   global->setAlignment(1);
   addCompilerUsedGlobal(global);
 
@@ -353,7 +364,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   global->setAlignment(getPointerAlignment().getValue());
 
   // This section name is magical for the Darwin static and dynamic linkers.
-  global->setSection("__DATA,__objc_selrefs,literal_pointers,no_dead_strip");
+  global->setSection(GetObjCSectionName("__objc_selrefs",
+                                        "literal_pointers,no_dead_strip"));
 
   // Make sure that this reference does not get optimized away.
   addCompilerUsedGlobal(global);
@@ -415,19 +427,19 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                  + protocolName);
   protocolLabel->setAlignment(getPointerAlignment().getValue());
   protocolLabel->setVisibility(llvm::GlobalValue::HiddenVisibility);
-  protocolLabel->setSection("__DATA,__objc_protolist,coalesced,no_dead_strip");
-  
+  protocolLabel->setSection(GetObjCSectionName("__objc_protolist",
+                                               "coalesced,no_dead_strip"));
+
   // Introduce a variable to reference the protocol.
-  auto *protocolRef
-    = new llvm::GlobalVariable(Module, Int8PtrTy,
-                               /*constant*/ false,
+  auto *protocolRef =
+      new llvm::GlobalVariable(Module, Int8PtrTy, /*constant*/ false,
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
-                               llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_")
-                                 + protocolName);
+                               llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_") + protocolName);
   protocolRef->setAlignment(getPointerAlignment().getValue());
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
-  protocolRef->setSection("__DATA,__objc_protorefs,coalesced,no_dead_strip");
+  protocolRef->setSection(GetObjCSectionName("__objc_protorefs",
+                                             "coalesced,no_dead_strip"));
 
   ObjCProtocolPair pair{protocolRecord, protocolRef};
   ObjCProtocols.insert({proto, pair});
@@ -897,9 +909,9 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   CallEmission emission(subIGF,
                         getObjCMethodCallee(subIGF, method, self,
                           CalleeInfo(origMethodType, origMethodType, {})));
-  
-  emission.setArgs(translatedParams);
-  
+
+  emission.setArgs(translatedParams, false);
+
   // Cleanup that always has to occur after the function call.
   auto cleanup = [&]{
     // Lifetime-extend 'self' by sending it to the autorelease pool if need be.
@@ -908,24 +920,26 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
       subIGF.emitObjCAutoreleaseCall(self);
     }
     // Release the context.
-    subIGF.emitNativeStrongRelease(context, subIGF.getDefaultAtomicity());
+    if (!resultType->isCalleeGuaranteed())
+      subIGF.emitNativeStrongRelease(context, subIGF.getDefaultAtomicity());
   };
   
    // Emit the call and produce the return value.
   if (indirectedDirectResult) {
     Address addr =
       indirectedResultTI->getAddressForPointer(indirectedDirectResult);
-    emission.emitToMemory(addr, *indirectedResultTI);
+    emission.emitToMemory(addr, *indirectedResultTI, false);
     cleanup();
     subIGF.Builder.CreateRetVoid();
   } else {
     Explosion result;
-    emission.emitToExplosion(result);
+    emission.emitToExplosion(result, false);
     cleanup();
     auto &callee = emission.getCallee();
     auto resultType =
         callee.getOrigFunctionType()->getDirectFormalResultsType();
-    subIGF.emitScalarReturn(resultType, result, true /*isSwiftCCReturn*/);
+    subIGF.emitScalarReturn(resultType, result, true /*isSwiftCCReturn*/,
+                            false);
   }
   
   return fwd;
@@ -959,8 +973,8 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
   Explosion selfParams;
   selfParams.add(self);
-  fieldLayout.getType().initializeFromParams(IGF, selfParams,
-                                             fieldAddr, fieldType);
+  fieldLayout.getType().initializeFromParams(IGF, selfParams, fieldAddr,
+                                             fieldType, false);
 
   // Create the forwarding stub.
   llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
