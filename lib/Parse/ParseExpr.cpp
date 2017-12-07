@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
@@ -1563,6 +1564,11 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
   case tok::kw_Any: { // Any
     auto SynResult = parseAnyType();
     auto expr = new (Context) TypeExpr(TypeLoc(SynResult.getAST()));
+    if (SynResult.hasSyntax()) {
+      TypeExprSyntaxBuilder Builder;
+      Builder.useType(SynResult.getSyntax());
+      SyntaxContext->addSyntax(Builder.build());
+    }
     Result = makeParserResult(expr);
     break;
   }
