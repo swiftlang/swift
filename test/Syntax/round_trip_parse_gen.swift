@@ -100,4 +100,7 @@ func foo(_ _: Int,
          d _: Int = true ? 2: 3,
          @objc e: X = true,
          f: inout Int,
-         g: Int...) {}
+         g: Int...) throws -> [Int: String] {}
+
+func foo(_ a: Int) throws -> Int {}
+func foo( a: Int) rethrows -> Int {}
