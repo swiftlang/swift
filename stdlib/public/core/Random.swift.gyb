@@ -129,7 +129,7 @@ public struct Random : RandomNumberGenerator {
   @_inlineable
   public func next() -> UInt {
     var random: UInt = 0
-    _swift_stdlib_random(&random, MemoryLayout<UInt>.size, _fatalErrorFlags())
+    _stdlib_random(&random, MemoryLayout<UInt>.size, _fatalErrorFlags())
     return random
   }
 }

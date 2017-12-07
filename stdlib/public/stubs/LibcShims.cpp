@@ -90,15 +90,6 @@ int swift::_stdlib_memcmp(const void *s1, const void *s2,
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_open(const char *path, int oflags) {
-#if defined(_WIN32)
-  return _open(path, oflags);
-#else
-  return open(path, oflags);
-#endif
-}
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t
 swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
@@ -348,7 +339,7 @@ swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   || ( defined(TARGET_OS_IPHONE) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 10000 ) \
   || ( defined(TARGET_OS_MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 )
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_swift_stdlib_random(void *buf,
+void swift::_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debug_flags) {
   arc4random_buf(buf, nbytes);
@@ -356,7 +347,7 @@ void swift::_swift_stdlib_random(void *buf,
 #else
 #include <Security/Security.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_swift_stdlib_random(void *buf,
+void swift::_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debug_flags) {
   if (SecRandomCopyBytes(kSecRandomDefault, nbytes, buf) != 0) {
@@ -373,7 +364,7 @@ void swift::_swift_stdlib_random(void *buf,
 #define _GNU_SOURCE
 #include <sys/syscall.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_swift_stdlib_random(void *buf,
+void swift::_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debug_flags) {
   int result = syscall(SYS_getrandom, buf, nbytes, 0);
@@ -383,18 +374,18 @@ void swift::_swift_stdlib_random(void *buf,
 }
 #else
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_swift_stdlib_random(void *buf,
+void swift::_stdlib_random(void *buf,
                                 __swift_ssize_t nbytes,
                                 __swift_uint32_t debug_flags) {
   int oflags = O_RDONLY;
-  int fd = swift::_swift_stdlib_open("/dev/urandom", oflags);
+  int fd = swift::_stdlib_open("/dev/urandom", oflags);
   if (fd < 0) {
     fatalError(debug_flags, "Fatal error: Unable to open /dev/urandom\n");
   }
-  if (swift::_swift_stdlib_read(fd, buf, nbytes) < 0) {
+  if (swift::_stdlib_read(fd, buf, nbytes) < 0) {
     fatalError(debug_flags, "Fatal error: Unable to read /dev/urandom\n");
   }
-  swift::_swift_stdlib_close(fd);
+  swift::_stdlib_close(fd);
 }
 #endif
 #endif
