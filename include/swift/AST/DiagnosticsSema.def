@@ -1688,7 +1688,7 @@ ERROR(requires_not_suitable_archetype,none,
       (TypeLoc))
 WARNING(requires_no_same_type_archetype,none,
         "neither type in same-type constraint (%0 or %1) refers to a "
-        "generic parameter  or associated type",
+        "generic parameter or associated type",
         (Type, Type))
 
 ERROR(requires_generic_params_made_equal,none,
