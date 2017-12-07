@@ -177,7 +177,7 @@ extension StringProtocol {
     if _fastPath(self is _SwiftStringView) {
       return (self as! _SwiftStringView)._ephemeralContent
     }
-    return String(String.CharacterView(self))
+    return String(self)
   }
 }
 

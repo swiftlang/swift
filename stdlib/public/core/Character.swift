@@ -91,6 +91,20 @@ public struct Character {
     return String(self).utf16
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal init(_smallRepresentation b: _SmallUTF16) {
+    _sanityCheck(Int64(b._storage) >= 0)
+    _representation = .smallUTF16(
+      Builtin.trunc_Int64_Int63(b._storage._value))
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal init(_largeRepresentation storage: _UTF16StringStorage) {
+    _representation = .large(storage)
+  }
+
   /// Creates a Character from a String that is already known to require the
   /// large representation.
   ///
@@ -100,8 +114,9 @@ public struct Character {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned
   internal init(_largeRepresentationString s: String) {
-    _representation = .large(
-      s._guts._extractNativeStorage(of: UTF16.CodeUnit.self))  }
+    let storage = s._guts._extractNativeStorage(of: UTF16.CodeUnit.self)
+    self.init(_largeRepresentation: storage)
+  }
 }
 
 extension Character
@@ -246,21 +261,134 @@ extension Character
   ///   instance. `s` must contain exactly one extended grapheme cluster.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ s: String) {
-    _precondition(
-      s._guts.count != 0, "Can't form a Character from an empty String")
-    _debugPrecondition(
-      s.index(after: s.startIndex) == s.endIndex,
+    let count = s._guts.count
+    _precondition(count != 0,
+      "Can't form a Character from an empty String")
+    _debugPrecondition(s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    if _fastPath(s._guts.count <= 4) {
-      let b = _SmallUTF16(s._core)
-      if _fastPath(Int64(truncatingIfNeeded: b._storage) >= 0) {
-        _representation = .smallUTF16(
-          Builtin.trunc_Int64_Int63(b._storage._value))
+    self.init(_unverified: s._guts)
+  }
+
+  /// Construct a Character from a _StringGuts, assuming it consists of exactly
+  /// one extended grapheme cluster.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_unverified guts: _StringGuts) {
+    defer { _fixLifetime(guts) }
+    if _slowPath(guts._isOpaque) {
+      self.init(_unverified: guts._asOpaque())
+      return
+    }
+
+    if guts.isASCII {
+      let ascii = guts._unmanagedASCIIView
+      if _fastPath(ascii.count == 1) {
+        self.init(_singleCodeUnit: ascii[0])
+      } else {
+        // The only multi-scalar ASCII grapheme cluster is CR/LF.
+        _sanityCheck(ascii.count == 2)
+        _sanityCheck(ascii.start[0] == _CR)
+        _sanityCheck(ascii.start[1] == _LF)
+        self.init(_codeUnitPair: UInt16(_CR), UInt16(_LF))
+      }
+      return
+    }
+
+    if guts._isNative {
+      self.init(_unverified:
+        guts._object.nativeStorage(of: UTF16.CodeUnit.self))
+    } else {
+      self.init(_unverified: guts._unmanagedUTF16View)
+    }
+  }
+
+  /// Construct a Character from a slice of a _StringGuts, assuming
+  /// the specified range covers exactly one extended grapheme cluster.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_unverified guts: _StringGuts, range: Range<Int>) {
+    defer { _fixLifetime(guts) }
+    if _fastPath(range.count == 1) {
+      let cu = guts.codeUnit(atCheckedOffset: range.lowerBound)
+      // Check for half a surrogate pair. (We may encounter these at boundaries
+      // of String slices or when the data itself has an invalid encoding.)
+      if _fastPath(UTF16._isScalar(cu)) {
+        self.init(_singleCodeUnit: cu)
+      } else {
+        self.init(_singleCodeUnit: UTF16._replacementCodeUnit)
+      }
+      return
+    }
+    if guts.isASCII {
+      let ascii = guts._unmanagedASCIIView
+      // The only multi-scalar ASCII grapheme cluster is CR/LF.
+      ascii._boundsCheck(offsetRange: range)
+      _sanityCheck(range.count == 2)
+      _sanityCheck(ascii.start[range.lowerBound] == _CR)
+      _sanityCheck(ascii.start[range.lowerBound + 1] == _LF)
+      self.init(_codeUnitPair: UInt16(_CR), UInt16(_LF))
+    } else if guts._isContiguous {
+      let utf16 = guts._unmanagedUTF16View.checkedSlice(range)
+      self.init(_unverified: utf16)
+    } else {
+      let opaque = guts._asOpaque().checkedSlice(range)
+      self.init(_unverified: opaque._copyToNativeStorage())
+    }
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  init(_singleCodeUnit cu: UInt16) {
+    _sanityCheck(UTF16._isScalar(cu))
+    _representation = .smallUTF16(
+      Builtin.zext_Int16_Int63(Builtin.reinterpretCast(cu)))
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+    init(_codeUnitPair first: UInt16, _ second: UInt16) {
+    _sanityCheck(
+      (UTF16._isScalar(first) && UTF16._isScalar(second)) ||
+      (UTF16.isLeadSurrogate(first) && UTF16.isTrailSurrogate(second)))
+    _representation = .smallUTF16(
+      Builtin.zext_Int32_Int63(
+        Builtin.reinterpretCast(
+          UInt32(first) | UInt32(second) &<< 16)))
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  init(_unverified storage: _SwiftStringStorage<Unicode.UTF16.CodeUnit>) {
+    if _fastPath(storage.count <= 4) {
+      _sanityCheck(storage.count > 0)
+      let b = _SmallUTF16(storage.unmanagedView)
+      if _fastPath(Int64(bitPattern: b._storage) >= 0) {
+        self.init(_smallRepresentation: b)
+        _fixLifetime(storage)
         return
       }
     }
-    self = Character(_largeRepresentationString: s)
+    // FIXME: We may want to make a copy if storage.unusedCapacity > 0
+    self.init(_largeRepresentation: storage)
+  }
+
+  @_inlineable
+  @_versioned
+  internal
+  init<V: _StringVariant>(_unverified variant: V) {
+    if _fastPath(variant.count <= 4) {
+      _sanityCheck(variant.count > 0)
+      let b = _SmallUTF16(variant)
+      if _fastPath(Int64(bitPattern: b._storage) >= 0) {
+        self.init(_smallRepresentation: b)
+        return
+      }
+    }
+    self.init(_largeRepresentation: variant._copyToNativeStorage())
   }
 }
 
