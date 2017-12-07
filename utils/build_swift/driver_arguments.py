@@ -298,7 +298,8 @@ def create_argument_parser():
            help='enable code coverage analysis in Swift (false, not-merged, '
                 'merged).')
 
-    option('--build-subdir', store_path,
+    option('--build-subdir', store,
+           metavar='PATH',
            help='name of the directory under $SWIFT_BUILD_ROOT where the '
                 'build products will be placed')
     option('--install-prefix', store_path,
@@ -315,7 +316,6 @@ def create_argument_parser():
     option('--darwin-xcrun-toolchain', store,
            default=defaults.DARWIN_XCRUN_TOOLCHAIN,
            help='the name of the toolchain to use on Darwin')
-    # TODO: Add executable check to store_path
     option('--cmake', store_path(executable=True),
            help='the path to a CMake executable that will be used to build '
                 'Swift')
