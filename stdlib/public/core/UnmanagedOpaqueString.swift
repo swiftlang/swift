@@ -61,6 +61,8 @@ extension _UnmanagedOpaqueString : Sequence {
   @_versioned
   @_fixed_layout
   struct Iterator : IteratorProtocol {
+    internal typealias Element = UTF16.CodeUnit
+
     @_versioned
     internal let _object: _CocoaString
 
@@ -171,6 +173,12 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
   }
 
   @_versioned
+  @_inlineable
+  var count: Int {
+    return range.count
+  }
+
+  @_versioned
   @_inlineable // FIXME(sil-serialize-all)
   subscript(position: Index) -> UTF16.CodeUnit {
     _sanityCheck(position._value >= range.lowerBound)
@@ -189,14 +197,48 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
   }
 }
 
-extension _UnmanagedOpaqueString {
+extension _UnmanagedOpaqueString : _StringVariant {
+  internal typealias Encoding = Unicode.UTF16
+  internal typealias CodeUnit = Encoding.CodeUnit
+
+  @_inlineable
   @_versioned
-  @inline(never)
-  internal func cocoaSlice() -> _CocoaString {
-    guard isSlice else { return object }
-    // FIXME: This usually copies storage; maybe add an NSString subclass
-    // for opaque slices?
-    return _cocoaStringSlice(object, range)
+  var isASCII: Bool {
+    @inline(__always) get { return false }
+  }
+
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  func _boundsCheck(_ i: Index) {
+    _precondition(i._value >= range.lowerBound && i._value < range.upperBound,
+      "String index is out of bounds")
+  }
+
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  func _boundsCheck(_ range: Range<Index>) {
+    _precondition(
+      range.lowerBound._value >= self.range.lowerBound &&
+      range.upperBound._value <= self.range.upperBound,
+      "String index range is out of bounds")
+  }
+
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  func _boundsCheck(offset: Int) {
+    _precondition(offset >= 0 && offset < range.count,
+      "String index is out of bounds")
+  }
+
+  @_inlineable
+  @_versioned
+  @inline(__always)
+  func _boundsCheck(offsetRange range: Range<Int>) {
+    _precondition(range.lowerBound >= 0 && range.upperBound <= count,
+      "String index range is out of bounds")
   }
 
   @_versioned
@@ -247,6 +289,31 @@ extension _UnmanagedOpaqueString {
       from: object,
       range: range,
       into: d.assumingMemoryBound(to: UTF16.CodeUnit.self))
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _copyToNativeStorage<TargetCodeUnit>(
+    of codeUnit: TargetCodeUnit.Type = TargetCodeUnit.self,
+    unusedCapacity: Int = 0
+  ) -> _SwiftStringStorage<TargetCodeUnit>
+  where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
+    let storage = _SwiftStringStorage<TargetCodeUnit>.create(
+      capacity: count + unusedCapacity,
+      count: count)
+    _copy(into: storage.usedBuffer)
+    return storage
+  }
+}
+
+extension _UnmanagedOpaqueString {
+  @_versioned
+  @inline(never)
+  internal func cocoaSlice() -> _CocoaString {
+    guard isSlice else { return object }
+    // FIXME: This usually copies storage; maybe add an NSString subclass
+    // for opaque slices?
+    return _cocoaStringSlice(object, range)
   }
 }
 
