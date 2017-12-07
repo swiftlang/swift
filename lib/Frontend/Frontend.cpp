@@ -205,9 +205,8 @@ bool CompilerInstance::setupForInput(const InputFile &input) {
 }
 void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer,
                                       bool isPrimary) {
-  auto copy =
-      std::unique_ptr<llvm::MemoryBuffer>(llvm::MemoryBuffer::getMemBufferCopy(
-          buffer->getBuffer(), buffer->getBufferIdentifier()));
+  auto copy = llvm::MemoryBuffer::getMemBufferCopy(
+      buffer->getBuffer(), buffer->getBufferIdentifier());
   if (serialization::isSerializedAST(copy->getBuffer())) {
     PartialModules.push_back({std::move(copy), nullptr});
   } else {
