@@ -3756,6 +3756,13 @@ namespace {
           continue;
         }
 
+        if (auto call = dyn_cast<CallExpr>(subExpr)) {
+          if (call->getNumArguments() == 0) {
+            subExpr = call->getFn();
+            continue;
+          }
+        }
+
         // Look through implicit conversions.
         if (auto conversion = dyn_cast<ImplicitConversionExpr>(subExpr)) {
           subExpr = conversion->getSubExpr();
