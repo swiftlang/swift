@@ -513,8 +513,6 @@ extension Set {
 }
 
 extension Set : ExpressibleByArrayLiteral {
-  associatedtype ArrayLiteralElement = Element
-
   //
   // `ExpressibleByArrayLiteral` conformance
   //
