@@ -84,6 +84,10 @@ template<> void ProtocolConformanceRecord::dump() const {
       printf("witness table accessor %s\n",
              symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
+    case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+      printf("conditional witness table accessor %s\n",
+             symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
+      break;
   }
 }
 #endif
@@ -136,8 +140,12 @@ const {
     return getStaticWitnessTable();
 
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-    // FIXME: this needs information about conditional conformances.
     return getWitnessTableAccessor()(type, nullptr, 0);
+
+  case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
+    // FIXME: this needs to query the conditional requirements to form the
+    // array of witness tables to pass along to the accessor.
+    return nullptr;
   }
 
   swift_runtime_unreachable(
@@ -558,6 +566,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
           break;
 
         case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+        case ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor:
           // If the record provides a dependent witness table accessor,
           // cache the result for the instantiated type metadata.
           C.cacheSuccess(type, P, record.getWitnessTable(type));
