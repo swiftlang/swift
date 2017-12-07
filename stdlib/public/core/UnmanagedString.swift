@@ -85,13 +85,6 @@ extension _UnmanagedString {
 
   @_inlineable
   @_versioned
-  internal var isASCII: Bool {
-    // NOTE: For now, single byte means ASCII. Might change in future
-    return CodeUnit.bitWidth == 8
-  }
-
-  @_inlineable
-  @_versioned
   internal var rawStart: UnsafeRawPointer {
     return UnsafeRawPointer(start)
   }
@@ -154,28 +147,33 @@ extension _UnmanagedString : RandomAccessCollection {
   }
 }
 
-extension _UnmanagedString {
+extension _UnmanagedString : _StringVariant {
   @_inlineable
   @_versioned
-  internal subscript(position: Int) -> UTF16.CodeUnit {
+  internal var isASCII: Bool {
+    // NOTE: For now, single byte means ASCII. Might change in future
+    return CodeUnit.bitWidth == 8
+  }
+
+  @_inlineable
+  @_versioned
+  internal subscript(offset: Int) -> UTF16.CodeUnit {
     @inline(__always)
     get {
-      _sanityCheck(position >= 0 && position < count)
-      return UTF16.CodeUnit(start[position])
+      _sanityCheck(offset >= 0 && offset < count)
+      return UTF16.CodeUnit(start[offset])
     }
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
-  internal subscript(_ bounds: Range<Int>) -> _UnmanagedString {
-    _sanityCheck(bounds.lowerBound >= 0 && bounds.upperBound <= count)
+  internal subscript(offsetRange: Range<Int>) -> _UnmanagedString {
+    _sanityCheck(offsetRange.lowerBound >= 0 && offsetRange.upperBound <= count)
     return _UnmanagedString(
-      start: start + bounds.lowerBound,
-      count: bounds.count)
+      start: start + offsetRange.lowerBound,
+      count: offsetRange.count)
   }
-}
 
-extension _UnmanagedString {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func _copy<TargetCodeUnit>(
@@ -204,6 +202,20 @@ extension _UnmanagedString {
         src: start,
         count: self.count)
     }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _copyToNativeStorage<TargetCodeUnit>(
+    of codeUnit: TargetCodeUnit.Type = TargetCodeUnit.self,
+    unusedCapacity: Int = 0
+  ) -> _SwiftStringStorage<TargetCodeUnit>
+  where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
+    let storage = _SwiftStringStorage<TargetCodeUnit>.create(
+      capacity: count + unusedCapacity,
+      count: count)
+    _copy(into: storage.usedBuffer)
+    return storage
   }
 }
 
