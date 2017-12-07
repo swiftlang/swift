@@ -367,3 +367,28 @@ func testVariadic() {
   let c2 = variadicAndNonOverload {}
   _ = c2 as String // expected-error {{cannot convert value of type 'Bool' to type 'String'}}
 }
+
+// rdar://18426302
+
+class TrailingBase {
+  init(fn: () -> ()) {}
+  init(x: Int, fn: () -> ()) {}
+
+  convenience init() {
+    self.init {}
+  }
+
+  convenience init(x: Int) {
+    self.init(x: x) {}
+  }
+}
+
+class TrailingDerived : TrailingBase {
+  init(foo: ()) {
+    super.init {}
+  }
+
+  init(x: Int, foo: ()) {
+    super.init(x: x) {}
+  }
+}
