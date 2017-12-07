@@ -125,4 +125,36 @@ extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
   }
 }
 
+extension _FixedArray${N} {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func withUnsafeMutableBufferPointer<R>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    let count = self.count
+    return try withUnsafeMutableBytes(of: &storage) { rawBuffer in
+      let buffer = UnsafeMutableBufferPointer<Element>(
+        start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked
+          .assumingMemoryBound(to: Element.self),
+        count: count)
+      return try body(buffer)
+    }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    let count = self.count
+    return try withUnsafeBytes(of: &storage) { rawBuffer in
+      let buffer = UnsafeBufferPointer<Element>(
+        start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked
+        .assumingMemoryBound(to: Element.self),
+        count: count)
+      return try body(buffer)
+    }
+  }
+}
+
 % end
