@@ -219,8 +219,8 @@ FunctionParameterSyntax getCannedFunctionParameter() {
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
 
-  return SyntaxFactory::makeFunctionParameter(ExternalName, LocalName, Colon,
-                                              IntAnnotation, NoEllipsis, Equal,
+  return SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName, Colon,
+                                              Int, NoEllipsis, Equal,
                                               One, Comma);
 }
 
@@ -256,13 +256,13 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, {});
 
-  auto Param = SyntaxFactory::makeFunctionParameter(ExternalName, LocalName,
-                                                    Colon, IntAnnotation,
+  auto Param = SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName,
+                                                    Colon, Int,
                                                     NoEllipsis, Equal, One,
                                                     Comma);
 
-  ASSERT_EQ(ExternalName.getRaw(), Param.getExternalName()->getRaw());
-  ASSERT_EQ(LocalName.getRaw(), Param.getLocalName().getRaw());
+  ASSERT_EQ(ExternalName.getRaw(), Param.getFirstName().getRaw());
+  ASSERT_EQ(LocalName.getRaw(), Param.getSecondName()->getRaw());
   ASSERT_EQ(Colon.getRaw(), Param.getColon().getRaw());
 
   auto GottenType = Param.getTypeAnnotation();
@@ -306,10 +306,10 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     getCannedFunctionParameter()
-      .withExternalName(ExternalName)
-      .withLocalName(LocalName)
+      .withFirstName(ExternalName)
+      .withSecondName(LocalName)
       .withColon(Colon)
-      .withTypeAnnotation(IntAnnotation)
+      .withTypeAnnotation(Int)
       .withDefaultEquals(Equal)
       .withDefaultValue(One)
       .withTrailingComma(Comma)
