@@ -35,6 +35,16 @@ class C1 {
     let testVariable = 1 // expected-note{{'testVariable' declared here}}
     _ = #selector(testVariable) // expected-error{{argument of '#selector' cannot refer to variable 'testVariable'}}
   }
+
+  @objc func testParen_a() {
+    _ = #selector(testParen_a())
+  }
+
+  @objc func testParen_b(a: A?) {
+    // expected-error@+1 {{argument of '#selector' does not refer to an '@objc' method, property, or initializer}}
+    _ = #selector(testParen_b(a: nil))
+  }
+
 }
 
 @objc protocol P1 {
