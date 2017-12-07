@@ -25,7 +25,7 @@ extension MTLBlitCommandEncoder {
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLBuffer {
     
-#if os(OSX)
+#if os(macOS)
     @available(macOS, introduced: 10.11)
     public func didModifyRange(_ range: Range<Int>) {
         __didModifyRange(NSMakeRange(range.lowerBound, range.count))
@@ -81,7 +81,7 @@ extension MTLDevice {
     }
 }
 
-#if os(OSX)
+#if os(macOS)
 @available(swift 4)
 @available(macOS 10.13, *)
 public func MTLCopyAllDevicesWithObserver(handler: @escaping MTLDeviceNotificationHandler) -> (devices:[MTLDevice], observer:NSObject) {
@@ -133,7 +133,7 @@ extension MTLRenderCommandEncoder {
         __use(heaps, count: heaps.count)
     }
     
-#if os(OSX)
+#if os(macOS)
     @available(macOS 10.13, *)
     public func setViewports(_ viewports: [MTLViewport]) {
         __setViewports(viewports, count: viewports.count)
