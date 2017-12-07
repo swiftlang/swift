@@ -26,6 +26,22 @@ where
   subscript(offset: Int) -> Element { get }
   subscript(offsetRange: Range<Int>) -> Self { get }
 
+  // Measure the length in UTF-16 code units of the first extended grapheme
+  // cluster in self.
+  func measureFirstExtendedGraphemeCluster() -> Int
+
+  // Measure the length in UTF-16 code units of the last extended grapheme
+  // cluster in self.
+  func measureLastExtendedGraphemeCluster() -> Int
+
+  // Slow path for measuring the length in UTF-16 code units of the first
+  // extended grapheme cluster in self.
+  func _measureFirstExtendedGraphemeClusterSlow() -> Int
+
+  // Slow path for measuring the length in UTF-16 code units of the last
+  // extended grapheme cluster in self.
+  func _measureLastExtendedGraphemeClusterSlow() -> Int
+
   func _copy<TargetCodeUnit>(
     into target: UnsafeMutableBufferPointer<TargetCodeUnit>
   ) where TargetCodeUnit : FixedWidthInteger & UnsignedInteger
