@@ -4554,9 +4554,15 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
-  if (getBracesRange().isValid())
+  if (getBracesRange().isValid()) {
     return { getSubscriptLoc(), getBracesRange().End };
-  return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+  } else if (ElementTy.getSourceRange().End.isValid()) {
+    return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+  } else if (ArrowLoc.isValid()) {
+    return { getSubscriptLoc(), ArrowLoc };
+  } else {
+    return getSubscriptLoc();
+  }
 }
 
 SourceRange SubscriptDecl::getSignatureSourceRange() const {
