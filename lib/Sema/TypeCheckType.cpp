@@ -1024,7 +1024,8 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
   }
 
   // If the lookup occurs from within a trailing 'where' clause of
-  // a constrained extension, also look for associated types.
+  // a constrained extension, also look for associated types and typealiases
+  // in the protocol.
   if (genericParams->hasTrailingWhereClause() &&
       comp->getIdLoc().isValid() &&
       TC.Context.SourceMgr.rangeContainsTokenLoc(
@@ -1047,12 +1048,15 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-          comp->setValue(assocType, DC);
-          return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                   diagnoseErrors, resolver,
-                                                   unsatisfiedDependency);
-        }
+        auto typeDecl = dyn_cast<TypeDecl>(decl);
+        if (!typeDecl) continue;
+
+        if (!isa<ProtocolDecl>(typeDecl->getDeclContext())) continue;
+
+        comp->setValue(typeDecl, DC);
+        return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                                 diagnoseErrors, resolver,
+                                                 unsatisfiedDependency);
       }
     }
   }

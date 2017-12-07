@@ -1686,10 +1686,11 @@ ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
       (TypeLoc))
-ERROR(requires_no_same_type_archetype,none,
-      "neither type in same-type refers to a generic parameter or "
-      "associated type",
-      ())
+WARNING(requires_no_same_type_archetype,none,
+        "neither type in same-type constraint (%0 or %1) refers to a "
+        "generic parameter  or associated type",
+        (Type, Type))
+
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
       (Type, Type))
