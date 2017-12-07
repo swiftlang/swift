@@ -858,7 +858,20 @@ NodePointer Demangler::popFunctionParams(Node::Kind kind) {
   } else {
     ParamsType = popNode(Node::Kind::Type);
   }
-  return createWithChild(kind, ParamsType);
+
+  NodePointer Node = nullptr;
+  // Store the number of parameters in the argument tuple
+  // node to make it easier to reach it, see `popFunctionParamLabels`.
+  if (ParamsType && kind == Node::Kind::ArgumentTuple) {
+    auto Params = ParamsType->getFirstChild();
+    Node::IndexType NumParams =
+        Params->getKind() == Node::Kind::Tuple ? Params->getNumChildren() : 1;
+    Node = createNode(kind, NumParams);
+  } else {
+    Node = createNode(kind);
+  }
+
+  return addChild(Node, ParamsType);
 }
 
 NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
@@ -880,12 +893,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
 
   assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
 
-  auto Parameters = ParameterType->getFirstChild()->getFirstChild();
-  if (Parameters->getKind() != Node::Kind::Tuple)
-    return nullptr;
-
   auto LabelList = createNode(Node::Kind::LabelList);
-  for (unsigned i = 0, n = Parameters->getNumChildren(); i != n; ++i) {
+  for (unsigned i = 0, n = ParameterType->getIndex(); i != n; ++i) {
     auto Label = popNode();
     assert(Label && (Label->getKind() == Node::Kind::Identifier ||
                      Label->getKind() == Node::Kind::FirstElementMarker));
