@@ -219,8 +219,8 @@ BoxPair swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *type,
     auto *oldObjectAddr = reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(box) + headerOffset);
     // Copy the data.
-    type->vw_initializeWithCopy(refAndObjectAddr.second, oldObjectAddr);
-    inlineBuffer->PrivateData[0] = refAndObjectAddr.first;
+    type->vw_initializeWithCopy(refAndObjectAddr.buffer, oldObjectAddr);
+    inlineBuffer->PrivateData[0] = refAndObjectAddr.object;
     // Release ownership of the old box.
     swift_release(box);
     return refAndObjectAddr;

@@ -954,7 +954,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       (canConsumeDynamicValue && (flags & DynamicCastFlags::TakeOnSuccess));
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue, isTake);
-    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.first);
+    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.object);
     maybeDeallocateSource(true);
     return true;
   }
@@ -1976,7 +1976,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.first);
+  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.object);
 }
 
 #endif
