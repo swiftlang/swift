@@ -18,6 +18,7 @@
     "StringCore.swift",
     "StringObject.swift",
     "StringGuts.swift",
+    "StringGraphemeBreaking.swift",  
     "StringHashable.swift",
     "StringIndex.swift",
     "StringIndexConversions.swift",

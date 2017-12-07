@@ -18,14 +18,6 @@
 // FIXME(ABI)#70 : The character string view should have a custom iterator type
 // to allow performance optimizations of linear traversals.
 
-/// CR and LF are common special cases in grapheme breaking logic
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _CR: UInt8 { return 0x0d }
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-internal var _LF: UInt8 { return 0x0a }
-
 import SwiftShims
 
 extension String {
