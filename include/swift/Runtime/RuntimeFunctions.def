@@ -946,13 +946,13 @@ FUNCTION(GetExistentialMetadata,
          ATTRS(NoUnwind, ReadOnly))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// Metadata *swift_initClassMetadata_UniversalStrategy(Metadata *self,
-//                                                     size_t numFields,
-//                                                     TypeLayout * const *fieldTypes,
-//                                                     size_t *fieldOffsets);
+// void swift_initClassMetadata_UniversalStrategy(Metadata *self,
+//                                                size_t numFields,
+//                                                TypeLayout * const *fieldTypes,
+//                                                size_t *fieldOffsets);
 FUNCTION(InitClassMetadataUniversal,
          swift_initClassMetadata_UniversalStrategy, DefaultCC,
-         RETURNS(TypeMetadataPtrTy),
+         RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),

@@ -3021,11 +3021,10 @@ namespace {
   };
 } // end anonymous namespace
 
-llvm::Value *
-irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
-                                       SILType T,
-                                       llvm::Value *metadata,
-                                       llvm::Value *vwtable) {
+void irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+                                            SILType T,
+                                            llvm::Value *metadata,
+                                            llvm::Value *vwtable) {
   auto *target = T.getNominalOrBoundGenericNominal();
   llvm::Value *fieldVector
     = emitAddressOfFieldOffsetVector(IGF, metadata, target)
@@ -3062,9 +3061,9 @@ irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 
   if (isa<ClassDecl>(target)) {
     assert(vwtable == nullptr);
-    metadata = IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
-                                      {metadata, numFields,
-                                       fields.getAddress(), fieldVector});
+    IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
+                           {metadata, numFields,
+                            fields.getAddress(), fieldVector});
   } else {
     assert(isa<StructDecl>(target));
     IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
@@ -3074,8 +3073,6 @@ irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 
   IGF.Builder.CreateLifetimeEnd(fields,
                   IGF.IGM.getPointerSize() * storedProperties.size());
-
-  return metadata;
 }
 
 // Classes
@@ -3489,11 +3486,9 @@ namespace {
     }
 
     llvm::Value *emitFinishInitializationOfClassMetadata(IRGenFunction &IGF,
-                                                      llvm::Value *metadata) {
+                                                         llvm::Value *metadata) {
       // We assume that we've already filled in the class's generic arguments.
       // We need to:
-      //   - relocate the metadata to accommodate the superclass,
-      //     if something in our hierarchy is resilient to us;
       //   - fill out the subclass's field offset vector, if its layout
       //     wasn't fixed;
       //   - copy field offsets and generic arguments from higher in the
@@ -3508,9 +3503,9 @@ namespace {
       if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, Target)) {
         auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
         auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
-        metadata = emitInitializeFieldOffsetVector(IGF, loweredClassTy,
-                                                   metadata,
-                                                   /*vwtable=*/nullptr);
+        emitInitializeFieldOffsetVector(IGF, loweredClassTy,
+                                        metadata,
+                                        /*vwtable=*/nullptr);
 
         // Realizing the class with the ObjC runtime will copy back to the
         // field offset globals for us; but if ObjC interop is disabled, we
@@ -3742,9 +3737,7 @@ namespace {
         IGF.Builder.CreateStore(superclassMetadata, superField);
       }
 
-      metadata = emitFinishInitializationOfClassMetadata(IGF, metadata);
-
-      return metadata;
+      return emitFinishInitializationOfClassMetadata(IGF, metadata);
     }
   };
 

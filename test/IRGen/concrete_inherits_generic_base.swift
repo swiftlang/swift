@@ -74,6 +74,6 @@ presentBase(Base(x: 2))
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_SuperDerived(i8*)
 // CHECK:         [[TMP:%.*]] = call %swift.type* @_T03foo7DerivedCMa()
 // CHECK-NEXT:    store %swift.type* [[TMP]], %swift.type** getelementptr inbounds ({{.*}} @_T03foo12SuperDerivedCMf{{.*}}, i32 1), align
-// CHECK:         [[METADATA:%.*]] = call %swift.type* @swift_initClassMetadata_UniversalStrategy(
-// CHECK:         store atomic %swift.type* [[METADATA]], %swift.type** @_T03foo12SuperDerivedCML release,
+// CHECK:         call void @swift_initClassMetadata_UniversalStrategy(
+// CHECK:         store atomic %swift.type* {{.*}}, %swift.type** @_T03foo12SuperDerivedCML release,
 // CHECK:         ret void
