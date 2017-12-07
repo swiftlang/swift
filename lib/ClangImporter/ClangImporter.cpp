@@ -540,6 +540,18 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
     }
   } else {
+    // Ideally we should turn this on for all Glibc targets that are actually
+    // using Glibc or a libc that respects that flag. This will cause some
+    // source breakage however (specifically with strerror_r()) on Linux
+    // without a workaround.
+    if (triple.isOSFuchsia()) {
+      // Many of the modern libc features are hidden behind feature macros like
+      // _GNU_SOURCE or _XOPEN_SOURCE.
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-D_GNU_SOURCE",
+      });
+    }
+
     // The module map used for Glibc depends on the target we're compiling for,
     // and is not included in the resource directory with the other implicit
     // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
