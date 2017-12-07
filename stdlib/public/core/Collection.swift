@@ -776,6 +776,9 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
+
+  @available(swift, deprecated, message: "all index distances are now of type Int")
+  typealias IndexDistance = Int
 }
 
 /// Default implementation for forward collections.
@@ -1695,17 +1698,9 @@ extension Collection {
   // guarantees of Swift 3, but it cannot due to a bug.
   @available(*, unavailable, renamed: "Iterator")
   public typealias Generator = Iterator
-}
 
-extension Collection {
   @available(swift, deprecated: 3.2, renamed: "Element")
   public typealias _Element = Element
-}
-
-
-extension Collection {
-  @available(swift, deprecated, message: "all index distances are now of type Int")
-  public typealias IndexDistance = Int
 
   @available(*, deprecated, message: "all index distances are now of type Int")
   public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
