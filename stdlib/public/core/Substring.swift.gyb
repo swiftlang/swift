@@ -616,13 +616,15 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
+    return String(Substring(_slice: Slice(base: self, bounds: bounds)))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
+    return String(Substring(_slice: Slice(
+          base: self,
+          bounds: bounds.relative(to: self))))
   }
 }
 
@@ -636,13 +638,13 @@ extension Substring {
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
+    return String(Substring(_slice: _slice[bounds]))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
+    return self[bounds.relative(to: self)]
   }
 }
 //===----------------------------------------------------------------------===//

@@ -11,6 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 extension String : StringProtocol, RangeReplaceableCollection {  
+  /// A type that represents the number of steps between two `String.Index`
+  /// values, where one value is reachable from the other.
+  ///
+  /// In Swift, *reachability* refers to the ability to produce one value from
+  /// the other through zero or more applications of `index(after:)`.
+  public typealias IndexDistance = Int
+
   public typealias SubSequence = Substring
 
   /// Creates a string representing the given character repeated the specified
@@ -55,7 +62,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
-    self._guts = _CharacterView(other)._guts
+    self = other.description
   }
   
   // The defaulted argument prevents this initializer from satisfies the
@@ -73,14 +80,26 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// In an empty string, `startIndex` is equal to `endIndex`.
   @_inlineable // FIXME(sil-serialize-all)
-  public var startIndex: Index { return _characters.startIndex }
+  public var startIndex: Index { return Index(encodedOffset: 0) }
 
   /// A string's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
   ///
   /// In an empty string, `endIndex` is equal to `startIndex`.
   @_inlineable // FIXME(sil-serialize-all)
-  public var endIndex: Index { return _characters.endIndex }
+  public var endIndex: Index { return Index(encodedOffset: _guts.count) }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _index(atEncodedOffset offset: Int) -> Index {
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().characterIndex(atOffset: offset)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.characterIndex(atOffset: offset)
+    } else {
+      return _guts._unmanagedUTF16View.characterIndex(atOffset: offset)
+    }
+  }
 
   /// Returns the position immediately after the given index.
   ///
@@ -89,7 +108,13 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The index value immediately after `i`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
-    return _guts.characterIndex(after: i)
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().characterIndex(after: i)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.characterIndex(after: i)
+    } else {
+      return _guts._unmanagedUTF16View.characterIndex(after: i)
+    }
   }
 
   /// Returns the position immediately before the given index.
@@ -99,7 +124,13 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The index value immediately before `i`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
-    return _guts.characterIndex(before: i)
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().characterIndex(before: i)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.characterIndex(before: i)
+    } else {
+      return _guts._unmanagedUTF16View.characterIndex(before: i)
+    }
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -124,10 +155,16 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-//  @_inlineable // FIXME(sil-serialize-all)
-//  public func index(_ i: Index, offsetBy n: Int) -> Index {
-//    return _guts.characterIndex(i, offsetBy: n)
-//  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().characterIndex(i, offsetBy: n)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.characterIndex(i, offsetBy: n)
+    } else {
+      return _guts._unmanagedUTF16View.characterIndex(i, offsetBy: n)
+    }
+  }
 
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
@@ -166,12 +203,24 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-//  @_inlineable // FIXME(sil-serialize-all)
-//  public func index(
-//    _ i: Index, offsetBy n: Int, limitedBy limit: Index
-//  ) -> Index? {
-//    return _characters.index(i, offsetBy: n, limitedBy: limit)
-//  }
+  @_inlineable // FIXME(sil-serialize-all)
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().characterIndex(i, offsetBy: n, limitedBy: limit)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.characterIndex(
+        i,
+        offsetBy: n,
+        limitedBy: limit)
+    } else {
+      return _guts._unmanagedUTF16View.characterIndex(
+        i,
+        offsetBy: n,
+        limitedBy: limit)
+    }
+  }
 
   /// Returns the distance between two indices.
   ///
@@ -183,27 +232,41 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   @_inlineable // FIXME(sil-serialize-all)
-  public func distance(from start: Index, to end: Index) -> Int {
-    return _characters.distance(from: start, to: end)
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().characterDistance(from: start, to: end)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.characterDistance(from: start, to: end)
+    } else {
+      return _guts._unmanagedUTF16View.characterDistance(from: start, to: end)
+    }
   }
 
-  // /// Accesses the character at the given position.
-  // ///
-  // /// You can use the same indices for subscripting a string and its substring.
-  // /// For example, this code finds the first letter after the first space:
-  // ///
-  // ///     let str = "Greetings, friend! How are you?"
-  // ///     let firstSpace = str.index(of: " ") ?? str.endIndex
-  // ///     let substr = str[firstSpace...]
-  // ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
-  // ///         print("Capital after a space: \(str[nextCapital])")
-  // ///     }
-  // ///     // Prints "Capital after a space: H"
-  // ///
-  // /// - Parameter i: A valid index of the string. `i` must be less than the
-  // ///   string's end index.
-  // @_inlineable // FIXME(sil-serialize-all)
-  // public subscript(i: Index) -> Character { return characters[i] }
+  /// Accesses the character at the given position.
+  ///
+  /// You can use the same indices for subscripting a string and its substring.
+  /// For example, this code finds the first letter after the first space:
+  ///
+  ///     let str = "Greetings, friend! How are you?"
+  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  ///     let substr = str[firstSpace...]
+  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///         print("Capital after a space: \(str[nextCapital])")
+  ///     }
+  ///     // Prints "Capital after a space: H"
+  ///
+  /// - Parameter i: A valid index of the string. `i` must be less than the
+  ///   string's end index.
+  @_inlineable // FIXME(sil-serialize-all)
+  public subscript(i: Index) -> Character {
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().character(at: i)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.character(at: i)
+    } else {
+      return _guts._unmanagedUTF16View.character(at: i)
+    }
+  }
 }
 
 extension String {
@@ -225,7 +288,8 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
     where S.Iterator.Element == Character {
-    self._guts = _CharacterView(characters)._guts
+    self = ""
+    self.append(contentsOf: characters)
   }
 
   /// Reserves enough space in the string's underlying storage to store the
@@ -261,6 +325,7 @@ extension String {
       _guts.append(contentsOf: small)
     } else {
       _guts.append(c._largeUTF16!.unmanagedView)
+      _fixLifetime(c)
     }
   }
 
@@ -312,10 +377,10 @@ extension String {
     _ bounds: Range<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Character {
-    withMutableCharacters {
-      (v: inout _CharacterView)
-      in v.replaceSubrange(bounds, with: newElements)
-    }
+    let offsetRange: Range<Int> =
+      bounds.lowerBound.encodedOffset ..< bounds.upperBound.encodedOffset
+    let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
+    _guts.replaceSubrange(offsetRange, with: lazyUTF16)
   }
 
   /// Inserts a new character at the specified position.
@@ -331,9 +396,8 @@ extension String {
   /// - Complexity: O(*n*), where *n* is the length of the string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func insert(_ newElement: Character, at i: Index) {
-    withMutableCharacters {
-      (v: inout _CharacterView) in v.insert(newElement, at: i)
-    }
+    let offset = i.encodedOffset
+    _guts.replaceSubrange(offset..<offset, with: newElement.utf16)
   }
 
   /// Inserts a collection of characters at the specified position.
@@ -354,9 +418,9 @@ extension String {
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: Index
   ) where S.Iterator.Element == Character {
-    withMutableCharacters {
-      (v: inout _CharacterView) in v.insert(contentsOf: newElements, at: i)
-    }
+    let offset = i.encodedOffset
+    let utf16 = newElements.lazy.flatMap { $0.utf16 }
+    _guts.replaceSubrange(offset..<offset, with: utf16)
   }
 
   /// Removes and returns the character at the specified position.
@@ -380,8 +444,28 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(at i: Index) -> Character {
-    return withMutableCharacters {
-      (v: inout _CharacterView) in v.remove(at: i)
+    let offset = i.encodedOffset
+    let stride = _stride(of: i)
+    let range: Range<Int> = offset ..< offset + stride
+    let old = Character(_unverified: _guts, range: range)
+    _guts.replaceSubrange(range, with: EmptyCollection())
+    return old
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _stride(of i: Index) -> Int {
+    if case .character(let stride) = i._cache {
+      // TODO: should _fastPath the case somehow
+      return Int(stride)
+    }
+    let offset = i.encodedOffset
+    if _slowPath(_guts._isOpaque) {
+      return _guts._asOpaque().characterStride(atOffset: offset)
+    } else if _guts.isASCII {
+      return _guts._unmanagedASCIIView.characterStride(atOffset: offset)
+    } else {
+      return _guts._unmanagedUTF16View.characterStride(atOffset: offset)
     }
   }
 
@@ -397,9 +481,9 @@ extension String {
   ///   lower bounds of `bounds` must be valid indices of the string.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func removeSubrange(_ bounds: Range<Index>) {
-    withMutableCharacters {
-      (v: inout _CharacterView) in v.removeSubrange(bounds)
-    }
+    let start = bounds.lowerBound.encodedOffset
+    let end = bounds.upperBound.encodedOffset
+    _guts.replaceSubrange(start..<end, with: EmptyCollection())
   }
 
   /// Replaces this string with the empty string.
@@ -413,8 +497,10 @@ extension String {
   ///   default value is `false`.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
-    withMutableCharacters {
-      (v: inout _CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
+    if keepCapacity {
+      _guts.replaceSubrange(0..<_guts.count, with: EmptyCollection())
+    } else {
+      _guts = _StringGuts()
     }
   }
 }

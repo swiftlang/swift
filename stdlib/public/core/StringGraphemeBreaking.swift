@@ -21,6 +21,150 @@ internal var _CR: UInt8 { return 0x0d }
 internal var _LF: UInt8 { return 0x0a }
 
 extension _StringVariant {
+  @_versioned
+  @_inlineable
+  internal func characterStride(atOffset offset: Int) -> Int {
+    let slice = self.checkedSlice(from: offset)
+    return slice.measureFirstExtendedGraphemeCluster()
+  }
+
+  @_versioned
+  @_inlineable
+  internal func characterIndex(atOffset offset: Int) -> String.Index {
+    let stride = self.characterStride(atOffset: offset)
+    return String.Index(
+      encodedOffset: offset,
+      .character(stride: UInt16(stride)))
+  }
+
+  @_versioned
+  @_inlineable
+  internal func characterIndex(after i: String.Index) -> String.Index {
+    let offset = i.encodedOffset
+    _precondition(offset >= 0, "String index is out of bounds")
+    _precondition(offset < count, "Can't advance past endIndex")
+    // Find the current grapheme distance
+    let slice = self[offset..<count]
+    let stride1: Int
+    if case .character(let stride) = i._cache {
+      // TODO: should _fastPath the case somehow
+      stride1 = Int(stride)
+    } else {
+      stride1 = slice.measureFirstExtendedGraphemeCluster()
+    }
+    // Calculate and cache the next grapheme distance
+    let stride2 = slice.dropFirst(stride1).measureFirstExtendedGraphemeCluster()
+    _sanityCheck(stride2 >= 0 && stride2 <= UInt16.max)
+    return String.Index(
+      encodedOffset: offset &+ stride1,
+      .character(stride: UInt16(truncatingIfNeeded: stride2)))
+  }
+
+  @_versioned
+  @_inlineable
+  internal func characterIndex(before i: String.Index) -> String.Index {
+    let offset = i.encodedOffset
+    _precondition(offset > 0, "Can't move before startIndex")
+    _precondition(offset <= count, "String index is out of bounds")
+    let slice = self[0..<offset]
+    let stride = slice.measureLastExtendedGraphemeCluster()
+    _sanityCheck(stride > 0 && stride <= UInt16.max)
+    return String.Index(
+      encodedOffset: offset &- stride,
+      .character(stride: UInt16(truncatingIfNeeded: stride)))
+  }
+
+  @_versioned
+  @_inlineable
+  internal func characterIndex(
+    _ i: String.Index,
+    offsetBy n: Int
+  ) -> String.Index {
+    var i = i
+    if n >= 0 {
+      for _ in 0 ..< n {
+        i = characterIndex(after: i)
+      }
+    } else {
+      for _ in n ..< 0 {
+        i = characterIndex(before: i)
+      }
+    }
+    return i
+  }
+
+  @_versioned
+  @_inlineable
+  internal func characterIndex(
+    _ i: String.Index,
+    offsetBy n: Int,
+    limitedBy limit: String.Index
+  ) -> String.Index? {
+    var i = i
+    if n >= 0 {
+      for _ in 0 ..< n {
+        // Note condition is >=, not ==: we do not want to jump
+        // over limit if it's in the middle of a grapheme cluster.
+        // https://bugs.swift.org/browse/SR-6545
+        if i >= limit { return nil }
+        i = characterIndex(after: i)
+      }
+    } else {
+      for _ in n ..< 0 {
+        if i <= limit { return nil } // See note above.
+        i = characterIndex(before: i)
+      }
+    }
+    return i
+  }
+
+  public func characterDistance(
+    from start: String.Index,
+    to end: String.Index
+  ) -> Int {
+    var i = start
+    var count = 0
+    if start < end {
+      // Note that the loop condition isn't just an equality check: we do not
+      // want to jump over `end` if it's in the middle of a grapheme cluster.
+      // https://bugs.swift.org/browse/SR-6546
+      while i < end {
+        count += 1
+        i = characterIndex(after: i)
+      }
+    } else {
+      while i > end { // See note above.
+        count -= 1
+        i = characterIndex(before: i)
+      }
+    }
+    return count
+  }
+
+  @_inlineable
+  @_versioned
+  internal func character(at i: String.Index) -> Character {
+    let offset = i.encodedOffset
+    let stride: Int
+    if case .character(let _stride) = i._cache {
+      // TODO: should _fastPath the case somehow
+      stride = Int(_stride)
+    } else {
+      stride = characterStride(atOffset: offset)
+    }
+    _sanityCheck(stride > 0)
+    if _slowPath(stride > 1) {
+      return Character(_unverified: self.checkedSlice(offset..<offset + stride))
+    }
+    let u = self.codeUnit(atCheckedOffset: offset)
+    if _slowPath(!UTF16._isScalar(u)) {
+      return Character(Unicode.Scalar._replacementCharacter)
+    }
+    return Character(_singleCodeUnit: u)
+  }
+}
+
+extension _StringVariant {
   // NOTE: Because this function is inlineable, it should contain only the fast
   // paths of grapheme breaking that we have high confidence won't change.
   /// Returns the length of the first extended grapheme cluster in UTF-16
@@ -155,7 +299,7 @@ extension _UnmanagedOpaqueString {
     }
     let shortLength = shortBuffer.withUnsafeBufferPointer { buffer in
       UTF16._measureLastExtendedGraphemeCluster(
-        in: UnsafeBufferPointer(rebasing: buffer.suffix(shortCount)))
+        in: UnsafeBufferPointer(rebasing: buffer.prefix(shortCount)))
     }
     if _fastPath(shortLength < maxShortCount) {
       return shortLength
