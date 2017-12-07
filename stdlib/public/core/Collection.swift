@@ -1015,6 +1015,8 @@ extension Collection {
   internal func _advanceForward(
     _ i: Index, by n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
+    if i == limit { return i }
+
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
 
