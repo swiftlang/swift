@@ -590,8 +590,24 @@ extension ExpressibleByStringLiteral
 public protocol ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
   associatedtype ArrayLiteralElement
-  /// Creates an instance initialized with the given elements.
+  /// Creates an instance initialized with the given elements. This
+  /// version has been deprecated in favor of the non-variadic equivalent.
+  @available(*, deprecated, message: "use the equivalent non-variadic version")
   init(arrayLiteral elements: ArrayLiteralElement...)
+
+  /// Creates an instance initialized with the given elements.
+  init(arrayLiteral elements: [ArrayLiteralElement])
+}
+
+extension ExpressibleByArrayLiteral {
+  public init(arrayLiteral: ArrayLiteralElement...) {
+    fatalError("Don't implement this!")
+  }
+
+  public init(arrayLiteral: [ArrayLiteralElement]) {
+    let f = unsafeBitCast(Self.init(arrayLiteral:) as (ArrayLiteralElement...)->Self, to: (([ArrayLiteralElement])->Self).self)
+    self = f(arrayLiteral)
+  }
 }
 
 /// A type that can be initialized using a dictionary literal.

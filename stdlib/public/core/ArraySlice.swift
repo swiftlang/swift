@@ -51,7 +51,11 @@ extension Slice: Equatable where Base: _ContiguouslyStored, Base.Element: Equata
 }
 
 extension Slice: ArrayLiteralConvertible where Base: ExpressibleByArrayLiteral {
-  
+  public typealias ArrayLiteralElement = Base.Element
+  public init(arrayLiteralElement: ArrayLiteralElement...) {
+    let base = Base(arrayLiteralElement: ArrayLiteralElement)
+    let self = base[...]
+  }
 }
 
 // %if Self == 'ArraySlice':
