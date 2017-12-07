@@ -150,11 +150,23 @@ DECL_NODES = [
     #   type '...'? '='? expression? ','?
     Node('FunctionParameter', kind='Syntax',
          children=[
-             Child('ExternalName', kind='IdentifierToken',
+             Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('LocalName', kind='IdentifierToken'),
+             Child('FirstName', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ]),
+             # One of these two names needs be optional, we choose the second
+             # name to avoid backtracking.
+             Child('SecondName', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ],
+                   is_optional=True),
              Child('Colon', kind='ColonToken'),
-             Child('TypeAnnotation', kind='TypeAnnotation'),
+             Child('TypeAnnotation', kind='Type'),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
              Child('DefaultEquals', kind='EqualToken',

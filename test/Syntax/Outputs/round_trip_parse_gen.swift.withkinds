@@ -4,11 +4,11 @@
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 
 class C {
-  func bar(_ a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>) <CodeBlock>{}</CodeBlock>
-  func bar1(_ a: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier>) -> <SimpleTypeIdentifier>Float </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <SequenceExpr><PrefixOperatorExpr>-<FloatLiteralExpr>0.6 </FloatLiteralExpr></PrefixOperatorExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><FloatLiteralExpr>0.1 </FloatLiteralExpr><BinaryOperatorExpr>- </BinaryOperatorExpr><FloatLiteralExpr>0.3 </FloatLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock>
-  func bar2(a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, b: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, c:<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>) -> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
-  func bar3(a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>) -> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
-  func bar4(_ a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>) -> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar(<FunctionParameter>_ a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) <CodeBlock>{}</CodeBlock>
+  func bar1(<FunctionParameter>_ a: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier></FunctionParameter>) -> <SimpleTypeIdentifier>Float </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <SequenceExpr><PrefixOperatorExpr>-<FloatLiteralExpr>0.6 </FloatLiteralExpr></PrefixOperatorExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><FloatLiteralExpr>0.1 </FloatLiteralExpr><BinaryOperatorExpr>- </BinaryOperatorExpr><FloatLiteralExpr>0.3 </FloatLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock>
+  func bar2(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>b: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>c:<SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) -> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar3(<FunctionParameter>a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) -> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
+  func bar4(<FunctionParameter>_ a: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) -> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>
   func foo() <CodeBlock>{
     var a = <StringLiteralExpr>/*comment*/"ab\(x)c"</StringLiteralExpr>/*comment*/
     var b = <PrefixOperatorExpr>/*comment*/+<IntegerLiteralExpr>2</IntegerLiteralExpr></PrefixOperatorExpr><IdentifierExpr>/*comment*/
@@ -93,3 +93,11 @@ private </DeclModifier>struct S<GenericParameterClause><<GenericParameter>A, </G
 }</MemberDeclBlock></StructDecl>
 
 protocol P<TypeInheritanceClause>: <InheritedType>class </InheritedType></TypeInheritanceClause>{}
+
+func foo(<FunctionParameter>_ _: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>,</FunctionParameter><FunctionParameter>
+         a b: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <SequenceExpr><IntegerLiteralExpr>3 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr>,</FunctionParameter><FunctionParameter>
+         _ c: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <IntegerLiteralExpr>2</IntegerLiteralExpr>,</FunctionParameter><FunctionParameter>
+         d _: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <SequenceExpr><TernaryExpr><BooleanLiteralExpr>true </BooleanLiteralExpr>? <IntegerLiteralExpr>2</IntegerLiteralExpr>: <IntegerLiteralExpr>3</IntegerLiteralExpr></TernaryExpr></SequenceExpr>,</FunctionParameter><FunctionParameter><Attribute>
+         @objc </Attribute>e: <SimpleTypeIdentifier>X </SimpleTypeIdentifier>= <BooleanLiteralExpr>true</BooleanLiteralExpr>,</FunctionParameter><FunctionParameter>
+         f: inout <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>,</FunctionParameter><FunctionParameter>
+         g: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>...</FunctionParameter>) <CodeBlock>{}</CodeBlock>
