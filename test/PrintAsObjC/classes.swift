@@ -433,6 +433,41 @@ class MyObject : NSObject {}
   @objc class Subclass : NestedSuperclass {}
 }
 
+// CHECK-LABEL: @interface NewBanned
+// CHECK-NEXT: - (nonnull instancetype)initWithArbitraryArgument:(NSInteger)arbitraryArgument OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class NewBanned : NSObject {
+  init(arbitraryArgument: Int) { super.init() }
+}
+
+// CHECK-LABEL: @interface NewBanned
+// CHECK-NEXT: - (nonnull instancetype)initWithDifferentArbitraryArgument:(NSInteger)differentArbitraryArgument OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithArbitraryArgument:(NSInteger)arbitraryArgument SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class NewBannedStill : NewBanned {
+  init(differentArbitraryArgument: Int) { super.init(arbitraryArgument: 0) }
+}
+
+// CHECK-LABEL: @interface NewUnbanned
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: + (nonnull instancetype)new;
+// CHECK-NEXT: - (nonnull instancetype)initWithArbitraryArgument:(NSInteger)arbitraryArgument SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class NewUnbanned : NewBanned {
+  init() { super.init(arbitraryArgument: 0) }
+}
+
+// CHECK-LABEL: @interface NewUnbannedDouble
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: + (nonnull instancetype)new;
+// CHECK-NEXT: - (nonnull instancetype)initWithDifferentArbitraryArgument:(NSInteger)differentArbitraryArgument SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class NewUnbannedDouble : NewBannedStill {
+  init() { super.init(differentArbitraryArgument: 0) }
+}
+
 // NEGATIVE-NOT: @interface Private :
 private class Private : A1 {}
 
