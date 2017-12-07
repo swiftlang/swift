@@ -17,7 +17,7 @@
 extension MTLBlitCommandEncoder {
     
     public func fill(buffer: MTLBuffer, range: Range<Int>, value: UInt8) {
-        __fill(buffer, range: NSMakeRange(range.lowerBound, range.count), value: value)
+        __fill(buffer, range: NSRange(location: range.lowerBound, length: range.count), value: value)
     }
 }
 
@@ -28,13 +28,13 @@ extension MTLBuffer {
 #if os(OSX)
     @available(macOS, introduced: 10.11)
     public func didModifyRange(_ range: Range<Int>) {
-        __didModifyRange(NSMakeRange(range.lowerBound, range.count))
+        __didModifyRange(NSRange(location: range.lowerBound, length: range.count))
     }
 #endif
     
     @available(macOS 10.12, iOS 10.0, tvOS 10.0, *)
     public func addDebugMarker(_ marker: String, range: Range<Int>) {
-        __addDebugMarker(marker, range: NSMakeRange(range.lowerBound, range.count))
+        __addDebugMarker(marker, range: NSRange(location: range.lowerBound, length: range.count))
     }
 }
 
@@ -53,19 +53,19 @@ extension MTLComputeCommandEncoder {
     }
     
     public func setBuffers(_ buffers: [MTLBuffer?], offsets: [Int], range: Range<Int>) {
-        __setBuffers(buffers, offsets: offsets, with: NSMakeRange(range.lowerBound, range.count))
+        __setBuffers(buffers, offsets: offsets, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setTextures(_ textures: [MTLTexture?], range: Range<Int>) {
-        __setTextures(textures, with: NSMakeRange(range.lowerBound, range.count))
+        __setTextures(textures, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setSamplerStates(_ samplers: [MTLSamplerState?], range: Range<Int>) {
-        __setSamplerStates(samplers, with: NSMakeRange(range.lowerBound, range.count))
+        __setSamplerStates(samplers, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setSamplerStates(_ samplers: [MTLSamplerState?], lodMinClamps: [Float], lodMaxClamps: [Float], range: Range<Int>) {
-        __setSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSMakeRange(range.lowerBound, range.count))
+        __setSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
     }
 }
 
@@ -97,7 +97,7 @@ public func MTLCopyAllDevicesWithObserver(handler: @escaping MTLDeviceNotificati
 extension MTLFunctionConstantValues {
     
     public func setConstantValues(_ values: UnsafeRawPointer, type: MTLDataType, range: Range<Int>) {
-        __setConstantValues(values, type: type, with: NSMakeRange(range.lowerBound, range.count))
+        __setConstantValues(values, type: type, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
 }
@@ -107,15 +107,15 @@ extension MTLFunctionConstantValues {
 extension MTLArgumentEncoder {
     
     public func setBuffers(_ buffers: [MTLBuffer?], offsets: [Int], range: Range<Int>) {
-        __setBuffers(buffers, offsets: offsets, with: NSMakeRange(range.lowerBound, range.count))
+        __setBuffers(buffers, offsets: offsets, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setTextures(_ textures: [MTLTexture?], range: Range<Int>) {
-        __setTextures(textures, with: NSMakeRange(range.lowerBound, range.count))
+        __setTextures(textures, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setSamplerStates(_ samplers: [MTLSamplerState?], range: Range<Int>) {
-        __setSamplerStates(samplers, with: NSMakeRange(range.lowerBound, range.count))
+        __setSamplerStates(samplers, with: NSRange(location: range.lowerBound, length: range.count))
     }
 }
 
@@ -146,57 +146,57 @@ extension MTLRenderCommandEncoder {
 #endif
     
     public func setVertexBuffers(_ buffers: [MTLBuffer?], offsets: [Int], range: Range<Int>) {
-        __setVertexBuffers(buffers, offsets: offsets, with: NSMakeRange(range.lowerBound, range.count))
+        __setVertexBuffers(buffers, offsets: offsets, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setVertexTextures(_ textures: [MTLTexture?], range: Range<Int>) {
-        __setVertexTextures(textures, with: NSMakeRange(range.lowerBound, range.count))
+        __setVertexTextures(textures, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setVertexSamplerStates(_ samplers: [MTLSamplerState?], range: Range<Int>) {
-        __setVertexSamplerStates(samplers, with: NSMakeRange(range.lowerBound, range.count))
+        __setVertexSamplerStates(samplers, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setVertexSamplerStates(_ samplers: [MTLSamplerState?], lodMinClamps: [Float], lodMaxClamps: [Float], range: Range<Int>) {
-        __setVertexSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSMakeRange(range.lowerBound, range.count))
+        __setVertexSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
     }
 
     public func setFragmentBuffers(_ buffers: [MTLBuffer?], offsets: [Int], range: Range<Int>) {
-        __setFragmentBuffers(buffers, offsets: offsets, with: NSMakeRange(range.lowerBound, range.count))
+        __setFragmentBuffers(buffers, offsets: offsets, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setFragmentTextures(_ textures: [MTLTexture?], range: Range<Int>) {
-        __setFragmentTextures(textures, with: NSMakeRange(range.lowerBound, range.count))
+        __setFragmentTextures(textures, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setFragmentSamplerStates(_ samplers: [MTLSamplerState?], range: Range<Int>) {
-        __setFragmentSamplerStates(samplers, with: NSMakeRange(range.lowerBound, range.count))
+        __setFragmentSamplerStates(samplers, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     public func setFragmentSamplerStates(_ samplers: [MTLSamplerState?], lodMinClamps: [Float], lodMaxClamps: [Float], range: Range<Int>) {
-        __setFragmentSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSMakeRange(range.lowerBound, range.count))
+        __setFragmentSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
     }
 
 #if os(iOS)
 
     @available(iOS 11.0, *)
     public func setTileBuffers(_ buffers: [MTLBuffer?], offsets: [Int], range: Range<Int>) {
-        __setTileBuffers(buffers, offsets: offsets, with: NSMakeRange(range.lowerBound, range.count))
+        __setTileBuffers(buffers, offsets: offsets, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     @available(iOS 11.0, *)
     public func setTileTextures(_ textures: [MTLTexture?], range: Range<Int>) {
-        __setTileTextures(textures, with: NSMakeRange(range.lowerBound, range.count))
+        __setTileTextures(textures, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     @available(iOS 11.0, *)
     public func setTileSamplerStates(_ samplers: [MTLSamplerState?], range: Range<Int>) {
-        __setTileSamplerStates(samplers, with: NSMakeRange(range.lowerBound, range.count))
+        __setTileSamplerStates(samplers, with: NSRange(location: range.lowerBound, length: range.count))
     }
     
     @available(iOS 11.0, *)
     public func setTileSamplerStates(_ samplers: [MTLSamplerState?], lodMinClamps: [Float], lodMaxClamps: [Float], range: Range<Int>) {
-        __setTileSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSMakeRange(range.lowerBound, range.count))
+        __setTileSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
     }
 #endif
 }
@@ -226,6 +226,6 @@ extension MTLTexture {
     
     @available(macOS 10.11, iOS 9.0, tvOS 9.0, *)
     public func makeTextureView(pixelFormat: MTLPixelFormat, textureType: MTLTextureType, levels levelRange: Range<Int>, slices sliceRange: Range<Int>) -> MTLTexture? {
-        return __newTextureView(with: pixelFormat, textureType: textureType, levels: NSMakeRange(levelRange.lowerBound, levelRange.count), slices: NSMakeRange(sliceRange.lowerBound, sliceRange.count))
+        return __newTextureView(with: pixelFormat, textureType: textureType, levels: NSRange(location: levelRange.lowerBound, length: levelRange.count), slices: NSRange(location: sliceRange.lowerBound, length: sliceRange.count))
     }
 }
