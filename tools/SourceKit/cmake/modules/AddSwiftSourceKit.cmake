@@ -238,9 +238,9 @@ macro(add_sourcekit_executable name)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
   endif()
 
-  target_link_libraries(${name} ${SOURCEKITEXE_LINK_LIBS})
+  target_link_libraries(${name} PRIVATE ${SOURCEKITEXE_LINK_LIBS})
   swift_common_llvm_config(${name} ${SOURCEKITEXE_LLVM_COMPONENT_DEPENDS})
-  target_link_libraries(${name} ${LLVM_COMMON_LIBS})
+  target_link_libraries(${name} PRIVATE ${LLVM_COMMON_LIBS})
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
   if (NOT SWIFT_ASAN_BUILD)
@@ -422,9 +422,9 @@ macro(add_sourcekit_xpc_service name framework_target)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
   endif(LLVM_COMMON_DEPENDS)
 
-  target_link_libraries(${name} ${SOURCEKITXPC_LINK_LIBS})
+  target_link_libraries(${name} PRIVATE ${SOURCEKITXPC_LINK_LIBS})
   swift_common_llvm_config(${name} ${SOURCEKITXPC_LLVM_COMPONENT_DEPENDS})
-  target_link_libraries(${name} ${LLVM_COMMON_LIBS})
+  target_link_libraries(${name} PRIVATE ${LLVM_COMMON_LIBS})
 
   add_dependencies(${framework_target} ${name})
 

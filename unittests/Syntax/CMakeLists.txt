@@ -12,4 +12,5 @@ add_swift_unittest(SwiftSyntaxTests
   )
 
 target_link_libraries(SwiftSyntaxTests
+  PRIVATE
   swiftSyntax)

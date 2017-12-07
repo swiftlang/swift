@@ -1961,7 +1961,7 @@ function(_add_swift_executable_single name)
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
+  target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
 
   set_target_properties(${name}

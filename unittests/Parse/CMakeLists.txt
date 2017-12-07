@@ -5,6 +5,7 @@ add_swift_unittest(SwiftParseTests
 )
 
 target_link_libraries(SwiftParseTests
+    PRIVATE
     swiftSIL
     swiftClangImporter
     swiftParse
