@@ -173,26 +173,6 @@ extension _UnmanagedString {
       start: start + bounds.lowerBound,
       count: bounds.count)
   }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func offset(of iterator: Iterator) -> Int {
-    return iterator._position - start
-  }
-}
-
-extension _UnmanagedString {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func makeIterator(startingAt position: Index) -> Iterator {
-    return Iterator(_elements: self, _position: position)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func makeIterator(startingAt offset: Int) -> Iterator {
-    return Iterator(_elements: self, _position: startIndex + offset)
-  }
 }
 
 extension _UnmanagedString {
