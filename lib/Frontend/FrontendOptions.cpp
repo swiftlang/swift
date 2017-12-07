@@ -48,8 +48,11 @@ bool FrontendInputs::shouldTreatAsSIL() const {
   unsigned silPrimaryCount = numberOfPrimaryInputsEndingWith(SIL_EXTENSION);
   if (silPrimaryCount == 0)
     return false;
-  if (silPrimaryCount == primaryInputCount())
+  if (silPrimaryCount == primaryInputCount()) {
+    // Not clear what to do someday with multiple primaries
+    assertMustNotBeMoreThanOnePrimaryInput();
     return true;
+  }
   llvm_unreachable("Either all primaries or none must end with .sil");
 }
 
