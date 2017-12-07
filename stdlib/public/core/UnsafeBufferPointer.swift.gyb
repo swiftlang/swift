@@ -165,12 +165,16 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   @_inlineable
   public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
-    // NOTE: This method is a no-op for performance reasons.
+    // NOTE: In release mode, this method is a no-op for performance reasons.
+    _debugPrecondition(index >= bounds.lowerBound)
+    _debugPrecondition(index < bounds.upperBound)
   }
 
   @_inlineable
   public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
-    // NOTE: This method is a no-op for performance reasons.
+    // NOTE: In release mode, this method is a no-op for performance reasons.
+    _debugPrecondition(range.lowerBound >= bounds.lowerBound)
+    _debugPrecondition(range.upperBound <= bounds.upperBound)
   }
 
   public typealias Indices = CountableRange<Int>
