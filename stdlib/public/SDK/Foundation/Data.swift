@@ -334,8 +334,8 @@ public final class _DataStorage {
             let tryCalloc = (origLength == 0 || (newLength / origLength) >= 4)
             if allocateCleared && tryCalloc {
                 newBytes = _DataStorage.allocate(newCapacity, true)
-                if newBytes != nil {
-                    _DataStorage.move(newBytes!, _bytes!, origLength)
+                if let newBytes = newBytes {
+                    _DataStorage.move(newBytes, _bytes!, origLength)
                     _freeBytes()
                 }
             }
@@ -344,8 +344,8 @@ public final class _DataStorage {
                 allocateCleared = false
                 if _deallocator != nil {
                     newBytes = _DataStorage.allocate(newCapacity, true)
-                    if newBytes != nil {
-                        _DataStorage.move(newBytes!, _bytes!, origLength)
+                    if let newBytes = newBytes {
+                        _DataStorage.move(newBytes, _bytes!, origLength)
                         _freeBytes()
                         _deallocator = nil
                     }
@@ -360,8 +360,8 @@ public final class _DataStorage {
                 allocateCleared = clear && _DataStorage.shouldAllocateCleared(newCapacity)
                 if allocateCleared && tryCalloc {
                     newBytes = _DataStorage.allocate(newCapacity, true)
-                    if newBytes != nil {
-                        _DataStorage.move(newBytes!, _bytes!, origLength)
+                    if let newBytes = newBytes {
+                        _DataStorage.move(newBytes, _bytes!, origLength)
                         _freeBytes()
                     }
                 }
@@ -610,8 +610,8 @@ public final class _DataStorage {
                 memmove(mutableBytes! + start + replacementLength, mutableBytes! + start + length, currentLength - start - length)
             }
             if replacementLength != 0 {
-                if replacementBytes != nil {
-                    memmove(mutableBytes! + start, replacementBytes!, replacementLength)
+                if let replacementBytes = replacementBytes {
+                    memmove(mutableBytes! + start, replacementBytes, replacementLength)
                 } else {
                     memset(mutableBytes! + start, 0, replacementLength)
                 }

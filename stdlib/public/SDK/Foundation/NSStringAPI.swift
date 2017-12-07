@@ -1471,8 +1471,8 @@ extension StringProtocol where Index == String.Index {
         tokenRanges: $0) as NSArray
     }
 
-    if nsTokenRanges != nil {
-      tokenRanges?.pointee = (nsTokenRanges! as [AnyObject]).map {
+    if let nsTokenRanges = nsTokenRanges {
+      tokenRanges?.pointee = (nsTokenRanges as [AnyObject]).map {
         self._range($0.rangeValue)
       }
     }
