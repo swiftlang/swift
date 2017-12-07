@@ -685,3 +685,54 @@ bb0(%0 : $*S<T>):
   %7 = tuple ()
   return %7 : $()
 }
+
+struct ObjWrapper {
+  var obj: AnyObject
+}
+
+// Test that backward copy propagation does not interfere with the previous
+// value of the copy's destination. The `load` is a use of the `alloc` value,
+// but not a direct use. Since it occurs between the initialization of `temp`
+// and the copy from temp into `alloc`, the copy into `alloc` cannot be backward
+// propagated.
+// <rdar://35646292> Swift CI: resilience bot seg faults in stdlib/RangeReplaceable.swift.gyb.
+//
+// CHECK-LABEL: sil @testLoadDestroy : $@convention(thin) (@in ObjWrapper, @in ObjWrapper) -> () {
+// CHECK: bb0(%0 : $*ObjWrapper, %1 : $*ObjWrapper):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $ObjWrapper, var, name "o"
+// CHECK:   [[ELT_ADDR:%.*]] = struct_element_addr [[ALLOC]] : $*ObjWrapper, #ObjWrapper.obj
+// CHECK:   copy_addr %0 to [initialization] [[ALLOC]] : $*ObjWrapper
+// CHECK:   [[TEMP:%.*]] = alloc_stack $ObjWrapper
+// CHECK:   copy_addr %1 to [initialization] [[TEMP]] : $*ObjWrapper
+// CHECK:   [[LD:%.*]] = load [[ELT_ADDR]] : $*AnyObject
+// CHECK:   strong_release [[LD]] : $AnyObject
+// CHECK:   copy_addr [take] [[TEMP]] to [initialization] [[ALLOC]] : $*ObjWrapper
+// CHECK:   dealloc_stack [[TEMP]] : $*ObjWrapper
+// CHECK:   dealloc_stack [[ALLOC]] : $*ObjWrapper
+// CHECK:   %{{.*}} = tuple ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'testLoadDestroy'
+sil @testLoadDestroy : $@convention(thin) (@in ObjWrapper, @in ObjWrapper) -> () {
+bb(%0 : $*ObjWrapper, %1 : $*ObjWrapper):
+  // Fully initialize a new stack var to arg0.
+  %alloc = alloc_stack $ObjWrapper, var, name "o"
+  %objadr = struct_element_addr %alloc : $*ObjWrapper, #ObjWrapper.obj
+  copy_addr %0 to [initialization] %alloc : $*ObjWrapper
+
+  // Fully initialize a temporary to arg1.
+  // Rewriting this to %alloc would alias with the subsequent load.
+  %temp = alloc_stack $ObjWrapper
+  copy_addr %1 to [initialization] %temp : $*ObjWrapper
+
+  // Load and release an reference from arg0 inside the stack var.
+  %obj = load %objadr : $*AnyObject
+  strong_release %obj : $AnyObject
+
+  // Move `temp` copy of arg1 into the stack var.
+  copy_addr [take] %temp to [initialization] %alloc : $*ObjWrapper
+
+  dealloc_stack %temp : $*ObjWrapper
+  dealloc_stack %alloc : $*ObjWrapper
+  %74 = tuple ()
+  return %74 : $()
+}
