@@ -233,11 +233,8 @@ public:
     Result = NextToken;
     LeadingTriviaResult = {LeadingTrivia};
     TrailingTriviaResult = {TrailingTrivia};
-    if (Result.isNot(tok::eof)) {
-      LeadingTrivia.clear();
-      TrailingTrivia.clear();
+    if (Result.isNot(tok::eof))
       lexImpl();
-    }
   }
 
   void lex(Token &Result) {
@@ -288,8 +285,6 @@ public:
   void restoreState(State S, bool enableDiagnostics = false) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
-    LeadingTrivia.clear();
-    TrailingTrivia.clear();
     // Don't reemit diagnostics while readvancing the lexer.
     llvm::SaveAndRestore<DiagnosticEngine*>
       D(Diags, enableDiagnostics ? Diags : nullptr);

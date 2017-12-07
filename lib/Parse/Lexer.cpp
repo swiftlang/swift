@@ -2058,6 +2058,10 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+    LeadingTrivia.clear();
+    TrailingTrivia.clear();
+  }
   NextToken.setAtStartOfLine(CurPtr == BufferStart);
 
   // Remember where we started so that we can find the comment range.
