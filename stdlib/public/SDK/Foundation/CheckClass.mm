@@ -59,7 +59,7 @@ namespace {
     template <size_t N>
     StringRefLite(const char (&staticStr)[N]) : data(staticStr), length(N) {}
 
-    StringRefLite(TypeNamePair rawValue)
+    StringRefLite(swift::TypeNamePair rawValue)
         : data(rawValue.data),
           length(rawValue.length){}
 
