@@ -1129,7 +1129,7 @@ extension Sequence where Element: StringProtocol {
     separator: String?
   ) -> String
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    var result = _SwiftStringStorage<CodeUnit>.create(capacity: capacity)
+    let result = _SwiftStringStorage<CodeUnit>.create(capacity: capacity)
 
     guard let separator = separator else {
       for x in self {
