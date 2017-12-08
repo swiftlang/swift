@@ -242,11 +242,7 @@ extension String {
   /// - Complexity: O(*n*)
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    if _guts.isASCII {
-      _guts.reserveCapacity(n, of: UInt8.self)
-    } else {
-      _guts.reserveCapacity(n, of: UTF16.CodeUnit.self)
-    }
+    _guts.reserveCapacity(n)
   }
 
   /// Appends the given character to the string.
@@ -291,7 +287,9 @@ extension String {
       _guts.append(v._wholeString._guts, range: v._encodedOffsetRange)
       return
     }
-    reserveCapacity(_guts.count + newElements.underestimatedCount)
+    _guts.reserveUnusedCapacity(
+      newElements.underestimatedCount,
+      ascii: _guts.isASCII)
     for c in newElements { self.append(c) }
   }
 
