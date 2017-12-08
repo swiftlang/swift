@@ -3282,7 +3282,7 @@ ${assignmentOperatorComment(x.operator, True)}
   /// A type that represents the words of this integer.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Words : BidirectionalCollection {
-    public typealias Indices = CountableRange<Int>
+    public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
     @_versioned // FIXME(sil-serialize-all)

@@ -492,7 +492,7 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
 
 extension ${Self}: RandomAccessCollection, MutableCollection {
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
   public typealias Iterator = IndexingIterator<${Self}>
 
 %if Self == 'ArraySlice':

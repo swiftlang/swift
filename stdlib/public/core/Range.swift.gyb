@@ -270,7 +270,7 @@ extension Range
   @_inlineable // FIXME(sil-serialize-all)
   public subscript(
     _bounds: Range<Bound._DisabledRangeIndex>
-  ) -> CountableRange<Bound> {
+  ) -> Range<Bound> {
     fatalError("uncallable")
   }
 
@@ -301,7 +301,6 @@ public typealias CountableRange<Bound: Comparable> = Range<Bound>
 all_range_types = [
   ('Range', '..<'),
   ('ClosedRange', '...'),
-  ('CountableClosedRange', '...')
 ]
 
 def get_init_warning(Self, OtherSelf):
@@ -328,11 +327,7 @@ def get_init_warning(Self, OtherSelf):
 % for (Self, op) in all_range_types:
 %   for (OtherSelf, other_op) in all_range_types:
 extension ${Self}
-%   if ('Countable' in OtherSelf or 'Closed' in OtherSelf or 'Closed' in Self) \
-%   and not 'Countable' in Self:
-  where
-  Bound : Strideable, Bound.Stride : SignedInteger
-%   end
+  where Bound : Strideable, Bound.Stride : SignedInteger
 {
   /// Creates an instance equivalent to the given range.
 ${get_init_warning(Self, OtherSelf)}
@@ -343,24 +338,15 @@ ${get_init_warning(Self, OtherSelf)}
   public init(_ other: ${OtherSelf}<Bound>) {
 %   if 'Closed' not in Self and 'Closed' in OtherSelf:
     let upperBound = other.upperBound.advanced(by: 1)
-%   elif 'Closed' in Self and 'Closed' not in OtherSelf:
+%   else:
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
-%   else:
-    let upperBound = other.upperBound
 %   end
     self.init(
       uncheckedBounds: (lower: other.lowerBound, upper: upperBound)
     )
   }
-}
 
-extension ${Self}
-%   if 'Countable' in OtherSelf and not 'Countable' in Self:
-  where
-  Bound : Strideable, Bound.Stride : SignedInteger
-%   end
-{
   /// Returns a Boolean value indicating whether this range and the given range
   /// contain an element in common.
   ///
@@ -647,7 +633,7 @@ extension PartialRangeThrough: RangeExpression {
 /// A partial interval extending upward from a lower bound that forms a
 /// sequence of increasing values.
 ///
-/// You create `CountablePartialRangeFrom` instances by using the postfix range
+/// You create `PartialRangeFrom` instances by using the postfix range
 /// operator (postfix `...`).
 ///
 ///     let atLeastFive = 5...
@@ -694,7 +680,7 @@ extension PartialRangeThrough: RangeExpression {
 ///     // "2 wasn't it..."
 ///     // "3 is the magic number!"
 ///
-/// Because a `CountablePartialRangeFrom` sequence counts upward indefinitely,
+/// Because a `PartialRangeFrom` sequence counts upward indefinitely,
 /// do not use one with methods that read the entire sequence before
 /// returning, such as `map(_:)`, `filter(_:)`, or `suffix(_:)`. It is safe to
 /// use operations that put an upper limit on the number of elements they
@@ -722,7 +708,7 @@ extension PartialRangeThrough: RangeExpression {
 ///
 /// The behavior of incrementing indefinitely is determined by the type of
 /// `Bound`. For example, iterating over an instance of
-/// `CountablePartialRangeFrom<Int>` traps when the sequence's next value
+/// `PartialRangeFrom<Int>` traps when the sequence's next value
 /// would be above `Int.max`.
 @_fixed_layout
 public struct PartialRangeFrom<Bound: Comparable> {
@@ -884,7 +870,7 @@ extension Strideable where Stride: SignedInteger {
   /// Use the half-open range operator (`..<`) to create a range of any type that
   /// conforms to the `Strideable` protocol with an associated integer `Stride`
   /// type, such as any of the standard library's integer types. This example
-  /// creates a `CountableRange<Int>` from zero up to, but not including, 5.
+  /// creates a `Range<Int>` from zero up to, but not including, 5.
   ///
   ///     let upToFive = 0..<5
   ///     print(upToFive.contains(3))         // Prints "true"
@@ -901,11 +887,11 @@ extension Strideable where Stride: SignedInteger {
   ///   - maximum: The upper bound for the range.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static func ..< (minimum: Self, maximum: Self) -> CountableRange<Self> {
+  public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     // FIXME: swift-3-indexing-model: tests for traps.
     _precondition(minimum <= maximum,
       "Can't form Range with upperBound < lowerBound")
-    return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
+    return Range(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 }
 

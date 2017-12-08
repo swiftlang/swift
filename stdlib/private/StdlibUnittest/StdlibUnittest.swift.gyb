@@ -319,13 +319,8 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   }
 }
 
-% for OtherRange in ['Range', 'ClosedRange', 'CountableClosedRange']:
-extension Range
-%   if 'Countable' in OtherRange:
-  where
-  Bound : Strideable, Bound.Stride : SignedInteger
-%   end
-{
+% for OtherRange in ['Range', 'ClosedRange']:
+extension Range {
   internal func _contains(_ other: ${OtherRange}<Bound>) -> Bool {
     if other.lowerBound < lowerBound { return false }
 %   if 'Closed' in OtherRange:
@@ -338,7 +333,7 @@ extension Range
 }
 % end
 
-% for Range in ['Range', 'ClosedRange', 'CountableClosedRange']:
+% for Range in ['Range', 'ClosedRange']:
 public func expectTrapping<Bound>(
   _ point: Bound, in range: ${Range}<Bound>, ${TRACE}
 ) {

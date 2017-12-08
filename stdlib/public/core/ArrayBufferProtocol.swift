@@ -16,7 +16,7 @@
 internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
-  associatedtype Indices = CountableRange<Int>
+  associatedtype Indices = Range<Int>
 
   /// Create an empty buffer.
   init()
@@ -160,7 +160,7 @@ extension _ArrayBufferProtocol {
 
       // Assign over the original subrange
       var i = newValues.startIndex
-      for j in CountableRange(subrange) {
+      for j in subrange {
         elements[j] = newValues[i]
         newValues.formIndex(after: &i)
       }

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
-// [Closed]Range and [Closed]CountableRange.
+// [Closed]Range.
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @_versioned
@@ -24,7 +24,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
 
 // FIXME(ABI)#23 (Nesting types in generics): should be a nested type in
 // `ClosedRange`.
-/// A position in a `CountableClosedRange` instance.
+/// A position in a `ClosedRange` instance.
 @_fixed_layout
 public struct ClosedRangeIndex<Bound: Strideable>
 where Bound.Stride : SignedInteger {
@@ -96,12 +96,12 @@ extension ClosedRangeIndex : Hashable where Bound : Hashable {
 
 /// A closed range that forms a collection of consecutive values.
 ///
-/// You create a `CountableClosedRange` instance by using the closed range
+/// You create a `ClosedRange` instance by using the closed range
 /// operator (`...`).
 ///
 ///     let throughFive = 0...5
 ///
-/// A `CountableClosedRange` instance contains both its lower bound and its
+/// A `ClosedRange` instance contains both its lower bound and its
 /// upper bound.
 ///
 ///     print(throughFive.contains(3))      // Prints "true"
@@ -110,7 +110,7 @@ extension ClosedRangeIndex : Hashable where Bound : Hashable {
 ///
 /// Because a closed range includes its upper bound, a closed range whose lower
 /// bound is equal to the upper bound contains one element. Therefore, a
-/// `CountableClosedRange` instance cannot represent an empty range.
+/// `ClosedRange` instance cannot represent an empty range.
 ///
 ///     let zeroInclusive = 0...0
 ///     print(zeroInclusive.isEmpty)
@@ -141,9 +141,7 @@ extension ClosedRangeIndex : Hashable where Bound : Hashable {
 /// iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
 @_fixed_layout
-public struct CountableClosedRange<Bound: Strideable>
-where Bound.Stride : SignedInteger {
-
+public struct ClosedRange<Bound: Comparable> {
   /// The range's lower bound.
   public let lowerBound: Bound
 
@@ -158,7 +156,7 @@ where Bound.Stride : SignedInteger {
   /// Because this initializer does not perform any checks, it should be used
   /// as an optimization only when you are absolutely certain that `lower` is
   /// less than or equal to `upper`. Using the closed range operator (`...`)
-  /// to form `CountableClosedRange` instances is preferred.
+  /// to form `ClosedRange` instances is preferred.
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
   @_inlineable
@@ -166,14 +164,33 @@ where Bound.Stride : SignedInteger {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
+  
+  /// Returns a Boolean value indicating whether the given element is contained
+  /// within the range.
+  ///
+  /// A `ClosedRange` instance contains both its lower and upper bound.
+  /// `element` is contained in the range if it is between the two bounds or
+  /// equal to either bound.
+  ///
+  /// - Parameter element: The element to check for containment.
+  /// - Returns: `true` if `element` is contained in the range; otherwise,
+  ///   `false`.
+  @_inlineable
+  public func contains(_ element: Bound) -> Bool {
+    return element >= self.lowerBound && element <= self.upperBound
+  }
 }
 
-extension CountableClosedRange: RandomAccessCollection {
+extension ClosedRange: Sequence, Collection, BidirectionalCollection, RandomAccessCollection
+  where Bound : Strideable, Bound.Stride : SignedInteger
+{
   /// The element type of the range; the same type as the range's bounds.
   public typealias Element = Bound
 
   /// A type that represents a position in the range.
   public typealias Index = ClosedRangeIndex<Bound>
+  public typealias Iterator = IndexingIterator<ClosedRange<Bound>>
+  public typealias SubSequence = Slice<ClosedRange<Bound>>
 
   /// The position of the first element in the range.
   @_inlineable
@@ -272,7 +289,7 @@ extension CountableClosedRange: RandomAccessCollection {
 
   @_inlineable
   public subscript(bounds: Range<Index>)
-    -> Slice<CountableClosedRange<Bound>> {
+    -> Slice<ClosedRange<Bound>> {
     return Slice(base: self, bounds: bounds)
   }
 
@@ -289,91 +306,9 @@ extension CountableClosedRange: RandomAccessCollection {
   public var isEmpty: Bool {
     return false
   }
-
-  /// Returns a Boolean value indicating whether the given element is contained
-  /// within the range.
-  ///
-  /// A `CountableClosedRange` instance contains both its lower and upper bound.
-  /// `element` is contained in the range if it is between the two bounds or
-  /// equal to either bound.
-  ///
-  /// - Parameter element: The element to check for containment.
-  /// - Returns: `true` if `element` is contained in the range; otherwise,
-  ///   `false`.
-  @_inlineable
-  public func contains(_ element: Bound) -> Bool {
-    return element >= self.lowerBound && element <= self.upperBound
-  }
 }
 
-/// An interval over a comparable type, from a lower bound up to, and
-/// including, an upper bound.
-///
-/// You create instances of `ClosedRange` by using the closed range operator
-/// (`...`).
-///
-///     let lowercase = "a"..."z"
-///
-/// You can use a `ClosedRange` instance to quickly check if a value is
-/// contained in a particular range of values. For example:
-///
-///     print(lowercase.contains("c"))      // Prints "true"
-///     print(lowercase.contains("5"))      // Prints "false"
-///     print(lowercase.contains("z"))      // Prints "true"
-///
-/// Unlike `Range`, instances of `ClosedRange` cannot represent an empty
-/// interval.
-///
-///     let lowercaseA = "a"..."a"
-///     print(lowercaseA.isEmpty)
-///     // Prints "false"
-@_fixed_layout
-public struct ClosedRange<Bound : Comparable> {
-
-  /// The range's lower bound.
-  public let lowerBound: Bound
-
-  /// The range's upper bound.
-  public let upperBound: Bound
-
-  /// Creates an instance with the given bounds.
-  ///
-  /// Because this initializer does not perform any checks, it should be used
-  /// as an optimization only when you are absolutely certain that `lower` is
-  /// less than or equal to `upper`. Using the closed range operator (`...`)
-  /// to form `ClosedRange` instances is preferred.
-  ///
-  /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
-  @inline(__always)
-  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-    self.lowerBound = bounds.lower
-    self.upperBound = bounds.upper
-  }
-
-  /// Returns a Boolean value indicating whether the given element is contained
-  /// within the range.
-  ///
-  /// A `ClosedRange` instance contains both its lower and upper bound.
-  /// `element` is contained in the range if it is between the two bounds or
-  /// equal to either bound.
-  ///
-  /// - Parameter element: The element to check for containment.
-  /// - Returns: `true` if `element` is contained in the range; otherwise,
-  ///   `false`.
-  @_inlineable
-  public func contains(_ element: Bound) -> Bool {
-    return element >= self.lowerBound && element <= self.upperBound
-  }
-
-  /// A Boolean value indicating whether the range contains no elements.
-  ///
-  /// Because a closed range cannot represent an empty range, this property is
-  /// always `false`.
-  @_inlineable
-  public var isEmpty: Bool {
-    return false
-  }
-}
+public typealias CountableClosedRange<Bound: Comparable> = ClosedRange<Bound>
 
 extension Comparable {  
   /// Returns a closed range that contains both of its bounds.
@@ -404,7 +339,7 @@ extension Strideable where Stride: SignedInteger {
   /// Use the closed range operator (`...`) to create a closed range of any type
   /// that conforms to the `Strideable` protocol with an associated signed
   /// integer `Stride` type, such as any of the standard library's integer
-  /// types. This example creates a `CountableClosedRange<Int>` from zero up to,
+  /// types. This example creates a `ClosedRange<Int>` from zero up to,
   /// and including, nine.
   ///
   ///     let singleDigits = 0...9
@@ -425,10 +360,10 @@ extension Strideable where Stride: SignedInteger {
   @_transparent
   public static func ... (
     minimum: Self, maximum: Self
-  ) -> CountableClosedRange<Self> {
+  ) -> ClosedRange<Self> {
     // FIXME: swift-3-indexing-model: tests for traps.
     _precondition(
       minimum <= maximum, "Can't form Range with upperBound < lowerBound")
-    return CountableClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
+    return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 }

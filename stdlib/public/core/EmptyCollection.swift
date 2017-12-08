@@ -61,7 +61,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Int
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
   public typealias SubSequence = EmptyCollection<Element>
 
   /// Always zero, just like `endIndex`.
