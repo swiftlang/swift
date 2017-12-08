@@ -1189,60 +1189,54 @@ internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
-  var buffer = _StringBuffer(
-    capacity: str._guts.count, initialSize: str._guts.count, elementWidth: 2)
-
-  // Allocation of a StringBuffer requires binding the memory to the correct
-  // encoding type.
-  let dest = buffer.start.bindMemory(
-    to: UTF16.CodeUnit.self, capacity: str._guts.count)
+  defer { _fixLifetime(str) }
+  let utf16 = str._guts._unmanagedUTF16View
+  var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+    capacity: utf16.count,
+    count: utf16.count)
 
   // Try to write it out to the same length.
   let z = _swift_stdlib_unicode_strToLower(
-    dest, Int32(str._guts.count),
-    str._core.startUTF16, Int32(str._guts.count))
+    dest, Int32(utf16.count), // FIXME: handle overflow case
+    utf16.start, Int32(utf16.count))
   let correctSize = Int(z)
 
   // If more space is needed, do it again with the correct buffer size.
-  if correctSize != str._guts.count {
-    buffer = _StringBuffer(
-      capacity: correctSize, initialSize: correctSize, elementWidth: 2)
-    let dest = buffer.start.bindMemory(
-      to: UTF16.CodeUnit.self, capacity: str._guts.count)
+  if correctSize != utf16.count {
+    storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: correctSize,
+      count: correctSize)
     _swift_stdlib_unicode_strToLower(
-      dest, Int32(correctSize), str._core.startUTF16, Int32(str._guts.count))
+      dest, Int32(utf16.count), // FIXME: handle overflow case
+      utf16.start, Int32(utf16.count))
   }
-
-  return String(_storage: buffer)
+  return String(_storage: storage)
 }
 
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
-  var buffer = _StringBuffer(
-    capacity: str._guts.count, initialSize: str._guts.count, elementWidth: 2)
-
-  // Allocation of a StringBuffer requires binding the memory to the correct
-  // encoding type.
-  let dest = buffer.start.bindMemory(
-    to: UTF16.CodeUnit.self, capacity: str._guts.count)
+  defer { _fixLifetime(str) }
+  let utf16 = str._guts._unmanagedUTF16View
+  var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+    capacity: utf16.count,
+    count: utf16.count)
 
   // Try to write it out to the same length.
   let z = _swift_stdlib_unicode_strToUpper(
-    dest, Int32(str._guts.count),
-    str._core.startUTF16, Int32(str._guts.count))
+    dest, Int32(utf16.count), // FIXME: handle overflow case
+    utf16.start, Int32(utf16.count))
   let correctSize = Int(z)
 
   // If more space is needed, do it again with the correct buffer size.
-  if correctSize != str._guts.count {
-    buffer = _StringBuffer(
-      capacity: correctSize, initialSize: correctSize, elementWidth: 2)
-    let dest = buffer.start.bindMemory(
-      to: UTF16.CodeUnit.self, capacity: str._guts.count)
+  if correctSize != utf16.count {
+    storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: correctSize,
+      count: correctSize)
     _swift_stdlib_unicode_strToUpper(
-      dest, Int32(correctSize), str._core.startUTF16, Int32(str._guts.count))
+      dest, Int32(utf16.count), // FIXME: handle overflow case
+      utf16.start, Int32(utf16.count))
   }
-
   return String(_storage: buffer)
 }
 #endif
@@ -1288,34 +1282,31 @@ extension String {
   /// - Complexity: O(*n*)
   @_inlineable // FIXME(sil-serialize-all)
   public func lowercased() -> String {
-    if let asciiBuffer = self._core.asciiBuffer {
-      let count = asciiBuffer.count
-      let source = asciiBuffer.baseAddress!
-      let buffer = _StringBuffer(
-        capacity: count, initialSize: count, elementWidth: 1)
-      let dest = buffer.start
-      for i in 0..<count {
-        // For each character in the string, we lookup if it should be shifted
-        // in our ascii table, then we return 0x20 if it should, 0x0 if not.
-        // This code is equivalent to:
-        // switch source[i] {
-        // case let x where (x >= 0x41 && x <= 0x5a):
-        //   dest[i] = x &+ 0x20
-        // case let x:
-        //   dest[i] = x
-        // }
-        let value = source[i]
-        let isUpper =
-          _asciiUpperCaseTable &>>
-          UInt64(((value &- 1) & 0b0111_1111) &>> 1)
-        let add = (isUpper & 0x1) &<< 5
-        // Since we are left with either 0x0 or 0x20, we can safely truncate to
-        // a UInt8 and add to our ASCII value (this will not overflow numbers in
-        // the ASCII range).
-        dest.storeBytes(of: value &+ UInt8(truncatingIfNeeded: add),
-          toByteOffset: i, as: UInt8.self)
+    if _guts.isASCII {
+      var guts = _guts
+      guts.withMutableASCIIStorage(unusedCapacity: 0) { storage in
+        for i in 0..<storage._value.count {
+          // For each character in the string, we lookup if it should be shifted
+          // in our ascii table, then we return 0x20 if it should, 0x0 if not.
+          // This code is equivalent to:
+          // switch source[i] {
+          // case let x where (x >= 0x41 && x <= 0x5a):
+          //   dest[i] = x &+ 0x20
+          // case let x:
+          //   dest[i] = x
+          // }
+          let value = storage._value.start[i]
+          let isUpper =
+            _asciiUpperCaseTable &>>
+            UInt64(((value &- 1) & 0b0111_1111) &>> 1)
+          let add = (isUpper & 0x1) &<< 5
+          // Since we are left with either 0x0 or 0x20, we can safely truncate to
+          // a UInt8 and add to our ASCII value (this will not overflow numbers in
+          // the ASCII range).
+          storage._value.start[i] = value &+ UInt8(truncatingIfNeeded: add)
+        }
       }
-      return String(_storage: buffer)
+      return String(guts)
     }
 
 #if _runtime(_ObjC)
@@ -1339,23 +1330,20 @@ extension String {
   /// - Complexity: O(*n*)
   @_inlineable // FIXME(sil-serialize-all)
   public func uppercased() -> String {
-    if let asciiBuffer = self._core.asciiBuffer {
-      let count = asciiBuffer.count
-      let source = asciiBuffer.baseAddress!
-      let buffer = _StringBuffer(
-        capacity: count, initialSize: count, elementWidth: 1)
-      let dest = buffer.start
-      for i in 0..<count {
-        // See the comment above in lowercaseString.
-        let value = source[i]
-        let isLower =
-          _asciiLowerCaseTable &>>
-          UInt64(((value &- 1) & 0b0111_1111) &>> 1)
-        let add = (isLower & 0x1) &<< 5
-        dest.storeBytes(of: value &- UInt8(truncatingIfNeeded: add),
-          toByteOffset: i, as: UInt8.self)
+    if _guts.isASCII {
+      var guts = _guts
+      guts.withMutableASCIIStorage(unusedCapacity: 0) { storage in
+        for i in 0..<storage._value.count {
+          // See the comment above in lowercaseString.
+          let value = storage._value.start[i]
+          let isLower =
+            _asciiLowerCaseTable &>>
+            UInt64(((value &- 1) & 0b0111_1111) &>> 1)
+          let add = (isLower & 0x1) &<< 5
+          storage._value.start[i] = value &- UInt8(truncatingIfNeeded: add)
+        }
       }
-      return String(_storage: buffer)
+      return String(guts)
     }
 
 #if _runtime(_ObjC)
