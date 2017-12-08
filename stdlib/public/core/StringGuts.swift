@@ -1009,7 +1009,7 @@ extension _StringGuts {
       let tailCount = storage.count - bounds.upperBound
       _precondition(tailCount >= 0,
         "replaceSubrange: subrange extends past String end")
-      var dst = storage.start + bounds.lowerBound
+      let dst = storage.start + bounds.lowerBound
       if deltaCount != 0 && tailCount > 0 {
         // Move tail to make space for new data
         (dst + newCount).moveInitialize(
