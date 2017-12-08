@@ -208,7 +208,7 @@ class r20097963MyClass {
       str = "A"
     case .B:
       str = "B"
-    default:    // expected-warning {{default will never be executed}}
+    default: 
       str = "unknown"  // Should not be rejected.
     }
     return str
