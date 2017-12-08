@@ -54,6 +54,13 @@ public:
   StringRef file() const { return Filename; }
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
+
+  /// Return Swift-standard file name from a buffer name set by
+  /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
+  static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+      StringRef filename) {
+    return filename.equals("<stdin>") ? "-" : filename;
+  }
 };
 
 /// Information about all the inputs to the frontend.
@@ -157,8 +164,7 @@ public:
   }
 
   bool isFilePrimary(StringRef file) {
-    StringRef correctedName = file.equals("<stdin>") ? "-" : file;
-    auto iterator = PrimaryInputs.find(correctedName);
+    auto iterator = PrimaryInputs.find(file);
     return iterator != PrimaryInputs.end() &&
            AllFiles[iterator->second].isPrimary();
   }

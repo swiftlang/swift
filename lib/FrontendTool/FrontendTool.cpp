@@ -782,7 +782,9 @@ static bool performCompile(CompilerInstance &Instance,
         for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
             if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
-                    SASTF->getFilename())) {
+                    InputFile::
+                        convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
+                            SASTF->getFilename()))) {
               assert(!PrimaryFile && "Can only handle one primary so far");
               PrimaryFile = fileUnit;
             }
