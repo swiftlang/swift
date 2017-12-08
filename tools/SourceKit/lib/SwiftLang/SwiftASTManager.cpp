@@ -683,8 +683,6 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
     StringRef File = input.file();
-    if (File.empty())
-      continue;
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
