@@ -397,8 +397,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   else
     RegisterPreservingCC = DefaultCC;
 
-  SwiftCC = SWIFT_LLVM_CC(SwiftCC);
-  UseSwiftCC = (SwiftCC == llvm::CallingConv::Swift);
+  SwiftCC = llvm::CallingConv::Swift;
 
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,

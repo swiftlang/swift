@@ -33,18 +33,6 @@
 #endif
 #endif
 
-/// Does the current Swift platform use LLVM's intrinsic "swiftcall"
-/// calling convention for Swift functions?
-#ifndef SWIFT_USE_SWIFTCALL
-// Clang doesn't support mangling functions with the swiftcall attribute
-// on Windows and crashes during compilation: http://bugs.llvm.org/show_bug.cgi?id=32000
-#if (__has_attribute(swiftcall) || defined(__linux__)) && !defined(_WIN32)
-#define SWIFT_USE_SWIFTCALL 1
-#else
-#define SWIFT_USE_SWIFTCALL 0
-#endif
-#endif
-
 /// Does the current Swift platform allow information other than the
 /// class pointer to be stored in the isa field?  If so, when deriving
 /// the class pointer of an object, we must apply a
@@ -105,17 +93,18 @@
 #define SWIFT_CC_preserve_all  __attribute__((preserve_all))
 #define SWIFT_CC_c
 
-#if SWIFT_USE_SWIFTCALL
+// Define SWIFT_CC_swift in terms of the Swift CC for runtime functions.
+// Functions outside the stdlib or runtime that include this file may be built 
+// with a compiler that doesn't support swiftcall; don't define these macros
+// in that case so any incorrect usage is caught.
+#if __has_attribute(swiftcall)
 #define SWIFT_CC_swift __attribute__((swiftcall))
 #define SWIFT_CONTEXT __attribute__((swift_context))
 #define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
 #define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
-#else
-#define SWIFT_CC_swift
-#define SWIFT_CONTEXT
-#define SWIFT_ERROR_RESULT
-#define SWIFT_INDIRECT_RESULT
 #endif
+
+#define SWIFT_CC_SwiftCC SWIFT_CC_swift
 
 // Map a logical calling convention (e.g. RegisterPreservingCC) to LLVM calling
 // convention.
@@ -133,11 +122,7 @@
 
 #define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
-#if SWIFT_USE_SWIFTCALL
 #define SWIFT_LLVM_CC_SwiftCC llvm::CallingConv::Swift
-#else
-#define SWIFT_LLVM_CC_SwiftCC llvm::CallingConv::C
-#endif
 
 // If defined, it indicates that runtime function wrappers
 // should be used on all platforms, even they do not support

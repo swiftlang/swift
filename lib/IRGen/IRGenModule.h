@@ -509,7 +509,6 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID RegisterPreservingCC; /// lightweight calling convention
   llvm::CallingConv::ID SwiftCC;     /// swift calling convention
-  bool UseSwiftCC;
 
   Signature getAssociatedTypeMetadataAccessFunctionSignature();
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
