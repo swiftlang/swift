@@ -315,11 +315,6 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
     super.init()
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public convenience init(_fixmeLegacyCore _core: _LegacyStringCore) {
-    self.init(_StringGuts(_core))
-  }
-
   @_versioned // FIXME(sil-serialize-all)
   @objc
   init(coder aDecoder: AnyObject) {
@@ -367,28 +362,6 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
     guard !_guts.isASCII else { return nil }
     return _guts._unmanagedUTF16View.start
   }
-
-  // //
-  // // Implement sub-slicing without adding layers of wrapping
-  // //
-  // @_versioned // FIXME(sil-serialize-all)
-  // @objc(substringFromIndex:)
-  // func substring(from start: Int) -> _NSContiguousString {
-  //   return _NSContiguousString(_fixmeLegacyCore: _core[Int(start)..<Int(_guts.count)])
-  // }
-
-  // @_versioned // FIXME(sil-serialize-all)
-  // @objc(substringToIndex:)
-  // func substring(to end: Int) -> _NSContiguousString {
-  //   return _NSContiguousString(_fixmeLegacyCore: _core[0..<Int(end)])
-  // }
-
-  // @_versioned // FIXME(sil-serialize-all)
-  // @objc(substringWithRange:)
-  // func substring(with aRange: _SwiftNSRange) -> _NSContiguousString {
-  //   return _NSContiguousString(_fixmeLegacyCore:
-  //     _core[Int(aRange.location)..<Int(aRange.location + aRange.length)])
-  // }
 
   @objc(copyWithZone:)
   public func copy(with zone: _SwiftNSZone?) -> AnyObject {
