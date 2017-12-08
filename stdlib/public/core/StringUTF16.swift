@@ -271,9 +271,7 @@ extension String {
 
     @_inlineable // FIXME(sil-serialize-all)
     public var description: String {
-      let start = _internalIndex(at: _offset)
-      let end = _internalIndex(at: _offset + _length)
-      return String(_fixmeLegacyCore: _core[start..<end])
+      return String(_guts._extractSlice(_encodedOffsetRange))
     }
 
     @_inlineable // FIXME(sil-serialize-all)
@@ -333,10 +331,7 @@ extension String {
     // semantics may be impossible to preserve in the case of string literals,
     // since we no longer have access to the length of the original string when
     // there is no owner and elements are dropped from the end.
-    let wholeString = utf16._core.nativeBuffer.map {
-      String(_fixmeLegacyCore: _LegacyStringCore($0))
-    } ?? String(utf16._guts)
-
+    let wholeString = String(utf16._guts)
     guard
       let start = UTF16Index(_offset: utf16._offset)
         .samePosition(in: wholeString),

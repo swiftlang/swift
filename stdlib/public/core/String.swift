@@ -785,12 +785,6 @@ public struct String {
     self._guts = _guts
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  init(_fixmeLegacyCore _core: _LegacyStringCore) {
-    self.init(_StringGuts(_core))
-  }
-
   public // @testable
   var _core: _LegacyStringCore {
     get { return _guts._legacyCore }
