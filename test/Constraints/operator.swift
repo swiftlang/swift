@@ -194,3 +194,28 @@ struct S_35740653 {
 func rdar35740653(val: S_35740653) {
   let _ = 0...Int(val / .value(1.0 / 42.0)) // Ok
 }
+
+// rdar://problem/35923263 - Ambiguous reference to member '+' with chaining
+
+class C_35923263 {
+  var v: Double = 0.0
+
+  static func zero() -> C_35923263 {
+    return C_35923263()
+  }
+
+  static func + (lhs: C_35923263, rhs: Double) -> C_35923263 {
+    lhs.v = lhs.v + rhs
+    return lhs
+  }
+}
+
+func rdar35923263() {
+  let one: Double = 1.0
+  let two: Double = 2.0
+
+  let _ = C_35923263.zero() + one         // Ok
+  let _ = C_35923263.zero() + one + two   // Ok
+  let _ = C_35923263.zero() + (one + two) // Ok
+  let _ = (C_35923263.zero() + one) + two // Ok
+}
