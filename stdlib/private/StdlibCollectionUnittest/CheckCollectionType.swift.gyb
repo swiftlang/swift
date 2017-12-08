@@ -546,8 +546,8 @@ extension TestSuite {
     // generate()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).generate()/semantics") {
-      for test in subscriptRangeTests {
+    self.test("\(testNamePrefix).generate()/semantics")
+      .forEach(in: subscriptRangeTests) { test in
         let c = makeWrappedCollection(test.collection)
         for _ in 0..<3 {
           checkSequence(
@@ -557,7 +557,6 @@ extension TestSuite {
             extractValue($0).value == extractValue($1).value
           }
         }
-      }
     }
 
     //===------------------------------------------------------------------===//
@@ -662,8 +661,8 @@ extension TestSuite {
     // subscript(_: Range)
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).subscript(_: Range)/Get/semantics") {
-      for test in subscriptRangeTests {
+    self.test("\(testNamePrefix).subscript(_: Range)/Get/semantics")
+      .forEach(in: subscriptRangeTests) { test in
         let base = makeWrappedCollection(test.collection)
         let sliceBounds = test.bounds(in: base)
         let slice = base[sliceBounds]
@@ -680,7 +679,6 @@ extension TestSuite {
           extractValue($0).value == extractValue($1).value
         }
         */
-      }
     }
 
     if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
@@ -808,30 +806,28 @@ extension TestSuite {
     // isEmpty
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).isEmpty/semantics") {
-      for test in subscriptRangeTests {
+    self.test("\(testNamePrefix).isEmpty/semantics")
+      .forEach(in: subscriptRangeTests) { test in
         let c = makeWrappedCollection(test.collection)
         expectEqual(test.isEmpty, c.isEmpty)
-      }
     }
 
     //===------------------------------------------------------------------===//
     // count
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).count/semantics") {
-      for test in subscriptRangeTests {
+    self.test("\(testNamePrefix).count/semantics")
+      .forEach(in: subscriptRangeTests) { test in
         let c = makeWrappedCollection(test.collection)
         expectEqual(test.count, numericCast(c.count) as Int)
-      }
     }
 
     //===------------------------------------------------------------------===//
     // index(of:)/index(where:)
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).index(of:)/semantics") {
-      for test in findTests {
+    self.test("\(testNamePrefix).index(of:)/semantics")
+      .forEach(in: findTests) { test in
         let c = makeWrappedCollectionWithEquatableElement(test.sequence)
         var result = c.index(of: wrapValueIntoEquatable(test.element))
         expectType(
@@ -844,11 +840,10 @@ extension TestSuite {
           test.expected,
           zeroBasedIndex,
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
-    self.test("\(testNamePrefix).index(where:)/semantics") {
-      for test in findTests {
+    self.test("\(testNamePrefix).index(where:)/semantics")
+      .forEach(in: findTests) { test in
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
         let c = makeWrappedCollectionWithEquatableElement(test.sequence)
@@ -865,15 +860,14 @@ extension TestSuite {
           test.expected,
           zeroBasedIndex,
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // first
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).first") {
-      for test in subscriptRangeTests {
+    self.test("\(testNamePrefix).first")
+      .forEach(in: subscriptRangeTests) { test in
         let c = makeWrappedCollection(test.collection)
         let result = c.first
         if test.isEmpty {
@@ -884,86 +878,80 @@ extension TestSuite {
             result.map(extractValue)
           ) { $0.value == $1.value }
         }
-      }
     }
 
     //===------------------------------------------------------------------===//
     // indices
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).indices") {
+    self.test("\(testNamePrefix).indices")
       // TODO: swift-3-indexing-model: improve this test.  `indices`
       // is not just a `Range` anymore, it can be anything.
-      for test in subscriptRangeTests {
+      .forEach(in: subscriptRangeTests) { test in
         let c = makeWrappedCollection(test.collection)
         let indices = c.indices
         expectEqual(c.startIndex, indices.startIndex)
         expectEqual(c.endIndex, indices.endIndex)
-      }
     }
 
     //===------------------------------------------------------------------===//
     // dropFirst()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).dropFirst/semantics") {
-      for test in dropFirstTests {
+    self.test("\(testNamePrefix).dropFirst/semantics")
+      .forEach(in: dropFirstTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.dropFirst(test.dropElements)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // dropLast()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).dropLast/semantics") {
-      for test in dropLastTests {
+    self.test("\(testNamePrefix).dropLast/semantics")
+      .forEach(in: dropLastTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.dropLast(test.dropElements)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // prefix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).prefix/semantics") {
-      for test in prefixTests {
+    self.test("\(testNamePrefix).prefix/semantics")
+      .forEach(in: prefixTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.prefix(test.maxLength)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // suffix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).suffix/semantics") {
-      for test in suffixTests {
+    self.test("\(testNamePrefix).suffix/semantics")
+      .forEach(in: suffixTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.suffix(test.maxLength)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // split()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).split/semantics") {
-      for test in splitTests {
+    self.test("\(testNamePrefix).split/semantics")
+      .forEach(in: splitTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.split(
           maxSplits: test.maxSplits,
@@ -977,15 +965,14 @@ extension TestSuite {
           }
         },
         stackTrace: SourceLocStack().with(test.loc)) { $0 == $1 }
-      }
     }
 
     //===------------------------------------------------------------------===//
     // prefix(through:)
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).prefix(through:)/semantics") {
-      for test in prefixThroughTests {
+    self.test("\(testNamePrefix).prefix(through:)/semantics")
+      .forEach(in: prefixThroughTests) { test in
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let index = c.index(
           c.startIndex, offsetBy: numericCast(test.position))
@@ -993,30 +980,28 @@ extension TestSuite {
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // prefix(upTo:)
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).prefix(upTo:)/semantics") {
-      for test in prefixUpToTests {
+    self.test("\(testNamePrefix).prefix(upTo:)/semantics")
+      .forEach(in: prefixUpToTests) { test in
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let index = c.index(c.startIndex, offsetBy: numericCast(test.end))
         let result = c.prefix(upTo: index)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // suffix(from:)
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).suffix(from:)/semantics") {
-      for test in suffixFromTests {
+    self.test("\(testNamePrefix).suffix(from:)/semantics")
+      .forEach(in: suffixFromTests) { test in
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         let index = c.index(c.startIndex, offsetBy: numericCast(test.start))
         let result = c.suffix(from: index)
@@ -1024,15 +1009,14 @@ extension TestSuite {
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // removeFirst()/slice
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).removeFirst()/slice/semantics") {
-      for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
+    self.test("\(testNamePrefix).removeFirst()/slice/semantics")
+      .forEach(in: removeFirstTests.filter { $0.numberToRemove == 1 }) { test in
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         var slice = c[...]
         let survivingIndices = _allIndices(
@@ -1057,7 +1041,6 @@ extension TestSuite {
           c.map { extractValue($0).value },
           "removeFirst() shouldn't mutate the collection that was sliced",
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     self.test("\(testNamePrefix).removeFirst()/slice/empty/semantics") {
@@ -1071,8 +1054,8 @@ extension TestSuite {
     // removeFirst(n: Int)/slice
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).removeFirst(n: Int)/slice/semantics") {
-      for test in removeFirstTests {
+    self.test("\(testNamePrefix).removeFirst(n: Int)/slice/semantics")
+      .forEach(in: removeFirstTests) { test in
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         var slice = c[...]
         let survivingIndices = _allIndices(
@@ -1099,7 +1082,6 @@ extension TestSuite {
           c.map { extractValue($0).value },
           "removeFirst() shouldn't mutate the collection that was sliced",
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     self.test("\(testNamePrefix).removeFirst(n: Int)/slice/empty/semantics") {
@@ -1129,9 +1111,9 @@ extension TestSuite {
     // popFirst()/slice
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).popFirst()/slice/semantics") {
+    self.test("\(testNamePrefix).popFirst()/slice/semantics")
       // This can just reuse the test data for removeFirst()
-      for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
+      .forEach(in: removeFirstTests.filter { $0.numberToRemove == 1 }) { test in
         let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
         var slice = c[...]
         let survivingIndices = _allIndices(
@@ -1156,7 +1138,6 @@ extension TestSuite {
           c.map { extractValue($0).value },
           "popFirst() shouldn't mutate the collection that was sliced",
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
@@ -1207,8 +1188,8 @@ extension TestSuite {
     // last
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).last") {
-      for test in subscriptRangeTests {
+    self.test("\(testNamePrefix).last")
+      .forEach(in: subscriptRangeTests) { test in
         let c = makeWrappedCollection(test.collection)
         let result = c.last
         if test.isEmpty {
@@ -1219,15 +1200,14 @@ extension TestSuite {
             result.map(extractValue)
           ) { $0.value == $1.value }
         }
-      }
     }
 
     //===------------------------------------------------------------------===//
     // removeLast()/slice
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).removeLast()/slice/semantics") {
-      for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
+    self.test("\(testNamePrefix).removeLast()/slice/semantics")
+      .forEach(in: removeLastTests.filter { $0.numberToRemove == 1 }) { test in
         let c = makeWrappedCollection(test.collection)
         var slice = c[...]
         let survivingIndices = _allIndices(
@@ -1257,7 +1237,6 @@ extension TestSuite {
           c.map { extractValue($0).value },
           "removeLast() shouldn't mutate the collection that was sliced",
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     self.test("\(testNamePrefix).removeLast()/slice/empty/semantics") {
@@ -1271,8 +1250,8 @@ extension TestSuite {
     // removeLast(n: Int)/slice
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).removeLast(n: Int)/slice/semantics") {
-      for test in removeLastTests {
+    self.test("\(testNamePrefix).removeLast(n: Int)/slice/semantics")
+      .forEach(in: removeLastTests) { test in
         let c = makeWrappedCollection(test.collection)
         var slice = c[...]
         let survivingIndices = _allIndices(
@@ -1299,7 +1278,6 @@ extension TestSuite {
           c.map { extractValue($0).value },
           "removeLast() shouldn't mutate the collection that was sliced",
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     self.test("\(testNamePrefix).removeLast(n: Int)/slice/empty/semantics") {
@@ -1331,9 +1309,9 @@ extension TestSuite {
     // popLast()/slice
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).popLast()/slice/semantics") {
+    self.test("\(testNamePrefix).popLast()/slice/semantics")
       // This can just reuse the test data for removeLast()
-      for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
+      .forEach(in: removeLastTests.filter { $0.numberToRemove == 1 }) { test in
         let c = makeWrappedCollection(test.collection)
         var slice = c[...]
         let survivingIndices = _allIndices(
@@ -1363,7 +1341,6 @@ extension TestSuite {
           c.map { extractValue($0).value },
           "popLast() shouldn't mutate the collection that was sliced",
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     self.test("\(testNamePrefix).popLast()/slice/empty/semantics") {
@@ -1458,28 +1435,26 @@ extension TestSuite {
     // dropLast()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).dropLast/semantics") {
-      for test in dropLastTests {
+    self.test("\(testNamePrefix).dropLast/semantics")
+      .forEach(in: dropLastTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.dropLast(test.dropElements)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // suffix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).suffix/semantics") {
-      for test in suffixTests {
+    self.test("\(testNamePrefix).suffix/semantics")
+      .forEach(in: suffixTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.suffix(test.maxLength)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
@@ -1514,28 +1489,26 @@ extension TestSuite {
     // prefix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).prefix/semantics") {
-      for test in prefixTests {
+    self.test("\(testNamePrefix).prefix/semantics")
+      .forEach(in: prefixTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.prefix(test.maxLength)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
     // suffix()
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).suffix/semantics") {
-      for test in suffixTests {
+    self.test("\(testNamePrefix).suffix/semantics")
+      .forEach(in: suffixTests) { test in
         let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
         let result = s.suffix(test.maxLength)
         expectEqualSequence(
           test.expected, result.map(extractValue).map { $0.value },
           stackTrace: SourceLocStack().with(test.loc))
-      }
     }
 
     //===------------------------------------------------------------------===//
@@ -1561,8 +1534,8 @@ extension TestSuite {
     }
 
 %   for function_name in ['index', 'formIndex']:
-    self.test("\(testNamePrefix).${function_name}(after:)/semantics") {
-      for test in indexAfterTests {
+    self.test("\(testNamePrefix).${function_name}(after:)/semantics")
+      .forEach(in: indexAfterTests) { test in
         let c = toCollection(test.start..<test.end)
         var currentIndex = c.startIndex
         var counter = test.start
@@ -1576,7 +1549,6 @@ extension TestSuite {
 %     end
           counter += 1
         } while counter < test.end
-      }
     }
 %   end
 
@@ -1663,10 +1635,10 @@ extension TestSuite {
     }
 %   end
 
-    self.test("\(testNamePrefix)/index(_:offsetBy: n, limitedBy:)/semantics") {
-      for test in indexOffsetByTests.filter(
-        {$0.limit != nil && $0.distance >= 0}
-      ) {
+    self.test("\(testNamePrefix)/index(_:offsetBy: n, limitedBy:)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit != nil && $0.distance >= 0 }
+      ) { test in
         let c = toCollection(0..<20)
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         let new = c.index(
@@ -1679,13 +1651,12 @@ extension TestSuite {
         } else {
           expectNil(new)
         }
-      }
     }
 
-    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n, limitedBy:)/semantics") {
-      for test in indexOffsetByTests.filter(
-        {$0.limit != nil && $0.distance >= 0}
-      ) {
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n, limitedBy:)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit != nil && $0.distance >= 0 }
+      ) { test in
         let c = toCollection(0..<20)
         let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
         var new = c.nthIndex(test.startOffset)
@@ -1699,7 +1670,6 @@ extension TestSuite {
           expectEqual(limit, new, stackTrace: SourceLocStack().with(test.loc))
           expectFalse(exact, stackTrace: SourceLocStack().with(test.loc))
         }
-      }
     }
 
     self.test("\(testNamePrefix)/index(_:offsetBy: -n, limitedBy:)/semantics")
