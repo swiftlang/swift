@@ -298,26 +298,31 @@ public:
 private:
   /// Keyed by empty string for no-primary case
   llvm::StringMap<OutputPaths> OutputPathsByPrimary;
+
+  OutputPaths &addOutputPaths(StringRef primaryName) {
+    OutputPathsByPrimary.insert(std::make_pair(primaryName, OutputPaths()));
+    auto iter = OutputPathsByPrimary.find(primaryName);
+    return iter->getValue();
+  }
+
 public:
   const OutputPaths &pathsForPrimary(StringRef primaryName) const {
     auto iter = OutputPathsByPrimary.find(primaryName);
     assert(iter != OutputPathsByPrimary.end());
-    return iter->second;
+    return iter->getValue();
   }
   OutputPaths &pathsForPrimary(StringRef primaryName) {
     auto iter = OutputPathsByPrimary.find(primaryName);
-    assert(iter != OutputPathsByPrimary.end());
-    return iter->second;
+    return iter != OutputPathsByPrimary.end() ? iter->getValue()
+                                              : addOutputPaths(primaryName);
   }
   const OutputPaths &pathsForAtMostOnePrimary() const {
     Inputs.assertMustNotBeMoreThanOnePrimaryInput();
-    const auto iter = OutputPathsByPrimary.find(Inputs.getNameOfUniquePrimaryInputFile());
-    return iter->getValue();
+    return pathsForPrimary(Inputs.getNameOfUniquePrimaryInputFile());
   }
   OutputPaths &pathsForAtMostOnePrimary() {
     Inputs.assertMustNotBeMoreThanOnePrimaryInput();
-    auto iter =  OutputPathsByPrimary.find(Inputs.getNameOfUniquePrimaryInputFile());
-    return iter->getValue();
+    return pathsForPrimary(Inputs.getNameOfUniquePrimaryInputFile());
   }
 
   /// The path to which we should output fixits as source edits.
