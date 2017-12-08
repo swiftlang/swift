@@ -1057,7 +1057,23 @@ extension String {
   @_inlineable // FIXME(sil-serialize-all)
   public // SPI(Foundation)
   init(_storage: _StringBuffer) { // FIXME: Replace with _SwiftStringStorage
-    _guts = _StringGuts(_LegacyStringCore(_storage))
+    if _storage.elementWidth == 1 {
+      let native = _SwiftStringStorage<UInt8>.create(
+        capacity: _storage.capacity,
+        count: _storage.usedCount)
+      native.start.initialize(
+        from: _storage.start.assumingMemoryBound(to: UInt8.self),
+        count: _storage.usedCount)
+      _guts = _StringGuts(native)
+    } else {
+      let native = _SwiftStringStorage<UInt16>.create(
+        capacity: _storage.capacity,
+        count: _storage.usedCount)
+      native.start.initialize(
+        from: _storage.start.assumingMemoryBound(to: UInt16.self),
+        count: _storage.usedCount)
+      _guts = _StringGuts(native)
+    }
   }
 
   @_inlineable // FIXME(sil-serialize-all)
