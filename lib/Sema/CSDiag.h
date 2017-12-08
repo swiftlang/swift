@@ -25,7 +25,9 @@ namespace swift {
   /// Rewrite any type variables & archetypes in the specified type with
   /// UnresolvedType.
   Type replaceTypeParametersWithUnresolved(Type ty);
-  Type replaceTypeVariablesWithUnresolved(Type ty);
+  /// Rewrite any type variables & archetypes in the specified type with
+  /// another type.
+  Type replaceTypeVariablesIn(Type ty, Type replacement);
   
 };
 

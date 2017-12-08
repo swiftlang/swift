@@ -1567,6 +1567,13 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
       Type type = expr->getType();
       if (type && type->hasTypeVariable())
         expr->setType(ErrorType::get(context));
+      // Type checking can open type variables into casts.  Erase those now.
+      if (auto *ECE = dyn_cast<ExplicitCastExpr>(expr)) {
+        Type CastTy = ECE->getCastTypeLoc().getType();
+        if (CastTy && CastTy->hasTypeVariable())
+          ECE->getCastTypeLoc().setType(ErrorType::get(context),
+                                        /*validated=*/true);
+      }
 
       return { true, expr };
     }

@@ -69,16 +69,16 @@ namespace swift {
     });
   }
 
-  Type replaceTypeVariablesWithUnresolved(Type ty) {
+  Type replaceTypeVariablesIn(Type ty, Type replacement) {
+    assert(replacement);
+
     if (!ty) return ty;
     
     if (!ty->hasTypeVariable()) return ty;
-    
-    auto &ctx = ty->getASTContext();
-    
+
     return ty.transform([&](Type type) -> Type {
       if (type->isTypeVariableOrMember())
-        return ctx.TheUnresolvedType;
+        return replacement;
       return type;
     });
   }
@@ -5165,7 +5165,26 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   // let's try to re-typecheck it to see if we can get some
   // more information about what is going on.
   if (currentType->hasTypeVariable() || currentType->hasUnresolvedType()) {
+    // HACK: Walk the expression tree looking for casts with dangling
+    // type variables.  The solver can open these into scope and
+    // 'getPossibleTypesOfExpressionWithoutApplying' will not re-open them.
+    auto eraseCastTypeVariables = [&](Expr *expr) {
+      auto replacement = ErrorType::get(currentType->getASTContext());
+      expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+        if (auto *ECE = dyn_cast<ExplicitCastExpr>(childExpr)) {
+          Type castTy = ECE->getCastTypeLoc().getType();
+          if (castTy && castTy->hasTypeVariable()) {
+            Type unresolvedTy = replaceTypeVariablesIn(castTy, replacement);
+            ECE->getCastTypeLoc().setType(unresolvedTy, /*validated=*/true);
+          }
+        }
+        return childExpr;
+      });
+    };
+    eraseCastTypeVariables(fnExpr);
+
     auto contextualType = CS.getContextualType();
+
     CallResultListener listener(contextualType);
     CS.TC.getPossibleTypesOfExpressionWithoutApplying(
         fnExpr, CS.DC, possibleTypes, FreeTypeVariableBinding::UnresolvedType,
@@ -8000,8 +8019,10 @@ FailureDiagnosis::validateContextualType(Type contextualType,
 
   // Remove all of the potentially leftover type variables or type parameters
   // from the contextual type to be used by new solver.
+  auto &ctx = contextualType->getASTContext();
   contextualType = replaceTypeParametersWithUnresolved(contextualType);
-  contextualType = replaceTypeVariablesWithUnresolved(contextualType);
+  contextualType = replaceTypeVariablesIn(contextualType,
+                                          ctx.TheUnresolvedType);
 
   return {contextualType, CTP};
 }

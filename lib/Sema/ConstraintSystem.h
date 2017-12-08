@@ -3289,6 +3289,13 @@ public:
     for (auto E : Exprs) {
       if (E->getType() && E->getType()->hasTypeVariable())
         E->setType(Type());
+      
+      // Type checking can open type variables into casts.  Erase those now.
+      if (auto *ECE = dyn_cast<ExplicitCastExpr>(E)) {
+        Type CastTy = ECE->getCastTypeLoc().getType();
+        if (CastTy && CastTy->hasTypeVariable())
+          ECE->getCastTypeLoc().setType(Type(), /*validated=*/true);
+      }
     }
 
     for (auto TL : TypeLocs) {
