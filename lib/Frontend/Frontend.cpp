@@ -188,7 +188,7 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
     PrimaryBufferID = *codeCompletionBufferID;
   }
 
-  if (isInMainMode() && MainBufferID == NO_SUCH_BUFFER &&
+  if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
       InputSourceCodeBufferIDs.size() == 1) {
     MainBufferID = InputSourceCodeBufferIDs.front();
   }
@@ -234,7 +234,7 @@ bool CompilerInstance::setUpForFile(StringRef fileName, bool isPrimary) {
   if (Optional<unsigned> existingBufferID =
           SourceMgr.getIDForBufferIdentifier(fileName)) {
     if (isInSILMode() ||
-        (isInMainMode() && filename(fileName) == "main.swift")) {
+        (isInputSwift() && filename(fileName) == "main.swift")) {
       assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
       MainBufferID = existingBufferID.getValue();
     }
@@ -279,7 +279,7 @@ bool CompilerInstance::setUpForFile(StringRef fileName, bool isPrimary) {
 
   InputSourceCodeBufferIDs.push_back(bufferID);
 
-  if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift")) {
+  if (isInSILMode() || (isInputSwift() && filename(fileName) == "main.swift")) {
     assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     MainBufferID = bufferID;
   }

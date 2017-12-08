@@ -426,7 +426,7 @@ private:
   bool setUpModuleLoaders();
   Optional<unsigned> setUpCodeCompletionBuffer();
   bool setupInputs(Optional<unsigned> codeCompletionBufferID);
-  bool isInMainMode() {
+  bool isInputSwift() {
     return Invocation.getInputKind() == InputFileKind::IFK_Swift;
   }
   bool isInSILMode() {
