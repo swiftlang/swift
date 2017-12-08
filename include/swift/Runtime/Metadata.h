@@ -2206,7 +2206,7 @@ struct TargetGenericMetadata {
   (TargetGenericMetadata<Runtime> *pattern, const void *arguments);
   
   /// The size of the template in bytes.
-  uint32_t MetadataSize;
+  uint32_t TemplateSize;
 
   /// The number of generic arguments that we need to unique on,
   /// in words.  The first 'NumArguments * sizeof(void*)' bytes of
@@ -2223,7 +2223,7 @@ struct TargetGenericMetadata {
   PrivateData[swift::NumGenericMetadataPrivateDataWords];
 
   // Here there is a variably-sized field:
-  // char alignas(void*) MetadataTemplate[MetadataSize];
+  // char alignas(void*) MetadataTemplate[TemplateSize];
 
   /// Return the starting address of the metadata template data.
   TargetPointer<Runtime, const void> getMetadataTemplate() const {
@@ -2602,8 +2602,9 @@ using ProtocolConformanceRecord
 ///     if (metadata = getExistingMetadata(&header.PrivateData,
 ///                                        arguments[0..header.NumArguments]))
 ///       return metadata
-///     metadata = malloc(header.MetadataSize)
-///     memcpy(metadata, header.MetadataTemplate, header.MetadataSize)
+///     metadata = malloc(superclass.MetadataSize +
+///                       numImmediateMembers * sizeof(void *))
+///     memcpy(metadata, header.MetadataTemplate, header.TemplateSize)
 ///     for (i in 0..header.NumFillInstructions)
 ///       metadata[header.FillInstructions[i].ToIndex]
 ///         = arguments[header.FillInstructions[i].FromIndex]
@@ -2623,7 +2624,8 @@ SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                                    const void *arguments,
-                                   ClassMetadata *superclass);
+                                   ClassMetadata *superclass,
+                                   size_t numImmediateMembers);
 
 // Callback to allocate a generic struct/enum metadata object.
 SWIFT_RUNTIME_EXPORT
@@ -2866,6 +2868,16 @@ void swift_initStructMetadata_UniversalStrategy(size_t numFields,
                                          const TypeLayout * const *fieldTypes,
                                          size_t *fieldOffsets,
                                          ValueWitnessTable *vwtable);
+
+/// Relocate the metadata for a class and copy fields from the given template.
+/// The final size of the metadata is calculated at runtime from the size of
+/// the superclass metadata together with the given number of immediate
+/// members.
+SWIFT_RUNTIME_EXPORT
+ClassMetadata *
+swift_relocateClassMetadata(ClassMetadata *self,
+                            size_t templateSize,
+                            size_t numImmediateMembers);
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.

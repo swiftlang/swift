@@ -631,7 +631,7 @@ struct {
     [](GenericMetadata *pattern, const void *args) -> Metadata* {
       auto metadata =
         swift_allocateGenericClassMetadata(pattern, args,
-                                           SuperclassWithPrefix_AddressPoint);
+                                           SuperclassWithPrefix_AddressPoint, 0);
       char *bytes = (char*) metadata + sizeof(ClassMetadata);
       auto metadataWords = reinterpret_cast<const void**>(bytes);
       auto argsWords = reinterpret_cast<const void* const *>(args);

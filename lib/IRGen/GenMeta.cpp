@@ -2926,7 +2926,7 @@ namespace {
       //   Metadata *(*CreateFunction)(GenericMetadata *, const void*);
       B.fillPlaceholder(createFunctionField, emitCreateFunction());
       
-      //   uint32_t MetadataSize;
+      //   uint32_t TemplateSize;
       // We compute this assuming that every entry in the metadata table
       // is a pointer in size.
       Size size = getNextOffsetFromTemplateHeader();
@@ -3141,7 +3141,6 @@ namespace {
   /// size is not known at compile time.
   class ResilientClassMemberBuilder {
     IRGenModule &IGM;
-    ConstantStructBuilder &B;
     SILVTable *VTable;
 
     struct MethodOverride {
@@ -3156,23 +3155,13 @@ namespace {
                                 ConstantStructBuilder &builder,
                                 const StructLayout &layout,
                                 const ClassLayout &fieldLayout)
-      : IGM(IGM), B(builder) {
+        : IGM(IGM) {
       VTable = IGM.getSILModule().lookUpVTable(theClass);
     }
 
-    void addFieldOffset(VarDecl *var) {
-      B.addInt(IGM.SizeTy, 0);
-    }
+    void addFieldOffset(VarDecl *var) {}
 
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      for (unsigned i = 0,
-                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
-           i < e; ++i) {
-        // Emit placeholder values for some number of stored properties we
-        // know exist but aren't able to reference directly.
-        B.addInt(IGM.SizeTy, 0);
-      }
-    }
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {}
 
     void addMethod(SILDeclRef fn) {
       // Find the vtable entry.
@@ -3192,8 +3181,6 @@ namespace {
         // Record the override so that we can fill it in later.
         Overrides.push_back({offset, entry->Implementation});
       }
-
-      B.addNullPointer(IGM.FunctionPtrTy);
     }
 
     // Update vtable entries for method overrides. The runtime copies in
@@ -3223,14 +3210,10 @@ namespace {
       // FIXME
     }
 
-    void addGenericArgument(CanType argTy, ClassDecl *forClass) {
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
-    }
+    void addGenericArgument(CanType argTy, ClassDecl *forClass) {}
 
     void addGenericWitnessTable(CanType argTy, ProtocolConformanceRef conf,
-                                ClassDecl *forClass) {
-      B.addNullPointer(IGM.WitnessTablePtrTy);
-    }
+                                ClassDecl *forClass) {}
   };
 
   /// Base class for laying out class metadata.
@@ -3399,6 +3382,7 @@ namespace {
     }
 
     void addClassAddressPoint() {
+      // FIXME: Wrong
       auto size = IGM.getMetadataLayout(Target).getSize();
       B.addInt32(size.AddressPoint.getValue());
     }
@@ -3720,8 +3704,19 @@ namespace {
         Address superField =
           emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
         superField = IGF.Builder.CreateElementBitCast(superField,
-                                                     IGF.IGM.TypeMetadataPtrTy);
+                                                     IGM.TypeMetadataPtrTy);
         IGF.Builder.CreateStore(superclassMetadata, superField);
+      }
+
+      // Relocate the metadata if it has a superclass that is resilient
+      // to us.
+      if (doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
+        auto templateSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
+        auto numImmediateMembers = IGM.getSize(
+          Size(IGM.getMetadataLayout(Target).getNumImmediateMembers()));
+        metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
+                                          {metadata, templateSize,
+                                           numImmediateMembers});
       }
 
       return emitFinishInitializationOfClassMetadata(IGF, metadata);
@@ -3804,11 +3799,15 @@ namespace {
                                IGM.getObjCRuntimeBaseForSwiftRootClass(Target));
       } else {
         superMetadata
-          = llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy);
+          = llvm::ConstantPointerNull::get(IGM.ObjCClassPtrTy);
       }
 
+      auto numImmediateMembers =
+        IGM.getSize(Size(IGM.getMetadataLayout(Target).getNumImmediateMembers()));
+
       return IGF.Builder.CreateCall(IGM.getAllocateGenericClassMetadataFn(),
-                                    {metadataPattern, arguments, superMetadata});
+                                    {metadataPattern, arguments, superMetadata,
+                                     numImmediateMembers});
     }
     
     void addMetadataFlags() {
