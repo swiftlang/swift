@@ -2475,6 +2475,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
       break;
 
     case tok::kw_func:
+      // Collect all modifiers into a modifier list.
+      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
+      DeclParsingContext.setCreateSyntax(SyntaxKind::FunctionDecl);
       DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
       StaticLoc = SourceLoc();   // we handled static if present.
       MayNeedOverrideCompletion = true;
