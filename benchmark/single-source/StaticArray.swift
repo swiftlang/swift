@@ -58,7 +58,6 @@ struct StaticArray<
   func count() -> Int { return values.count() }
 
   typealias Index = Int
-  typealias IndexDistance = Int
   let startIndex: Int = 0
   var endIndex: Int { return count()}
 

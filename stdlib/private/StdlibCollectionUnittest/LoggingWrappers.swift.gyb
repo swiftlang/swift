@@ -414,9 +414,7 @@ public struct ${Self}<
     return base.isEmpty
   }
 
-  public typealias IndexDistance = Base.IndexDistance
-
-  public var count: IndexDistance {
+  public var count: Int {
     Log.count[selfType] += 1
     return base.count
   }
@@ -433,19 +431,19 @@ public struct ${Self}<
     return base.first
   }
 
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     Log.advance[selfType] += 1
     return base.index(i, offsetBy: n)
   }
 
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     Log.advanceLimit[selfType] += 1
     return base.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     Log.distance[selfType] += 1
     return base.distance(from: start, to: end)
   }
@@ -558,7 +556,7 @@ public struct ${Self}<
     base.replaceSubrange(bounds, with: newElements)
   }
 
-  public mutating func reserveCapacity(_ n: IndexDistance) {
+  public mutating func reserveCapacity(_ n: Int) {
     Log.reserveCapacity[selfType] += 1
     base.reserveCapacity(n)
   }
@@ -601,8 +599,8 @@ public struct ${Self}<
   public typealias Log = MutableCollectionLog
 
   public typealias SubSequence = Base.SubSequence
-
   public typealias Iterator = Base.Iterator
+  public typealias Element = Base.Element
 
   public init(wrapping base: Base) {
     self.base = base
@@ -613,6 +611,7 @@ public struct ${Self}<
   }
 
   public typealias Index = Base.Index
+  public typealias Indices = Base.Indices
 
   public var startIndex: Index {
     return base.startIndex
@@ -621,8 +620,12 @@ public struct ${Self}<
   public var endIndex: Index {
     return base.endIndex
   }
-
-  public subscript(position: Index) -> Base.Iterator.Element {
+  
+  public var indices: Indices {
+    return base.indices
+  }
+  
+  public subscript(position: Index) -> Element {
     get {
       return base[position]
     }
@@ -650,11 +653,11 @@ public struct ${Self}<
   }
 %     end
 
-  public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return base.index(i, offsetBy: n)
   }
 
-  public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     return base.distance(from: start, to: end)
   }
 

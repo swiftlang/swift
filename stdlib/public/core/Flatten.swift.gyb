@@ -261,8 +261,6 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<Base>
 
-  public typealias IndexDistance = Base.IndexDistance
-
   /// Creates a flattened view of `base`.
   @_inlineable // FIXME(sil-serialize-all)
   public init(_ base: Base) {

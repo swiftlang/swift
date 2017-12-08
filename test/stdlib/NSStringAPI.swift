@@ -1149,7 +1149,7 @@ func toIntRange<
   S : StringProtocol
 >(
   _ string: S, _ maybeRange: Range<String.Index>?
-) -> Range<Int>? where S.Index == String.Index, S.IndexDistance == Int {
+) -> Range<Int>? where S.Index == String.Index {
   guard let range = maybeRange else { return nil }
 
   return

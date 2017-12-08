@@ -96,7 +96,6 @@ extension String {
     }
 
     public typealias Index = String.Index
-    public typealias IndexDistance = Int
     
     /// Translates a `_core` index into a `UnicodeScalarIndex` using this view's
     /// `_coreOffset`.
@@ -528,14 +527,14 @@ extension String.UnicodeScalarView {
   @available(
     swift, obsoleted: 4.0,
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(_ i: Index?,  offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index?,  offsetBy n: Int) -> Index {
     return index(i!, offsetBy: n)
   }
   @_inlineable // FIXME(sil-serialize-all)
   @available(
     swift, obsoleted: 4.0,
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(from i: Index?, to j: Index?) -> IndexDistance {
+  public func distance(from i: Index?, to j: Index?) -> Int {
     return distance(from: i!, to: j!)
   }
   @_inlineable // FIXME(sil-serialize-all)

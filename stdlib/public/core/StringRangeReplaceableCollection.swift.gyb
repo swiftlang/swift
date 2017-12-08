@@ -11,13 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 extension String : StringProtocol, RangeReplaceableCollection {  
-  /// A type that represents the number of steps between two `String.Index`
-  /// values, where one value is reachable from the other.
-  ///
-  /// In Swift, *reachability* refers to the ability to produce one value from
-  /// the other through zero or more applications of `index(after:)`.
-  public typealias IndexDistance = _CharacterView.IndexDistance
-
   public typealias SubSequence = Substring
 
   /// Creates a string representing the given character repeated the specified
@@ -128,7 +121,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _characters.index(i, offsetBy: n)
   }
 
@@ -171,7 +164,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   @_inlineable // FIXME(sil-serialize-all)
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     return _characters.index(i, offsetBy: n, limitedBy: limit)
   }
@@ -186,7 +179,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
   @_inlineable // FIXME(sil-serialize-all)
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     return _characters.distance(from: start, to: end)
   }
 

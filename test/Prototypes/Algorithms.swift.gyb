@@ -230,7 +230,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   @inline(__always)
   internal mutating func _rotateCycle(
     start: Index,
-    sourceOffsetForIndex: (Index) -> IndexDistance
+    sourceOffsetForIndex: (Index) -> Int
   ) {
     let tmp = self[start]
     var i = start
@@ -407,18 +407,17 @@ public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection}
 %   end
 
 %   if Traversal is 'RandomAccess':
-  public func index(_ i: Index, offsetBy n: ${Self}.IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     if n == 0 { return i }
     return n > 0 ? _offsetForward(i, by: n) : _offsetBackward(i, by: -n)
   }
 
   internal func _offsetForward(
-    _ i: Index, by n: ${Self}.IndexDistance
+    _ i: Index, by n: Int
   ) -> Index {
     switch i._position {
     case let .first(i):
-      let d: ${Self}.IndexDistance = numericCast(
-        _base1.distance(from: i, to: _base1.endIndex))
+      let d: Int = _base1.distance(from: i, to: _base1.endIndex)
       if n < d {
         return ConcatenatedCollectionIndex(
           first: _base1.index(i, offsetBy: numericCast(n)))
@@ -433,15 +432,14 @@ public struct ${Self}<C1 : ${Collection}, C2: ${Collection}>: ${Collection}
   }
 
   internal func _offsetBackward(
-    _ i: Index, by n: ${Self}.IndexDistance
+    _ i: Index, by n: Int
   ) -> Index {
     switch i._position {
     case let .first(i):
       return ConcatenatedCollectionIndex(
         first: _base1.index(i, offsetBy: -numericCast(n)))
     case let .second(i):
-      let d: ${Self}.IndexDistance = numericCast(
-        _base2.distance(from: _base2.startIndex, to: i))
+      let d: Int = _base2.distance(from: _base2.startIndex, to: i)
       if n <= d {
         return ConcatenatedCollectionIndex(
           second: _base2.index(i, offsetBy: -numericCast(n)))
@@ -529,7 +527,7 @@ public struct ${Self}<
   }
 %   end
 
-  public func index(_ i: Index, offsetBy n: ${Self}.IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return RotatedCollectionIndex(
       _index: _concatenation.index(i._index, offsetBy: n))
   }
@@ -583,7 +581,7 @@ extension BidirectionalCollection
   }
 
   mutating func _stablePartition(
-    distance n: IndexDistance,
+    distance n: Int,
     choosingStartGroupBy p: (Element) -> Bool
   ) -> Index {
     assert(n >= 0)

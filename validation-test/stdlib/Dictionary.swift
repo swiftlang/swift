@@ -64,7 +64,6 @@ DictionaryTestSuite.test("AssociatedTypes") {
     iteratorType: DictionaryIterator<MinimalHashableValue, OpaqueValue<Int>>.self,
     subSequenceType: Slice<Collection>.self,
     indexType: DictionaryIndex<MinimalHashableValue, OpaqueValue<Int>>.self,
-    indexDistanceType: Int.self,
     indicesType: DefaultIndices<Collection>.self)
 }
 

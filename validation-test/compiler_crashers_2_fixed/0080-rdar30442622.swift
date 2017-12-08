@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -primary-file %s
 
 protocol AnyCodeUnits_ {
-  typealias IndexDistance = Int64
   typealias Index = Int64
   typealias Element = UInt32
   var startIndex: Index { get }
