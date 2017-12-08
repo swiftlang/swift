@@ -66,14 +66,14 @@ extension String {
     @_versioned
     internal var _guts: _StringGuts
 
-    /// The offset of this view's `_guts` from an original guts. This works
-    /// around the fact that `_StringGuts` is always zero-indexed.
-    /// `_coreOffset` should be subtracted from `Index.encodedOffset` before
-    /// that value is used as a `_guts` index.
+    /// The offset of this view's `_guts` from the start of an original string,
+    /// in UTF-16 code units. This is here to support legacy Swift 3-style
+    /// slicing where `s.unicodeScalars[i..<j]` produces a
+    /// `String.UnicodeScalarView`. The offset should be subtracted from the
+    /// `encodedOffset` of view indices before it is passed to `_guts`.
     ///
-    /// Note: this is *only* here to support legacy Swift3-style slicing where
-    /// `s.unicodeScalars[i..<j]` produces a `String.UnicodeScalarView`, and
-    /// should be removed when those semantics are no longer supported.
+    /// Note: This should be removed when Swift 3 semantics are no longer
+    /// supported.
     @_versioned // FIXME(sil-serialize-all)
     internal var _coreOffset: Int
 
@@ -126,7 +126,15 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     public func index(after i: Index) -> Index {
       let offset = _toCoreIndex(i)
-      let length = _guts._unicodeScalarWidth(startingAt: offset)
+      let length: Int
+      if _slowPath(_guts._isOpaque) {
+        length = _guts._asOpaque().unicodeScalarWidth(startingAt: offset)
+      } else if _guts.isASCII {
+        length = 1
+      } else {
+        let utf16 = _guts._unmanagedUTF16View
+        length = utf16.unicodeScalarWidth(startingAt: offset)
+      }
       return _fromCoreIndex(offset + length)
     }
 
@@ -136,7 +144,15 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     public func index(before i: Index) -> Index {
       let offset = _toCoreIndex(i)
-      let length = _guts._unicodeScalarWidth(endingAt: offset - 1)
+      let length: Int
+      if _slowPath(_guts._isOpaque) {
+        length = _guts._asOpaque().unicodeScalarWidth(endingAt: offset)
+      } else if _guts.isASCII {
+        length = 1
+      } else {
+        let utf16 = _guts._unmanagedUTF16View
+        length = utf16.unicodeScalarWidth(endingAt: offset)
+      }
       return _fromCoreIndex(offset - length)
     }
 
@@ -158,13 +174,17 @@ extension String {
     ///   must be less than the view's end index.
     @_inlineable // FIXME(sil-serialize-all)
     public subscript(position: Index) -> Unicode.Scalar {
-      switch _guts._decodeUnicodeScalar(startingAt: _toCoreIndex(position)) {
-      case .scalarValue(let us):
-        return us
-      case .emptyInput:
-        _preconditionFailure("cannot subscript using an endIndex")
-      case .error:
-        return Unicode.Scalar._replacementCharacter
+      let offset = position.encodedOffset
+      if _slowPath(_guts._isOpaque) {
+        let opaque = _guts._asOpaque()
+        return opaque.decodeUnicodeScalar(startingAt: offset)
+      } else if _guts.isASCII {
+        let ascii = _guts._unmanagedASCIIView
+        let u = ascii.codeUnit(atCheckedOffset: offset)
+        return Unicode.Scalar(_unchecked: UInt32(u))
+      } else {
+        let utf16 = _guts._unmanagedUTF16View
+        return utf16.decodeUnicodeScalar(startingAt: offset)
       }
     }
 
