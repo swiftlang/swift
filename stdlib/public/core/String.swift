@@ -894,6 +894,10 @@ extension String : _ExpressibleByBuiltinStringLiteral {
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
+    if Int(utf8CodeUnitCount) == 0 {
+      self.init()
+      return
+    }
     if _fastPath(Bool(isASCII)) {
       self = String(_StringGuts(_UnmanagedString<UInt8>(
             start: UnsafePointer(start),

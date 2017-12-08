@@ -18,16 +18,18 @@ import SwiftShims
 // FIXME: what about ppc64 and s390x?
 //
 
+
+
 @_fixed_layout
 public // FIXME
 struct _StringGuts {
   // TODO 32-bit: Insert padding between fields
   public // FIXME for testing only
-  var _storage: (_BuiltinBridgeObject, UInt)
+  var _storage: (_StringObject, UInt)
 
   @_inlineable
   public
-  var _object: _BuiltinBridgeObject {
+  var _object: _StringObject {
     @inline(__always) get { return _storage.0 }
     @inline(__always) set { _storage.0 = newValue }
   }
@@ -37,247 +39,15 @@ struct _StringGuts {
     @inline(__always) get { return _storage.1 }
     @inline(__always) set { _storage.1 = newValue }
   }
-  @_inlineable
-  public
-  var _objectBitPattern: UInt {
-    @inline(__always) get { return _bitPattern(_object) }
-    @inline(__always) set { _object = Builtin.reinterpretCast(newValue) }
-  }
 
   @_inlineable
   @inline(__always)
   public
-  init(_ object: _BuiltinBridgeObject, _ otherBits: UInt) {
+  init(object: _StringObject, otherBits: UInt) {
     self._storage.0 = object
     self._storage.1 = otherBits
-  }
-}
-
-// //
-// // Work around ARC
-// //
-// @inline(never)
-// @_versioned
-// internal
-// func _unmanagedContiguousImpl(
-//   bridgeObjectBits: UInt, otherBits: UInt
-// ) -> UnsafeString? {
-//   // TODO: This is super ugly and redundant. Organize and tidy up alongside
-//   // Builtin.swift and _StringGuts local vars.
-
-//   let isSingleByte = bridgeObjectBits & _twoByteCodeUnitBit == 0
-//   let unflaggedBObject = (bridgeObjectBits & ~_twoByteCodeUnitBit)
-
-//   // is already an unsafe string
-//   if (unflaggedBObject & _objCTaggedPointerBits != 0) && (unflaggedBObject & _smallBit == 0) {
-//     let ptr = UnsafeMutableRawPointer(
-//       bitPattern: _bridgeObject(toTagPayload: Builtin.reinterpretCast(unflaggedBObject))
-//     )._unsafelyUnwrappedUnchecked
-//     let count = Int(bitPattern: otherBits)
-//     _sanityCheck(count >= 0)
-//     return UnsafeString(
-//       baseAddress: ptr, count: count, isSingleByte: isSingleByte)
-//   }
-
-//   // is native
-//   if unflaggedBObject & (_objCTaggedPointerBits | _objectPointerIsObjCBit) == 0 {
-//     let ptr = _StringBuffer(_StringBuffer._Storage(
-//       _nativeObject: _nativeObject(
-//         fromBridge: Builtin.reinterpretCast(unflaggedBObject)))
-//     ).start
-//     let count = Int(bitPattern: otherBits)
-//     _sanityCheck(count >= 0)
-//     return UnsafeString(
-//       baseAddress: ptr, count: count, isSingleByte: isSingleByte)
-//   }
-
-//   // non tagged cocoa
-//   if _isNonTaggedObjCPointer(Builtin.reinterpretCast(unflaggedBObject)) {
-//     if _slowPath(otherBits == 0) {
-//       return nil
-//     }
-//     let count = _stdlib_binary_CFStringGetLength(
-//       _bridgeObject(toNonTaggedObjC: Builtin.reinterpretCast(unflaggedBObject)))
-//     _sanityCheck(count >= 0)
-//     let ptr = UnsafeMutableRawPointer(
-//       bitPattern: otherBits
-//     )._unsafelyUnwrappedUnchecked
-//     return UnsafeString(
-//       baseAddress: ptr,
-//       count: count,
-//       isSingleByte: isSingleByte
-//     )
-//   }
-
-//   return nil
-// }
-
-//
-// Discriminators
-//
-
-// FIXME: Define this properly per ABI. For now, it's taking advantage of tag
-// bits being highest (and possibly lowest but shifted away). Furthermore, these
-// won't work out-of-the-box for 32bit platforms.
-
-// The bit used to discriminate value or managed.
-/*fileprivate*/
-@_versioned
-@_inlineable
-internal var _tagBit: UInt {
-  @inline(__always)
-  get {
-    return _objCTaggedPointerBits
-  }
-}
-
-// When a value, the bit that discriminates a small string from an unsafe string
-//
-// NOTE: Until we wean ourselves off of _StringCore, the only "small" strings we
-// can store are tagged NSStrings. For now, this is synonymous with a tagged
-// NSString but this will be expanded in the future to store other forms.
-//
-/*fileprivate*/
-@_versioned
-@_inlineable
-internal var _smallBit: UInt {
-  @inline(__always)
-  get { return _tagBit >> 1 }
-}
-
-// When managed, or an unsafe string, the bit used to discriminate two-byte or
-// one-byte code units.
-/*fileprivate*/
-@_versioned
-@_inlineable
-internal var _twoByteCodeUnitBit: UInt {
-  @inline(__always)
-  get { return _smallBit >> 1 }
-}
-
-//
-// Flags
-//
-// TODO: It would be more clear to wrap up BridgeObject in a
-// "StringObject"-like struct, and provide this functionality on that.
-//
-extension _StringGuts {
-  @_versioned
-  @_inlineable
-  /*private*/ internal var _flagsMask: UInt {
-    @inline(__always)
-    get { return _twoByteCodeUnitBit }
-  }
-
-  @_inlineable
-  public // @testable
-  var isSingleByte: Bool {
-    @inline(__always) get {
-      if _slowPath(_isSmallCocoa) { return false }
-      _sanityCheck(_isNative || _isUnmanaged || _isNonTaggedCocoa)
-      return (_objectBitPattern & _twoByteCodeUnitBit) == 0
-    }
-  }
-
-  @_inlineable
-  public // @testable
-  var byteWidth: Int {
-    @inline(__always) get { return isSingleByte ? 1 : 2 }
-  }
-
-  @_inlineable
-  @_versioned
-  var bitWidth: Int {
-    @inline(__always) get { return byteWidth &<< 3 }
-  }
-
-  // NOTE: Currently, single byte representation is synonymous with ASCII. This
-  // may change in the future in preference of either UTF8 or Latin1.
-  @_inlineable
-  public // @testable
-  var isASCII: Bool {
-    @inline(__always) get { return isSingleByte }
-  }
-
-  @_inlineable
-  @_versioned
-  internal
-  var _unflaggedObject: _BuiltinBridgeObject {
-    @inline(__always)
-    get {
-      _sanityCheck(!_isSmallCocoa, "TODO: drop small cocoa")
-      return Builtin.reinterpretCast(_objectBitPattern & ~_flagsMask)
-    }
-  }
-
-  @_versioned
-  @_inlineable
-  var _isTagged: Bool {
-    @inline(__always)
-    get { return _isTaggedObject(_object) }
-  }
-
-  @_versioned
-  @_inlineable
-  var _untaggedUnflaggedBitPattern: UInt {
-    _sanityCheck(_isTagged)
-    return _bridgeObject(toTagPayload: _unflaggedObject)
-  }
-
-  @_inlineable
-  public // @testable
-  var _owner: AnyObject? { // For testing only
-    if _isNative {
-      return _bridgeObject(toNative: _object)
-    } else if _isNonTaggedCocoa {
-      return _bridgeObject(toNonTaggedObjC: _object)
-    }
-    return nil
-  }
-
-  @_inlineable
-  @_versioned
-  @inline(__always)
-  /*private*/ internal init(
-    _unflagged object: _BuiltinBridgeObject,
-    isSingleByte: Bool,
-    otherBits: UInt
-  ) {
-    self.init(object, otherBits)
-    if !isSingleByte {
-      self._objectBitPattern |= _twoByteCodeUnitBit
-    }
-
-    _sanityCheck(_bitPattern(self._unflaggedObject) == _bitPattern(object))
     _invariantCheck()
   }
-}
-
-extension _StringGuts {
-  /// Create the guts of an empty string.
-  @_inlineable
-  public init() {
-    self.init(
-      _UnmanagedString(
-        start: _emptyStringBase.assumingMemoryBound(to: UInt8.self),
-        count: 0))
-  }
-
-  @_inlineable
-  @_versioned
-  internal
-  var _isEmptyLiteral: Bool {
-    return _isUnmanaged && _unmanagedCount == 0
-  }
-}
-
-@_versioned // FIXME(sil-serialize-all)
-internal var _emptyStringStorage: UInt32 = 0
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal var _emptyStringBase: UnsafeRawPointer {
-  return UnsafeRawPointer(Builtin.addressof(&_emptyStringStorage))
 }
 
 extension _StringGuts {
@@ -285,81 +55,120 @@ extension _StringGuts {
   @_versioned // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
-    if _isNative {
-      _sanityCheck(UInt(_nativeRawStorage.count) == self._otherBits)
-    } else if _isUnmanaged {
-      _sanityCheck(_untaggedUnflaggedBitPattern != 0)
-    } else if _isSmallCocoa {
-      _sanityCheck(_otherBits != 0)
-    } else if _isNonTaggedCocoa {
+    if _object.isNative {
+      _sanityCheck(UInt(_object.nativeRawStorage.count) == self._otherBits)
+    } else if _object.isUnmanaged {
+    } else if _object.isCocoa {
+      if _object.isContiguous {
+        _sanityCheck(_otherBits != 0) // TODO: in ABI's address space
+      } else {
+        _sanityCheck(_otherBits == 0)
+      }
+    } else if _object.isSmall {
     } else {
       fatalError("Unimplemented string form")
     }
 #endif
   }
+
+  @_inlineable
+  @inline(__always)
+  public // @testable
+  mutating func isUniqueNative() -> Bool {
+    guard _isNative else { return false }
+    // Note that the isUnique test must be in a separate statement;
+    // `isNative && _isUnique` always evaluates to false in debug builds,
+    // because SILGen keeps the self reference in `isNative` alive for the
+    // duration of the expression.
+
+    // Note that we have to perform this operation here, and not as a (even
+    // mutating) method on our _StringObject to avoid all chances of a semantic
+    // copy.
+    //
+    // FIXME: Super hacky. Is there a better way?
+    defer { _fixLifetime(self) }
+    var bitPattern = _object.payloadBits
+    return _isUnique_native(&bitPattern)
+  }
+
 }
 
 extension _StringGuts {
-  //
-  // Native Swift Strings
-  //
-  // Bit layout (x64):
-  //
-  // _object:
-  // +---+---+---+-------+--------------------------------------------+----+---+
-  // + t | c | w | uuuuu | storage reference (53 bits)                | uu | t |
-  // +---+---+---+-------+--------------------------------------------+----+---+
-  //
-  // _otherBits:
-  // +----------+--------------------------------------------------------------+
-  // | uuuuuuuu | count (56 bits)                                              |
-  // +----------+--------------------------------------------------------------+
-  // where t: tag bits (must be 0)
-  //       c: Cocoa indicator bit (must be 0)
-  //       w: width indicator bit (0: ASCII, 1: UTF-16)
-  //       u: unused bits
-  //
-  // TODO: Find a use for the 15 unused bits.
-
   @_inlineable
-  public // TODO(StringGuts): for testing only
-  var _isNative: Bool {
-    return _isNativePointer(_object)
-  }
-
-  @_inlineable
-  @_versioned
-  @inline(__always)
-  internal
-  func _nativeStorage<CodeUnit>(
-    of codeUnit: CodeUnit.Type = CodeUnit.self
-  ) -> _SwiftStringStorage<CodeUnit>
-  where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(_isNative)
-    _sanityCheck(CodeUnit.bitWidth == self.bitWidth)
-    return Builtin.castReference(_bridgeObject(toNative: _object))
-
+  public // @testable
+  var isASCII: Bool {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.isContiguousASCII
   }
 
   @_inlineable
   public // @testable
-  var _nativeRawStorage: _SwiftRawStringStorage {
-    @inline(__always) get {
-      _sanityCheck(_isNative)
-      return _bridgeObject(toNative: _object) as! _SwiftRawStringStorage
-    }
+  var _isNative: Bool {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.isNative
   }
 
   @_inlineable
+  public // @testable
+  var _isCocoa: Bool {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.isCocoa
+  }
+
+  @_inlineable
+  public // @testable
+  var _isUnmanaged: Bool {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.isUnmanaged
+  }
+
+  @_inlineable
+  public // @testable
+  var _isSmall: Bool {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.isSmall
+  }
+
+  @_inlineable
+  public // @testable
+  var _owner: AnyObject? {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.owner
+  }
+
+  @_inlineable
+  public // @testable
+  var isSingleByte: Bool {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.isSingleByte
+  }
+
   @_versioned
+  @_inlineable
+  internal
+  var _isEmptyLiteral: Bool {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.isEmptyLiteral
+  }
+
+  @_inlineable
+  public // @testable
+  var byteWidth: Int {
+    // FIXME: Currently used to sometimes mean contiguous ASCII
+    return _object.byteWidth
+  }
+
+  @_versioned
+  @_inlineable
   internal
   var _nativeCount: Int {
     @inline(__always) get {
-      _sanityCheck(_isNative)
+      _sanityCheck(_object.isNative)
       return Int(bitPattern: _otherBits)
     }
     @inline(__always) set {
-      _sanityCheck(_isNative)
+      _sanityCheck(_object.isNative)
+      _sanityCheck(newValue >= 0)
       _otherBits = UInt(bitPattern: newValue)
     }
   }
@@ -369,99 +178,51 @@ extension _StringGuts {
   internal
   init<CodeUnit>(_ storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
+    _sanityCheck(storage.count >= 0)
     self.init(
-      _unflagged: _bridgeObject(fromNative: storage),
-      isSingleByte: CodeUnit.bitWidth == 8,
+      object: _StringObject(storage),
       otherBits: UInt(bitPattern: storage.count))
-    _sanityCheck(_isNative)
-    _invariantCheck()
-  }
-
-  //
-  // Cocoa (non-tagged) Strings
-  //
-  // Bit layout (x64):
-  //
-  // _object:
-  // +---+---+---+-------+--------------------------------------------+----+---+
-  // + t | c | w | uuuuu | Cocoa object reference (53 bits)           | uu | t |
-  // +---+---+---+-------+--------------------------------------------+----+---+
-  //
-  // _otherBits:
-  // +----------+--------------------------------------------------------------+
-  // | uuuuuuuu | start address or zero (56 bits)                              |
-  // +----------+--------------------------------------------------------------+
-  // where t: tag bits (must be 0)
-  //       c: Cocoa indicator bit (must be 1)
-  //       w: width indicator bit (0: ASCII, 1: UTF-16)
-  //       u: unusued
-  //
-  // TODO: Use the extra 15 bits
-  //
-
-  @_inlineable
-  public // @testable
-  var _isNonTaggedCocoa: Bool {
-    @inline(__always) get {
-      return _isNonTaggedObjCPointer(_object)
-    }
-  }
-
-  @_inlineable
-  public // @testable
-  var _isContiguousCocoa: Bool {
-    @inline(__always) get {
-      return _isNonTaggedCocoa && _nonTaggedCocoaRawStart != nil
-    }
-  }
-
-  @_inlineable
-  public // @testable
-  var _isNoncontiguousCocoa: Bool {
-    @inline(__always) get {
-      return _isNonTaggedCocoa && _nonTaggedCocoaRawStart == nil
-    }
-  }
-
-  @_inlineable
-  @_versioned
-  var _nonTaggedCocoaObject: _CocoaString {
-    @inline(__always) get {
-      _sanityCheck(_isNonTaggedCocoa)
-      return _bridgeObject(toNonTaggedObjC: _object)
-    }
   }
 
   @_versioned
-  var _nonTaggedCocoaCount: Int {
+  var _cocoaCount: Int {
     @inline(never) // Hide CF dependency
     get {
-      _sanityCheck(_isNonTaggedCocoa)
-      return _stdlib_binary_CFStringGetLength(_nonTaggedCocoaObject)
+      _sanityCheck(_object.isCocoa)
+      return _stdlib_binary_CFStringGetLength(_object.asCocoaObject)
     }
   }
 
-  @_inlineable
   @_versioned
-  var _nonTaggedCocoaRawStart: UnsafeRawPointer? {
-    @inline(__always) get {
-      _sanityCheck(_isNonTaggedCocoa)
-      return UnsafeRawPointer(bitPattern: _otherBits)
+  @_inlineable
+  var _cocoaRawStart: UnsafeRawPointer {
+    @inline(__always)
+    get {
+      _sanityCheck(_object.isContiguousCocoa)
+      _sanityCheck(Int(bitPattern: _otherBits) >= 1) // TODO: ABI's min address
+      return UnsafeRawPointer(
+        bitPattern: _otherBits
+      )._unsafelyUnwrappedUnchecked
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   func _asContiguousCocoa<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _UnmanagedString<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(_isContiguousCocoa)
-    _sanityCheck(CodeUnit.bitWidth == self.bitWidth)
-    let start = _nonTaggedCocoaRawStart
-      ._unsafelyUnwrappedUnchecked
-      .assumingMemoryBound(to: CodeUnit.self)
-    return _UnmanagedString(start: start, count: _nonTaggedCocoaCount)
+    _sanityCheck(_object.isContiguousCocoa)
+    _sanityCheck(CodeUnit.bitWidth == _object.bitWidth)
+    let start = _cocoaRawStart.assumingMemoryBound(to: CodeUnit.self)
+    return _UnmanagedString(start: start, count: _cocoaCount)
+  }
+
+  @_inlineable
+  @inline(__always)
+  public // @testable
+  init() {
+    self.init(object: _StringObject(), otherBits: 0)
   }
 
   @inline(never)
@@ -479,136 +240,69 @@ extension _StringGuts {
       return
     }
     self.init(
-      _unflagged: _bridgeObject(fromNonTaggedObjC: s),
-      isSingleByte: isSingleByte,
+      object: _StringObject(
+        cocoaObject: s, isSingleByte: isSingleByte, isContiguous: start != nil),
       otherBits: UInt(bitPattern: start))
-    _sanityCheck(_isNonTaggedCocoa)
-    _invariantCheck()
-  }
-
-  //
-  // Unmanaged Strings
-  //
-  // Bit layout (x64):
-  //
-  // _object:
-  // +---+---+---+------+--------------------------------------------------+---+
-  // + t | s | w | uuuu | start address (56 bits)                          | t |
-  // +---+---+---+------+--------------------------------------------------+---+
-  //
-  // _otherBits:
-  // +----------+--------------------------------------------------------------+
-  // | uuuuuuuu | count (56 bits)                                              |
-  // +----------+--------------------------------------------------------------+
-  // where t: tag bits (must be 1)
-  //       s: Small string indicator bit (must be 0)
-  //       w: width indicator bit (0: ASCII, 1: UTF-16)
-  //       u: unused bits
-  //
-  // TODO: Use the extra 12 bits
-
-  ///*fileprivate*/ internal // TODO: private in Swift 4
-  @_inlineable
-  public // TODO(StringGuts): for testing only
-  var _isUnmanaged: Bool {
-    @inline(__always) get {
-      return _isTagged && _objectBitPattern & _smallBit == 0
+    if start == nil {
+      _sanityCheck(_object.isOpaque)
+    } else {
+      _sanityCheck(_object.isContiguous)
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal var _unmanagedCount: Int {
     @inline(__always) get {
-      _sanityCheck(_isUnmanaged)
+      _sanityCheck(_object.isUnmanaged)
       return Int(bitPattern: _otherBits)
     }
   }
 
-  @_inlineable
-  public // @testable
-  var _unmanagedRawStart: UnsafeRawPointer {
-    @inline(__always) get {
-      _sanityCheck(_isUnmanaged)
-      return UnsafeRawPointer(
-        bitPattern: _untaggedUnflaggedBitPattern)._unsafelyUnwrappedUnchecked
-    }
-  }
-
-  @_inlineable
   @_versioned
+  @_inlineable
   @inline(__always)
   internal
   func _asUnmanaged<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _UnmanagedString<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(_isUnmanaged)
-    _sanityCheck(CodeUnit.bitWidth == self.bitWidth)
-    let start = _unmanagedRawStart.assumingMemoryBound(to: CodeUnit.self)
+    _sanityCheck(_object.isUnmanaged)
+    _sanityCheck(CodeUnit.bitWidth == _object.bitWidth)
+    let start = _object.asUnmanagedRawStart.assumingMemoryBound(to: CodeUnit.self)
     let count = _unmanagedCount
     _sanityCheck(count >= 0)
     return _UnmanagedString(start: start, count: count)
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   init<CodeUnit>(_ s: _UnmanagedString<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    // Tag it, flag it, and go
+    _sanityCheck(s.count >= 0)
     self.init(
-      _unflagged: _bridgeObject(taggingPayload: UInt(bitPattern: s.start)),
-      isSingleByte: CodeUnit.bitWidth == 8,
-      otherBits: UInt(s.count))
-    _sanityCheck(_isUnmanaged)
-    _invariantCheck()
-    _sanityCheck(_unmanagedRawStart == s.rawStart)
+      object: _StringObject(unmanaged: s.start),
+      otherBits: UInt(bitPattern: s.count))
+    _sanityCheck(_object.isUnmanaged)
+    _sanityCheck(_object.asUnmanagedRawStart == s.rawStart)
     _sanityCheck(_unmanagedCount == s.count)
   }
 
   //
-  // Tagged Cocoa Strings
+  // NOTE: For now, small strings are tagged cocoa strings
   //
-  // TODO: Replace with native small strings holding 15 bytes of data
-  //
-  // Bit layout (x64):
-  //
-  // _object:
-  // +---+---+---+---------------------------------------------------------+---+
-  // + t | s | w | count (60 bits)                                         | t |
-  // +---+---+---+---------------------------------------------------------+---+
-  //
-  // _otherBits:
-  // +-------------------------------------------------------------------------+
-  // | Cocoa tagged pointer (64 bits)                                          |
-  // +-------------------------------------------------------------------------+
-  // where t: tag bits (must be 1)
-  //       s: Small string indicator bit (must be 1)
-  //       w: width indicator bit (0: ASCII, 1: UTF-16)
-  //
-  // Note that the count of tagged Cocoa strings always fits in 4 bits, so
-  // allocating 60 bits for the count field is overkill.
-
-  @_inlineable
-  public // @testable
-  var _isSmallCocoa: Bool {
-    @inline(__always)
-    get { return _isTagged && _objectBitPattern & _smallBit != 0 }
-  }
-
-  @_inlineable
   @_versioned
+  @_inlineable
   internal var _taggedCocoaCount: Int {
-    let countMask: UInt = (1 &<< 60) &- 1
-    return Int(bitPattern:
-      _bridgeObject(toTagPayload: _object) & countMask)
+    _sanityCheck(_object.isSmall)
+    return Int(bitPattern: _object.payloadBits)
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal var _taggedCocoaObject: _CocoaString {
     @inline(__always) get {
-      _sanityCheck(_isSmallCocoa)
+      _sanityCheck(_object.isSmall)
       return Builtin.reinterpretCast(_otherBits)
     }
   }
@@ -619,43 +313,42 @@ extension _StringGuts {
     _sanityCheck(_isObjCTaggedPointer(object))
     let count = _stdlib_binary_CFStringGetLength(object)
     self.init(
-      _bridgeObject(taggingPayload: UInt(count)),
-      Builtin.reinterpretCast(object))
-    self._objectBitPattern |= _smallBit | _twoByteCodeUnitBit
-    _sanityCheck(_isSmallCocoa)
-    _invariantCheck()
+      object: _StringObject(
+        smallStringPayload: UInt(count), isSingleByte: false),
+      otherBits: Builtin.reinterpretCast(object))
+    _sanityCheck(_object.isSmall)
   }
 }
 
 extension _StringGuts {
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   var _unmanagedASCIIView: _UnmanagedString<UInt8> {
-    _sanityCheck(isASCII)
-    if _isUnmanaged {
+    _sanityCheck(_object.isContiguousASCII)
+    if _object.isUnmanaged {
       return _asUnmanaged()
-    } else if _isNative {
-      return _nativeStorage(of: UInt8.self).unmanagedView
+    } else if _object.isNative {
+      return _object.nativeStorage(of: UInt8.self).unmanagedView
     } else {
-      _sanityCheck(_isContiguousCocoa)
+      _sanityCheck(_object.isContiguousCocoa)
       return _asContiguousCocoa(of: UInt8.self)
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   var _unmanagedUTF16View: _UnmanagedString<UTF16.CodeUnit> {
-    _sanityCheck(!isASCII)
-    if _isUnmanaged {
+    _sanityCheck(_object.isContiguousUTF16)
+    if _object.isUnmanaged {
       return _asUnmanaged()
-    } else if _isNative {
-      return _nativeStorage(of: UTF16.CodeUnit.self).unmanagedView
-    } else if _isContiguousCocoa {
+    } else if _object.isNative {
+      return _object.nativeStorage(of: UTF16.CodeUnit.self).unmanagedView
+    } else if _object.isCocoa {
       return _asContiguousCocoa(of: UTF16.CodeUnit.self)
     } else {
-      _sanityCheckFailure("String isn't contiguous")
+      fatalError("Small strings aren't contiguous")
     }
   }
 }
@@ -665,31 +358,51 @@ extension _StringGuts {
   /// The returned object may contain unmanaged pointers into the
   /// storage of this string; you are responsible for ensuring that
   /// it will not outlive `self`.
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   func _ephemeralCocoaString() -> _CocoaString {
-    if _isNative {
-      return _nativeRawStorage
-    } else if _isNonTaggedCocoa {
-      return _nonTaggedCocoaObject
-    } else if _isSmallCocoa {
-      return _taggedCocoaObject
-    } else if isASCII {
-      return _NSContiguousString(
-        _StringGuts(_asUnmanaged(of: UInt8.self)))
-    } else {
-      return _NSContiguousString(
-        _StringGuts(_asUnmanaged(of: UTF16.CodeUnit.self)))
+    if _object.isNative {
+      return _object.asNativeObject
     }
+    if _object.isCocoa {
+      return _object.asCocoaObject
+    }
+    if _object.isSmall {
+      return _taggedCocoaObject
+    }
+    _sanityCheck(_object.isUnmanaged)
+    if _object.isSingleByte {
+      return _NSContiguousString(_StringGuts(_asUnmanaged(of: UInt8.self)))
+    }
+
+    return _NSContiguousString(
+      _StringGuts(_asUnmanaged(of: UTF16.CodeUnit.self)))
   }
+
+  @_versioned
+  @_inlineable
+  internal
+  var _isOpaque: Bool {
+    @inline(__always)
+    get { return _object.isOpaque }
+  }
+
+  @_versioned
+  @_inlineable
+  internal
+  var _isContiguous: Bool {
+    @inline(__always)
+    get { return _object.isContiguous }
+  }
+
 
   /// Return an NSString instance containing a slice of this string.
   /// The returned object may contain unmanaged pointers into the
   /// storage of this string; you are responsible for ensuring that
   /// it will not outlive `self`.
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   func _ephemeralCocoaString(_ range: Range<Int>) -> _CocoaString {
     if _slowPath(_isOpaque) {
@@ -703,73 +416,58 @@ extension _StringGuts {
 extension _StringGuts {
   public // @testable
   var _underlyingCocoaString: _CocoaString? {
-    if _isNative {
-      return _nativeRawStorage
-    } else if _isNonTaggedCocoa {
-      return _nonTaggedCocoaObject
-    } else if _isSmallCocoa {
+    if _object.isNative {
+      return _object.nativeRawStorage
+    } 
+    if _object.isCocoa {
+      return _object.asCocoaObject
+    } 
+    if _object.isSmall {
       return _taggedCocoaObject
-    } else {
-      return nil
     }
+
+    return nil
   }
 }
 
 extension _StringGuts {
-  // Opaque strings
-
-  @_inlineable
-  @_versioned
-  internal
-  var _isContiguous: Bool {
-    @inline(__always) get {
-      return !_isOpaque
-    }
-  }
-
-  @_inlineable
-  @_versioned
-  internal
-  var _isOpaque: Bool {
-    @inline(__always) get {
-      return _isSmallCocoa || _isNoncontiguousCocoa
-    }
-  }
-
   @inline(never)
   @_versioned
   internal func _asOpaque() -> _UnmanagedOpaqueString {
-    if _isSmallCocoa {
+    if _object.isSmall {
       return _UnmanagedOpaqueString(
-        _taggedCocoaObject,
-        count: _taggedCocoaCount)
-    } else {
-      _sanityCheck(_isNoncontiguousCocoa)
-      return _UnmanagedOpaqueString(
-        _nonTaggedCocoaObject,
-        count: _nonTaggedCocoaCount)
+        _taggedCocoaObject, count: _taggedCocoaCount)
     }
+
+    _sanityCheck(_object.isNoncontiguousCocoa)
+    return _UnmanagedOpaqueString(_object.asCocoaObject, count: _cocoaCount)
   }
 }
 
 // Internal hex dumping function. Useful because `print` is implemented in the
 // stdlib through a series of very high level String calls, resulting in
 // infinite recursion.
+@_versioned
 internal func internalDumpHexImpl(_ x: UInt, newline: Bool) {
   _swift_stdlib_print_hex(x, newline ? 1 : 0)
 }
+@_versioned
 internal func internalDumpHex(_ x: _BuiltinNativeObject, newline: Bool) {
   internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
+@_versioned
 internal func internalDumpHex(_ x: UInt, newline: Bool = true) {
   internalDumpHexImpl(x, newline: newline)
 }
+@_versioned
 internal func internalDumpHex(_ x: AnyObject, newline: Bool = true) {
   internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
+@_versioned
 internal func internalDumpHex(_ x: UnsafeRawPointer?, newline: Bool = true) {
   internalDumpHexImpl(Builtin.reinterpretCast(x), newline: newline)
 }
+@_versioned
 internal func internalDumpHex(_ x: Bool, newline: Bool = true) {
   internalDumpHexImpl(x ? 1 : 0, newline: newline)
 }
@@ -809,25 +507,30 @@ extension _StringGuts {
   @_versioned
   var _legacyCore: _LegacyStringCore {
     defer { _fixLifetime(self) }
-    if _isUnmanaged {
+    if _object.isUnmanaged {
       return _LegacyStringCore(
-        baseAddress: UnsafeMutableRawPointer(mutating: _unmanagedRawStart),
+        baseAddress: UnsafeMutableRawPointer(mutating: _object.asUnmanagedRawStart),
         count: _unmanagedCount,
-        elementShift: isSingleByte ? 0 : 1,
+        elementShift: _object.isSingleByte ? 0 : 1,
         hasCocoaBuffer: false,
         owner: nil)
-    } else if _isNative {
-      return makeCocoaLegacyStringCore(_cocoaString: _nativeRawStorage)
-    } else if _isNonTaggedCocoa {
-      return makeCocoaLegacyStringCore(_cocoaString: _nonTaggedCocoaObject)
+    } else if _object.isNative {
+      return makeCocoaLegacyStringCore(_cocoaString: _object.nativeRawStorage)
+    } else if _object.isCocoa {
+      return makeCocoaLegacyStringCore(_cocoaString: _object.asCocoaObject)
     } else {
-      _sanityCheck(_isSmallCocoa)
+      _sanityCheck(_object.isSmall)
       return makeCocoaLegacyStringCore(_cocoaString: _taggedCocoaObject)
     }
   }
 
   @_versioned
   init(_ legacyCore: _LegacyStringCore) {
+    if UnsafeRawPointer(legacyCore._baseAddress) == _emptyStringBase {
+      self.init()
+      return
+    }
+
     if _slowPath(legacyCore._baseAddress == nil) {
       // Opaque Cocoa string
       _sanityCheck(legacyCore.hasCocoaBuffer,
@@ -889,12 +592,12 @@ extension _StringGuts {
 extension _StringGuts {
   public func _dump() {
     print("_StringGuts(", terminator: "")
-    internalDumpHex(_objectBitPattern, newline: false)
+    internalDumpHex(_object.rawBits, newline: false)
     print(" ", terminator: "")
     internalDumpHex(_otherBits, newline: false)
     print(": ", terminator: "")
-    if _isNative {
-      let storage = _nativeRawStorage
+    if _object.isNative {
+      let storage = _object.nativeRawStorage
       print("native ", terminator: "")
       internalDumpHex(storage, newline: false)
       print(" start: ", terminator: "")
@@ -903,23 +606,23 @@ extension _StringGuts {
       print(storage.count, terminator: "")
       print("/", terminator: "")
       print(storage.capacity, terminator: "")
-    } else if _isNonTaggedCocoa {
+    } else if _object.isCocoa {
       print("cocoa ", terminator: "")
-      internalDumpHex(_nonTaggedCocoaObject, newline: false)
+      internalDumpHex(_object.asCocoaObject, newline: false)
       print(" start: ", terminator: "")
-      if let start = _nonTaggedCocoaRawStart {
-        internalDumpHex(start, newline: false)
+      if _object.isContiguous {
+        internalDumpHex(_cocoaRawStart, newline: false)
       } else {
         print("<opaque>", terminator: "")
       }
       print(" count: ", terminator: "")
-      print(_nonTaggedCocoaCount, terminator: "")
-    } else if _isUnmanaged {
+      print(_cocoaCount, terminator: "")
+    } else if _object.isUnmanaged {
       print("unmanaged ", terminator: "")
-      internalDumpHex(_unmanagedRawStart, newline: false)
+      internalDumpHex(_object.asUnmanagedRawStart, newline: false)
       print(" count: ", terminator: "")
       print(_unmanagedCount, terminator: "")
-    } else if _isSmallCocoa {
+    } else if _object.isSmall {
       print("small cocoa ", terminator: "")
       internalDumpHex(_taggedCocoaObject, newline: false)
       print(" count: ", terminator: "")
@@ -950,8 +653,8 @@ extension _StringGuts {
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _SwiftStringStorage<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    if _fastPath(_isNative && CodeUnit.bitWidth == self.bitWidth) {
-      return _bridgeObject(toNative: _object) as! _SwiftStringStorage<CodeUnit>
+    if _fastPath(_object.isNative && CodeUnit.bitWidth == _object.bitWidth) {
+      return _object.nativeStorage()
     }
     let count = self.count
     return _copyToNativeStorage(from: 0..<count, capacity: count)
@@ -982,7 +685,7 @@ extension _StringGuts {
   func _extractSlice(_ range: Range<Int>) -> _StringGuts {
     if range.isEmpty { return _StringGuts() }
     if range == 0..<count { return self }
-    switch (isASCII, _isUnmanaged) {
+    switch (isASCII, _object.isUnmanaged) {
     case (true, true):
         return _StringGuts(_asUnmanaged(of: UInt8.self)[range])
     case (true, false):
@@ -995,29 +698,17 @@ extension _StringGuts {
     }
   }
 
-  @_inlineable
-  @inline(__always)
-  public // @testable
-  mutating func isUniqueNative() -> Bool {
-    guard _isNative else { return false }
-    // Note that the isUnique test must be in a separate statement;
-    // `_isNative && _isUnique` always evaluates to false in debug builds,
-    // because SILGen keeps the self reference in `_isNative` alive for the
-    // duration of the expression.
-    return _isUnique(&_storage.0)
-  }
-
-  @_inlineable
   @_versioned
+  @_inlineable
   internal mutating func allocationParametersForMutableStorage<CodeUnit>(
     of type: CodeUnit.Type,
     unusedCapacity: Int
   ) -> (count: Int, capacity: Int)?
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    if _slowPath(!_isNative) {
+    if _slowPath(!_object.isNative) {
       return (self.count, count + unusedCapacity)
     }
-    unowned(unsafe) let storage = _nativeRawStorage
+    unowned(unsafe) let storage = _object.nativeRawStorage
     defer { _fixLifetime(self) }
     if _slowPath(storage.unusedCapacity < unusedCapacity) {
       return (
@@ -1026,7 +717,7 @@ extension _StringGuts {
           _growArrayCapacity(storage.capacity),
           count + unusedCapacity))
     }
-    if _fastPath(self.bitWidth == CodeUnit.bitWidth) {
+    if _fastPath(_object.bitWidth == CodeUnit.bitWidth) {
       if _fastPath(isUniqueNative()) {
         return nil
       }
@@ -1036,8 +727,8 @@ extension _StringGuts {
 
   // Convert ourselves (if needed) to a native string with the specified storage
   // parameters and call `body` on the resulting native storage.
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   mutating func withMutableStorage<CodeUnit, R>(
     of type: CodeUnit.Type = CodeUnit.self,
@@ -1049,7 +740,7 @@ extension _StringGuts {
       of: CodeUnit.self,
       unusedCapacity: unusedCapacity)
     if _fastPath(paramsOpt == nil) {
-      unowned(unsafe) let storage = _nativeStorage(of: CodeUnit.self)
+      unowned(unsafe) let storage = _object.nativeStorage(of: CodeUnit.self)
       let result = body(Unmanaged.passUnretained(storage))
       self._nativeCount = storage.count
       _fixLifetime(self)
@@ -1067,8 +758,8 @@ extension _StringGuts {
     return result
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   @inline(__always)
   internal
   mutating func withMutableASCIIStorage<R>(
@@ -1079,8 +770,8 @@ extension _StringGuts {
       of: UInt8.self, unusedCapacity: unusedCapacity, body)
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   @inline(__always)
   internal
   mutating func withMutableUTF16Storage<R>(
@@ -1111,10 +802,10 @@ extension _StringGuts {
   @_inlineable
   public // @testable
   var count: Int {
-    if _slowPath(_isSmallCocoa) {
+    if _slowPath(_object.isSmall) {
       return _taggedCocoaCount
-    } else if _slowPath(_isNonTaggedCocoa) {
-      return _nonTaggedCocoaCount
+    } else if _slowPath(_object.isCocoa) {
+      return _cocoaCount
     }
     _sanityCheck(Int(self._otherBits) >= 0)
     return Int(bitPattern: self._otherBits)
@@ -1123,8 +814,8 @@ extension _StringGuts {
   @_inlineable
   public // @testable
   var capacity: Int {
-    if _fastPath(_isNative) {
-      return self._nativeRawStorage.capacity
+    if _fastPath(_object.isNative) {
+      return _object.nativeRawStorage.capacity
     }
     return 0
   }
@@ -1133,13 +824,15 @@ extension _StringGuts {
   @_inlineable // FIXME(sil-serialize-all)
   public // @testable
   subscript(position: Int) -> UTF16.CodeUnit {
+    if _slowPath(_isOpaque) {
+      return _asOpaque()[position]
+    }
+
     if isASCII {
       return _unmanagedASCIIView[position]
-    } else if _slowPath(_isOpaque) {
-      return _asOpaque()[position]
-    } else {
-      return _unmanagedUTF16View[position]
     }
+
+    return _unmanagedUTF16View[position]
   }
 
   // Copy code units from a slice of this string into a buffer.
@@ -1150,10 +843,13 @@ extension _StringGuts {
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _sanityCheck(CodeUnit.bitWidth == 8 || CodeUnit.bitWidth == 16)
     _sanityCheck(dest.count >= range.count)
+    if _slowPath(_isOpaque) {
+      _asOpaque()[range]._copy(into: dest)
+      return
+    }
+
     if isASCII {
       _unmanagedASCIIView[range]._copy(into: dest)
-    } else if _slowPath(_isOpaque) {
-      _asOpaque()[range]._copy(into: dest)
     } else {
       _unmanagedUTF16View[range]._copy(into: dest)
     }
@@ -1165,8 +861,8 @@ extension _StringGuts {
     of codeUnit: CodeUnit.Type = CodeUnit.self)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     if _fastPath(isUniqueNative()) {
-      if _fastPath(bitWidth == CodeUnit.bitWidth) {
-        if _fastPath(_nativeRawStorage.capacity >= capacity) {
+      if _fastPath(_object.bitWidth == CodeUnit.bitWidth) {
+        if _fastPath(_object.nativeRawStorage.capacity >= capacity) {
           return
         }
       }
@@ -1180,12 +876,12 @@ extension _StringGuts {
     _invariantCheck()
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   mutating func append(_ other: _UnmanagedASCIIString) {
     guard other.count > 0 else { return  }
-    if isSingleByte {
+    if _object.isSingleByte {
       withMutableASCIIStorage(unusedCapacity: other.count) { storage in
         storage._value._appendInPlace(other)
       }
@@ -1196,8 +892,8 @@ extension _StringGuts {
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   mutating func append(_ other: _UnmanagedUTF16String) {
     guard other.count > 0 else { return  }
@@ -1206,8 +902,8 @@ extension _StringGuts {
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   mutating func append(_ other: _UnmanagedOpaqueString) {
     guard other.count > 0 else { return  }
@@ -1219,18 +915,21 @@ extension _StringGuts {
   @_inlineable
   public // TODO(StringGuts): for testing only
   mutating func append(_ other: _StringGuts) {
-    if _isEmptyLiteral {
+    if _object.isEmptyLiteral {
       self = other
       return
     }
+    if _slowPath(other._isOpaque) {
+      self.append(other._asOpaque())
+      return
+    }
+
+    defer { _fixLifetime(other) }
     if other.isASCII {
       self.append(other._unmanagedASCIIView)
-    } else if _slowPath(other._isOpaque) {
-      self.append(other._asOpaque())
     } else {
       self.append(other._unmanagedUTF16View)
     }
-    _fixLifetime(other)
   }
 
   @_inlineable
@@ -1238,24 +937,27 @@ extension _StringGuts {
   mutating func append(_ other: _StringGuts, range: Range<Int>) {
     _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
     guard range.count > 0 else { return }
-    if _isEmptyLiteral && range.count == other.count {
+    if _object.isEmptyLiteral && range.count == other.count {
       self = other
       return
     }
+    if _slowPath(other._isOpaque) {
+      self.append(other._asOpaque()[range])
+      return
+    }
+
+    defer { _fixLifetime(other) }
     if other.isASCII {
       self.append(other._unmanagedASCIIView[range])
-    } else if _slowPath(other._isOpaque) {
-      self.append(other._asOpaque()[range])
     } else {
       self.append(other._unmanagedUTF16View[range])
     }
-    _fixLifetime(other)
   }
 
   public // @testable
   mutating func append<C : Collection>(contentsOf other: C)
   where C.Element == UTF16.CodeUnit {
-    if isSingleByte && !other.contains(where: { $0 > 0x7f }) {
+    if _object.isSingleByte && !other.contains(where: { $0 > 0x7f }) {
       withMutableASCIIStorage(
         unusedCapacity: numericCast(other.count)) { storage in
         storage._value._appendInPlaceUTF16(contentsOf: other)
@@ -1289,7 +991,7 @@ extension _StringGuts {
     if _fastPath(paramsOpt == nil) {
       // We have unique native storage of the correct code unit,
       // with enough capacity to do the replacement inline.
-      unowned(unsafe) let storage = _nativeStorage(of: CodeUnit.self)
+      unowned(unsafe) let storage = _object.nativeStorage(of: CodeUnit.self)
       _sanityCheck(storage.unusedCapacity >= deltaCount)
       let tailCount = storage.count - bounds.upperBound
       _precondition(tailCount >= 0,
@@ -1422,8 +1124,8 @@ extension String {
 }
 
 extension _StringGuts {
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   func character(at i: String.Index) -> Character {
     if isASCII {
@@ -1435,8 +1137,8 @@ extension _StringGuts {
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   func characterIndex(after i: String.Index) -> String.Index {
     if isASCII {
@@ -1448,8 +1150,8 @@ extension _StringGuts {
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   func characterIndex(before i: String.Index) -> String.Index {
     if isASCII {
@@ -1478,8 +1180,8 @@ extension _StringGuts {
 }
 
 extension _UnmanagedString {
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   func characterStride(from i: String.Index) -> Int {
     // TODO: should _fastPath the case somehow
@@ -1490,8 +1192,8 @@ extension _UnmanagedString {
     }
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   func character(at i: String.Index) -> Character {
     let offset = i.encodedOffset
@@ -1627,16 +1329,16 @@ extension _UnmanagedOpaqueString {
 }
 
 extension Character {
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   init(_singleCodeUnit cu: UInt16) {
     _representation = .smallUTF16(
       Builtin.zext_Int16_Int63(Builtin.reinterpretCast(cu)))
   }
 
-  @_inlineable
   @_versioned
+  @_inlineable
   internal
   init<CodeUnit>(_ unsafeStr: _UnmanagedString<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
