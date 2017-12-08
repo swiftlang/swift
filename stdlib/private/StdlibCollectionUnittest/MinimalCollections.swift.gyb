@@ -497,13 +497,6 @@ extension MinimalStrideableIndex : Strideable {
 // Minimal***[Mutable]?Collection
 //===----------------------------------------------------------------------===//
 
-/*
-FIXME: swift-3-indexing-model: generate three variants, with Int, Int8 and
-Int64 distances.
-
-  public typealias Distance = {Distance}
-*/
-
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
@@ -546,10 +539,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
     }
   }
 
-%     if StrideableIndex:
-  public typealias Indices = CountableRange<${Index}>
-%     end
-
 %     if RangeReplaceable:
   public init() {
     self.underestimatedCount = 0
@@ -574,7 +563,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
   public typealias Index = ${Index}
-  public typealias IndexDistance = Int
 
   internal func _index(forPosition i: Int) -> ${Index} {
     return ${Index}(
@@ -603,6 +591,13 @@ public struct ${Self}<T> : ${SelfProtocols} {
     timesEndIndexCalled.value += 1
     return _uncheckedIndex(forPosition: _elements.endIndex)
   }
+
+%     if StrideableIndex:
+  public typealias Indices = CountableRange<${Index}>
+%     elif Traversal == 'RandomAccess':
+  // FIXME: this shouldn't be necessary, should come by default
+  public typealias Indices = DefaultRandomAccessIndices<${Self}<T>>
+%     end
 
   public func _failEarlyRangeCheck(
     _ index: ${Index},
@@ -661,7 +656,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
 %     end
 
   public func distance(from start: ${Index}, to end: ${Index})
-    -> IndexDistance {
+    -> Int {
 %     if Traversal == 'Forward':
     _precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
@@ -676,7 +671,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
     return end.position - start.position
   }
 
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
 %     if Traversal == 'Forward':
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
@@ -871,10 +866,12 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   public typealias Base = ${Base}<Element>
   public typealias Iterator = MinimalIterator<Element>
   public typealias Index = ${Index}
-  public typealias IndexDistance = Int
 
 %   if StrideableIndex:
   public typealias Indices = CountableRange<${Index}>
+%  elif Traversal == 'RandomAccess':
+  // FIXME: this shouldn't be necessary, should come by default
+  public typealias Indices = DefaultRandomAccessIndices<${Self}<Element>>
 %   end
 
 %   if Mutable or RangeReplaceable:
@@ -934,11 +931,11 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
 %       if Traversal == 'RandomAccess':
   public func distance(from start: ${Index}, to end: ${Index})
-    -> IndexDistance {
+    -> Int {
     return base.distance(from: start, to: end)
   }
 
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return base.index(i, offsetBy: n)
   }
 %       end

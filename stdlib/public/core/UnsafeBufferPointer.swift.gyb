@@ -65,7 +65,6 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   // struct A { struct B { let x: UnsafeMutableBufferPointer<...> } let b: B }
 
   public typealias Index = Int
-  public typealias IndexDistance = Int
   public typealias Iterator = UnsafeBufferPointerIterator<Element>
 
   /// The index of the first element in a nonempty buffer.

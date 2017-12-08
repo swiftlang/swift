@@ -140,7 +140,6 @@ public struct Slice<Base: Collection> {
 extension Slice: Collection {
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
-  public typealias IndexDistance = Base.IndexDistance  
   public typealias Element = Base.Element
   public typealias SubSequence = Slice<Base>
   public typealias Iterator = IndexingIterator<Slice<Base>>
@@ -188,21 +187,21 @@ extension Slice: Collection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(i, offsetBy: n)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: range check.
     return _base.index(i, offsetBy: n, limitedBy: limit)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     // FIXME: swift-3-indexing-model: range check.
     return _base.distance(from: start, to: end)
   }
@@ -292,12 +291,12 @@ extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollecti
   ) where C : Collection, C.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
-    let sliceOffset: IndexDistance =
+    let sliceOffset =
       _base.distance(from: _base.startIndex, to: _startIndex)
-    let newSliceCount: IndexDistance =
+    let newSliceCount =
       _base.distance(from: _startIndex, to: subRange.lowerBound)
       + _base.distance(from: subRange.upperBound, to: _endIndex)
-      + (numericCast(newElements.count) as IndexDistance)
+      + (numericCast(newElements.count) as Int)
     _base.replaceSubrange(subRange, with: newElements)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -306,9 +305,8 @@ extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollecti
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
-    let sliceOffset: IndexDistance =
-      _base.distance(from: _base.startIndex, to: _startIndex)
-    let newSliceCount: IndexDistance = count + 1
+    let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount = count + 1
     _base.insert(newElement, at: i)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -319,10 +317,8 @@ extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollecti
   where S: Collection, S.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
-    let sliceOffset: IndexDistance =
-      _base.distance(from: _base.startIndex, to: _startIndex)
-    let newSliceCount: IndexDistance =
-      count + (numericCast(newElements.count) as IndexDistance)
+    let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount = count + newElements.count
     _base.insert(contentsOf: newElements, at: i)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -331,9 +327,8 @@ extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollecti
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func remove(at i: Index) -> Base.Element {
     // FIXME: swift-3-indexing-model: range check.
-    let sliceOffset: IndexDistance =
-      _base.distance(from: _base.startIndex, to: _startIndex)
-    let newSliceCount: IndexDistance = count - 1
+    let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount = count - 1
     let result = _base.remove(at: i)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -343,9 +338,8 @@ extension Slice: RangeReplaceableCollection where Base: RangeReplaceableCollecti
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check.
-    let sliceOffset: IndexDistance =
-      _base.distance(from: _base.startIndex, to: _startIndex)
-    let newSliceCount: IndexDistance =
+    let sliceOffset = _base.distance(from: _base.startIndex, to: _startIndex)
+    let newSliceCount =
       count - distance(from: bounds.lowerBound, to: bounds.upperBound)
     _base.removeSubrange(bounds)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
@@ -362,10 +356,10 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   ) where C : Collection, C.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if subRange.lowerBound == _base.startIndex {
-      let newSliceCount: IndexDistance =
+      let newSliceCount =
         _base.distance(from: _startIndex, to: subRange.lowerBound)
         + _base.distance(from: subRange.upperBound, to: _endIndex)
-        + (numericCast(newElements.count) as IndexDistance)
+        + (numericCast(newElements.count) as Int)
       _base.replaceSubrange(subRange, with: newElements)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -374,7 +368,7 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
       let lastValidIndex = _base.index(before: subRange.lowerBound)
       let newEndIndexOffset =
         _base.distance(from: subRange.upperBound, to: _endIndex)
-        + (numericCast(newElements.count) as IndexDistance) + 1
+        + (numericCast(newElements.count) as Int) + 1
       _base.replaceSubrange(subRange, with: newElements)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -387,7 +381,7 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   public mutating func insert(_ newElement: Base.Element, at i: Index) {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount: IndexDistance = count + 1
+      let newSliceCount = count + 1
       _base.insert(newElement, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -408,8 +402,7 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   where S : Collection, S.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount: IndexDistance =
-        count + (numericCast(newElements.count) as IndexDistance)
+      let newSliceCount = count + numericCast(newElements.count)
       _base.insert(contentsOf: newElements, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -418,7 +411,7 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
       let lastValidIndex = _base.index(before: i)
       let newEndIndexOffset =
         _base.distance(from: i, to: _endIndex)
-        + (numericCast(newElements.count) as IndexDistance) + 1
+        + numericCast(newElements.count) + 1
       _base.insert(contentsOf: newElements, at: i)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -431,7 +424,7 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   public mutating func remove(at i: Index) -> Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
-      let newSliceCount: IndexDistance = count - 1
+      let newSliceCount = count - 1
       let result = _base.remove(at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -453,17 +446,16 @@ where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: range check.
     if bounds.lowerBound == _base.startIndex {
-      let newSliceCount: IndexDistance =
-        count
-        - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
+      let newSliceCount =
+        count - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
       _base.removeSubrange(bounds)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
     } else {
       let shouldUpdateStartIndex = bounds.lowerBound == _startIndex
       let lastValidIndex = _base.index(before: bounds.lowerBound)
-      let newEndIndexOffset: Base.IndexDistance =
-        _base.distance(from: bounds.lowerBound, to: _endIndex)
+      let newEndIndexOffset =
+          _base.distance(from: bounds.lowerBound, to: _endIndex)
         - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
         + 1
       _base.removeSubrange(bounds)

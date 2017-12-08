@@ -42,7 +42,6 @@ internal struct _FixedArray${N}<T> {
 
 extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
   internal typealias Index = Int
-  internal typealias IndexDistance = Int
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -57,7 +56,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
   }
 
   @_versioned // FIXME(sil-serialize-all)
-  internal var count : IndexDistance { return _FixedArray${N}._arraySize }
+  internal var count : Int { return _FixedArray${N}._arraySize }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)

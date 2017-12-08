@@ -2898,6 +2898,9 @@ public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
 
+  public typealias IntegerLiteralType = ${Self}
+
+
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
