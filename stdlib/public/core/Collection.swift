@@ -701,16 +701,11 @@ public protocol Collection: Sequence where SubSequence: Collection {
 
   /// Returns the distance between two indices.
   ///
-  /// Unless the collection conforms to the `BidirectionalCollection` protocol,
-  /// `start` must be less than or equal to `end`.
-  ///
   /// - Parameters:
   ///   - start: A valid index of the collection.
   ///   - end: Another valid index of the collection. If `end` is equal to
   ///     `start`, the result is zero.
-  /// - Returns: The distance between `start` and `end`. The result can be
-  ///   negative only if the collection conforms to the
-  ///   `BidirectionalCollection` protocol.
+  /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
@@ -962,30 +957,34 @@ extension Collection {
 
   /// Returns the distance between two indices.
   ///
-  /// Unless the collection conforms to the `BidirectionalCollection` protocol,
-  /// `start` must be less than or equal to `end`.
-  ///
   /// - Parameters:
   ///   - start: A valid index of the collection.
   ///   - end: Another valid index of the collection. If `end` is equal to
   ///     `start`, the result is zero.
-  /// - Returns: The distance between `start` and `end`. The result can be
-  ///   negative only if the collection conforms to the
-  ///   `BidirectionalCollection` protocol.
+  /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   @_inlineable
   public func distance(from start: Index, to end: Index) -> Int {
-    _precondition(start <= end,
-      "Only BidirectionalCollections can have end come before start")
-
-    var start = start
+    var _start: Index
+    let _end: Index
+    let step: Int
+    if start > end {
+      _start = end
+      _end = start
+      step = -1
+    }
+    else {
+      _start = start
+      _end = end
+      step = 1
+    }
     var count = 0
-    while start != end {
-      count = count + 1
-      formIndex(after: &start)
+    while _start != _end {
+      count += step
+      formIndex(after: &_start)
     }
     return count
   }
