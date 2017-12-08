@@ -182,12 +182,16 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
       return true;
 
   // Set the primary file to the code-completion point if one exists.
-  if (codeCompletionBufferID.hasValue())
+  if (codeCompletionBufferID.hasValue() &&
+      *codeCompletionBufferID != PrimaryBufferID) {
+    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
     PrimaryBufferID = *codeCompletionBufferID;
+  }
 
   if (isInMainMode() && MainBufferID == NO_SUCH_BUFFER &&
-      InputSourceCodeBufferIDs.size() == 1)
+      InputSourceCodeBufferIDs.size() == 1) {
     MainBufferID = InputSourceCodeBufferIDs.front();
+  }
 
   return false;
 }
@@ -210,11 +214,15 @@ void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer,
     unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(copy));
     InputSourceCodeBufferIDs.push_back(bufferID);
 
-    if (isInSILMode())
+    if (isInSILMode()) {
+      assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
       MainBufferID = bufferID;
+    }
 
-    if (isPrimary)
+    if (isPrimary) {
+      assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
       PrimaryBufferID = bufferID;
+    }
   }
 }
 
@@ -226,11 +234,16 @@ bool CompilerInstance::setUpForFile(StringRef fileName, bool isPrimary) {
   using namespace llvm::sys::path;
   if (Optional<unsigned> existingBufferID =
           SourceMgr.getIDForBufferIdentifier(fileName)) {
-    if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
+    if (isInSILMode() ||
+        (isInMainMode() && filename(fileName) == "main.swift")) {
+      assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
       MainBufferID = existingBufferID.getValue();
+    }
 
-    if (isPrimary)
+    if (isPrimary) {
+      assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
       PrimaryBufferID = existingBufferID.getValue();
+    }
 
     return false; // replaced by a memory buffer.
   }
@@ -267,11 +280,15 @@ bool CompilerInstance::setUpForFile(StringRef fileName, bool isPrimary) {
 
   InputSourceCodeBufferIDs.push_back(bufferID);
 
-  if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift"))
+  if (isInSILMode() || (isInMainMode() && filename(fileName) == "main.swift")) {
+    assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     MainBufferID = bufferID;
+  }
 
-  if (isPrimary)
+  if (isPrimary) {
+    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
     PrimaryBufferID = bufferID;
+  }
 
   return false;
 }
