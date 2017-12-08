@@ -670,7 +670,7 @@ extension _StringGuts {
       return _object.nativeStorage()
     }
     let count = self.count
-    return _copyToNativeStorage(from: 0..<count, capacity: count)
+    return _copyToNativeStorage(from: 0..<count)
   }
 
   @_specialize(where CodeUnit == UInt8)
@@ -682,12 +682,12 @@ extension _StringGuts {
   func _copyToNativeStorage<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self,
     from range: Range<Int>,
-    capacity: Int = 0
+    unusedCapacity: Int = 0
   ) -> _SwiftStringStorage<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(capacity >= 0)
+    _sanityCheck(unusedCapacity >= 0)
     let storage = _SwiftStringStorage<CodeUnit>.create(
-      capacity: Swift.max(range.count, capacity),
+      capacity: range.count + unusedCapacity,
       count: range.count)
     self._copy(range: range, into: storage.usedBuffer)
     return storage
@@ -724,17 +724,20 @@ extension _StringGuts {
     unowned(unsafe) let storage = _object.nativeRawStorage
     defer { _fixLifetime(self) }
     if _slowPath(storage.unusedCapacity < unusedCapacity) {
+      // Need more space; borrow Array's exponential growth curve.
       return (
         storage.count,
         Swift.max(
           _growArrayCapacity(storage.capacity),
           count + unusedCapacity))
     }
+    // We have enough space; check if it's unique and of the correct width.
     if _fastPath(_object.bitWidth == CodeUnit.bitWidth) {
       if _fastPath(isUniqueNative()) {
         return nil
       }
     }
+    // If not, allocate new storage, but keep existing capacity.
     return (storage.count, storage.capacity)
   }
 
@@ -764,7 +767,7 @@ extension _StringGuts {
       self._copyToNativeStorage(
         of: CodeUnit.self,
         from: 0..<params.count,
-        capacity: params.capacity))
+        unusedCapacity: params.capacity - params.count))
     let result = body(unmanagedRef)
     self = _StringGuts(unmanagedRef.takeRetainedValue())
     _fixLifetime(self)
@@ -850,6 +853,7 @@ extension _StringGuts {
 
   // Copy code units from a slice of this string into a buffer.
   @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
   internal func _copy<CodeUnit>(
     range: Range<Int>,
     into dest: UnsafeMutableBufferPointer<CodeUnit>)
@@ -868,24 +872,56 @@ extension _StringGuts {
     }
   }
 
+  @_inlineable
   public // TODO(StringGuts): for testing
-  mutating func reserveCapacity<CodeUnit>(
-    _ capacity: Int,
-    of codeUnit: CodeUnit.Type = CodeUnit.self)
-  where CodeUnit : FixedWidthInteger & UnsignedInteger {
+  mutating func reserveUnusedCapacity(
+    _ unusedCapacity: Int,
+    ascii: Bool = false
+  ) {
     if _fastPath(isUniqueNative()) {
-      if _fastPath(_object.bitWidth == CodeUnit.bitWidth) {
-        if _fastPath(_object.nativeRawStorage.capacity >= capacity) {
-          return
-        }
+      if _fastPath(
+        ascii == (_object.bitWidth == 8) &&
+        _object.nativeRawStorage.unusedCapacity >= unusedCapacity) {
+        return
       }
     }
-    let count = self.count
-    let storage = _copyToNativeStorage(
-      of: CodeUnit.self,
-      from: 0..<count,
-      capacity: Swift.max(capacity, count))
-    self = _StringGuts(storage)
+    if ascii {
+      let storage = _copyToNativeStorage(
+        of: UInt8.self,
+        from: 0..<self.count,
+        unusedCapacity: unusedCapacity)
+      self = _StringGuts(storage)
+    } else {
+      let storage = _copyToNativeStorage(
+        of: UTF16.CodeUnit.self,
+        from: 0..<self.count,
+        unusedCapacity: unusedCapacity)
+      self = _StringGuts(storage)
+    }
+    _invariantCheck()
+  }
+
+  @_inlineable
+  public // TODO(StringGuts): for testing
+  mutating func reserveCapacity(_ capacity: Int) {
+    if _fastPath(isUniqueNative()) {
+      if _fastPath(_object.nativeRawStorage.capacity >= capacity) {
+        return
+      }
+    }
+    if isASCII {
+      let storage = _copyToNativeStorage(
+        of: UInt8.self,
+        from: 0..<self.count,
+        unusedCapacity: Swift.max(capacity - count, 0))
+      self = _StringGuts(storage)
+    } else {
+      let storage = _copyToNativeStorage(
+        of: UTF16.CodeUnit.self,
+        from: 0..<self.count,
+        unusedCapacity: capacity)
+      self = _StringGuts(storage)
+    }
     _invariantCheck()
   }
 

@@ -734,11 +734,7 @@ extension String._CharacterView : RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
-    if _guts.isASCII {
-      _guts.reserveCapacity(n, of: UInt8.self)
-    } else {
-      _guts.reserveCapacity(n, of: UTF16.CodeUnit.self)
-    }
+    _guts.reserveCapacity(n)
   }
 
   /// Appends the given character to the character view.
