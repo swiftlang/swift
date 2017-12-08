@@ -254,13 +254,13 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
   return try body(a, targetLength)
 }
 
-extension _LegacyStringCore {
+extension _StringGuts {
   /// Invokes `body` on a null-terminated sequence of code units in the given
   /// encoding corresponding to the substring in `bounds`.
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal func _withCSubstring<Result, TargetEncoding: Unicode.Encoding>(
-    in bounds: Range<Index>,
+    in bounds: Range<Int>,
     encoding targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
@@ -275,32 +275,32 @@ extension _LegacyStringCore {
   internal func _withCSubstringAndLength<
     Result, TargetEncoding: Unicode.Encoding
   >(
-    in bounds: Range<Index>,
+    in bounds: Range<Int>,
     encoding targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
   ) rethrows -> Result {
-    if _fastPath(hasContiguousStorage) {
-      defer { _fixLifetime(self) }
-      if isASCII {
-        return try Swift._withCStringAndLength(
-          encodedAs: targetEncoding,
-          from: UnsafeBufferPointer(start: startASCII, count: count)[bounds],
-          encodedAs: Unicode.ASCII.self,
-          execute: body
-        )
-      }
-      else {
-        return try Swift._withCStringAndLength(
-          encodedAs: targetEncoding,
-          from: UnsafeBufferPointer(start: startUTF16, count: count)[bounds],
-          encodedAs: Unicode.UTF16.self,
-          execute: body
-        )
-      }
+    if _slowPath(_isOpaque) {
+      let opaque = _asOpaque()[bounds]
+      return try Swift._withCStringAndLength(
+        encodedAs: targetEncoding,
+        from: opaque,
+        encodedAs: Unicode.UTF16.self,
+        execute: body
+      )
     }
+    if isASCII {
+      let ascii = _unmanagedASCIIView[bounds]
+      return try Swift._withCStringAndLength(
+        encodedAs: targetEncoding,
+        from: ascii.buffer,
+        encodedAs: Unicode.ASCII.self,
+        execute: body
+      )
+    }
+    let utf16 = _unmanagedUTF16View[bounds]
     return try Swift._withCStringAndLength(
       encodedAs: targetEncoding,
-      from: self[bounds],
+      from: utf16.buffer,
       encodedAs: Unicode.UTF16.self,
       execute: body
     )
@@ -426,8 +426,10 @@ extension String {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try _core._withCSubstring(
-      in: _core.startIndex..<_core.endIndex, encoding: targetEncoding, body)
+    return try _guts._withCSubstring(
+      in: 0..<_guts.count,
+      encoding: TargetEncoding.self,
+      body)
   }
 }
 // FIXME: complexity documentation for most of methods on String ought to be
