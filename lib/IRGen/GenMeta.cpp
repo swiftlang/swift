@@ -2758,8 +2758,6 @@ namespace {
     struct FillOp {
       CanType Type;
       Optional<ProtocolConformanceRef> Conformance;
-      Size ToOffset;
-      bool IsRelative;
     };
 
     SmallVector<FillOp, 8> FillOps;
@@ -2836,7 +2834,10 @@ namespace {
       // fill indexes are word-indexed.
       Address metadataWords(IGF.Builder.CreateBitCast(metadataValue, IGM.Int8PtrPtrTy),
                             IGM.getPointerAlignment());
-      
+
+      auto genericReqtOffset = IGM.getMetadataLayout(Target)
+          .getGenericRequirementsOffset(IGF);
+
       for (auto &fillOp : FillOps) {
         llvm::Value *value;
         if (fillOp.Conformance) {
@@ -2846,20 +2847,12 @@ namespace {
         }
 
         auto dest = createPointerSizedGEP(IGF, metadataWords,
-                                          fillOp.ToOffset - AddressPoint);
+                                          genericReqtOffset.getStatic());
+        genericReqtOffset = genericReqtOffset.offsetBy(
+          IGF, IGM.getPointerSize());
 
-        // A far relative indirectable pointer.
-        if (fillOp.IsRelative) {
-          dest = IGF.Builder.CreateElementBitCast(dest,
-                                                  IGM.FarRelativeAddressTy);
-          IGF.emitStoreOfRelativeIndirectablePointer(value, dest,
-                                                     /*isFar*/ true);
-
-        // A direct pointer.
-        } else {
-          value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
-          IGF.Builder.CreateStore(value, dest);
-        }
+        value = IGF.Builder.CreateBitCast(value, IGM.Int8PtrTy);
+        IGF.Builder.CreateStore(value, dest);
       }
       
       // Initialize the instantiated dependent value witness table, if we have
@@ -2894,12 +2887,6 @@ namespace {
       return f;
     }
 
-    void addFillOp(CanType type, Optional<ProtocolConformanceRef> conf,
-                   bool isRelative) {
-      FillOps.push_back({type, conf, getNextOffsetFromTemplateHeader(),
-                         isRelative });
-    }
-    
   public:
     void createMetadataAccessFunction() {
       (void) getGenericTypeMetadataAccessFunction(IGM, Target, ForDefinition);
@@ -2981,14 +2968,14 @@ namespace {
 
     template <class... T>
     void addGenericArgument(CanType type, T &&...args) {
-      addFillOp(type, None, /*relative*/ false);
+      FillOps.push_back({type, None});
       super::addGenericArgument(type, std::forward<T>(args)...);
     }
 
     template <class... T>
     void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf,
                                 T &&...args) {
-      addFillOp(type, conf, /*relative*/ false);
+      FillOps.push_back({type, conf});
       super::addGenericWitnessTable(type, conf, std::forward<T>(args)...);
     }
     
@@ -3021,11 +3008,10 @@ namespace {
   };
 } // end anonymous namespace
 
-llvm::Value *
-irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
-                                       SILType T,
-                                       llvm::Value *metadata,
-                                       llvm::Value *vwtable) {
+void irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+                                            SILType T,
+                                            llvm::Value *metadata,
+                                            llvm::Value *vwtable) {
   auto *target = T.getNominalOrBoundGenericNominal();
   llvm::Value *fieldVector
     = emitAddressOfFieldOffsetVector(IGF, metadata, target)
@@ -3062,9 +3048,9 @@ irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 
   if (isa<ClassDecl>(target)) {
     assert(vwtable == nullptr);
-    metadata = IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
-                                      {metadata, numFields,
-                                       fields.getAddress(), fieldVector});
+    IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
+                           {metadata, numFields,
+                            fields.getAddress(), fieldVector});
   } else {
     assert(isa<StructDecl>(target));
     IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
@@ -3074,8 +3060,6 @@ irgen::emitInitializeFieldOffsetVector(IRGenFunction &IGF,
 
   IGF.Builder.CreateLifetimeEnd(fields,
                   IGF.IGM.getPointerSize() * storedProperties.size());
-
-  return metadata;
 }
 
 // Classes
@@ -3489,11 +3473,9 @@ namespace {
     }
 
     llvm::Value *emitFinishInitializationOfClassMetadata(IRGenFunction &IGF,
-                                                      llvm::Value *metadata) {
+                                                         llvm::Value *metadata) {
       // We assume that we've already filled in the class's generic arguments.
       // We need to:
-      //   - relocate the metadata to accommodate the superclass,
-      //     if something in our hierarchy is resilient to us;
       //   - fill out the subclass's field offset vector, if its layout
       //     wasn't fixed;
       //   - copy field offsets and generic arguments from higher in the
@@ -3508,9 +3490,9 @@ namespace {
       if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, Target)) {
         auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
         auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
-        metadata = emitInitializeFieldOffsetVector(IGF, loweredClassTy,
-                                                   metadata,
-                                                   /*vwtable=*/nullptr);
+        emitInitializeFieldOffsetVector(IGF, loweredClassTy,
+                                        metadata,
+                                        /*vwtable=*/nullptr);
 
         // Realizing the class with the ObjC runtime will copy back to the
         // field offset globals for us; but if ObjC interop is disabled, we
@@ -3742,9 +3724,7 @@ namespace {
         IGF.Builder.CreateStore(superclassMetadata, superField);
       }
 
-      metadata = emitFinishInitializationOfClassMetadata(IGF, metadata);
-
-      return metadata;
+      return emitFinishInitializationOfClassMetadata(IGF, metadata);
     }
   };
 

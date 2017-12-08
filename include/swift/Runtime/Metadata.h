@@ -2869,16 +2869,11 @@ void swift_initStructMetadata_UniversalStrategy(size_t numFields,
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
-///
-/// This will relocate the metadata if it doesn't have enough space
-/// for its superclass.  Note that swift_allocateGenericClassMetadata will
-/// never produce a metadata that requires relocation.
 SWIFT_RUNTIME_EXPORT
-ClassMetadata *
-swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                          size_t numFields,
-                                          const TypeLayout * const *fieldTypes,
-                                          size_t *fieldOffsets);
+void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
+                                               size_t numFields,
+                                               const TypeLayout * const *fieldTypes,
+                                               size_t *fieldOffsets);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT

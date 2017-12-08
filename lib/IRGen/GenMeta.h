@@ -255,10 +255,10 @@ namespace irgen {
 
   /// \brief Initialize the field offset vector within the given class or struct
   /// metadata.
-  llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
-                                               SILType T,
-                                               llvm::Value *metadata,
-                                               llvm::Value *vwtable);
+  void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
+                                       SILType T,
+                                       llvm::Value *metadata,
+                                       llvm::Value *vwtable);
 
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.

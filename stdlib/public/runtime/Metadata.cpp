@@ -1381,11 +1381,7 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 
 /// Initialize the invariant superclass components of a class metadata,
 /// such as the generic type arguments, field offsets, and so on.
-///
-/// This may also relocate the metadata object if it wasn't allocated
-/// with enough space.
-static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
-                                                  bool copyFieldOffsetVectors) {
+static void _swift_initializeSuperclass(ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
   // If the class is generic, we need to give it a name for Objective-C.
   if (theClass->getDescription()->GenericParams.isGeneric())
@@ -1393,44 +1389,6 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
 #endif
 
   const ClassMetadata *theSuperclass = theClass->SuperClass;
-
-  // Relocate the metadata if necessary.
-  //
-  // For now, we assume that relocation is only required when the parent
-  // class has prefix matter we didn't know about.  This isn't consistent
-  // with general class resilience, however.
-  //
-  // FIXME: This part isn't used right now.
-  if (theSuperclass && theSuperclass->isTypeMetadata()) {
-    auto superAP = theSuperclass->getClassAddressPoint();
-    auto oldClassAP = theClass->getClassAddressPoint();
-    if (superAP > oldClassAP) {
-      size_t extraPrefixSize = superAP - oldClassAP;
-      size_t oldClassSize = theClass->getClassSize();
-
-      // Allocate a new metadata object.
-      auto rawNewClass = (char*) malloc(extraPrefixSize + oldClassSize);
-      auto rawOldClass = (const char*) theClass;
-      auto rawSuperclass = (const char*) theSuperclass;
-
-      // Copy the extra prefix from the superclass.
-      memcpy((void**) (rawNewClass),
-             (void* const *) (rawSuperclass - superAP),
-             extraPrefixSize);
-      // Copy the rest of the data from the derived class.
-      memcpy((void**) (rawNewClass + extraPrefixSize),
-             (void* const *) (rawOldClass - oldClassAP),
-             oldClassSize);
-
-      // Update the class extents on the new metadata object.
-      theClass = reinterpret_cast<ClassMetadata*>(rawNewClass + oldClassAP);
-      theClass->setClassAddressPoint(superAP);
-      theClass->setClassSize(extraPrefixSize + oldClassSize);
-
-      // The previous metadata should be global data, so we have no real
-      // choice but to drop it on the floor.
-    }
-  }
 
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
@@ -1449,7 +1407,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
   }
 
   if (theSuperclass == nullptr)
-    return theClass;
+    return;
 
   // If any ancestor classes have generic parameters, field offset vectors
   // or virtual methods, inherit them.
@@ -1480,8 +1438,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
     }
 
     // Copy the field offsets.
-    if (copyFieldOffsetVectors &&
-        description->Class.hasFieldOffsetVector()) {
+    if (description->Class.hasFieldOffsetVector()) {
       unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;
       memcpy(classWords + fieldOffsetVector,
              superWords + fieldOffsetVector,
@@ -1498,8 +1455,6 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
     = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
   theMetaclass->SuperClass = theSuperMetaclass;
 #endif
-
-  return theClass;
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -1512,12 +1467,12 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
-ClassMetadata *
+void
 swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                                  size_t numFields,
                                            const TypeLayout * const *fieldTypes,
                                                  size_t *fieldOffsets) {
-  self = _swift_initializeSuperclass(self, /*copyFieldOffsetVectors=*/true);
+  _swift_initializeSuperclass(self);
 
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
@@ -1689,8 +1644,6 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
     }
   }
 #endif
-
-  return self;
 }
 
 /***************************************************************************/
