@@ -171,10 +171,10 @@ struct SwiftError : SwiftErrorHeader {
 /// copied (or taken if \c isTake is true) into the newly-allocated error box.
 /// If value is null, the box's contents will be left uninitialized, and
 /// \c isTake should be false.
-SWIFT_RUNTIME_STDLIB_API
-BoxPair::Return swift_allocError(const Metadata *type,
-                                 const WitnessTable *errorConformance,
-                                 OpaqueValue *value, bool isTake);
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+BoxPair swift_allocError(const Metadata *type,
+                         const WitnessTable *errorConformance,
+                         OpaqueValue *value, bool isTake);
   
 /// Deallocate an error object whose contained object has already been
 /// destroyed.

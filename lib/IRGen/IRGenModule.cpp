@@ -610,6 +610,10 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
                                                   RETURNS, ARGS, ATTRS)        \
   FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
+#define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_SwiftCC(ID, NAME, SYMBOL, CC,        \
+                                                  RETURNS, ARGS, ATTRS)        \
+  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+
 #define FUNCTION_WITH_GLOBAL_SYMBOL_FOR_CONV_RegisterPreservingCC(             \
     ID, NAME, SYMBOL, CC, RETURNS, ARGS, ATTRS)                                \
   FUNCTION_WITH_GLOBAL_SYMBOL_IMPL(ID, NAME, SYMBOL, CC, QUOTE(RETURNS),       \
