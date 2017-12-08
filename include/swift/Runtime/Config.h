@@ -102,6 +102,11 @@
 #define SWIFT_CONTEXT __attribute__((swift_context))
 #define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
 #define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
+#else
+#define SWIFT_CC_swift
+#define SWIFT_CONTEXT
+#define SWIFT_ERROR_RESULT
+#define SWIFT_INDIRECT_RESULT
 #endif
 
 #define SWIFT_CC_SwiftCC SWIFT_CC_swift
