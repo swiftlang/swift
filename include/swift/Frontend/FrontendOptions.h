@@ -47,11 +47,16 @@ public:
   /// string.
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {}
+      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
+    assert(!name.empty());
+  }
 
   bool isPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *buffer() const { return Buffer; }
-  StringRef file() const { return Filename; }
+  StringRef file() const {
+    assert(!Filename.empty());
+    return Filename;
+  }
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
 
