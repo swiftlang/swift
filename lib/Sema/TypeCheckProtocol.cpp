@@ -6479,6 +6479,11 @@ static bool shouldWarnAboutPotentialWitness(
   if (groupChecker.isCoveredMember(witness))
     return false;
 
+  // If the kinds of the requirement and witness are different, there's
+  // nothing to warn about.
+  if (req->getKind() != witness->getKind())
+    return false;
+
   // If the warning couldn't be suppressed, don't warn.
   if (!canSuppressPotentialWitnessWarningWithMovement(req, witness) &&
       !canSuppressPotentialWitnessWarningWithNonObjC(req, witness))
