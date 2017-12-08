@@ -1258,6 +1258,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
   case Kind::NominalTypeDescriptor:
+  case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
@@ -1344,6 +1345,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return true;
 
   case Kind::SwiftMetaclassStub:
+  case Kind::ClassMetadataBaseOffset:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
     return ::isAvailableExternally(IGM, getDecl());
@@ -2817,6 +2819,15 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
   
   return addr;
+}
+
+/// Returns the address of a class metadata base offset.
+llvm::Constant *
+IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
+                                              ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forClassMetadataBaseOffset(D);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
+                               SizeTy, DebugTypeInfo());
 }
 
 /// Return the address of a nominal type descriptor.  Right now, this
