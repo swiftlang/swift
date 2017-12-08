@@ -162,7 +162,6 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/AssociatedTypes") {
     iteratorType: IndexingIterator<Subject>.self,
     subSequenceType: MutableRandomAccessSlice<Subject>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
 

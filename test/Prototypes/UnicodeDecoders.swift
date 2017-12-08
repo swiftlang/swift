@@ -158,13 +158,13 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
     
     switch parser.parseScalar(from: &more) {
     case .valid(let scalarContent):
-      let d: CodeUnits.IndexDistance = -numericCast(scalarContent.count)
+      let d: Int = -scalarContent.count
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d),
         scalar: Encoding.decode(scalarContent),
         stride: numericCast(scalarContent.count))
     case .error(let stride):
-      let d: CodeUnits.IndexDistance = -numericCast(stride)
+      let d: Int = -stride
       return Index(
         codeUnitIndex: codeUnits.index(i.codeUnitIndex, offsetBy: d) ,
         scalar: Unicode.Scalar(_unchecked: 0xfffd),

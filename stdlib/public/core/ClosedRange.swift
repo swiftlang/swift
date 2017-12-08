@@ -173,7 +173,6 @@ extension CountableClosedRange: RandomAccessCollection {
 
   /// A type that represents a position in the range.
   public typealias Index = ClosedRangeIndex<Bound>
-  public typealias IndexDistance = Bound.Stride
 
   /// The position of the first element in the range.
   @_inlineable
@@ -213,12 +212,12 @@ extension CountableClosedRange: RandomAccessCollection {
   }
 
   @_inlineable
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     switch i._value {
     case .inRange(let x):
       let d = x.distance(to: upperBound)
       if n <= d {
-        let newPosition = x.advanced(by: n)
+        let newPosition = x.advanced(by: numericCast(n))
         _precondition(newPosition >= lowerBound,
           "Advancing past start index")
         return ClosedRangeIndex(newPosition)
@@ -230,24 +229,24 @@ extension CountableClosedRange: RandomAccessCollection {
         return i
       } 
       if n < 0 {
-        return index(ClosedRangeIndex(upperBound), offsetBy: (n + 1))
+        return index(ClosedRangeIndex(upperBound), offsetBy: numericCast(n + 1))
       }
       _preconditionFailure("Advancing past end index")
     }
   }
 
   @_inlineable
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     switch (start._value, end._value) {
     case let (.inRange(left), .inRange(right)):
       // in range <--> in range
-      return left.distance(to: right)
+      return numericCast(left.distance(to: right))
     case let (.inRange(left), .pastEnd):
       // in range --> end
-      return 1 + left.distance(to: upperBound)
+      return numericCast(1 + left.distance(to: upperBound))
     case let (.pastEnd, .inRange(right)):
       // in range <-- end
-      return upperBound.distance(to: right) - 1
+      return numericCast(upperBound.distance(to: right) - 1)
     case (.pastEnd, .pastEnd):
       // end <--> end
       return 0

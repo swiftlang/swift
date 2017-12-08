@@ -14,10 +14,10 @@
 
 //===--- Niceties ---------------------------------------------------------===//
 extension Collection {
-  func index(_ d: IndexDistance) -> Index {
+  func index(_ d: Int) -> Index {
     return index(startIndex, offsetBy: d)
   }
-  func offset(of i: Index) -> IndexDistance {
+  func offset(of i: Index) -> Int {
     return distance(from: startIndex, to: i)
   }
 }

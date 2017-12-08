@@ -151,7 +151,6 @@ public struct ${Self}<
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Base.Index
 
-  public typealias IndexDistance = Base.IndexDistance
 
   /// Creates an instance containing the elements of `base` that
   /// satisfy `isIncluded`.

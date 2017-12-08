@@ -120,7 +120,6 @@ extension String {
     }
 
     public typealias Index = String.Index
-    public typealias IndexDistance = Int
 
     /// The position of the first code unit if the UTF-8 view is
     /// nonempty.
@@ -273,7 +272,7 @@ extension String {
     }
     
     @_inlineable // FIXME(sil-serialize-all)
-    public func distance(from i: Index, to j: Index) -> IndexDistance {
+    public func distance(from i: Index, to j: Index) -> Int {
       if _fastPath(_core.isASCII) {
         return j.encodedOffset - i.encodedOffset
       }
@@ -284,8 +283,8 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     @_versioned
     @inline(__always)
-    internal func _forwardDistance(from i: Index, to j: Index) -> IndexDistance {
-      var r: IndexDistance = j._transcodedOffset - i._transcodedOffset
+    internal func _forwardDistance(from i: Index, to j: Index) -> Int {
+      var r = j._transcodedOffset - i._transcodedOffset
       UTF8._transcode(
         _core[i.encodedOffset..<j.encodedOffset], from: UTF16.self) {
         r += $0.count
@@ -678,7 +677,7 @@ extension String.UTF8View {
   @available(
     swift, obsoleted: 4.0,
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(_ i: Index?, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index?, offsetBy n: Int) -> Index {
     return index(i!, offsetBy: n)
   }
   @_inlineable // FIXME(sil-serialize-all)
@@ -686,7 +685,7 @@ extension String.UTF8View {
     swift, obsoleted: 4.0,
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
   public func distance(
-    from i: Index?, to j: Index?) -> IndexDistance {
+    from i: Index?, to j: Index?) -> Int {
     return distance(from: i!, to: j!)
   }
   @_inlineable // FIXME(sil-serialize-all)

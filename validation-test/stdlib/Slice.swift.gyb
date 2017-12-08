@@ -61,7 +61,6 @@ SliceTests.test("${Slice}/AssociatedTypes") {
       iteratorType: IndexingIterator<CollectionSlice>.self,
       subSequenceType: CollectionSlice.self,
       indexType: MinimalIndex.self,
-      indexDistanceType: Int.self,
       indicesType: Collection.Indices.self)
   }
 

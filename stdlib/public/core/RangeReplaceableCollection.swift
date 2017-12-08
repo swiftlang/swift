@@ -132,7 +132,7 @@ where SubSequence: RangeReplaceableCollection
   /// less storage than requested, or to take no action at all.
   ///
   /// - Parameter n: The requested number of elements to store.
-  mutating func reserveCapacity(_ n: IndexDistance)
+  mutating func reserveCapacity(_ n: Int)
 
   //===--- Derivable Requirements -----------------------------------------===//
 
@@ -648,7 +648,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter n: The requested number of elements to store.
   @_inlineable
-  public mutating func reserveCapacity(_ n: IndexDistance) {}
+  public mutating func reserveCapacity(_ n: Int) {}
 }
 
 extension RangeReplaceableCollection where SubSequence == Self {

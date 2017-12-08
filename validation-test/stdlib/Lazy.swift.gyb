@@ -40,7 +40,6 @@ LazyTestSuite.test("Repeated/AssociatedTypes") {
     iteratorType: IndexingIterator<Subject>.self,
     subSequenceType: Slice<Subject>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
 
@@ -123,7 +122,6 @@ LazyTestSuite.test("CollectionOfOne/AssociatedTypes") {
     iteratorType: IteratorOverOne<OpaqueValue<Int>>.self,
     subSequenceType: Slice<Subject>.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
 
@@ -247,7 +245,6 @@ LazyTestSuite.test("EmptyCollection/AssociatedTypes") {
     iteratorType: EmptyIterator<OpaqueValue<Int>>.self,
     subSequenceType: Subject.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
 
@@ -878,7 +875,6 @@ tests.test("LazyMapCollection/AssociatedTypes") {
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
     subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: Base.Indices.self)
 }
 
@@ -890,7 +886,6 @@ tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
     subSequenceType: LazyMapBidirectionalCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: Base.Indices.self)
 }
 
@@ -902,7 +897,6 @@ tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
     subSequenceType: LazyMapRandomAccessCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: Base.Indices.self)
 }
 
@@ -1168,7 +1162,6 @@ tests.test("LazyFilterCollection/AssociatedTypes") {
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
     subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
     indexType: LazyFilterIndex<Base>.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
@@ -1180,7 +1173,6 @@ tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
     subSequenceType: LazyFilterBidirectionalCollection<Base.SubSequence>.self,
     indexType: LazyFilterIndex<Base>.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultBidirectionalIndices<Subject>.self)
 }
 
@@ -1363,7 +1355,6 @@ tests.test("LazyPrefixWhileCollection/AssociatedTypes") {
     iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
     subSequenceType: Slice<Subject>.self,
     indexType: LazyPrefixWhileIndex<Base>.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
@@ -1376,7 +1367,6 @@ tests.test("LazyPrefixWhileBidirectionalCollection/AssociatedTypes") {
     // FIXME(ABI)#82 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
     indexType: LazyPrefixWhileIndex<Base>.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultBidirectionalIndices<Subject>.self)
 }
 
@@ -1423,7 +1413,6 @@ tests.test("LazyDropWhileCollection/AssociatedTypes") {
     iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
     subSequenceType: Slice<Subject>.self,
     indexType: LazyDropWhileIndex<Base>.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
@@ -1436,7 +1425,6 @@ tests.test("LazyDropWhileBidirectionalCollection/AssociatedTypes") {
     // FIXME(ABI)#83 (Associated Types with where clauses): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
     subSequenceType: Slice<Subject>.self,
     indexType: LazyDropWhileIndex<Base>.self,
-    indexDistanceType: Base.IndexDistance.self,
     indicesType: DefaultBidirectionalIndices<Subject>.self)
 }
 

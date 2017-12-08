@@ -130,18 +130,17 @@ extension _UIntBuffer : BidirectionalCollection {
 
 extension _UIntBuffer : RandomAccessCollection {
   public typealias Indices = DefaultRandomAccessIndices<_UIntBuffer>
-  public typealias IndexDistance = Int
   
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    let x = IndexDistance(i.bitOffset) &+ n &* Element.bitWidth
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
+    let x = Int(i.bitOffset) &+ n &* Element.bitWidth
     return Index(bitOffset: UInt8(truncatingIfNeeded: x))
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public func distance(from i: Index, to j: Index) -> IndexDistance {
+  public func distance(from i: Index, to j: Index) -> Int {
     return (Int(j.bitOffset) &- Int(i.bitOffset)) / Element.bitWidth
   }
 }
@@ -232,6 +231,6 @@ extension _UIntBuffer : RangeReplaceableCollection {
     _storage |= replacement1._storage &<< (headCount &* w)
     _storage |= tailBits &<< ((tailOffset &+ growth) &* w)
     _bitCount = UInt8(
-      truncatingIfNeeded: IndexDistance(_bitCount) &+ growth &* w)
+      truncatingIfNeeded: Int(_bitCount) &+ growth &* w)
   }
 }
