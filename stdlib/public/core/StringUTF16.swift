@@ -377,7 +377,7 @@ extension String.UTF16View : _SwiftStringView {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   var _encodedOffsetRange : Range<Int> {
-    return 0..<_guts.count
+    return _offset..<_offset+_length
   }
 }
 
