@@ -233,11 +233,8 @@ public:
     Result = NextToken;
     LeadingTriviaResult = {LeadingTrivia};
     TrailingTriviaResult = {TrailingTrivia};
-    if (Result.isNot(tok::eof)) {
-      LeadingTrivia.clear();
-      TrailingTrivia.clear();
+    if (Result.isNot(tok::eof))
       lexImpl();
-    }
   }
 
   void lex(Token &Result) {
@@ -288,8 +285,6 @@ public:
   void restoreState(State S, bool enableDiagnostics = false) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
-    LeadingTrivia.clear();
-    TrailingTrivia.clear();
     // Don't reemit diagnostics while readvancing the lexer.
     llvm::SaveAndRestore<DiagnosticEngine*>
       D(Diags, enableDiagnostics ? Diags : nullptr);
@@ -517,12 +512,7 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(syntax::TriviaList &T, bool StopAtFirstNewline = false);
-  Optional<syntax::TriviaPiece> lexWhitespace(bool StopAtFirstNewline);
-  Optional<syntax::TriviaPiece> lexComment();
-  Optional<syntax::TriviaPiece> lexSingleLineComment(syntax::TriviaKind Kind);
-  Optional<syntax::TriviaPiece> lexBlockComment(syntax::TriviaKind Kind);
-  Optional<syntax::TriviaPiece> lexDocComment();
+  void lexTrivia(syntax::TriviaList &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,

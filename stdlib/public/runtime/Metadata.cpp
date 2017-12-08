@@ -636,8 +636,8 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
   BoxPair refAndValueAddr(swift_allocBox(metatype));
-  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.first;
-  return refAndValueAddr.second;
+  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.object;
+  return refAndValueAddr.buffer;
 }
 
 /// Generic tuple value witness for 'destroy'.
@@ -2542,8 +2542,8 @@ template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buff
 
   // Allocate the box.
   BoxPair refAndValueAddr(swift_allocBox(this));
-  buffer->PrivateData[0] = refAndValueAddr.first;
-  return refAndValueAddr.second;
+  buffer->PrivateData[0] = refAndValueAddr.object;
+  return refAndValueAddr.buffer;
 }
 
 template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {

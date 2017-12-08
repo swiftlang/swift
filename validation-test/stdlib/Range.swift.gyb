@@ -760,7 +760,6 @@ CountableRangeTestSuite.test("AssociatedTypes") {
     iteratorType: IndexingIterator<Collection>.self,
     subSequenceType: Collection.self,
     indexType: MinimalStrideableValue.self,
-    indexDistanceType: MinimalStrideableValue.Stride.self,
     indicesType: Collection.self)
 }
 
@@ -771,7 +770,6 @@ CountableClosedRangeTestSuite.test("AssociatedTypes") {
     iteratorType: IndexingIterator<Collection>.self,
     subSequenceType: RandomAccessSlice<Collection>.self,
     indexType: ClosedRangeIndex<MinimalStrideableValue>.self,
-    indexDistanceType: MinimalStrideableValue.Stride.self,
     indicesType: DefaultRandomAccessIndices<Collection>.self)
 }
 
@@ -786,7 +784,7 @@ MiscTestSuite.test("map()") {
 
 MiscTestSuite.test("reversed()") {
   var result = (0..<10).lazy.reversed()
-  typealias Expected = LazyRandomAccessCollection<
+  typealias Expected = LazyCollection<
     ReversedRandomAccessCollection<CountableRange<Int>>>
     expectType(Expected.self, &result)
   expectEqualSequence(

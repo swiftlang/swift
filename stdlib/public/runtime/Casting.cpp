@@ -113,9 +113,8 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-TwoWordPair<const char *, uintptr_t>::Return
+TypeNamePair
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
-  using Pair = TwoWordPair<const char *, uintptr_t>;
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
 
   static StaticReadWriteLock TypeNameCacheLock;
@@ -132,7 +131,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     auto found = cache.find(key);
     if (found != cache.end()) {
       auto result = found->second;
-      return Pair{result.first, result.second};
+      return TypeNamePair{result.first, result.second};
     }
   }
 
@@ -145,7 +144,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     auto found = cache.find(key);
     if (found != cache.end()) {
       auto result = found->second;
-      return Pair{result.first, result.second};
+      return TypeNamePair{result.first, result.second};
     }
 
     // Build the metadata name.
@@ -157,7 +156,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     result[size] = 0;
 
     cache.insert({key, {result, size}});
-    return Pair{result, size};
+    return TypeNamePair{result, size};
   }
 }
 
@@ -955,7 +954,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       (canConsumeDynamicValue && (flags & DynamicCastFlags::TakeOnSuccess));
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue, isTake);
-    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.first);
+    *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.object);
     maybeDeallocateSource(true);
     return true;
   }
@@ -1977,7 +1976,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
 
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.first);
+  return _swift_stdlib_bridgeErrorToNSError((SwiftError*)errorBox.object);
 }
 
 #endif

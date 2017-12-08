@@ -415,7 +415,6 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type,
   indexType: X.Index.Type,
-  indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) {}
 
@@ -426,7 +425,6 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type,
   indexType: X.Index.Type,
-  indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) {}
 
@@ -437,7 +435,6 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type,
   indexType: X.Index.Type,
-  indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) {}
 
@@ -2433,7 +2430,7 @@ public func expectEqualsUnordered<
   T : Strideable
 >(
   _ expected: Range<T>, _ actual: [T], ${TRACE}
-) where T.Stride : SignedInteger {
+) where T.Stride: SignedInteger {
   expectEqualsUnordered(
     CountableRange(uncheckedBounds:
       (lower: expected.lowerBound, upper: expected.upperBound)),

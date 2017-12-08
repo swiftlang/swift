@@ -155,7 +155,7 @@ extension RandomAccessCollection {
   /// - Complexity: O(1)
   @_inlineable
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
     let l = distance(from: i, to: limit)
@@ -168,7 +168,7 @@ extension RandomAccessCollection {
 
 extension RandomAccessCollection
 where Index : Strideable, 
-      Index.Stride == IndexDistance,
+      Index.Stride == Int,
       Indices == CountableRange<Index> {
 
   /// The indices that are valid for subscripting the collection, in ascending

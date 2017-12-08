@@ -58,6 +58,9 @@ public enum TriviaPiece: Codable {
     case "DocBlockComment":
       let value = try container.decode(String.self, forKey: .value)
       self = .docLineComment(value)
+    case "GarbageText":
+      let value = try container.decode(String.self, forKey: .value)
+      self = .garbageText(value)
     default:
       let context =
         DecodingError.Context(codingPath: [CodingKeys.kind],
@@ -81,6 +84,9 @@ public enum TriviaPiece: Codable {
     case .lineComment(let comment):
       try container.encode("LineComment", forKey: .kind)
       try container.encode(comment, forKey: .value)
+    case .garbageText(let text):
+      try container.encode("GarbageText", forKey: .kind)
+      try container.encode(text, forKey: .value)
     case .formfeeds(let count):
       try container.encode("Formfeed", forKey: .kind)
       try container.encode(count, forKey: .value)
@@ -132,6 +138,9 @@ public enum TriviaPiece: Codable {
 
   /// A documentation block comment, starting with '/**' and ending with '*/.
   case docBlockComment(String)
+
+  /// Any skipped text.
+  case garbageText(String)
 }
 
 extension TriviaPiece: TextOutputStreamable {
@@ -153,7 +162,8 @@ extension TriviaPiece: TextOutputStreamable {
     case let .lineComment(text),
          let .blockComment(text),
          let .docLineComment(text),
-         let .docBlockComment(text):
+         let .docBlockComment(text),
+         let .garbageText(text):
       target.write(text)
     }
   }
@@ -247,6 +257,11 @@ public struct Trivia: Codable {
   /// Return a piece of trivia for a documentation block comment ('/** ... */')
   public static func docBlockComment(_ text: String) -> Trivia {
     return [.docBlockComment(text)]
+  }
+
+  /// Return a piece of trivia for any garbage text.
+  public static func garbageText(_ text: String) -> Trivia {
+    return [.garbageText(text)]
   }
 }
 
