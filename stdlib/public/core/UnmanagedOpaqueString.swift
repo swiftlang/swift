@@ -291,73 +291,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
       into: d.assumingMemoryBound(to: UTF16.CodeUnit.self))
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func _copyToNativeStorage<TargetCodeUnit>(
-    of codeUnit: TargetCodeUnit.Type = TargetCodeUnit.self,
-    unusedCapacity: Int = 0
-  ) -> _SwiftStringStorage<TargetCodeUnit>
-  where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
-    let storage = _SwiftStringStorage<TargetCodeUnit>.create(
-      capacity: count + unusedCapacity,
-      count: count)
-    _copy(into: storage.usedBuffer)
-    return storage
-  }
-}
-
-extension _UnmanagedOpaqueString {
-  @_versioned
-  @inline(never)
-  internal func cocoaSlice() -> _CocoaString {
-    guard isSlice else { return object }
-    // FIXME: This usually copies storage; maybe add an NSString subclass
-    // for opaque slices?
-    return _cocoaStringSlice(object, range)
-  }
-}
-
-extension _UnmanagedOpaqueString {
-  @_versioned // FIXME(sil-serialize-all)
-  @inline(never)
-  func _unicodeScalarWidth(startingAt index: Int) -> Int {
-    if _slowPath(UTF16.isLeadSurrogate(self[index])) {
-      if index + 1 < self.count &&
-      UTF16.isTrailSurrogate(self[index + 1]) {
-        return 2
-      }
-    }
-    return 1
-  }
-
-  @_versioned // FIXME(sil-serialize-all)
-  @inline(never)
-  func _unicodeScalarWidth(endingAt offset: Int) -> Int {
-    _sanityCheck(offset >= 0 && offset < count)
-    if _slowPath(UTF16.isTrailSurrogate(self[offset])) {
-      if offset >= 1 && UTF16.isLeadSurrogate(self[offset - 1]) {
-        return 2
-      }
-    }
-    return 1
-  }
-
-  @_versioned // FIXME(sil-serialize-all)
-  @inline(never)
-  func _decodeUnicodeScalar(startingAt offset: Int) -> UnicodeDecodingResult {
-    let u0 = self[offset]
-    if _fastPath(UTF16._isScalar(u0)) {
-      return .scalarValue(Unicode.Scalar(_unchecked: UInt32(u0)))
-    }
-    if UTF16.isLeadSurrogate(u0) && offset + 1 < count {
-      let u1 = self[offset + 1]
-      if UTF16.isTrailSurrogate(u1) {
-        return .scalarValue(UTF16._decodeSurrogates(u0, u1))
-      }
-    }
-    return .error
-  }
-
   @_versioned // FIXME(sil-serialize-all)
   internal struct UnicodeScalarIterator : IteratorProtocol {
     var _base: _UnmanagedOpaqueString.Iterator
@@ -392,5 +325,16 @@ extension _UnmanagedOpaqueString {
   @inline(never)
   func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
     return UnicodeScalarIterator(self)
+  }
+}
+
+extension _UnmanagedOpaqueString {
+  @_versioned
+  @inline(never)
+  internal func cocoaSlice() -> _CocoaString {
+    guard isSlice else { return object }
+    // FIXME: This usually copies storage; maybe add an NSString subclass
+    // for opaque slices?
+    return _cocoaStringSlice(object, range)
   }
 }

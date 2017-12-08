@@ -204,79 +204,6 @@ extension _UnmanagedString : _StringVariant {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func _copyToNativeStorage<TargetCodeUnit>(
-    of codeUnit: TargetCodeUnit.Type = TargetCodeUnit.self,
-    unusedCapacity: Int = 0
-  ) -> _SwiftStringStorage<TargetCodeUnit>
-  where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
-    let storage = _SwiftStringStorage<TargetCodeUnit>.create(
-      capacity: count + unusedCapacity,
-      count: count)
-    _copy(into: storage.usedBuffer)
-    return storage
-  }
-}
-
-extension _UnmanagedString {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  func _unicodeScalarWidth(startingAt offset: Int) -> Int {
-    _sanityCheck(offset >= 0 && offset < count)
-    if CodeUnit.bitWidth == 8 {
-      return 1
-    }
-    if _slowPath(UTF16.isLeadSurrogate(self[offset])) {
-      if offset + 1 < self.count &&
-      UTF16.isTrailSurrogate(self[offset + 1]) {
-        return 2
-      }
-    }
-    return 1
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  func _unicodeScalarWidth(endingAt offset: Int) -> Int {
-    _sanityCheck(offset >= 0 && offset < count)
-    if CodeUnit.bitWidth == 8 {
-      return 1
-    }
-    if _slowPath(UTF16.isTrailSurrogate(self[offset])) {
-      if offset >= 1 && UTF16.isLeadSurrogate(self[offset - 1]) {
-        return 2
-      }
-    }
-    return 1
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  func _decodeUnicodeScalar(startingAt offset: Int) -> UnicodeDecodingResult {
-    if CodeUnit.bitWidth == 8 {
-      if _fastPath(offset < count) {
-        return .scalarValue(Unicode.Scalar(_unchecked: UInt32(self[offset])))
-      } else {
-        return .emptyInput
-      }
-    }
-    guard _fastPath(offset < count) else {
-      return .emptyInput
-    }
-    let u0 = self[offset]
-    if _fastPath(UTF16._isScalar(u0)) {
-      return .scalarValue(Unicode.Scalar(_unchecked: UInt32(u0)))
-    }
-    if UTF16.isLeadSurrogate(u0) && offset + 1 < count {
-      let u1 = self[offset + 1]
-      if UTF16.isTrailSurrogate(u1) {
-        return .scalarValue(UTF16._decodeSurrogates(u0, u1))
-      }
-    }
-    return .error
-  }
-
   @_fixed_layout
   @_versioned // FIXME(sil-serialize-all)
   internal struct UnicodeScalarIterator : IteratorProtocol {
@@ -314,7 +241,7 @@ extension _UnmanagedString {
   }
 
   @_versioned // FIXME(sil-serialize-all)
-  @inline(never)
+  @_inlineable
   func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
     return UnicodeScalarIterator(self)
   }

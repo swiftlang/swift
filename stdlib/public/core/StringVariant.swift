@@ -18,6 +18,8 @@ where
   SubSequence == Self {
   // FIXME associatedtype Encoding : _UnicodeEncoding
   associatedtype CodeUnit : FixedWidthInteger & UnsignedInteger
+  associatedtype UnicodeScalarIterator : IteratorProtocol
+    where UnicodeScalarIterator.Element == Unicode.Scalar
 
   var isASCII: Bool { get }
 
@@ -25,6 +27,8 @@ where
   // regardless of what the Index type is.
   subscript(offset: Int) -> Element { get }
   subscript(offsetRange: Range<Int>) -> Self { get }
+
+  func makeUnicodeScalarIterator() -> UnicodeScalarIterator
 
   // Measure the length in UTF-16 code units of the first extended grapheme
   // cluster in self.
@@ -45,20 +49,21 @@ where
   func _copy<TargetCodeUnit>(
     into target: UnsafeMutableBufferPointer<TargetCodeUnit>
   ) where TargetCodeUnit : FixedWidthInteger & UnsignedInteger
-
-  func _copyToNativeStorage<TargetCodeUnit>(
-    of codeUnit: TargetCodeUnit.Type,
-    unusedCapacity: Int
-  ) -> _SwiftStringStorage<TargetCodeUnit>
 }
 
 extension _StringVariant {
-  @_inlineable
-  @_versioned
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal func _copyToNativeStorage<TargetCodeUnit>(
-    of codeUnit: TargetCodeUnit.Type = TargetCodeUnit.self
-  ) -> _SwiftStringStorage<TargetCodeUnit> {
-    return _copyToNativeStorage(of: TargetCodeUnit.self, unusedCapacity: 0)
+    of codeUnit: TargetCodeUnit.Type = TargetCodeUnit.self,
+    unusedCapacity: Int = 0
+  ) -> _SwiftStringStorage<TargetCodeUnit>
+  where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
+    let storage = _SwiftStringStorage<TargetCodeUnit>.create(
+      capacity: count + unusedCapacity,
+      count: count)
+    _copy(into: storage.usedBuffer)
+    return storage
   }
 
   @_inlineable
@@ -130,5 +135,48 @@ extension _StringVariant {
     let r: Range<Int> = 0..<endOffset
     _boundsCheck(offsetRange: r)
     return self[r]
+  }
+}
+
+extension _StringVariant {
+  @_inlineable
+  @_versioned
+  internal func unicodeScalarWidth(startingAt offset: Int) -> Int {
+    _boundsCheck(offset: offset)
+    if _slowPath(UTF16.isLeadSurrogate(self[offset])) {
+      if offset + 1 < self.count &&
+      UTF16.isTrailSurrogate(self[offset + 1]) {
+        return 2
+      }
+    }
+    return 1
+  }
+
+  @_inlineable
+  @_versioned
+  func unicodeScalarWidth(endingAt offset: Int) -> Int {
+    _boundsCheck(offset: offset - 1)
+    if _slowPath(UTF16.isTrailSurrogate(self[offset - 1])) {
+      if offset >= 2 && UTF16.isLeadSurrogate(self[offset - 2]) {
+        return 2
+      }
+    }
+    return 1
+  }
+
+  @_inlineable
+  @_versioned
+  func decodeUnicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
+    let u0 = self.codeUnit(atCheckedOffset: offset)
+    if _fastPath(UTF16._isScalar(u0)) {
+      return Unicode.Scalar(_unchecked: UInt32(u0))
+    }
+    if UTF16.isLeadSurrogate(u0) && offset + 1 < count {
+      let u1 = self[offset + 1]
+      if UTF16.isTrailSurrogate(u1) {
+        return UTF16._decodeSurrogates(u0, u1)
+      }
+    }
+    return Unicode.Scalar._replacementCharacter
   }
 }
