@@ -753,7 +753,7 @@ void FrontendArgsToOptionsConverter::deriveOutputFilenameFromParts(
 std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput() const {
   std::string nameToStem;
   if (Opts.Inputs.hasPrimaryInputs()) {
-    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().getFile();
+    nameToStem = Opts.Inputs.getRequiredUniquePrimaryInput().file();
   } else if (auto UserSpecifiedModuleName =
                  Args.getLastArg(options::OPT_module_name)) {
     nameToStem = UserSpecifiedModuleName->getValue();
@@ -1645,7 +1645,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
   } else if (const InputFile *input =
                  FrontendOpts.Inputs.getUniquePrimaryInput()) {
-    Opts.MainInputFilename = input->getFile();
+    Opts.MainInputFilename = input->file();
   } else if (FrontendOpts.Inputs.hasSingleInput()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }

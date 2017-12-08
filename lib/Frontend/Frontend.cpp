@@ -197,11 +197,11 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
 }
 
 bool CompilerInstance::setupForInput(const InputFile &input) {
-  if (llvm::MemoryBuffer *inputBuffer = input.getBuffer()) {
-    setupForBuffer(inputBuffer, input.getIsPrimary());
+  if (llvm::MemoryBuffer *inputBuffer = input.buffer()) {
+    setupForBuffer(inputBuffer, input.isPrimary());
     return false;
   }
-  return setUpForFile(input.getFile(), input.getIsPrimary());
+  return setUpForFile(input.file(), input.isPrimary());
 }
 void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer,
                                       bool isPrimary) {

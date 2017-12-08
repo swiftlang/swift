@@ -60,7 +60,7 @@ unsigned
 FrontendInputs::numberOfPrimaryInputsEndingWith(const char *extension) const {
   return count_if(
       PrimaryInputs, [&](const llvm::StringMapEntry<unsigned> &elem) -> bool {
-        StringRef filename = AllFiles[elem.second].getFile();
+        StringRef filename = AllFiles[elem.second].file();
         return llvm::sys::path::extension(filename).endswith(extension);
       });
 }
@@ -98,10 +98,10 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
 
 bool FrontendInputs::areAllNonPrimariesSIB() const {
   for (const InputFile &input : getAllFiles()) {
-    assert(!input.getFile().empty() && "all files have (perhaps pseudo) names");
-    if (input.getIsPrimary())
+    assert(!input.file().empty() && "all files have (perhaps pseudo) names");
+    if (input.isPrimary())
       continue;
-    if (!llvm::sys::path::extension(input.getFile()).endswith(SIB_EXTENSION)) {
+    if (!llvm::sys::path::extension(input.file()).endswith(SIB_EXTENSION)) {
       return false;
     }
   }
@@ -204,7 +204,7 @@ StringRef FrontendOptions::originalPath() const {
   // serialized diagnostics file, otherwise fall back on the
   // module name.
   const auto input = Inputs.getUniquePrimaryInput();
-  return input ? llvm::sys::path::filename(input->getFile())
+  return input ? llvm::sys::path::filename(input->file())
                : StringRef(ModuleName);
 }
 

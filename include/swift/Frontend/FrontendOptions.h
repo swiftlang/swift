@@ -49,9 +49,9 @@ public:
             llvm::MemoryBuffer *buffer = nullptr)
       : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {}
 
-  bool getIsPrimary() const { return IsPrimary; }
-  llvm::MemoryBuffer *getBuffer() const { return Buffer; }
-  StringRef getFile() const { return Filename; }
+  bool isPrimary() const { return IsPrimary; }
+  llvm::MemoryBuffer *buffer() const { return Buffer; }
+  StringRef file() const { return Filename; }
 
   void setBuffer(llvm::MemoryBuffer *buffer) { Buffer = buffer; }
 };
@@ -86,8 +86,8 @@ public:
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
     for (auto &input : getAllFiles()) {
-      assert(!input.getFile().empty());
-      filenames.push_back(input.getFile());
+      assert(!input.file().empty());
+      filenames.push_back(input.file());
     }
     return filenames;
   }
@@ -101,7 +101,7 @@ public:
   StringRef getFilenameOfFirstInput() const {
     assert(hasInputs());
     const InputFile &inp = getAllFiles()[0];
-    StringRef f = inp.getFile();
+    StringRef f = inp.file();
     assert(!f.empty());
     return f;
   }
@@ -153,14 +153,14 @@ public:
   /// isn't one.
   StringRef getNameOfUniquePrimaryInputFile() const {
     const auto *input = getUniquePrimaryInput();
-    return input == nullptr ? StringRef() : input->getFile();
+    return input == nullptr ? StringRef() : input->file();
   }
 
   bool isFilePrimary(StringRef file) {
     StringRef correctedName = file.equals("<stdin>") ? "-" : file;
     auto iterator = PrimaryInputs.find(correctedName);
     return iterator != PrimaryInputs.end() &&
-           AllFiles[iterator->second].getIsPrimary();
+           AllFiles[iterator->second].isPrimary();
   }
 
   unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
@@ -188,8 +188,8 @@ public:
   }
 
   void addInput(const InputFile &input) {
-    if (!input.getFile().empty() && input.getIsPrimary())
-      PrimaryInputs.insert(std::make_pair(input.getFile(), AllFiles.size()));
+    if (!input.file().empty() && input.isPrimary())
+      PrimaryInputs.insert(std::make_pair(input.file(), AllFiles.size()));
     AllFiles.push_back(input);
   }
   void clearInputs() {

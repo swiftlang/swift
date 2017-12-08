@@ -403,15 +403,15 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
   FrontendInputs replacementInputs;
   for (const InputFile &input : inputs.getAllFiles()) {
     std::string newFilename =
-        SwiftLangSupport::resolvePathSymlinks(input.getFile());
-    bool newIsPrimary = input.getIsPrimary() ||
+        SwiftLangSupport::resolvePathSymlinks(input.file());
+    bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
       ++primaryCount;
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
     replacementInputs.addInput(
-        InputFile(newFilename, newIsPrimary, input.getBuffer()));
+        InputFile(newFilename, newIsPrimary, input.buffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {
@@ -682,7 +682,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
       Invok.Opts.Invok.getFrontendOptions().Inputs.inputCount());
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
-    StringRef File = input.getFile();
+    StringRef File = input.file();
     if (File.empty())
       continue;
     bool FoundSnapshot = false;
@@ -773,7 +773,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   SmallVector<FileContent, 8> Contents;
   for (const auto &input :
        Opts.Invok.getFrontendOptions().Inputs.getAllFiles()) {
-    StringRef File = input.getFile();
+    StringRef File = input.file();
     if (File.empty())
       continue;
     bool FoundSnapshot = false;
