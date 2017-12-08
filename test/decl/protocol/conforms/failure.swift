@@ -75,7 +75,7 @@ struct P5Conformer : P5 { // expected-error {{does not conform}}
 
 
 protocol P6Base {
-  associatedtype Foo
+  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; do you want to add it?}}
   func foo()
   func bar() -> Foo
 }
@@ -88,7 +88,7 @@ extension P6 {
   func bar() -> Bar? { return nil }
 }
 
-struct P6Conformer : P6 { // expected-error {{does not conform}}
+struct P6Conformer : P6 { // expected-error 2 {{does not conform}}
   func foo() {}
 }
 
