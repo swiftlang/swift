@@ -265,12 +265,10 @@ public struct Substring : StringProtocol {
   @_inlineable // FIXME(sil-serialize-all)
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    return try _wholeString._core._withCSubstringAndLength(
-      in: startIndex.encodedOffset..<endIndex.encodedOffset,
-      encoding: UTF8.self) {
-      p, length in try p.withMemoryRebound(to: CChar.self, capacity: length) {
-        try body($0)
-      }
+    return try _wholeString._guts._withCSubstringAndLength(
+      in: _encodedOffsetRange,
+      encoding: UTF8.self) { p, length in
+      try p.withMemoryRebound(to: CChar.self, capacity: length, body)
     }
   }
 
@@ -295,9 +293,10 @@ public struct Substring : StringProtocol {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try _wholeString._core._withCSubstring(
-      in: startIndex.encodedOffset..<endIndex.encodedOffset,
-      encoding: targetEncoding, body)
+    return try _wholeString._guts._withCSubstring(
+      in: _encodedOffsetRange,
+      encoding: targetEncoding,
+      body)
   }
 }
 
