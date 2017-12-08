@@ -969,7 +969,39 @@ extension String {
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {
-    return _core.encode(encoding, into: processCodeUnit)
+    if _slowPath(_guts._isOpaque) {
+#if _runtime(_ObjC)
+      let opaque = _guts._asOpaque()
+      var i = opaque.makeIterator()
+      Unicode.UTF16.ForwardParser._parse(&i) {
+        Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
+      }
+#else
+      _sanityCheckFailure("encode: non-native string without objc runtime")
+#endif
+    } else if _guts.isASCII {
+      let ascii = _guts._unmanagedASCIIView
+      if encoding == Unicode.ASCII.self
+      || encoding == Unicode.UTF8.self
+      || encoding == Unicode.UTF16.self
+      || encoding == Unicode.UTF32.self {
+        ascii.forEach {
+          processCodeUnit(Encoding.CodeUnit(truncatingIfNeeded: $0))
+        }
+      } else {
+        // TODO: be sure tests exercise this code path.
+        for b in ascii {
+          Encoding._encode(
+            Unicode.Scalar(_unchecked: UInt32(b))).forEach(processCodeUnit)
+        }
+      }
+    } else {
+      let utf16 = _guts._unmanagedUTF16View
+      var i = utf16.makeIterator()
+      Unicode.UTF16.ForwardParser._parse(&i) {
+        Encoding._transcode($0, from: UTF16.self).forEach(processCodeUnit)
+      }
+    }
   }
 }
 
