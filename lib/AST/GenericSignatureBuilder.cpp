@@ -4285,21 +4285,16 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
   }
 
   case RequirementReprKind::SameType: {
-    // Require that at least one side of the requirement contain a type
-    // parameter.
+    // Warn if neither side of the requirement contains a type parameter.
     if (!Req->getFirstType()->hasTypeParameter() &&
-        !Req->getSecondType()->hasTypeParameter()) {
-      if (!Req->getFirstType()->hasError() &&
-          !Req->getSecondType()->hasError()) {
-        Impl->HadAnyError = true;
-
-        Diags.diagnose(Req->getEqualLoc(),
-                       diag::requires_no_same_type_archetype)
-          .highlight(Req->getFirstTypeLoc().getSourceRange())
-          .highlight(Req->getSecondTypeLoc().getSourceRange());
-      }
-
-      return ConstraintResult::Concrete;
+        !Req->getSecondType()->hasTypeParameter() &&
+        !Req->getFirstType()->hasError() &&
+        !Req->getSecondType()->hasError()) {
+      Diags.diagnose(Req->getEqualLoc(),
+                     diag::requires_no_same_type_archetype,
+                     Req->getFirstType(), Req->getSecondType())
+        .highlight(Req->getFirstTypeLoc().getSourceRange())
+        .highlight(Req->getSecondTypeLoc().getSourceRange());
     }
 
     auto firstType = subst(Req->getFirstType());
