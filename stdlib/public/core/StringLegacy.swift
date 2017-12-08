@@ -12,6 +12,25 @@
 
 import SwiftShims
 
+extension _StringVariant {
+  @_versioned
+  func _repeated(_ count: Int) -> _SwiftStringStorage<CodeUnit> {
+    _sanityCheck(count > 0)
+    let c = self.count
+    let storage = _copyToNativeStorage(
+      of: CodeUnit.self,
+      unusedCapacity: (count - 1) * c)
+    var p = storage.start + c
+    for _ in 1 ..< count {
+      p.initialize(from: storage.start, count: c)
+      p += c
+    }
+    _sanityCheck(p == storage.start + count * c)
+    storage.count = p - storage.start
+    return storage
+  }
+}
+
 extension String {
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
@@ -31,16 +50,20 @@ extension String {
   public init(repeating repeatedValue: String, count: Int) {
     if count == 0 {
       self = ""
-      return
-    }
-    precondition(count > 0, "Negative count not allowed")
-    let s = repeatedValue
-    self = String(_storage: _StringBuffer(
-        capacity: s._guts.count * count,
-        initialSize: 0,
-        elementWidth: s._core.elementWidth))
-    for _ in 0..<count {
-      self += s
+    } else if count == 1 {
+      self = repeatedValue
+    } else {
+      precondition(count > 0, "Negative count not allowed")
+      if _slowPath(repeatedValue._guts._isOpaque) {
+        let opaque = repeatedValue._guts._asOpaque()
+        self.init(_StringGuts(opaque._repeated(count)))
+      } else if repeatedValue._guts.isASCII {
+        let ascii = repeatedValue._guts._unmanagedASCIIView
+        self.init(_StringGuts(ascii._repeated(count)))
+      } else {
+        let utf16 = repeatedValue._guts._unmanagedUTF16View
+        self.init(_StringGuts(utf16._repeated(count)))
+      }
     }
   }
 
