@@ -112,7 +112,16 @@ public struct Substring : StringProtocol {
   internal init(_slice: Slice<String>) {
     self._slice = _slice
   }
-  
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
+    self.init(
+      _base: String(guts),
+      Index(encodedOffset: offsetRange.lowerBound) ..<
+        Index(encodedOffset: offsetRange.upperBound))
+  }
+
   /// Creates a substring with the specified bounds within the given string.
   ///
   /// - Parameters:
@@ -517,29 +526,19 @@ extension Substring : RangeReplaceableCollection {
   where S.Element == Character {
     let e0 = elements as? _SwiftStringView
     if _fastPath(e0 != nil), let e = e0 {
-      self = e._ephemeralContent[...]
-    }
-    else {
-      self = String(elements)[...]
+      self.init(e._wholeString._guts, e._encodedOffsetRange)
+    } else {
+      self.init(String(elements))
     }
   }
   
   @_inlineable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf elements: S)
   where S.Element == Character {
-    var c = self._ephemeralContent._core
-    self = Substring()
-    
-    let e0 = elements as? _SwiftStringView
-    if _fastPath(e0 != nil), let e1 = e0 {
-      c.append(contentsOf: e1._ephemeralContent.utf16)
-      self = String(_fixmeLegacyCore: c)[...]
-    }
-    else {
-      var s = String(_fixmeLegacyCore: c)
-      s.append(contentsOf: elements)
-      self = s[...]
-    }
+    var string = String(self)
+    self = Substring() // Keep unique storage if possible
+    string.append(contentsOf: elements)
+    self = Substring(string)
   }
 }
 
