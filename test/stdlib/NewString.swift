@@ -24,11 +24,11 @@ func repr(_ x: _StringGuts) -> String {
       + "owner: \(hexAddrVal(x._owner)), "
       + "count: \(x.count), "
       + "capacity: \(x.capacity))"
-  } else if x._isNonTaggedCocoa {
+  } else if x._isCocoa {
     return "Cocoa("
       + "owner: \(hexAddrVal(x._owner)), "
       + "count: \(x.count))"
-  } else if x._isSmallCocoa {
+  } else if x._isSmall {
     return "Cocoa("
       + "owner: <tagged>, "
       + "count: \(x.count))"
