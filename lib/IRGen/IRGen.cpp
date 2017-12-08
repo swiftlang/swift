@@ -875,7 +875,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
   } _igmDeleter(irgen);
   
-  auto OutputIter = Opts.OutputFilenames.begin();
+  auto OutputIter = Opts.IRGenOutputFilenames.begin();
   bool IGMcreated = false;
 
   auto &Ctx = M->getASTContext();
@@ -888,7 +888,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
-    if (OutputIter == Opts.OutputFilenames.end()) {
+    if (OutputIter == Opts.IRGenOutputFilenames.end()) {
       // TODO: Check this already at argument parsing.
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;

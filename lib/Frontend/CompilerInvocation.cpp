@@ -1691,7 +1691,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (FrontendOpts.Inputs.hasUniqueInput()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
-  Opts.OutputFilenames = FrontendOpts.pathsForAtMostOnePrimary().OutputFilenames;
+  Opts.IRGenOutputFilenames = FrontendOpts.pathsForAtMostOnePrimary().OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))

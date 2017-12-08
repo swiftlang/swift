@@ -66,7 +66,8 @@ class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
   std::string MainInputFilename;
-  std::vector<std::string> OutputFilenames;
+  /// Needed this to not be the same name as OutputFilenames for now.
+  std::vector<std::string> IRGenOutputFilenames;
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -191,8 +192,8 @@ public:
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename() const {
-    if (OutputFilenames.size() >= 1)
-      return OutputFilenames.back();
+    if (IRGenOutputFilenames.size() >= 1)
+      return IRGenOutputFilenames.back();
     return StringRef();
   }
 
