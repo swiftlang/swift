@@ -147,7 +147,7 @@ static llvm::Value *emitLoadOfGenericRequirement(IRGenFunction &IGF,
                                                  llvm::Type *reqtTy) {
   auto offset =
     IGF.IGM.getMetadataLayout(decl).getGenericRequirementsOffset(IGF);
-  offset = offset.offsetBy(IGF, Offset(reqtIndex * IGF.IGM.getPointerSize()));
+  offset = offset.offsetBy(IGF, Size(reqtIndex * IGF.IGM.getPointerSize()));
 
   auto slot = IGF.emitAddressAtOffset(metadata, offset, reqtTy,
                                       IGF.IGM.getPointerAlignment());
@@ -203,7 +203,7 @@ Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
 /********************************** CLASSES ***********************************/
 
 ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
-    : NominalMetadataLayout(Kind::Class) {
+    : NominalMetadataLayout(Kind::Class), NumImmediateMembers(0) {
 
   struct Scanner : LayoutScanner<Scanner, ClassMetadataScanner> {
     using super = LayoutScanner;
@@ -228,9 +228,26 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::noteStartOfGenericRequirements(forClass);
     }
 
+    void addGenericWitnessTable(CanType argType, ProtocolConformanceRef conf,
+                                ClassDecl *forClass) {
+      if (forClass == Target) {
+        Layout.NumImmediateMembers++;
+      }
+      super::addGenericWitnessTable(argType, conf, forClass);
+    }
+
+    void addGenericArgument(CanType argType, ClassDecl *forClass) {
+      if (forClass == Target) {
+        Layout.NumImmediateMembers++;
+      }
+      super::addGenericArgument(argType, forClass);
+    }
+
     void addMethod(SILDeclRef fn) {
-      if (fn.getDecl()->getDeclContext() == Target)
+      if (fn.getDecl()->getDeclContext() == Target) {
+        Layout.NumImmediateMembers++;
         Layout.MethodInfos.try_emplace(fn, getNextOffset());
+      }
       super::addMethod(fn);
     }
 
@@ -241,9 +258,19 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void addFieldOffset(VarDecl *field) {
-      if (field->getDeclContext() == Target)
+      if (field->getDeclContext() == Target) {
+        Layout.NumImmediateMembers++;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
+      }
       super::addFieldOffset(field);
+    }
+
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      if (placeholder->getDeclContext() == Target) {
+        Layout.NumImmediateMembers +=
+          placeholder->getNumberOfFieldOffsetVectorEntries();
+      }
+      super::addFieldOffsetPlaceholders(placeholder);
     }
 
     void addVTableEntries(ClassDecl *forClass) {
