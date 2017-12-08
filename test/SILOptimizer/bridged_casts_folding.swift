@@ -911,3 +911,36 @@ var anyHashable: AnyHashable = 0
 public func testUncondCastSwiftToSubclass() -> NSObjectSubclass {
   return anyHashable as! NSObjectSubclass
 }
+
+class MyThing: Hashable {
+    let name: String
+    
+    init(name: String) {
+        self.name = name
+    }
+    
+    deinit {
+        Swift.print("Deinit \(name)")
+    }
+    
+    var hashValue: Int {
+        return 0
+    }
+    
+    static func ==(lhs: MyThing, rhs: MyThing) -> Bool {
+        return false
+    }
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_T021bridged_casts_folding26doSomethingWithAnyHashableys0gH0VF : $@convention(thin) (@in AnyHashable) -> ()
+// CHECK: checked_cast_addr_br take_always AnyHashable in %0 : $*AnyHashable to MyThing
+@inline(never)
+func doSomethingWithAnyHashable(_ item: AnyHashable) {
+  _ = item as? MyThing
+}
+
+@inline(never)
+public func testMyThing() {
+  let x = MyThing(name: "B")
+  doSomethingWithAnyHashable(x)
+}
