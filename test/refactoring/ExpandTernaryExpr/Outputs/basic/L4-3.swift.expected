@@ -1,4 +1,4 @@
-func testExpandTernaryExpr() {
+func testExpandBasicTernaryExpr() {
   let a = 3
   let b = 5
   let x: Int
@@ -28,3 +28,8 @@ func testExpandAssignOnlyTernaryExpr() {
   let y: Int
   (x, y) = a < 5 ? (a, b) : (b, a)
 }
+
+
+
+
+

@@ -1,7 +1,7 @@
-func testExpandTernaryExpr() {
+func testExpandBasicTernaryExpr() {
   let a = 3
   let b = 5
-  let x: Int = a < 5 ? a : b
+  let x = a < 5 ? a : b
 }
 func testExpandMultilineTernaryExpr() {
   let a = 3
@@ -26,3 +26,8 @@ func testExpandAssignOnlyTernaryExpr() {
   let y: Int
   (x, y) = a < 5 ? (a, b) : (b, a)
 }
+
+
+
+
+

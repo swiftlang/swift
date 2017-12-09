@@ -1,4 +1,4 @@
-func testExpandTernaryExpr() {
+func testExpandBasicTernaryExpr() {
   let a = 3
   let b = 5
   let x = a < 5 ? a : b

@@ -1964,7 +1964,8 @@ findConvertToTernaryExpression(ResolvedRangeInfo Info) {
     AssignExpr *Assign = nullptr;
 
     AssignExprFinder(Stmt* S) {
-      walk(S);
+      if (S)
+        walk(S);
     }
 
     virtual bool walkToExprPre(Expr *E) {
