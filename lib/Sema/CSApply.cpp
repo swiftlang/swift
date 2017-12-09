@@ -357,6 +357,16 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
         return cs.getType(expr);
       });
 
+  // 'super.' is always OK
+  if (isa<SuperRefExpr>(base))
+    return true;
+
+  // 'self.' reference with concrete type is OK
+  if (isa<DeclRefExpr>(base) &&
+      cast<DeclRefExpr>(base)->getDecl()->getBaseName() == tc.Context.Id_self &&
+      !baseTy->is<ArchetypeType>())
+    return true;
+
   // FIXME: The "hasClangNode" check here is a complete hack.
   if (isNonFinalClass(instanceTy) &&
       !isStaticallyDerived &&
@@ -2535,6 +2545,13 @@ namespace {
                            ConstructorDecl *ctor,
                            FunctionRefKind functionRefKind,
                            Type openedType) {
+
+      // If the member is a constructor, verify that it can be legally
+      // referenced from this base.
+      if (!diagnoseInvalidDynamicConstructorReferences(cs, base, nameLoc,
+                                                       ctor, SuppressDiagnostics))
+        return nullptr;
+
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
