@@ -184,12 +184,24 @@ extension _StringGuts {
       otherBits: UInt(bitPattern: storage.count))
   }
 
+  //
+  // HACK HACK HACK: Work around for ARC :-(
+  //  @inline(never) // Hide CF dependency
   @_versioned
+  internal static func getCocoaLength(_unsafeBitPattern: UInt) -> Int {
+    return _stdlib_binary_CFStringGetLength(
+      Builtin.reinterpretCast(_unsafeBitPattern))
+  }
+
+  @_versioned
+  @_inlineable
   var _cocoaCount: Int {
-    @inline(never) // Hide CF dependency
+    @inline(__always)
     get {
       _sanityCheck(_object.isCocoa)
-      return _stdlib_binary_CFStringGetLength(_object.asCocoaObject)
+      defer { _fixLifetime(self) }
+      return _StringGuts.getCocoaLength(_unsafeBitPattern: _object.payloadBits)
+      // _stdlib_binary_CFStringGetLength(_object.asCocoaObject)
     }
   }
 
