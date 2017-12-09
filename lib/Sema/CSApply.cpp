@@ -321,6 +321,75 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
   return true;
 }
 
+/// Determine whether the given type refers to a non-final class (or
+/// dynamic self of one).
+static bool isNonFinalClass(Type type) {
+  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
+    type = dynamicSelf->getSelfType();
+
+  if (auto classDecl = type->getClassOrBoundGenericClass())
+    return !classDecl->isFinal();
+
+  if (auto archetype = type->getAs<ArchetypeType>())
+    if (auto super = archetype->getSuperclass())
+      return isNonFinalClass(super);
+
+  return false;
+}
+
+// Non-required constructors may not be not inherited. Therefore when
+// constructing a class object, either the metatype must be statically
+// derived (rather than an arbitrary value of metatype type) or the referenced
+// constructor must be required.
+static bool
+diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
+                                            Expr *base,
+                                            DeclNameLoc memberRefLoc,
+                                            ConstructorDecl *ctorDecl,
+                                            bool SuppressDiagnostics) {
+  auto &tc = cs.getTypeChecker();
+  auto baseTy = cs.getType(base)->getRValueType();
+  auto instanceTy = baseTy->getRValueInstanceType();
+
+  bool isStaticallyDerived =
+    base->isStaticallyDerivedMetatype(
+      [&](const Expr *expr) -> Type {
+        return cs.getType(expr);
+      });
+
+  // FIXME: The "hasClangNode" check here is a complete hack.
+  if (isNonFinalClass(instanceTy) &&
+      !isStaticallyDerived &&
+      !ctorDecl->hasClangNode() &&
+      !(ctorDecl->isRequired() ||
+        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
+    if (SuppressDiagnostics)
+      return false;
+
+    tc.diagnose(memberRefLoc, diag::dynamic_construct_class, instanceTy)
+      .highlight(base->getSourceRange());
+    auto ctor = cast<ConstructorDecl>(ctorDecl);
+    tc.diagnose(ctorDecl, diag::note_nonrequired_initializer,
+                ctor->isImplicit(), ctor->getFullName());
+  // Constructors cannot be called on a protocol metatype, because there is no
+  // metatype to witness it.
+  } else if (isa<ConstructorDecl>(ctorDecl) &&
+             baseTy->is<MetatypeType>() &&
+             instanceTy->isExistentialType()) {
+    if (SuppressDiagnostics)
+      return false;
+
+    if (isStaticallyDerived) {
+      tc.diagnose(memberRefLoc, diag::construct_protocol_by_name, instanceTy)
+        .highlight(base->getSourceRange());
+    } else {
+      tc.diagnose(memberRefLoc, diag::construct_protocol_value, baseTy)
+        .highlight(base->getSourceRange());
+    }
+  }
+  return true;
+}
+
 namespace {
 
   /// \brief Rewrites an expression by applying the solution of a constraint
@@ -825,12 +894,12 @@ namespace {
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
+
         // If the member is a constructor, verify that it can be legally
         // referenced from this base.
         if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-          cs.setExprTypes(base);
-          if (!tc.diagnoseInvalidDynamicConstructorReferences(base, memberLoc,
-                                           baseMeta, ctor, SuppressDiagnostics))
+          if (!diagnoseInvalidDynamicConstructorReferences(cs, base, memberLoc,
+                                           ctor, SuppressDiagnostics))
             return nullptr;
         }
       }
@@ -6803,67 +6872,6 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   cs.setType(literal, type);
 
   return literal;
-}
-
-/// Determine whether the given type refers to a non-final class (or
-/// dynamic self of one).
-static bool isNonFinalClass(Type type) {
-  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
-    type = dynamicSelf->getSelfType();
-
-  if (auto classDecl = type->getClassOrBoundGenericClass())
-    return !classDecl->isFinal();
-
-  if (auto archetype = type->getAs<ArchetypeType>())
-    if (auto super = archetype->getSuperclass())
-      return isNonFinalClass(super);
-
-  return false;
-}
-
-// Non-required constructors may not be not inherited. Therefore when
-// constructing a class object, either the metatype must be statically
-// derived (rather than an arbitrary value of metatype type) or the referenced
-// constructor must be required.
-bool
-TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
-                                                     DeclNameLoc memberRefLoc,
-                                                     AnyMetatypeType *metaTy,
-                                                     ConstructorDecl *ctorDecl,
-                                                     bool SuppressDiagnostics) {
-  auto ty = metaTy->getInstanceType();
-  
-  // FIXME: The "hasClangNode" check here is a complete hack.
-  if (isNonFinalClass(ty) &&
-      !base->isStaticallyDerivedMetatype() &&
-      !ctorDecl->hasClangNode() &&
-      !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
-    if (SuppressDiagnostics)
-      return false;
-
-    diagnose(memberRefLoc, diag::dynamic_construct_class, ty)
-      .highlight(base->getSourceRange());
-    auto ctor = cast<ConstructorDecl>(ctorDecl);
-    diagnose(ctorDecl, diag::note_nonrequired_initializer,
-             ctor->isImplicit(), ctor->getFullName());
-  // Constructors cannot be called on a protocol metatype, because there is no
-  // metatype to witness it.
-  } else if (isa<ConstructorDecl>(ctorDecl) &&
-             isa<MetatypeType>(metaTy) &&
-             ty->isExistentialType()) {
-    if (SuppressDiagnostics)
-      return false;
-
-    if (base->isStaticallyDerivedMetatype()) {
-      diagnose(memberRefLoc, diag::construct_protocol_by_name, ty)
-        .highlight(base->getSourceRange());
-    } else {
-      diagnose(memberRefLoc, diag::construct_protocol_value, metaTy)
-        .highlight(base->getSourceRange());
-    }
-  }
-  return true;
 }
 
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
