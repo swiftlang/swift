@@ -323,7 +323,7 @@ extension _StringObject {
     _sanityCheck(isNative)
     _sanityCheck(CodeUnit.bitWidth == self.bitWidth)
     // TODO: Is this the way to do it?
-    return unsafeDowncast(
+    return _unsafeUncheckedDowncast(
       asNativeObject, to: _SwiftStringStorage<CodeUnit>.self)
   }
 
@@ -332,7 +332,8 @@ extension _StringObject {
   var nativeRawStorage: _SwiftRawStringStorage {
     @inline(__always) get {
       _sanityCheck(isNative)
-      return unsafeDowncast(asNativeObject, to: _SwiftRawStringStorage.self)
+      return _unsafeUncheckedDowncast(
+        asNativeObject, to: _SwiftRawStringStorage.self)
     }
   }
 }
