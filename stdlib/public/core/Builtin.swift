@@ -259,6 +259,13 @@ public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T 
   return Builtin.castReference(x)
 }
 
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
+  _sanityCheck(x is T, "invalid unsafeDowncast")
+  return Builtin.castReference(x)
+}
+
 import SwiftShims
 
 @_inlineable // FIXME(sil-serialize-all)
