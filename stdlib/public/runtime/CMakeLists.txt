@@ -45,7 +45,7 @@ set(swift_runtime_sources
     HeapObject.cpp
     ImageInspectionMachO.cpp
     ImageInspectionELF.cpp
-    ImageInspectionWin32.cpp
+    ImageInspectionCOFF.cpp
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp
@@ -71,6 +71,7 @@ set(LLVM_OPTIONAL_SOURCES
     CygwinPort.cpp
     ImageInspectionELF.cpp
     StaticBinaryELF.cpp
+    SwiftRT-COFF.cpp
     SwiftRT-ELF.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
@@ -128,18 +129,28 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   INSTALL_IN_COMPONENT never_install)
 
 set(ELFISH_SDKS)
+set(COFF_SDKS)
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
     list(APPEND ELFISH_SDKS ${sdk})
+  elseif("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "COFF")
+    list(APPEND COFF_SDKS ${sdk})
   endif()
 endforeach()
 
-add_swift_library(swiftImageRegistrationObject
+add_swift_library(swiftImageRegistrationObjectELF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-ELF.cpp
                   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${ELFISH_SDKS}
+                  INSTALL_IN_COMPONENT none)
+add_swift_library(swiftImageRegistrationObjectCOFF
+                  OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+                  SwiftRT-COFF.cpp
+                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                  LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                  TARGET_SDKS ${COFF_SDKS}
                   INSTALL_IN_COMPONENT none)
 
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
@@ -147,11 +158,12 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
     set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
 
-    if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
+    if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF" OR
+       "${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "COFF")
       # TODO(compnerd) switch to the generator expression when cmake is upgraded
       # to a version which supports it.
-      # set(swiftrtObject "$<TARGET_OBJECTS:swiftImageRegistrationObject-${arch_suffix}>")
-      set(swiftrtObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObject-${arch_suffix}.dir/SwiftRT-ELF.cpp${CMAKE_C_OUTPUT_EXTENSION})
+      # set(swiftrtObject "$<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}>")
+      set(swiftrtObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}.dir/SwiftRT-${SWIFT_SDK_${sdk}_OBJECT_FORMAT}.cpp${CMAKE_C_OUTPUT_EXTENSION})
       set(swiftrtPath "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
 
       add_custom_command_target(swiftImageRegistration-${arch_suffix}
