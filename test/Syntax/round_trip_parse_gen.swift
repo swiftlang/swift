@@ -109,4 +109,7 @@ struct C {
 @objc
 @available(*, unavailable)
 private static override func foo<a, b, c>(a b: Int, c: Int) throws -> [Int] where a==p1, b:p2 { ddd }
+func rootView() -> Label {}
+static func ==() -> bool {}
+static func !=<a, b, c>() -> bool {}
 }
