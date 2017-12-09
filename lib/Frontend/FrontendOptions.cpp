@@ -27,7 +27,7 @@
 using namespace swift;
 using namespace llvm::opt;
 
-bool FrontendInputs::shouldTreatAsLLVM() const {
+bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   if (hasUniqueInput()) {
     StringRef Input(getFilenameOfFirstInput());
     return llvm::sys::path::extension(Input).endswith(LLVM_BC_EXTENSION) ||
@@ -36,7 +36,7 @@ bool FrontendInputs::shouldTreatAsLLVM() const {
   return false;
 }
 
-bool FrontendInputs::shouldTreatAsSIL() const {
+bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasUniqueInput()) {
     // If we have exactly one input filename, and its extension is "sil",
     // treat the input as SIL.
@@ -54,7 +54,7 @@ bool FrontendInputs::shouldTreatAsSIL() const {
 }
 
 unsigned
-FrontendInputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
+FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
   unsigned N = 0;
   for (const auto &iter : PrimaryInputs) {
     StringRef filename = AllFiles[iter.second].getFile();
@@ -64,7 +64,7 @@ FrontendInputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
   return N;
 }
 
-bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
+bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                                   bool isREPLRequested,
                                   bool isNoneRequested) const {
   if (isREPLRequested) {
@@ -95,7 +95,7 @@ bool FrontendInputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
   return false;
 }
 
-bool FrontendInputs::doAllNonPrimariesEndWithSIB() const {
+bool FrontendInputsAndOutputs::doAllNonPrimariesEndWithSIB() const {
   for (const InputFile &input : getAllFiles()) {
     assert(!input.getFile().empty() && "all files have (perhaps pseudo) names");
     if (input.getIsPrimary())
@@ -176,8 +176,13 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
+  // Not really all!
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
+    for (const auto input: getAllInputs()) {
+      UP TO HERE
+      fn(input.outputs().OutputFilename)
+    }
     for (const std::string &OutputFileName : pathsForAtMostOnePrimary().OutputFilenames) {
       fn(OutputFileName);
     }

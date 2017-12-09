@@ -115,7 +115,7 @@ namespace swift {
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const ArgList &Args;
-  FrontendInputs &Inputs;
+  FrontendInputsAndOutputs &Inputs;
 
   Arg const *const FilelistPathArg;
   Arg const *const PrimaryFilelistPathArg;
@@ -127,7 +127,7 @@ class ArgsToFrontendInputsConverter {
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
-                                FrontendInputs &Inputs)
+                                FrontendInputsAndOutputs &Inputs)
       : Diags(Diags), Args(Args), Inputs(Inputs),
         FilelistPathArg(Args.getLastArg(options::OPT_filelist)),
         PrimaryFilelistPathArg(Args.getLastArg(options::OPT_primary_filelist)) {
@@ -712,7 +712,8 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
   }
   if (outputFilenamesFromCommandLineOrFilelist.size() > 1) {
     // WMO, threaded with N files (also someday batch mode).
-    Opts.pathsForPrimary("").OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+    Opts.ThreadedWMOOutputFilenames = outputFilenamesFromCommandLineOrFilelist;
+    //xxx Opts.pathsForPrimary("").OutputFilenames = outputFilenamesFromCommandLineOrFilelist;
     return false;
   }
   return computeOutputFilenamesForPrimary("", outputFilenamesFromCommandLineOrFilelist.empty() ? "" : outputFilenamesFromCommandLineOrFilelist[0]);
@@ -736,10 +737,7 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenamesForPrimary(StringRef 
     if (deriveOutputFilenameForDirectory(primaryOrEmpty, correspondingOutput, result))
       return true;
   }
-  std::vector<std::string> &OutputFilenames = Opts.pathsForPrimary(primaryOrEmpty).OutputFilenames;
-  assert(OutputFilenames.empty() &&
-         "Output filename should not be set at this point");
-  OutputFilenames.push_back(result);
+  Opts.pathsForPrimary(primaryOrEmpty).OutputFilename = result;
   return false;
 }
 
@@ -851,7 +849,7 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenamesForPri
         if (!Args.hasArg(optWithoutPath))
           return;
 
-        if (useMainOutput && !Opts.pathsForPrimary(primaryOrEmpty).OutputFilenames.empty()) {
+        if (useMainOutput && !Opts.MainOutputFilename.empty()) {//OR WMO?
           output = Opts.getSingleOutputFilename(primaryOrEmpty);
           return;
         }
@@ -1691,7 +1689,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (FrontendOpts.Inputs.hasUniqueInput()) {
     Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
   }
-  Opts.IRGenOutputFilenames = FrontendOpts.pathsForAtMostOnePrimary().OutputFilenames;
+  Opts.IRGenOutputFilenames.push_back(FrontendOpts.pathsForAtMostOnePrimary().OutputFilename); // OR WMO names
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))

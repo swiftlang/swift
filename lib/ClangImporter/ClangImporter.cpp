@@ -976,7 +976,7 @@ ClangImporter::create(ASTContext &ctx,
     return importer;
 
   bool canBegin = action->BeginSourceFile(instance,
-                                          instance.getFrontendOpts().Inputs[0]);
+                                          instance.getFrontendOpts().InputsAndOutputs[0]);
   if (!canBegin)
     return nullptr; // there was an error related to the compiler arguments.
 
@@ -1275,8 +1275,8 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
       std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
 
   invocation->getFrontendOpts().DisableFree = false;
-  invocation->getFrontendOpts().Inputs.clear();
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getFrontendOpts().InputsAndOutputs.clear();
+  invocation->getFrontendOpts().InputsAndOutputs.push_back(
       clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
@@ -1331,8 +1331,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   auto invocation = std::make_shared<clang::CompilerInvocation>
     (clang::CompilerInvocation(*Impl.Invocation));
   invocation->getFrontendOpts().DisableFree = false;
-  invocation->getFrontendOpts().Inputs.clear();
-  invocation->getFrontendOpts().Inputs.push_back(
+  invocation->getFrontendOpts().InputsAndOutputs.clear();
+  invocation->getFrontendOpts().InputsAndOutputs.push_back(
       clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;

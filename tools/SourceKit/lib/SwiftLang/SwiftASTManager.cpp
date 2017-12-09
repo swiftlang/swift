@@ -88,7 +88,7 @@ struct InvocationOptions {
   }
   void applyTo(CompilerInvocation &CompInvok) const;
   void applyToSubstitutingInputs(CompilerInvocation &CompInvok,
-                                 FrontendInputs &&Inputs) const;
+                                 FrontendInputsAndOutputs &&Inputs) const;
   void profile(llvm::FoldingSetNodeID &ID) const;
   void raw(std::vector<std::string> &Args, std::string &PrimaryFile) const;
 
@@ -134,7 +134,7 @@ void InvocationOptions::applyTo(CompilerInvocation &CompInvok) const {
   CompInvok = this->Invok;
 }
 void InvocationOptions::applyToSubstitutingInputs(
-    CompilerInvocation &CompInvok, FrontendInputs &&inputs) const {
+    CompilerInvocation &CompInvok, FrontendInputsAndOutputs &&inputs) const {
   CompInvok = this->Invok;
   CompInvok.getFrontendOptions().Inputs = inputs;
 }
@@ -408,16 +408,16 @@ static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
   }
 }
 
-static FrontendInputs
+static FrontendInputsAndOutputs
 convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
-  FrontendInputs inputs;
+  FrontendInputsAndOutputs inputs;
   for (const FileContent &content : contents)
     inputs.addInput(InputFile(content));
   return inputs;
 }
 
-static FrontendInputs
-resolveSymbolicLinksInInputs(FrontendInputs &inputs,
+static FrontendInputsAndOutputs
+resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputs,
                              StringRef UnresolvedPrimaryFile,
                              std::string &Error) {
   unsigned primaryCount = 0;
@@ -425,7 +425,7 @@ resolveSymbolicLinksInInputs(FrontendInputs &inputs,
       SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
-  FrontendInputs replacementInputs;
+  FrontendInputsAndOutputs replacementInputs;
   for (const InputFile &input : inputs.getAllFiles()) {
     std::string newFilename =
         SwiftLangSupport::resolvePathSymlinks(input.getFile());
