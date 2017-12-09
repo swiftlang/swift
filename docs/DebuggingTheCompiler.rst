@@ -2,6 +2,7 @@
 
 .. highlight:: none
 
+============================
 Debugging the Swift Compiler
 ============================
 
@@ -67,12 +68,11 @@ print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except ``-dump-ast``) can be redirected
 with an additional ``-o <file>`` option.
 
-
 Debugging on SIL Level
-~~~~~~~~~~~~~~~~~~~~~~
+----------------------
 
 Options for Dumping the SIL
-```````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Often it is not sufficient to dump the SIL at the beginning or end of the
 optimization pipeline.
@@ -92,7 +92,7 @@ function names (``-Xllvm -sil-print-only-function``/``s``) or by pass names
 For details see ``PassManager.cpp``.
 
 Dumping the SIL and other Data in LLDB
-``````````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When debugging the Swift compiler with LLDB (or Xcode, of course), there is
 even a more powerful way to examine the data in the compiler, e.g. the SIL.
@@ -125,7 +125,7 @@ Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
 
 Debugging and Profiling on SIL level
-````````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The compiler provides a way to debug and profile on SIL level. To enable SIL
 debugging add the front-end option -gsil together with -g. Example::
@@ -141,7 +141,7 @@ To enable SIL debugging and profiling for the Swift standard library, use
 the build-script-impl option ``--build-sil-debugging-stdlib``.
 
 ViewCFG: Regex based CFG Printer
-````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ViewCFG (``./utils/viewcfg``) is a script that parses a textual CFG (e.g. a llvm
 or sil function) and displays a .dot file of the CFG. Since the parsing is done
@@ -178,7 +178,7 @@ to be invoked with the sil function body. Note,
 **NOTE** Since we use open, .dot files should be associated with the Graphviz app for viewcfg to work.
 
 Using Breakpoints
-`````````````````
+~~~~~~~~~~~~~~~~~
 
 LLDB has very powerful breakpoints, which can be utilized in many ways to debug
 the compiler and Swift executables. The examples in this section show the LLDB
@@ -255,7 +255,7 @@ we know to ignore swift_getGenericMetadata 84 times, i.e.::
     (lldb) br set -i 84 -n GlobalARCOpts::run
 
 LLDB Scripts
-````````````
+~~~~~~~~~~~~
 
 LLDB has powerful capabilities of scripting in Python among other languages. An
 often overlooked, but very useful technique is the -s command to lldb. This
@@ -294,7 +294,7 @@ Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly every time.
 
 Reducing SIL test cases using bug_reducer
-`````````````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is functionality provided in ./swift/utils/bug_reducer/bug_reducer.py for
 reducing SIL test cases by:
