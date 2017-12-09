@@ -2468,15 +2468,6 @@ public:
   /// Diagnose assigning variable to itself.
   bool diagnoseSelfAssignment(const Expr *E);
 
-  /// When referencing a class initializer, check that the base expression is
-  /// either a static metatype or that the initializer is 'required'.
-  bool
-  diagnoseInvalidDynamicConstructorReferences(Expr *base,
-                                              DeclNameLoc memberRefLoc,
-                                              AnyMetatypeType *metaTy,
-                                              ConstructorDecl *ctorDecl,
-                                              bool SuppressDiagnostics);
-
   /// Builds a string representing a "default" generic argument list for
   /// \p typeDecl. In general, this means taking the bound of each generic
   /// parameter. The \p getPreferredType callback can be used to provide a
