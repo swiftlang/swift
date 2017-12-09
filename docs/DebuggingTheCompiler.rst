@@ -68,6 +68,80 @@ print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except ``-dump-ast``) can be redirected
 with an additional ``-o <file>`` option.
 
+Debugging the Type Checker
+--------------------------
+
+Enabling Logging
+~~~~~~~~~~~~~~~~
+
+To enable logging in the type checker, use the following argument: ``-Xfrontend -debug-constraints``.
+This will cause the typechecker to log its internal state as it solves
+constraints and present the final type checked solution, e.g.::
+
+  ---Constraint solving for the expression at [test.swift:3:10 - line:3:10]---
+  ---Initial constraints for the given expression---
+  (integer_literal_expr type='$T0' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)
+  Score: 0 0 0 0 0 0 0 0 0 0 0 0 0
+  Contextual Type: Int
+  Type Variables:
+    #0 = $T0 [inout allowed]
+
+  Active Constraints:
+
+  Inactive Constraints:
+    $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
+    $T0 conv Int [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
+  ($T0 literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+  Active bindings: $T0 := Int
+  (trying $T0 := Int
+    (found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
+  )
+  ---Solution---
+  Fixed score: 0 0 0 0 0 0 0 0 0 0 0 0 0
+  Type variables:
+    $T0 as Int
+
+  Overload choices:
+
+  Constraint restrictions:
+
+  Disjunction choices:
+
+  Conformances:
+    At locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]
+  (normal_conformance type=Int protocol=ExpressibleByIntegerLiteral lazy
+    (normal_conformance type=Int protocol=_ExpressibleByBuiltinIntegerLiteral lazy))
+  (found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
+  ---Type-checked expression---
+  (call_expr implicit type='Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] arg_labels=_builtinIntegerLiteral:
+    (constructor_ref_call_expr implicit type='(_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10]
+      (declref_expr implicit type='(Int.Type) -> (_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] decl=Swift.(file).Int.init(_builtinIntegerLiteral:) function_ref=single)
+      (type_expr implicit type='Int.Type' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] typerepr='Int'))
+    (tuple_expr implicit type='(_builtinIntegerLiteral: Int2048)' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] names=_builtinIntegerLiteral
+      (integer_literal_expr type='Int2048' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)))
+
+When using the integrated swift-repl, one can dump the same output for each
+expression as one evaluates the expression by enabling constraints debugging by
+typing ``:constraints debug on``::
+
+  $ swift -frontend -repl -enable-objc-interop -module-name REPL
+  ***  You are running Swift's integrated REPL,  ***
+  ***  intended for compiler and stdlib          ***
+  ***  development and testing purposes only.    ***
+  ***  The full REPL is built as part of LLDB.   ***
+  ***  Type ':help' for assistance.              ***
+  (swift) :constraints debug on
+
+Asserting on First Error
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When changing the typechecker, one can cause a series of cascading errors. Since
+Swift doesn't assert on such errors, one has to know more about the typechecker
+to know where to stop in the debugger. Rather than doing that, one can use the
+option ``-Xllvm -swift-diagnostics-assert-on-error=1`` to cause the
+DiagnosticsEngine to assert upon the first error, providing the signal that the
+debugger needs to know that it should attach.
+
 Debugging on SIL Level
 ----------------------
 
