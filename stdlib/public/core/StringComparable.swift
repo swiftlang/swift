@@ -72,6 +72,25 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 #endif
 
 extension _StringGuts {
+
+  //
+  // HACK HACK HACK: Work around for ARC :-(
+  //
+  @inline(never)
+  public
+  static func _compareDeterministicUnicodeCollation(
+    _leftUnsafeStringGutsBitPattern leftBits: (UInt, UInt),
+    _rightUnsafeStringGutsBitPattern rightBits: (UInt, UInt)
+  ) -> Int {
+    let left = _StringGuts(
+      object: _StringObject(rawBits: leftBits.0),
+      otherBits: leftBits.1)
+    let right = _StringGuts(
+      object: _StringObject(rawBits: rightBits.0),
+      otherBits: rightBits.1)
+    return _compareDeterministicUnicodeCollation(left, to: right)
+  }
+
   /// Compares two slices of strings with the Unicode Collation Algorithm.
   @inline(never) // Hide the CF/ICU dependency
   public  // @testable
@@ -229,10 +248,12 @@ extension _StringGuts {
       _fixLifetime(right)
       return result
     }
-    return _compareDeterministicUnicodeCollation(left, to: right)
-#else
-    return _compareDeterministicUnicodeCollation(left, to: right)
 #endif
+    let leftBits = (left._object.rawBits, left._otherBits)
+    let rightBits = (right._object.rawBits, right._otherBits)
+    return _compareDeterministicUnicodeCollation(
+      _leftUnsafeStringGutsBitPattern: leftBits,
+      _rightUnsafeStringGutsBitPattern: rightBits)
   }
 }
 
