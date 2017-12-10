@@ -499,7 +499,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned NumRequirementsInSignature : 16;
   BITFIELD_END;
 
-  BITFIELD_START(ClassDecl, NominalTypeDecl, 8);
+  BITFIELD_START(ClassDecl, NominalTypeDecl, 13);
     /// The stage of the inheritance circularity check for this class.
     unsigned Circularity : 2;
 
@@ -522,6 +522,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// it is implicit. This bit is used during parsing and type-checking to
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
+
+    /// Whether the class has @objc ancestry.
+    unsigned ObjCKind : 3;
+
+    unsigned HasMissingDesignatedInitializers : 1;
+    unsigned HasMissingVTableEntries : 1;
   BITFIELD_END;
 
   BITFIELD_START(StructDecl, NominalTypeDecl, 1);
@@ -3256,12 +3262,6 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> Superclass;
   } LazySemanticInfo;
 
-  /// Whether the class has @objc ancestry.
-  unsigned ObjCKind : 3;
-
-  unsigned HasMissingDesignatedInitializers : 1;
-  unsigned HasMissingVTableEntries : 1;
-
   friend class IterativeTypeChecker;
 
 public:
@@ -3354,7 +3354,7 @@ public:
   bool hasMissingDesignatedInitializers() const;
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
-    HasMissingDesignatedInitializers = newValue;
+    ClassDeclBits.HasMissingDesignatedInitializers = newValue;
   }
 
   /// Returns true if the class has missing members that require vtable entries.
@@ -3364,7 +3364,7 @@ public:
   bool hasMissingVTableEntries() const;
 
   void setHasMissingVTableEntries(bool newValue = true) {
-    HasMissingVTableEntries = newValue;
+    ClassDeclBits.HasMissingVTableEntries = newValue;
   }
 
   /// Find a method of a class that overrides a given method.

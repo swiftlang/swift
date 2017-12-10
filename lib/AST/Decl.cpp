@@ -2693,9 +2693,9 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
   ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
-  ObjCKind = 0;
-  HasMissingDesignatedInitializers = 0;
-  HasMissingVTableEntries = 0;
+  ClassDeclBits.ObjCKind = 0;
+  ClassDeclBits.HasMissingDesignatedInitializers = 0;
+  ClassDeclBits.HasMissingVTableEntries = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2752,12 +2752,12 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
   (void)mutableThis->lookupDirect(getASTContext().Id_init,
                                   /*ignoreNewExtensions*/true);
-  return HasMissingDesignatedInitializers;
+  return ClassDeclBits.HasMissingDesignatedInitializers;
 }
 
 bool ClassDecl::hasMissingVTableEntries() const {
   (void)getMembers();
-  return HasMissingVTableEntries;
+  return ClassDeclBits.HasMissingVTableEntries;
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
@@ -2858,8 +2858,8 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
   // See if we've already computed this.
-  if (ObjCKind)
-    return ObjCClassKind(ObjCKind - 1);
+  if (ClassDeclBits.ObjCKind)
+    return ObjCClassKind(ClassDeclBits.ObjCKind - 1);
 
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
   bool genericAncestry = false, isObjC = false;
@@ -2896,7 +2896,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     kind = ObjCClassKind::ObjCWithSwiftRoot;
 
   // Save the result for later.
-  const_cast<ClassDecl *>(this)->ObjCKind
+  const_cast<ClassDecl *>(this)->ClassDeclBits.ObjCKind
     = unsigned(kind) + 1;
   return kind;
 }
