@@ -312,7 +312,25 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public func reversed() -> LazyCollection<ReversedCollection<Elements>> {
+  public func reversed() -> LazyBidirectionalCollection<
+    ReversedCollection<Elements>
+  > {
+    return ReversedCollection(_base: elements).lazy
+  }
+}
+
+extension LazyCollectionProtocol
+  where
+  Self : RandomAccessCollection,
+  Elements : RandomAccessCollection {
+
+  /// Returns the elements of the collection in reverse order.
+  ///
+  /// - Complexity: O(1)
+  @_inlineable
+  public func reversed() -> LazyRandomAccessCollection<
+    ReversedCollection<Elements>
+  > {
     return ReversedCollection(_base: elements).lazy
   }
 }
