@@ -1624,7 +1624,7 @@ void Remangler::mangleLabelList(Node *node) {
 }
 
 void Remangler::mangleTypeMangling(Node *node) {
-  mangleSingleChildNode(node);
+  mangleChildNodes(node);
   Buffer << 'D';
 }
 

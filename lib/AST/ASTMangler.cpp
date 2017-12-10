@@ -388,7 +388,12 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
     bindGenericParameters(DC);
   DeclCtx = DC;
 
-  appendType(Ty);
+  if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
+    appendFunction(fnType, false);
+  } else {
+    appendType(Ty);
+  }
+
   appendOperator("D");
   return finalize();
 }
@@ -1446,6 +1451,32 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   addSubstitution(key.getPointer());
 }
 
+void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
+  // Append parameter labels right before the signature/type.
+  auto parameters = fn->getParams();
+  auto firstLabel = std::find_if(
+                  parameters.begin(), parameters.end(),
+                  [&](AnyFunctionType::Param param) { return param.hasLabel(); });
+
+  if (firstLabel != parameters.end()) {
+    for (auto param : parameters) {
+      auto label = param.getLabel();
+      if (!label.empty())
+        appendIdentifier(label.str());
+      else
+        appendOperator("_");
+    }
+  } else if (parameters.size() > 0) {
+    appendOperator("y");
+  }
+
+  if (isFunctionMangling) {
+    appendFunctionSignature(fn);
+  } else {
+    appendFunctionType(fn);
+  }
+}
+
 void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
@@ -1849,29 +1880,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
   auto type = getDeclTypeForMangling(decl, genericSig, parentGenericSig);
 
   if (AnyFunctionType *FuncTy = type->getAs<AnyFunctionType>()) {
-    // Append parameter labels right before the signature/type.
-    auto parameters = FuncTy->getParams();
-    auto firstLabel = std::find_if(
-        parameters.begin(), parameters.end(),
-        [&](AnyFunctionType::Param param) { return param.hasLabel(); });
-
-    if (firstLabel != parameters.end()) {
-      for (auto param : parameters) {
-        auto label = param.getLabel();
-        if (!label.empty())
-          appendIdentifier(label.str());
-        else
-          appendOperator("_");
-      }
-    } else {
-      appendOperator("y");
-    }
-
-    if (isFunctionMangling) {
-      appendFunctionSignature(FuncTy);
-    } else {
-      appendFunctionType(FuncTy);
-    }
+    appendFunction(FuncTy, isFunctionMangling);
   } else {
     appendType(type);
   }

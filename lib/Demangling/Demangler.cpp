@@ -386,13 +386,23 @@ NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
   return NewNode;
 }
 
+NodePointer Demangler::demangleTypeMangling() {
+  auto Type = popNode(Node::Kind::Type);
+  auto LabelList = popFunctionParamLabels(Type);
+  auto TypeMangling = createNode(Node::Kind::TypeMangling);
+
+  addChild(TypeMangling, LabelList);
+  addChild(TypeMangling, Type);
+  return TypeMangling;
+//  return createWithChild(Node::Kind::TypeMangling, popNode(Node::Kind::Type));
+}
+
 NodePointer Demangler::demangleOperator() {
   switch (char c = nextChar()) {
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleAnyGenericType(Node::Kind::Class);
-    case 'D': return createWithChild(Node::Kind::TypeMangling,
-                                     popNode(Node::Kind::Type));
+    case 'D': return demangleTypeMangling();
     case 'E': return demangleExtensionContext();
     case 'F': return demanglePlainFunction();
     case 'G': return demangleBoundGenericType();
@@ -2007,10 +2017,8 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   NodePointer LabelList = popFunctionParamLabels(Type);
   NodePointer Name = popNode(isDeclName);
   NodePointer Context = popContext();
-  return LabelList
-             ? createWithChildren(Node::Kind::Variable, Context, Name,
-                                  LabelList, Type)
-             : createWithChildren(Node::Kind::Variable, Context, Name, Type);
+  return LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
+                   : createWithChildren(Kind, Context, Name, Type);
 }
 
 NodePointer Demangler::demangleVariable() {

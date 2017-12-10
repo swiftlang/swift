@@ -464,6 +464,7 @@ protected:
   NodePointer demangleValueWitness();
 
   NodePointer demangleObjCTypeName();
+  NodePointer demangleTypeMangling();
 
   void dump();
 
