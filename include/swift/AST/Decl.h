@@ -231,11 +231,12 @@ bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
 #define BITFIELD_START(D, PD, C) \
   enum { Num##D##Bits = Num##PD##Bits + C }; \
   static_assert(Num##D##Bits <= 64, "fits in a uint64_t"); \
+  LLVM_PACKED_START; \
   class D##Bitfields { \
     friend class D; \
     uint64_t : Num##PD##Bits
 
-#define BITFIELD_END }
+#define BITFIELD_END }; LLVM_PACKED_END
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
@@ -353,12 +354,15 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned HasArgumentType : 1;
   BITFIELD_END;
   
-  BITFIELD_START(AbstractFunctionDecl, ValueDecl, 13);
+  BITFIELD_START(AbstractFunctionDecl, ValueDecl, 21);
     /// \see AbstractFunctionDecl::BodyKind
     unsigned BodyKind : 3;
 
     /// Number of curried parameter lists.
     unsigned NumParameterLists : 5;
+
+    /// Import as member status.
+    unsigned IAMStatus : 8;
 
     /// Whether we are overridden later.
     unsigned Overridden : 1;
@@ -4785,10 +4789,17 @@ public:
 
 /// Encodes imported-as-member status for C functions that get imported
 /// as methods.
-struct ImportAsMemberStatus {
+class ImportAsMemberStatus {
+  friend class AbstractFunctionDecl;
+
   // non-0 denotes import-as-member. 1 denotes no self index. n+2 denotes self
   // index of n
-  uint8_t rawValue = 0;
+  uint8_t rawValue;
+
+public:
+  ImportAsMemberStatus(uint8_t rawValue = 0) : rawValue(rawValue) {}
+
+  uint8_t getRawValue() const { return rawValue; }
 
   bool isImportAsMember() const { return rawValue != 0; }
   bool isInstance() const { return rawValue >= 2; }
@@ -4865,8 +4876,6 @@ protected:
   /// Location of the 'throws' token.
   SourceLoc ThrowsLoc;
 
-  ImportAsMemberStatus IAMStatus;
-
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        unsigned NumParameterLists,
@@ -4904,14 +4913,32 @@ public:
   bool isTransparent() const;
 
   // Expose our import as member status
-  bool isImportAsMember() const { return IAMStatus.isImportAsMember(); }
-  bool isImportAsInstanceMember() const { return IAMStatus.isInstance(); }
-  bool isImportAsStaticMember() const { return IAMStatus.isStatic(); }
-  uint8_t getSelfIndex() const { return IAMStatus.getSelfIndex(); }
-  ImportAsMemberStatus getImportAsMemberStatus() const { return IAMStatus; }
+  ImportAsMemberStatus getImportAsMemberStatus() const {
+    return ImportAsMemberStatus(AbstractFunctionDeclBits.IAMStatus);
+  }
+  bool isImportAsMember() const {
+    return getImportAsMemberStatus().isImportAsMember();
+  }
+  bool isImportAsInstanceMember() const {
+    return getImportAsMemberStatus().isInstance();
+  }
+  bool isImportAsStaticMember() const {
+    return getImportAsMemberStatus().isStatic();
+  }
+  uint8_t getSelfIndex() const {
+    return getImportAsMemberStatus().getSelfIndex();
+  }
 
-  void setImportAsStaticMember() { IAMStatus.setStatic(); }
-  void setSelfIndex(uint8_t idx) { return IAMStatus.setSelfIndex(idx); }
+  void setImportAsStaticMember() {
+    auto newValue = getImportAsMemberStatus();
+    newValue.setStatic();
+    AbstractFunctionDeclBits.IAMStatus = newValue.getRawValue();
+  }
+  void setSelfIndex(uint8_t idx) {
+    auto newValue = getImportAsMemberStatus();
+    newValue.setSelfIndex(idx);
+    AbstractFunctionDeclBits.IAMStatus = newValue.getRawValue();
+  }
 
 public:
   /// Retrieve the location of the 'throws' keyword, if present.
