@@ -503,8 +503,7 @@ namespace {
     /// \brief Coerce an expression of implicitly unwrapped optional type to its
     /// underlying value type, in the correct way for an implicit
     /// look-through.
-    Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
-                                         ConstraintLocatorBuilder locator);
+    Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy);
 
     /// \brief Build a collection upcast expression.
     ///
@@ -893,7 +892,7 @@ namespace {
       // through ImplicitlyUnwrappedOptional<T>.
       if (!Implicit) {
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
-          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
           baseTy = objTy;
         }
       }
@@ -1410,7 +1409,7 @@ namespace {
         if (auto pathTy = cs.lookThroughImplicitlyUnwrappedOptionalType(keyPathExprTy)) {
           keyPathExprTy = pathTy;
           indexKP = coerceImplicitlyUnwrappedOptionalToValue(
-            indexKP, keyPathExprTy, locator);
+            indexKP, keyPathExprTy);
         }
 
         Type valueTy;
@@ -1495,7 +1494,7 @@ namespace {
 
       // Handle accesses that implicitly look through ImplicitlyUnwrappedOptional<T>.
       if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
-        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
+        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
         baseTy = cs.getType(base);
       }
 
@@ -2654,8 +2653,7 @@ namespace {
         // Look through an implicitly unwrapped optional.
         auto baseTy = cs.getType(base);
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
-          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
-                                         cs.getConstraintLocator(base));
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
           baseTy = objTy;
         }
 
@@ -2703,8 +2701,7 @@ namespace {
       case OverloadChoiceKind::TupleIndex: {
         auto baseTy = cs.getType(base)->getRValueType();
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
-          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
-                                         cs.getConstraintLocator(base));
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
         }
 
         Type toType = simplifyType(cs.getType(expr));
@@ -2960,8 +2957,7 @@ namespace {
       auto base = expr->getBase();
       auto baseTy = cs.getType(base)->getRValueType();
       if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
-        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
-                                              cs.getConstraintLocator(base));
+        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy);
         expr->setBase(base);
       }
 
@@ -5191,7 +5187,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     // FIXME: Hack. We shouldn't try to coerce existential when there is no
     // existential upcast to perform.
     if (ty->isEqual(toType)) {
-      return coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+      return coerceImplicitlyUnwrappedOptionalToValue(expr, ty);
     }
   }
 
@@ -5337,8 +5333,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   return expr;
 }
 
-Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
-                                            ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy) {
   auto optTy = cs.getType(expr);
   // Coerce to an r-value.
   if (optTy->is<LValueType>())
@@ -6172,14 +6167,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ForceUnchecked: {
       auto valueTy = fromType->getImplicitlyUnwrappedOptionalObjectType();
       assert(valueTy);
-      expr = coerceImplicitlyUnwrappedOptionalToValue(expr, valueTy, locator);
+      expr = coerceImplicitlyUnwrappedOptionalToValue(expr, valueTy);
       return coerceToType(expr, toType, locator);
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
       // Look through implicitly unwrapped optionals.
       if (auto objTy= cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // Build the value conversion.
@@ -6191,7 +6186,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Look through implicitly unwrapped optionals.
       if (auto objTy
           = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(expr))) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // We want to check conformance on the rvalue, as that's what has
@@ -6215,7 +6210,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Look through implicitly unwrapped optionals.
       if (auto objTy
           = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(expr))) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // Build the value conversion.
@@ -6227,7 +6222,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Look through implicitly unwrapped optionals.
       if (auto objTy
           = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(expr))) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy);
       }
 
       // Build the value conversion.
@@ -6496,7 +6491,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Look through ImplicitlyUnwrappedOptional<T> before coercing expression.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
-    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty);
     return coerceToType(expr, toType, locator);
   }
 
@@ -7053,7 +7048,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   
   // Handle applications that look through ImplicitlyUnwrappedOptional<T>.
   if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(cs.getType(fn)))
-    fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy, locator);
+    fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy);
 
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.
