@@ -3059,9 +3059,9 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.ExistentialConformsToSelf = false;
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
-  HasMissingRequirements = false;
-  KnownProtocol = 0;
-  NumRequirementsInSignature = 0;
+  ProtocolDeclBits.NumRequirementsInSignature = 0;
+  ProtocolDeclBits.HasMissingRequirements = false;
+  ProtocolDeclBits.KnownProtocol = 0;
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
@@ -3503,17 +3503,18 @@ void ProtocolDecl::computeRequirementSignature() {
     GenericSignatureBuilder::computeRequirementSignature(this);
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
-  NumRequirementsInSignature = requirementSig->getRequirements().size();
+  ProtocolDeclBits.NumRequirementsInSignature =
+    requirementSig->getRequirements().size();
 }
 
 void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   assert(!RequirementSignature && "already computed requirement signature");
   if (requirements.empty()) {
     RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
-    NumRequirementsInSignature = 0;
+    ProtocolDeclBits.NumRequirementsInSignature = 0;
   } else {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
-    NumRequirementsInSignature = requirements.size();
+    ProtocolDeclBits.NumRequirementsInSignature = requirements.size();
   }
 }
 

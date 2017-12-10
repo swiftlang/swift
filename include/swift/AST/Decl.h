@@ -463,7 +463,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned HasValidatedLayout : 1;
   BITFIELD_END;
 
-  BITFIELD_START(ProtocolDecl, NominalTypeDecl, 8);
+  BITFIELD_START(ProtocolDecl, NominalTypeDecl, 43);
     /// Whether the \c RequiresClass bit is valid.
     unsigned RequiresClassValid : 1;
 
@@ -482,8 +482,21 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the existential of this protocol can be represented.
     unsigned ExistentialTypeSupported : 1;
 
+    /// True if the protocol has requirements that cannot be satisfied (e.g.
+    /// because they could not be imported from Objective-C).
+    unsigned HasMissingRequirements : 1;
+
+    unsigned : 12; // unused flags
+
+    /// If this is a compiler-known protocol, this will be a KnownProtocolKind
+    /// value, plus one. Otherwise, it will be 0.
+    unsigned KnownProtocol : 6;
+
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;
+
+    /// The number of requirements in the requirement signature.
+    unsigned NumRequirementsInSignature : 16;
   BITFIELD_END;
 
   BITFIELD_START(ClassDecl, NominalTypeDecl, 8);
@@ -3540,17 +3553,6 @@ class ProtocolDecl final : public NominalTypeDecl {
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
 
-  /// True if the protocol has requirements that cannot be satisfied (e.g.
-  /// because they could not be imported from Objective-C).
-  unsigned HasMissingRequirements : 1;
-
-  /// If this is a compiler-known protocol, this will be a KnownProtocolKind
-  /// value, plus one. Otherwise, it will be 0.
-  unsigned KnownProtocol : 6;
-
-  /// The number of requirements in the requirement signature.
-  unsigned NumRequirementsInSignature : 16;
-
   bool requiresClassSlow();
 
   bool existentialConformsToSelfSlow();
@@ -3670,9 +3672,9 @@ public:
   ///
   /// Note that this is only valid after type-checking.
   Optional<KnownProtocolKind> getKnownProtocolKind() const {
-    if (KnownProtocol == 0)
+    if (ProtocolDeclBits.KnownProtocol == 0)
       return None;
-    return static_cast<KnownProtocolKind>(KnownProtocol - 1);
+    return static_cast<KnownProtocolKind>(ProtocolDeclBits.KnownProtocol - 1);
   }
 
   /// Check whether this protocol is of a specific, known protocol kind.
@@ -3687,7 +3689,7 @@ public:
   void setKnownProtocolKind(KnownProtocolKind kind) {
     assert((!getKnownProtocolKind() || *getKnownProtocolKind() == kind) &&
            "can't reset known protocol kind");
-    KnownProtocol = static_cast<unsigned>(kind) + 1;
+    ProtocolDeclBits.KnownProtocol = static_cast<unsigned>(kind) + 1;
     assert(getKnownProtocolKind() && *getKnownProtocolKind() == kind &&
            "not enough bits");
   }
@@ -3709,11 +3711,11 @@ public:
   /// with requirements that cannot be represented in Swift.
   bool hasMissingRequirements() const {
     (void)getMembers();
-    return HasMissingRequirements;
+    return ProtocolDeclBits.HasMissingRequirements;
   }
 
   void setHasMissingRequirements(bool newValue) {
-    HasMissingRequirements = newValue;
+    ProtocolDeclBits.HasMissingRequirements = newValue;
   }
 
   /// Returns the default witness for a requirement, or nullptr if there is
@@ -3750,7 +3752,8 @@ public:
   ArrayRef<Requirement> getRequirementSignature() const {
     assert(isRequirementSignatureComputed() &&
            "getting requirement signature before computing it");
-    return llvm::makeArrayRef(RequirementSignature, NumRequirementsInSignature);
+    return llvm::makeArrayRef(RequirementSignature,
+                              ProtocolDeclBits.NumRequirementsInSignature);
   }
 
   /// Has the requirement signature been computed yet?
