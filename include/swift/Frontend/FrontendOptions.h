@@ -55,6 +55,33 @@ namespace swift {
     
     /// The path to which we should output a TBD file.
     std::string TBDPath;
+    
+    OutputPaths(unsigned i,
+                Optional<std::vector<std::string>> &objCHeaderOutputs,
+                Optional<std::vector<std::string>> &moduleOutput,
+                Optional<std::vector<std::string>> &moduleDocOutputs,
+                Optional<std::vector<std::string>> &dependenciesFiles,
+                Optional<std::vector<std::string>> &referenceDependenciesFiles,
+                Optional<std::vector<std::string>> &serializedDiagnostics,
+                Optional<std::vector<std::string>> &loadedModuleTrace,
+                Optional<std::vector<std::string>> &TBDs
+                ) :
+     ObjCHeaderOutputPath(ith(objCHeaderOutputs, i)),
+     ModuleOutputPath(ith(moduleOutput, i)),
+     ModuleDocOutputPath(ith(moduleDocOutputs, i)),
+     DependenciesFilePath(ith(dependenciesFiles, i)),
+     ReferenceDependenciesFilePath(ith(referenceDependenciesFiles, i)),
+     SerializedDiagnosticsPath(ith(serializedDiagnostics, i)),
+     LoadedModuleTracePath(ith(loadedModuleTrace, i)),
+     TBDPath(ith(TBDs, i))
+        {  }
+    
+    OutputPaths() = default;
+    
+  private:
+    static std::string ith(Optional<std::vector<std::string>> &names, unsigned i) {
+      return !names ? "" : (*names)[i];
+    }
   };
   
 
@@ -158,6 +185,16 @@ public:
   void forEachPrimaryMalleably(llvm::function_ref<void(InputFile& input)> fn) {
     for (auto p: PrimaryInputs)
       fn(getAllFilesMalleably()[p.second]);
+  }
+  
+  StringRef lastOutputFilename() {
+    // FIXME use reverse iterator?
+    for (auto i = AllFiles.size(); ; ) {
+      if (!AllFiles[i].outputs().OutputFilename.empty())
+        return AllFiles[i].outputs().OutputFilename;
+      if (i == 0) break;
+    }
+    return StringRef();
   }
   
   // FIXME: iterator?
