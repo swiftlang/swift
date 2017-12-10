@@ -524,8 +524,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned HasOverridden : 1;
   BITFIELD_END;
 
-  BITFIELD_START(ImportDecl, Decl, 3);
+  BITFIELD_START(ImportDecl, Decl, 11);
     unsigned ImportKind : 3;
+
+    /// The number of elements in this path.
+    unsigned NumPathElements : 8;
   BITFIELD_END;
 
   BITFIELD_START(ExtensionDecl, Decl, 5);
@@ -1450,9 +1453,6 @@ private:
   SourceLoc ImportLoc;
   SourceLoc KindLoc;
 
-  /// The number of elements in this path.
-  unsigned NumPathElements;
-
   /// The resolved module.
   ModuleDecl *Mod = nullptr;
   /// The resolved decls if this is a decl import.
@@ -1481,7 +1481,8 @@ public:
   static Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> Decls);
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
-    return {getTrailingObjects<AccessPathElement>(), NumPathElements};
+    return {getTrailingObjects<AccessPathElement>(),
+            ImportDeclBits.NumPathElements};
   }
 
   ArrayRef<AccessPathElement> getModulePath() const {

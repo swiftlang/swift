@@ -757,8 +757,9 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
 
 ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
                        SourceLoc KindLoc, ArrayRef<AccessPathElement> Path)
-  : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc),
-    NumPathElements(Path.size()) {
+  : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc) {
+  ImportDeclBits.NumPathElements = Path.size();
+  assert(ImportDeclBits.NumPathElements == Path.size() && "Truncation error");
   ImportDeclBits.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
   std::uninitialized_copy(Path.begin(), Path.end(),
