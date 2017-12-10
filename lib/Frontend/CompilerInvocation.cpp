@@ -293,6 +293,7 @@ private:
 
   std::string deriveOutputFileFromParts(StringRef dir, StringRef base);
 
+  void computeSupplementaryOutputFilenames();
   void determineSupplementaryOutputFilenames(const OutputPaths &arg, StringRef lastOutputFilenameOrEmpty, InputFile &);
 
   /// Returns the output filenames on the command line or in the output
@@ -381,16 +382,9 @@ bool FrontendArgsToOptionsConverter::convert() {
 
   if (computeOutputFilenames())
     return true;
-  {
-    ArrayRef<OutputPaths> suppFilelistArgs = getSupplementaryFilelists();
-    StringRef lastOutputFilename = Opts.InputsAndOutputs.lastOutputFilename();
-    // FIXME factor with same line in computeOutputFilenames
-    std::vector<InputFile*> files = Opts.InputsAndOutputs.hasPrimaries()
-    ? Opts.InputsAndOutputs.getAllPrimariesMalleably() : Opts.InputsAndOutputs.getAllFilePointersMalleable();
-    for (auto i: indices(files))
-      determineSupplementaryOutputFilenames(suppFilelistArgs[i], lastOutputFilename, Opts.InputsAndOutputs.getAllFilesMalleably()[i]);
-  }
-#error unimp
+  
+  computeSupplementaryOutputFilenames();
+
 //  Opts.InputsAndOutputs.forEachPrimaryOrEmpty([&] (StringRef pri)->void {determineSupplementaryOutputFilenames(arg, input); });
 
 #error unimp must pass inputFile of prims or inputs
@@ -890,6 +884,16 @@ Optional<std::vector<std::string>> FrontendArgsToOptionsConverter::readSupplemen
   auto r = readOutputFileList(A->getValue());
   assert(r.size() == N);
   return r;
+}
+
+void FrontendArgsToOptionsConverter::computeSupplementaryOutputFilenames() {
+  std::vector<OutputPaths> suppFilelistArgs = getSupplementaryFilenamesFromFilelists();
+  StringRef lastOutputFilename = Opts.InputsAndOutputs.lastOutputFilename();
+  // FIXME factor with same line in computeOutputFilenames
+  std::vector<InputFile*> files = Opts.InputsAndOutputs.hasPrimaries()
+  ? Opts.InputsAndOutputs.getAllPrimariesMalleably() : Opts.InputsAndOutputs.getAllFilePointersMalleable();
+  for (auto i: indices(files))
+    determineSupplementaryOutputFilenames(suppFilelistArgs[i], lastOutputFilename, Opts.InputsAndOutputs.getAllFilesMalleably()[i]);
 }
 
 void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(const OutputPaths &suppOutArg, StringRef lastOutputFilenameOrEmpty, InputFile &input) {
