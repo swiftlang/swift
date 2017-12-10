@@ -750,6 +750,7 @@ bool FrontendArgsToOptionsConverter::checkNumberOfOutputArguments(unsigned outAr
                    Opts.InputsAndOutputs.hasPrimaries() ? diag::error_output_files_must_correspond_to_primaries : diag::error_output_files_must_correspond_to_inputs);
     return true;
   }
+  return false;
 }
 
 
@@ -922,7 +923,7 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(const
 
         assert(output.empty());
 
-        llvm::SmallString<128> path(Opts.originalPath(input.getFile()));
+        llvm::SmallString<128> path(Opts.originalPath(input));
         llvm::sys::path::replace_extension(path, extension);
         output = path.str();
       };
@@ -1614,7 +1615,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.getSingleOutputFilename(FEOpts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile());
+    StringRef BaseName = FEOpts.InputsAndOutputs.lastOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -1765,8 +1766,18 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   } else if (FrontendOpts.InputsAndOutputs.hasUniqueInput()) {
     Opts.MainInputFilename = FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
   }
-#error unimp
-//  Opts.IRGenOutputFilenames.push_back(FrontendOpts.pathsForAtMostOnePrimary().OutputFilename); // OR WMO names
+  if (FrontendOpts.InputsAndOutputs.isWholeModule() && SILOpts.NumThreads > 1) {
+    for (const InputFile &input: FrontendOpts.InputsAndOutputs.getAllFiles())
+      Opts.OutputFilesForThreadedWMO.push_back(input.outputs().OutputFilename);
+  }
+  else if (FrontendOpts.InputsAndOutputs.hasPrimaries()) {
+    for (const InputFile &input: FrontendOpts.InputsAndOutputs.getAllFiles())
+      Opts.OutputsForBatchMode.push_back( input.outputs());
+  }
+  else {
+    Opts.OutputForSingleThreadedWMO = FrontendOpts.InputsAndOutputs.lastOutputFilename();
+  }
+    
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))

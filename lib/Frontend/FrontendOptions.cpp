@@ -176,39 +176,34 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
-#error unimp
   // Not really all!
-//  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
-//      RequestedAction != FrontendOptions::ActionType::MergeModules) {
-//    for (const auto input: getAllInputs()) {
-//      //UP TO HERE
-//      fn(input.outputs().OutputFilename)
-//    }
-//    for (const std::string &OutputFileName : pathsForAtMostOnePrimary().OutputFilenames) {
-//      fn(OutputFileName);
-//    }
-//  }
-//  const std::string *outputs[] = {&pathsForAtMostOnePrimary().ModuleOutputPath,
-//                                  &pathsForAtMostOnePrimary().ModuleDocOutputPath,
-//                                  &pathsForAtMostOnePrimary().ObjCHeaderOutputPath};
-//  for (const std::string *next : outputs) {
-//    if (!next->empty())
-//      fn(*next);
-//  }
+  const InputFile &pri = InputsAndOutputs.firstPrimary();
+  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
+      RequestedAction != FrontendOptions::ActionType::MergeModules &&
+      !pri.outputs().OutputFilename.empty() ) {
+    fn(pri.outputs().OutputFilename);
+  }
+  const std::string *outputs[] = {
+    &pri.outputs().ModuleOutputPath,
+    &pri.outputs().ModuleDocOutputPath,
+    &pri.outputs().ObjCHeaderOutputPath
+  };
+  for (const std::string *next : outputs) {
+    if (!next->empty())
+      fn(*next);
+  }
 }
 
 
-StringRef FrontendOptions::originalPath(StringRef primaryOrEmpty) const {
-#error unimp
-//  if (hasNamedOutputFile(primaryOrEmpty))
-//    // Put the serialized diagnostics file next to the output file.
-//    return getSingleOutputFilename(primaryOrEmpty);
-//
-//  // If we have a primary input, so use that as the basis for the name of the
-//  // serialized diagnostics file, otherwise fall back on the
-//  // module name.
-//  return !primaryOrEmpty.empty() ? llvm::sys::path::filename(primaryOrEmpty)
-//               : StringRef(ModuleName);
+StringRef FrontendOptions::originalPath(const InputFile &input) const {
+  if (!input.outputs().OutputFilename.empty() && input.outputs().OutputFilename != "-")
+    // Put the serialized diagnostics file next to the output file.
+    return input.outputs().OutputFilename;
+  
+  if (input.getIsPrimary() && input.getFile() != "-")
+    return llvm::sys::path::filename(input.getFile());
+  
+  return ModuleName;
 }
 
 

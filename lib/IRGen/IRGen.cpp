@@ -666,9 +666,10 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
     return std::make_pair(nullptr, nullptr);
 
   // Create the IR emitter.
+   assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", Opts.getSingleOutputFilename());
+                      "", Opts.OutputForSingleThreadedWMO);
 
   initLLVMModule(*IGM);
 
@@ -720,8 +721,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
+  assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
-                  LLVMContext, ModuleName, Opts.getSingleOutputFilename());
+                  LLVMContext, ModuleName, Opts.OutputForSingleThreadedWMO);
 
   initLLVMModule(IGM);
 
@@ -875,7 +877,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
   } _igmDeleter(irgen);
   
-  auto OutputIter = Opts.IRGenOutputFilenames.begin();
+  auto OutputIter = Opts.OutputFilesForThreadedWMO.begin();
   bool IGMcreated = false;
 
   auto &Ctx = M->getASTContext();
@@ -888,7 +890,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     
     // There must be an output filename for each source file.
     // We ignore additional output filenames.
-    if (OutputIter == Opts.IRGenOutputFilenames.end()) {
+    if (OutputIter == Opts.OutputFilesForThreadedWMO.end()) {
       // TODO: Check this already at argument parsing.
       Ctx.Diags.diagnose(SourceLoc(), diag::too_few_output_filenames);
       return;
@@ -1103,9 +1105,10 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return;
-
+  
+  assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
-                  OutputPath, Opts.getSingleOutputFilename());
+                  OutputPath, Opts.OutputForSingleThreadedWMO);
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
@@ -1148,10 +1151,11 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
     return true;
 
   embedBitcode(Module, Opts);
+  assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(),
                     Ctx.LangOpts.EffectiveLanguageVersion,
-                    Opts.getSingleOutputFilename(), Stats))
+                    Opts.OutputForSingleThreadedWMO, Stats))
     return true;
   return false;
 }

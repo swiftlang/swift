@@ -16,6 +16,8 @@
 #include "swift/AST/Module.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
+#include "swift/Basic/InputFile.h"
+
 
 #include <string>
 #include <vector>
@@ -25,99 +27,6 @@ namespace llvm {
 }
 
 namespace swift {
-  
-  
-  struct OutputPaths {
-    /// The specified output file (.o).
-    std::string OutputFilename;
-    
-    /// The path to which we should emit an Objective-C header for the module.
-    std::string ObjCHeaderOutputPath;
-    
-    /// The path to which we should emit a serialized module.
-    std::string ModuleOutputPath;
-    
-    /// The path to which we should emit a module documentation file.
-    std::string ModuleDocOutputPath;
-    
-    /// The path to which we should output a Make-style dependencies file.
-    std::string DependenciesFilePath;
-    
-    /// The path to which we should output a Swift reference dependencies file.
-    std::string ReferenceDependenciesFilePath;
-    
-    /// Path to a file which should contain serialized diagnostics for this
-    /// frontend invocation.
-    std::string SerializedDiagnosticsPath;
-    
-    /// The path to which we should output a loaded module trace file.
-    std::string LoadedModuleTracePath;
-    
-    /// The path to which we should output a TBD file.
-    std::string TBDPath;
-    
-    OutputPaths(unsigned i,
-                Optional<std::vector<std::string>> &objCHeaderOutputs,
-                Optional<std::vector<std::string>> &moduleOutput,
-                Optional<std::vector<std::string>> &moduleDocOutputs,
-                Optional<std::vector<std::string>> &dependenciesFiles,
-                Optional<std::vector<std::string>> &referenceDependenciesFiles,
-                Optional<std::vector<std::string>> &serializedDiagnostics,
-                Optional<std::vector<std::string>> &loadedModuleTrace,
-                Optional<std::vector<std::string>> &TBDs
-                ) :
-     ObjCHeaderOutputPath(ith(objCHeaderOutputs, i)),
-     ModuleOutputPath(ith(moduleOutput, i)),
-     ModuleDocOutputPath(ith(moduleDocOutputs, i)),
-     DependenciesFilePath(ith(dependenciesFiles, i)),
-     ReferenceDependenciesFilePath(ith(referenceDependenciesFiles, i)),
-     SerializedDiagnosticsPath(ith(serializedDiagnostics, i)),
-     LoadedModuleTracePath(ith(loadedModuleTrace, i)),
-     TBDPath(ith(TBDs, i))
-        {  }
-    
-    OutputPaths() = default;
-    
-  private:
-    static std::string ith(Optional<std::vector<std::string>> &names, unsigned i) {
-      return !names ? "" : (*names)[i];
-    }
-  };
-  
-
-enum class InputFileKind {
-  IFK_None,
-  IFK_Swift,
-  IFK_Swift_Library,
-  IFK_Swift_REPL,
-  IFK_SIL,
-  IFK_LLVM_IR
-};
-
-// Inputs may include buffers that override contents, and eventually should
-// always include a buffer.
-class InputFile {
-  std::string Filename;
-  bool IsPrimary;
-  /// Null if the contents are not overridden.
-  llvm::MemoryBuffer *Buffer;
-  OutputPaths Outputs;
-
-public:
-  /// Does not take ownership of \p buffer. Does take ownership of (copy) a
-  /// string.
-  InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
-      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
-    assert(!name.empty() && "Empty strings signify no inputs in other places");
-  }
-
-  bool getIsPrimary() const { return IsPrimary; }
-  llvm::MemoryBuffer *getBuffer() const { return Buffer; }
-  StringRef getFile() const { return Filename; }
-  const OutputPaths &outputs() const { return Outputs; }
-  OutputPaths &malleableOutputs() { return Outputs; }
-};
 
 
 /// Information about all the inputs to the frontend.
@@ -177,6 +86,11 @@ public:
     return primaries;
   }
   
+  const InputFile &firstPrimary() const {
+    assert(!PrimaryInputs.empty());
+    return AllFiles[PrimaryInputs.front().second];
+  }
+  
   void forEachPrimary(llvm::function_ref<void(const InputFile& input)> fn) const {
     for (auto p: PrimaryInputs)
       fn(getAllFiles()[p.second]);
@@ -191,7 +105,14 @@ public:
     return hasPrimaries() ? getAllPrimariesMalleably() : getAllFilePointersMalleably();
   }
   
-  StringRef lastOutputFilename() {
+  //FIXME: check all uses
+  OutputPaths pathsForAtMostOnePrimary() const {
+    return hasPrimaries() ? AllFiles[PrimaryInputs.front().second].outputs() :
+    AllFiles.empty() ? OutputPaths() : AllFiles.front().outputs();
+  }
+  
+  // FIXME: Why the *last* one?
+  StringRef lastOutputFilename() const {
     // FIXME use reverse iterator?
     for (auto i = AllFiles.size(); ; ) {
       if (!AllFiles[i].outputs().OutputFilename.empty())
@@ -289,6 +210,7 @@ public:
 
   /// Return the name of the unique primary input, or an empty StringRef if there
   /// isn't one.
+  // FIXME: probably wrong
   StringRef getNameOfUniquePrimaryInputFile() const {
     const auto *input = getUniquePrimaryInput();
     return input == nullptr ? StringRef() : input->getFile();
@@ -345,31 +267,10 @@ public:
 
   void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
 
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename(StringRef primaryOrEmpty) {
-#error unimp
-//    return !primaryOrEmpty.empty() ? outputFilenameForPrimary(primaryOrEmpty)
-//    : outputFilenamesForWMO().empty() ? std::string("")
-//    : outputFilenamesForWMO().back();
+  bool isOutputFilenameStdout() {
+    return InputsAndOutputs.lastOutputFilename() == "-";
   }
-  /// Sets a single filename as output filename.
-//  void setSingleOutputFilename(StringRef primaryOrEmpty, const std::string &filename) {
-//    if (!primaryOrEmpty.empty())
-//      outputFilenameForPrimary(primaryOrEmpty) = filename;
-//    else {
-//      outputFilenamesForWMO().clear();
-//      outputFilenamesForWMO().push_back(filename);
-//    }
-//  }
-//  void setOutputFilenameToStdout(StringRef primaryOrEmpty) { setSingleOutputFilename(primaryOrEmpty, "-"); }
-  bool isOutputFilenameStdout(StringRef primaryOrEmpty) {
-    return getSingleOutputFilename(primaryOrEmpty) == "-";
-  }
-  bool hasNamedOutputFile(StringRef primaryOrEmpty) {
-    return !isOutputFilenameStdout(primaryOrEmpty);
-  }
-
+ 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
 
@@ -387,26 +288,6 @@ public:
   
  
 public:
-//  std::string &outputFilenameForPrimary(StringRef pri) { return pathsForPrimary(pri).OutputFilename;}
-//  std::string &objCHeaderOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ObjCHeaderOutputPath;}
-//  std::string &moduleOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ModuleOutputPath;}
-//  std::string &moduleDocOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ModuleDocOutputPath;}
-//  std::string &dependenciesFilePathForPrimary(StringRef pri) { return pathsForPrimary(pri).DependenciesFilePath;}
-//  std::string &referenceDependenciesFilePathForPrimary(StringRef pri) { return pathsForPrimary(pri).ReferenceDependenciesFilePath;}
-//  std::string &serializedDiagnosticsPathForPrimary(StringRef pri) { return pathsForPrimary(pri).SerializedDiagnosticsPath;}
-//  std::string &loadedModuleTracePathForPrimary(StringRef pri) { return pathsForPrimary(pri).LoadedModuleTracePath;}
-//  std::string &TBDPathForPrimary(StringRef pri) { return pathsForPrimary(pri).TBDPath;}
-//
-//  std::vector<std::string> &outputFilenamesForWMO() { return pathsForWMO.OutputFilenames;}
-//  std::string &objCHeaderOutputPathForWMO() { return pathsForWMO.ObjCHeaderOutputPath;}
-//  std::string &moduleOutputPathForWMO() { return pathsForWMO.ModuleOutputPath;}
-//  std::string &moduleDocOutputPathForWMO() { return pathsForWMO.ModuleDocOutputPath;}
-//  std::string &dependenciesFilePathForWMO() { return pathsForWMO.DependenciesFilePath;}
-//  std::string &referenceDependenciesFilePathForWMO() { return pathsForWMO.ReferenceDependenciesFilePath;}
-//  std::string &serializedDiagnosticsPathForWMO() { return pathsForWMO.SerializedDiagnosticsPath;}
-//  std::string &loadedModuleTracePathForWMO() { return pathsForWMO.LoadedModuleTracePath;}
-//  std::string &TBDPathForWMO() { return pathsForWMO.TBDPath;}
-  
 
 
   /// The path to which we should output fixits as source edits.
@@ -617,13 +498,14 @@ public:
     return llvm::hash_value(0);
   }
 
-  StringRef originalPath(StringRef primaryOrEmpty) const;
+  StringRef originalPath(const InputFile &) const;
 
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift && InputsAndOutputs.hasUniqueInput();
   }
+  
 
 private:
   static const char *suffixForPrincipalOutputFileForAction(ActionType);

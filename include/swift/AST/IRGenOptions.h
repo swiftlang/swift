@@ -25,6 +25,7 @@
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
+#include "swift/Basic/InputFile.h"
 #include <string>
 #include <vector>
 
@@ -66,8 +67,9 @@ class IRGenOptions {
 public:
   /// The name of the first input file, used by the debug info.
   std::string MainInputFilename;
-  /// Needed this to not be the same name as OutputFilenames for now.
-  std::vector<std::string> IRGenOutputFilenames;
+  std::vector<std::string> OutputFilesForThreadedWMO;
+  std::vector<OutputPaths> OutputsForBatchMode;
+  std::string OutputForSingleThreadedWMO;
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
@@ -189,13 +191,6 @@ public:
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
 
-  /// Gets the name of the specified output filename.
-  /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
-    if (IRGenOutputFilenames.size() >= 1)
-      return IRGenOutputFilenames.back();
-    return StringRef();
-  }
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.
