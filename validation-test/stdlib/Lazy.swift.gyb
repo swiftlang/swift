@@ -507,7 +507,7 @@ LazyTestSuite.test("MapCollection<${TraversalCollection}>/underestimatedCount") 
     OpaqueValue(Int32(input.value))
   }
   expectType(
-    LazyMapCollection<
+    LazyMap${TraversalCollection}<
       Minimal${TraversalCollection}<OpaqueValue<Int>>, OpaqueValue<Int32>
     >.self,
     &lazyMap)
@@ -810,7 +810,7 @@ tests.test("LazyMap${TraversalCollection}/Collection") {
   expectEqual(0, calls)
 
   expectType(
-    LazyMapCollection<
+    LazyMap${TraversalCollection}<
       Minimal${TraversalCollection}<OpaqueValue<Int>>,
       OpaqueValue<Double>>.self,
     &mapped)
@@ -880,22 +880,22 @@ tests.test("LazyMapCollection/AssociatedTypes") {
 
 tests.test("LazyMapBidirectionalCollection/AssociatedTypes") {
   typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
-  typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
+  typealias Subject = LazyMapBidirectionalCollection<Base, OpaqueValue<Int32>>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
+    subSequenceType: LazyMapBidirectionalCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indicesType: Base.Indices.self)
 }
 
 tests.test("LazyMapRandomAccessCollection/AssociatedTypes") {
   typealias Base = MinimalRandomAccessCollection<OpaqueValue<Int>>
-  typealias Subject = LazyMapCollection<Base, OpaqueValue<Int32>>
+  typealias Subject = LazyMapRandomAccessCollection<Base, OpaqueValue<Int32>>
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyMapIterator<Base.Iterator, OpaqueValue<Int32>>.self,
-    subSequenceType: LazyMapCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
+    subSequenceType: LazyMapRandomAccessCollection<Base.SubSequence, OpaqueValue<Int32>>.self,
     indexType: Base.Index.self,
     indicesType: Base.Indices.self)
 }
@@ -926,7 +926,7 @@ tests.test("lazy.mapped/TypeInference") {
     var mapped = MinimalBidirectionalCollection(elements: baseArray)
       .lazy.map { _ in OpaqueValue<Int8>(0) }
     expectType(
-      LazyMapCollection<
+      LazyMapBidirectionalCollection<
         MinimalBidirectionalCollection<OpaqueValue<Int>>,
         OpaqueValue<Int8>
       >.self,
@@ -936,7 +936,7 @@ tests.test("lazy.mapped/TypeInference") {
     var mapped = MinimalRandomAccessCollection(elements: baseArray)
       .lazy.map { _ in OpaqueValue<Int8>(0) }
     expectType(
-      LazyMapCollection<
+      LazyMapRandomAccessCollection<
         MinimalRandomAccessCollection<OpaqueValue<Int>>,
         OpaqueValue<Int8>
       >.self,
@@ -960,14 +960,14 @@ tests.test("ReversedCollection") {
   }
 
   checkBidirectionalCollection(
-    "raboof",
-    "foobar".reversed())
+    "raboof".characters,
+    "foobar".characters.reversed())
 
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = "foobar".reversed().map { _ in calls += 1 }
-    expectEqual("foobar".count, calls)
+    _ = "foobar".characters.reversed().map { _ in calls += 1 }
+    expectEqual("foobar".characters.count, calls)
   }
 }
 
@@ -985,10 +985,11 @@ tests.test("ReversedCollection/Lazy") {
 
     let base = Array(stride(from: 11, through: 0, by: -1)).lazy.map { $0 }
 
-    typealias Base = LazyMapCollection<[Int], Int>
+    typealias Base = LazyMapRandomAccessCollection<[Int], Int>
     ExpectType<Base>.test(base)
 
-    typealias LazyReversedBase = LazyCollection<ReversedCollection<Base>>
+    typealias LazyReversedBase = LazyRandomAccessCollection<
+      ReversedCollection<Base>>
 
     let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
@@ -1001,11 +1002,17 @@ tests.test("ReversedCollection/Lazy") {
   }
 
   do {
-    let base = "foobar".lazy.map { $0 }
-    typealias Base = LazyMapCollection<String, Character>
+    typealias Expected = LazyBidirectionalCollection<
+      ReversedCollection<String.CharacterView>
+    >
+
+    let base = "foobar".characters.lazy.map { $0 }
+    typealias Base = LazyMapBidirectionalCollection<
+      String.CharacterView, Character>
     ExpectType<Base>.test(base)
 
-    typealias LazyReversedBase = LazyCollection<ReversedCollection<Base>>
+    typealias LazyReversedBase = LazyBidirectionalCollection<
+      ReversedCollection<Base>>
 
     let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
@@ -1013,7 +1020,7 @@ tests.test("ReversedCollection/Lazy") {
     var calls = 0
     let reversedAndMapped = reversed.map { (x) -> Character in calls += 1; return x }
     expectEqual(0, calls)
-    checkBidirectionalCollection("raboof", reversedAndMapped)
+    checkBidirectionalCollection("raboof".characters, reversedAndMapped)
     expectNotEqual(0, calls)
   }
 }
@@ -1154,18 +1161,18 @@ tests.test("LazyFilterCollection/AssociatedTypes") {
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
     subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
-    indexType: Base.Index.self,
+    indexType: LazyFilterIndex<Base>.self,
     indicesType: DefaultIndices<Subject>.self)
 }
 
 tests.test("LazyFilterBidirectionalCollection/AssociatedTypes") {
   typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
-  typealias Subject = LazyFilterCollection<Base>
+  typealias Subject = LazyFilterBidirectionalCollection<Base>
   expectBidirectionalCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: LazyFilterIterator<Base.Iterator>.self,
-    subSequenceType: LazyFilterCollection<Base.SubSequence>.self,
-    indexType: Base.Index.self,
+    subSequenceType: LazyFilterBidirectionalCollection<Base.SubSequence>.self,
+    indexType: LazyFilterIndex<Base>.self,
     indicesType: DefaultBidirectionalIndices<Subject>.self)
 }
 
@@ -1189,7 +1196,7 @@ tests.test("lazy.filter/TypeInference") {
     var filtered = MinimalBidirectionalCollection(elements: baseArray)
       .lazy.filter { _ in true }
     expectType(
-      LazyFilterCollection<
+      LazyFilterBidirectionalCollection<
         MinimalBidirectionalCollection<OpaqueValue<Int>>
       >.self,
       &filtered)
@@ -1198,7 +1205,7 @@ tests.test("lazy.filter/TypeInference") {
     var filtered = MinimalRandomAccessCollection(elements: baseArray)
       .lazy.filter { _ in true }
     expectType(
-      LazyFilterCollection<
+      LazyFilterBidirectionalCollection<
         MinimalRandomAccessCollection<OpaqueValue<Int>>
       >.self,
       &filtered)
