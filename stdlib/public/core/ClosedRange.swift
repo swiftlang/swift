@@ -13,87 +13,6 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range.
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned
-internal enum _ClosedRangeIndexRepresentation<Bound>
-  where
-  Bound : Strideable, Bound.Stride : BinaryInteger {
-  case pastEnd
-  case inRange(Bound)
-}
-
-// FIXME(ABI)#23 (Nesting types in generics): should be a nested type in
-// `ClosedRange`.
-/// A position in a `ClosedRange` instance.
-@_fixed_layout
-public struct ClosedRangeIndex<Bound: Strideable>
-where Bound.Stride : SignedInteger {
-  @_versioned
-  internal var _value: _ClosedRangeIndexRepresentation<Bound>
-
-  /// Creates the "past the end" position.
-  @_inlineable
-  @_versioned
-  internal init() { _value = .pastEnd }
-
-  /// Creates a position `p` for which `r[p] == x`.
-  @_inlineable
-  @_versioned
-  internal init(_ x: Bound) { _value = .inRange(x) }
-
-  @_inlineable
-  @_versioned
-  internal var _dereferenced: Bound {
-    switch _value {
-    case .inRange(let x): return x
-    case .pastEnd: _preconditionFailure("Index out of range")
-    }
-  }
-}
-
-extension ClosedRangeIndex : Comparable {
-  @_inlineable
-  public static func == (
-    lhs: ClosedRangeIndex<Bound>,
-    rhs: ClosedRangeIndex<Bound>
-  ) -> Bool {
-    switch (lhs._value, rhs._value) {
-    case (.inRange(let l), .inRange(let r)):
-      return l == r
-    case (.pastEnd, .pastEnd):
-      return true
-    default:
-      return false
-    }
-  }
-
-  @_inlineable
-  public static func < (
-    lhs: ClosedRangeIndex<Bound>,
-    rhs: ClosedRangeIndex<Bound>
-  ) -> Bool {
-    switch (lhs._value, rhs._value) {
-    case (.inRange(let l), .inRange(let r)):
-      return l < r
-    case (.inRange(_), .pastEnd):
-      return true
-    default:
-      return false
-    }
-  }
-}
-
-extension ClosedRangeIndex : Hashable where Bound : Hashable {
-  public var hashValue: Int {
-    switch _value {
-    case .inRange(let value):
-      return value.hashValue
-    case .pastEnd:
-      return .max
-    }
-  }
-}
-
 /// A closed range that forms a collection of consecutive values.
 ///
 /// You create a `ClosedRange` instance by using the closed range
@@ -164,7 +83,29 @@ public struct ClosedRange<Bound: Comparable> {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
-  
+}
+
+// define isEmpty, which is available even on an uncountable ClosedRange
+extension ClosedRange {
+  /// A Boolean value indicating whether the range contains no elements.
+  ///
+  /// Because a closed range cannot represent an empty range, this property is
+  /// always `false`.
+  @_inlineable
+  public var isEmpty: Bool {
+    return false
+  }
+}
+
+extension ClosedRange: RangeExpression {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func relative<C: Collection>(to collection: C) -> Range<Bound>
+  where C.Index == Bound {
+    return Range(
+      uncheckedBounds: (
+        lower: lowerBound, upper: collection.index(after: self.upperBound)))
+  }
+
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range.
   ///
@@ -181,37 +122,93 @@ public struct ClosedRange<Bound: Comparable> {
   }
 }
 
-extension ClosedRange: Sequence, Collection, BidirectionalCollection, RandomAccessCollection
-  where Bound : Strideable, Bound.Stride : SignedInteger
-{
-  /// The element type of the range; the same type as the range's bounds.
+extension ClosedRange: Sequence
+where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Element = Bound
-
-  /// A type that represents a position in the range.
-  public typealias Index = ClosedRangeIndex<Bound>
   public typealias Iterator = IndexingIterator<ClosedRange<Bound>>
+}
+
+extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
+  public enum Index {
+    case pastEnd
+    case inRange(Bound)
+  }
+}
+
+extension ClosedRange.Index : Comparable {
+  @_inlineable
+  public static func == (
+    lhs: ClosedRange<Bound>.Index,
+    rhs: ClosedRange<Bound>.Index
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (.inRange(let l), .inRange(let r)):
+      return l == r
+    case (.pastEnd, .pastEnd):
+      return true
+    default:
+      return false
+    }
+  }
+
+  @_inlineable
+  public static func < (
+    lhs: ClosedRange<Bound>.Index,
+    rhs: ClosedRange<Bound>.Index
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (.inRange(let l), .inRange(let r)):
+      return l < r
+    case (.inRange(_), .pastEnd):
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+/* FIXME: compiler crash
+extension ClosedRange.Index: Hashable where Bound: Hashable {
+  public var hashValue: Int {
+    switch self {
+    case .inRange(let value):
+      return value.hashValue
+    case .pastEnd:
+      return .max
+    }
+  }
+}
+*/
+
+// FIXME: this should only be conformance to RandomAccessCollection but
+// the compiler balks without all 3
+extension ClosedRange: Collection, BidirectionalCollection, RandomAccessCollection
+where Bound : Strideable, Bound.Stride : SignedInteger
+{
+  // while a ClosedRange can't be empty, a _slice_ of a ClosedRange can,
+  // so ClosedRange can't be its own self-slice unlike Range
   public typealias SubSequence = Slice<ClosedRange<Bound>>
 
   /// The position of the first element in the range.
   @_inlineable
-  public var startIndex: ClosedRangeIndex<Bound> {
-    return ClosedRangeIndex(lowerBound)
+  public var startIndex: Index {
+    return .inRange(lowerBound)
   }
 
   /// The range's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
   @_inlineable
-  public var endIndex: ClosedRangeIndex<Bound> {
-    return ClosedRangeIndex()
+  public var endIndex: Index {
+    return .pastEnd
   }
 
   @_inlineable
   public func index(after i: Index) -> Index {
-    switch i._value {
+    switch i {
     case .inRange(let x):
       return x == upperBound
-        ? ClosedRangeIndex() 
-        : ClosedRangeIndex(x.advanced(by: 1))
+        ? .pastEnd
+        : .inRange(x.advanced(by: 1))
     case .pastEnd: 
       _preconditionFailure("Incrementing past end index")
     }
@@ -219,35 +216,35 @@ extension ClosedRange: Sequence, Collection, BidirectionalCollection, RandomAcce
 
   @_inlineable
   public func index(before i: Index) -> Index {
-    switch i._value {
+    switch i {
     case .inRange(let x):
       _precondition(x > lowerBound, "Incrementing past start index")
-      return ClosedRangeIndex(x.advanced(by: -1))
+      return .inRange(x.advanced(by: -1))
     case .pastEnd: 
       _precondition(upperBound >= lowerBound, "Incrementing past start index")
-      return ClosedRangeIndex(upperBound)
+      return .inRange(upperBound)
     }
   }
 
   @_inlineable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    switch i._value {
+    switch i {
     case .inRange(let x):
       let d = x.distance(to: upperBound)
       if n <= d {
         let newPosition = x.advanced(by: numericCast(n))
         _precondition(newPosition >= lowerBound,
           "Advancing past start index")
-        return ClosedRangeIndex(newPosition)
+        return .inRange(newPosition)
       }
-      if d - -1 == n { return ClosedRangeIndex() }
+      if d - -1 == n { return .pastEnd }
       _preconditionFailure("Advancing past end index")
     case .pastEnd:
       if n == 0 {
         return i
       } 
       if n < 0 {
-        return index(ClosedRangeIndex(upperBound), offsetBy: numericCast(n + 1))
+        return index(.inRange(upperBound), offsetBy: numericCast(n + 1))
       }
       _preconditionFailure("Advancing past end index")
     }
@@ -255,7 +252,7 @@ extension ClosedRange: Sequence, Collection, BidirectionalCollection, RandomAcce
 
   @_inlineable
   public func distance(from start: Index, to end: Index) -> Int {
-    switch (start._value, end._value) {
+    switch (start, end) {
     case let (.inRange(left), .inRange(right)):
       // in range <--> in range
       return numericCast(left.distance(to: right))
@@ -282,9 +279,12 @@ extension ClosedRange: Sequence, Collection, BidirectionalCollection, RandomAcce
   ///   must be a valid index of the range, and must not equal the range's end
   ///   index.
   @_inlineable
-  public subscript(position: ClosedRangeIndex<Bound>) -> Bound {
+  public subscript(position: Index) -> Bound {
     // FIXME: swift-3-indexing-model: range checks and tests.
-    return position._dereferenced
+    switch position {
+    case .inRange(let x): return x
+    case .pastEnd: _preconditionFailure("Index out of range")
+    }
   }
 
   @_inlineable
@@ -297,18 +297,7 @@ extension ClosedRange: Sequence, Collection, BidirectionalCollection, RandomAcce
   public func _customContainsEquatableElement(_ element: Bound) -> Bool? {
     return element >= self.lowerBound && element <= self.upperBound
   }
-
-  /// A Boolean value indicating whether the range contains no elements.
-  ///
-  /// Because a closed range cannot represent an empty range, this property is
-  /// always `false`.
-  @_inlineable
-  public var isEmpty: Bool {
-    return false
-  }
 }
-
-public typealias CountableClosedRange<Bound: Comparable> = ClosedRange<Bound>
 
 extension Comparable {  
   /// Returns a closed range that contains both of its bounds.
@@ -353,17 +342,137 @@ extension Strideable where Stride: SignedInteger {
   ///     print(singleDigits.last)
   ///     // Prints "9"
   ///
-  /// - Parameters:
+  /// - Parameters:)`.
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static func ... (
-    minimum: Self, maximum: Self
-  ) -> ClosedRange<Self> {
+  public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     // FIXME: swift-3-indexing-model: tests for traps.
     _precondition(
       minimum <= maximum, "Can't form Range with upperBound < lowerBound")
     return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
   }
 }
+
+extension ClosedRange: Equatable {
+  /// Returns a Boolean value indicating whether two ranges are equal.
+  ///
+  /// Two ranges are equal when they have the same lower and upper bounds.
+  ///
+  ///     let x: ClosedRange = 5...15
+  ///     print(x == 5...15)
+  ///     // Prints "true"
+  ///     print(x == 10...20)
+  ///     // Prints "false"
+  ///
+  /// - Parameters:
+  ///   - lhs: A range to compare.
+  ///   - rhs: Another range to compare.
+  @_inlineable
+  public static func == (
+    lhs: ClosedRange<Bound>, rhs: ClosedRange<Bound>
+  ) -> Bool {
+    return lhs.lowerBound == rhs.lowerBound && lhs.upperBound == rhs.upperBound
+  }
+}
+
+extension ClosedRange : CustomStringConvertible {
+  /// A textual representation of the range.
+  @_inlineable // FIXME(sil-serialize-all)...\(
+  public var description: String {
+    return "\(lowerBound)...\(upperBound)"
+  }
+}
+
+extension ClosedRange : CustomDebugStringConvertible {
+  /// A textual representation of the range, suitable for debugging.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var debugDescription: String {
+    return "ClosedRange(\(String(reflecting: lowerBound))"
+    + "...\(String(reflecting: upperBound)))"
+  }
+}
+
+extension ClosedRange : CustomReflectable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var customMirror: Mirror {
+    return Mirror(
+      self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
+  }
+}
+
+extension ClosedRange {
+  /// Returns a copy of this range clamped to the given limiting range.
+  ///
+  /// The bounds of the result are always limited to the bounds of `limits`.
+  /// For example:
+  ///
+  ///     let x: ClosedRange = 0...20
+  ///     print(x.clamped(to: 10...1000))
+  ///     // Prints "10...20"
+  ///
+  /// If the two ranges do not overlap, the result is a single-element range at
+  /// the upper or lower bound of `limits`.
+  ///
+  ///     let y: ClosedRange = 0...5
+  ///     print(y.clamped(to: 10...1000))
+  ///     // Prints "10...10"
+  ///
+  /// - Parameter limits: The range to clamp the bounds of this range.
+  /// - Returns: A new range clamped to the bounds of `limits`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @inline(__always)
+  public func clamped(to limits: ClosedRange) -> ClosedRange {
+    let lower =         
+      limits.lowerBound > self.lowerBound ? limits.lowerBound
+          : limits.upperBound < self.lowerBound ? limits.upperBound
+          : self.lowerBound
+    let upper =
+      limits.upperBound < self.upperBound ? limits.upperBound
+          : limits.lowerBound > self.upperBound ? limits.lowerBound
+          : self.upperBound
+    return ClosedRange(uncheckedBounds: (lower: lower, upper: upper))
+  }
+}
+
+extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
+  /// Now that Range is conditionally a collection when Bound: Strideable,
+  /// CountableRange is no longer needed. This is a deprecated initializer
+  /// for any remaining uses of Range(countableRange).
+  @available(*,deprecated: 4.2, 
+    message: "CountableRange is now Range. No need to convert any more.")
+  public init(_ other: ClosedRange<Bound>) {
+    self = other
+  }  
+  
+  /// Creates an instance equivalent to the given `Range`.
+  ///
+  /// - Parameter other: A `Range` to convert to a `ClosedRange` instance.
+  ///
+  /// An equivalent range must be representable as a closed range.
+  /// For example, passing an empty range as `other` triggers a runtime error,
+  /// because an empty range cannot be represented by a closed range instance.
+  public init(_ other: Range<Bound>) {
+    _precondition(!other.isEmpty, "Can't form an empty closed range")
+    let upperBound = other.upperBound.advanced(by: -1)
+    self.init(uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
+  }
+}
+
+extension ClosedRange {
+  @_inlineable
+  public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
+    return self.contains(other.lowerBound) || other.contains(lowerBound)
+  }
+
+  @_inlineable
+  public func overlaps(_ other: Range<Bound>) -> Bool {
+    return other.overlaps(self)
+  }
+}
+
+@available(*, deprecated, renamed: "ClosedRange.Index")
+public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
+@available(*, deprecated, renamed: "ClosedRange")
+public typealias CountableClosedRange<T: Comparable> = ClosedRange<T>

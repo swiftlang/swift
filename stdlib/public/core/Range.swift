@@ -1,4 +1,4 @@
-//===--- Range.swift.gyb --------------------------------------*- swift -*-===//
+//===--- Range.swift ------------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -100,9 +100,18 @@ extension RangeExpression {
 ///     print(empty.contains(0.0))          // Prints "false"
 ///     print(empty.isEmpty)                // Prints "true"
 @_fixed_layout
-public struct Range<
-  Bound : Comparable
-> {
+public struct Range<Bound : Comparable> {
+  /// The range's lower bound.
+  ///
+  /// In an empty range, `lowerBound` is equal to `upperBound`.
+  public let lowerBound: Bound
+
+  /// The range's upper bound.
+  ///
+  /// In an empty range, `upperBound` is equal to `lowerBound`. A `Range`
+  /// instance does not contain its upper bound.
+  public let upperBound: Bound
+
   /// Creates an instance with the given bounds.
   ///
   /// Because this initializer does not perform any checks, it should be used
@@ -116,17 +125,6 @@ public struct Range<
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
-
-  /// The range's lower bound.
-  ///
-  /// In an empty range, `lowerBound` is equal to `upperBound`.
-  public let lowerBound: Bound
-
-  /// The range's upper bound.
-  ///
-  /// In an empty range, `upperBound` is equal to `lowerBound`. A `Range`
-  /// instance does not contain its upper bound.
-  public let upperBound: Bound
 
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range.
@@ -156,28 +154,26 @@ public struct Range<
   }
 }
 
-extension Range : Sequence, Collection,
-  BidirectionalCollection, RandomAccessCollection
-  where Bound : Strideable, Bound.Stride : SignedInteger
-{
-  /// The bound type of the range.
+extension Range: Sequence
+where Bound: Strideable, Bound.Stride : SignedInteger {
   public typealias Element = Bound
+  public typealias Iterator = IndexingIterator<Range<Bound>>
+}
 
+// FIXME: should just be RandomAccessCollection
+extension Range: Collection, BidirectionalCollection, RandomAccessCollection
+where Bound : Strideable, Bound.Stride : SignedInteger
+{
   /// A type that represents a position in the range.
   public typealias Index = Bound
   public typealias Indices = Range<Bound>
   public typealias SubSequence = Range<Bound>
-  public typealias Iterator = IndexingIterator<Range<Bound>>
 
   @_inlineable
-  public var startIndex: Index {
-    return lowerBound
-  }
+  public var startIndex: Index { return lowerBound }
 
   @_inlineable
-  public var endIndex: Index {
-    return upperBound
-  }
+  public var endIndex: Index { return upperBound }
 
   @_inlineable
   public func index(after i: Index) -> Index {
@@ -228,16 +224,6 @@ extension Range : Sequence, Collection,
     return lowerBound <= element && element < upperBound
   }
 
-  //===--- Protection against 0-based indexing assumption -------------------===//
-  // The following two extensions provide subscript overloads that
-  // create *intentional* ambiguities to prevent the use of integers as
-  // indices for ranges, outside a generic context.  This prevents mistakes
-  // such as x = r[0], which will trap unless 0 happens to be contained in the
-  // range r.
-  //
-  // FIXME(ABI)#56 (Statically Unavailable/Dynamically Available): remove this
-  // code, it creates an ABI burden on the library.
-
   /// Accesses the element at specified position.
   ///
   /// You can subscript a collection with any valid index other than the
@@ -254,155 +240,54 @@ extension Range : Sequence, Collection,
     _debugPrecondition(self.contains(position), "Index out of range")
     return position
   }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(_position: Bound._DisabledRangeIndex) -> Element {
-    fatalError("uncallable")
-  }
 }
 
-extension Range
-  where
-  Bound : Strideable,
-  Bound._DisabledRangeIndex : Strideable,
-  Bound._DisabledRangeIndex.Stride : SignedInteger {
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(
-    _bounds: Range<Bound._DisabledRangeIndex>
-  ) -> Range<Bound> {
-    fatalError("uncallable")
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(
-    _bounds: ClosedRange<Bound._DisabledRangeIndex>
-  ) -> Range<Bound> {
-    fatalError("uncallable")
-  }
-
-  /// Accesses the subsequence bounded by the given range.
+extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
+  /// Now that Range is conditionally a collection when Bound: Strideable,
+  /// CountableRange is no longer needed. This is a deprecated initializer
+  /// for any remaining uses of Range(countableRange).
+  @available(*,deprecated: 4.2, 
+    message: "CountableRange is now Range. No need to convert any more.")
+  public init(_ other: Range<Bound>) {
+    self = other
+  }  
+  
+  /// Creates an instance equivalent to the given `ClosedRange`.
   ///
-  /// - Parameter bounds: A range of the collection's indices. The upper and
-  ///   lower bounds of the `bounds` range must be valid indices of the
-  ///   collection and `bounds.upperBound` must be less than the collection's
-  ///   end index.
-//  @_inlineable
-//  public subscript(bounds: ClosedRange<Bound>) -> Range<Bound> {
-//    return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
-//  }
-}
-
-public typealias CountableRange<Bound: Comparable> = Range<Bound>
-
-//===--- End 0-based indexing protection ----------------------------------===//
-
-%{
-all_range_types = [
-  ('Range', '..<'),
-  ('ClosedRange', '...'),
-]
-
-def get_init_warning(Self, OtherSelf):
-  if 'Closed' in Self and 'Closed' not in OtherSelf:
-    return """\
+  /// - Parameter other: A closed range to convert to a `Range` instance.
   ///
-  /// An equivalent range must be representable as an instance of `%s`.
-  /// For example, passing an empty range as `other` triggers a runtime error,
-  /// because an empty range cannot be represented by a `%s` instance.\
-""" % (Self, Self)
-  elif 'Closed' not in Self and 'Closed' in OtherSelf:
-    return """\
-  ///
-  /// An equivalent range must be representable as an instance of `%s`.
+  /// An equivalent range must be representable as an instance of Range<Bound>.
   /// For example, passing a closed range with an upper bound of `Int.max`
   /// triggers a runtime error, because the resulting half-open range would
   /// require an upper bound of `Int.max + 1`, which is not representable as
-  /// an `Int`.\
-""" % Self
-  else:
-    return ""
-}%
-
-% for (Self, op) in all_range_types:
-%   for (OtherSelf, other_op) in all_range_types:
-extension ${Self}
-  where Bound : Strideable, Bound.Stride : SignedInteger
-{
-  /// Creates an instance equivalent to the given range.
-${get_init_warning(Self, OtherSelf)}
-  ///
-  /// - Parameter other: A range to convert to a `${Self}` instance.
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public init(_ other: ${OtherSelf}<Bound>) {
-%   if 'Closed' not in Self and 'Closed' in OtherSelf:
+  public init(_ other: ClosedRange<Bound>) {
     let upperBound = other.upperBound.advanced(by: 1)
-%   else:
-    _precondition(!other.isEmpty, "Can't form an empty closed range")
-    let upperBound = other.upperBound.advanced(by: -1)
-%   end
-    self.init(
-      uncheckedBounds: (lower: other.lowerBound, upper: upperBound)
-    )
-  }
-
-  /// Returns a Boolean value indicating whether this range and the given range
-  /// contain an element in common.
-  ///
-  /// This example shows two overlapping ranges:
-  ///
-  ///     let x: ${Self} = 0${op}20
-  ///     print(x.overlaps(10${other_op}1000 as ${OtherSelf}))
-  ///     // Prints "true"
-  ///
-% if 'Closed' in Self:
-  /// Because a closed range includes its upper bound, the ranges in the
-  /// following example also overlap:
-  ///
-  ///     let y: ${OtherSelf} = 20${op}30
-  ///     print(x.overlaps(y))
-  ///     // Prints "true"
-% else:
-  /// Because a half-open range does not include its upper bound, the ranges
-  /// in the following example do not overlap:
-  ///
-  ///     let y: ${OtherSelf} = 20${op}30
-  ///     print(x.overlaps(y))
-  ///     // Prints "false"
-% end
-  ///
-  /// - Parameter other: A range to check for elements in common.
-  /// - Returns: `true` if this range and `other` have at least one element in
-  ///   common; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public func overlaps(_ other: ${OtherSelf}<Bound>) -> Bool {
-    return (!other.isEmpty && self.contains(other.lowerBound))
-        || (!self.isEmpty && other.contains(lowerBound))
+    self.init(uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
   }
 }
-%   end
 
-extension ${Self} {
+extension Range: RangeExpression {
+  @_inlineable // FIXME(sil-serialize-all)
+  public func relative<C: Collection>(to collection: C) -> Range<Bound>
+  where C.Index == Bound {
+    return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+  }
+}
+
+extension Range {
   /// Returns a copy of this range clamped to the given limiting range.
   ///
   /// The bounds of the result are always limited to the bounds of `limits`.
   /// For example:
   ///
-  ///     let x: ${Self} = 0${op}20
+  ///     let x: Range = 0${op}20
   ///     print(x.clamped(to: 10${op}1000))
   ///     // Prints "10${op}20"
   ///
-% if 'Closed' in Self:
-  /// If the two ranges do not overlap, the result is a single-element range at
-  /// the upper or lower bound of `limits`.
-% else:
   /// If the two ranges do not overlap, the result is an empty range within the
   /// bounds of `limits`.
-% end
   ///
-  ///     let y: ${Self} = 0${op}5
+  ///     let y: Range = 0${op}5
   ///     print(y.clamped(to: 10${op}1000))
   ///     // Prints "10${op}10"
   ///
@@ -410,54 +295,37 @@ extension ${Self} {
   /// - Returns: A new range clamped to the bounds of `limits`.
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public func clamped(to limits: ${Self}) -> ${Self} {
-    return ${Self}(
-      uncheckedBounds: (
-        lower:
-        limits.lowerBound > self.lowerBound ? limits.lowerBound
+  public func clamped(to limits: Range) -> Range {
+    let lower =         
+      limits.lowerBound > self.lowerBound ? limits.lowerBound
           : limits.upperBound < self.lowerBound ? limits.upperBound
-          : self.lowerBound,
-        upper:
-          limits.upperBound < self.upperBound ? limits.upperBound
+          : self.lowerBound
+    let upper =
+      limits.upperBound < self.upperBound ? limits.upperBound
           : limits.lowerBound > self.upperBound ? limits.lowerBound
           : self.upperBound
-      )
-    )
+    return Range(uncheckedBounds: (lower: lower, upper: upper))
   }
 }
 
-extension ${Self}: RangeExpression {
-  @_inlineable // FIXME(sil-serialize-all)
-  public func relative<C: Collection>(to collection: C) -> Range<Bound>
-  where C.Index == Bound {
-    %   if 'Closed' in Self:
-    return Range(
-      uncheckedBounds: (
-        lower: lowerBound, upper: collection.index(after: self.upperBound)))
-    %   else:
-    return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound))
-    %   end
-  }
-}
-
-extension ${Self} : CustomStringConvertible {
+extension Range : CustomStringConvertible {
   /// A textual representation of the range.
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
-    return "\(lowerBound)${op}\(upperBound)"
+    return "\(lowerBound)..<\(upperBound)"
   }
 }
 
-extension ${Self} : CustomDebugStringConvertible {
+extension Range : CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
-    return "${Self}(\(String(reflecting: lowerBound))"
-    + "${op}\(String(reflecting: upperBound)))"
+    return "Range(\(String(reflecting: lowerBound))"
+    + "..<\(String(reflecting: upperBound)))"
   }
 }
 
-extension ${Self} : CustomReflectable {
+extension Range : CustomReflectable {
   @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
@@ -465,83 +333,30 @@ extension ${Self} : CustomReflectable {
   }
 }
 
-extension ${Self} : Equatable {
+extension Range: Equatable {
   /// Returns a Boolean value indicating whether two ranges are equal.
   ///
   /// Two ranges are equal when they have the same lower and upper bounds.
-% if 'Closed' in Self:
-  ///
-  ///     let x: ${Self} = 5...15
-  ///     print(x == 5...15)
-  ///     // Prints "true"
-  ///     print(x == 10...20)
-  ///     // Prints "false"
-% else:
   /// That requirement holds even for empty ranges.
   ///
-  ///     let x: ${Self} = 5..<15
+  ///     let x: Range = 5..<15
   ///     print(x == 5..<15)
   ///     // Prints "true"
   ///
-  ///     let y: ${Self} = 5..<5
+  ///     let y: Range = 5..<5
   ///     print(y == 15..<15)
   ///     // Prints "false"
-% end
   ///
   /// - Parameters:
   ///   - lhs: A range to compare.
   ///   - rhs: Another range to compare.
   @_inlineable
-  public static func == (lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
+  public static func == (lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
     return
       lhs.lowerBound == rhs.lowerBound &&
       lhs.upperBound == rhs.upperBound
   }
-
-  /// Returns a Boolean value indicating whether a value is included in a
-  /// range.
-  ///
-  /// You can use this pattern matching operator (`~=`) to test whether a value
-  /// is included in a range. The following example uses the `~=` operator to
-  /// test whether an integer is included in a range of single-digit numbers.
-  ///
-  ///     let chosenNumber = 3
-% if 'Closed' in Self:
-  ///     if 0...9 ~= chosenNumber {
-% else:
-  ///     if 0..<10 ~= chosenNumber {
-% end
-  ///         print("\(chosenNumber) is a single digit.")
-  ///     }
-  ///     // Prints "3 is a single digit."
-  ///
-  /// The `~=` operator is used internally in `case` statements for pattern
-  /// matching. When you match against a range in a `case` statement, this
-  /// operator is called behind the scenes.
-  ///
-  ///     switch chosenNumber {
-% if 'Closed' in Self:
-  ///     case 0...9:
-% else:
-  ///     case 0..<10:
-% end
-  ///         print("\(chosenNumber) is a single digit.")
-  ///     case Int.min..<0:
-  ///         print("\(chosenNumber) is negative.")
-  ///     default:
-  ///         print("\(chosenNumber) is positive.")
-  ///     }
-  ///     // Prints "3 is a single digit."
-  ///
-  /// - Parameters:
-  ///   - lhs: A range.
-  ///   - rhs: A value to match against `lhs`.
-  @_inlineable
-  public static func ~= (pattern: ${Self}<Bound>, value: Bound) -> Bool {
-    return pattern.contains(value)
-  }
 }
-% end
 
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
@@ -863,38 +678,6 @@ extension Comparable {
   }
 }
 
-extension Strideable where Stride: SignedInteger {
-  /// Returns a countable half-open range that contains its lower bound but not
-  /// its upper bound.
-  ///
-  /// Use the half-open range operator (`..<`) to create a range of any type that
-  /// conforms to the `Strideable` protocol with an associated integer `Stride`
-  /// type, such as any of the standard library's integer types. This example
-  /// creates a `Range<Int>` from zero up to, but not including, 5.
-  ///
-  ///     let upToFive = 0..<5
-  ///     print(upToFive.contains(3))         // Prints "true"
-  ///     print(upToFive.contains(5))         // Prints "false"
-  ///
-  /// You can use sequence or collection methods on the `upToFive` countable
-  /// range.
-  ///
-  ///     print(upToFive.count)               // Prints "5"
-  ///     print(upToFive.last)                // Prints "4"
-  ///
-  /// - Parameters:
-  ///   - minimum: The lower bound for the range.
-  ///   - maximum: The upper bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
-    // FIXME: swift-3-indexing-model: tests for traps.
-    _precondition(minimum <= maximum,
-      "Can't form Range with upperBound < lowerBound")
-    return Range(uncheckedBounds: (lower: minimum, upper: maximum))
-  }
-}
-
 // FIXME: replace this with a computed var named `...` when the language makes
 // that possible.
 @_fixed_layout // FIXME(sil-serialize-all)
@@ -940,3 +723,42 @@ extension MutableCollection {
     }
   }
 }
+
+// TODO: enhance RangeExpression to make this generic and available on
+// any expression.
+extension Range {
+  /// Returns a Boolean value indicating whether this range and the given range
+  /// contain an element in common.
+  ///
+  /// This example shows two overlapping ranges:
+  ///
+  ///     let x: Range = 0..<20
+  ///     print(x.overlaps(10...1000))
+  ///     // Prints "true"
+  ///
+  /// Because a half-open range does not include its upper bound, the ranges
+  /// in the following example do not overlap:
+  ///
+  ///     let y = 20..<30
+  ///     print(x.overlaps(y))
+  ///     // Prints "false"
+  ///
+  /// - Parameter other: A range to check for elements in common.
+  /// - Returns: `true` if this range and `other` have at least one element in
+  ///   common; otherwise, `false`.
+  @_inlineable
+  public func overlaps(_ other: Range<Bound>) -> Bool {
+    return (!other.isEmpty && self.contains(other.lowerBound))
+        || (!self.isEmpty && other.contains(self.lowerBound))
+  }
+
+  @_inlineable
+  public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
+    return self.contains(other.lowerBound)
+        || (!self.isEmpty && other.contains(self.lowerBound))
+  }
+}
+
+@available(*, deprecated, renamed: "Range")
+public typealias CountableRange<Bound: Comparable> = Range<Bound>
+
