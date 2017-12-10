@@ -962,6 +962,14 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
+ERROR(invalid_retroactive_conformance_dmlp,none,
+      "retroactive conformance of %0 to 'DynamicMemberLookupProtocol' is not "
+      "allowed, only primary type declarations may conform", (Type))
+
+ERROR(type_invalid_conformance_dmlp,none,
+      "type %0 does not conform to 'DynamicMemberLookupProtocol'; "
+      "subscript(dynamicMember:) should take a single string parameter", (Type))
+
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",

@@ -3041,6 +3041,12 @@ void Solution::dump(raw_ostream &out) const {
           << choice.getBaseType()->getString() << "\n";
       break;
 
+    case OverloadChoiceKind::DynamicMemberLookup:
+      out << "dynamic member lookup root "
+          << choice.getBaseType()->getString()
+          << " name='" << choice.getName() << "'\n";
+      break;
+  
     case OverloadChoiceKind::TupleIndex:
       out << "tuple " << choice.getBaseType()->getString() << " index "
         << choice.getTupleIndex() << "\n";
@@ -3213,6 +3219,12 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::KeyPathApplication:
         out << "key path application root "
             << choice.getBaseType()->getString() << "\n";
+        break;
+
+      case OverloadChoiceKind::DynamicMemberLookup:
+        out << "dynamic member lookup:"
+            << choice.getBaseType()->getString() << "  name="
+            << choice.getName() << "\n";
         break;
 
       case OverloadChoiceKind::TupleIndex:
