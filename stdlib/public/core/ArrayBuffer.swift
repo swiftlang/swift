@@ -299,8 +299,7 @@ extension _ArrayBuffer {
       // Look for contiguous storage in the NSArray
       let nonNative = self._nonNative
       let cocoa = _CocoaArrayWrapper(nonNative)
-      let cocoaStorageBaseAddress =
-        cocoa.contiguousStorage(Range(self.indices))
+      let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
 
       if let cocoaStorageBaseAddress = cocoaStorageBaseAddress {
         let basePtr = UnsafeMutableRawPointer(cocoaStorageBaseAddress)
