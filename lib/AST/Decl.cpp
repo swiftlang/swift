@@ -2563,9 +2563,11 @@ AbstractTypeParamDecl::getConformingProtocols() const {
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc,
                                            unsigned depth, unsigned index)
-  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc),
-    Depth(depth), Index(index)
-{
+  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
+  GenericTypeParamDeclBits.Depth = depth;
+  assert(GenericTypeParamDeclBits.Depth == depth && "Truncation");
+  GenericTypeParamDeclBits.Index = index;
+  assert(GenericTypeParamDeclBits.Index == index && "Truncation");
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setInterfaceType(MetatypeType::get(type, ctx));

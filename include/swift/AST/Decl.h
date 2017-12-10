@@ -428,6 +428,16 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned CheckedInheritanceClause : 1;
   BITFIELD_END;
 
+  BITFIELD_START(AbstractTypeParamDecl, TypeDecl, 0);
+  BITFIELD_END;
+
+  BITFIELD_START(GenericTypeParamDecl, AbstractTypeParamDecl, 47);
+    unsigned : 15; // unused padding
+
+    unsigned Depth : 16;
+    unsigned Index : 16;
+  BITFIELD_END;
+
   BITFIELD_START(GenericTypeDecl, TypeDecl, 0);
   BITFIELD_END;
 
@@ -577,6 +587,8 @@ protected:
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
+    AbstractTypeParamDeclBitfields AbstractTypeParamDeclBit;
+    GenericTypeParamDeclBitfields GenericTypeParamDeclBits;
     GenericTypeDeclBitfields GenericTypeDeclBits;
     TypeAliasDeclBitfields TypeAliasDeclBits;
     NominalTypeDeclBitfields NominalTypeDeclBits;
@@ -2486,9 +2498,6 @@ public:
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl : public AbstractTypeParamDecl {
-  unsigned Depth : 16;
-  unsigned Index : 16;
-
 public:
   static const unsigned InvalidDepth = 0xFFFF;
 
@@ -2513,12 +2522,15 @@ public:
   /// \endcode
   ///
   /// Here 'T' has depth 0 and 'U' has depth 1. Both have index 0.
-  unsigned getDepth() const { return Depth; }
+  unsigned getDepth() const { return GenericTypeParamDeclBits.Depth; }
 
   /// Set the depth of this generic type parameter.
   ///
   /// \sa getDepth
-  void setDepth(unsigned depth) { Depth = depth; }
+  void setDepth(unsigned depth) {
+    GenericTypeParamDeclBits.Depth = depth;
+    assert(GenericTypeParamDeclBits.Depth == depth && "Truncation");
+  }
 
   /// The index of this generic type parameter within its generic parameter
   /// list.
@@ -2530,7 +2542,7 @@ public:
   /// \endcode
   ///
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
-  unsigned getIndex() const { return Index; }
+  unsigned getIndex() const { return GenericTypeParamDeclBits.Index; }
 
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
