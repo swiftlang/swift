@@ -150,7 +150,7 @@ public:
   // FIXME: Can these be const to ensure PrimaryInputs invarients are preserved?
   ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
   std::vector<InputFile> &getAllFilesMalleably()  { return AllFiles; }
-  std::vector<InputFile*> getAllFilePointersMalleable() {
+  std::vector<InputFile*> getAllFilePointersMalleably() {
     std::vector<InputFile*> pointers;
     for (InputFile &input: AllFiles) {
       pointers.push_back(&input);
@@ -185,6 +185,10 @@ public:
   void forEachPrimaryMalleably(llvm::function_ref<void(InputFile& input)> fn) {
     for (auto p: PrimaryInputs)
       fn(getAllFilesMalleably()[p.second]);
+  }
+  
+  std::vector<InputFile *>filesWithOutputs() {
+    return hasPrimaries() ? getAllPrimariesMalleably() : getAllFilePointersMalleably();
   }
   
   StringRef lastOutputFilename() {
