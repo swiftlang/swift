@@ -176,43 +176,41 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
 
 void FrontendOptions::forAllOutputPaths(
     std::function<void(const std::string &)> fn) const {
+#error unimp
   // Not really all!
-  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
-      RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    for (const auto input: getAllInputs()) {
-      UP TO HERE
-      fn(input.outputs().OutputFilename)
-    }
-    for (const std::string &OutputFileName : pathsForAtMostOnePrimary().OutputFilenames) {
-      fn(OutputFileName);
-    }
-  }
-  const std::string *outputs[] = {&pathsForAtMostOnePrimary().ModuleOutputPath,
-                                  &pathsForAtMostOnePrimary().ModuleDocOutputPath,
-                                  &pathsForAtMostOnePrimary().ObjCHeaderOutputPath};
-  for (const std::string *next : outputs) {
-    if (!next->empty())
-      fn(*next);
-  }
+//  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
+//      RequestedAction != FrontendOptions::ActionType::MergeModules) {
+//    for (const auto input: getAllInputs()) {
+//      //UP TO HERE
+//      fn(input.outputs().OutputFilename)
+//    }
+//    for (const std::string &OutputFileName : pathsForAtMostOnePrimary().OutputFilenames) {
+//      fn(OutputFileName);
+//    }
+//  }
+//  const std::string *outputs[] = {&pathsForAtMostOnePrimary().ModuleOutputPath,
+//                                  &pathsForAtMostOnePrimary().ModuleDocOutputPath,
+//                                  &pathsForAtMostOnePrimary().ObjCHeaderOutputPath};
+//  for (const std::string *next : outputs) {
+//    if (!next->empty())
+//      fn(*next);
+//  }
 }
 
 
 StringRef FrontendOptions::originalPath(StringRef primaryOrEmpty) const {
-  if (hasNamedOutputFile(primaryOrEmpty))
-    // Put the serialized diagnostics file next to the output file.
-    return getSingleOutputFilename(primaryOrEmpty);
-
-  // If we have a primary input, so use that as the basis for the name of the
-  // serialized diagnostics file, otherwise fall back on the
-  // module name.
-  return !primaryOrEmpty.empty() ? llvm::sys::path::filename(primaryOrEmpty)
-               : StringRef(ModuleName);
+#error unimp
+//  if (hasNamedOutputFile(primaryOrEmpty))
+//    // Put the serialized diagnostics file next to the output file.
+//    return getSingleOutputFilename(primaryOrEmpty);
+//
+//  // If we have a primary input, so use that as the basis for the name of the
+//  // serialized diagnostics file, otherwise fall back on the
+//  // module name.
+//  return !primaryOrEmpty.empty() ? llvm::sys::path::filename(primaryOrEmpty)
+//               : StringRef(ModuleName);
 }
 
-bool FrontendOptions::isOutputFileDirectory(StringRef primaryOrEmpty) const {
-  return hasNamedOutputFile(primaryOrEmpty) &&
-         llvm::sys::fs::is_directory(getSingleOutputFilename(primaryOrEmpty));
-}
 
 const char *
 FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
@@ -268,8 +266,8 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedDependenciesFilePath(StringRef primaryOrEmpty) const {
-  return !pathsForPrimary(primaryOrEmpty).DependenciesFilePath.empty() &&
+bool FrontendOptions::hasUnusedDependenciesFilePath(const InputFile &input) const {
+  return !input.outputs().DependenciesFilePath.empty() &&
          !canActionEmitDependencies(RequestedAction);
 }
 
@@ -304,8 +302,8 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedObjCHeaderOutputPath(StringRef primaryOrEmpty) const {
-  return !pathsForPrimary(primaryOrEmpty).ObjCHeaderOutputPath.empty() &&
+bool FrontendOptions::hasUnusedObjCHeaderOutputPath(const InputFile &input) const {
+  return !input.outputs().ObjCHeaderOutputPath.empty() &&
          !canActionEmitHeader(RequestedAction);
 }
 
@@ -340,8 +338,8 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedLoadedModuleTracePath(StringRef primaryOrEmpty) const {
-  return !pathsForPrimary(primaryOrEmpty).LoadedModuleTracePath.empty() &&
+bool FrontendOptions::hasUnusedLoadedModuleTracePath(const InputFile &input) const {
+  return !input.outputs().LoadedModuleTracePath.empty() &&
          !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
@@ -376,13 +374,13 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedModuleOutputPath(StringRef primaryOrEmpty) const {
-  return !pathsForPrimary(primaryOrEmpty).ModuleOutputPath.empty() &&
+bool FrontendOptions::hasUnusedModuleOutputPath(const InputFile &input) const {
+  return !input.outputs().ModuleOutputPath.empty() &&
          !canActionEmitModule(RequestedAction);
 }
 
-bool FrontendOptions::hasUnusedModuleDocOutputPath(StringRef primaryOrEmpty) const {
-  return !pathsForPrimary(primaryOrEmpty).ModuleDocOutputPath.empty() &&
+bool FrontendOptions::hasUnusedModuleDocOutputPath(const InputFile &input) const {
+  return !input.outputs().ModuleDocOutputPath.empty() &&
          !canActionEmitModule(RequestedAction);
 }
 

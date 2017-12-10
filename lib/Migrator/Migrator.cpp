@@ -118,7 +118,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
     llvm::MemoryBuffer::getMemBufferCopy(InputText, getInputFilename());
 
   CompilerInvocation Invocation { StartInvocation };
-  Invocation.getFrontendOptions().Inputs.clearInputs();
+  Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.getLangOptions().EffectiveLanguageVersion = SwiftLanguageVersion;
   auto &LLVMArgs = Invocation.getFrontendOptions().LLVMArgs;
   auto aarch64_use_tbi = std::find(LLVMArgs.begin(), LLVMArgs.end(),
@@ -144,10 +144,10 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
 
   const auto &OrigFrontendOpts = StartInvocation.getFrontendOptions();
 
-  assert(OrigFrontendOpts.Inputs.hasPrimaryInputs() &&
+  assert(OrigFrontendOpts.Inputs.hasPrimaries() &&
          "Migration must have a primary");
   for (const auto &input : OrigFrontendOpts.Inputs.getAllFiles()) {
-    Invocation.getFrontendOptions().Inputs.addInput(InputFile(
+    Invocation.getFrontendOptions().InputsAndOutputs.addInput(InputFile(
         input.getFile(), input.getIsPrimary(),
         input.getIsPrimary() ? InputBuffer.get() : input.getBuffer()));
   }

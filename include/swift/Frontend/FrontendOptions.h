@@ -88,7 +88,8 @@ public:
   bool getIsPrimary() const { return IsPrimary; }
   llvm::MemoryBuffer *getBuffer() const { return Buffer; }
   StringRef getFile() const { return Filename; }
-  OutputPaths &outputs() { return Outputs; }
+  const OutputPaths &outputs() const { return Outputs; }
+  OutputPaths &malleableOutputs() { return Outputs; }
 };
 
 
@@ -117,11 +118,49 @@ public:
       addInput(input);
     return *this;
   }
-
+  
   // Readers:
-
+  // FIXME: Can these be const to ensure PrimaryInputs invarients are preserved?
   ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-
+  std::vector<InputFile> &getAllFilesMalleably()  { return AllFiles; }
+  std::vector<InputFile*> getAllFilePointersMalleable() {
+    std::vector<InputFile*> pointers;
+    for (InputFile &input: AllFiles) {
+      pointers.push_back(&input);
+    }
+    return pointers;
+  }
+  // FIXME: Can I use an iterator instead of making a new collection?
+  
+  
+  
+  
+//  std::vector<const InputFile &> getAllPrimaries() const {
+//    std::vector<const InputFile &> primaries;
+//    forEachPrimary([&] (InputFile& input) -> void {
+//      primaries.push_back(input);
+//    });
+//    return primaries;
+//  }
+  std::vector<InputFile*> getAllPrimariesMalleably() {
+    std::vector<InputFile*> primaries;
+    forEachPrimaryMalleably([&] (InputFile& input) -> void {
+      primaries.push_back(&input);
+    });
+    return primaries;
+  }
+  
+  void forEachPrimary(llvm::function_ref<void(const InputFile& input)> fn) const {
+    for (auto p: PrimaryInputs)
+      fn(getAllFiles()[p.second]);
+  }
+  
+  void forEachPrimaryMalleably(llvm::function_ref<void(InputFile& input)> fn) {
+    for (auto p: PrimaryInputs)
+      fn(getAllFilesMalleably()[p.second]);
+  }
+  
+  // FIXME: iterator?
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
     for (auto &input : getAllFiles()) {
@@ -171,20 +210,20 @@ public:
 
   bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
 
-  bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
+  bool hasPrimaries() const { return primaryInputCount() > 0; }
 
-  bool isWholeModule() const { return !hasPrimaryInputs(); }
+  bool isWholeModule() const { return !hasPrimaries(); }
   
-  void forEachPrimaryOrEmpty(llvm::function_ref<void(StringRef)> fn) const{
-    if (!hasPrimaryInputs())
-      fn("");
-    else
-      for (const auto &p: PrimaryInputs)
-        fn(p.first);
-  }
+//  void forEachPrimaryOrEmpty(llvm::function_ref<void(StringRef)> fn) const{
+//    if (!hasPrimaries())
+//      fn("");
+//    else
+//      for (const auto &p: PrimaryInputs)
+//        fn(p.first);
+//  }
   
   bool forEachPrimaryOrEmptyWithErrors(llvm::function_ref<bool(StringRef)> fn) const{
-    if (!hasPrimaryInputs())
+    if (!hasPrimaries())
       return fn("");
     for (const auto &p: PrimaryInputs)
       if (fn(p.first))
@@ -268,24 +307,24 @@ public:
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   StringRef getSingleOutputFilename(StringRef primaryOrEmpty) {
-    return !primaryOrEmpty.empty() ? outputFilenameForPrimary(primaryOrEmpty)
-    : outputFilenamesForWMO().empty() ? std::string("")
-    : outputFilenamesForWMO().back();
+#error unimp
+//    return !primaryOrEmpty.empty() ? outputFilenameForPrimary(primaryOrEmpty)
+//    : outputFilenamesForWMO().empty() ? std::string("")
+//    : outputFilenamesForWMO().back();
   }
   /// Sets a single filename as output filename.
-  void setSingleOutputFilename(StringRef primaryOrEmpty, const std::string &filename) {
-    if (!primaryOrEmpty.empty())
-      outputFilenameForPrimary(primaryOrEmpty) = filename;
-    else {
-      outputFilenamesForWMO().clear();
-      outputFilenamesForWMO().push_back(filename);
-    }
-  }
-  void setOutputFilenameToStdout(StringRef primaryOrEmpty) { setSingleOutputFilename(primaryOrEmpty, "-"); }
+//  void setSingleOutputFilename(StringRef primaryOrEmpty, const std::string &filename) {
+//    if (!primaryOrEmpty.empty())
+//      outputFilenameForPrimary(primaryOrEmpty) = filename;
+//    else {
+//      outputFilenamesForWMO().clear();
+//      outputFilenamesForWMO().push_back(filename);
+//    }
+//  }
+//  void setOutputFilenameToStdout(StringRef primaryOrEmpty) { setSingleOutputFilename(primaryOrEmpty, "-"); }
   bool isOutputFilenameStdout(StringRef primaryOrEmpty) {
     return getSingleOutputFilename(primaryOrEmpty) == "-";
   }
-  bool isOutputFileDirectory(StringRef primaryOrEmpty);
   bool hasNamedOutputFile(StringRef primaryOrEmpty) {
     return !isOutputFilenameStdout(primaryOrEmpty);
   }
@@ -305,38 +344,27 @@ public:
  
 
   
-private:
-  WMOOutputPaths pathsForWMO;
-  
-  llvm::StringMap<PrimaryOutputPaths> OutputPathsByPrimary;
-
-  PrimaryOutputPaths &pathsForPrimary(StringRef primaryName) {
-    assert(!primaryName.empty());
-    auto iter = OutputPathsByPrimary.find(primaryName);
-    assert(iter != OutputPathsByPrimary.end());
-    return iter->getValue();
-  }
-
+ 
 public:
-  std::string &outputFilenameForPrimary(StringRef pri) { return pathsForPrimary(pri).OutputFilename;}
-  std::string &objCHeaderOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ObjCHeaderOutputPath;}
-  std::string &moduleOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ModuleOutputPath;}
-  std::string &moduleDocOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ModuleDocOutputPath;}
-  std::string &dependenciesFilePathForPrimary(StringRef pri) { return pathsForPrimary(pri).DependenciesFilePath;}
-  std::string &referenceDependenciesFilePathForPrimary(StringRef pri) { return pathsForPrimary(pri).ReferenceDependenciesFilePath;}
-  std::string &serializedDiagnosticsPathForPrimary(StringRef pri) { return pathsForPrimary(pri).SerializedDiagnosticsPath;}
-  std::string &loadedModuleTracePathForPrimary(StringRef pri) { return pathsForPrimary(pri).LoadedModuleTracePath;}
-  std::string &TBDPathForPrimary(StringRef pri) { return pathsForPrimary(pri).TBDPath;}
-  
-  std::vector<std::string> &outputFilenamesForWMO() { return pathsForWMO.OutputFilenames;}
-  std::string &objCHeaderOutputPathForWMO() { return pathsForWMO.ObjCHeaderOutputPath;}
-  std::string &moduleOutputPathForWMO() { return pathsForWMO.ModuleOutputPath;}
-  std::string &moduleDocOutputPathForWMO() { return pathsForWMO.ModuleDocOutputPath;}
-  std::string &dependenciesFilePathForWMO() { return pathsForWMO.DependenciesFilePath;}
-  std::string &referenceDependenciesFilePathForWMO() { return pathsForWMO.ReferenceDependenciesFilePath;}
-  std::string &serializedDiagnosticsPathForWMO() { return pathsForWMO.SerializedDiagnosticsPath;}
-  std::string &loadedModuleTracePathForWMO() { return pathsForWMO.LoadedModuleTracePath;}
-  std::string &TBDPathForWMO() { return pathsForWMO.TBDPath;}
+//  std::string &outputFilenameForPrimary(StringRef pri) { return pathsForPrimary(pri).OutputFilename;}
+//  std::string &objCHeaderOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ObjCHeaderOutputPath;}
+//  std::string &moduleOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ModuleOutputPath;}
+//  std::string &moduleDocOutputPathForPrimary(StringRef pri) { return pathsForPrimary(pri).ModuleDocOutputPath;}
+//  std::string &dependenciesFilePathForPrimary(StringRef pri) { return pathsForPrimary(pri).DependenciesFilePath;}
+//  std::string &referenceDependenciesFilePathForPrimary(StringRef pri) { return pathsForPrimary(pri).ReferenceDependenciesFilePath;}
+//  std::string &serializedDiagnosticsPathForPrimary(StringRef pri) { return pathsForPrimary(pri).SerializedDiagnosticsPath;}
+//  std::string &loadedModuleTracePathForPrimary(StringRef pri) { return pathsForPrimary(pri).LoadedModuleTracePath;}
+//  std::string &TBDPathForPrimary(StringRef pri) { return pathsForPrimary(pri).TBDPath;}
+//
+//  std::vector<std::string> &outputFilenamesForWMO() { return pathsForWMO.OutputFilenames;}
+//  std::string &objCHeaderOutputPathForWMO() { return pathsForWMO.ObjCHeaderOutputPath;}
+//  std::string &moduleOutputPathForWMO() { return pathsForWMO.ModuleOutputPath;}
+//  std::string &moduleDocOutputPathForWMO() { return pathsForWMO.ModuleDocOutputPath;}
+//  std::string &dependenciesFilePathForWMO() { return pathsForWMO.DependenciesFilePath;}
+//  std::string &referenceDependenciesFilePathForWMO() { return pathsForWMO.ReferenceDependenciesFilePath;}
+//  std::string &serializedDiagnosticsPathForWMO() { return pathsForWMO.SerializedDiagnosticsPath;}
+//  std::string &loadedModuleTracePathForWMO() { return pathsForWMO.LoadedModuleTracePath;}
+//  std::string &TBDPathForWMO() { return pathsForWMO.TBDPath;}
   
 
 
@@ -553,21 +581,21 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift && Inputs.hasUniqueInput();
+    return InputKind == InputFileKind::IFK_Swift && InputsAndOutputs.hasUniqueInput();
   }
 
 private:
   static const char *suffixForPrincipalOutputFileForAction(ActionType);
 
-  bool hasUnusedDependenciesFilePath(StringRef primaryOrEmpty) const;
+  bool hasUnusedDependenciesFilePath(const InputFile &input) const;
   static bool canActionEmitDependencies(ActionType);
-  bool hasUnusedObjCHeaderOutputPath(StringRef primaryOrEmpty) const;
+  bool hasUnusedObjCHeaderOutputPath(const InputFile &input) const;
   static bool canActionEmitHeader(ActionType);
-  bool hasUnusedLoadedModuleTracePath(StringRef primaryOrEmpty) const;
+  bool hasUnusedLoadedModuleTracePath(const InputFile &input) const;
   static bool canActionEmitLoadedModuleTrace(ActionType);
-  bool hasUnusedModuleOutputPath(StringRef primaryOrEmpty) const;
+  bool hasUnusedModuleOutputPath(const InputFile &input) const;
   static bool canActionEmitModule(ActionType);
-  bool hasUnusedModuleDocOutputPath(StringRef primaryOrEmpty) const;
+  bool hasUnusedModuleDocOutputPath(const InputFile &input) const;
   static bool canActionEmitModuleDoc(ActionType);
 
   static bool doesActionProduceOutput(ActionType);

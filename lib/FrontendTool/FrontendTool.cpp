@@ -138,7 +138,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
     for (auto const &path :
-         reversePathSortedFilenames(opts.Inputs.getInputFilenames()))
+         reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames()))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
     for (auto const &path :
@@ -523,15 +523,15 @@ static bool performCompile(CompilerInstance &Instance,
     auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
     if (!PCHOutDir.empty()) {
       ImporterOpts.BridgingHeader =
-          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput();
+          Invocation.getFrontendOptions().InputsAndOutputs.getFilenameOfFirstInput();
       // Create or validate a persistent PCH.
       auto SwiftPCHHash = Invocation.getPCHHash();
       auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       return !PCH.hasValue();
     }
     return clangImporter->emitBridgingPCH(
-        Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
-        opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()));
+        Invocation.getFrontendOptions().InputsAndOutputs.getFilenameOfFirstInput(),
+        opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()));
   }
 
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
@@ -541,15 +541,15 @@ static bool performCompile(CompilerInstance &Instance,
     auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
-    assert(Invocation.getFrontendOptions().Inputs.hasUniqueInput() &&
+    assert(Invocation.getFrontendOptions().InputsAndOutputs.hasUniqueInput() &&
            "We expect a single input for bitcode input!");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
         llvm::MemoryBuffer::getFileOrSTDIN(
-            Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput());
+            Invocation.getFrontendOptions().InputsAndOutputs.getFilenameOfFirstInput());
     if (!FileBufOrErr) {
       Instance.getASTContext().Diags.diagnose(
           SourceLoc(), diag::error_open_input_file,
-          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          Invocation.getFrontendOptions().InputsAndOutputs.getFilenameOfFirstInput(),
           FileBufOrErr.getError().message());
       return true;
     }
@@ -564,7 +564,7 @@ static bool performCompile(CompilerInstance &Instance,
       // if available.
       Instance.getASTContext().Diags.diagnose(
           SourceLoc(), diag::error_parse_input_file,
-          Invocation.getFrontendOptions().Inputs.getFilenameOfFirstInput(),
+          Invocation.getFrontendOptions().InputsAndOutputs.getFilenameOfFirstInput(),
           Err.getMessage());
       return true;
     }
@@ -697,7 +697,7 @@ static bool performCompile(CompilerInstance &Instance,
       SF->dumpInterfaceHash(llvm::errs());
     else if (Action == FrontendOptions::ActionType::EmitSyntax) {
       emitSyntax(SF, Invocation.getLangOptions(), Instance.getSourceMgr(),
-                 opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()));
+                 opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()));
     } else
       SF->dump();
     return Context.hadError();
@@ -778,12 +778,12 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
-    if (opts.Inputs.hasPrimaryInputs()) {
+    if (opts.InputsAndOutputs.hasPrimaries()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
         for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
-            if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
+            if (Invocation.getFrontendOptions().InputsAndOutputs.isFilePrimary(
                     SASTF->getFilename())) {
               assert(!PrimaryFile && "Can only handle one primary so far");
               PrimaryFile = fileUnit;
@@ -816,7 +816,7 @@ static bool performCompile(CompilerInstance &Instance,
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
     return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()), opts.EmitSortedSIL);
+                    opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()), opts.EmitSortedSIL);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
@@ -1003,7 +1003,7 @@ static bool performCompile(CompilerInstance &Instance,
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSIL) {
     return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()), opts.EmitSortedSIL);
+                    opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()), opts.EmitSortedSIL);
   }
 
   assert(Action >= FrontendOptions::ActionType::Immediate &&
@@ -1044,12 +1044,12 @@ static bool performCompile(CompilerInstance &Instance,
   llvm::GlobalVariable *HashGlobal;
   if (PrimarySourceFile) {
     IRModule = performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
-                                   opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()), LLVMContext,
+                                   opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()), LLVMContext,
                                    0, &HashGlobal);
   } else {
     IRModule = performIRGeneration(IRGenOpts, Instance.getMainModule(),
                                    std::move(SM),
-                                   opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()), LLVMContext,
+                                   opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()), LLVMContext,
                                    &HashGlobal);
   }
 
@@ -1110,7 +1110,7 @@ static bool performCompile(CompilerInstance &Instance,
   // Now that we have a single IR Module, hand it over to performLLVM.
   return performLLVM(IRGenOpts, &Instance.getDiags(), nullptr, HashGlobal,
                   IRModule.get(), TargetMachine.get(), EffectiveLanguageVersion,
-                  opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()), Stats) || HadError;
+                  opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()), Stats) || HadError;
 }
 
 static bool emitIndexData(SourceFile *PrimarySourceFile,
@@ -1135,7 +1135,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
 
   if (PrimarySourceFile) {
     if (index::indexAndRecord(
-            PrimarySourceFile, opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile()),
+            PrimarySourceFile, opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile()),
             opts.IndexStorePath, opts.IndexSystemModules,
             isDebugCompilation, Invocation.getTargetTriple(),
             *Instance.getDependencyTracker())) {
@@ -1144,7 +1144,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
   } else {
     StringRef moduleToken = opts.pathsForAtMostOnePrimary().ModuleOutputPath;
     if (moduleToken.empty())
-      moduleToken = opts.getSingleOutputFilename(opts.Inputs.getRequiredUniquePrimaryInput().getFile());
+      moduleToken = opts.getSingleOutputFilename(opts.InputsAndOutputs.getRequiredUniquePrimaryInput().getFile());
 
     if (index::indexAndRecord(Instance.getMainModule(),
                               opts.pathsForAtMostOnePrimary().OutputFilenames, moduleToken,

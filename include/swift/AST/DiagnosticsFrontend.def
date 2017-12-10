@@ -149,6 +149,10 @@ ERROR(error_no_output_filename_specified,none,
 ERROR(error_output_files_must_correspond_to_primaries,none,
 "the number of output filenames must equal the number of primaries", ())
 
+ERROR(error_output_files_must_correspond_to_inputs,none,
+"the number of output filenames must equal the number of inputs in threaded WMO mode", ())
+
+
 ERROR(error_implicit_output_file_is_directory,none,
   "the implicit output file '%0' is a directory; explicitly specify a filename "
   "using -o", (StringRef))

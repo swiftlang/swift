@@ -58,7 +58,7 @@ void CompilerInstance::createSILModule() {
   // Assume WMO if a -primary-file option was not provided.
   TheSILModule = SILModule::createEmptyModule(
       getMainModule(), Invocation.getSILOptions(),
-      Invocation.getFrontendOptions().Inputs.isWholeModule());
+      Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -179,7 +179,7 @@ bool CompilerInstance::setUpInputs() {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (const InputFile &input :
-       Invocation.getFrontendOptions().Inputs.getAllFiles()) {
+       Invocation.getFrontendOptions().InputsAndOutputs.getAllFiles()) {
     if (setUpForInput(input))
       return true;
   }
