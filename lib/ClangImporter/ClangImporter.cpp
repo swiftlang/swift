@@ -446,11 +446,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
   invocationArgStrs.insert(invocationArgStrs.end(), {
-      // Enable modules
-      "-fmodules",
-      "-Werror=non-modular-include-in-framework-module",
-      "-Xclang", "-fmodule-feature", "-Xclang", "swift",
-
       // Don't emit LLVM IR.
       "-fsyntax-only",
 
@@ -463,6 +458,18 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
   });
+
+  // Enable modules.
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-fmodules",
+      "-Xclang", "-fmodule-feature", "-Xclang", "swift"
+  });
+  // Don't enforce strict rules when inside the debugger to work around search
+  // path problems caused by a module existing in both the build/install
+  // directory and the source directory.
+  if (!importerOpts.DebuggerSupport)
+    invocationArgStrs.push_back(
+        "-Werror=non-modular-include-in-framework-module");
 
   if (LangOpts.EnableObjCInterop) {
     invocationArgStrs.insert(invocationArgStrs.end(),
