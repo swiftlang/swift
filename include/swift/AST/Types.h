@@ -339,6 +339,13 @@ protected:
   };
   NUMBITS(SILFunctionType, NumTypeBaseBits + 12);
 
+  struct SILBoxTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    unsigned : 32 - NumTypeBaseBits; // unused / padding
+    unsigned NumGenericArgs : 32;
+  };
+  NUMBITS(SILBoxType, 64);
+
   struct AnyMetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
     /// The representation of the metatype.
@@ -379,6 +386,7 @@ protected:
     TypeVariableTypeBitfields TypeVariableTypeBits;
     ArchetypeTypeBitfields ArchetypeTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
+    SILBoxTypeBitfields SILBoxTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
     ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
     TupleTypeBitfields TupleTypeBits;
@@ -3806,7 +3814,6 @@ class SILBoxType final : public TypeBase,
   friend TrailingObjects;
   
   SILLayout *Layout;
-  unsigned NumGenericArgs;
 
   static RecursiveTypeProperties
   getRecursivePropertiesFromSubstitutions(SubstitutionList Args);
@@ -3822,7 +3829,7 @@ public:
   SILLayout *getLayout() const { return Layout; }
   SubstitutionList getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
-                              NumGenericArgs);
+                              SILBoxTypeBits.NumGenericArgs);
   }
   
   // In SILType.h:
