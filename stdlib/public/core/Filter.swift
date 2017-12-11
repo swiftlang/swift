@@ -266,6 +266,33 @@ extension LazyFilterCollection : LazyCollectionProtocol, Collection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  public func distance(from start: Index, to end: Index) -> Int {
+    // The following line makes sure that distance(from:to:) is invoked on the
+    // _base at least once, to trigger a _precondition in forward only
+    // collections.
+    _ = _base.distance(from: start, to: end)
+    var _start: Index
+    let _end: Index
+    let step: Int
+    if start > end {
+      _start = end
+      _end = start
+      step = -1
+    }
+    else {
+      _start = start
+      _end = end
+      step = 1
+    }
+    var count = 0
+    while _start != _end {
+      count += step
+      formIndex(after: &_start)
+    }
+    return count
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     var i = i
     let step = n.signum()
