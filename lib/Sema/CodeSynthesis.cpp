@@ -172,6 +172,10 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (storage->isStatic())
     getter->setStatic();
 
+  if (auto *overridden = storage->getOverriddenDecl())
+    if (auto *overriddenAccessor = overridden->getGetter())
+      getter->setOverriddenDecl(overriddenAccessor);
+
   return getter;
 }
 
@@ -218,6 +222,14 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   if (isStatic)
     setter->setStatic();
+
+  if (auto *overridden = storage->getOverriddenDecl()) {
+    auto *overriddenAccessor = overridden->getSetter();
+    if (overriddenAccessor &&
+        overridden->isSetterAccessibleFrom(storage->getDeclContext())) {
+      setter->setOverriddenDecl(overriddenAccessor);
+    }
+  }
 
   return setter;
 }
@@ -351,7 +363,15 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // materializeForSet is final if the storage is.
   if (storage->isFinal())
     makeFinal(ctx, materializeForSet);
-  
+
+  if (auto *overridden = storage->getOverriddenDecl()) {
+    auto *overriddenAccessor = overridden->getMaterializeForSetFunc();
+    if (overriddenAccessor && !overriddenAccessor->hasForcedStaticDispatch() &&
+        overridden->isSetterAccessibleFrom(storage->getDeclContext())) {
+      materializeForSet->setOverriddenDecl(overriddenAccessor);
+    }
+  }
+
   // If the storage is dynamic or ObjC-native, we can't add a dynamically-
   // dispatched method entry for materializeForSet, so force it to be
   // statically dispatched. ("final" would be inappropriate because the
@@ -709,11 +729,6 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   SourceLoc loc = storage->getLoc();
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
 
-  // Record the getter as an override, which can happen with addressors.
-  if (auto *baseASD = storage->getOverriddenDecl())
-    if (baseASD->isAccessibleFrom(storage->getDeclContext()))
-      getter->setOverriddenDecl(baseASD->getGetter());
-
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(getter);
@@ -733,15 +748,6 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storage,
                                             setterBody, TC);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
-
-  // Record the setter as an override, which can happen with addressors.
-  if (auto *baseASD = storage->getOverriddenDecl()) {
-    auto *baseSetter = baseASD->getSetter();
-    if (baseSetter != nullptr &&
-        baseASD->isSetterAccessibleFrom(storage->getDeclContext())) {
-      setter->setOverriddenDecl(baseSetter);
-    }
-  }
 
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
@@ -847,21 +853,6 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
   addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
                              storage->getSetter());
   storage->setMaterializeForSetFunc(materializeForSet);
-
-  // Make sure we record the override.
-  //
-  // FIXME: Instead, we should just not call checkOverrides() on
-  // storage until all accessors are in place.
-  if (auto *baseASD = storage->getOverriddenDecl()) {
-    // If the base storage has a private setter, we're not overriding
-    // materializeForSet either.
-    auto *baseMFS = baseASD->getMaterializeForSetFunc();
-    if (baseMFS != nullptr &&
-        !baseMFS->hasForcedStaticDispatch() &&
-        baseASD->isSetterAccessibleFrom(storage->getDeclContext())) {
-      materializeForSet->setOverriddenDecl(baseMFS);
-    }
-  }
 
   return materializeForSet;
 }
