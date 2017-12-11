@@ -63,6 +63,10 @@ public let StringComparison = [
     name: "StringComparison_zalgo",
     runFunction: run_StringComparison_zalgo,
     tags: [.validation, .api, .String]),    
+  BenchmarkInfo(
+    name: "StringComparison_longSharedPrefix",
+    runFunction: run_StringComparison_longSharedPrefix,
+    tags: [.validation, .api, .String]),    
 ]
     
   @inline(never)
@@ -181,6 +185,22 @@ public let StringComparison = [
   public func run_StringComparison_zalgo(_ N: Int) {
     var count = 0
     let workload = Workload.zalgo
+    let tripCount = workload.tripCount
+    let payload = workload.payload
+    for _ in 1...tripCount*N {
+      for s1 in payload {
+        for s2 in payload {
+          let cmp = s1 < s2
+          count += cmp ? 1 : 0
+        }
+      }
+    }
+  }
+    
+  @inline(never)
+  public func run_StringComparison_longSharedPrefix(_ N: Int) {
+    var count = 0
+    let workload = Workload.longSharedPrefix
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
@@ -387,6 +407,21 @@ struct Workload {
     xͣͤͥͦͧͨͩͪͫͬͭͮ
     """.lines(),
     scaleMultiplier: 0.25
+  )
+  
+  static let longSharedPrefix = Workload(
+    name: "LongSharedPrefix",
+    payload: """
+    http://www.dogbook.com/dog/239495828/friends/mutual/2939493815
+    http://www.dogbook.com/dog/239495828/friends/mutual/3910583739
+    http://www.dogbook.com/dog/239495828/friends/mutual/3910583739/shared
+    http://www.dogbook.com/dog/239495828/friends/mutual/3910583739/shared
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.🤔
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+    🤔Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.🤔
+    """.lines()
   )
   
 }
