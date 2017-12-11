@@ -122,6 +122,25 @@ StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
   return StringRef();
 }
 
+StringRef FrontendInputsAndOutputs::experimentallyTryFirstOutputFilename() const {
+  if (AllFiles.empty()) return StringRef();
+  // FIXME use reverse iterator?
+  for (auto i: indices(AllFiles)) {
+    if (!AllFiles[i].outputs().OutputFilename.empty()) {
+      assert(i == 0);
+      return AllFiles[i].outputs().OutputFilename;
+    }
+  }
+  return StringRef();
+}
+
+/// Do something better when >1 primary
+StringRef FrontendInputsAndOutputs::outputFilenameForPrimary() const {
+  assertMustNotBeMoreThanOnePrimaryInput();
+  assert(hasPrimaries());
+  return pathsForAtMostOnePrimary().OutputFilename;
+}
+
 bool FrontendOptions::needsProperModuleName(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
