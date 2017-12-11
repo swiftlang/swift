@@ -295,8 +295,7 @@ private:
   std::string deriveOutputFileFromParts(StringRef dir, StringRef base);
 
   bool computeSupplementaryOutputFilenames();
-  void determineSupplementaryOutputFilenames(
-      const OutputPaths &arg, StringRef lastOutputFilenameOrEmpty, InputFile &);
+  void determineSupplementaryOutputFilenames(const OutputPaths &arg, InputFile &);
 
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
@@ -913,13 +912,11 @@ FrontendArgsToOptionsConverter::readSupplementaryOutputFileList(
 bool FrontendArgsToOptionsConverter::computeSupplementaryOutputFilenames() {
   std::vector<OutputPaths> suppFilelistArgs =
       getSupplementaryFilenamesFromFilelists();
-  StringRef lastOutputFilename = Opts.InputsAndOutputs.lastOutputFilename();
-
+  
   std::vector<InputFile *> files = Opts.InputsAndOutputs.filesWithOutputs();
 
   for (auto i : indices(files)) {
-    determineSupplementaryOutputFilenames(suppFilelistArgs[i],
-                                          lastOutputFilename, *files[i]);
+    determineSupplementaryOutputFilenames(suppFilelistArgs[i], *files[i]);
     if (checkUnusedOutputPaths(*files[i]))
       return true;
   }
@@ -927,8 +924,7 @@ bool FrontendArgsToOptionsConverter::computeSupplementaryOutputFilenames() {
 }
 
 void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(
-    const OutputPaths &suppOutArg, StringRef lastOutputFilenameOrEmpty,
-    InputFile &input) {
+    const OutputPaths &suppOutArg, InputFile &input) {
   using namespace options;
   auto determineOutputFilename =
       [&](std::string &output, StringRef pathFromList,
@@ -954,9 +950,12 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(
         if (!Args.hasArg(optWithoutPath))
           return;
 
-        if (useMainOutput && !lastOutputFilenameOrEmpty.empty()) {
-          output = lastOutputFilenameOrEmpty;
-          return;
+        if (useMainOutput) {
+          auto lastOutputFilename = Opts.InputsAndOutputs.lastOutputFilename();
+          if (!lastOutputFilename.empty()) {
+            output = lastOutputFilename;
+            return;
+          }
         }
 
         assert(output.empty());
