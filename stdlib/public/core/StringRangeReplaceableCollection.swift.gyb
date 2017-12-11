@@ -457,6 +457,7 @@ extension String {
   internal func _stride(of i: Index) -> Int {
     if case .character(let stride) = i._cache {
       // TODO: should _fastPath the case somehow
+      _sanityCheck(stride > 0)
       return Int(stride)
     }
     let offset = i.encodedOffset
