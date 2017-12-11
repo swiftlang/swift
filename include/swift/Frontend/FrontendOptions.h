@@ -114,9 +114,9 @@ public:
   StringRef lastOutputFilename() const {
     if (AllFiles.empty()) return StringRef();
     // FIXME use reverse iterator?
-    for (auto i = AllFiles.size();;) {
+    for (auto i = AllFiles.size();; --i) {
       if (!AllFiles[i].outputs().OutputFilename.empty())
-        return AllFiles[--i].outputs().OutputFilename;
+        return AllFiles[i].outputs().OutputFilename;
       if (i == 0)
         break;
     }
