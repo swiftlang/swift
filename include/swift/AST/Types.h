@@ -362,8 +362,13 @@ protected:
     
     /// Whether an element of the tuple is inout.
     unsigned HasInOutElement : 1;
+
+    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+
+    /// The number of elements of the tuple.
+    unsigned Count : 32;
   };
-  NUMBITS(TupleType, NumTypeBaseBits + 1);
+  NUMBITS(TupleType, 64);
 
 #undef NUMBITS
   union {
@@ -1577,8 +1582,9 @@ typedef ArrayRefView<TupleTypeElt,CanType,getCanTupleEltType>
 /// TupleType - A tuple is a parenthesized list of types where each name has an
 /// optional name.
 ///
-class TupleType : public TypeBase, public llvm::FoldingSetNode {
-  const ArrayRef<TupleTypeElt> Elements;
+class TupleType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<TupleType, TupleTypeElt> {
+  friend TrailingObjects;
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
@@ -1590,16 +1596,20 @@ public:
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
-  /// getFields - Return the fields of this tuple.
-  ArrayRef<TupleTypeElt> getElements() const { return Elements; }
+  unsigned getNumElements() const { return TupleTypeBits.Count; }
 
-  unsigned getNumElements() const { return Elements.size(); }
+  /// getElements - Return the elements of this tuple.
+  ArrayRef<TupleTypeElt> getElements() const {
+    return {getTrailingObjects<TupleTypeElt>(), getNumElements()};
+  }
 
-  const TupleTypeElt &getElement(unsigned i) const { return Elements[i]; }
+  const TupleTypeElt &getElement(unsigned i) const {
+    return getTrailingObjects<TupleTypeElt>()[i];
+  }
 
   /// getElementType - Return the type of the specified element.
   Type getElementType(unsigned ElementNo) const {
-    return Elements[ElementNo].getType();
+    return getTrailingObjects<TupleTypeElt>()[ElementNo].getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
@@ -1631,7 +1641,7 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Elements);
+    Profile(ID, getElements());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       ArrayRef<TupleTypeElt> Elements);
@@ -1640,8 +1650,11 @@ private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties,
             bool hasInOut)
-     : TypeBase(TypeKind::Tuple, CanCtx, properties), Elements(elements) {
+     : TypeBase(TypeKind::Tuple, CanCtx, properties) {
      TupleTypeBits.HasInOutElement = hasInOut;
+     TupleTypeBits.Count = elements.size();
+     std::uninitialized_copy(elements.begin(), elements.end(),
+                             getTrailingObjects<TupleTypeElt>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
