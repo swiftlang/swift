@@ -1047,7 +1047,7 @@ void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
                                     Opts.InputsAndOutputs.inputCount() != 0 &&
                                     !Opts.InputsAndOutputs.getAllFiles()[0]
                                          .outputs()
-                                         .ModuleDocOutputPath.empty();
+                                         .ModuleOutputPath.empty();
   }
 }
 void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
