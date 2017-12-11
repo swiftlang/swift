@@ -10,6 +10,7 @@
 
 #include "llvm/Support/MemoryBuffer.h"
 #include <string>
+#include<vector>
 
 namespace swift {
 
