@@ -721,9 +721,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (!targetMachine) return nullptr;
 
   // Create the IR emitter.
-  assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, Opts.OutputForSingleThreadedWMO);
+                  ModuleName, Opts.singleOutput());
 
   initLLVMModule(IGM);
 

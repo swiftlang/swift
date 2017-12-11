@@ -70,6 +70,14 @@ public:
   std::vector<std::string> OutputFilesForThreadedWMO;
   std::vector<OutputPaths> OutputsForBatchMode;
   std::string OutputForSingleThreadedWMO;
+  
+  std::string singleOutput() const {
+    if (!OutputForSingleThreadedWMO.empty()) return OutputForSingleThreadedWMO;
+    // FIXME for batch mode
+    assert(OutputsForBatchMode.size() == 1);
+    return OutputsForBatchMode[0].OutputFilename;
+  }
+  
   std::string ModuleName;
 
   /// The compilation directory for the debug info.
