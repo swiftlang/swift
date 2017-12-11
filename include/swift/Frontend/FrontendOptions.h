@@ -111,17 +111,7 @@ public:
 
   // FIXME: Why the *last* one?
   
-  StringRef lastOutputFilename() const {
-    if (AllFiles.empty()) return StringRef();
-    // FIXME use reverse iterator?
-    for (auto i = AllFiles.size();; --i) {
-      if (!AllFiles[i].outputs().OutputFilename.empty())
-        return AllFiles[i].outputs().OutputFilename;
-      if (i == 0)
-        break;
-    }
-    return StringRef();
-  }
+  StringRef lastOutputFilename() const;
 
   // FIXME: iterator?
   std::vector<std::string> getInputFilenames() const {

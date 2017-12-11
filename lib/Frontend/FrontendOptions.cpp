@@ -108,6 +108,20 @@ bool FrontendInputsAndOutputs::doAllNonPrimariesEndWithSIB() const {
   return true;
 }
 
+StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
+  if (AllFiles.empty()) return StringRef();
+  // FIXME use reverse iterator?
+  for (auto i = AllFiles.size();; --i) {
+    if (!AllFiles[i].outputs().OutputFilename.empty()) {
+      assert(AllFiles[i].outputs().OutputFilename == AllFiles[0].outputs().OutputFilename);
+      return AllFiles[i].outputs().OutputFilename;
+    }
+    if (i == 0)
+      break;
+  }
+  return StringRef();
+}
+
 bool FrontendOptions::needsProperModuleName(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:

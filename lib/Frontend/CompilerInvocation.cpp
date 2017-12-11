@@ -705,7 +705,7 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
 // Frontend is called with one directory output for testing
 static bool
 areOutputArgumentsUniqueDirectory(llvm::ArrayRef<std::string> outArgs) {
-  return outArgs.size() == 1 && !llvm::sys::fs::is_directory(outArgs[0]);
+  return outArgs.size() == 1 && llvm::sys::fs::is_directory(outArgs[0]);
 }
 
 bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
