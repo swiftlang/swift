@@ -2384,8 +2384,8 @@ bool TypeBase::matches(Type other, TypeMatchOptions matchMode,
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    if (Elements[i].getName() == I)
+  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+    if (getTrailingObjects<TupleTypeElt>()[i].getName() == I)
       return i;
   }
 
@@ -2397,15 +2397,15 @@ int TupleType::getNamedElementId(Identifier I) const {
 /// scalar, return the field number that the scalar is assigned to.  If not,
 /// return -1.
 int TupleType::getElementForScalarInit() const {
-  if (Elements.empty()) return -1;
+  if (TupleTypeBits.Count == 0) return -1;
   
   int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
+  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
     // If we already saw a non-vararg field missing a default value, then we
     // cannot assign a scalar to this tuple.
     if (FieldWithoutDefault != -1) {
       // Vararg fields are okay; they'll just end up being empty.
-      if (Elements[i].isVararg())
+      if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
         continue;
     
       return -1;
@@ -2424,9 +2424,9 @@ int TupleType::getElementForScalarInit() const {
 /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
 /// Otherwise, this returns Type().
 Type TupleType::getVarArgsBaseType() const {
-  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    if (Elements[i].isVararg())
-      return Elements[i].getVarargBaseTy();
+  for (unsigned i = 0, e = TupleTypeBits.Count; i != e; ++i) {
+    if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
+      return getTrailingObjects<TupleTypeElt>()[i].getVarargBaseTy();
   }
   
   return Type();
