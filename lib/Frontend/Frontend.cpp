@@ -187,6 +187,9 @@ bool CompilerInstance::setUpInputs() {
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue())
     PrimaryBufferID = *codeCompletionBufferID;
+  
+  if (PrimaryBufferID != NO_SUCH_BUFFER)
+    Invocation.getFrontendOptions().InputsAndOutputs.assertMustNotBeMoreThanOnePrimaryInput(); // not impl yet
 
   if (isInMainMode() && MainBufferID == NO_SUCH_BUFFER &&
       InputSourceCodeBufferIDs.size() == 1)

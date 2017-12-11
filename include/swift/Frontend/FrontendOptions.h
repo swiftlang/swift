@@ -224,6 +224,15 @@ public:
   }
 
   unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
+  
+  
+  
+  std::vector<std::string> outputFilenamesForEachInput() const {
+    std::vector<std::string> result;
+    for (const InputFile &input: AllFiles)
+      result.push_back(input.outputs().OutputFilename);
+    return result;
+  }
 
   // Multi-facet readers
 
@@ -253,6 +262,8 @@ public:
     AllFiles.clear();
     PrimaryInputs.clear();
   }
+  
+  
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -505,6 +516,7 @@ public:
   bool isCompilingExactlyOneSwiftFile() const {
     return InputKind == InputFileKind::IFK_Swift && InputsAndOutputs.hasUniqueInput();
   }
+ 
   
 
 private:

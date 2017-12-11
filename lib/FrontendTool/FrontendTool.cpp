@@ -1147,7 +1147,7 @@ static bool emitIndexData(SourceFile *PrimarySourceFile,
       moduleToken = opts.InputsAndOutputs.lastOutputFilename();
 
     if (index::indexAndRecord(Instance.getMainModule(),
-                              opts.InputsAndOutputs.pathsForAtMostOnePrimary().OutputFilenames, moduleToken,
+                              opts.InputsAndOutputs.outputFilenamesForEachInput(), moduleToken,
                               opts.IndexStorePath, opts.IndexSystemModules,
                               isDebugCompilation, Invocation.getTargetTriple(),
                               *Instance.getDependencyTracker())) {
