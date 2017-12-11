@@ -3969,6 +3969,10 @@ public:
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
       }
+      if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
+        if (!protocol->hasFixedLayout())
+          TC.inferDefaultWitnesses(protocol);
+      }
     }
   }
 

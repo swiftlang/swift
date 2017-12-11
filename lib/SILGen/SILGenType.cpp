@@ -827,7 +827,8 @@ public:
 
     // Build a default witness table if this is a protocol.
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
-      if (!protocol->isObjC())
+      if (!protocol->isObjC() &&
+          !protocol->hasFixedLayout())
         SGM.emitDefaultWitnessTable(protocol);
       return;
     }
