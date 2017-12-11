@@ -196,7 +196,6 @@ ArrayTestSuite.test("init(repeating:count:)") {
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
   var (a, nsa) = getBridgedVerbatimArrayAndNSMutableArray()
-  expectTrue(isCocoaArray(a))
 
   // Find an existing value.
   do {
@@ -216,7 +215,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
   var (a, nsa) = getBridgedNonverbatimArrayAndNSMutableArray()
-  expectTrue(isNativeArray(a))
 
   // Find an existing value.
   do {
@@ -321,7 +319,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Subscript") {
   let a = getBridgedVerbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isCocoaArray(a))
 
   // Find an existing value.
   do {
@@ -340,7 +337,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Subscript") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Subscript") {
   var a = getBridgedNonverbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isNativeArray(a))
 
   // Find an existing value.
   do {
@@ -359,7 +355,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Subscript") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   var a = getBridgedVerbatimArray()
   let identity = a._rawIdentifier()
-  expectTrue(isCocoaArray(a))
 
   let index = 0
   expectEqual(1010, (a[index] as! TestObjCValueTy).value)
@@ -367,7 +362,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 
   let removedElement = a.remove(at: index)
   expectNotEqual(identity, a._rawIdentifier())
-  expectTrue(isNativeArray(a))
   expectEqual(1010, (removedElement as! TestObjCValueTy).value)
   expectEqual(2, a.count)
 }
@@ -375,7 +369,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
   var a = getBridgedNonverbatimArray()
   let identity = a._rawIdentifier()
-  expectTrue(isNativeArray(a))
 
   let index = 0
   expectEqual(1010, a[index].value)
@@ -383,7 +376,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
 
   let removedElement = a.remove(at: index)
   expectEqual(identity, a._rawIdentifier())
-  expectTrue(isNativeArray(a))
   expectEqual(1010, removedElement.value)
   expectEqual(2, a.count)
 }
@@ -392,7 +384,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var a = getBridgedVerbatimArray()
     let identity1 = a._rawIdentifier()
-    expectTrue(isCocoaArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
     expectEqual(1010, (a[0] as! TestObjCValueTy).value)
@@ -406,7 +397,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var a = getBridgedVerbatimArray()
     let identity1 = a._rawIdentifier()
-    expectTrue(isCocoaArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
     expectEqual(1010, (a[0] as! TestObjCValueTy).value)
@@ -420,7 +410,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var a1 = getBridgedVerbatimArray()
     let identity1 = a1._rawIdentifier()
-    expectTrue(isCocoaArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
     expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
@@ -439,7 +428,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var a1 = getBridgedVerbatimArray()
     let identity1 = a1._rawIdentifier()
-    expectTrue(isCocoaArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
     expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
@@ -460,7 +448,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var a = getBridgedNonverbatimArray()
     let identity1 = a._rawIdentifier()
-    expectTrue(isNativeArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
     expectEqual(1010, a[0].value)
@@ -474,7 +461,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var a = getBridgedNonverbatimArray()
     let identity1 = a._rawIdentifier()
-    expectTrue(isNativeArray(a))
     let originalCapacity = a.count
     expectEqual(3, a.count)
     expectEqual(1010, a[0].value)
@@ -488,7 +474,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var a1 = getBridgedNonverbatimArray()
     let identity1 = a1._rawIdentifier()
-    expectTrue(isNativeArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
     expectEqual(1010, a1[0].value)
@@ -507,7 +492,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var a1 = getBridgedNonverbatimArray()
     let identity1 = a1._rawIdentifier()
-    expectTrue(isNativeArray(a1))
     let originalCapacity = a1.count
     expectEqual(3, a1.count)
     expectEqual(1010, a1[0].value)
@@ -527,7 +511,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   let a = getBridgedVerbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isCocoaArray(a))
 
   expectEqual(3, a.count)
   expectEqual(identity1, a._rawIdentifier())
@@ -536,7 +519,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Count") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
   let a = getBridgedNonverbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isNativeArray(a))
 
   expectEqual(3, a.count)
   expectEqual(identity1, a._rawIdentifier())
@@ -545,7 +527,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   let a = getBridgedVerbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isCocoaArray(a))
 
   var iter = a.makeIterator()
   var values = Array<Int>()
@@ -562,7 +543,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   let a = getBridgedNonverbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isNativeArray(a))
 
   var iter = a.makeIterator()
   var values = Array<Int>()
@@ -579,7 +559,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   let a = getBridgedVerbatimArray([])
   let identity1 = a._rawIdentifier()
-  expectTrue(isCocoaArray(a))
 
   var iter = a.makeIterator()
   expectNil(iter.next())
@@ -592,7 +571,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   let a = getBridgedNonverbatimArray([])
   let identity1 = a._rawIdentifier()
-  expectTrue(isNativeArray(a))
 
   var iter = a.makeIterator()
   expectNil(iter.next())
@@ -605,7 +583,6 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   let a = getHugeBridgedVerbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isCocoaArray(a))
 
   var iter = a.makeIterator()
   var values = Array<Int>()
@@ -626,7 +603,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   let a = getHugeBridgedNonverbatimArray()
   let identity1 = a._rawIdentifier()
-  expectTrue(isNativeArray(a))
 
   var iter = a.makeIterator()
   var values = Array<Int>()
@@ -647,11 +623,9 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   let a1 = getBridgedVerbatimEquatableArray([])
   let identity1 = a1._rawIdentifier()
-  expectTrue(isCocoaArray(a1))
 
   let a2 = getBridgedVerbatimEquatableArray([])
   let identity2 = a2._rawIdentifier()
-  expectTrue(isCocoaArray(a2))
 
   // We can't check that `identity1 != identity2` because Foundation might be
   // returning the same singleton NSArray for empty arrays.
@@ -666,11 +640,9 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   a1.append(TestBridgedEquatableValueTy(1))
   a1.removeLast()
   let identity1 = a1._rawIdentifier()
-  expectTrue(isNativeArray(a1))
 
   let a2 = getBridgedNonverbatimEquatableArray([])
   let identity2 = a2._rawIdentifier()
-  expectTrue(isNativeArray(a2))
   expectNotEqual(identity1, identity2)
 
   expectEqual(a1, a2)
@@ -682,11 +654,9 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(_ na1: Array<Int>, _ na2: Array<Int>, _ expectedEq: Bool) {
     let a1 = getBridgedVerbatimEquatableArray(na1)
     let identity1 = a1._rawIdentifier()
-    expectTrue(isCocoaArray(a1))
 
     var a2 = getBridgedVerbatimEquatableArray(na2)
     var identity2 = a2._rawIdentifier()
-    expectTrue(isCocoaArray(a2))
 
     do {
       let eq1 = (a1 == a2)
@@ -706,7 +676,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
 
     a2.append(TestObjCEquatableValueTy(1111))
     a2.removeLast()
-    expectTrue(isNativeArray(a2))
     expectNotEqual(identity2, a2._rawIdentifier())
     identity2 = a2._rawIdentifier()
 
@@ -911,144 +880,6 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
   checkArrayFastEnumerationFromObjC(
     [], a, { a },
     { ($0 as! TestObjCValueTy).value })
-}
-
-//===---
-// Array -> NSArray bridging tests.
-//
-// Values are bridged non-verbatim.
-//===---
-
-ArrayTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
-  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
-  let enumerator = a.objectEnumerator()
-
-  var values = Array<Int>()
-  while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as AnyObject
-    let v = (value as! TestObjCValueTy).value
-    values.append(v)
-  }
-  expectEqual([ 1010, 1020, 1030 ], values)
-
-  expectAutoreleasedValues(unopt: 3)
-}
-
-ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift") {
-  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
-
-  checkArrayFastEnumerationFromSwift(
-    [ 1010, 1020, 1030 ],
-    a, { a.objectEnumerator() },
-    { ($0 as! TestObjCValueTy).value })
-
-  expectAutoreleasedValues(unopt: 3)
-}
-
-ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift.Partial") {
-  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
-    numElements: 9)
-
-  checkArrayEnumeratorPartialFastEnumerationFromSwift(
-    [ 1010, 1020, 1030, 1040, 1050,
-      1060, 1070, 1080, 1090 ],
-    a, maxFastEnumerationItems: 5,
-    { ($0 as! TestObjCValueTy).value })
-
-  expectAutoreleasedValues(unopt: 9)
-}
-
-ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromObjC") {
-  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
-
-  checkArrayFastEnumerationFromObjC(
-    [ 1010, 1020, 1030 ],
-    a, { a.objectEnumerator() },
-    { ($0 as! TestObjCValueTy).value })
-
-  expectAutoreleasedValues(unopt: 3)
-}
-
-ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
-  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
-
-  checkArrayFastEnumerationFromSwift(
-    [ 1010, 1020, 1030 ],
-    a, { a },
-    { ($0 as! TestObjCValueTy).value })
-
-  expectAutoreleasedValues(unopt: 3)
-}
-
-ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
-  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
-
-  checkArrayFastEnumerationFromObjC(
-    [ 1010, 1020, 1030 ],
-    a, { a },
-    { ($0 as! TestObjCValueTy).value })
-
-  expectAutoreleasedValues(unopt: 3)
-}
-
-ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
-  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
-    numElements: 0)
-
-  checkArrayFastEnumerationFromSwift(
-    [], a, { a },
-    { ($0 as! TestObjCValueTy).value })
-
-  checkArrayFastEnumerationFromObjC(
-    [], a, { a },
-    { ($0 as! TestObjCValueTy).value })
-}
-
-ArrayTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
-  let a = getBridgedNSArrayOfObj_ValueTypeCustomBridged()
-  let enumerator = a.objectEnumerator()
-
-  var values = Array<Int>()
-  while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as AnyObject
-    let v = (value as! TestObjCValueTy).value
-    values.append(v)
-  }
-  expectEqual([ 1010, 1020, 1030 ], values)
-
-  expectAutoreleasedValues(unopt: 3)
-}
-
-ArrayTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
-  let a = getBridgedNSArrayOfValue_ValueTypeCustomBridged()
-  let enumerator = a.objectEnumerator()
-
-  var values = Array<Int>()
-  while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as AnyObject
-    let v = (value as! TestObjCValueTy).value
-    values.append(v)
-  }
-  expectEqual([ 1010, 1020, 1030 ], values)
-
-  expectAutoreleasedValues(unopt: 3)
-}
-
-//===---
-// NSArray -> Array -> NSArray bridging tests.
-//===---
-
-ArrayTestSuite.test("BridgingRoundtrip") {
-  let a = getRoundtripBridgedNSArray()
-  let enumerator = a.objectEnumerator()
-
-  var values = Array<Int>()
-  while let valueObj = enumerator.nextObject() {
-    let value: AnyObject = valueObj as AnyObject
-    let v = (value as! TestObjCValueTy).value
-    values.append(v)
-  }
-  expectEqual([ 1010, 1020, 1030 ], values)
 }
 
 //===---

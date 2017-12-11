@@ -259,22 +259,6 @@ import SlurpFastEnumeration
     convertValue)
 }
 
-func getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
-  numElements: Int = 3
-) -> NSArray {
-  expectFalse(_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
-
-  var a = Array<TestBridgedValueTy>()
-  for i in 1..<(numElements + 1) {
-    a.append(TestBridgedValueTy(i * 10 + 1000))
-  }
-
-  let bridged = convertArrayToNSArray(a)
-  expectTrue(isNativeNSArray(bridged))
-
-  return bridged
-}
-
  func checkArrayEnumeratorPartialFastEnumerationFromSwift(
   _ expected: [Int],
   _ a: NSArray,
@@ -313,14 +297,6 @@ func _expectAutoreleasedKeysAndValues(
 #endif
 
   TestObjCValueTy.objectCount -= expectedValues
-}
-
-func isCocoaArray<T>(_ a: Array<T>) -> Bool {
-  return !isNativeArray(a)
-}
-
-func isNativeArray<T>(_ a: Array<T>) -> Bool {
-  return a._buffer._storage.isNative
 }
 
 func convertArrayToNSArray<T>(_ a: [T]) -> NSArray {
@@ -422,34 +398,6 @@ func getHugeBridgedNonverbatimArray()
     -> Array<TestBridgedValueTy> {
   let nsa = getHugeBridgedVerbatimArrayHelper()
   return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
-}
-
-func getBridgedNSArrayOfObj_ValueTypeCustomBridged() -> NSArray {
-  expectTrue(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
-
-  var a = Array<TestObjCValueTy>()
-  a.append(TestObjCValueTy(1010))
-  a.append(TestObjCValueTy(1020))
-  a.append(TestObjCValueTy(1030))
-
-  let bridged = convertArrayToNSArray(a)
-  expectTrue(isNativeNSArray(bridged))
-
-  return bridged
-}
-
-func getBridgedNSArrayOfValue_ValueTypeCustomBridged() -> NSArray {
-  expectFalse(_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
-
-  var a = Array<TestBridgedValueTy>()
-  a.append(TestBridgedValueTy(1010))
-  a.append(TestBridgedValueTy(1020))
-  a.append(TestBridgedValueTy(1030))
-
-  let bridged = convertArrayToNSArray(a)
-  expectTrue(isNativeNSArray(bridged))
-
-  return bridged
 }
 
 func getRoundtripBridgedNSArray() -> NSArray {

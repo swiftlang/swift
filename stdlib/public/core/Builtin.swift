@@ -256,9 +256,8 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 @_transparent
 public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   if _isDebugAssertConfiguration() && _slowPath(!(x is T)) {
-    _assertionFailed(
-      "unsafeDowncast",
-      "\(type(of: x)) to \(T.self)", #file, #line, flags: _fatalErrorFlags())
+    fatalError(
+      "unsafeDowncast \(type(of: x)) to \(T.self)")
   }
   return Builtin.castReference(x)
 }
