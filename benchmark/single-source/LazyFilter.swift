@@ -47,7 +47,7 @@ public func run_LazilyFilteredArrays(_ N: Int) {
   CheckResults(res == 123)
 }
 
-fileprivate var multiplesOfThree: LazyFilterBidirectionalCollection<Array<Int>>?
+fileprivate var multiplesOfThree: LazyFilterCollection<Array<Int>>?
 
 fileprivate func setup_LazilyFilteredArrayContains() {
   multiplesOfThree = Array(1..<5_000).lazy.filter { $0 % 3 == 0 }

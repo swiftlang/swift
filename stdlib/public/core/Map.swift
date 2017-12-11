@@ -1,4 +1,4 @@
-//===--- Map.swift.gyb - Lazily map over a Sequence -----------*- swift -*-===//
+//===--- Map.swift - Lazily map over a Sequence ---------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,13 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-%{
-from gyb_stdlib_support import (
-    TRAVERSALS,
-    collectionForTraversal
-)
-}%
 
 /// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
 /// Produces each element by passing the output of the `Base`
@@ -96,22 +89,14 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
 //===--- Collections ------------------------------------------------------===//
 
-// FIXME(ABI)#45 (Conditional Conformance): `LazyMap*Collection` types should be
-// collapsed into one `LazyMapCollection` using conditional conformances.
-// Maybe even combined with `LazyMapSequence`.
-// rdar://problem/17144340
-
-% for Traversal in TRAVERSALS:
-%   Self = "LazyMap" + collectionForTraversal(Traversal)
-
 /// A `Collection` whose elements consist of those in a `Base`
 /// `Collection` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 @_fixed_layout
-public struct ${Self}<
-  Base : ${collectionForTraversal(Traversal)}, Element
-> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
+public struct LazyMapCollection<
+  Base : Collection, Element
+> : LazyCollectionProtocol, Collection {
 
   // FIXME(compiler limitation): should be inferable.
   public typealias Index = Base.Index
@@ -129,16 +114,6 @@ public struct ${Self}<
     _base.formIndex(after: &i)
   }
 
-%   if Traversal in ['Bidirectional', 'RandomAccess']:
-  @_inlineable
-  public func index(before i: Index) -> Index { return _base.index(before: i) }
-
-  @_inlineable
-  public func formIndex(before i: inout Index) {
-    _base.formIndex(before: &i)
-  }
-%   end
-
   /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
@@ -148,7 +123,7 @@ public struct ${Self}<
     return _transform(_base[position])
   }
 
-  public typealias SubSequence = ${Self}<Base.SubSequence, Element>
+  public typealias SubSequence = LazyMapCollection<Base.SubSequence, Element>
 
   @_inlineable
   public subscript(bounds: Range<Base.Index>) -> SubSequence {
@@ -182,11 +157,6 @@ public struct ${Self}<
 
   @_inlineable
   public var first: Element? { return _base.first.map(_transform) }
-
-%   if Traversal in ['Bidirectional', 'RandomAccess']:
-  @_inlineable
-  public var last: Element? { return _base.last.map(_transform) }
-%   end
 
   @_inlineable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -233,7 +203,24 @@ public struct ${Self}<
   internal let _transform: (Base.Element) -> Element
 }
 
-% end
+extension LazyMapCollection : BidirectionalCollection
+  where Base : BidirectionalCollection {
+
+  @_inlineable
+  public func index(before i: Index) -> Index { return _base.index(before: i) }
+
+  @_inlineable
+  public func formIndex(before i: inout Index) {
+    _base.formIndex(before: &i)
+  }
+
+  @_inlineable
+  public var last: Element? { return _base.last.map(_transform) }
+}
+
+extension LazyMapCollection : RandomAccessCollection
+  where Base : RandomAccessCollection {}
+
 
 //===--- Support for s.lazy -----------------------------------------------===//
 
@@ -249,29 +236,17 @@ extension LazySequenceProtocol {
   }
 }
 
-% for Traversal in TRAVERSALS:
-
-extension LazyCollectionProtocol
-%   if Traversal != 'Forward':
-  where
-  Self : ${collectionForTraversal(Traversal)},
-  Elements : ${collectionForTraversal(Traversal)}
-%   end
-{
+extension LazyCollectionProtocol {
   /// Returns a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   @_inlineable
   public func map<U>(
     _ transform: @escaping (Elements.Element) -> U
-  ) -> LazyMap${collectionForTraversal(Traversal)}<Self.Elements, U> {
-    return LazyMap${collectionForTraversal(Traversal)}(
-      _base: self.elements,
-      transform: transform)
+  ) -> LazyMapCollection<Self.Elements, U> {
+    return LazyMapCollection(_base: self.elements, transform: transform)
   }
 }
-
-% end
 
 extension LazyMapCollection {
   // This overload is needed to re-enable Swift 3 source compatibility related
@@ -289,6 +264,7 @@ extension LazyMapCollection {
   }
 }
 
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
+@available(*, deprecated, renamed: "LazyMapCollection")
+public typealias LazyMapBidirectionalCollection<T, E> = LazyMapCollection<T, E> where T : BidirectionalCollection
+@available(*, deprecated, renamed: "LazyMapCollection")
+public typealias LazyMapRandomAccessCollection<T, E> = LazyMapCollection<T, E> where T : RandomAccessCollection
