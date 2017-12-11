@@ -7276,7 +7276,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     case CC_SelfMismatch:         // Self argument mismatches.
     case CC_ArgumentNearMismatch: // Argument list mismatch.
     case CC_ArgumentMismatch:     // Argument list mismatch.
-      assert(0 && "These aren't produced by filterContextualMemberList");
+      llvm_unreachable("These aren't produced by filterContextualMemberList");
       return false;
 
     case CC_ExactMatch: { // This is a perfect match for the arguments.
