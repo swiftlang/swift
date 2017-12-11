@@ -177,9 +177,6 @@ enum TypeVariableOptions {
 /// to, what specific types it might be and, eventually, the fixed type to
 /// which it is assigned.
 class TypeVariableType::Implementation {
-  /// Type variable options.
-  unsigned Options : 3;
-
   /// \brief The locator that describes where this type variable was generated.
   constraints::ConstraintLocator *locator;
 
@@ -191,37 +188,9 @@ class TypeVariableType::Implementation {
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
-  ///  Index into the list of type variables, as used by the
-  ///  constraint graph.
-  unsigned GraphIndex;
-
   friend class constraints::SavedTypeVariableBinding;
 
 public:
-  explicit Implementation(constraints::ConstraintLocator *locator,
-                          unsigned options)
-    : Options(options), locator(locator),
-      ParentOrFixed(getTypeVariable()) { }
-
-  /// \brief Retrieve the unique ID corresponding to this type variable.
-  unsigned getID() const { return getTypeVariable()->getID(); }
-
-  /// Whether this type variable can bind to an lvalue type.
-  bool canBindToLValue() const { return Options & TVO_CanBindToLValue; }
-
-  /// Whether this type variable can bind to an inout type.
-  bool canBindToInOut() const { return Options & TVO_CanBindToInOut; }
-
-  /// Whether this type variable prefers a subtype binding over a supertype
-  /// binding.
-  bool prefersSubtypeBinding() const {
-    return Options & TVO_PrefersSubtypeBinding;
-  }
-
-  bool mustBeMaterializable() const {
-    return !(Options & TVO_CanBindToInOut) && !(Options & TVO_CanBindToLValue);
-  }
-
   /// \brief Retrieve the type variable associated with this implementation.
   TypeVariableType *getTypeVariable() {
     return reinterpret_cast<TypeVariableType *>(this) - 1;
@@ -230,6 +199,42 @@ public:
   /// \brief Retrieve the type variable associated with this implementation.
   const TypeVariableType *getTypeVariable() const {
     return reinterpret_cast<const TypeVariableType *>(this) - 1;
+  }
+
+  explicit Implementation(constraints::ConstraintLocator *locator,
+                          unsigned options)
+    : locator(locator), ParentOrFixed(getTypeVariable()) {
+    getTypeVariable()->TypeVariableTypeBits.Options = options;
+  }
+
+  /// \brief Retrieve the unique ID corresponding to this type variable.
+  unsigned getID() const { return getTypeVariable()->getID(); }
+
+  unsigned getRawOptions() const {
+    return getTypeVariable()->TypeVariableTypeBits.Options;
+  }
+
+  void setRawOptions(unsigned bits) {
+    getTypeVariable()->TypeVariableTypeBits.Options = bits;
+    assert(getTypeVariable()->TypeVariableTypeBits.Options == bits
+           && "Trucation");
+  }
+
+  /// Whether this type variable can bind to an lvalue type.
+  bool canBindToLValue() const { return getRawOptions() & TVO_CanBindToLValue; }
+
+  /// Whether this type variable can bind to an inout type.
+  bool canBindToInOut() const { return getRawOptions() & TVO_CanBindToInOut; }
+
+  /// Whether this type variable prefers a subtype binding over a supertype
+  /// binding.
+  bool prefersSubtypeBinding() const {
+    return getRawOptions() & TVO_PrefersSubtypeBinding;
+  }
+
+  bool mustBeMaterializable() const {
+    return !(getRawOptions() & TVO_CanBindToInOut) &&
+           !(getRawOptions() & TVO_CanBindToLValue);
   }
 
   /// Retrieve the corresponding node in the constraint graph.
@@ -243,11 +248,13 @@ public:
   /// Retrieve the index into the constraint graph's list of type variables.
   unsigned getGraphIndex() const { 
     assert(GraphNode && "Graph node isn't set");
-    return GraphIndex; 
+    return getTypeVariable()->TypeVariableTypeBits.GraphIndex; 
   }
 
   /// Set the index into the constraint graph's list of type variables.
-  void setGraphIndex(unsigned newIndex) { GraphIndex = newIndex; }
+  void setGraphIndex(unsigned newIndex) {
+    getTypeVariable()->TypeVariableTypeBits.GraphIndex = newIndex;
+  }
   
   /// \brief Check whether this type variable either has a representative that
   /// is not itself or has a fixed type binding.
@@ -339,8 +346,8 @@ public:
     if (!mustBeMaterializable() && otherRep->getImpl().mustBeMaterializable()) {
       if (record)
         recordBinding(*record);
-      Options &= ~TVO_CanBindToLValue;
-      Options &= ~TVO_CanBindToInOut;
+      getTypeVariable()->TypeVariableTypeBits.Options &= ~TVO_CanBindToLValue;
+      getTypeVariable()->TypeVariableTypeBits.Options &= ~TVO_CanBindToInOut;
     }
   }
 
@@ -381,8 +388,10 @@ public:
     if (!rep->getImpl().mustBeMaterializable()) {
       if (record)
         rep->getImpl().recordBinding(*record);
-      rep->getImpl().Options &= ~TVO_CanBindToLValue;
-      rep->getImpl().Options &= ~TVO_CanBindToInOut;
+      rep->getImpl().getTypeVariable()->TypeVariableTypeBits.Options
+        &= ~TVO_CanBindToLValue;
+      rep->getImpl().getTypeVariable()->TypeVariableTypeBits.Options
+        &= ~TVO_CanBindToInOut;
     }
   }
 

@@ -1314,8 +1314,8 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
   : TypeBase(TypeKind::Paren, nullptr, properties),
     UnderlyingType(flags.isInOut()
                      ? InOutType::get(baseType)
-                     : baseType),
-    parameterFlags(flags) {
+                     : baseType) {
+  ParenTypeBits.Flags = flags.toRaw();
   if (flags.isInOut())
     assert(!baseType->is<InOutType>() && "caller did not pass a base type");
   if (baseType->is<InOutType>())
