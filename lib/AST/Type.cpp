@@ -4103,10 +4103,8 @@ void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
 SILBoxType::SILBoxType(ASTContext &C,
                        SILLayout *Layout, SubstitutionList Args)
 : TypeBase(TypeKind::SILBox, &C,
-           getRecursivePropertiesFromSubstitutions(Args)),
-  Layout(Layout),
-  NumGenericArgs(Args.size())
-{
+           getRecursivePropertiesFromSubstitutions(Args)), Layout(Layout) {
+  SILBoxTypeBits.NumGenericArgs = Args.size();
 #ifndef NDEBUG
   // Check that the generic args are reasonable for the box's signature.
   if (Layout->getGenericSignature())
@@ -4115,9 +4113,8 @@ SILBoxType::SILBoxType(ASTContext &C,
     assert(arg.getReplacement()->isCanonical() &&
            "box arguments must be canonical types!");
 #endif
-  auto paramsBuf = getTrailingObjects<Substitution>();
-  for (unsigned i = 0; i < NumGenericArgs; ++i)
-    ::new (paramsBuf + i) Substitution(Args[i]);
+  std::uninitialized_copy(Args.begin(), Args.end(),
+                          getTrailingObjects<Substitution>());
 }
 
 RecursiveTypeProperties SILBoxType::
