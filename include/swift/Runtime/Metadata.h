@@ -29,6 +29,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
+#include "swift/ABI/TrailingObjects.h"
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
@@ -1023,12 +1024,12 @@ struct GenericContextDescriptor {
   /// to NumGenericRequirements; it counts only the type parameters
   /// and not any required witness tables.
   uint32_t NumPrimaryParams;
+  
+  // TODO: add meaningful descriptions of the generic requirements.
 };
 
-/// Header for a generic parameter descriptor. This is a variable-sized
-/// structure that describes how to find and parse a generic parameter vector
-/// within the type metadata for an instance of a nominal type.
-struct GenericParameterDescriptor {
+/// Header for a generic parameter descriptor.
+struct GenericParameterDescriptorHeader {
   /// The offset to the first generic argument from the start of
   /// metadata record.
   ///
@@ -1063,13 +1064,6 @@ struct GenericParameterDescriptor {
   bool isGeneric() const {
     return hasGenericRequirements();
   }
-
-  GenericContextDescriptor getContext(unsigned depth) const {
-    assert(depth < NestingDepth);
-    return ((const GenericContextDescriptor *)(this + 1))[depth];
-  }
-
-  // TODO: add meaningful descriptions of the generic requirements.
 };
 
 template <typename Runtime>
@@ -1086,27 +1080,43 @@ struct TargetMethodDescriptor {
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.
-template <typename Runtime>
-struct TargetVTableDescriptor {
+struct VTableDescriptorHeader {
   /// The offset of the vtable for this class in its metadata, if any.
   uint32_t VTableOffset;
-  /// The number of vtable entries, in words.
+  /// The number of vtable entries. This is the number of MethodDescriptor
+  /// records following the vtable header in the class's nominal type
+  /// descriptor, which is equal to the number of words this subclass's vtable
+  /// entries occupy in instantiated class metadata.
   uint32_t VTableSize;
-
-  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
-
-  MethodDescriptor VTable[];
-
-  void *getMethod(unsigned index) const {
-    return VTable[index].Impl.get();
-  }
 };
 
+template<typename Runtime> struct TargetNominalTypeDescriptor;
+
+template<typename Runtime>
+using TargetNominalTypeDescriptorTrailingObjects
+  = swift::ABI::TrailingObjects<TargetNominalTypeDescriptor<Runtime>,
+        GenericContextDescriptor,
+        VTableDescriptorHeader,
+        TargetMethodDescriptor<Runtime>>;
+
 /// Common information about all nominal types. For generic types, this
-/// descriptor is shared for all instantiations of the generic type.
+/// descriptor is shared for all instantiations of the generic type. Unlike
+/// metadata records, the uniqueness of a nominal type descriptor should not
+/// be relied on.
 template <typename Runtime>
-struct TargetNominalTypeDescriptor {
+struct TargetNominalTypeDescriptor final
+    : private TargetNominalTypeDescriptorTrailingObjects<Runtime>
+{
+private:
+  using TrailingObjects = TargetNominalTypeDescriptorTrailingObjects<Runtime>;
+  friend TrailingObjects;
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
   using StoredPointer = typename Runtime::StoredPointer;
+  using MethodDescriptor = TargetMethodDescriptor<Runtime>;
+  
   /// The mangled name of the nominal type.
   TargetRelativeDirectPointer<Runtime, const char> Name;
   
@@ -1231,29 +1241,56 @@ struct TargetNominalTypeDescriptor {
     return offsetof(TargetNominalTypeDescriptor<Runtime>, Name);
   }
 
-  using VTableDescriptor = TargetVTableDescriptor<Runtime>;
-
-  const VTableDescriptor *getVTableDescriptor() const {
-    if (getKind() != NominalTypeKind::Class ||
-        !GenericParams.Flags.hasVTable())
-      return nullptr;
-
-    auto asWords = reinterpret_cast<const uint32_t *>(this + 1);
-
-    // TODO: Once we emit reflective descriptions of generic requirements,
-    // skip the right number of words here.
-
-    return reinterpret_cast<const VTableDescriptor *>(asWords
-        + GenericParams.NestingDepth);
-  }
-
   /// The generic parameter descriptor header. This describes how to find and
   /// parse the generic parameter vector in metadata records for this nominal
   /// type.
-  GenericParameterDescriptor GenericParams;
+  GenericParameterDescriptorHeader GenericParams;
+
+  const GenericContextDescriptor *getGenericContexts() const {
+    return this->template getTrailingObjects<GenericContextDescriptor>();
+  }
   
-  // NOTE: GenericParams ends with a tail-allocated array, so it cannot be
-  // followed by additional fields.
+  const GenericContextDescriptor &getGenericContext(unsigned i) const {
+    assert(i < numTrailingObjects(OverloadToken<GenericContextDescriptor>{}));
+    return getGenericContexts()[i];
+  }
+
+  bool hasVTable() const {
+    return getKind() == NominalTypeKind::Class
+      && GenericParams.Flags.hasVTable();
+  }
+  
+  const VTableDescriptorHeader *getVTableDescriptor() const {
+    if (!hasVTable())
+      return nullptr;
+    return this->template getTrailingObjects<VTableDescriptorHeader>();
+  }
+  
+  const MethodDescriptor *getMethodDescriptors() const {
+    if (!hasVTable())
+      return nullptr;
+    return this->template getTrailingObjects<MethodDescriptor>();
+  }
+  
+  void *getMethod(unsigned i) const {
+    assert(hasVTable()
+           && i < numTrailingObjects(OverloadToken<MethodDescriptor>{}));
+    return getMethodDescriptors()[i].Impl.get();
+  }
+
+private:
+  size_t numTrailingObjects(OverloadToken<GenericContextDescriptor>) const {
+    return GenericParams.NestingDepth;
+  }
+  size_t numTrailingObjects(OverloadToken<VTableDescriptorHeader>) const {
+    return hasVTable() ? 1 : 0;
+  }
+  size_t numTrailingObjects(OverloadToken<MethodDescriptor>) const {
+    if (!hasVTable())
+      return 0;
+
+    return getVTableDescriptor()->VTableSize;
+  }
 };
 using NominalTypeDescriptor = TargetNominalTypeDescriptor<InProcess>;
 
