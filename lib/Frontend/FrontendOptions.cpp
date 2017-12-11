@@ -111,7 +111,7 @@ bool FrontendInputsAndOutputs::doAllNonPrimariesEndWithSIB() const {
 StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
   if (AllFiles.empty()) return StringRef();
   // FIXME use reverse iterator?
-  for (auto i = AllFiles.size();; --i) {
+  for (auto i = AllFiles.size() - 1; ; --i) {
     if (!AllFiles[i].outputs().OutputFilename.empty()) {
       assert(AllFiles[i].outputs().OutputFilename == AllFiles[0].outputs().OutputFilename);
       return AllFiles[i].outputs().OutputFilename;

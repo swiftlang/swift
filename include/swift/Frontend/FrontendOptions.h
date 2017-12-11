@@ -103,10 +103,11 @@ public:
   }
 
   // FIXME: check all uses
-  OutputPaths pathsForAtMostOnePrimary() const {
+  const OutputPaths &pathsForAtMostOnePrimary() const {
+    static OutputPaths empty;
     return hasPrimaries()
                ? AllFiles[PrimaryInputs.front().second].outputs()
-               : AllFiles.empty() ? OutputPaths() : AllFiles.front().outputs();
+               : AllFiles.empty() ? empty : AllFiles.front().outputs();
   }
 
   // FIXME: Why the *last* one?

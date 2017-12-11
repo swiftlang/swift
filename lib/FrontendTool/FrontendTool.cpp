@@ -910,8 +910,8 @@ static bool performCompile(CompilerInstance &Instance,
                .ModuleOutputPath.empty()) {
         SerializationOptions serializationOpts;
         serializationOpts.OutputPath =
-            opts.InputsAndOutputs.pathsForAtMostOnePrimary()
-                .ModuleOutputPath.c_str();
+        opts.InputsAndOutputs.pathsForAtMostOnePrimary()
+        .ModuleOutputPath.c_str();
         serializationOpts.DocOutputPath =
             opts.InputsAndOutputs.pathsForAtMostOnePrimary()
                 .ModuleDocOutputPath.c_str();
