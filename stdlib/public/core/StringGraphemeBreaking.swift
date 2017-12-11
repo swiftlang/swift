@@ -20,7 +20,34 @@ internal var _CR: UInt8 { return 0x0d }
 @_versioned
 internal var _LF: UInt8 { return 0x0a }
 
+extension String.Index {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal init(encodedOffset: Int, characterStride stride: Int) {
+    if _slowPath(stride == 0 || stride > UInt16.max) {
+      // Don't store a 0 stride for the endIndex
+      // or a truncated stride for an overlong grapheme cluster.
+      self.init(encodedOffset: encodedOffset)
+      return
+    }
+    self.init(
+      encodedOffset: encodedOffset,
+      .character(stride: UInt16(truncatingIfNeeded: stride)))
+  }
+}
+
 extension _StringVariant {
+  @_versioned
+  @_inlineable
+  internal func _stride(at i: String.Index) -> Int {
+    if case .character(let stride) = i._cache {
+      // TODO: should _fastPath the case somehow
+      _sanityCheck(stride > 0)
+      return Int(stride)
+    }
+    return characterStride(atOffset: i.encodedOffset)
+  }
+
   @_versioned
   @_inlineable
   internal func characterStride(atOffset offset: Int) -> Int {
@@ -32,9 +59,7 @@ extension _StringVariant {
   @_inlineable
   internal func characterIndex(atOffset offset: Int) -> String.Index {
     let stride = self.characterStride(atOffset: offset)
-    return String.Index(
-      encodedOffset: offset,
-      .character(stride: UInt16(stride)))
+    return String.Index(encodedOffset: offset, characterStride: stride)
   }
 
   @_versioned
@@ -45,19 +70,12 @@ extension _StringVariant {
     _precondition(offset < count, "Can't advance past endIndex")
     // Find the current grapheme distance
     let slice = self[offset..<count]
-    let stride1: Int
-    if case .character(let stride) = i._cache {
-      // TODO: should _fastPath the case somehow
-      stride1 = Int(stride)
-    } else {
-      stride1 = slice.measureFirstExtendedGraphemeCluster()
-    }
+    let stride1 = _stride(at: i)
     // Calculate and cache the next grapheme distance
     let stride2 = slice.dropFirst(stride1).measureFirstExtendedGraphemeCluster()
-    _sanityCheck(stride2 >= 0 && stride2 <= UInt16.max)
     return String.Index(
       encodedOffset: offset &+ stride1,
-      .character(stride: UInt16(truncatingIfNeeded: stride2)))
+      characterStride: stride2)
   }
 
   @_versioned
@@ -71,7 +89,7 @@ extension _StringVariant {
     _sanityCheck(stride > 0 && stride <= UInt16.max)
     return String.Index(
       encodedOffset: offset &- stride,
-      .character(stride: UInt16(truncatingIfNeeded: stride)))
+      characterStride: stride)
   }
 
   @_versioned
@@ -144,15 +162,8 @@ extension _StringVariant {
   @_inlineable
   @_versioned
   internal func character(at i: String.Index) -> Character {
+    let stride = _stride(at: i)
     let offset = i.encodedOffset
-    let stride: Int
-    if case .character(let _stride) = i._cache {
-      // TODO: should _fastPath the case somehow
-      stride = Int(_stride)
-    } else {
-      stride = characterStride(atOffset: offset)
-    }
-    _sanityCheck(stride > 0)
     if _slowPath(stride > 1) {
       return Character(_unverified: self.checkedSlice(offset..<offset + stride))
     }
