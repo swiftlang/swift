@@ -2955,7 +2955,7 @@ enum class ParameterConvention {
 };
 // Check that the enum values fit inside SILFunctionTypeBits.
 static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
-              "fits in SILFunctionTypeBits");
+              "fits in SILFunctionTypeBits and SILParameterInfo");
 
 // Does this parameter convention require indirect storage? This reflects a
 // SILFunctionType's formal (immutable) conventions, as opposed to the transient
@@ -3015,20 +3015,19 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
 
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
-  CanType Ty;
-  ParameterConvention Convention;
+  llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
 public:
-  SILParameterInfo() : Ty(), Convention((ParameterConvention)0) {}
+  SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
   SILParameterInfo(CanType type, ParameterConvention conv)
-    : Ty(type), Convention(conv) {
+    : TypeAndConvention(type, conv) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
   CanType getType() const {
-    return Ty;
+    return TypeAndConvention.getPointer();
   }
   ParameterConvention getConvention() const {
-    return Convention;
+    return TypeAndConvention.getInt();
   }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
@@ -3089,8 +3088,8 @@ public:
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(Ty.getPointer());
-    id.AddInteger((unsigned)Convention);
+    id.AddPointer(getType().getPointer());
+    id.AddInteger((unsigned)getConvention());
   }
 
   void dump() const;
@@ -3104,7 +3103,7 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return Ty == rhs.Ty && Convention == rhs.Convention;
+    return getType() == rhs.getType() && getConvention() == rhs.getConvention();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
