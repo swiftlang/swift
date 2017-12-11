@@ -283,6 +283,13 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned NumPatternEntries : 16;
   BITFIELD_END;
   
+  BITFIELD_START(EnumCaseDecl, Decl, 51);
+    unsigned : 19; // unused / padding
+
+    /// The number of tail-allocated element pointers.
+    unsigned NumElements : 32;
+  BITFIELD_END;
+
   BITFIELD_START(ValueDecl, Decl, 3);
     friend class MemberLookupTable;
 
@@ -597,6 +604,7 @@ protected:
   union {
     DeclBitfields DeclBits;
     PatternBindingDeclBitfields PatternBindingDeclBits;
+    EnumCaseDeclBitfields EnumCaseDeclBits;
     ValueDeclBitfields ValueDeclBits;
     AbstractStorageDeclBitfields AbstractStorageDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
@@ -5504,15 +5512,13 @@ class EnumCaseDecl final : public Decl,
   friend TrailingObjects;
   SourceLoc CaseLoc;
   
-  /// The number of tail-allocated element pointers.
-  unsigned NumElements;
-  
   EnumCaseDecl(SourceLoc CaseLoc,
                ArrayRef<EnumElementDecl *> Elements,
                DeclContext *DC)
     : Decl(DeclKind::EnumCase, DC),
-      CaseLoc(CaseLoc), NumElements(Elements.size())
+      CaseLoc(CaseLoc)
   {
+    EnumCaseDeclBits.NumElements = Elements.size();
     std::uninitialized_copy(Elements.begin(), Elements.end(),
                             getTrailingObjects<EnumElementDecl *>());
   }
@@ -5524,7 +5530,8 @@ public:
   
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
-    return {getTrailingObjects<EnumElementDecl *>(), NumElements};
+    return {getTrailingObjects<EnumElementDecl *>(),
+            EnumCaseDeclBits.NumElements};
   }
   
   SourceLoc getLoc() const {
