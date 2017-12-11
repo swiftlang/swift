@@ -318,7 +318,14 @@ protected:
     unsigned : NumTypeBaseBits;
 
     /// \brief The unique number assigned to this type variable.
-    uint64_t ID : 64 - NumTypeBaseBits;
+    uint64_t ID : 32 - NumTypeBaseBits;
+
+    /// Type variable options.
+    unsigned Options : 3;
+
+    ///  Index into the list of type variables, as used by the
+    ///  constraint graph.
+    unsigned GraphIndex : 29;
   };
   NUMBITS(TypeVariableType, 64);
 

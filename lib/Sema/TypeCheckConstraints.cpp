@@ -61,12 +61,12 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVarAndOptions(typeVar, typeVar->getImpl().Options),
+  : TypeVarAndOptions(typeVar, typeVar->getImpl().getRawOptions()),
     ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 
 void SavedTypeVariableBinding::restore() {
   auto *typeVar = getTypeVariable();
-  typeVar->getImpl().Options = getOptions();
+  typeVar->getImpl().setRawOptions(getOptions());
   typeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
