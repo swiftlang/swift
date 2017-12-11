@@ -110,11 +110,13 @@ public:
   }
 
   // FIXME: Why the *last* one?
+  
   StringRef lastOutputFilename() const {
+    if (AllFiles.enpty()) return StringRef();
     // FIXME use reverse iterator?
     for (auto i = AllFiles.size();;) {
       if (!AllFiles[i].outputs().OutputFilename.empty())
-        return AllFiles[i].outputs().OutputFilename;
+        return AllFiles[--i].outputs().OutputFilename;
       if (i == 0)
         break;
     }
