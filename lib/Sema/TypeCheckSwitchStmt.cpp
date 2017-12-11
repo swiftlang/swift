@@ -750,7 +750,7 @@ namespace {
           break;
         case SpaceKind::Disjunct: {
           if (forDisplay) {
-            assert(false && "Attempted to display disjunct to user!");
+            llvm_unreachable("Attempted to display disjunct to user!");
           } else {
             buffer << "DISJOIN(";
             for (auto &sp : Spaces) {
