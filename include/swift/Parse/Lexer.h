@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/LexerState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Trivia.h"
@@ -59,12 +60,14 @@ enum class ConflictMarkerKind {
   /// separated by 4 "="s, and terminated by 4 "<"s.
   Perforce
 };
-  
+
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
   DiagnosticEngine *Diags;
   const unsigned BufferID;
+
+  using State = LexerState;
 
   /// Pointer to the first character of the buffer, even in a lexer that
   /// scans a subrange of the buffer.
@@ -128,28 +131,6 @@ class Lexer {
   /// `TriviaRetentionMode::WithTrivia`.
   syntax::TriviaList TrailingTrivia;
   
-public:
-  /// \brief Lexer state can be saved/restored to/from objects of this class.
-  class State {
-  public:
-    State() {}
-
-    bool isValid() const {
-      return Loc.isValid();
-    }
-
-    State advance(unsigned Offset) const {
-      assert(isValid());
-      return State(Loc.getAdvancedLoc(Offset));
-    }
-
-  private:
-    explicit State(SourceLoc Loc) : Loc(Loc) {}
-    SourceLoc Loc;
-    friend class Lexer;
-  };
-
-private:
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
@@ -262,10 +243,6 @@ public:
   /// there.
   State getStateForBeginningOfToken(const Token &Tok,
                                     const syntax::Trivia &LeadingTrivia = {}) const {
-    // If trivia parsing mode, start position of trivia is the position we want
-    // to restore.
-    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
-      return State(Tok.getLoc().getAdvancedLoc(-LeadingTrivia.getTextLength()));
 
     // If the token has a comment attached to it, rewind to before the comment,
     // not just the start of the token.  This ensures that we will re-lex and
@@ -273,11 +250,18 @@ public:
     SourceLoc TokStart = Tok.getCommentStart();
     if (TokStart.isInvalid())
       TokStart = Tok.getLoc();
-    return getStateForBeginningOfTokenLoc(TokStart);
+    auto S = getStateForBeginningOfTokenLoc(TokStart);
+    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
+      S.LeadingTrivia = LeadingTrivia.Pieces;
+    return S;
   }
 
   State getStateForEndOfTokenLoc(SourceLoc Loc) const {
     return State(getLocForEndOfToken(SourceMgr, Loc));
+  }
+
+  bool isStateForCurrentBuffer(LexerState State) const {
+    return SourceMgr.findBufferContainingLoc(State.Loc) == getBufferID();
   }
 
   /// \brief Restore the lexer state to a given one, that can be located either
@@ -288,7 +272,13 @@ public:
     // Don't reemit diagnostics while readvancing the lexer.
     llvm::SaveAndRestore<DiagnosticEngine*>
       D(Diags, enableDiagnostics ? Diags : nullptr);
+
     lexImpl();
+
+    // Restore Trivia.
+    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
+      if (auto &LTrivia = S.LeadingTrivia)
+        LeadingTrivia = std::move(*LTrivia);
   }
 
   /// \brief Restore the lexer state to a given state that is located before

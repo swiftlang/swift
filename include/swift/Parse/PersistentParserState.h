@@ -19,6 +19,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/LocalContext.h"
+#include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/Scope.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -114,7 +115,7 @@ private:
   DelayedAccessorBodiesTy DelayedAccessorBodies;
 
   /// \brief Parser sets this if it stopped parsing before the buffer ended.
-  ParserPos MarkedPos;
+  ParserPosition MarkedPos;
 
   std::unique_ptr<DelayedDeclState> CodeCompletionDelayedDeclState;
 
@@ -166,16 +167,16 @@ public:
     return TopLevelCode;
   }
 
-  void markParserPosition(SourceLoc Loc, SourceLoc PrevLoc,
+  void markParserPosition(ParserPosition Pos,
                           bool InPoundLineEnvironment) {
-    MarkedPos = {Loc, PrevLoc};
+    MarkedPos = Pos;
     this->InPoundLineEnvironment = InPoundLineEnvironment;
   }
 
   /// \brief Returns the marked parser position and resets it.
-  ParserPos takeParserPosition() {
-    ParserPos Pos = MarkedPos;
-    MarkedPos = ParserPos();
+  ParserPosition takeParserPosition() {
+    ParserPosition Pos = MarkedPos;
+    MarkedPos = ParserPosition();
     return Pos;
   }
 };
