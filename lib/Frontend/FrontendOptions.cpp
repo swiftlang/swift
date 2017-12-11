@@ -113,7 +113,7 @@ StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
   // FIXME use reverse iterator?
   for (auto i = AllFiles.size() - 1; ; --i) {
     if (!AllFiles[i].outputs().OutputFilename.empty()) {
-      assert(AllFiles[i].outputs().OutputFilename == AllFiles[0].outputs().OutputFilename);
+//      assert(AllFiles[i].outputs().OutputFilename == AllFiles[0].outputs().OutputFilename);
       return AllFiles[i].outputs().OutputFilename;
     }
     if (i == 0)
