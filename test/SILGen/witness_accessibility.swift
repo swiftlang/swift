@@ -20,9 +20,9 @@ extension R {
 
 public struct S : R {}
 
-// CHECK-LABEL: sil private @_T021witness_accessibility1R{{.*}}AE18privateRequirementyyF
 // CHECK-LABEL: sil private @_T021witness_accessibility1R{{.*}}E17publicRequirementyyF
 // CHECK-LABEL: sil private @_T021witness_accessibility1R{{.*}}E19internalRequirementyyF
+// CHECK-LABEL: sil private @_T021witness_accessibility1R{{.*}}AE18privateRequirementyyF
 
 // CHECK-LABEL: sil private [transparent] [thunk] @_T021witness_accessibility1SVAA1R{{.*}}dELLP18privateRequirementyyFTW
 // CHECK-LABEL: sil private [transparent] [thunk] @_T021witness_accessibility1SVAA1QA2aDP19internalRequirementyyFTW

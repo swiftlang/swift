@@ -678,7 +678,8 @@ void swift::finishTypeCheckingFile(SourceFile &SF) {
 
   for (auto D : SF.Decls)
     if (auto PD = dyn_cast<ProtocolDecl>(D))
-      TC.inferDefaultWitnesses(PD);
+      if (!PD->hasFixedLayout())
+        TC.inferDefaultWitnesses(PD);
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
