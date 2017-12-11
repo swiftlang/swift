@@ -86,11 +86,7 @@ struct StringGutsCollection: RangeReplaceableCollection, RandomAccessCollection 
   }
 
   mutating func reserveCapacity(_ n: Int) {
-    if _guts.isASCII {
-      _guts.reserveCapacity(n, of: UInt8.self)
-    } else {
-      _guts.reserveCapacity(n, of: UTF16.CodeUnit.self)
-    }
+    _guts.reserveCapacity(n)
   }
 }
 
@@ -948,7 +944,7 @@ StringTests.test("stringGutsReserve")
 func makeStringGuts(_ base: String) -> _StringGuts {
   var x = _StringGuts()
   // make sure some - but not all - replacements will have to grow the buffer
-  x.reserveCapacity(base._guts.count * 3 / 2, of: UInt8.self)
+  x.reserveCapacity(base._guts.count * 3 / 2)
   let capacity = x.capacity
   x.append(base._guts)
   // Widening the guts should not make it lose its capacity
@@ -981,13 +977,16 @@ StringTests.test("CharacterViewReplace") {
   
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
+      let g1 = makeStringGuts(s1)
+      let g2 = makeStringGuts(s2 + s2)
       checkRangeReplaceable(
-        { () -> String._CharacterView in String._CharacterView(makeStringGuts(s1)) },
-        { String._CharacterView(makeStringGuts(s2 + s2)._extractSlice(0..<$0)) }
+        { () -> String._CharacterView in
+          String._CharacterView(String(g1)) },
+        { String._CharacterView(String(g2._extractSlice(0..<$0))) }
       )
       checkRangeReplaceable(
-        { String._CharacterView(makeStringGuts(s1)) },
-        { Array(String._CharacterView(makeStringGuts(s2 + s2)))[0..<$0] }
+        { String._CharacterView(String(g1)) },
+        { Array(String._CharacterView(String(g2)))[0..<$0] }
       )
     }
   }
