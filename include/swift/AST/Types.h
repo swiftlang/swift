@@ -285,6 +285,15 @@ protected:
   };
   NUMBITS(ErrorType, NumTypeBaseBits + 1);
 
+  struct ParenTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    /// Whether there is an original type.
+    enum { NumFlagBits = 5 };
+    unsigned Flags : NumFlagBits;
+  };
+  NUMBITS(ParenType, NumTypeBaseBits + ParenTypeBitfields::NumFlagBits);
+
   struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
 
@@ -353,6 +362,7 @@ protected:
   union {
     TypeBaseBitfields TypeBaseBits;
     ErrorTypeBitfields ErrorTypeBits;
+    ParenTypeBitfields ParenTypeBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     ArchetypeTypeBitfields ArchetypeTypeBits;
@@ -1415,6 +1425,9 @@ class ParameterTypeFlags {
 
 public:
   ParameterTypeFlags() = default;
+  static ParameterTypeFlags fromRaw(uint8_t raw) {
+    return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
+  }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut, bool shared)
       : value((variadic ? Variadic : 0) |
@@ -1465,7 +1478,6 @@ public:
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public TypeBase {
   Type UnderlyingType;
-  ParameterTypeFlags parameterFlags;
 
   friend class ASTContext;
   
@@ -1482,7 +1494,9 @@ public:
   TypeBase *getSinglyDesugaredType();
 
   /// Get the parameter flags
-  ParameterTypeFlags getParameterFlags() const { return parameterFlags; }
+  ParameterTypeFlags getParameterFlags() const {
+    return ParameterTypeFlags::fromRaw(ParenTypeBits.Flags);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
