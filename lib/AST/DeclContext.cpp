@@ -938,7 +938,8 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
-  FirstDeclAndLazyMembers.setInt(true);
+  auto lazyMembers = FirstDeclAndLazyMembers.getInt() | LazyMembers::Present;
+  FirstDeclAndLazyMembers.setInt(LazyMembers(lazyMembers));
   contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
@@ -958,7 +959,8 @@ void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
     /*lazyLoader=*/nullptr);
-  FirstDeclAndLazyMembers.setInt(false);
+  auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;
+  FirstDeclAndLazyMembers.setInt(LazyMembers(lazyMembers));
 
   const Decl *container = getDecl();
   contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),

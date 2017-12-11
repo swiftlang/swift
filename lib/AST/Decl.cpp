@@ -757,8 +757,9 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
 
 ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
                        SourceLoc KindLoc, ArrayRef<AccessPathElement> Path)
-  : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc),
-    NumPathElements(Path.size()) {
+  : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc) {
+  ImportDeclBits.NumPathElements = Path.size();
+  assert(ImportDeclBits.NumPathElements == Path.size() && "Truncation error");
   ImportDeclBits.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
   std::uninitialized_copy(Path.begin(), Path.end(),
@@ -2562,9 +2563,11 @@ AbstractTypeParamDecl::getConformingProtocols() const {
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc,
                                            unsigned depth, unsigned index)
-  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc),
-    Depth(depth), Index(index)
-{
+  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
+  GenericTypeParamDeclBits.Depth = depth;
+  assert(GenericTypeParamDeclBits.Depth == depth && "Truncation");
+  GenericTypeParamDeclBits.Index = index;
+  assert(GenericTypeParamDeclBits.Index == index && "Truncation");
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setInterfaceType(MetatypeType::get(type, ctx));
@@ -2690,9 +2693,9 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
   ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
-  ObjCKind = 0;
-  HasMissingDesignatedInitializers = 0;
-  HasMissingVTableEntries = 0;
+  ClassDeclBits.ObjCKind = 0;
+  ClassDeclBits.HasMissingDesignatedInitializers = 0;
+  ClassDeclBits.HasMissingVTableEntries = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2749,12 +2752,12 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
   (void)mutableThis->lookupDirect(getASTContext().Id_init,
                                   /*ignoreNewExtensions*/true);
-  return HasMissingDesignatedInitializers;
+  return ClassDeclBits.HasMissingDesignatedInitializers;
 }
 
 bool ClassDecl::hasMissingVTableEntries() const {
   (void)getMembers();
-  return HasMissingVTableEntries;
+  return ClassDeclBits.HasMissingVTableEntries;
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
@@ -2855,8 +2858,8 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
   // See if we've already computed this.
-  if (ObjCKind)
-    return ObjCClassKind(ObjCKind - 1);
+  if (ClassDeclBits.ObjCKind)
+    return ObjCClassKind(ClassDeclBits.ObjCKind - 1);
 
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
   bool genericAncestry = false, isObjC = false;
@@ -2893,7 +2896,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     kind = ObjCClassKind::ObjCWithSwiftRoot;
 
   // Save the result for later.
-  const_cast<ClassDecl *>(this)->ObjCKind
+  const_cast<ClassDecl *>(this)->ClassDeclBits.ObjCKind
     = unsigned(kind) + 1;
   return kind;
 }
@@ -3056,9 +3059,9 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.ExistentialConformsToSelf = false;
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
-  HasMissingRequirements = false;
-  KnownProtocol = 0;
-  NumRequirementsInSignature = 0;
+  ProtocolDeclBits.NumRequirementsInSignature = 0;
+  ProtocolDeclBits.HasMissingRequirements = false;
+  ProtocolDeclBits.KnownProtocol = 0;
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
@@ -3500,17 +3503,18 @@ void ProtocolDecl::computeRequirementSignature() {
     GenericSignatureBuilder::computeRequirementSignature(this);
   RequirementSignature = requirementSig->getRequirements().data();
   assert(RequirementSignature != nullptr);
-  NumRequirementsInSignature = requirementSig->getRequirements().size();
+  ProtocolDeclBits.NumRequirementsInSignature =
+    requirementSig->getRequirements().size();
 }
 
 void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   assert(!RequirementSignature && "already computed requirement signature");
   if (requirements.empty()) {
     RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
-    NumRequirementsInSignature = 0;
+    ProtocolDeclBits.NumRequirementsInSignature = 0;
   } else {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
-    NumRequirementsInSignature = requirements.size();
+    ProtocolDeclBits.NumRequirementsInSignature = requirements.size();
   }
 }
 

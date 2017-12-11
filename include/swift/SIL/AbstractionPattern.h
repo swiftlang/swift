@@ -369,7 +369,7 @@ class AbstractionPattern {
                              Kind kind,
                              ImportAsMemberStatus memberStatus) {
     initClangType(signature, origType, clangType, kind);
-    OtherData = memberStatus.rawValue;
+    OtherData = memberStatus.getRawValue();
   }
 
   AbstractionPattern() {}
@@ -482,9 +482,7 @@ public:
   /// method with no `self` parameter.
   ImportAsMemberStatus getImportAsMemberStatus() const {
     assert(hasImportAsMemberStatus());
-    ImportAsMemberStatus status;
-    status.rawValue = OtherData;
-    return status;
+    return ImportAsMemberStatus(OtherData);
   }
   
   /// Return an abstraction pattern for a value that is discarded after being
