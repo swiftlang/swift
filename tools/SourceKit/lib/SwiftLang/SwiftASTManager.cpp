@@ -83,7 +83,8 @@ struct InvocationOptions {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
-    assert(this->Invok.getFrontendOptions().InputsAndOutputs.hasUniquePrimaryInput() &&
+    assert(this->Invok.getFrontendOptions()
+               .InputsAndOutputs.hasUniquePrimaryInput() &&
            "Must have exactly one primary input for code completion, etc.");
   }
   void applyTo(CompilerInvocation &CompInvok) const;
@@ -370,13 +371,15 @@ static void setModuleName(CompilerInvocation &Invocation) {
   if (!Invocation.getModuleName().empty())
     return;
 
-  StringRef Filename = Invocation.getFrontendOptions().InputsAndOutputs.lastOutputFilename();
+  StringRef Filename =
+      Invocation.getFrontendOptions().InputsAndOutputs.lastOutputFilename();
   if (Filename.empty()) {
     if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
       Invocation.setModuleName("__main__");
       return;
     }
-    Filename = Invocation.getFrontendOptions().InputsAndOutputs.getFilenameOfFirstInput();
+    Filename = Invocation.getFrontendOptions()
+                   .InputsAndOutputs.getFilenameOfFirstInput();
   }
   Filename = llvm::sys::path::filename(Filename);
   StringRef ModuleName = llvm::sys::path::stem(Filename);
@@ -464,8 +467,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-  Invocation.getFrontendOptions().InputsAndOutputs = resolveSymbolicLinksInInputs(
-      Invocation.getFrontendOptions().InputsAndOutputs, UnresolvedPrimaryFile, Error);
+  Invocation.getFrontendOptions().InputsAndOutputs =
+      resolveSymbolicLinksInInputs(
+          Invocation.getFrontendOptions().InputsAndOutputs,
+          UnresolvedPrimaryFile, Error);
   if (!Error.empty())
     return true;
 

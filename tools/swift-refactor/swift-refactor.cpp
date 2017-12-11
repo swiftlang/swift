@@ -229,7 +229,8 @@ int main(int argc, char *argv[]) {
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(argv[0],
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
-  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(options::SourceFilename);
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
+      options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
 

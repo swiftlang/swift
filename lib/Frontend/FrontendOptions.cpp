@@ -53,8 +53,8 @@ bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   assert(false && "Either all primaries or none must end with .sil");
 }
 
-unsigned
-FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(const char *suffix) const {
+unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
+    const char *suffix) const {
   unsigned N = 0;
   for (const auto &iter : PrimaryInputs) {
     StringRef filename = AllFiles[iter.second].getFile();
@@ -64,9 +64,10 @@ FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(const char *suffix) co
   return N;
 }
 
-bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
-                                  bool isREPLRequested,
-                                  bool isNoneRequested) const {
+bool FrontendInputsAndOutputs::verifyInputs(DiagnosticEngine &diags,
+                                            bool treatAsSIL,
+                                            bool isREPLRequested,
+                                            bool isNoneRequested) const {
   if (isREPLRequested) {
     if (hasInputs()) {
       diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
@@ -180,29 +181,27 @@ void FrontendOptions::forAllOutputPaths(
   const InputFile &pri = InputsAndOutputs.firstPrimary();
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules &&
-      !pri.outputs().OutputFilename.empty() ) {
+      !pri.outputs().OutputFilename.empty()) {
     fn(pri.outputs().OutputFilename);
   }
-  const std::string *outputs[] = {
-    &pri.outputs().ModuleOutputPath,
-    &pri.outputs().ModuleDocOutputPath,
-    &pri.outputs().ObjCHeaderOutputPath
-  };
+  const std::string *outputs[] = {&pri.outputs().ModuleOutputPath,
+                                  &pri.outputs().ModuleDocOutputPath,
+                                  &pri.outputs().ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
   }
 }
 
-
 StringRef FrontendOptions::originalPath(const InputFile &input) const {
-  if (!input.outputs().OutputFilename.empty() && input.outputs().OutputFilename != "-")
+  if (!input.outputs().OutputFilename.empty() &&
+      input.outputs().OutputFilename != "-")
     // Put the serialized diagnostics file next to the output file.
     return input.outputs().OutputFilename;
-  
+
   if (input.getIsPrimary() && input.getFile() != "-")
     return llvm::sys::path::filename(input.getFile());
-  
+
   return ModuleName;
 }
 
@@ -261,7 +260,8 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedDependenciesFilePath(const InputFile &input) const {
+bool FrontendOptions::hasUnusedDependenciesFilePath(
+    const InputFile &input) const {
   return !input.outputs().DependenciesFilePath.empty() &&
          !canActionEmitDependencies(RequestedAction);
 }
@@ -297,7 +297,8 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedObjCHeaderOutputPath(const InputFile &input) const {
+bool FrontendOptions::hasUnusedObjCHeaderOutputPath(
+    const InputFile &input) const {
   return !input.outputs().ObjCHeaderOutputPath.empty() &&
          !canActionEmitHeader(RequestedAction);
 }
@@ -333,7 +334,8 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedLoadedModuleTracePath(const InputFile &input) const {
+bool FrontendOptions::hasUnusedLoadedModuleTracePath(
+    const InputFile &input) const {
   return !input.outputs().LoadedModuleTracePath.empty() &&
          !canActionEmitLoadedModuleTrace(RequestedAction);
 }
@@ -374,7 +376,8 @@ bool FrontendOptions::hasUnusedModuleOutputPath(const InputFile &input) const {
          !canActionEmitModule(RequestedAction);
 }
 
-bool FrontendOptions::hasUnusedModuleDocOutputPath(const InputFile &input) const {
+bool FrontendOptions::hasUnusedModuleDocOutputPath(
+    const InputFile &input) const {
   return !input.outputs().ModuleDocOutputPath.empty() &&
          !canActionEmitModule(RequestedAction);
 }

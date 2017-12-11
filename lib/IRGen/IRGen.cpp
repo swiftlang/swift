@@ -666,7 +666,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod,
     return std::make_pair(nullptr, nullptr);
 
   // Create the IR emitter.
-   assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
+  assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
                       "", Opts.OutputForSingleThreadedWMO);
@@ -722,8 +722,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create the IR emitter.
   assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
-  IRGenModule IGM(irgen, std::move(targetMachine), nullptr,
-                  LLVMContext, ModuleName, Opts.OutputForSingleThreadedWMO);
+  IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
+                  ModuleName, Opts.OutputForSingleThreadedWMO);
 
   initLLVMModule(IGM);
 
@@ -876,7 +876,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
       }
     }
   } _igmDeleter(irgen);
-  
+
   auto OutputIter = Opts.OutputFilesForThreadedWMO.begin();
   bool IGMcreated = false;
 
@@ -1105,7 +1105,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return;
-  
+
   assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
                   OutputPath, Opts.OutputForSingleThreadedWMO);
@@ -1153,8 +1153,7 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
   embedBitcode(Module, Opts);
   assert(!Opts.OutputForSingleThreadedWMO.empty() && "not WMO?");
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
-                    TargetMachine.get(),
-                    Ctx.LangOpts.EffectiveLanguageVersion,
+                    TargetMachine.get(), Ctx.LangOpts.EffectiveLanguageVersion,
                     Opts.OutputForSingleThreadedWMO, Stats))
     return true;
   return false;

@@ -24,8 +24,8 @@
 #include "swift/Basic/OptimizationMode.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
-#include "llvm/Transforms/Instrumentation.h"
 #include "swift/Basic/InputFile.h"
+#include "llvm/Transforms/Instrumentation.h"
 #include <string>
 #include <vector>
 

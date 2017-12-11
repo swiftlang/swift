@@ -14,10 +14,9 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/AST/Module.h"
+#include "swift/Basic/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
-#include "swift/Basic/InputFile.h"
-
 
 #include <string>
 #include <vector>
@@ -54,74 +53,74 @@ public:
       addInput(input);
     return *this;
   }
-  
+
   // Readers:
   // FIXME: Can these be const to ensure PrimaryInputs invarients are preserved?
   ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-  std::vector<InputFile> &getAllFilesMalleably()  { return AllFiles; }
-  std::vector<InputFile*> getAllFilePointersMalleably() {
-    std::vector<InputFile*> pointers;
-    for (InputFile &input: AllFiles) {
+  std::vector<InputFile> &getAllFilesMalleably() { return AllFiles; }
+  std::vector<InputFile *> getAllFilePointersMalleably() {
+    std::vector<InputFile *> pointers;
+    for (InputFile &input : AllFiles) {
       pointers.push_back(&input);
     }
     return pointers;
   }
   // FIXME: Can I use an iterator instead of making a new collection?
-  
-  
-  
-  
-//  std::vector<const InputFile &> getAllPrimaries() const {
-//    std::vector<const InputFile &> primaries;
-//    forEachPrimary([&] (InputFile& input) -> void {
-//      primaries.push_back(input);
-//    });
-//    return primaries;
-//  }
-  std::vector<InputFile*> getAllPrimariesMalleably() {
-    std::vector<InputFile*> primaries;
-    forEachPrimaryMalleably([&] (InputFile& input) -> void {
-      primaries.push_back(&input);
-    });
+
+  //  std::vector<const InputFile &> getAllPrimaries() const {
+  //    std::vector<const InputFile &> primaries;
+  //    forEachPrimary([&] (InputFile& input) -> void {
+  //      primaries.push_back(input);
+  //    });
+  //    return primaries;
+  //  }
+  std::vector<InputFile *> getAllPrimariesMalleably() {
+    std::vector<InputFile *> primaries;
+    forEachPrimaryMalleably(
+        [&](InputFile &input) -> void { primaries.push_back(&input); });
     return primaries;
   }
-  
+
   const InputFile &firstPrimary() const {
     assert(!PrimaryInputs.empty());
     return AllFiles[PrimaryInputs.front().second];
   }
-  
-  void forEachPrimary(llvm::function_ref<void(const InputFile& input)> fn) const {
-    for (auto p: PrimaryInputs)
+
+  void
+  forEachPrimary(llvm::function_ref<void(const InputFile &input)> fn) const {
+    for (auto p : PrimaryInputs)
       fn(getAllFiles()[p.second]);
   }
-  
-  void forEachPrimaryMalleably(llvm::function_ref<void(InputFile& input)> fn) {
-    for (auto p: PrimaryInputs)
+
+  void forEachPrimaryMalleably(llvm::function_ref<void(InputFile &input)> fn) {
+    for (auto p : PrimaryInputs)
       fn(getAllFilesMalleably()[p.second]);
   }
-  
-  std::vector<InputFile *>filesWithOutputs() {
-    return hasPrimaries() ? getAllPrimariesMalleably() : getAllFilePointersMalleably();
+
+  std::vector<InputFile *> filesWithOutputs() {
+    return hasPrimaries() ? getAllPrimariesMalleably()
+                          : getAllFilePointersMalleably();
   }
-  
-  //FIXME: check all uses
+
+  // FIXME: check all uses
   OutputPaths pathsForAtMostOnePrimary() const {
-    return hasPrimaries() ? AllFiles[PrimaryInputs.front().second].outputs() :
-    AllFiles.empty() ? OutputPaths() : AllFiles.front().outputs();
+    return hasPrimaries()
+               ? AllFiles[PrimaryInputs.front().second].outputs()
+               : AllFiles.empty() ? OutputPaths() : AllFiles.front().outputs();
   }
-  
+
   // FIXME: Why the *last* one?
   StringRef lastOutputFilename() const {
     // FIXME use reverse iterator?
-    for (auto i = AllFiles.size(); ; ) {
+    for (auto i = AllFiles.size();;) {
       if (!AllFiles[i].outputs().OutputFilename.empty())
         return AllFiles[i].outputs().OutputFilename;
-      if (i == 0) break;
+      if (i == 0)
+        break;
     }
     return StringRef();
   }
-  
+
   // FIXME: iterator?
   std::vector<std::string> getInputFilenames() const {
     std::vector<std::string> filenames;
@@ -175,15 +174,15 @@ public:
   bool hasPrimaries() const { return primaryInputCount() > 0; }
 
   bool isWholeModule() const { return !hasPrimaries(); }
-  
-//  void forEachPrimaryOrEmpty(llvm::function_ref<void(StringRef)> fn) const{
-//    if (!hasPrimaries())
-//      fn("");
-//    else
-//      for (const auto &p: PrimaryInputs)
-//        fn(p.first);
-//  }
-  
+
+  //  void forEachPrimaryOrEmpty(llvm::function_ref<void(StringRef)> fn) const{
+  //    if (!hasPrimaries())
+  //      fn("");
+  //    else
+  //      for (const auto &p: PrimaryInputs)
+  //        fn(p.first);
+  //  }
+
   bool forEachPrimaryOrEmptyWithErrors(llvm::function_ref<bool(StringRef)> fn) const{
     if (!hasPrimaries())
       return fn("");
@@ -208,8 +207,8 @@ public:
     assert(false);
   }
 
-  /// Return the name of the unique primary input, or an empty StringRef if there
-  /// isn't one.
+  /// Return the name of the unique primary input, or an empty StringRef if
+  /// there isn't one.
   // FIXME: probably wrong
   StringRef getNameOfUniquePrimaryInputFile() const {
     const auto *input = getUniquePrimaryInput();
@@ -224,12 +223,10 @@ public:
   }
 
   unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
-  
-  
-  
+
   std::vector<std::string> outputFilenamesForEachInput() const {
     std::vector<std::string> result;
-    for (const InputFile &input: AllFiles)
+    for (const InputFile &input : AllFiles)
       result.push_back(input.outputs().OutputFilename);
     return result;
   }
@@ -262,8 +259,6 @@ public:
     AllFiles.clear();
     PrimaryInputs.clear();
   }
-  
-  
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -281,7 +276,7 @@ public:
   bool isOutputFilenameStdout() {
     return InputsAndOutputs.lastOutputFilename() == "-";
   }
- 
+
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
 
@@ -294,13 +289,7 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
- 
-
-  
- 
 public:
-
-
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
 
@@ -514,10 +503,9 @@ public:
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift && InputsAndOutputs.hasUniqueInput();
+    return InputKind == InputFileKind::IFK_Swift &&
+           InputsAndOutputs.hasUniqueInput();
   }
- 
-  
 
 private:
   static const char *suffixForPrincipalOutputFileForAction(ActionType);

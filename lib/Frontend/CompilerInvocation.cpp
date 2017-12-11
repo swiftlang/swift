@@ -252,11 +252,12 @@ private:
   void computeDebugTimeOptions();
   bool computeFallbackModuleName();
   bool computeModuleName();
-  
+
   bool computeOutputFilenames();
-  bool checkNumberOfOutputArguments(unsigned outArgCount, unsigned fileCount) const;
+  bool checkNumberOfOutputArguments(unsigned outArgCount,
+                                    unsigned fileCount) const;
   bool computeOutputFilenamesForPrimary(StringRef primaryOrEmpty, StringRef correspondingOutputFile);
- 
+
   void computeDumpScopeMapLocations();
   void computeHelpOptions();
   void computeImplicitImportModuleNames();
@@ -289,12 +290,13 @@ private:
   /// filename if output is required for the requested action.
   bool deriveOutputFileForDirectory(StringRef dir, InputFile &);
 
-  std::string determineBaseNameOfOutput(const InputFile&) const;
+  std::string determineBaseNameOfOutput(const InputFile &) const;
 
   std::string deriveOutputFileFromParts(StringRef dir, StringRef base);
 
   bool computeSupplementaryOutputFilenames();
-  void determineSupplementaryOutputFilenames(const OutputPaths &arg, StringRef lastOutputFilenameOrEmpty, InputFile &);
+  void determineSupplementaryOutputFilenames(
+      const OutputPaths &arg, StringRef lastOutputFilenameOrEmpty, InputFile &);
 
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
@@ -305,7 +307,8 @@ private:
   bool checkUnusedOutputPaths(const InputFile &) const;
 
   std::vector<std::string> readOutputFileList(StringRef filelistPath) const;
-  Optional<std::vector<std::string>> readSupplementaryOutputFileList(swift::options::ID, unsigned N) const;
+  Optional<std::vector<std::string>>
+  readSupplementaryOutputFileList(swift::options::ID, unsigned N) const;
 
 public:
   FrontendArgsToOptionsConverter(DiagnosticEngine &Diags,
@@ -356,7 +359,8 @@ bool FrontendArgsToOptionsConverter::convert() {
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
   computeHelpOptions();
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs).convert())
+  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs)
+          .convert())
     return true;
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
@@ -382,7 +386,7 @@ bool FrontendArgsToOptionsConverter::convert() {
 
   if (computeOutputFilenames())
     return true;
-  
+
   if (computeSupplementaryOutputFilenames())
     return true;
 
@@ -690,15 +694,17 @@ bool FrontendArgsToOptionsConverter::computeFallbackModuleName() {
   bool isOutputAUniqueOrdinaryFile =
       outputFilenames.size() == 1 && outputFilenames[0] != "-" &&
       !llvm::sys::fs::is_directory(outputFilenames[0]);
-  std::string nameToStem = isOutputAUniqueOrdinaryFile
-                               ? outputFilenames[0]
-                               : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
+  std::string nameToStem =
+      isOutputAUniqueOrdinaryFile
+          ? outputFilenames[0]
+          : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
 }
 
 // Frontend is called with one directory output for testing
-static bool areOutputArgumentsUniqueDirectory(llvm::ArrayRef<std::string> outArgs) {
+static bool
+areOutputArgumentsUniqueDirectory(llvm::ArrayRef<std::string> outArgs) {
   return outArgs.size() == 1 && !llvm::sys::fs::is_directory(outArgs[0]);
 }
 
@@ -706,57 +712,63 @@ bool FrontendArgsToOptionsConverter::computeOutputFilenames() {
   if (!FrontendOptions::doesActionProduceOutput(Opts.RequestedAction)) {
     return false;
   }
-  std::vector<InputFile*> files = Opts.InputsAndOutputs.filesWithOutputs();
-  
-  ArrayRef<std::string> outArgs =
-  getOutputFilenamesFromCommandLineOrFilelist();
-  
+  std::vector<InputFile *> files = Opts.InputsAndOutputs.filesWithOutputs();
+
+  ArrayRef<std::string> outArgs = getOutputFilenamesFromCommandLineOrFilelist();
+
   if (checkNumberOfOutputArguments(outArgs.size(), files.size())) {
     Diags.diagnose(SourceLoc(),
-                   Opts.InputsAndOutputs.hasPrimaries() ? diag::error_output_files_must_correspond_to_primaries : diag::error_output_files_must_correspond_to_inputs);
+                   Opts.InputsAndOutputs.hasPrimaries()
+                       ? diag::error_output_files_must_correspond_to_primaries
+                       : diag::error_output_files_must_correspond_to_inputs);
     return true;
   }
-  
+
   // WMO threaded or batch mode or WMO one input
-  llvm::function_ref<bool(StringRef, InputFile &)> assignUnaltered = [&] (StringRef s, InputFile &input) -> bool {
+  llvm::function_ref<bool(StringRef, InputFile &)> assignUnaltered =
+      [&](StringRef s, InputFile &input) -> bool {
     input.malleableOutputs().OutputFilename = s;
     return false;
   };
-  // For testing: supply a directory that gets used for each primary or threaded WMO input
-  llvm::function_ref<bool(StringRef, InputFile &)> deriveForDirectory = [&] (StringRef dir, InputFile &input) -> bool {
+  // For testing: supply a directory that gets used for each primary or threaded
+  // WMO input
+  llvm::function_ref<bool(StringRef, InputFile &)> deriveForDirectory =
+      [&](StringRef dir, InputFile &input) -> bool {
     return deriveOutputFileForDirectory(dir, input);
   };
   // For testing: derive output name from input name.
-  llvm::function_ref<bool(StringRef, InputFile &)>  deriveFromInput = [&] (StringRef, InputFile &input) -> bool {
+  llvm::function_ref<bool(StringRef, InputFile &)> deriveFromInput =
+      [&](StringRef, InputFile &input) -> bool {
     return deriveOutputFileFromInput(input);
   };
   llvm::function_ref<bool(StringRef, InputFile &)> fn =
-  areOutputArgumentsUniqueDirectory(outArgs) ? deriveForDirectory
-  : outArgs.empty() ? deriveFromInput
-  : assignUnaltered;
-  
+      areOutputArgumentsUniqueDirectory(outArgs)
+          ? deriveForDirectory
+          : outArgs.empty() ? deriveFromInput : assignUnaltered;
+
   for (auto i : indices(files))
-    if (fn( outArgs.empty() ? StringRef() :
-           outArgs.size() == 1 ? StringRef(outArgs[0])
-           : StringRef(outArgs[i]),
+    if (fn(outArgs.empty() ? StringRef()
+                           : outArgs.size() == 1 ? StringRef(outArgs[0])
+                                                 : StringRef(outArgs[i]),
            *files[i]))
       return true;
   return false;
 }
 
-bool FrontendArgsToOptionsConverter::checkNumberOfOutputArguments(unsigned outArgCount, unsigned fileCount) const {
+bool FrontendArgsToOptionsConverter::checkNumberOfOutputArguments(
+    unsigned outArgCount, unsigned fileCount) const {
   if (outArgCount > 1 && outArgCount != fileCount) {
     Diags.diagnose(SourceLoc(),
-                   Opts.InputsAndOutputs.hasPrimaries() ? diag::error_output_files_must_correspond_to_primaries : diag::error_output_files_must_correspond_to_inputs);
+                   Opts.InputsAndOutputs.hasPrimaries()
+                       ? diag::error_output_files_must_correspond_to_primaries
+                       : diag::error_output_files_must_correspond_to_inputs);
     return true;
   }
   return false;
 }
 
-
-
-
-bool FrontendArgsToOptionsConverter::deriveOutputFileFromInput(InputFile &input) {
+bool FrontendArgsToOptionsConverter::deriveOutputFileFromInput(
+    InputFile &input) {
   if (input.getFile() == "-" ||
       FrontendOptions::doesActionProduceTextualOutput(Opts.RequestedAction)) {
     input.malleableOutputs().OutputFilename = "-";
@@ -773,7 +785,8 @@ bool FrontendArgsToOptionsConverter::deriveOutputFileFromInput(InputFile &input)
     input.malleableOutputs().OutputFilename = "";
     return false;
   }
-  input.malleableOutputs().OutputFilename = deriveOutputFileFromParts("", baseName);
+  input.malleableOutputs().OutputFilename =
+      deriveOutputFileFromParts("", baseName);
   return false;
 }
 
@@ -786,12 +799,14 @@ bool FrontendArgsToOptionsConverter::deriveOutputFileForDirectory(
                    outputDir);
     return true;
   }
-  input.malleableOutputs().OutputFilename = deriveOutputFileFromParts(outputDir, baseName);
+  input.malleableOutputs().OutputFilename =
+      deriveOutputFileFromParts(outputDir, baseName);
   return false;
 }
 
-std::string FrontendArgsToOptionsConverter::deriveOutputFileFromParts(
-    StringRef dir, StringRef base) {
+std::string
+FrontendArgsToOptionsConverter::deriveOutputFileFromParts(StringRef dir,
+                                                          StringRef base) {
   assert(!base.empty());
   llvm::SmallString<128> path(dir);
   llvm::sys::path::append(path, base);
@@ -801,7 +816,8 @@ std::string FrontendArgsToOptionsConverter::deriveOutputFileFromParts(
   return path.str();
 }
 
-std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput(const InputFile &input) const {
+std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput(
+    const InputFile &input) const {
   std::string nameToStem;
   if (input.getIsPrimary()) {
     nameToStem = input.getFile();
@@ -815,7 +831,7 @@ std::string FrontendArgsToOptionsConverter::determineBaseNameOfOutput(const Inpu
 
   return llvm::sys::path::stem(nameToStem).str();
 }
-//FIXME rename
+// FIXME rename
 ArrayRef<std::string>
 FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   if (cachedOutputFilenamesFromCommandLineOrFilelist) {
@@ -834,22 +850,35 @@ FrontendArgsToOptionsConverter::getOutputFilenamesFromCommandLineOrFilelist() {
   return *cachedOutputFilenamesFromCommandLineOrFilelist;
 }
 
-std::vector<OutputPaths> FrontendArgsToOptionsConverter::getSupplementaryFilenamesFromFilelists() {
-    unsigned N = Opts.InputsAndOutputs.hasPrimaries() ? Opts.InputsAndOutputs.primaryInputCount() : Opts.InputsAndOutputs.inputCount();
-  
-  auto objCHeaderOutput = readSupplementaryOutputFileList(options::OPT_objCHeaderOutput_filelist, N);
-  auto moduleOutput = readSupplementaryOutputFileList(options::OPT_moduleOutput_filelist, N);
-  auto moduleDocOutput = readSupplementaryOutputFileList(options::OPT_moduleDocOutput_filelist, N);
-  auto dependenciesFile = readSupplementaryOutputFileList(options::OPT_dependenciesFile_filelist, N);
-  auto referenceDependenciesFile = readSupplementaryOutputFileList(options::OPT_referenceDependenciesFile_filelist, N);
-  auto serializedDiagnostics = readSupplementaryOutputFileList(options::OPT_serializedDiagnostics_filelist, N);
-  auto loadedModuleTrace = readSupplementaryOutputFileList(options::OPT_loadedModuleTrace_filelist, N);
+std::vector<OutputPaths>
+FrontendArgsToOptionsConverter::getSupplementaryFilenamesFromFilelists() {
+  unsigned N = Opts.InputsAndOutputs.hasPrimaries()
+                   ? Opts.InputsAndOutputs.primaryInputCount()
+                   : Opts.InputsAndOutputs.inputCount();
+
+  auto objCHeaderOutput = readSupplementaryOutputFileList(
+      options::OPT_objCHeaderOutput_filelist, N);
+  auto moduleOutput =
+      readSupplementaryOutputFileList(options::OPT_moduleOutput_filelist, N);
+  auto moduleDocOutput =
+      readSupplementaryOutputFileList(options::OPT_moduleDocOutput_filelist, N);
+  auto dependenciesFile = readSupplementaryOutputFileList(
+      options::OPT_dependenciesFile_filelist, N);
+  auto referenceDependenciesFile = readSupplementaryOutputFileList(
+      options::OPT_referenceDependenciesFile_filelist, N);
+  auto serializedDiagnostics = readSupplementaryOutputFileList(
+      options::OPT_serializedDiagnostics_filelist, N);
+  auto loadedModuleTrace = readSupplementaryOutputFileList(
+      options::OPT_loadedModuleTrace_filelist, N);
   auto TBD = readSupplementaryOutputFileList(options::OPT_TBD_filelist, N);
-  
+
   std::vector<OutputPaths> result;
 
   for (unsigned i = 0; i < N; ++i) {
-    result.push_back(OutputPaths(i, objCHeaderOutput, moduleOutput, moduleDocOutput, dependenciesFile, referenceDependenciesFile, serializedDiagnostics, loadedModuleTrace, TBD));
+    result.push_back(
+        OutputPaths(i, objCHeaderOutput, moduleOutput, moduleDocOutput,
+                    dependenciesFile, referenceDependenciesFile,
+                    serializedDiagnostics, loadedModuleTrace, TBD));
   }
   return result;
 }
@@ -870,33 +899,41 @@ std::vector<std::string> FrontendArgsToOptionsConverter::readOutputFileList(
   return outputFiles;
 }
 
-Optional<std::vector<std::string>> FrontendArgsToOptionsConverter::readSupplementaryOutputFileList(swift::options::ID id, unsigned N) const {
+Optional<std::vector<std::string>>
+FrontendArgsToOptionsConverter::readSupplementaryOutputFileList(
+    swift::options::ID id, unsigned N) const {
   Arg *A = Args.getLastArg(id);
-  if (!A) return None;
+  if (!A)
+    return None;
   auto r = readOutputFileList(A->getValue());
   assert(r.size() == N);
   return r;
 }
 
 bool FrontendArgsToOptionsConverter::computeSupplementaryOutputFilenames() {
-  std::vector<OutputPaths> suppFilelistArgs = getSupplementaryFilenamesFromFilelists();
+  std::vector<OutputPaths> suppFilelistArgs =
+      getSupplementaryFilenamesFromFilelists();
   StringRef lastOutputFilename = Opts.InputsAndOutputs.lastOutputFilename();
 
-  std::vector<InputFile*> files = Opts.InputsAndOutputs.filesWithOutputs();
+  std::vector<InputFile *> files = Opts.InputsAndOutputs.filesWithOutputs();
 
-  for (auto i: indices(files)) {
-    determineSupplementaryOutputFilenames(suppFilelistArgs[i], lastOutputFilename, *files[i]);
+  for (auto i : indices(files)) {
+    determineSupplementaryOutputFilenames(suppFilelistArgs[i],
+                                          lastOutputFilename, *files[i]);
     if (checkUnusedOutputPaths(*files[i]))
       return true;
   }
   return false;
 }
 
-void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(const OutputPaths &suppOutArg, StringRef lastOutputFilenameOrEmpty, InputFile &input) {
+void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(
+    const OutputPaths &suppOutArg, StringRef lastOutputFilenameOrEmpty,
+    InputFile &input) {
   using namespace options;
   auto determineOutputFilename =
-      [&](std::string &output, StringRef pathFromList, OptSpecifier optWithoutPath,
-          OptSpecifier optWithPath, const char *extension, bool useMainOutput) {
+      [&](std::string &output, StringRef pathFromList,
+          OptSpecifier optWithoutPath, OptSpecifier optWithPath,
+          const char *extension, bool useMainOutput) {
         const Arg *A = Args.getLastArg(optWithPath);
         if (A == nullptr && !pathFromList.empty()) {
           output = pathFromList;
@@ -909,7 +946,8 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(const
         }
         if (A != nullptr && !pathFromList.empty()) {
           // FIXME: write out arg name and file list name
-          Diags.diagnose(SourceLoc(), diag::error_cannot_have_filelist_and_argument);
+          Diags.diagnose(SourceLoc(),
+                         diag::error_cannot_have_filelist_and_argument);
           return; // FIXME: bail?
         }
 
@@ -929,32 +967,26 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(const
       };
 
   auto &OutputPaths = input.malleableOutputs();
-  determineOutputFilename(OutputPaths.DependenciesFilePath,
-                          suppOutArg.DependenciesFilePath,
-                          OPT_emit_dependencies, OPT_emit_dependencies_path,
-                          "d", false);
-  determineOutputFilename(OutputPaths.ReferenceDependenciesFilePath,
-                          suppOutArg.ReferenceDependenciesFilePath,
-                          OPT_emit_reference_dependencies,
-                          OPT_emit_reference_dependencies_path, "swiftdeps",
-                          false);
+  determineOutputFilename(
+      OutputPaths.DependenciesFilePath, suppOutArg.DependenciesFilePath,
+      OPT_emit_dependencies, OPT_emit_dependencies_path, "d", false);
+  determineOutputFilename(
+      OutputPaths.ReferenceDependenciesFilePath,
+      suppOutArg.ReferenceDependenciesFilePath, OPT_emit_reference_dependencies,
+      OPT_emit_reference_dependencies_path, "swiftdeps", false);
   determineOutputFilename(OutputPaths.SerializedDiagnosticsPath,
                           suppOutArg.SerializedDiagnosticsPath,
                           OPT_serialize_diagnostics,
                           OPT_serialize_diagnostics_path, "dia", false);
   determineOutputFilename(OutputPaths.ObjCHeaderOutputPath,
-                          suppOutArg.ObjCHeaderOutputPath,
-                          OPT_emit_objc_header, OPT_emit_objc_header_path, "h",
-                          false);
+                          suppOutArg.ObjCHeaderOutputPath, OPT_emit_objc_header,
+                          OPT_emit_objc_header_path, "h", false);
   determineOutputFilename(
-      OutputPaths.LoadedModuleTracePath,
-                          suppOutArg.LoadedModuleTracePath,
-                          OPT_emit_loaded_module_trace,
-      OPT_emit_loaded_module_trace_path, "trace.json", false);
+      OutputPaths.LoadedModuleTracePath, suppOutArg.LoadedModuleTracePath,
+      OPT_emit_loaded_module_trace, OPT_emit_loaded_module_trace_path,
+      "trace.json", false);
 
-  determineOutputFilename(OutputPaths.TBDPath,
-                          suppOutArg.TBDPath,
-                          OPT_emit_tbd,
+  determineOutputFilename(OutputPaths.TBDPath, suppOutArg.TBDPath, OPT_emit_tbd,
                           OPT_emit_tbd_path, "tbd", false);
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
@@ -977,12 +1009,13 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(const
                           OPT_emit_module_path, ext, canUseMainOutputForModule);
 
   determineOutputFilename(OutputPaths.ModuleDocOutputPath,
-                          suppOutArg.ModuleDocOutputPath,
-                          OPT_emit_module_doc, OPT_emit_module_doc_path,
+                          suppOutArg.ModuleDocOutputPath, OPT_emit_module_doc,
+                          OPT_emit_module_doc_path,
                           SERIALIZED_MODULE_DOC_EXTENSION, false);
 }
 
-bool FrontendArgsToOptionsConverter::checkUnusedOutputPaths(const InputFile &input) const {
+bool FrontendArgsToOptionsConverter::checkUnusedOutputPaths(
+    const InputFile &input) const {
   if (Opts.hasUnusedDependenciesFilePath(input)) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
     return true;
@@ -1012,8 +1045,10 @@ void FrontendArgsToOptionsConverter::computeImportObjCHeaderOptions() {
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
     Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaries() &&
-    Opts.InputsAndOutputs.inputCount() != 0 &&
-    !Opts.InputsAndOutputs.getAllFiles()[0].outputs().ModuleDocOutputPath.empty();
+                                    Opts.InputsAndOutputs.inputCount() != 0 &&
+                                    !Opts.InputsAndOutputs.getAllFiles()[0]
+                                         .outputs()
+                                         .ModuleDocOutputPath.empty();
   }
 }
 void FrontendArgsToOptionsConverter::computeImplicitImportModuleNames() {
@@ -1764,20 +1799,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                  FrontendOpts.InputsAndOutputs.getUniquePrimaryInput()) {
     Opts.MainInputFilename = input->getFile();
   } else if (FrontendOpts.InputsAndOutputs.hasUniqueInput()) {
-    Opts.MainInputFilename = FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
+    Opts.MainInputFilename =
+        FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
   }
   if (FrontendOpts.InputsAndOutputs.isWholeModule() && SILOpts.NumThreads > 1) {
-    for (const InputFile &input: FrontendOpts.InputsAndOutputs.getAllFiles())
+    for (const InputFile &input : FrontendOpts.InputsAndOutputs.getAllFiles())
       Opts.OutputFilesForThreadedWMO.push_back(input.outputs().OutputFilename);
+  } else if (FrontendOpts.InputsAndOutputs.hasPrimaries()) {
+    for (const InputFile &input : FrontendOpts.InputsAndOutputs.getAllFiles())
+      Opts.OutputsForBatchMode.push_back(input.outputs());
+  } else {
+    Opts.OutputForSingleThreadedWMO =
+        FrontendOpts.InputsAndOutputs.lastOutputFilename();
   }
-  else if (FrontendOpts.InputsAndOutputs.hasPrimaries()) {
-    for (const InputFile &input: FrontendOpts.InputsAndOutputs.getAllFiles())
-      Opts.OutputsForBatchMode.push_back( input.outputs());
-  }
-  else {
-    Opts.OutputForSingleThreadedWMO = FrontendOpts.InputsAndOutputs.lastOutputFilename();
-  }
-    
+
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))
