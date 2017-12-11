@@ -3077,10 +3077,6 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
         = C.Impl.getArena(arena).TupleTypes.FindNodeOrInsertPos(ID,InsertPos))
     return TT;
 
-  // Make a copy of the fields list into ASTContext owned memory.
-  TupleTypeElt *FieldsCopy =
-    C.AllocateCopy<TupleTypeElt>(Fields.begin(), Fields.end(), arena);
-
   bool IsCanonical = true;   // All canonical elts means this is canonical.
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.getType().isNull() || !Elt.getType()->isCanonical()) {
@@ -3089,11 +3085,12 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     }
   }
 
-  Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
-
-  TupleType *New =
-      new (C, arena) TupleType(Fields, IsCanonical ? &C : nullptr,
-                               properties, hasInOut);
+  // TupleType will copy the fields list into ASTContext owned memory.
+  void *mem = C.Allocate(sizeof(TupleType) +
+                         sizeof(TupleTypeElt) * Fields.size(),
+                         alignof(TupleType), arena);
+  auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr, properties,
+                                 hasInOut);
   C.Impl.getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }
