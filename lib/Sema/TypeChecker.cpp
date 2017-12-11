@@ -672,16 +672,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 }
 
-void swift::finishTypeCheckingFile(SourceFile &SF) {
-  auto &Ctx = SF.getASTContext();
-  TypeChecker TC(Ctx);
-
-  for (auto D : SF.Decls)
-    if (auto PD = dyn_cast<ProtocolDecl>(D))
-      if (!PD->hasFixedLayout())
-        TC.inferDefaultWitnesses(PD);
-}
-
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();

@@ -184,10 +184,6 @@ namespace swift {
                            unsigned WarnLongExpressionTypeChecking = 0,
                            unsigned ExpressionTimeoutThreshold = 0);
 
-  /// Once type checking is complete, this walks protocol requirements
-  /// to resolve default witnesses.
-  void finishTypeCheckingFile(SourceFile &SF);
-
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
   /// override checking.
