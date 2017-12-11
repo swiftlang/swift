@@ -784,7 +784,7 @@ MiscTestSuite.test("map()") {
 
 MiscTestSuite.test("reversed()") {
   var result = (0..<10).lazy.reversed()
-  typealias Expected = LazyCollection<
+  typealias Expected = LazyRandomAccessCollection<
     ReversedRandomAccessCollection<CountableRange<Int>>>
     expectType(Expected.self, &result)
   expectEqualSequence(

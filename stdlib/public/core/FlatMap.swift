@@ -95,7 +95,8 @@ extension LazyCollectionProtocol {
 extension LazyCollectionProtocol
   where
   Self : BidirectionalCollection,
-  Elements : BidirectionalCollection {
+  Elements : BidirectionalCollection
+{
   /// Returns the concatenated results of mapping the given transformation over
   /// this collection.
   ///
@@ -110,7 +111,7 @@ extension LazyCollectionProtocol
     _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
-      LazyMapCollection<Elements, SegmentOfResult>>> {
+      LazyMapBidirectionalCollection<Elements, SegmentOfResult>>> {
     return self.map(transform).joined()
   }
   
@@ -127,9 +128,9 @@ extension LazyCollectionProtocol
   @_inlineable // FIXME(sil-serialize-all)
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyMapCollection<
-    LazyFilterCollection<
-      LazyMapCollection<Elements, ElementOfResult?>>,
+  ) -> LazyMapBidirectionalCollection<
+    LazyFilterBidirectionalCollection<
+      LazyMapBidirectionalCollection<Elements, ElementOfResult?>>,
     ElementOfResult
   > {
     return self.map(transform).filter { $0 != nil }.map { $0! }
