@@ -651,7 +651,6 @@ void CompilerInstance::finishTypeChecking(
       performWholeModuleTypeChecking(SF);
     });
   }
-  forEachFileToTypeCheck([&](SourceFile &SF) { finishTypeCheckingFile(SF); });
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals) {

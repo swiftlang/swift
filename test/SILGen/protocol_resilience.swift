@@ -254,19 +254,6 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
   inoutFunc(&OtherConformingType.staticPropertyInExtension)
 }
 
-// Protocol is not public -- make sure default witnesses have the right linkage
-protocol InternalProtocol {
-  func noDefaultF()
-  func defaultG()
-}
-
-extension InternalProtocol {
-
-  // CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_resilience16InternalProtocolP8defaultGyyF
-  // CHECK: return
-  func defaultG() {}
-}
-
 // CHECK-LABEL: sil_default_witness_table P {
 // CHECK-NEXT: }
 
@@ -327,9 +314,4 @@ extension InternalProtocol {
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvg
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvs
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: {{.*}} : @_T019protocol_resilience21ReabstractSelfRefinedP8callbackxxcvm
-// CHECK-NEXT: }
-
-// CHECK-LABEL: sil_default_witness_table hidden InternalProtocol {
-// CHECK-NEXT:   no_default
-// CHECK-NEXT:   method #InternalProtocol.defaultG!1: {{.*}} : @_T019protocol_resilience16InternalProtocolP8defaultGyyF
 // CHECK-NEXT: }

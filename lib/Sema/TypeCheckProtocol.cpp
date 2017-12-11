@@ -384,6 +384,10 @@ struct swift::RequirementMatch {
   /// The set of optional adjustments performed on the witness.
   SmallVector<OptionalAdjustment, 2> OptionalAdjustments;
 
+  /// Substitutions mapping the type of the witness to the requirement
+  /// environment.
+  SmallVector<Substitution, 2> WitnessSubstitutions;
+
   /// \brief Determine whether this match is viable.
   bool isViable() const {
     switch(Kind) {
@@ -437,8 +441,6 @@ struct swift::RequirementMatch {
 
     llvm_unreachable("Unhandled MatchKind in switch.");
   }
-
-  SmallVector<Substitution, 2> WitnessSubstitutions;
 
   swift::Witness getWitness(ASTContext &ctx) const {
     SmallVector<Substitution, 2> syntheticSubs;
