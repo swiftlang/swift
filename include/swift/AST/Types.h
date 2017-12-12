@@ -301,8 +301,10 @@ protected:
     /// regparm and the calling convention.
     enum { NumExtInfoBits = 7 };
     unsigned ExtInfo : NumExtInfoBits;
+
+    unsigned NumParams : 10;
   };
-  NUMBITS(AnyFunctionType, NumTypeBaseBits + 7);
+  NUMBITS(AnyFunctionType, NumTypeBaseBits + 17);
 
   struct ArchetypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -2397,7 +2399,6 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 class AnyFunctionType : public TypeBase {
   const Type Input;
   const Type Output;
-  const unsigned NumParams;
   
 public:
   using Representation = FunctionTypeRepresentation;
@@ -2609,9 +2610,9 @@ protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, const ExtInfo &Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output),
-    NumParams(NumParams) {
+  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
+    AnyFunctionTypeBits.NumParams = NumParams;
     // The use of both assert() and static_assert() is intentional.
     assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
     static_assert(ExtInfo::NumMaskBits ==
@@ -2638,7 +2639,7 @@ public:
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<AnyFunctionType::Param> getParams() const;
-  unsigned getNumParams() const { return NumParams; }
+  unsigned getNumParams() const { return AnyFunctionTypeBits.NumParams; }
 
   GenericSignature *getOptGenericSignature() const;
   
