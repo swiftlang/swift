@@ -1020,6 +1020,11 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
       uses.append(copy->getUses().begin(), copy->getUses().end());
       continue;
     }
+    // @noescape block storage can be passed as an Optional (Nullable).
+    if (EnumInst *EI = dyn_cast<EnumInst>(user)) {
+      uses.append(EI->getUses().begin(), EI->getUses().end());
+      continue;
+    }
     if (auto apply = isa<ApplySite>(user)) {
       SILValue arg = oper->get();
       auto ArgumentFnType = getSILFunctionTypeForValue(arg);
