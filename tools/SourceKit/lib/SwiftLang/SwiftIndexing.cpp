@@ -279,7 +279,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     return;
   }
 
-  if (!Invocation.getFrontendOptions().Inputs.hasInputFilenames()) {
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
     IdxConsumer.failed("no input filenames specified");
     return;
   }
