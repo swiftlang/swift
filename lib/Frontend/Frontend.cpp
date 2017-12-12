@@ -232,7 +232,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
             std::unique_ptr<llvm::MemoryBuffer>>
       buffers = getInputBufferAndModuleDocBufferIfPresent(input);
 
-  if (!buffers.first.get()) {
+  if (!buffers.first) {
     failed = true;
     return None;
   }
