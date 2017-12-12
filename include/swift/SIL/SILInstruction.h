@@ -3345,17 +3345,17 @@ class AssignInst
                              NonValueInstruction> {
   friend SILBuilder;
 
+  FixedOperandList<2> Operands;
+
+  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+
+public:
   enum {
     /// the value being stored
     Src,
     /// the lvalue being stored to
     Dest
   };
-  FixedOperandList<2> Operands;
-
-  AssignInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
-
-public:
 
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
@@ -3767,8 +3767,6 @@ class BindMemoryInst final :
                                           BindMemoryInst, NonValueInstruction> {
   friend SILBuilder;
 
-  enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
-
   SILType BoundType;
 
   static BindMemoryInst *create(
@@ -3782,6 +3780,8 @@ class BindMemoryInst final :
                                           Loc), BoundType(BoundType) {}
 
 public:
+  enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
+
   SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
 
   SILValue getIndex() const { return getAllOperands()[IndexOperIdx].get(); }
@@ -7240,12 +7240,6 @@ class CheckedCastAddrBranchInst
 
   CastConsumptionKind ConsumptionKind;
 
-  enum {
-    /// the value being stored
-    Src,
-    /// the lvalue being stored to
-    Dest
-  };
   FixedOperandList<2> Operands;
   SILSuccessor DestBBs[2];
 
@@ -7264,6 +7258,13 @@ class CheckedCastAddrBranchInst
         SourceType(srcType), TargetType(targetType) {}
 
 public:
+  enum {
+    /// the value being stored
+    Src,
+    /// the lvalue being stored to
+    Dest
+  };
+
   CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 
   SILValue getSrc() const { return Operands[Src].get(); }

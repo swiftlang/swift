@@ -139,6 +139,13 @@ struct LLVM_LIBRARY_VISIBILITY FindClosureResult {
 /// by a reabstraction thunk.
 FindClosureResult findClosureForAppliedArg(SILValue V);
 
+/// Visit each address accessed by the given memory operation.
+///
+/// This only visits instructions that modify memory in some user-visible way,
+/// which could be considered part of a formal access.
+void visitAccessedAddress(SILInstruction *I,
+                          std::function<void(Operand *)> visitor);
+
 /// A utility class for evaluating whether a newly parsed or deserialized
 /// function has qualified or unqualified ownership.
 ///
