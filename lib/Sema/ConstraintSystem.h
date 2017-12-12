@@ -2331,6 +2331,44 @@ public: // FIXME: public due to statics in CSSimplify.cpp
                           ConstraintLocatorBuilder locator);
 
 public:
+  // Build a disjunction for the choices between an Optional type and
+  // it's underlying type. We'll make the choice of the Optional
+  // preferred, and select that if the expression type-checks
+  // appropriately with that type.
+  void buildDisjunctionForImplicitlyUnwrappedOptional(
+      TypeVariableType *tv, Type type, ConstraintLocator *locator) {
+
+    // Create the constraint to bind to the optional type and make it
+    // the favored choice.
+    auto *bindToOptional =
+        Constraint::create(*this, ConstraintKind::Bind, tv, type, locator);
+    bindToOptional->setFavored();
+
+    Type underlyingType;
+
+    // FIXME: Support unwrapping results of function calls.
+    assert(!type->is<AnyFunctionType>());
+
+    underlyingType = type->getWithoutSpecifierType()->getAnyOptionalObjectType();
+    assert(underlyingType);
+
+    if (type->is<LValueType>())
+      underlyingType = LValueType::get(underlyingType);
+    else if (type->is<InOutType>())
+      underlyingType = InOutType::get(underlyingType);
+
+    // Create the constraint to bind to the underlying type.
+    auto *bindToUnderlying = Constraint::create(*this, ConstraintKind::Bind, tv,
+                                                underlyingType, locator);
+
+    llvm::SmallVector<Constraint *, 2> choices = {bindToOptional,
+                                                  bindToUnderlying};
+
+    // Create the disjunction
+    addDisjunctionConstraint(choices, locator, RememberChoice);
+  }
+
+
   /// \brief Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
                        OverloadChoice choice, DeclContext *useDC);
