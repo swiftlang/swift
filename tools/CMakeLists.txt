@@ -1,3 +1,6 @@
+# Add generated libSyntax headers to global dependencies.
+list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
+
 add_swift_tool_subdirectory(driver)
 add_swift_tool_subdirectory(sil-opt)
 add_swift_tool_subdirectory(swift-ide-test)
