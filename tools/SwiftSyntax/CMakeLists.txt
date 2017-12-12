@@ -3,6 +3,11 @@ add_swift_library(swiftSwiftSyntax SHARED
   # filename.
   SwiftSyntax.swift
   AtomicCache.swift
+  Diagnostic.swift
+  DiagnosticConsumer.swift
+  DiagnosticEngine.swift
+  JSONDiagnosticConsumer.swift
+  PrintingDiagnosticConsumer.swift
   RawSyntax.swift
   SourcePresence.swift
   SwiftcInvocation.swift

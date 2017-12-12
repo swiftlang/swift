@@ -14,6 +14,12 @@
 
 import Foundation
 
+#if os(macOS)
+import Darwin
+#elseif os(Linux)
+import Glibc
+#endif
+
 /// A list of possible errors that could be encountered while parsing a
 /// Syntax tree.
 public enum ParserError: Error {
