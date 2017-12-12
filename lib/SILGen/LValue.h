@@ -500,6 +500,8 @@ public:
   ~InOutConversionScope();
 };
 
+// FIXME: Misnomer. This class is used for both shared (read) and exclusive
+// (modify) formal borrows.
 struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
   std::unique_ptr<LogicalPathComponent> component;
   ManagedValue base;
