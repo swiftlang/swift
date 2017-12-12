@@ -1741,30 +1741,59 @@ function(add_swift_library name)
                   endif()
                 endif()
 
-                # For all other targets we just install the lib at the arch subdirectory
-                if(SWIFTLIB_SHARED)
-                  set(resource_dir "swift")
+                # For all other targets we just install the lib at the arch
+                # subdirectory
+                if(NOT SWIFTLIB_SHARED AND SWIFTLIB_STATIC)
+                  # This is a special case where the library is explicitly so
+                  # we install it into both static and shared lib folder
                   set(file_permissions
-                      OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                      GROUP_READ GROUP_EXECUTE
-                      WORLD_READ WORLD_EXECUTE)
+                        OWNER_READ OWNER_WRITE
+                        GROUP_READ
+                        WORLD_READ)
                   set(install_libpath
-                    "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+                      "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+                  swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                      FILES "${install_libpath}"
+                      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}"
+                      PERMISSIONS ${file_permissions})
+
+                  swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                      FILES "${install_libpath}"
+                      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}"
+                      PERMISSIONS ${file_permissions})
 
                 else()
-                  set(resource_dir "swift_static")
-                  set(file_permissions
-                      OWNER_READ OWNER_WRITE
-                      GROUP_READ
-                      WORLD_READ)
-                  set(install_libpath
-                    "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
-                endif()
+                  if(SWIFTLIB_SHARED)
+                    set(resource_dir "swift")
+                    set(file_permissions
+                        OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                        GROUP_READ GROUP_EXECUTE
+                        WORLD_READ WORLD_EXECUTE)
+                    set(install_libpath
+                      "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
 
-                swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
-                  FILES "${install_libpath}"
-                  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}"
-                  PERMISSIONS ${file_permissions})
+                    swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                      FILES "${install_libpath}"
+                      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}"
+                      PERMISSIONS ${file_permissions})
+                  endif()
+
+                  if(SWIFTLIB_STATIC)
+                    set(resource_dir "swift_static")
+                    set(file_permissions
+                        OWNER_READ OWNER_WRITE
+                        GROUP_READ
+                        WORLD_READ)
+                    set(install_libpath
+                      "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+                    swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                      FILES "${install_libpath}"
+                      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}"
+                      PERMISSIONS ${file_permissions})
+                  endif()
+                endif()
               endforeach()
             endif()
           endif()
