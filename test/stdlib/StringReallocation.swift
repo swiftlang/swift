@@ -3,6 +3,13 @@
 
 import StdlibUnittest
 
+extension String {
+  var bufferID: UInt {
+    guard let object = _guts._underlyingCocoaString else { return 0 }
+    return unsafeBitCast(object, to: UInt.self)
+  }
+}
+
 // CHECK-NOT: Reallocations exceeded 30
 func testReallocation() {
   var x = "The quick brown fox jumped over the lazy dog\n"._split(separator: " ")
@@ -13,10 +20,10 @@ func testReallocation() {
   var reallocations = 0
   for i in 0..<laps {
     for s in x {
-      var lastBase = story._core._baseAddress
+      var lastBase = story.bufferID
       story += " "
       story += s
-      if lastBase != story._core._baseAddress {
+      if lastBase != story.bufferID {
         reallocations += 1
         
         // To avoid dumping a vast string here, just write the first
