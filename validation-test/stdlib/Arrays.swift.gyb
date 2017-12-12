@@ -232,7 +232,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
   }
 }
 
-ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsNotRetained") {
   let nsa: NSArray = autoreleasepool {
     NSArray(array: getAsNSArray([1010, 1020, 1030]))
   }
@@ -241,7 +241,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
   
   let bridgedBack: NSArray = convertArrayToNSArray(a)
   
-  expectEqual(
+  expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
   
@@ -268,7 +268,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
   _blackHole(bridgedBack)
 }
 
-ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsNotRetained") {
   let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
   
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
@@ -276,13 +276,13 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
   CustomImmutableNSArray.timesCountWasCalled = 0
   let a: [AnyObject] = convertNSArrayToArray(nsa)
-  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
-  expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesObjectEnumeratorWasCalled)
-  expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+  expectEqual(1, CustomImmutableNSArray.timesCountWasCalled)
   
   let bridgedBack: NSArray = convertArrayToNSArray(a)
-  expectEqual(
+  expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
   
@@ -300,8 +300,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
   CustomImmutableNSArray.timesCountWasCalled = 0
   TestBridgedValueTy.bridgeOperations = 0
   let a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
-  //FIXME: Why is this copied?
-  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
   expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
   expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
@@ -361,7 +360,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   expectEqual(identity, a._rawIdentifier())
 
   let removedElement = a.remove(at: index)
-  expectNotEqual(identity, a._rawIdentifier())
+  expectEqual(identity, a._rawIdentifier())
   expectEqual(1010, (removedElement as! TestObjCValueTy).value)
   expectEqual(2, a.count)
 }
@@ -402,7 +401,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
     expectEqual(1010, (a[0] as! TestObjCValueTy).value)
 
     a.removeAll(keepingCapacity: true)
-    expectNotEqual(identity1, a._rawIdentifier())
+    expectEqual(identity1, a._rawIdentifier())
     expectGE(a._buffer.capacity, originalCapacity)
     expectEqual(0, a.count)
   }
@@ -674,9 +673,6 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
     expectEqual(identity1, a1._rawIdentifier())
     expectEqual(identity2, a2._rawIdentifier())
 
-    a2.append(TestObjCEquatableValueTy(1111))
-    a2.removeLast()
-    expectNotEqual(identity2, a2._rawIdentifier())
     identity2 = a2._rawIdentifier()
 
     do {
