@@ -110,6 +110,30 @@ SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
       closureTy.getAs<SILFunctionType>()->getCalleeConvention());
 }
 
+ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
+                                               SILType substFnTy,
+                                               SubstitutionList subs,
+                                               ArrayRef<ManagedValue> args,
+                                               SILType closureTy) {
+  llvm::SmallVector<SILValue, 8> values;
+  transform(args, std::back_inserter(values), [&](ManagedValue mv) -> SILValue {
+    return mv.forward(getSILGenFunction());
+  });
+  SILValue result = SILGenBuilder::createPartialApply(loc, fn, substFnTy, subs,
+                                                      values, closureTy);
+  // Partial apply instructions create a box, so we need to put on a cleanup.
+  return getSILGenFunction().emitManagedRValueWithCleanup(result);
+}
+
+ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
+                                                  ManagedValue fn,
+                                                  SILType resultTy) {
+  CleanupCloner cloner(*this, fn);
+  SILValue result = SILBuilder::createConvertFunction(
+      loc, fn.forward(getSILGenFunction()), resultTy);
+  return cloner.clone(result);
+}
+
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
                                           SILType resultTy,
                                           SubstitutionList subs,
@@ -599,6 +623,11 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
   SGF.emitInjectOptionalNothingInto(loc, tempResult,
                                     SGF.getTypeLowering(type));
   return ManagedValue::forUnmanaged(tempResult);
+}
+
+ManagedValue SILGenBuilder::createManagedFunctionRef(SILLocation loc,
+                                                     SILFunction *f) {
+  return ManagedValue::forUnmanaged(SILBuilder::createFunctionRef(loc, f));
 }
 
 ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,

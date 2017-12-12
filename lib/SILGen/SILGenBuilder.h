@@ -88,6 +88,10 @@ public:
                                        SILType substFnTy, SubstitutionList subs,
                                        ArrayRef<SILValue> args,
                                        SILType closureTy);
+  ManagedValue createPartialApply(SILLocation loc, SILValue fn,
+                                  SILType substFnTy, SubstitutionList subs,
+                                  ArrayRef<ManagedValue> args,
+                                  SILType closureTy);
 
   BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
                              SubstitutionList subs, ArrayRef<SILValue> args);
@@ -309,6 +313,14 @@ public:
   using SILBuilder::createOptionalSome;
   ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
   ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);
+
+  // TODO: Rename this to createFunctionRef once all calls to createFunctionRef
+  // are removed.
+  ManagedValue createManagedFunctionRef(SILLocation loc, SILFunction *f);
+
+  using SILBuilder::createConvertFunction;
+  ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
+                                     SILType resultTy);
 
   /// Forward \p value into \p address.
   ///
