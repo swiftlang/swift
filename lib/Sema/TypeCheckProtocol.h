@@ -18,8 +18,10 @@
 #ifndef SWIFT_SEMA_PROTOCOL_H
 #define SWIFT_SEMA_PROTOCOL_H
 
+#include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/Witness.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -34,6 +36,7 @@ class DeclContext;
 class NormalProtocolConformance;
 class ProtocolDecl;
 class TypeChecker;
+class TypeRepr;
 class ValueDecl;
 
 /// A conflict between two inferred type witnesses for the same
@@ -139,7 +142,290 @@ struct InferredTypeWitnessesSolution {
   void dump();
 };
 
-struct RequirementMatch;
+class RequirementEnvironment;
+
+/// \brief The result of matching a particular declaration to a given
+/// requirement.
+enum class MatchKind : unsigned char {
+  /// \brief The witness matched the requirement exactly.
+  ExactMatch,
+
+  /// \brief There is a difference in optionality.
+  OptionalityConflict,
+
+  /// \brief The witness matched the requirement with some renaming.
+  RenamedMatch,
+
+  /// \brief The witness is invalid or has an invalid type.
+  WitnessInvalid,
+
+  /// \brief The kind of the witness and requirement differ, e.g., one
+  /// is a function and the other is a variable.
+  KindConflict,
+
+  /// \brief The types conflict.
+  TypeConflict,
+
+  /// The witness throws, but the requirement does not.
+  ThrowsConflict,
+
+  /// \brief The witness did not match due to static/non-static differences.
+  StaticNonStaticConflict,
+
+  /// \brief The witness is not settable, but the requirement is.
+  SettableConflict,
+
+  /// \brief The witness did not match due to prefix/non-prefix differences.
+  PrefixNonPrefixConflict,
+
+  /// \brief The witness did not match due to postfix/non-postfix differences.
+  PostfixNonPostfixConflict,
+
+  /// \brief The witness did not match because of mutating conflicts.
+  MutatingConflict,
+
+  /// \brief The witness did not match because of nonmutating conflicts.
+  NonMutatingConflict,
+
+  /// \brief The witness did not match because of __consuming conflicts.
+  ConsumingConflict,
+
+  /// The witness is not rethrows, but the requirement is.
+  RethrowsConflict,
+
+  /// The witness is explicitly @nonobjc but the requirement is @objc.
+  NonObjC,
+};
+
+/// Describes the kind of optional adjustment performed when
+/// comparing two types.
+enum class OptionalAdjustmentKind {
+  // No adjustment required.
+  None,
+
+  /// The witness can produce a 'nil' that won't be handled by
+  /// callers of the requirement. This is a type-safety problem.
+  ProducesUnhandledNil,
+
+  /// Callers of the requirement can provide 'nil', but the witness
+  /// does not handle it. This is a type-safety problem.
+  ConsumesUnhandledNil,
+
+  /// The witness handles 'nil', but won't ever be given a 'nil'.
+  /// This is not a type-safety problem.
+  WillNeverConsumeNil,
+
+  /// Callers of the requirement can expect to receive 'nil', but
+  /// the witness will never produce one. This is not a type-safety
+  /// problem.
+  WillNeverProduceNil,
+
+  /// The witness has an IUO that can be removed, because the
+  /// protocol doesn't need it. This is not a type-safety problem.
+  RemoveIUO,
+
+  /// The witness has an IUO that should be translated into a true
+  /// optional. This is not a type-safety problem.
+  IUOToOptional,
+};
+
+/// Once a witness has been found, there are several reasons it may
+/// not be usable.
+enum class CheckKind : unsigned {
+  /// The witness is OK.
+  Success,
+
+  /// The witness is less accessible than the requirement.
+  Access,
+
+  /// The witness is storage whose setter is less accessible than the
+  /// requirement.
+  AccessOfSetter,
+
+  /// The witness is less available than the requirement.
+  Availability,
+
+  /// The requirement was marked explicitly unavailable.
+  Unavailable,
+
+  /// The witness requires optional adjustments.
+  OptionalityConflict,
+
+  /// The witness is a constructor which is more failable than the
+  /// requirement.
+  ConstructorFailability,
+
+  /// The witness itself is inaccessible.
+  WitnessUnavailable,
+};
+
+/// Describes an optional adjustment made to a witness.
+class OptionalAdjustment {
+  /// The kind of adjustment.
+  unsigned Kind : 16;
+
+  /// Whether this is a parameter adjustment (with an index) vs. a
+  /// result or value type adjustment (no index needed).
+  unsigned IsParameterAdjustment : 1;
+
+  /// The adjustment index, for parameter adjustments.
+  unsigned ParameterAdjustmentIndex : 15;
+
+public:
+  /// Create a non-parameter optional adjustment.
+  explicit OptionalAdjustment(OptionalAdjustmentKind kind)
+    : Kind(static_cast<unsigned>(kind)), IsParameterAdjustment(false),
+      ParameterAdjustmentIndex(0) { }
+
+  /// Create an optional adjustment to a parameter.
+  OptionalAdjustment(OptionalAdjustmentKind kind,
+                     unsigned parameterIndex)
+    : Kind(static_cast<unsigned>(kind)), IsParameterAdjustment(true),
+      ParameterAdjustmentIndex(parameterIndex) { }
+
+  /// Determine the kind of optional adjustment.
+  OptionalAdjustmentKind getKind() const {
+    return static_cast<OptionalAdjustmentKind>(Kind);
+  }
+
+  /// Determine whether this is a parameter adjustment.
+  bool isParameterAdjustment() const {
+    return IsParameterAdjustment;
+  }
+
+  /// Return the index of a parameter adjustment.
+  unsigned getParameterIndex() const {
+    assert(isParameterAdjustment() && "Not a parameter adjustment");
+    return ParameterAdjustmentIndex;
+  }
+
+  /// Determines whether the optional adjustment is an error.
+  bool isError() const {
+    switch (getKind()) {
+    case OptionalAdjustmentKind::None:
+      return false;
+
+    case OptionalAdjustmentKind::ProducesUnhandledNil:
+    case OptionalAdjustmentKind::ConsumesUnhandledNil:
+      return true;
+
+    case OptionalAdjustmentKind::WillNeverConsumeNil:
+    case OptionalAdjustmentKind::WillNeverProduceNil:
+    case OptionalAdjustmentKind::RemoveIUO:
+    case OptionalAdjustmentKind::IUOToOptional:
+      // Warnings at most.
+      return false;
+    }
+
+    llvm_unreachable("Unhandled OptionalAdjustmentKind in switch.");
+  }
+
+  /// Retrieve the source location at which the optional is
+  /// specified or would be inserted.
+  SourceLoc getOptionalityLoc(ValueDecl *witness) const;
+
+  /// Retrieve the optionality location for the given type
+  /// representation.
+  SourceLoc getOptionalityLoc(TypeRepr *tyR) const;
+};
+
+/// \brief Describes a match between a requirement and a witness.
+struct RequirementMatch {
+  RequirementMatch(ValueDecl *witness, MatchKind kind,
+                   Optional<RequirementEnvironment> &&env = None)
+    : Witness(witness), Kind(kind), WitnessType(), ReqEnv(std::move(env)) {
+    assert(!hasWitnessType() && "Should have witness type");
+  }
+
+  RequirementMatch(ValueDecl *witness, MatchKind kind,
+                   Type witnessType,
+                   Optional<RequirementEnvironment> &&env = None,
+                   ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+    : Witness(witness), Kind(kind), WitnessType(witnessType),
+      ReqEnv(std::move(env)),
+      OptionalAdjustments(optionalAdjustments.begin(),
+                          optionalAdjustments.end())
+  {
+    assert(hasWitnessType() == !witnessType.isNull() &&
+           "Should (or should not) have witness type");
+  }
+
+  /// \brief The witness that matches the (implied) requirement.
+  ValueDecl *Witness;
+
+  /// \brief The kind of match.
+  MatchKind Kind;
+
+  /// \brief The type of the witness when it is referenced.
+  Type WitnessType;
+
+  /// \brief The requirement environment to use for the witness thunk.
+  Optional<RequirementEnvironment> ReqEnv;
+
+  /// The set of optional adjustments performed on the witness.
+  SmallVector<OptionalAdjustment, 2> OptionalAdjustments;
+
+  /// Substitutions mapping the type of the witness to the requirement
+  /// environment.
+  SmallVector<Substitution, 2> WitnessSubstitutions;
+
+  /// \brief Determine whether this match is viable.
+  bool isViable() const {
+    switch(Kind) {
+    case MatchKind::ExactMatch:
+    case MatchKind::OptionalityConflict:
+    case MatchKind::RenamedMatch:
+      return true;
+
+    case MatchKind::WitnessInvalid:
+    case MatchKind::KindConflict:
+    case MatchKind::TypeConflict:
+    case MatchKind::StaticNonStaticConflict:
+    case MatchKind::SettableConflict:
+    case MatchKind::PrefixNonPrefixConflict:
+    case MatchKind::PostfixNonPostfixConflict:
+    case MatchKind::MutatingConflict:
+    case MatchKind::NonMutatingConflict:
+    case MatchKind::ConsumingConflict:
+    case MatchKind::RethrowsConflict:
+    case MatchKind::ThrowsConflict:
+    case MatchKind::NonObjC:
+      return false;
+    }
+
+    llvm_unreachable("Unhandled MatchKind in switch.");
+  }
+
+  /// \brief Determine whether this requirement match has a witness type.
+  bool hasWitnessType() const {
+    switch(Kind) {
+    case MatchKind::ExactMatch:
+    case MatchKind::RenamedMatch:
+    case MatchKind::TypeConflict:
+    case MatchKind::OptionalityConflict:
+      return true;
+
+    case MatchKind::WitnessInvalid:
+    case MatchKind::KindConflict:
+    case MatchKind::StaticNonStaticConflict:
+    case MatchKind::SettableConflict:
+    case MatchKind::PrefixNonPrefixConflict:
+    case MatchKind::PostfixNonPostfixConflict:
+    case MatchKind::MutatingConflict:
+    case MatchKind::NonMutatingConflict:
+    case MatchKind::ConsumingConflict:
+    case MatchKind::RethrowsConflict:
+    case MatchKind::ThrowsConflict:
+    case MatchKind::NonObjC:
+      return false;
+    }
+
+    llvm_unreachable("Unhandled MatchKind in switch.");
+  }
+
+  swift::Witness getWitness(ASTContext &ctx) const;
+};
+
 struct RequirementCheck;
 
 class WitnessChecker {
@@ -292,24 +578,6 @@ class ConformanceChecker : public WitnessChecker {
   ResolveWitnessResult resolveTypeWitnessViaLookup(
                          AssociatedTypeDecl *assocType);
 
-  /// Infer associated type witnesses for the given tentative
-  /// requirement/witness match.
-  InferredAssociatedTypesByWitness inferTypeWitnessesViaValueWitness(
-                                     ValueDecl *req,
-                                     ValueDecl *witness);
-
-  /// Infer associated type witnesses for the given value requirement.
-  InferredAssociatedTypesByWitnesses inferTypeWitnessesViaValueWitnesses(
-                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
-                   ValueDecl *req);
-
-  /// Infer associated type witnesses for all relevant value requirements.
-  ///
-  /// \param assocTypes The set of associated types we're interested in.
-  InferredAssociatedTypes
-  inferTypeWitnessesViaValueWitnesses(
-    const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
-
   /// Diagnose or defer a diagnostic, as appropriate.
   ///
   /// \param requirement The requirement with which this diagnostic is
@@ -421,6 +689,26 @@ public:
                           NormalProtocolConformance *conformance);
 
 private:
+  /// Infer associated type witnesses for the given tentative
+  /// requirement/witness match.
+  InferredAssociatedTypesByWitness inferTypeWitnessesViaValueWitness(
+                                     ValueDecl *req,
+                                     ValueDecl *witness);
+
+  /// Infer associated type witnesses for the given value requirement.
+  InferredAssociatedTypesByWitnesses inferTypeWitnessesViaValueWitnesses(
+                   ConformanceChecker &checker,
+                   const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
+                   ValueDecl *req);
+
+  /// Infer associated type witnesses for all relevant value requirements.
+  ///
+  /// \param assocTypes The set of associated types we're interested in.
+  InferredAssociatedTypes
+  inferTypeWitnessesViaValueWitnesses(
+    ConformanceChecker &checker,
+    const llvm::SetVector<AssociatedTypeDecl *> &assocTypes);
+
   /// Compute the default type witness from an associated type default,
   /// if there is one.
   Type computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
@@ -494,6 +782,33 @@ public:
   /// \returns \c true if an error occurred, \c false otherwise
   Optional<InferredTypeWitnesses> solve(ConformanceChecker &checker);
 };
+
+/// \brief Match the given witness to the given requirement.
+///
+/// \returns the result of performing the match.
+RequirementMatch matchWitness(
+             TypeChecker &tc,
+             DeclContext *dc, ValueDecl *req, ValueDecl *witness,
+             const std::function<
+                     std::tuple<Optional<RequirementMatch>, Type, Type>(void)>
+               &setup,
+             const std::function<Optional<RequirementMatch>(Type, Type)>
+               &matchTypes,
+             const std::function<
+                     RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
+                   > &finalize);
+
+RequirementMatch matchWitness(TypeChecker &tc,
+                              ProtocolDecl *proto,
+                              ProtocolConformance *conformance,
+                              DeclContext *dc,
+                              ValueDecl *req,
+                              ValueDecl *witness);
+
+/// If the given type is a direct reference to an associated type of
+/// the given protocol, return the referenced associated type.
+AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
+                                                     ProtocolDecl *proto);
 
 }
 
