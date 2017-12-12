@@ -2613,6 +2613,7 @@ protected:
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
     AnyFunctionTypeBits.ExtInfo = Info.Bits;
     AnyFunctionTypeBits.NumParams = NumParams;
+    assert(AnyFunctionTypeBits.NumParams == NumParams && "Params dropped!");
     // The use of both assert() and static_assert() is intentional.
     assert(AnyFunctionTypeBits.ExtInfo == Info.Bits && "Bits were dropped!");
     static_assert(ExtInfo::NumMaskBits ==
