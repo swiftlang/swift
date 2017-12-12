@@ -335,10 +335,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     break;
   }
   case OutputInfo::Mode::SingleCompile: {
+    StringRef PrimaryFileWrittenToCommandLine;
     if (context.Output.getPrimaryOutputType() == types::TY_IndexData) {
       if (Arg *A = context.Args.getLastArg(options::OPT_index_file_path)) {
         Arguments.push_back("-primary-file");
         Arguments.push_back(A->getValue());
+        PrimaryFileWrittenToCommandLine = A->getValue();
       }
     }
     if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
@@ -347,7 +349,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       Arguments.push_back(context.getAllSourcesPath());
     } else {
       for (const Action *A : context.InputActions) {
-        cast<InputAction>(A)->getInputArg().render(context.Args, Arguments);
+        const Arg &InputArg = cast<InputAction>(A)->getInputArg();
+        // Frontend no longer tolerates redundant input files on command line.
+        if (InputArg.getValue() != PrimaryFileWrittenToCommandLine)
+          InputArg.render(context.Args, Arguments);
       }
     }
     break;

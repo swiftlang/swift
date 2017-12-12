@@ -173,11 +173,11 @@ public:
     return SearchPathOpts.SDKPath;
   }
 
-  void setSerializedDiagnosticsPath(StringRef Path) {
-    FrontendOpts.SerializedDiagnosticsPath = Path;
+  void setSerializedDiagnosticsPath(StringRef primaryOrEmpty, StringRef Path) {
+    FrontendOpts.pathsForPrimary(primaryOrEmpty).SerializedDiagnosticsPath = Path;
   }
-  StringRef getSerializedDiagnosticsPath() const {
-    return FrontendOpts.SerializedDiagnosticsPath;
+  StringRef getSerializedDiagnosticsPath(StringRef primaryOrEmpty) const {
+    return FrontendOpts.pathsForPrimary(primaryOrEmpty).SerializedDiagnosticsPath;
   }
 
   LangOptions &getLangOptions() {
@@ -242,23 +242,9 @@ public:
     return FrontendOpts.ModuleName;
   }
 
-  void addInputFilename(StringRef Filename) {
-    FrontendOpts.Inputs.addInputFilename(Filename);
-  }
 
-  /// Does not take ownership of \p Buf.
-  void addInputBuffer(llvm::MemoryBuffer *Buf) {
-    FrontendOpts.Inputs.addInputBuffer(Buf);
-  }
-
-  void setPrimaryInput(SelectedInput pi) {
-    FrontendOpts.Inputs.setPrimaryInput(pi);
-  }
-
-  void clearInputs() { FrontendOpts.Inputs.clearInputs(); }
-
-  StringRef getOutputFilename() const {
-    return FrontendOpts.getSingleOutputFilename();
+  StringRef getOutputFilename(StringRef primaryOrEmpty) const {
+    return FrontendOpts.getSingleOutputFilename(primaryOrEmpty);
   }
 
   void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
@@ -307,7 +293,7 @@ public:
   /// Return value includes the buffer so caller can keep it alive.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   setUpInputForSILTool(StringRef inputFilename, StringRef moduleNameArg,
-                       bool alwaysSetModuleToMain,
+                       bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
     return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
@@ -358,8 +344,6 @@ class CompilerInstance {
 
   void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
-
-  bool setUpForFileAt(unsigned i);
 
 public:
   SourceManager &getSourceMgr() { return SourceMgr; }
@@ -436,6 +420,26 @@ public:
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
+private:
+  void setUpLLVMArguments();
+  void setUpDiagnosticOptions();
+  bool setUpModuleLoaders();
+  Optional<unsigned> setupCodeCompletionBuffer();
+  bool setUpInputs();
+
+  bool isInMainMode() {
+    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+  }
+  bool isInSILMode() {
+    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+  }
+  bool setUpForInput(const InputFile &input);
+  Optional<unsigned> getBufferID(const InputFile &input, bool &failed);
+  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
+            std::unique_ptr<llvm::MemoryBuffer>>
+  getInputAndMaybeModuleDocBuffers(const InputFile &input);
+
+public:
   /// Parses and type-checks all input files.
   void performSema();
 
@@ -445,6 +449,13 @@ public:
   ///
   void performParseOnly(bool EvaluateConditionals = false);
 
+private:
+  SourceFile *
+  createSourceFileForMainModule(SourceFileKind FileKind,
+                                SourceFile::ImplicitModuleImportKind ImportKind,
+                                Optional<unsigned> BufferID);
+
+public:
   /// Frees up the ASTContext and SILModule objects that this instance is
   /// holding on.
   void freeContextAndSIL();
@@ -469,7 +480,7 @@ public: // for static functions in Frontend.cpp
   };
 
 private:
-  void createREPLFile(const ImplicitImports &implicitImports) const;
+  void createREPLFile(const ImplicitImports &implicitImports);
   std::unique_ptr<DelayedParsingCallbacks>
   computeDelayedParsingCallback(bool isPrimary);
 

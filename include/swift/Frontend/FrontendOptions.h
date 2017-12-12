@@ -15,6 +15,7 @@
 
 #include "swift/AST/Module.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/MapVector.h"
 
 #include <string>
 #include <vector>
@@ -25,34 +26,6 @@ namespace llvm {
 
 namespace swift {
 
-class SelectedInput {
-public:
-  /// The index of the input, in either FrontendOptions::InputFilenames or
-  /// FrontendOptions::InputBuffers, depending on this SelectedInput's
-  /// InputKind.
-  unsigned Index;
-
-  enum class InputKind {
-    /// Denotes a file input, in FrontendOptions::InputFilenames
-    Filename,
-
-    /// Denotes a buffer input, in FrontendOptions::InputBuffers
-    Buffer,
-  };
-
-  /// The kind of input which this SelectedInput represents.
-  InputKind Kind;
-
-  SelectedInput(unsigned Index, InputKind Kind = InputKind::Filename)
-      : Index(Index), Kind(Kind) {}
-
-  /// \returns true if the SelectedInput's Kind is a filename
-  bool isFilename() const { return Kind == InputKind::Filename; }
-
-  /// \returns true if the SelectedInput's Kind is a buffer
-  bool isBuffer() const { return Kind == InputKind::Buffer; }
-};
-
 enum class InputFileKind {
   IFK_None,
   IFK_Swift,
@@ -62,64 +35,102 @@ enum class InputFileKind {
   IFK_LLVM_IR
 };
 
+// Inputs may include buffers that override contents, and eventually should
+// always include a buffer.
+class InputFile {
+  std::string Filename;
+  bool IsPrimary;
+  /// Null if the contents are not overridden.
+  llvm::MemoryBuffer *Buffer;
+
+public:
+  /// Does not take ownership of \p buffer. Does take ownership of (copy) a
+  /// string.
+  InputFile(StringRef name, bool isPrimary,
+            llvm::MemoryBuffer *buffer = nullptr)
+      : Filename(name), IsPrimary(isPrimary), Buffer(buffer) {
+    assert(!name.empty() && "Empty strings signify no inptus in other places");
+  }
+
+  bool getIsPrimary() const { return IsPrimary; }
+  llvm::MemoryBuffer *getBuffer() const { return Buffer; }
+  StringRef getFile() const { return Filename; }
+};
+
 /// Information about all the inputs to the frontend.
 class FrontendInputs {
   friend class ArgsToFrontendInputsConverter;
 
-private:
-  /// The names of input files to the frontend.
-  std::vector<std::string> InputFilenames;
-
-  /// Input buffers which may override the file contents of input files.
-  std::vector<llvm::MemoryBuffer *> InputBuffers;
-
-  /// The inputs for which output should be generated. If empty, output will
-  /// be generated for the whole module, in other words, whole-module mode.
-  /// Even if every input file is mentioned here, it is not the same as
-  /// whole-module mode.
-  std::vector<SelectedInput> PrimaryInputs;
+  std::vector<InputFile> AllFiles;
+  typedef llvm::MapVector<StringRef, unsigned> InputFileMap;
+  InputFileMap PrimaryInputs;
 
 public:
+  FrontendInputs() = default;
+
+  FrontendInputs(const FrontendInputs &other) {
+    for (InputFile input : other.getAllFiles())
+      addInput(input);
+  }
+  FrontendInputs(FrontendInputs &&other) {
+    AllFiles = std::move(other.AllFiles);
+    PrimaryInputs = std::move(other.PrimaryInputs);
+  }
+  FrontendInputs &operator=(const FrontendInputs &other) {
+    clearInputs();
+    for (InputFile input : other.getAllFiles())
+      addInput(input);
+    return *this;
+  }
+
   // Readers:
 
-  // Input filename readers
-  ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
-  bool hasInputFilenames() const { return !getInputFilenames().empty(); }
-  unsigned inputFilenameCount() const { return getInputFilenames().size(); }
+  ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
 
-  bool hasUniqueInputFilename() const { return inputFilenameCount() == 1; }
-  const std::string &getFilenameOfFirstInput() const {
-    assert(hasInputFilenames());
-    return getInputFilenames()[0];
+  std::vector<std::string> getInputFilenames() const {
+    std::vector<std::string> filenames;
+    for (auto &input : getAllFiles()) {
+      assert(!input.getFile().empty());
+      filenames.push_back(input.getFile());
+    }
+    return filenames;
+  }
+
+  unsigned inputCount() const { return getAllFiles().size(); }
+
+  bool hasInputs() const { return !AllFiles.empty(); }
+
+  bool hasUniqueInput() const { return inputCount() == 1; }
+
+  const StringRef getFilenameOfFirstInput() const {
+    assert(hasInputs());
+    const InputFile &inp = getAllFiles()[0];
+    StringRef f = inp.getFile();
+    assert(!f.empty());
+    return f;
   }
 
   bool isReadingFromStdin() const {
-    return hasUniqueInputFilename() && getFilenameOfFirstInput() == "-";
+    return hasUniqueInput() && getFilenameOfFirstInput() == "-";
   }
 
   // If we have exactly one input filename, and its extension is "bc" or "ll",
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
 
-  // Input buffer readers
-
-  ArrayRef<llvm::MemoryBuffer *> getInputBuffers() const {
-    return InputBuffers;
-  }
-  unsigned inputBufferCount() const { return getInputBuffers().size(); }
-
   // Primary input readers
 
 private:
-  void assertMustNotBeMoreThanOnePrimaryInput() const {
-    assert(PrimaryInputs.size() < 2 &&
-           "have not implemented >1 primary input yet");
-  }
+  
+  bool doAllNonPrimariesEndWithSIB() const;
 
 public:
-  ArrayRef<SelectedInput> getPrimaryInputs() const { return PrimaryInputs; }
-
-  unsigned primaryInputCount() const { return getPrimaryInputs().size(); }
+  void assertMustNotBeMoreThanOnePrimaryInput() const {
+    assert(primaryInputCount() < 2 &&
+           "have not implemented >1 primary input yet");
+  }
+  
+  unsigned primaryInputCount() const { return PrimaryInputs.size(); }
 
   // Primary count readers:
 
@@ -128,116 +139,81 @@ public:
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
 
   bool isWholeModule() const { return !hasPrimaryInputs(); }
-
-  // Count-dependend readers:
-
-  Optional<SelectedInput> getOptionalPrimaryInput() const {
-    return hasPrimaryInputs() ? Optional<SelectedInput>(getPrimaryInputs()[0])
-                              : Optional<SelectedInput>();
+  
+  void forEachPrimaryOrEmpty(llvm::function_ref<void(StringRef)> fn) const{
+    if (!hasPrimaryInputs())
+      fn("");
+    else
+      for (const auto &p: PrimaryInputs)
+        fn(p.first);
   }
-
-  SelectedInput getRequiredUniquePrimaryInput() const {
-    assert(hasUniquePrimaryInput());
-    return getPrimaryInputs()[0];
-  }
-
-  Optional<SelectedInput> getOptionalUniquePrimaryInput() const {
-    return hasUniquePrimaryInput()
-               ? Optional<SelectedInput>(getPrimaryInputs()[0])
-               : Optional<SelectedInput>();
-  }
-
-  bool hasAPrimaryInputFile() const {
-    return hasPrimaryInputs() && getOptionalPrimaryInput()->isFilename();
-  }
-
-  Optional<StringRef> getOptionalUniquePrimaryInputFilename() const {
-    Optional<SelectedInput> primaryInput = getOptionalUniquePrimaryInput();
-    return (primaryInput && primaryInput->isFilename())
-               ? Optional<StringRef>(getInputFilenames()[primaryInput->Index])
-               : Optional<StringRef>();
-  }
-
-  bool isInputPrimary(unsigned i) const {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    if (Optional<SelectedInput> primaryInput = getOptionalPrimaryInput())
-      return primaryInput->isFilename() && primaryInput->Index == i;
+  
+  bool forEachPrimaryOrEmptyWithErrors(llvm::function_ref<bool(StringRef)> fn) const{
+    if (!hasPrimaryInputs())
+      return fn("");
+    for (const auto &p: PrimaryInputs)
+      if (fn(p.first))
+        return true;
     return false;
   }
 
-  Optional<unsigned> primaryInputFileIndex() const {
-    return hasAPrimaryInputFile()
-               ? Optional<unsigned>(getOptionalPrimaryInput()->Index)
-               : None;
+  // Count-dependend readers:
+
+  /// Return the unique primary input, if one exists.
+  const InputFile *getUniquePrimaryInput() const {
+    assertMustNotBeMoreThanOnePrimaryInput();
+    const auto &b = PrimaryInputs.begin();
+    return b == PrimaryInputs.end() ? nullptr : &AllFiles[b->second];
   }
 
-  StringRef primaryInputFilenameIfAny() const {
-    if (auto Index = primaryInputFileIndex()) {
-      return getInputFilenames()[*Index];
-    }
-    return StringRef();
+  const InputFile &getRequiredUniquePrimaryInput() const {
+    if (const auto *input = getUniquePrimaryInput())
+      return *input;
+    assert(false);
   }
 
-public:
+  /// Return the name of the unique primary input, or an empty StringRef if there
+  /// isn't one.
+  StringRef getNameOfUniquePrimaryInputFile() const {
+    const auto *input = getUniquePrimaryInput();
+    return input == nullptr ? StringRef() : input->getFile();
+  }
+
+  bool isFilePrimary(StringRef file) {
+    StringRef correctedName = file.equals("<stdin>") ? "-" : file;
+    auto iterator = PrimaryInputs.find(correctedName);
+    return iterator != PrimaryInputs.end() &&
+           AllFiles[iterator->second].getIsPrimary();
+  }
+
+  unsigned numberOfPrimaryInputsEndingWith(const char *suffix) const;
+
   // Multi-facet readers
+
   bool shouldTreatAsSIL() const;
 
   /// Return true for error
   bool verifyInputs(DiagnosticEngine &diags, bool treatAsSIL,
                     bool isREPLRequested, bool isNoneRequested) const;
 
-  // Input filename writers
+  // Writers
 
-  void addInputFilename(StringRef Filename) {
-    InputFilenames.push_back(Filename);
+  void addInputFile(StringRef file, llvm::MemoryBuffer *buffer = nullptr) {
+    addInput(InputFile(file, false, buffer));
   }
-  void transformInputFilenames(
-      const llvm::function_ref<std::string(std::string)> &fn);
-
-  // Input buffer writers
-
-  void addInputBuffer(llvm::MemoryBuffer *Buf) { InputBuffers.push_back(Buf); }
-
-  // Primary input writers
-
-private:
-  std::vector<SelectedInput> &getMutablePrimaryInputs() {
-    assertMustNotBeMoreThanOnePrimaryInput();
-    return PrimaryInputs;
+  void addPrimaryInputFile(StringRef file,
+                           llvm::MemoryBuffer *buffer = nullptr) {
+    addInput(InputFile(file.str(), true, buffer));
   }
 
-public:
-  void clearPrimaryInputs() { getMutablePrimaryInputs().clear(); }
-
-  void setPrimaryInputToFirstFile() {
-    clearPrimaryInputs();
-    addPrimaryInput(SelectedInput(0, SelectedInput::InputKind::Filename));
+  void addInput(const InputFile &input) {
+    if (!input.getFile().empty() && input.getIsPrimary())
+      PrimaryInputs.insert(std::make_pair(input.getFile(), AllFiles.size()));
+    AllFiles.push_back(input);
   }
-
-  void addPrimaryInput(SelectedInput si) { PrimaryInputs.push_back(si); }
-
-  void setPrimaryInput(SelectedInput si) {
-    clearPrimaryInputs();
-    getMutablePrimaryInputs().push_back(si);
-  }
-
-  void addPrimaryInputFilename(unsigned index) {
-    addPrimaryInput(SelectedInput(index, SelectedInput::InputKind::Filename));
-  }
-
-  void setPrimaryInputForInputFilename(const std::string &inputFilename) {
-    setPrimaryInput(!inputFilename.empty() && inputFilename != "-"
-                        ? SelectedInput(inputFilenameCount(),
-                                        SelectedInput::InputKind::Filename)
-                        : SelectedInput(inputBufferCount(),
-                                        SelectedInput::InputKind::Buffer));
-  }
-
-  // Multi-faceted writers
-
   void clearInputs() {
-    InputFilenames.clear();
-    InputBuffers.clear();
+    AllFiles.clear();
+    PrimaryInputs.clear();
   }
 };
 
@@ -251,72 +227,106 @@ public:
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
-  /// The specified output files. If only a single outputfile is generated,
-  /// the name of the last specified file is taken.
-  std::vector<std::string> OutputFilenames;
-
   void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const {
+  StringRef getSingleOutputFilename(StringRef primaryOrEmpty) const {
+    auto &OutputFilenames = pathsForPrimary(primaryOrEmpty).OutputFilenames;
     if (OutputFilenames.size() >= 1)
       return OutputFilenames.back();
     return StringRef();
   }
   /// Sets a single filename as output filename.
-  void setSingleOutputFilename(const std::string &FileName) {
-    OutputFilenames.clear();
-    OutputFilenames.push_back(FileName);
+  void setSingleOutputFilename(StringRef primaryOrEmpty, const std::string &FileName) {
+    pathsForPrimary(primaryOrEmpty).OutputFilenames.clear();
+    pathsForPrimary(primaryOrEmpty).OutputFilenames.push_back(FileName);
   }
-  void setOutputFilenameToStdout() { setSingleOutputFilename("-"); }
-  bool isOutputFilenameStdout() const {
-    return getSingleOutputFilename() == "-";
+  void setOutputFilenameToStdout(StringRef primaryOrEmpty) { setSingleOutputFilename(primaryOrEmpty, "-"); }
+  bool isOutputFilenameStdout(StringRef primaryOrEmpty) const {
+    return getSingleOutputFilename(primaryOrEmpty) == "-";
   }
-  bool isOutputFileDirectory() const;
-  bool hasNamedOutputFile() const {
-    return !OutputFilenames.empty() && !isOutputFilenameStdout();
+  bool isOutputFileDirectory(StringRef primaryOrEmpty) const;
+  bool hasNamedOutputFile(StringRef primaryOrEmpty) const {
+    return !pathsForPrimary(primaryOrEmpty).OutputFilenames.empty() && !isOutputFilenameStdout(primaryOrEmpty);
   }
 
   /// A list of arbitrary modules to import and make implicitly visible.
   std::vector<std::string> ImplicitImportModuleNames;
 
-  /// An Objective-C header to import and make implicitly visible.
-  std::string ImplicitObjCHeaderPath;
-
   /// The name of the module which the frontend is building.
   std::string ModuleName;
-
-  /// The path to which we should emit a serialized module.
-  std::string ModuleOutputPath;
-
-  /// The path to which we should emit a module documentation file.
-  std::string ModuleDocOutputPath;
 
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
-  /// The path to which we should emit an Objective-C header for the module.
-  std::string ObjCHeaderOutputPath;
+  /// An Objective-C header to import and make implicitly visible.
+  std::string ImplicitObjCHeaderPath;
 
-  /// Path to a file which should contain serialized diagnostics for this
-  /// frontend invocation.
-  std::string SerializedDiagnosticsPath;
+  // Depends on primary:
 
-  /// The path to which we should output a Make-style dependencies file.
-  std::string DependenciesFilePath;
+  struct OutputPaths {
+    /// The specified output files. If only a single outputfile is generated,
+    /// the name of the last specified file is taken.
+    std::vector<std::string> OutputFilenames;
 
-  /// The path to which we should output a Swift reference dependencies file.
-  std::string ReferenceDependenciesFilePath;
+    /// The path to which we should emit an Objective-C header for the module.
+    std::string ObjCHeaderOutputPath;
+
+    /// The path to which we should emit a serialized module.
+    std::string ModuleOutputPath;
+
+    /// The path to which we should emit a module documentation file.
+    std::string ModuleDocOutputPath;
+
+    /// The path to which we should output a Make-style dependencies file.
+    std::string DependenciesFilePath;
+
+    /// The path to which we should output a Swift reference dependencies file.
+    std::string ReferenceDependenciesFilePath;
+
+    /// Path to a file which should contain serialized diagnostics for this
+    /// frontend invocation.
+    std::string SerializedDiagnosticsPath;
+
+    /// The path to which we should output a loaded module trace file.
+    std::string LoadedModuleTracePath;
+
+    /// The path to which we should output a TBD file.
+    std::string TBDPath;
+  };
+private:
+  /// Keyed by empty string for no-primary case
+  llvm::StringMap<OutputPaths> OutputPathsByPrimary;
+
+  OutputPaths &addOutputPaths(StringRef primaryName) {
+    OutputPathsByPrimary.insert(std::make_pair(primaryName, OutputPaths()));
+    auto iter = OutputPathsByPrimary.find(primaryName);
+    return iter->getValue();
+  }
+
+public:
+  const OutputPaths &pathsForPrimary(StringRef primaryName) const {
+    auto iter = OutputPathsByPrimary.find(primaryName);
+    assert(iter != OutputPathsByPrimary.end());
+    return iter->getValue();
+  }
+  OutputPaths &pathsForPrimary(StringRef primaryName) {
+    auto iter = OutputPathsByPrimary.find(primaryName);
+    return iter != OutputPathsByPrimary.end() ? iter->getValue()
+                                              : addOutputPaths(primaryName);
+  }
+  const OutputPaths &pathsForAtMostOnePrimary() const {
+    Inputs.assertMustNotBeMoreThanOnePrimaryInput();
+    return pathsForPrimary(Inputs.getNameOfUniquePrimaryInputFile());
+  }
+  OutputPaths &pathsForAtMostOnePrimary() {
+    Inputs.assertMustNotBeMoreThanOnePrimaryInput();
+    return pathsForPrimary(Inputs.getNameOfUniquePrimaryInputFile());
+  }
 
   /// The path to which we should output fixits as source edits.
   std::string FixitsOutputPath;
-
-  /// The path to which we should output a loaded module trace file.
-  std::string LoadedModuleTracePath;
-
-  /// The path to which we should output a TBD file.
-  std::string TBDPath;
 
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
@@ -523,27 +533,26 @@ public:
     return llvm::hash_value(0);
   }
 
-  StringRef originalPath() const;
+  StringRef originalPath(StringRef primaryOrEmpty) const;
 
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
-    return InputKind == InputFileKind::IFK_Swift &&
-           Inputs.hasUniqueInputFilename();
+    return InputKind == InputFileKind::IFK_Swift && Inputs.hasUniqueInput();
   }
 
 private:
   static const char *suffixForPrincipalOutputFileForAction(ActionType);
 
-  bool hasUnusedDependenciesFilePath() const;
+  bool hasUnusedDependenciesFilePath(StringRef primaryOrEmpty) const;
   static bool canActionEmitDependencies(ActionType);
-  bool hasUnusedObjCHeaderOutputPath() const;
+  bool hasUnusedObjCHeaderOutputPath(StringRef primaryOrEmpty) const;
   static bool canActionEmitHeader(ActionType);
-  bool hasUnusedLoadedModuleTracePath() const;
+  bool hasUnusedLoadedModuleTracePath(StringRef primaryOrEmpty) const;
   static bool canActionEmitLoadedModuleTrace(ActionType);
-  bool hasUnusedModuleOutputPath() const;
+  bool hasUnusedModuleOutputPath(StringRef primaryOrEmpty) const;
   static bool canActionEmitModule(ActionType);
-  bool hasUnusedModuleDocOutputPath() const;
+  bool hasUnusedModuleDocOutputPath(StringRef primaryOrEmpty) const;
   static bool canActionEmitModuleDoc(ActionType);
 
   static bool doesActionProduceOutput(ActionType);
