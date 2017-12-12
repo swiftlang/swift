@@ -14,6 +14,7 @@
 #include "Cleanup.h"
 #include "ExitableFullExpr.h"
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
 #include "Scope.h"
@@ -2156,9 +2157,13 @@ void PatternMatchEmission::emitEnumElementDispatch(
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
         if (eltTL->isLoadable()) {
+          UnenforcedAccess access;
+          SILValue accessAddress =
+            access.beginAccess(SGF, loc, boxedValue, SILAccessKind::Read);
           ManagedValue newLoadedBoxValue = SGF.B.createLoadBorrow(
-              loc, ManagedValue::forUnmanaged(boxedValue));
+            loc, ManagedValue::forUnmanaged(accessAddress));
           boxedValue = newLoadedBoxValue.getUnmanagedValue();
+          access.endAccess(SGF);
         }
 
         // The boxed value may be shared, so we always have to copy it.
