@@ -1384,8 +1384,6 @@ static void makeStructRawValued(
   var->addTrivialAccessors(varGetter, nullptr, nullptr);
   assert(var->hasStorage());
 
-  structDecl->setHasDelayedMembers();
-
   // Create constructors to initialize that value from a value of the
   // underlying type.
   if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
@@ -1537,7 +1535,6 @@ static void makeStructRawValuedWithBridge(
         Impl, structDecl, computedVar, storedVar,
         /*wantLabel*/ false, wantBody);
 
-  structDecl->setHasDelayedMembers();
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);
   structDecl->addMember(init);
