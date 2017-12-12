@@ -377,6 +377,16 @@ protected:
   };
   NUMBITS(TupleType, 64);
 
+  struct BoundGenericTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    unsigned : 32 - NumTypeBaseBits; // unused / padding
+
+    /// The number of generic arguments.
+    unsigned GenericArgCount : 32;
+  };
+  NUMBITS(BoundGenericType, 64);
+
 #undef NUMBITS
   union {
     TypeBaseBitfields TypeBaseBits;
@@ -390,6 +400,7 @@ protected:
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
     ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
     TupleTypeBitfields TupleTypeBits;
+    BoundGenericTypeBitfields BoundGenericTypeBits;
   };
 
 protected:
@@ -1733,8 +1744,12 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
   /// \brief The type of the parent, in which this type is nested.
   Type Parent;
   
-  ArrayRef<Type> GenericArgs;
-  
+  /// Retrieve the intrusive pointer storage from the subtype
+  const Type *getTrailingObjectsPointer() const;
+  Type *getTrailingObjectsPointer() {
+    const BoundGenericType *temp = this;
+    return const_cast<Type *>(temp->getTrailingObjectsPointer());
+  }
 
 protected:
   BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
@@ -1759,10 +1774,12 @@ public:
   Type getParent() const { return Parent; }
 
   /// Retrieve the set of generic arguments provided at this level.
-  ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
+  ArrayRef<Type> getGenericArgs() const {
+    return {getTrailingObjectsPointer(), BoundGenericTypeBits.GenericArgCount};
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, TheDecl, Parent, GenericArgs);
+    Profile(ID, TheDecl, Parent, getGenericArgs());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
                       Type Parent, ArrayRef<Type> GenericArgs);
@@ -1783,7 +1800,10 @@ END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic class type.
-class BoundGenericClassType : public BoundGenericType {
+class BoundGenericClassType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericClassType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericClassType(ClassDecl *theDecl, Type parent,
                         ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -1814,7 +1834,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
 /// BoundGenericEnumType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic enum type.
-class BoundGenericEnumType : public BoundGenericType {
+class BoundGenericEnumType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericEnumType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericEnumType(EnumDecl *theDecl, Type parent,
                        ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -1845,7 +1868,10 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
-class BoundGenericStructType : public BoundGenericType {
+class BoundGenericStructType final : public BoundGenericType,
+    private llvm::TrailingObjects<BoundGenericStructType, Type> {
+  friend TrailingObjects;
+
 private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
@@ -5065,6 +5091,16 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic, bool isShar
   // ParameterTypeFlags::fromParameterType entirely.
   bool inOut = paramTy->is<InOutType>();
   return {isVariadic, autoclosure, escaping, inOut, isShared};
+}
+
+inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
+  if (auto ty = dyn_cast<BoundGenericStructType>(this))
+    return ty->getTrailingObjects<Type>();
+  if (auto ty = dyn_cast<BoundGenericEnumType>(this))
+    return ty->getTrailingObjects<Type>();
+  if (auto ty = dyn_cast<BoundGenericClassType>(this))
+    return ty->getTrailingObjects<Type>();
+  llvm_unreachable("Unhandled BoundGenericType!");
 }
   
 /// \brief If this is a method in a type or extension thereof, compute
