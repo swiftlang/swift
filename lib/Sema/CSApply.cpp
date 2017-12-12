@@ -3427,7 +3427,8 @@ namespace {
       // If we weren't explicitly told by the caller which disjunction choice,
       // get it from the solution to determine whether we've picked a coercion
       // or a bridging conversion.
-      auto locator = cs.getConstraintLocator(expr);
+      auto *locator = cs.getConstraintLocator(expr);
+
       if (!choice) {
         if (tc.Context.LangOpts.EnableObjCInterop)
           choice = solution.getDisjunctionChoice(locator);
