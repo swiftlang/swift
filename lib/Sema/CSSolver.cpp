@@ -650,6 +650,21 @@ bool ConstraintSystem::tryTypeVariableBindings(
         }
         type = openUnboundGenericType(type, typeVar->getImpl().getLocator());
         type = type->reconstituteSugar(/*recursive=*/false);
+      } else if ((binding.BindingSource == ConstraintKind::ArgumentConversion ||
+                  binding.BindingSource ==
+                      ConstraintKind::ArgumentTupleConversion) &&
+                 !type->hasTypeVariable() && isCollectionType(type)) {
+        // If the type binding comes from the argument conversion, let's
+        // instead of binding collection types directly let's try to
+        // bind using temporary type variables substituted for element
+        // types, that's going to ensure that subtype relationship is
+        // always preserved.
+        auto *BGT = type->castTo<BoundGenericType>();
+        auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
+                                           BGT->getASTContext());
+
+        type = openUnboundGenericType(UGT, typeVar->getImpl().getLocator());
+        type = type->reconstituteSugar(/*recursive=*/false);
       }
 
       // FIXME: We want the locator that indicates where the binding came
@@ -697,7 +712,8 @@ bool ConstraintSystem::tryTypeVariableBindings(
           = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
         for (auto altType : getAlternativeLiteralTypes(knownKind)) {
           if (exploredTypes.insert(altType->getCanonicalType()).second)
-            newBindings.push_back({altType, AllowedBindingKind::Subtypes, 
+            newBindings.push_back({altType, AllowedBindingKind::Subtypes,
+                                   binding.BindingSource,
                                    binding.DefaultedProtocol});
         }
       }
@@ -710,7 +726,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
         // Try lvalue qualification in addition to rvalue qualification.
         auto subtype = LValueType::get(type);
         if (exploredTypes.insert(subtype->getCanonicalType()).second)
-          newBindings.push_back({subtype, binding.Kind, None});
+          newBindings.push_back({subtype, binding.Kind, binding.BindingSource});
       }
 
       if (binding.Kind == AllowedBindingKind::Subtypes) {
@@ -719,7 +735,8 @@ bool ConstraintSystem::tryTypeVariableBindings(
           if (scalarIdx >= 0) {
             auto eltType = tupleTy->getElementType(scalarIdx);
             if (exploredTypes.insert(eltType->getCanonicalType()).second)
-              newBindings.push_back({eltType, binding.Kind, None});
+              newBindings.push_back(
+                  {eltType, binding.Kind, binding.BindingSource});
           }
         }
 
@@ -733,10 +750,12 @@ bool ConstraintSystem::tryTypeVariableBindings(
             if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
               if (typeVar->getImpl().canBindToLValue() ==
                   otherTypeVar->getImpl().canBindToLValue()) {
-                newBindings.push_back({objTy, binding.Kind, None});
+                newBindings.push_back(
+                    {objTy, binding.Kind, binding.BindingSource});
               }
             } else {
-              newBindings.push_back({objTy, binding.Kind, None});
+              newBindings.push_back(
+                  {objTy, binding.Kind, binding.BindingSource});
             }
           }
         }
@@ -753,7 +772,11 @@ bool ConstraintSystem::tryTypeVariableBindings(
 
         // If we haven't seen this supertype, add it.
         if (exploredTypes.insert((*simpleSuper)->getCanonicalType()).second)
-          newBindings.push_back({*simpleSuper, binding.Kind, None});
+          newBindings.push_back({
+              *simpleSuper,
+              binding.Kind,
+              binding.BindingSource,
+          });
       }
     }
 

@@ -70,9 +70,8 @@ public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 /// `replaceSubrange(_:with:)` with an empty collection for the `newElements` 
 /// parameter. You can override any of the protocol's required methods to 
 /// provide your own custom implementation.
-public protocol RangeReplaceableCollection: Collection
-where SubSequence: RangeReplaceableCollection
-{
+public protocol RangeReplaceableCollection : Collection
+  where SubSequence : RangeReplaceableCollection {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence = Slice<Self>
 
@@ -132,7 +131,7 @@ where SubSequence: RangeReplaceableCollection
   /// less storage than requested, or to take no action at all.
   ///
   /// - Parameter n: The requested number of elements to store.
-  mutating func reserveCapacity(_ n: IndexDistance)
+  mutating func reserveCapacity(_ n: Int)
 
   //===--- Derivable Requirements -----------------------------------------===//
 
@@ -648,7 +647,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter n: The requested number of elements to store.
   @_inlineable
-  public mutating func reserveCapacity(_ n: IndexDistance) {}
+  public mutating func reserveCapacity(_ n: Int) {}
 }
 
 extension RangeReplaceableCollection where SubSequence == Self {
@@ -782,9 +781,7 @@ extension RangeReplaceableCollection {
 }
 
 extension RangeReplaceableCollection
-  where
-  Self : BidirectionalCollection,
-  SubSequence == Self {
+  where Self : BidirectionalCollection, SubSequence == Self {
 
   @_inlineable
   public mutating func _customRemoveLast() -> Element? {
@@ -854,10 +851,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
 // FIXME: swift-3-indexing-model: file a bug for the compiler?
 /// Ambiguity breakers.
 extension RangeReplaceableCollection
-  where
-  Self : BidirectionalCollection,
-  SubSequence == Self
-{
+  where Self : BidirectionalCollection, SubSequence == Self {
   /// Removes and returns the last element of the collection.
   ///
   /// The collection must not be empty.

@@ -1024,7 +1024,8 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
   }
 
   // If the lookup occurs from within a trailing 'where' clause of
-  // a constrained extension, also look for associated types.
+  // a constrained extension, also look for associated types and typealiases
+  // in the protocol.
   if (genericParams->hasTrailingWhereClause() &&
       comp->getIdLoc().isValid() &&
       TC.Context.SourceMgr.rangeContainsTokenLoc(
@@ -1047,12 +1048,15 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-          comp->setValue(assocType, DC);
-          return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                   diagnoseErrors, resolver,
-                                                   unsatisfiedDependency);
-        }
+        auto typeDecl = dyn_cast<TypeDecl>(decl);
+        if (!typeDecl) continue;
+
+        if (!isa<ProtocolDecl>(typeDecl->getDeclContext())) continue;
+
+        comp->setValue(typeDecl, DC);
+        return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                                 diagnoseErrors, resolver,
+                                                 unsatisfiedDependency);
       }
     }
   }
@@ -1129,14 +1133,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return Type();
 
   auto id = comp->getIdentifier();
-
-  // If we're compiling for Swift version < 5 and we have a mention of
-  // ImplicitlyUnwrappedOptional where it is not allowed, treat it as
-  // if it was spelled Optional.
-  if (id == TC.Context.Id_ImplicitlyUnwrappedOptional
-      && !options.contains(TypeResolutionFlags::AllowIUO)
-      && !TC.Context.isSwiftVersionAtLeast(5))
-    id = TC.Context.Id_Optional;
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
@@ -1239,7 +1235,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       }
     } else if (isa<GenericIdentTypeRepr>(comp)) {
       Diagnostic diag =
-          diag::implicitly_unwrapped_optional_spelling_decay_to_optional;
+          diag::implicitly_unwrapped_optional_spelling_suggest_optional;
 
       if (TC.Context.isSwiftVersionAtLeast(5))
         diag = diag::implicitly_unwrapped_optional_spelling_in_illegal_position;
@@ -1258,7 +1254,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
               genericTyR->getAngleBrackets().End.getAdvancedLoc(1));
     } else {
       Diagnostic diag =
-          diag::implicitly_unwrapped_optional_spelling_decay_to_optional;
+          diag::implicitly_unwrapped_optional_spelling_suggest_optional;
 
       if (TC.Context.isSwiftVersionAtLeast(5))
         diag = diag::
@@ -2847,7 +2843,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        TypeResolutionOptions options) {
   if (!options.contains(TypeResolutionFlags::AllowIUO)) {
     Diagnostic diag = diag::
-        implicitly_unwrapped_optional_in_illegal_position_decay_to_optional;
+        implicitly_unwrapped_optional_in_illegal_position_suggest_optional;
 
     if (TC.Context.isSwiftVersionAtLeast(5))
       diag = diag::implicitly_unwrapped_optional_in_illegal_position;
@@ -2865,12 +2861,8 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (!baseTy || baseTy->hasError()) return baseTy;
 
   Type uncheckedOptionalTy;
-  if (!options.contains(TypeResolutionFlags::AllowIUO))
-    // Treat IUOs in illegal positions as optionals.
-    uncheckedOptionalTy = TC.getOptionalType(repr->getExclamationLoc(), baseTy);
-  else
-    uncheckedOptionalTy = TC.getImplicitlyUnwrappedOptionalType(
-        repr->getExclamationLoc(), baseTy);
+  uncheckedOptionalTy =
+      TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
 
   if (!uncheckedOptionalTy)
     return ErrorType::get(Context);

@@ -770,31 +770,82 @@ void IRGenModule::addLazyConformances(NominalTypeDecl *Nominal) {
   }
 }
 
+std::string IRGenModule::GetObjCSectionName(StringRef Section,
+                                            StringRef MachOAttributes) {
+  assert(Section.substr(0, 2) == "__" && "expected the name to begin with __");
+
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("must know the object file format");
+  case llvm::Triple::MachO:
+    return MachOAttributes.empty()
+               ? ("__DATA," + Section).str()
+               : ("__DATA," + Section + "," + MachOAttributes).str();
+  case llvm::Triple::ELF:
+    return Section.substr(2).str();
+  case llvm::Triple::COFF:
+    return ("." + Section.substr(2) + "$B").str();
+  case llvm::Triple::Wasm:
+    error(SourceLoc(), "wasm is not a supported object file format");
+  }
+
+  llvm_unreachable("unexpected object file format");
+}
+
+void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
+                                           ObjCLabelType Type) {
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("must know the object file format");
+  case llvm::Triple::MachO:
+    switch (Type) {
+    case ObjCLabelType::ClassName:
+      GV->setSection("__TEXT,__objc_classname,cstring_literals");
+      return;
+    case ObjCLabelType::MethodVarName:
+      GV->setSection("__TEXT,__objc_methname,cstring_literals");
+      return;
+    case ObjCLabelType::MethodVarType:
+      GV->setSection("__TEXT,__objc_methtype,cstring_literals");
+      return;
+    case ObjCLabelType::PropertyName:
+      GV->setSection("__TEXT,__cstring,cstring_literals");
+      return;
+    }
+  case llvm::Triple::ELF:
+    return;
+  case llvm::Triple::COFF:
+    return;
+  case llvm::Triple::Wasm:
+    error(SourceLoc(), "wasm is not a supported object file format");
+    return;
+  }
+
+  llvm_unreachable("unexpected object file format");
+}
+
 void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
-    assert(TargetInfo.OutputObjectFormat == llvm::Triple::MachO);
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(*this, ObjCClasses, "objc_classes",
-                   "__DATA, __objc_classlist, regular, no_dead_strip",
-                   llvm::GlobalValue::InternalLinkage,
-                   Int8PtrTy,
-                   false);
+                   GetObjCSectionName("__objc_classlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
+
     // So do categories.
     emitGlobalList(*this, ObjCCategories, "objc_categories",
-                   "__DATA, __objc_catlist, regular, no_dead_strip",
-                   llvm::GlobalValue::InternalLinkage,
-                   Int8PtrTy,
-                   false);
+                   GetObjCSectionName("__objc_catlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
     // Emit nonlazily realized class references in a second magic section to make
     // sure they are realized by the Objective-C runtime before any instances
     // are allocated.
     emitGlobalList(*this, ObjCNonLazyClasses, "objc_non_lazy_classes",
-                   "__DATA, __objc_nlclslist, regular, no_dead_strip",
-                   llvm::GlobalValue::InternalLinkage,
-                   Int8PtrTy,
-                   false);
+                   GetObjCSectionName("__objc_nlclslist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
   }
 
   // @llvm.used
@@ -1207,6 +1258,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::SwiftMetaclassStub:
   case Kind::FieldOffset:
   case Kind::NominalTypeDescriptor:
+  case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
@@ -1293,6 +1345,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return true;
 
   case Kind::SwiftMetaclassStub:
+  case Kind::ClassMetadataBaseOffset:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
     return ::isAvailableExternally(IGM, getDecl());
@@ -2288,7 +2341,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     auto flags = typeEntity.flags;
     llvm::Constant *witnessTableVar;
     if (!isResilient(conformance->getProtocol(),
-                     ResilienceExpansion::Maximal)) {
+                     ResilienceExpansion::Maximal) &&
+        conformance->getConditionalRequirements().empty()) {
       flags = flags.withConformanceKind(
           ProtocolConformanceReferenceKind::WitnessTable);
 
@@ -2297,8 +2351,13 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
       // it.
       witnessTableVar = getAddrOfWitnessTable(conformance);
     } else {
-      flags = flags.withConformanceKind(
-          ProtocolConformanceReferenceKind::WitnessTableAccessor);
+      if (conformance->getConditionalRequirements().empty()) {
+        flags = flags.withConformanceKind(
+            ProtocolConformanceReferenceKind::WitnessTableAccessor);
+      } else {
+        flags = flags.withConformanceKind(
+            ProtocolConformanceReferenceKind::ConditionalWitnessTableAccessor);
+      }
 
       witnessTableVar = getAddrOfWitnessTableAccessFunction(
           conformance, ForDefinition);
@@ -2332,7 +2391,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     sectionName = "swift2_protocol_conformances";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2prtc";
+    sectionName = ".sw2prtc$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit protocol conformances for "
@@ -2355,7 +2414,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     sectionName = "swift2_type_metadata";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw2tymd";
+    sectionName = ".sw2tymd$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit type metadata table for "
@@ -2422,7 +2481,8 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
   // Define it lazily.
   if (auto global = dyn_cast<llvm::GlobalVariable>(addr)) {
     if (global->isDeclaration()) {
-      global->setSection("__DATA,__objc_classrefs,regular,no_dead_strip");
+      global->setSection(GetObjCSectionName("__objc_classrefs",
+                                            "regular,no_dead_strip"));
       global->setLinkage(llvm::GlobalVariable::PrivateLinkage);
       global->setExternallyInitialized(true);
       global->setInitializer(getAddrOfObjCClass(theClass, NotForDefinition));
@@ -2759,6 +2819,15 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
   
   return addr;
+}
+
+/// Returns the address of a class metadata base offset.
+llvm::Constant *
+IRGenModule::getAddrOfClassMetadataBaseOffset(ClassDecl *D,
+                                              ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forClassMetadataBaseOffset(D);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
+                               SizeTy, DebugTypeInfo());
 }
 
 /// Return the address of a nominal type descriptor.  Right now, this

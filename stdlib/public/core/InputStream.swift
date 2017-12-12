@@ -69,6 +69,6 @@ public func readLine(strippingNewline: Bool = true) -> String? {
     input: UnsafeMutableBufferPointer(
       start: linePtr,
       count: readBytes)).0
-  _swift_stdlib_free(linePtr)
+  _stdlib_free(linePtr)
   return result
 }

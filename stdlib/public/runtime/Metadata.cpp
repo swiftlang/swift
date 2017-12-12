@@ -137,23 +137,24 @@ static GenericMetadataCache &unsafeGetInitializedCache(GenericMetadata *metadata
 ClassMetadata *
 swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                                           const void *arguments,
-                                          ClassMetadata *superclass) {
+                                          ClassMetadata *superclass,
+                                          size_t numImmediateMembers) {
   void * const *argumentsAsArray = reinterpret_cast<void * const *>(arguments);
   size_t numGenericArguments = pattern->NumKeyArguments;
 
-  // Right now, we only worry about there being a difference in prefix matter.
-  size_t metadataSize = pattern->MetadataSize;
-  size_t prefixSize = pattern->AddressPoint;
-  size_t extraPrefixSize = 0;
+  size_t metadataSize;
   if (superclass && superclass->isTypeMetadata()) {
-    if (superclass->getClassAddressPoint() > prefixSize) {
-      extraPrefixSize = (superclass->getClassAddressPoint() - prefixSize);
-      prefixSize += extraPrefixSize;
-      metadataSize += extraPrefixSize;
-    }
+    assert(superclass->getClassAddressPoint() <= pattern->AddressPoint);
+
+    metadataSize = (superclass->getClassSize() -
+                    superclass->getClassAddressPoint() +
+                    pattern->AddressPoint +
+                    numImmediateMembers * sizeof(void *));
+    assert(pattern->TemplateSize <= metadataSize);
+  } else {
+    metadataSize = (pattern->TemplateSize +
+                    numImmediateMembers * sizeof(void *));
   }
-  assert(metadataSize == pattern->MetadataSize + extraPrefixSize);
-  assert(prefixSize == pattern->AddressPoint + extraPrefixSize);
 
   char *bytes = GenericCacheEntry::allocate(
                               unsafeGetInitializedCache(pattern).getAllocator(),
@@ -161,20 +162,18 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
                               numGenericArguments,
                               metadataSize)->getData<char>();
 
-  // Copy any extra prefix bytes in from the superclass.
-  if (extraPrefixSize) {
-    memcpy(bytes, (const char*) superclass - prefixSize, extraPrefixSize);
-    bytes += extraPrefixSize;
-  }
-
   // Copy in the metadata template.
-  memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
+  memcpy(bytes, pattern->getMetadataTemplate(), pattern->TemplateSize);
+
+  // Zero out the rest of the metadata.
+  memset(bytes + pattern->TemplateSize, 0,
+         metadataSize - pattern->TemplateSize);
 
   // Okay, move to the address point.
   bytes += pattern->AddressPoint;
   ClassMetadata *metadata = reinterpret_cast<ClassMetadata*>(bytes);
   assert(metadata->isTypeMetadata());
-  
+
   // Overwrite the superclass field.
   metadata->SuperClass = superclass;
   // Adjust the relative reference to the nominal type descriptor.
@@ -186,12 +185,9 @@ swift::swift_allocateGenericClassMetadata(GenericMetadata *pattern,
         reinterpret_cast<const ClassMetadata*>(patternBytes)->getDescription());
   }
 
-  // Adjust the class object extents.
-  if (extraPrefixSize) {
-    metadata->setClassSize(metadata->getClassSize() + extraPrefixSize);
-    metadata->setClassAddressPoint(prefixSize);
-  }
-  assert(metadata->getClassAddressPoint() == prefixSize);
+  // The pattern might have private prefix matter prior to the start
+  // of metadata.
+  assert(metadata->getClassAddressPoint() <= pattern->AddressPoint);
 
   return metadata;
 }
@@ -206,10 +202,10 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
     GenericCacheEntry::allocate(
                               unsafeGetInitializedCache(pattern).getAllocator(),
                               argumentsAsArray, numGenericArguments,
-                              pattern->MetadataSize)->getData<char>();
+                              pattern->TemplateSize)->getData<char>();
 
   // Copy in the metadata template.
-  memcpy(bytes, pattern->getMetadataTemplate(), pattern->MetadataSize);
+  memcpy(bytes, pattern->getMetadataTemplate(), pattern->TemplateSize);
 
   // Okay, move to the address point.
   bytes += pattern->AddressPoint;
@@ -654,8 +650,8 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
   BoxPair refAndValueAddr(swift_allocBox(metatype));
-  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.first;
-  return refAndValueAddr.second;
+  *reinterpret_cast<HeapObject **>(buffer) = refAndValueAddr.object;
+  return refAndValueAddr.buffer;
 }
 
 /// Generic tuple value witness for 'destroy'.
@@ -1399,11 +1395,7 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 
 /// Initialize the invariant superclass components of a class metadata,
 /// such as the generic type arguments, field offsets, and so on.
-///
-/// This may also relocate the metadata object if it wasn't allocated
-/// with enough space.
-static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
-                                                  bool copyFieldOffsetVectors) {
+static void _swift_initializeSuperclass(ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
   // If the class is generic, we need to give it a name for Objective-C.
   if (theClass->getDescription()->GenericParams.isGeneric())
@@ -1411,44 +1403,6 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
 #endif
 
   const ClassMetadata *theSuperclass = theClass->SuperClass;
-
-  // Relocate the metadata if necessary.
-  //
-  // For now, we assume that relocation is only required when the parent
-  // class has prefix matter we didn't know about.  This isn't consistent
-  // with general class resilience, however.
-  //
-  // FIXME: This part isn't used right now.
-  if (theSuperclass && theSuperclass->isTypeMetadata()) {
-    auto superAP = theSuperclass->getClassAddressPoint();
-    auto oldClassAP = theClass->getClassAddressPoint();
-    if (superAP > oldClassAP) {
-      size_t extraPrefixSize = superAP - oldClassAP;
-      size_t oldClassSize = theClass->getClassSize();
-
-      // Allocate a new metadata object.
-      auto rawNewClass = (char*) malloc(extraPrefixSize + oldClassSize);
-      auto rawOldClass = (const char*) theClass;
-      auto rawSuperclass = (const char*) theSuperclass;
-
-      // Copy the extra prefix from the superclass.
-      memcpy((void**) (rawNewClass),
-             (void* const *) (rawSuperclass - superAP),
-             extraPrefixSize);
-      // Copy the rest of the data from the derived class.
-      memcpy((void**) (rawNewClass + extraPrefixSize),
-             (void* const *) (rawOldClass - oldClassAP),
-             oldClassSize);
-
-      // Update the class extents on the new metadata object.
-      theClass = reinterpret_cast<ClassMetadata*>(rawNewClass + oldClassAP);
-      theClass->setClassAddressPoint(superAP);
-      theClass->setClassSize(extraPrefixSize + oldClassSize);
-
-      // The previous metadata should be global data, so we have no real
-      // choice but to drop it on the floor.
-    }
-  }
 
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
@@ -1461,13 +1415,13 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
     if (genericParams.Flags.hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
       for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
-        classWords[vtable->VTableOffset + i] = vtable->getMethod(i);
+        classWords[vtable->VTableOffset + i] = description->getMethod(i);
       }
     }
   }
 
   if (theSuperclass == nullptr)
-    return theClass;
+    return;
 
   // If any ancestor classes have generic parameters, field offset vectors
   // or virtual methods, inherit them.
@@ -1498,8 +1452,7 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
     }
 
     // Copy the field offsets.
-    if (copyFieldOffsetVectors &&
-        description->Class.hasFieldOffsetVector()) {
+    if (description->Class.hasFieldOffsetVector()) {
       unsigned fieldOffsetVector = description->Class.FieldOffsetVectorOffset;
       memcpy(classWords + fieldOffsetVector,
              superWords + fieldOffsetVector,
@@ -1516,8 +1469,6 @@ static ClassMetadata *_swift_initializeSuperclass(ClassMetadata *theClass,
     = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
   theMetaclass->SuperClass = theSuperMetaclass;
 #endif
-
-  return theClass;
 }
 
 #if SWIFT_OBJC_INTEROP
@@ -1528,14 +1479,50 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 }
 #endif
 
+ClassMetadata *
+swift::swift_relocateClassMetadata(ClassMetadata *self,
+                                   size_t templateSize,
+                                   size_t numImmediateMembers) {
+  const ClassMetadata *superclass = self->SuperClass;
+
+  size_t metadataSize;
+  if (superclass && superclass->isTypeMetadata()) {
+    metadataSize = (superclass->getClassSize() -
+                    superclass->getClassAddressPoint() +
+                    self->getClassAddressPoint() +
+                    numImmediateMembers * sizeof(void *));
+  } else {
+    metadataSize = (templateSize +
+                    numImmediateMembers * sizeof(void *));
+  }
+
+  if (templateSize < metadataSize) {
+    auto rawNewClass = (char*) malloc(metadataSize);
+    auto rawOldClass = (const char*) self;
+    rawOldClass -= self->getClassAddressPoint();
+
+    memcpy(rawNewClass, rawOldClass, templateSize);
+    memset(rawNewClass + templateSize, 0,
+           metadataSize - templateSize);
+
+    rawNewClass += self->getClassAddressPoint();
+    auto *newClass = (ClassMetadata *) rawNewClass;
+    assert(newClass->isTypeMetadata());
+
+    return newClass;
+  }
+
+  return self;
+}
+
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
-ClassMetadata *
+void
 swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
                                                  size_t numFields,
                                            const TypeLayout * const *fieldTypes,
                                                  size_t *fieldOffsets) {
-  self = _swift_initializeSuperclass(self, /*copyFieldOffsetVectors=*/true);
+  _swift_initializeSuperclass(self);
 
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
@@ -1707,8 +1694,6 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
     }
   }
 #endif
-
-  return self;
 }
 
 /***************************************************************************/
@@ -2607,8 +2592,8 @@ template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buff
 
   // Allocate the box.
   BoxPair refAndValueAddr(swift_allocBox(this));
-  buffer->PrivateData[0] = refAndValueAddr.first;
-  return refAndValueAddr.second;
+  buffer->PrivateData[0] = refAndValueAddr.object;
+  return refAndValueAddr.buffer;
 }
 
 template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {

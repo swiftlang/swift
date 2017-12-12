@@ -21,7 +21,7 @@ extension ${Self} : CustomPlaygroundQuickLookable {
     // we could send a Raw, but I don't want to make a copy of the
     // bytes for no good reason make an NSImage out of them and
     // send that
-#if os(OSX)
+#if os(macOS)
     let image = data.flatMap(NSImage.init(data:)) ?? NSImage()
 #elseif os(iOS) || os(watchOS) || os(tvOS)
     let image = data.flatMap(UIImage.init(data:)) ?? UIImage() 

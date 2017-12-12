@@ -269,7 +269,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsSerialized_t::IsSerialized);
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
-  if (Store->getFunction()->hasUnqualifiedOwnership())
+  if (!Store->getFunction()->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
   auto *EntryBB = GetterF->createBasicBlock();
   // Copy instructions into GetterF
@@ -523,7 +523,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
       getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsSerialized_t::IsSerialized);
-  if (InitF->hasUnqualifiedOwnership())
+  if (!InitF->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
 
   auto *EntryBB = GetterF->createBasicBlock();

@@ -49,6 +49,7 @@ class C {
   }
 
   func foo3() {
+    _ = [Any]()
     _ = a.a.a
     _ = a.b
     _ = 1.a
@@ -64,3 +65,58 @@ typealias C = [Int]
 typealias D = [Int: String]
 typealias E = Int?.Protocol
 typealias F = [Int]!.Type
+
+struct foo {
+  struct foo {
+    struct foo {
+      func foo() {
+      }
+    }
+  }
+  struct foo {}
+}
+
+struct foo {
+  @available(*, unavailable)
+  struct foo {}
+  public class foo {
+    @available(*, unavailable)
+    @objc(fooObjc)
+    private static func foo() {}
+  }
+}
+
+struct S<A, B, C, @objc D> where A:B, B==C, A : C, B.C == D.A, A.B: C.D {}
+
+private struct S<A, B>: Base where A: B {
+  private struct S: A, B {}
+}
+
+protocol P: class {}
+
+func foo(_ _: Int,
+         a b: Int = 3 + 2,
+         _ c: Int = 2,
+         d _: Int = true ? 2: 3,
+         @objc e: X = true,
+         f: inout Int,
+         g: Int...) throws -> [Int: String] {}
+
+func foo(_ a: Int) throws -> Int {}
+func foo( a: Int) rethrows -> Int {}
+
+struct C {
+@objc
+@available(*, unavailable)
+private static override func foo<a, b, c>(a b: Int, c: Int) throws -> [Int] where a==p1, b:p2 { ddd }
+func rootView() -> Label {}
+static func ==() -> bool {}
+static func !=<a, b, c>() -> bool {}
+}
+
+@objc
+private protocol foo : bar where A==B {}
+protocol foo { func foo() }
+private protocol foo{}
+@objc
+public protocol foo where A:B {}

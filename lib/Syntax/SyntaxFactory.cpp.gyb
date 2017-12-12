@@ -85,6 +85,21 @@ SyntaxFactory::countChildren(SyntaxKind Kind){
   }
 }
 
+bool SyntaxFactory::
+canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
+  switch (CollectionKind) {
+% for node in SYNTAX_NODES:
+%     if node.is_syntax_collection():
+  case SyntaxKind::${node.syntax_kind}: {
+    return Member.is<${node.collection_element_type}>();
+  }
+%     end
+% end
+  default:
+    llvm_unreachable("Not collection kind.");
+  }
+}
+
 Optional<Syntax>
 SyntaxFactory::createSyntax(SyntaxKind Kind, llvm::ArrayRef<Syntax> Elements) {
   switch(Kind) {
@@ -308,7 +323,7 @@ TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
 GenericParameterSyntax
 SyntaxFactory::makeGenericParameter(TokenSyntax Name,
   llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeGenericParameter(Name, None, None, TrailingComma);
+  return makeGenericParameter(None, Name, None, None, TrailingComma);
 }
 
 TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,

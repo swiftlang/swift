@@ -25,12 +25,11 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
 // `ClosedRange`.
 /// A position in a `CountableClosedRange` instance.
 @_fixed_layout
-public struct ClosedRangeIndex<Bound>
-  where
-  // swift-3-indexing-model: should conform to _Strideable, otherwise
-  // CountableClosedRange is not interchangeable with CountableRange in all
-  // contexts.
-  Bound : Strideable, Bound.Stride : SignedInteger {
+public struct ClosedRangeIndex<Bound: Strideable>
+where Bound.Stride : SignedInteger {
+  @_versioned
+  internal var _value: _ClosedRangeIndexRepresentation<Bound>
+
   /// Creates the "past the end" position.
   @_inlineable
   @_versioned
@@ -41,8 +40,6 @@ public struct ClosedRangeIndex<Bound>
   @_versioned
   internal init(_ x: Bound) { _value = .inRange(x) }
 
-  @_versioned
-  internal var _value: _ClosedRangeIndexRepresentation<Bound>
   @_inlineable
   @_versioned
   internal var _dereferenced: Bound {
@@ -143,9 +140,8 @@ extension ClosedRangeIndex : Hashable where Bound : Hashable {
 /// iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
 @_fixed_layout
-public struct CountableClosedRange<Bound> : RandomAccessCollection
-  where
-  Bound : Strideable, Bound.Stride : SignedInteger {
+public struct CountableClosedRange<Bound: Strideable>
+where Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -156,13 +152,27 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   /// more applications of `index(after:)`.
   public let upperBound: Bound
 
+  /// Creates an instance with the given bounds.
+  ///
+  /// Because this initializer does not perform any checks, it should be used
+  /// as an optimization only when you are absolutely certain that `lower` is
+  /// less than or equal to `upper`. Using the closed range operator (`...`)
+  /// to form `CountableClosedRange` instances is preferred.
+  ///
+  /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
+  @_inlineable
+  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    self.lowerBound = bounds.lower
+    self.upperBound = bounds.upper
+  }
+}
+
+extension CountableClosedRange: RandomAccessCollection {
   /// The element type of the range; the same type as the range's bounds.
   public typealias Element = Bound
 
   /// A type that represents a position in the range.
   public typealias Index = ClosedRangeIndex<Bound>
-
-  public typealias IndexDistance = Bound.Stride
 
   /// The position of the first element in the range.
   @_inlineable
@@ -202,12 +212,12 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   }
 
   @_inlineable
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     switch i._value {
     case .inRange(let x):
       let d = x.distance(to: upperBound)
       if n <= d {
-        let newPosition = x.advanced(by: n)
+        let newPosition = x.advanced(by: numericCast(n))
         _precondition(newPosition >= lowerBound,
           "Advancing past start index")
         return ClosedRangeIndex(newPosition)
@@ -219,24 +229,24 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
         return i
       } 
       if n < 0 {
-        return index(ClosedRangeIndex(upperBound), offsetBy: (n + 1))
+        return index(ClosedRangeIndex(upperBound), offsetBy: numericCast(n + 1))
       }
       _preconditionFailure("Advancing past end index")
     }
   }
 
   @_inlineable
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     switch (start._value, end._value) {
     case let (.inRange(left), .inRange(right)):
       // in range <--> in range
-      return left.distance(to: right)
+      return numericCast(left.distance(to: right))
     case let (.inRange(left), .pastEnd):
       // in range --> end
-      return 1 + left.distance(to: upperBound)
+      return numericCast(1 + left.distance(to: upperBound))
     case let (.pastEnd, .inRange(right)):
       // in range <-- end
-      return upperBound.distance(to: right) - 1
+      return numericCast(upperBound.distance(to: right) - 1)
     case (.pastEnd, .pastEnd):
       // end <--> end
       return 0
@@ -263,20 +273,6 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
   public subscript(bounds: Range<Index>)
     -> Slice<CountableClosedRange<Bound>> {
     return Slice(base: self, bounds: bounds)
-  }
-
-  /// Creates an instance with the given bounds.
-  ///
-  /// Because this initializer does not perform any checks, it should be used
-  /// as an optimization only when you are absolutely certain that `lower` is
-  /// less than or equal to `upper`. Using the closed range operator (`...`)
-  /// to form `CountableClosedRange` instances is preferred.
-  ///
-  /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
-  @_inlineable
-  public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-    self.lowerBound = bounds.lower
-    self.upperBound = bounds.upper
   }
 
   @_inlineable
@@ -331,9 +327,13 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 ///     print(lowercaseA.isEmpty)
 ///     // Prints "false"
 @_fixed_layout
-public struct ClosedRange<
-  Bound : Comparable
-> {
+public struct ClosedRange<Bound : Comparable> {
+
+  /// The range's lower bound.
+  public let lowerBound: Bound
+
+  /// The range's upper bound.
+  public let upperBound: Bound
 
   /// Creates an instance with the given bounds.
   ///
@@ -348,12 +348,6 @@ public struct ClosedRange<
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
-
-  /// The range's lower bound.
-  public let lowerBound: Bound
-
-  /// The range's upper bound.
-  public let upperBound: Bound
 
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range.
@@ -396,8 +390,7 @@ extension Comparable {
   ///   - maximum: The upper bound for the range.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  public static func ... (minimum: Self, maximum: Self)
-    -> ClosedRange<Self> {
+  public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
       minimum <= maximum, "Can't form Range with upperBound < lowerBound")
     return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))

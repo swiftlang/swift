@@ -272,8 +272,7 @@
 ///       let numberPointer = Unsafe${Mutable}Pointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @_fixed_layout
-public struct ${Self}<Pointee>
-  : Strideable, Hashable, _Pointer {
+public struct ${Self}<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
   public typealias Distance = Int
@@ -851,11 +850,45 @@ public struct ${Self}<Pointee>
     }
 %  end
   }
+}
 
-  //
-  // Protocol conformance
-  //
+extension ${Self}: Equatable {
+  // - Note: Strideable's implementation is potentially less efficient and cannot
+  //   handle misaligned pointers.
+  /// Returns a Boolean value indicating whether two pointers are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
+  ///   otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+}
 
+extension ${Self}: Comparable {
+  // - Note: Strideable's implementation is potentially less efficient and
+  // cannot handle misaligned pointers.
+  //
+  // - Note: This is an unsigned comparison unlike Strideable's implementation.
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// an earlier memory location than the second pointer.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address earlier than
+  ///   `rhs`; otherwise, `false`.
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
+}
+extension ${Self}: Hashable {
   /// The pointer's hash value.
   ///
   /// The hash value is not guaranteed to be stable across different
@@ -865,7 +898,9 @@ public struct ${Self}<Pointee>
   public var hashValue: Int {
     return Int(bitPattern: self)
   }
-
+}
+  
+extension ${Self}: Strideable {
   /// Returns a pointer to the next consecutive instance.
   ///
   /// The resulting pointer must be within the bounds of the same allocation as
@@ -964,44 +999,10 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 }
 
+// - Note: The following family of operator overloads are redundant
+//   with Strideable. However, optimizer improvements are needed
+//   before they can be removed without affecting performance.
 extension ${Self} {
-  // - Note: Strideable's implementation is potentially less efficient and cannot
-  //   handle misaligned pointers.
-  /// Returns a Boolean value indicating whether two pointers are equal.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
-  ///   otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-
-  // - Note: Strideable's implementation is potentially less efficient and
-  // cannot handle misaligned pointers.
-  //
-  // - Note: This is an unsigned comparison unlike Strideable's implementation.
-  /// Returns a Boolean value indicating whether the first pointer references
-  /// an earlier memory location than the second pointer.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` references a memory address earlier than
-  ///   `rhs`; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-
-  // - Note: The following family of operator overloads are redundant
-  //   with Strideable. However, optimizer improvements are needed
-  //   before they can be removed without affecting performance.
-
   /// Creates a new pointer, offset from a pointer by a specified number of
   /// instances of the pointer's `Pointee` type.
   ///

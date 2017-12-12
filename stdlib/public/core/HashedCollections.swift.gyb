@@ -2153,9 +2153,11 @@ extension Dictionary {
     get {
       return _variantBuffer.maybeGet(key) ?? defaultValue()
     }
-    set(newValue) {
-      // FIXME(performance): this loads and discards the old value.
-      _variantBuffer.updateValue(newValue, forKey: key)
+    mutableAddressWithNativeOwner {
+      let (_, address) = _variantBuffer
+        .pointerToValue(forKey: key, insertingDefault: defaultValue)
+      return (address, Builtin.castToNativeObject(
+        _variantBuffer.asNative._storage))
     }
   }
 
@@ -4865,6 +4867,17 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     }
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func ensureNativeBuffer() {
+#if _runtime(_ObjC)
+    if _fastPath(guaranteedNative) { return }
+    if case .cocoa(let cocoaBuffer) = self {
+      migrateDataToNativeBuffer(cocoaBuffer)
+    }
+#endif
+  }
+
 #if _runtime(_ObjC)
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -5314,6 +5327,42 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 #endif
     }
   }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func nativePointerToValue(
+    forKey key: Key, insertingDefault defaultValue: () -> Value
+  ) -> (inserted: Bool, pointer: UnsafeMutablePointer<Value>) {
+
+    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    if found {
+      let pointer = nativePointerToValue(at: ._native(i))
+      return (inserted: false, pointer: pointer)
+    }
+
+    let minCapacity = NativeBuffer.minimumCapacity(
+      minimumCount: asNative.count + 1,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+
+    let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
+
+    if capacityChanged {
+      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+    }
+
+    asNative.initializeKey(key, value: defaultValue(), at: i.offset)
+    asNative.count += 1
+    return (inserted: true, pointer: asNative.values + i.offset)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal mutating func pointerToValue(
+    forKey key: Key, insertingDefault defaultValue: () -> Value
+  ) -> (inserted: Bool, pointer: UnsafeMutablePointer<Value>) {
+    ensureNativeBuffer()
+    return nativePointerToValue(forKey: key, insertingDefault: defaultValue)
+  }
 %end
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -5358,20 +5407,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func insert(
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
-
-    if _fastPath(guaranteedNative) {
-      return nativeInsert(value, forKey: key)
-    }
-
-    switch self {
-    case .native:
-      return nativeInsert(value, forKey: key)
-#if _runtime(_ObjC)
-    case .cocoa(let cocoaBuffer):
-      migrateDataToNativeBuffer(cocoaBuffer)
-      return nativeInsert(value, forKey: key)
-#endif
-    }
+    ensureNativeBuffer()
+    return nativeInsert(value, forKey: key)
   }
 
 %if Self == 'Dictionary':
@@ -5475,20 +5512,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     _ keysAndValues: S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
-    if _fastPath(guaranteedNative) {
-      try nativeMerge(keysAndValues, uniquingKeysWith: combine)
-      return
-    }
-
-    switch self {
-    case .native:
-      try nativeMerge(keysAndValues, uniquingKeysWith: combine)
-#if _runtime(_ObjC)
-    case .cocoa(let cocoaStorage):
-      migrateDataToNativeBuffer(cocoaStorage)
-      try nativeMerge(keysAndValues, uniquingKeysWith: combine)
-#endif
-    }
+    ensureNativeBuffer()
+    try nativeMerge(keysAndValues, uniquingKeysWith: combine)
   }
 
   @_inlineable // FIXME(sil-serialize-all)

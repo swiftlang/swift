@@ -8,7 +8,6 @@ add_sourcekit_library(SourceKitSwiftLang
   SwiftIndexing.cpp
   SwiftLangSupport.cpp
   SwiftSourceDocInfo.cpp
-  DEPENDS swift-syntax-generated-headers
   LINK_LIBS
     SourceKitCore swiftDriver swiftFrontend swiftClangImporter swiftIDE
     swiftAST swiftMarkup swiftParse swiftParseSIL swiftSIL swiftSILGen

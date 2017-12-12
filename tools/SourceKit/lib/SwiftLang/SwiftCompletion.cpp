@@ -144,7 +144,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   if (Failed) {
     return false;
   }
-  if (!Invocation.getFrontendOptions().Inputs.haveInputFilenames()) {
+  if (!Invocation.getFrontendOptions().Inputs.hasInputs()) {
     Error = "no input filenames specified";
     return false;
   }

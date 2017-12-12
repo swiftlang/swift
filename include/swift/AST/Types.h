@@ -72,7 +72,7 @@ namespace swift {
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
 
-  enum class TypeKind {
+  enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
@@ -243,6 +243,10 @@ enum class TypeMatchFlags {
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
+#define NUMBITS(E, V) \
+  enum { Num##E##Bits = V }; \
+  static_assert(Num##E##Bits <= 64, "fits in a uint64_t")
+
 /// TypeBase - Base class for all types in Swift.
 class alignas(1 << TypeAlignInBits) TypeBase {
   
@@ -255,15 +259,13 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
-  /// Kind - The discriminator that indicates what subclass of type this is.
-  const TypeKind Kind;
-
   struct TypeBaseBitfields {
+    /// Kind - The discriminator that indicates what subclass of type this is.
+    const TypeKind Kind; // Naturally sized for speed (it only needs 6 bits).
+
     unsigned Properties : RecursiveTypeProperties::BitWidth;
   };
-
-  enum { NumTypeBaseBits = RecursiveTypeProperties::BitWidth };
-  static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
+  NUMBITS(TypeBase, RecursiveTypeProperties::BitWidth + sizeof(TypeKind) * 8 );
 
   /// Returns true if the given type is a sugared type.
   ///
@@ -281,8 +283,16 @@ protected:
     /// Whether there is an original type.
     unsigned HasOriginalType : 1;
   };
-  enum { NumErrorTypeBits = NumTypeBaseBits + 1 };
-  static_assert(NumErrorTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(ErrorType, NumTypeBaseBits + 1);
+
+  struct ParenTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    /// Whether there is an original type.
+    enum { NumFlagBits = 5 };
+    unsigned Flags : NumFlagBits;
+  };
+  NUMBITS(ParenType, NumTypeBaseBits + ParenTypeBitfields::NumFlagBits);
 
   struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -292,8 +302,7 @@ protected:
     enum { NumExtInfoBits = 7 };
     unsigned ExtInfo : NumExtInfoBits;
   };
-  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
-  static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(AnyFunctionType, NumTypeBaseBits + 7);
 
   struct ArchetypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -303,17 +312,22 @@ protected:
     unsigned HasLayoutConstraint : 1;
     unsigned NumProtocols : 16;
   };
-  enum { NumArchetypeTypeBitfields = NumTypeBaseBits + 19 };
-  static_assert(NumArchetypeTypeBitfields <= 32, "fits in an unsigned");
+  NUMBITS(ArchetypeType, NumTypeBaseBits + 19);
 
   struct TypeVariableTypeBitfields {
     unsigned : NumTypeBaseBits;
 
     /// \brief The unique number assigned to this type variable.
-    unsigned ID : 32 - NumTypeBaseBits;
+    uint64_t ID : 32 - NumTypeBaseBits;
+
+    /// Type variable options.
+    unsigned Options : 3;
+
+    ///  Index into the list of type variables, as used by the
+    ///  constraint graph.
+    unsigned GraphIndex : 29;
   };
-  enum { NumTypeVariableTypeBits = NumTypeBaseBits + (32 - NumTypeBaseBits) };
-  static_assert(NumTypeVariableTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(TypeVariableType, 64);
 
   struct SILFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -323,8 +337,14 @@ protected:
     unsigned HasErrorResult : 1;
     unsigned CoroutineKind : 2;
   };
-  enum { NumSILFunctionTypeBits = NumTypeBaseBits + 12 };
-  static_assert(NumSILFunctionTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(SILFunctionType, NumTypeBaseBits + 12);
+
+  struct SILBoxTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    unsigned : 32 - NumTypeBaseBits; // unused / padding
+    unsigned NumGenericArgs : 32;
+  };
+  NUMBITS(SILBoxType, 64);
 
   struct AnyMetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -334,8 +354,7 @@ protected:
     /// the value is the representation + 1
     unsigned Representation : 2;
   };
-  enum { NumAnyMetatypeTypeBits = NumTypeBaseBits + 2 };
-  static_assert(NumAnyMetatypeTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(AnyMetatypeType, NumTypeBaseBits + 2);
 
   struct ProtocolCompositionTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -343,24 +362,31 @@ protected:
     /// implied by any of our members.
     unsigned HasExplicitAnyObject : 1;
   };
-  enum { NumProtocolCompositionTypeBits = NumTypeBaseBits + 1 };
-  static_assert(NumProtocolCompositionTypeBits <= 32, "fits in an unsigned");
+  NUMBITS(ProtocolCompositionType, NumTypeBaseBits + 1);
+
   struct TupleTypeBitfields {
     unsigned : NumTypeBaseBits;
     
     /// Whether an element of the tuple is inout.
     unsigned HasInOutElement : 1;
+
+    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+
+    /// The number of elements of the tuple.
+    unsigned Count : 32;
   };
-  enum { NumTupleTypeBits = NumTypeBaseBits + 1 };
-  static_assert(NumTupleTypeBits <= 32, "fits in an unsigned");
-  
+  NUMBITS(TupleType, 64);
+
+#undef NUMBITS
   union {
     TypeBaseBitfields TypeBaseBits;
     ErrorTypeBitfields ErrorTypeBits;
+    ParenTypeBitfields ParenTypeBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     ArchetypeTypeBitfields ArchetypeTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
+    SILBoxTypeBitfields SILBoxTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
     ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
     TupleTypeBitfields TupleTypeBits;
@@ -369,7 +395,8 @@ protected:
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
            RecursiveTypeProperties properties)
-    : CanonicalType((TypeBase*)nullptr), Kind(kind) {
+    : CanonicalType((TypeBase*)nullptr) {
+    *const_cast<TypeKind *>(&TypeBaseBits.Kind) = kind;
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
@@ -383,7 +410,7 @@ protected:
 
 public:
   /// getKind - Return what kind of type this is.
-  TypeKind getKind() const { return Kind; }
+  TypeKind getKind() const { return TypeBaseBits.Kind; }
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
@@ -1418,6 +1445,9 @@ class ParameterTypeFlags {
 
 public:
   ParameterTypeFlags() = default;
+  static ParameterTypeFlags fromRaw(uint8_t raw) {
+    return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
+  }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping, bool inOut, bool shared)
       : value((variadic ? Variadic : 0) |
@@ -1468,7 +1498,6 @@ public:
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public TypeBase {
   Type UnderlyingType;
-  ParameterTypeFlags parameterFlags;
 
   friend class ASTContext;
   
@@ -1485,7 +1514,9 @@ public:
   TypeBase *getSinglyDesugaredType();
 
   /// Get the parameter flags
-  ParameterTypeFlags getParameterFlags() const { return parameterFlags; }
+  ParameterTypeFlags getParameterFlags() const {
+    return ParameterTypeFlags::fromRaw(ParenTypeBits.Flags);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1559,8 +1590,9 @@ typedef ArrayRefView<TupleTypeElt,CanType,getCanTupleEltType>
 /// TupleType - A tuple is a parenthesized list of types where each name has an
 /// optional name.
 ///
-class TupleType : public TypeBase, public llvm::FoldingSetNode {
-  const ArrayRef<TupleTypeElt> Elements;
+class TupleType final : public TypeBase, public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<TupleType, TupleTypeElt> {
+  friend TrailingObjects;
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
@@ -1572,16 +1604,20 @@ public:
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
 
-  /// getFields - Return the fields of this tuple.
-  ArrayRef<TupleTypeElt> getElements() const { return Elements; }
+  unsigned getNumElements() const { return TupleTypeBits.Count; }
 
-  unsigned getNumElements() const { return Elements.size(); }
+  /// getElements - Return the elements of this tuple.
+  ArrayRef<TupleTypeElt> getElements() const {
+    return {getTrailingObjects<TupleTypeElt>(), getNumElements()};
+  }
 
-  const TupleTypeElt &getElement(unsigned i) const { return Elements[i]; }
+  const TupleTypeElt &getElement(unsigned i) const {
+    return getTrailingObjects<TupleTypeElt>()[i];
+  }
 
   /// getElementType - Return the type of the specified element.
   Type getElementType(unsigned ElementNo) const {
-    return Elements[ElementNo].getType();
+    return getTrailingObjects<TupleTypeElt>()[ElementNo].getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
@@ -1613,7 +1649,7 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Elements);
+    Profile(ID, getElements());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       ArrayRef<TupleTypeElt> Elements);
@@ -1622,8 +1658,11 @@ private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties,
             bool hasInOut)
-     : TypeBase(TypeKind::Tuple, CanCtx, properties), Elements(elements) {
+     : TypeBase(TypeKind::Tuple, CanCtx, properties) {
      TupleTypeBits.HasInOutElement = hasInOut;
+     TupleTypeBits.Count = elements.size();
+     std::uninitialized_copy(elements.begin(), elements.end(),
+                             getTrailingObjects<TupleTypeElt>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
@@ -2924,7 +2963,7 @@ enum class ParameterConvention {
 };
 // Check that the enum values fit inside SILFunctionTypeBits.
 static_assert(unsigned(ParameterConvention::Direct_Guaranteed) < (1<<3),
-              "fits in SILFunctionTypeBits");
+              "fits in SILFunctionTypeBits and SILParameterInfo");
 
 // Does this parameter convention require indirect storage? This reflects a
 // SILFunctionType's formal (immutable) conventions, as opposed to the transient
@@ -2984,20 +3023,19 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
 
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
-  CanType Ty;
-  ParameterConvention Convention;
+  llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
 public:
-  SILParameterInfo() : Ty(), Convention((ParameterConvention)0) {}
+  SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
   SILParameterInfo(CanType type, ParameterConvention conv)
-    : Ty(type), Convention(conv) {
+    : TypeAndConvention(type, conv) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
   CanType getType() const {
-    return Ty;
+    return TypeAndConvention.getPointer();
   }
   ParameterConvention getConvention() const {
-    return Convention;
+    return TypeAndConvention.getInt();
   }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
@@ -3058,8 +3096,8 @@ public:
   }
 
   void profile(llvm::FoldingSetNodeID &id) {
-    id.AddPointer(Ty.getPointer());
-    id.AddInteger((unsigned)Convention);
+    id.AddPointer(getType().getPointer());
+    id.AddInteger((unsigned)getConvention());
   }
 
   void dump() const;
@@ -3073,7 +3111,7 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return Ty == rhs.Ty && Convention == rhs.Convention;
+    return getType() == rhs.getType() && getConvention() == rhs.getConvention();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -3776,7 +3814,6 @@ class SILBoxType final : public TypeBase,
   friend TrailingObjects;
   
   SILLayout *Layout;
-  unsigned NumGenericArgs;
 
   static RecursiveTypeProperties
   getRecursivePropertiesFromSubstitutions(SubstitutionList Args);
@@ -3792,7 +3829,7 @@ public:
   SILLayout *getLayout() const { return Layout; }
   SubstitutionList getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
-                              NumGenericArgs);
+                              SILBoxTypeBits.NumGenericArgs);
   }
   
   // In SILType.h:

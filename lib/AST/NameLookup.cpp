@@ -1238,43 +1238,6 @@ void ExtensionDecl::addedMember(Decl *member) {
 // In all lookup routines, the 'ignoreNewExtensions' flag means that
 // lookup should only use the set of extensions already observed.
 
-void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
-  // If we haven't allocated the lookup table yet, do so now.
-  if (!LookupTable.getPointer()) {
-    auto &ctx = getASTContext();
-    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
-  }
-
-  // If we're an IDC that has not yet loaded its full member set, we're doing
-  // NamedLazyMemberLoading, and we should not force getMembers().
-  if (hasLazyMembers())
-    return;
-
-  // If we haven't walked the member list yet to update the lookup
-  // table, do so now.
-  if (!LookupTable.getInt()) {
-    // Note that we'll have walked the members now.
-    LookupTable.setInt(true);
-
-    // Add the members of the nominal declaration to the table.
-    LookupTable.getPointer()->addMembers(getMembers());
-  }
-
-  if (!ignoreNewExtensions) {
-    // Update the lookup table to introduce members from extensions.
-    LookupTable.getPointer()->updateLookupTable(this);
-  }
-}
-
-void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
-  if (!LookupTable.getPointer()) {
-    auto &ctx = getASTContext();
-    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
-  }
-  
-  LookupTable.getPointer()->addMember(member);
-}
-
 static bool
 populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
                                           MemberLookupTable &LookupTable,
@@ -1304,18 +1267,85 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   }
 }
 
-static void
-populateLookupTableEntryFromMembers(ASTContext &ctx,
-                                    MemberLookupTable &LookupTable,
-                                    DeclName name,
-                                    IterableDeclContext *IDC) {
-  for (auto m : IDC->getMembers()) {
+static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
+    ASTContext &ctx, MemberLookupTable &LookupTable, DeclName name,
+    IterableDeclContext *IDC) {
+  for (auto m : IDC->getCurrentMembersWithoutLoading()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
       if (v->getFullName().matchesRef(name)) {
         LookupTable.addMember(m);
       }
     }
   }
+}
+
+static bool
+populateLookupTableEntryFromExtensions(ASTContext &ctx,
+                                       MemberLookupTable &table,
+                                       NominalTypeDecl *nominal,
+                                       DeclName name,
+                                       bool ignoreNewExtensions) {
+  if (!ignoreNewExtensions) {
+    for (auto e : nominal->getExtensions()) {
+      if (e->wasDeserialized() || e->hasClangNode()) {
+        if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
+                                                      name, e)) {
+          return true;
+        }
+      } else {
+        populateLookupTableEntryFromCurrentMembersWithoutLoading(ctx, table,
+                                                                 name, e);
+      }
+    }
+  }
+  return false;
+}
+
+void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
+  // If we haven't allocated the lookup table yet, do so now.
+  if (!LookupTable.getPointer()) {
+    auto &ctx = getASTContext();
+    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
+  }
+
+  if (hasLazyMembers()) {
+    // Lazy members: if the table needs population, populate the table _only
+    // from those members already in the IDC member list_ such as implicits or
+    // globals-as-members, then update table entries from the extensions that
+    // have the same names as any such initial-population members.
+    if (!LookupTable.getInt()) {
+      LookupTable.setInt(true);
+      LookupTable.getPointer()->addMembers(getCurrentMembersWithoutLoading());
+      for (auto *m : getCurrentMembersWithoutLoading()) {
+        if (auto v = dyn_cast<ValueDecl>(m)) {
+          populateLookupTableEntryFromExtensions(getASTContext(),
+                                                 *LookupTable.getPointer(),
+                                                 this, v->getBaseName(),
+                                                 ignoreNewExtensions);
+        }
+      }
+    }
+
+  } else {
+    // No lazy members: if the table needs population, populate the table
+    // en-masse; and in either case update the extensions.
+    if (!LookupTable.getInt()) {
+      LookupTable.setInt(true);
+      LookupTable.getPointer()->addMembers(getMembers());
+    }
+    if (!ignoreNewExtensions) {
+      LookupTable.getPointer()->updateLookupTable(this);
+    }
+  }
+}
+
+void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
+  if (!LookupTable.getPointer()) {
+    auto &ctx = getASTContext();
+    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
+  }
+  
+  LookupTable.getPointer()->addMember(member);
 }
 
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
@@ -1329,11 +1359,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                 .NominalTypeDecl__lookupDirect.getGuard();
   }
 
-  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
-        << ", lookupTable.getInt()=" << LookupTable.getInt()
-        << ", hasLazyMembers()=" << hasLazyMembers()
-        << "\n");
-
   // We only use NamedLazyMemberLoading when a user opts-in and we have
   // not yet loaded all the members into the IDC list in the first place.
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
@@ -1346,6 +1371,12 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   if (name.getBaseName() == ctx.Id_init)
     useNamedLazyMemberLoading = false;
 
+  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
+        << ", lookupTable.getInt()=" << LookupTable.getInt()
+        << ", hasLazyMembers()=" << hasLazyMembers()
+        << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
+        << "\n");
+
   // We check the LookupTable at most twice, possibly treating a miss in the
   // first try as a cache-miss that we then do a cache-fill on, and retry.
   for (int i = 0; i < 2; ++i) {
@@ -1354,13 +1385,22 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // populated the IDC and brought it up to date with any extensions. This
     // will flip the hasLazyMembers() flag to false as well.
     if (!useNamedLazyMemberLoading) {
-      // If we're about to load members here, purge the MemberLookupTable;
-      // it will be rebuilt in prepareLookup, below. Base this decision on
-      // the LookupTable's int value, not hasLazyMembers(), since the latter
-      // can sometimes change underfoot if some other party calls getMembers
-      // outside of lookup (eg. typo correction).
-      if (LookupTable.getPointer() && !LookupTable.getInt()) {
+      // It's possible that the lookup table exists but has information in it
+      // that is either currently out of date or soon to be out of date.
+      // This can happen two ways:
+      //
+      //   - We've not yet indexed the members we have (LookupTable.getInt()
+      //     is zero).
+      //
+      //   - We've still got more lazy members left to load; this can happen
+      //     even if we _did_ index some members.
+      //
+      // In either of these cases, we want to reset the table to empty and
+      // mark it as needing reconstruction.
+      if (LookupTable.getPointer() &&
+          (hasLazyMembers() || !LookupTable.getInt())) {
         LookupTable.getPointer()->clear();
+        LookupTable.setInt(false);
       }
 
       (void)getMembers();
@@ -1374,8 +1414,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     }
 
     // Next, in all cases, prepare the lookup table for use, possibly
-    // repopulating it from the IDC if just did our initial IDC population
-    // above.
+    // repopulating it from the IDC if the IDC member list has just grown.
     prepareLookupTable(ignoreNewExtensions);
 
     // Look for a declaration with this name.
@@ -1396,23 +1435,10 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // false, and we fall back to loading all members during the retry.
     auto &Table = *LookupTable.getPointer();
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                  name, this)) {
+                                                  name, this) ||
+        populateLookupTableEntryFromExtensions(ctx, Table, this, name,
+                                               ignoreNewExtensions)) {
       useNamedLazyMemberLoading = false;
-    } else {
-      if (!ignoreNewExtensions) {
-        for (auto E : getExtensions()) {
-          if (E->wasDeserialized() || E->hasClangNode()) {
-            if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                          name, E)) {
-              useNamedLazyMemberLoading = false;
-              break;
-            }
-          } else {
-            populateLookupTableEntryFromMembers(ctx, Table,
-                                                name, E);
-          }
-        }
-      }
     }
   }
 

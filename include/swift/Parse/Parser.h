@@ -30,6 +30,7 @@
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
+#include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParserResult.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
@@ -358,26 +359,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
 
-  class ParserPosition {
-  public:
-    ParserPosition() = default;
-    ParserPosition &operator=(const ParserPosition &) = default;
-
-    bool isValid() const {
-      return LS.isValid();
-    }
-
-  private:
-    ParserPosition(Lexer::State LS, SourceLoc PreviousLoc):
-        LS(LS), PreviousLoc(PreviousLoc)
-    {}
-    Lexer::State LS;
-    SourceLoc PreviousLoc;
-    friend class Parser;
-  };
-
   ParserPosition getParserPosition() {
-    return ParserPosition(L->getStateForBeginningOfToken(Tok),
+    return ParserPosition(L->getStateForBeginningOfToken(Tok, LeadingTrivia),
                           PreviousLoc);
   }
 
@@ -385,9 +368,6 @@ public:
     return ParserPosition(L->getStateForBeginningOfTokenLoc(Pos.Loc),
                           Pos.PrevLoc);
   }
-
-  /// \brief Return parser position after the first character of token T
-  ParserPosition getParserPositionAfterFirstCharacter(Token T);
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
     L->restoreState(PP.LS, enableDiagnostics);
@@ -594,7 +574,8 @@ public:
   /// \brief Consume the starting character of the current token, and split the
   /// remainder of the token into a new token (or tokens).
   SourceLoc
-  consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced);
+  consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
+                                         size_t Len = 1);
 
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
@@ -1331,6 +1312,8 @@ public:
 
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
+                        SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);

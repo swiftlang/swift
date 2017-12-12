@@ -64,7 +64,6 @@ DictionaryTestSuite.test("AssociatedTypes") {
     iteratorType: DictionaryIterator<MinimalHashableValue, OpaqueValue<Int>>.self,
     subSequenceType: Slice<Collection>.self,
     indexType: DictionaryIndex<MinimalHashableValue, OpaqueValue<Int>>.self,
-    indexDistanceType: Int.self,
     indicesType: DefaultIndices<Collection>.self)
 }
 
@@ -124,6 +123,14 @@ func getCOWFastDictionary() -> Dictionary<Int, Int> {
   d[10] = 1010
   d[20] = 1020
   d[30] = 1030
+  return d
+}
+
+func getCOWFastDictionaryWithCOWValues() -> Dictionary<Int, TestValueCOWTy> {
+  var d = Dictionary<Int, TestValueCOWTy>(minimumCapacity: 10)
+  d[10] = TestValueCOWTy(1010)
+  d[20] = TestValueCOWTy(1020)
+  d[30] = TestValueCOWTy(1030)
   return d
 }
 
@@ -801,6 +808,32 @@ DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
     // Keep variables alive.
     _fixLifetime(d1)
     _fixLifetime(d2)
+  }
+}
+
+DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotCopyValue") {
+  do {
+    var d = getCOWFastDictionaryWithCOWValues()
+    let identityValue30 = d[30]!.baseAddress
+
+    // Increment the value without having to reallocate the underlying Base
+    // instance, as uniquely referenced.
+    d[30, default: TestValueCOWTy()].value += 1
+    assert(identityValue30 == d[30]!.baseAddress)
+    assert(d[30]!.value == 1031)
+
+    let value40 = TestValueCOWTy()
+    let identityValue40 = value40.baseAddress
+
+    // Increment the value, reallocating the underlying Base, as not uniquely
+    // referenced.
+    d[40, default: value40].value += 1
+    assert(identityValue40 != d[40]!.baseAddress)
+    assert(d[40]!.value == 1)
+
+    // Keep variables alive.
+    _fixLifetime(d)
+    _fixLifetime(value40)
   }
 }
 

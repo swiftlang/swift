@@ -17,7 +17,8 @@ DeclModifierSyntax getCannedDeclModifier() {
   auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
-  return SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
+  return SyntaxFactory::makeDeclModifier(Private,
+    SyntaxFactory::makeTokenList({ LParen, Set, RParen}));
 }
 
 TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
@@ -40,12 +41,13 @@ TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
   auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
-  auto Mod = SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
+  auto Mod = SyntaxFactory::makeDeclModifier(Private,
+    SyntaxFactory::makeTokenList({LParen, Set, RParen}));
 
   ASSERT_EQ(Private.getRaw(), Mod.getName().getRaw());
-  ASSERT_EQ(LParen.getRaw(), Mod.getLeftParen()->getRaw());
-  ASSERT_EQ(Set.getRaw(), Mod.getArgument()->getRaw());
-  ASSERT_EQ(RParen.getRaw(), Mod.getRightParen()->getRaw());
+  ASSERT_EQ(LParen.getRaw(), Mod.getDetail()[0].getRaw());
+  ASSERT_EQ(Set.getRaw(), Mod.getDetail()[1].getRaw());
+  ASSERT_EQ(RParen.getRaw(), Mod.getDetail()[2].getRaw());
 }
 
 TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
@@ -58,9 +60,7 @@ TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
   llvm::raw_svector_ostream OS(Scratch);
   SyntaxFactory::makeBlankDeclModifier()
     .withName(Private)
-    .withLeftParen(LParen)
-    .withArgument(Set)
-    .withRightParen(RParen)
+    .withDetail(SyntaxFactory::makeTokenList({LParen, Set, RParen}))
     .print(OS);
   ASSERT_EQ(OS.str().str(), "private(set)");
 }
@@ -82,7 +82,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto Subsequence = SyntaxFactory::makeIdentifier("MyCollection", {}, {});
     auto ElementName = SyntaxFactory::makeIdentifier("Element", {}, {});
     auto ElementParam =
-      SyntaxFactory::makeGenericParameter(ElementName, None, None, None);
+      SyntaxFactory::makeGenericParameter(None, ElementName, None, None, None);
     auto LeftAngle = SyntaxFactory::makeLeftAngleToken({}, {});
     auto RightAngle = SyntaxFactory::makeRightAngleToken({}, Trivia::spaces(1));
     auto GenericParams = GenericParameterClauseSyntaxBuilder()
@@ -119,7 +119,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto MyCollection = SyntaxFactory::makeIdentifier("MyCollection", {}, {});
   auto ElementName = SyntaxFactory::makeIdentifier("Element", {}, {});
   auto ElementParam =
-      SyntaxFactory::makeGenericParameter(ElementName, None, None, None);
+      SyntaxFactory::makeGenericParameter(None, ElementName, None, None, None);
   auto LeftAngle = SyntaxFactory::makeLeftAngleToken({}, {});
   auto RightAngle =
     SyntaxFactory::makeRightAngleToken({}, { Trivia::spaces(1) });
@@ -219,8 +219,8 @@ FunctionParameterSyntax getCannedFunctionParameter() {
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
 
-  return SyntaxFactory::makeFunctionParameter(ExternalName, LocalName, Colon,
-                                              IntAnnotation, NoEllipsis, Equal,
+  return SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName, Colon,
+                                              Int, NoEllipsis, Equal,
                                               One, Comma);
 }
 
@@ -256,13 +256,13 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
     SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto Comma = SyntaxFactory::makeCommaToken({}, {});
 
-  auto Param = SyntaxFactory::makeFunctionParameter(ExternalName, LocalName,
-                                                    Colon, IntAnnotation,
+  auto Param = SyntaxFactory::makeFunctionParameter(None, ExternalName, LocalName,
+                                                    Colon, Int,
                                                     NoEllipsis, Equal, One,
                                                     Comma);
 
-  ASSERT_EQ(ExternalName.getRaw(), Param.getExternalName()->getRaw());
-  ASSERT_EQ(LocalName.getRaw(), Param.getLocalName().getRaw());
+  ASSERT_EQ(ExternalName.getRaw(), Param.getFirstName().getRaw());
+  ASSERT_EQ(LocalName.getRaw(), Param.getSecondName()->getRaw());
   ASSERT_EQ(Colon.getRaw(), Param.getColon().getRaw());
 
   auto GottenType = Param.getTypeAnnotation();
@@ -306,10 +306,10 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     getCannedFunctionParameter()
-      .withExternalName(ExternalName)
-      .withLocalName(LocalName)
+      .withFirstName(ExternalName)
+      .withSecondName(LocalName)
       .withColon(Colon)
-      .withTypeAnnotation(IntAnnotation)
+      .withTypeAnnotation(Int)
       .withDefaultEquals(Equal)
       .withDefaultValue(One)
       .withTrailingComma(Comma)
@@ -480,12 +480,12 @@ ModifierListSyntax getCannedModifiers() {
   auto NoLParen = TokenSyntax::missingToken(tok::l_paren, "(");
   auto NoArgument = TokenSyntax::missingToken(tok::identifier, "");
   auto NoRParen = TokenSyntax::missingToken(tok::r_paren, ")");
-  auto Public = SyntaxFactory::makeDeclModifier(PublicID, NoLParen, NoArgument,
-                                                NoRParen);
+  auto Public = SyntaxFactory::makeDeclModifier(PublicID,
+    SyntaxFactory::makeTokenList({NoLParen, NoArgument, NoRParen}));
 
   auto StaticKW = SyntaxFactory::makeStaticKeyword({}, Trivia::spaces(1));
-  auto Static = SyntaxFactory::makeDeclModifier(StaticKW, NoLParen, NoArgument,
-                                                NoRParen);
+  auto Static = SyntaxFactory::makeDeclModifier(StaticKW,
+    SyntaxFactory::makeTokenList({NoLParen, NoArgument, NoRParen}));
 
   return SyntaxFactory::makeBlankModifierList()
     .appending(Public)

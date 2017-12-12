@@ -54,7 +54,7 @@ entry(%0 : $*T):
 // CHECK:  ret %swift.opaque* [[EXISTENTIAL_BUFFER_OPAQUE]]
 //
 // CHECK:allocateBox:
-// CHECK:  [[CALL:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METATYPE]])
+// CHECK:  [[CALL:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METATYPE]])
 // CHECK:  [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[CALL]], 0
 // CHECK:  [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[CALL]], 1
 // CHECK:  [[ADDR_IN_BUFFER:%.*]] = bitcast [{{(24|12)}} x i8]* [[EXISTENTIAL_BUFFER]] to %swift.refcounted**
@@ -221,7 +221,7 @@ bb0(%0 : $*Existential):
 // CHECK: boxed:
 // CHECK:  [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
 // CHECK:  [[OPAQUE_ADDR:%.*]] = bitcast [{{(24|12)}} x i8]* %0 to %swift.opaque*
-// CHECK:  [[REFANDADDR:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_makeBoxUnique(%swift.opaque* [[OPAQUE_ADDR]], %swift.type* %1, {{(i64|i32)}} [[ALIGNMASK]])
+// CHECK:  [[REFANDADDR:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_makeBoxUnique(%swift.opaque* [[OPAQUE_ADDR]], %swift.type* %1, {{(i64|i32)}} [[ALIGNMASK]])
 // CHECK:  [[REF:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[REFANDADDR]], 0
 // CHECK:  [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[REFANDADDR]], 1
 // CHECK:  ret %swift.opaque* [[ADDR]]

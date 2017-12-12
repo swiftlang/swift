@@ -58,6 +58,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "copy-forwarding"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -67,7 +68,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SIL/DebugUtils.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -169,6 +170,104 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
 //===----------------------------------------------------------------------===//
 //                 Forward and backward copy propagation
 //===----------------------------------------------------------------------===//
+
+// Visitor for visitAddressUsers.
+namespace {
+class AddressUserVisitor {
+public:
+  virtual ~AddressUserVisitor() {}
+
+  virtual void visitNormalUse(SILInstruction *user) = 0;
+  virtual void visitTake(CopyAddrInst *copy) = 0;
+  virtual void visitDestroy(DestroyAddrInst *destroy) = 0;
+  virtual void visitDebugValue(DebugValueAddrInst *debugValue) = 0;
+};
+} // namespace
+
+/// Gather all instructions that use the given `address`
+///
+/// "Normal" uses are a whitelisted set of uses that guarantees the address is
+/// only used as if it refers to a single value and all uses are accounted for
+/// (no address projections).
+///
+/// Takes are "copy_addr [take]"
+///
+/// Destroys are "destroy_addr"
+/// -
+///
+/// If we are unable to find all uses, for example, because we don't look
+/// through struct_element_addr, then return false.
+///
+/// The collected use points will be consulted during forward and backward
+/// copy propagation.
+///
+/// \param ignoredUser will be ignored if it is is non-null.
+static bool visitAddressUsers(SILValue address, SILInstruction *ignoredUser,
+                              AddressUserVisitor &visitor) {
+  for (Operand *use : address->getUses()) {
+    SILInstruction *UserInst = use->getUser();
+    if (UserInst == ignoredUser)
+      continue;
+
+    if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
+      /// A call to materializeForSet exposes an address within the parent
+      /// object. However, we can rely on a subsequent mark_dependent
+      /// instruction to take that object as an operand, causing it to escape
+      /// for the purpose of this analysis.
+      assert(Apply->getSubstCalleeConv()
+                 .getSILArgumentConvention(use->getOperandNumber()
+                                           - Apply->getArgumentOperandNumber())
+                 .isIndirectConvention()
+             && "copy_addr location should be passed indirect");
+      visitor.visitNormalUse(UserInst);
+      continue;
+    }
+    if (auto *CopyInst = dyn_cast<CopyAddrInst>(UserInst)) {
+      if (CopyInst->getSrc() == use->get() && CopyInst->isTakeOfSrc())
+        visitor.visitTake(CopyInst);
+      else
+        visitor.visitNormalUse(CopyInst);
+      continue;
+    }
+    if (auto *Destroy = dyn_cast<DestroyAddrInst>(UserInst)) {
+      visitor.visitDestroy(Destroy);
+      continue;
+    }
+    switch (UserInst->getKind()) {
+    case SILInstructionKind::LoadInst:
+      visitor.visitNormalUse(UserInst);
+      break;
+    case SILInstructionKind::ExistentialMetatypeInst:
+    case SILInstructionKind::InjectEnumAddrInst:
+    case SILInstructionKind::StoreInst:
+      visitor.visitNormalUse(UserInst);
+      break;
+    case SILInstructionKind::DebugValueAddrInst:
+      visitor.visitDebugValue(cast<DebugValueAddrInst>(UserInst));
+      break;
+    case SILInstructionKind::DeallocStackInst:
+      break;
+    default:
+      // Most likely one of:
+      //   init_enum_data_addr
+      //   open_existential_addr
+      //   partial_apply
+      //   struct_element_addr
+      //   unchecked_take_enum_data_addr
+      //
+      // TODO: Peek through struct element users like COWArrayOpts.
+      //
+      // TODO: Attempt to analyze partial applies or run closure propagation
+      // first.
+      //
+      // TODO: assert that this list is consistent with
+      // isTransitiveEscapeInst().
+      DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def" << *UserInst);
+      return false;
+    }
+  }
+  return true;
+}
 
 namespace {
 /// Analyze an instruction that operates on the Address of a forward propagated
@@ -373,13 +472,15 @@ class CopyForwarding {
   bool HasChanged;
   bool HasChangedCFG;
 
+  // --- Per copied-def state ---
+
   // Transient state for the current Def valid during forwardCopiesOf.
   SILValue CurrentDef;
 
   // Is the addressed defined by CurrentDef ever loaded from?
   // This indicates that lifetime of any transitively referenced objects lives
   // beyond the value's immediate uses.
-  bool IsLoadedFrom;
+  bool IsSrcLoadedFrom;
 
   bool HasForwardedToCopy;
   SmallPtrSet<SILInstruction*, 16> SrcUserInsts;
@@ -387,11 +488,37 @@ class CopyForwarding {
   SmallVector<CopyAddrInst*, 4> TakePoints;
   SmallVector<DestroyAddrInst*, 4> DestroyPoints;
   SmallPtrSet<SILBasicBlock*, 32> DeadInBlocks;
+
+  // --- Per copy_addr state ---
+  CopyAddrInst *CurrentCopy = nullptr;
+
+  class CopySrcUserVisitor : public AddressUserVisitor {
+    CopyForwarding &CPF;
+  public:
+    CopySrcUserVisitor(CopyForwarding &CPF) : CPF(CPF) {}
+
+    virtual void visitNormalUse(SILInstruction *user) {
+      if (isa<LoadInst>(user))
+        CPF.IsSrcLoadedFrom = true;
+      
+      CPF.SrcUserInsts.insert(user);
+    }
+    virtual void visitTake(CopyAddrInst *take) {
+      CPF.TakePoints.push_back(take);
+    }
+    virtual void visitDestroy(DestroyAddrInst *destroy) {
+      CPF.DestroyPoints.push_back(destroy);
+    }
+    virtual void visitDebugValue(DebugValueAddrInst *debugValue) {
+      CPF.SrcDebugValueInsts.insert(debugValue);
+    }
+  };
+
 public:
   CopyForwarding(PostOrderAnalysis *PO, DominanceAnalysis *DA)
       : PostOrder(PO), DomAnalysis(DA), DoGlobalHoisting(false),
-        HasChanged(false), HasChangedCFG(false), IsLoadedFrom(false),
-        HasForwardedToCopy(false) {}
+        HasChanged(false), HasChangedCFG(false), IsSrcLoadedFrom(false),
+        HasForwardedToCopy(false), CurrentCopy(nullptr) {}
 
   void reset(SILFunction *F) {
     // Don't hoist destroy_addr globally in transparent functions. Avoid cloning
@@ -408,13 +535,14 @@ public:
       PostOrder->invalidate(F, SILAnalysis::InvalidationKind::Everything);
     }
     CurrentDef = SILValue();
-    IsLoadedFrom = false;
+    IsSrcLoadedFrom = false;
     HasForwardedToCopy = false;
     SrcUserInsts.clear();
     SrcDebugValueInsts.clear();
     TakePoints.clear();
     DestroyPoints.clear();
     DeadInBlocks.clear();
+    CurrentCopy = nullptr;
   }
 
   bool hasChanged() const { return HasChanged; }
@@ -427,95 +555,36 @@ public:
   void forwardCopiesOf(SILValue Def, SILFunction *F);
 
 protected:
-  bool collectUsers();
   bool propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy);
   CopyAddrInst *findCopyIntoDeadTemp(CopyAddrInst *destCopy);
   bool forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy);
-  bool forwardPropagateCopy(CopyAddrInst *CopyInst,
-                            SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
-  bool backwardPropagateCopy(CopyAddrInst *CopyInst,
-                             SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
+  bool forwardPropagateCopy();
+  bool backwardPropagateCopy();
   bool hoistDestroy(SILInstruction *DestroyPoint, SILLocation DestroyLoc);
 
-  bool isSourceDeadAtCopy(CopyAddrInst *);
-  bool areCopyDestUsersDominatedBy(CopyAddrInst *,
-                                   SmallVectorImpl<Operand *> &);
+  bool isSourceDeadAtCopy();
+
+  typedef llvm::SmallSetVector<SILInstruction *, 16> UserVector;
+  bool doesCopyDominateDestUsers(const UserVector &DirectDestUses);
+};
+
+class CopyDestUserVisitor : public AddressUserVisitor {
+  SmallPtrSetImpl<SILInstruction *> &DestUsers;
+
+public:
+  CopyDestUserVisitor(SmallPtrSetImpl<SILInstruction *> &DestUsers)
+      : DestUsers(DestUsers) {}
+
+  virtual void visitNormalUse(SILInstruction *user) { DestUsers.insert(user); }
+  virtual void visitTake(CopyAddrInst *take) { DestUsers.insert(take); }
+  virtual void visitDestroy(DestroyAddrInst *destroy) {
+    DestUsers.insert(destroy);
+  }
+  virtual void visitDebugValue(DebugValueAddrInst *debugValue) {
+    DestUsers.insert(debugValue);
+  }
 };
 } // end anonymous namespace
-
-/// Gather all instructions that use CurrentDef:
-/// - DestroyPoints records 'destroy'
-/// - TakePoints records 'copy_addr [take] src'
-/// - SrcUserInsts records other users.
-///
-/// If we are unable to find all uses, for example, because we don't look
-/// through struct_element_addr, then return false.
-///
-/// The collected use points will be consulted during forward and backward
-/// copy propagation.
-bool CopyForwarding::collectUsers() {
-  for (auto UI : CurrentDef->getUses()) {
-    SILInstruction *UserInst = UI->getUser();
-    if (auto *Apply = dyn_cast<ApplyInst>(UserInst)) {
-      /// A call to materializeForSet exposes an address within the parent
-      /// object. However, we can rely on a subsequent mark_dependent
-      /// instruction to take that object as an operand, causing it to escape
-      /// for the purpose of this analysis.
-      assert(Apply->getSubstCalleeConv()
-                 .getSILArgumentConvention(UI->getOperandNumber()
-                                           - Apply->getArgumentOperandNumber())
-                 .isIndirectConvention()
-             && "copy_addr location should be passed indirect");
-      SrcUserInsts.insert(Apply);
-      continue;
-    }
-    if (auto *CopyInst = dyn_cast<CopyAddrInst>(UserInst)) {
-      if (CopyInst->getSrc() == UI->get() && CopyInst->isTakeOfSrc())
-        TakePoints.push_back(CopyInst);
-      else
-        SrcUserInsts.insert(CopyInst);
-      continue;
-    }
-    if (auto *Destroy = dyn_cast<DestroyAddrInst>(UserInst)) {
-      DestroyPoints.push_back(Destroy);
-      continue;
-    }
-    switch (UserInst->getKind()) {
-    case SILInstructionKind::LoadInst:
-      IsLoadedFrom = true;
-      SrcUserInsts.insert(UserInst);
-      break;
-    case SILInstructionKind::ExistentialMetatypeInst:
-    case SILInstructionKind::InjectEnumAddrInst:
-    case SILInstructionKind::StoreInst:
-      SrcUserInsts.insert(UserInst);
-      break;
-    case SILInstructionKind::DebugValueAddrInst:
-      SrcDebugValueInsts.insert(cast<DebugValueAddrInst>(UserInst));
-      break;
-    case SILInstructionKind::DeallocStackInst:
-      break;
-    default:
-      // Most likely one of:
-      //   init_enum_data_addr
-      //   open_existential_addr
-      //   partial_apply
-      //   struct_element_addr
-      //   unchecked_take_enum_data_addr
-      //
-      // TODO: Peek through struct element users like COWArrayOpts.
-      //
-      // TODO: Attempt to analyze partial applies or run closure propagation
-      // first.
-      //
-      // TODO: assert that this list is consistent with
-      // isTransitiveEscapeInst().
-      DEBUG(llvm::dbgs() << "  Skipping copy: use exposes def" << *UserInst);
-      return false;
-    }
-  }
-  return true;
-}
 
 /// Attempt to forward, then backward propagate this copy.
 ///
@@ -530,47 +599,50 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
   if (!EnableCopyForwarding)
     return false;
 
+  // CopyForwarding should be split into per-def-state vs. per-copy-state, but
+  // this hack is good enough for a pass that's going away "soon".
+  struct RAIISetCurrentCopy {
+    CopyAddrInst *&CurrentCopy;
+
+    RAIISetCurrentCopy(CopyAddrInst *&CurrentCopy, CopyAddrInst *CopyInst)
+      : CurrentCopy(CurrentCopy) {
+      assert(!CurrentCopy);
+      CurrentCopy = CopyInst;
+    }
+    ~RAIISetCurrentCopy() {
+      CurrentCopy = nullptr;
+    }
+  };
+  RAIISetCurrentCopy setCurrentCopy(CurrentCopy, CopyInst);
+
   // Handle copy-of-copy without analyzing uses.
-  // Assumes that CopyInst->getSrc() is dead after CopyInst.
-  assert(CopyInst->isTakeOfSrc() || hoistingDestroy);
-  if (auto *srcCopy = findCopyIntoDeadTemp(CopyInst)) {
-    if (forwardDeadTempCopy(srcCopy, CopyInst)) {
+  // Assumes that CurrentCopy->getSrc() is dead after CurrentCopy.
+  assert(CurrentCopy->isTakeOfSrc() || hoistingDestroy);
+  if (auto *srcCopy = findCopyIntoDeadTemp(CurrentCopy)) {
+    if (forwardDeadTempCopy(srcCopy, CurrentCopy)) {
       HasChanged = true;
       ++NumDeadTemp;
       return true;
     }
   }
 
-  SILValue CopyDest = CopyInst->getDest();
-  SILBasicBlock *BB = CopyInst->getParent();
-
-  // Gather a list of CopyDest users in this block.
-  SmallPtrSet<SILInstruction*, 16> DestUserInsts;
-  for (auto UI : CopyDest->getUses()) {
-    SILInstruction *UserInst = UI->getUser();
-    if (UserInst != CopyInst && UI->getUser()->getParent() == BB)
-      DestUserInsts.insert(UI->getUser());
-  }
-  // Note that DestUserInsts is likely empty when the dest is an 'out' argument,
-  // allowing us to go straight to backward propagation.
-  if (forwardPropagateCopy(CopyInst, DestUserInsts)) {
-    DEBUG(llvm::dbgs() << "  Forwarding Copy:" << *CopyInst);
-    if (!CopyInst->isInitializationOfDest()) {
+  if (forwardPropagateCopy()) {
+    DEBUG(llvm::dbgs() << "  Forwarding Copy:" << *CurrentCopy);
+    if (!CurrentCopy->isInitializationOfDest()) {
       // Replace the original copy with a destroy. We may be able to hoist it
       // more in another pass but don't currently iterate.
-      SILBuilderWithScope(CopyInst)
-          .createDestroyAddr(CopyInst->getLoc(), CopyInst->getDest());
+      SILBuilderWithScope(CurrentCopy)
+          .createDestroyAddr(CurrentCopy->getLoc(), CurrentCopy->getDest());
     }
-    CopyInst->eraseFromParent();
+    CurrentCopy->eraseFromParent();
     HasChanged = true;
     ++NumCopyForward;
     return true;
   }
   // Forward propagation failed. Attempt to backward propagate.
-  if (CopyInst->isInitializationOfDest()
-      && backwardPropagateCopy(CopyInst, DestUserInsts)) {
-    DEBUG(llvm::dbgs() << "  Reversing Copy:" << *CopyInst);
-    CopyInst->eraseFromParent();
+  if (CurrentCopy->isInitializationOfDest() && backwardPropagateCopy()) {
+    DEBUG(llvm::dbgs() << "  Reversing Copy:" << *CurrentCopy);
+    CurrentCopy->eraseFromParent();
     HasChanged = true;
     ++NumCopyBackward;
     return true;
@@ -681,57 +753,30 @@ forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
 
 /// Check that the lifetime of %src ends at the copy and is not reinitialized
 /// thereafter with a new value.
-bool CopyForwarding::isSourceDeadAtCopy(CopyAddrInst *Copy) {
+bool CopyForwarding::isSourceDeadAtCopy() {
   // A single copy_addr [take] %Src.
   if (TakePoints.size() == 1 && DestroyPoints.empty() && SrcUserInsts.empty())
     return true;
 
   if (TakePoints.empty() && DestroyPoints.size() == 1 &&
       SrcUserInsts.size() == 1) {
-    assert(*SrcUserInsts.begin() == Copy);
+    assert(*SrcUserInsts.begin() == CurrentCopy);
     return true;
   }
   // For now just check for a single copy_addr that destroys its source.
   return false;
 }
 
-/// Check that all users of the destination address of the copy are dominated by
-/// the copy. There is no path around copy that could initialize %dest with a
-/// different value.
-bool CopyForwarding::areCopyDestUsersDominatedBy(
-    CopyAddrInst *Copy, SmallVectorImpl<Operand *> &DestUses) {
-
-  SILValue CopyDest = Copy->getDest();
-  DominanceInfo *DT = nullptr;
-
-  for (auto *Use : CopyDest->getUses()) {
-    auto *UserInst = Use->getUser();
-    if (UserInst == Copy)
-      continue;
-    if (isa<DeallocStackInst>(UserInst))
-      continue;
-
-    // Initialize the dominator tree info.
-    if (!DT)
-      DT = DomAnalysis->get(Copy->getFunction());
-
+/// Check that all immediate users of the destination address of the copy are
+/// dominated by the copy. There is no path around copy that could initialize
+/// %dest with a different value.
+bool CopyForwarding::doesCopyDominateDestUsers(
+    const UserVector &DirectDestUsers) {
+  DominanceInfo *DT = DomAnalysis->get(CurrentCopy->getFunction());
+  for (auto *user : DirectDestUsers) {
     // Check dominance of the parent blocks.
-    if (!DT->dominates(Copy->getParent(), UserInst->getParent()))
+    if (!DT->properlyDominates(CurrentCopy, user))
       return false;
-
-    bool CheckDominanceInBlock = Copy->getParent() == UserInst->getParent();
-    // Check whether Copy is before UserInst.
-    if (CheckDominanceInBlock) {
-      auto SI = Copy->getIterator(), SE = Copy->getParent()->end();
-      for (++SI; SI != SE; ++SI)
-        if (&*SI == UserInst)
-          break;
-      if (SI == SE)
-        return false;
-    }
-
-    // We can forward to this use.
-    DestUses.push_back(Use);
   }
   return true;
 }
@@ -756,18 +801,6 @@ static DeallocStackInst *getSingleDealloc(AllocStackInst *ASI) {
   return SingleDSI;
 }
 
-/// Replace all uses of \p ASI by \p RHS, except the dealloc_stack.
-static void replaceAllUsesExceptDealloc(AllocStackInst *ASI, ValueBase *RHS) {
-  llvm::SmallVector<Operand *, 8> Uses;
-  for (Operand *Use : ASI->getUses()) {
-    if (!isa<DeallocStackInst>(Use->getUser()))
-      Uses.push_back(Use);
-  }
-  for (Operand *Use : Uses) {
-    Use->set(RHS);
-  }
-}
-
 /// Perform forward copy-propagation. Find a set of uses that the given copy can
 /// forward to and replace them with the copy's source.
 ///
@@ -789,16 +822,28 @@ static void replaceAllUsesExceptDealloc(AllocStackInst *ASI, ValueBase *RHS) {
 /// The caller has already guaranteed that the lifetime of the copy's source
 /// ends at this copy. Either the copy is a [take] or a destroy can be hoisted
 /// to the copy.
-bool CopyForwarding::forwardPropagateCopy(
-  CopyAddrInst *CopyInst,
-  SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
+bool CopyForwarding::forwardPropagateCopy() {
 
-  SILValue CopyDest = CopyInst->getDest();
+  SILValue CopyDest = CurrentCopy->getDest();
   // Require the copy dest to be a simple alloc_stack. This ensures that all
   // instructions that may read from the destination address depend on CopyDest.
   if (!isa<AllocStackInst>(CopyDest))
     return false;
 
+  // Record all direct dest uses. Forward propagation doesn't care if they are
+  // projections or propagate the address in any way--their operand only needs
+  // to be substituted with the copy's source.
+  UserVector DirectDestUsers;
+  for (auto *Use : CopyDest->getUses()) {
+    auto *UserInst = Use->getUser();
+    if (UserInst == CurrentCopy)
+      continue;
+
+    if (isa<DeallocStackInst>(UserInst))
+      continue;
+
+    DirectDestUsers.insert(UserInst);
+  }
   // Looking at
   //
   //    copy_addr %Src, [init] %Dst
@@ -810,20 +855,23 @@ bool CopyForwarding::forwardPropagateCopy(
   // not).  Additionally, we must know that all accesses to %Dst further on must
   // have had this copy on their path (there might be reinitialization of %Dst
   // later, but there must not be a path around this copy that reads from %Dst).
-  SmallVector<Operand *, 16> DestUses;
-  if (isSourceDeadAtCopy(CopyInst) &&
-      areCopyDestUsersDominatedBy(CopyInst, DestUses)) {
-
+  if (isSourceDeadAtCopy() && doesCopyDominateDestUsers(DirectDestUsers)) {
+    SILValue CopySrc = CurrentCopy->getSrc();
     // Replace all uses of Dest with a use of Src.
-    for (auto *Oper : DestUses) {
-      Oper->set(CopyInst->getSrc());
-      if (isa<CopyAddrInst>(Oper->getUser()))
+    for (SILInstruction *user : DirectDestUsers) {
+      for (Operand &oper : user->getAllOperands()) {
+        if (oper.get() != CopyDest)
+          continue;
+
+        // Rewrite both read and writes of CopyDest as CopySrc.
+        oper.set(CopySrc);
+      }
+      if (isa<CopyAddrInst>(user))
         HasForwardedToCopy = true;
     }
-
     // The caller will Remove the destroy_addr of %src.
     assert((DestroyPoints.empty() ||
-            (!CopyInst->isTakeOfSrc() && DestroyPoints.size() == 1)) &&
+            (!CurrentCopy->isTakeOfSrc() && DestroyPoints.size() == 1)) &&
            "Must only have one destroy");
 
     // The caller will remove the copy_addr.
@@ -834,7 +882,7 @@ bool CopyForwarding::forwardPropagateCopy(
   if (auto *ASI = dyn_cast<AllocStackInst>(CurrentDef)) {
     DefDealloc = getSingleDealloc(ASI);
     if (!DefDealloc) {
-      DEBUG(llvm::dbgs() << "  Skipping copy" << *CopyInst
+      DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
             << "  stack address has multiple uses.\n");
       return false;
     }
@@ -843,23 +891,23 @@ bool CopyForwarding::forwardPropagateCopy(
   // Scan forward recording all operands that use CopyDest until we see the
   // next deinit of CopyDest.
   SmallVector<Operand*, 16> ValueUses;
-  auto SI = CopyInst->getIterator(), SE = CopyInst->getParent()->end();
+  auto SI = CurrentCopy->getIterator(), SE = CurrentCopy->getParent()->end();
   for (++SI; SI != SE; ++SI) {
     SILInstruction *UserInst = &*SI;
     // If we see another use of Src, then the source location is reinitialized
     // before the Dest location is deinitialized. So we really need the copy.
     if (SrcUserInsts.count(UserInst)) {
-      DEBUG(llvm::dbgs() << "  Skipping copy" << *CopyInst
+      DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
             << "  source used by" << *UserInst);
       return false;
     }
     if (UserInst == DefDealloc) {
-      DEBUG(llvm::dbgs() << "  Skipping copy" << *CopyInst
+      DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
             << "    dealloc_stack before dest use.\n");
       return false;
     }
     // Early check to avoid scanning unrelated instructions.
-    if (!DestUserInsts.count(UserInst))
+    if (!DirectDestUsers.count(UserInst))
       continue;
 
     AnalyzeForwardUse AnalyzeUse(CopyDest);
@@ -895,7 +943,7 @@ bool CopyForwarding::forwardPropagateCopy(
   // Now that a deinit was found, it is safe to substitute all recorded uses
   // with the copy's source.
   for (auto *Oper : ValueUses) {
-    Oper->set(CopyInst->getSrc());
+    Oper->set(CurrentCopy->getSrc());
     if (isa<CopyAddrInst>(Oper->getUser()))
       HasForwardedToCopy = true;
   }
@@ -906,6 +954,10 @@ bool CopyForwarding::forwardPropagateCopy(
 /// not including:
 /// - 'Def' itself
 /// - Transitive uses of 'Def' (listed elsewhere in DestUserInsts)
+///
+/// i.e. If Def is returned directly, RootUserInsts will be empty.
+///
+/// Return nullptr when the root != Def, and root has unrecognized uses.
 /// 
 /// If the returned root is not 'Def' itself, then 'Def' must be an address
 /// projection that can be trivially rematerialized with the root as its
@@ -913,30 +965,39 @@ bool CopyForwarding::forwardPropagateCopy(
 static ValueBase *
 findAddressRootAndUsers(ValueBase *Def,
                         SmallPtrSetImpl<SILInstruction*> &RootUserInsts) {
-  if (isa<InitEnumDataAddrInst>(Def) || isa<InitExistentialAddrInst>(Def)) {
+  switch (Def->getKind()) {
+  default:
+    return Def;
+  case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::InitExistentialAddrInst:
     auto InitInst = cast<SingleValueInstruction>(Def);
     SILValue InitRoot = InitInst->getOperand(0);
-    for (auto *Use : InitRoot->getUses()) {
-      auto *UserInst = Use->getUser();
-      if (UserInst == InitInst)
-        continue;
-      RootUserInsts.insert(UserInst);
-    }
+
+    CopyDestUserVisitor visitor(RootUserInsts);
+    if (!visitAddressUsers(InitRoot, InitInst, visitor))
+      return nullptr;
     return InitRoot;
   }
-  return Def;
 }
 
 /// Perform backward copy-propagation. Find the initialization point of the
 /// copy's source and replace the initializer's address with the copy's dest.
-bool CopyForwarding::backwardPropagateCopy(
-  CopyAddrInst *CopyInst,
-  SmallPtrSetImpl<SILInstruction*> &DestUserInsts) {
+bool CopyForwarding::backwardPropagateCopy() {
 
-  SILValue CopySrc = CopyInst->getSrc();
-  ValueBase *CopyDestDef = CopyInst->getDest();
+  SILValue CopySrc = CurrentCopy->getSrc();
+  ValueBase *CopyDestDef = CurrentCopy->getDest();
+
+  SmallPtrSet<SILInstruction *, 16> DestUserInsts;
+  CopyDestUserVisitor visitor(DestUserInsts);
+  if (!visitAddressUsers(CopyDestDef, CurrentCopy, visitor))
+    return false;
+
+  // RootUserInsts will contain any users of the same object not covered by
+  // DestUserInsts.
   SmallPtrSet<SILInstruction*, 8> RootUserInsts;
   ValueBase *CopyDestRoot = findAddressRootAndUsers(CopyDestDef, RootUserInsts);
+  if (!CopyDestRoot)
+    return false;
 
   // Require the copy dest value to be identified by this address. This ensures
   // that all instructions that may write to destination address depend on
@@ -951,7 +1012,7 @@ bool CopyForwarding::backwardPropagateCopy(
   // ValueUses records the uses of CopySrc in reverse order.
   SmallVector<Operand*, 16> ValueUses;
   SmallVector<DebugValueAddrInst*, 4> DebugValueInstsToDelete;
-  auto SI = CopyInst->getIterator(), SE = CopyInst->getParent()->begin();
+  auto SI = CurrentCopy->getIterator(), SE = CurrentCopy->getParent()->begin();
   while (SI != SE) {
     --SI;
     SILInstruction *UserInst = &*SI;
@@ -967,7 +1028,7 @@ bool CopyForwarding::backwardPropagateCopy(
         DebugValueInstsToDelete.push_back(DVAI);
         continue;
       }
-      DEBUG(llvm::dbgs() << "  Skipping copy" << *CopyInst
+      DEBUG(llvm::dbgs() << "  Skipping copy" << *CurrentCopy
             << "    dest used by " << *UserInst);
       return false;
     }
@@ -1011,7 +1072,7 @@ bool CopyForwarding::backwardPropagateCopy(
   // Now that an init was found, it is safe to substitute all recorded uses
   // with the copy's dest.
   for (auto *Oper : ValueUses) {
-    Oper->set(CopyInst->getDest());
+    Oper->set(CurrentCopy->getDest());
     if (isa<CopyAddrInst>(Oper->getUser()))
       HasForwardedToCopy = true;
   }
@@ -1083,20 +1144,21 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   reset(F);
   CurrentDef = Def;
   DEBUG(llvm::dbgs() << "Analyzing copies of Def: " << Def);
-  if (!collectUsers())
+  CopySrcUserVisitor visitor(*this);
+  if (!visitAddressUsers(Def, nullptr, visitor))
     return;
 
   // First forward any copies that implicitly destroy CurrentDef. There is no
   // need to hoist Destroy for these.
-  for (auto *CopyInst : TakePoints)
+  for (auto *CopyInst : TakePoints) {
     propagateCopy(CopyInst, /*hoistingDestroy=*/false);
-
+  }
   // If the copied address is also loaded from, then destroy hoisting is unsafe.
   //
   // TODO: Record all loads during collectUsers. Implement findRetainPoints to
   // peek though projections of the load, like unchecked_enum_data to find the
   // true extent of the lifetime including transitively referenced objects.
-  if (IsLoadedFrom)
+  if (IsSrcLoadedFrom)
     return;
 
   bool HoistedDestroyFound = false;
@@ -1240,6 +1302,18 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
       return false;
   }
   return true;
+}
+
+/// Replace all uses of \p ASI by \p RHS, except the dealloc_stack.
+static void replaceAllUsesExceptDealloc(AllocStackInst *ASI, ValueBase *RHS) {
+  llvm::SmallVector<Operand *, 8> Uses;
+  for (Operand *Use : ASI->getUses()) {
+    if (!isa<DeallocStackInst>(Use->getUser()))
+      Uses.push_back(Use);
+  }
+  for (Operand *Use : Uses) {
+    Use->set(RHS);
+  }
 }
 
 /// Remove a copy for which canNRVO returned true.

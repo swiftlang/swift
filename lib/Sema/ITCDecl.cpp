@@ -342,8 +342,10 @@ void IterativeTypeChecker::processResolveTypeDecl(
         typeAliasDecl->getGenericParams() == nullptr) {
       TypeResolutionOptions options =
                                    TypeResolutionFlags::TypeAliasUnderlyingType;
-      if (typeAliasDecl->getFormalAccess() <= AccessLevel::FilePrivate)
+      if (!typeAliasDecl->getDeclContext()->isCascadingContextForLookup(
+            /*functionsAreNonCascading*/true)) {
         options |= TypeResolutionFlags::KnownNonCascadingDependency;
+      }
 
       // Note: recursion into old type checker is okay when passing in an
       // unsatisfied-dependency callback.

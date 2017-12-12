@@ -211,7 +211,6 @@ extension String._CharacterView : BidirectionalCollection {
   }
   
   public typealias Index = String.Index
-  public typealias IndexDistance = Int
 
   /// The position of the first character in a nonempty character view.
   /// 

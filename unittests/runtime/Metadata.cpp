@@ -330,7 +330,7 @@ TEST(MetadataTest, getGenericMetadata) {
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
   { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1,
-    ClassFlags(), nullptr, 0, 0, 0, 0, 0 }
+    ClassFlags(), 0, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {
@@ -612,7 +612,7 @@ struct {
 } SuperclassWithPrefix = {
   { &Global1, &Global3, &Global2, &Global3 },
   { { { &destroySuperclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
+    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
       0, 0, 0, sizeof(SuperclassWithPrefix),
       sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
 };
@@ -631,7 +631,7 @@ struct {
     [](GenericMetadata *pattern, const void *args) -> Metadata* {
       auto metadata =
         swift_allocateGenericClassMetadata(pattern, args,
-                                           SuperclassWithPrefix_AddressPoint);
+                                           SuperclassWithPrefix_AddressPoint, 0);
       char *bytes = (char*) metadata + sizeof(ClassMetadata);
       auto metadataWords = reinterpret_cast<const void**>(bytes);
       auto argsWords = reinterpret_cast<const void* const *>(args);
@@ -644,54 +644,12 @@ struct {
     {} // private data
   },
   { { { &destroySubclass }, { &VALUE_WITNESS_SYM(Bo) } },
-    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
+    { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), 0,
       0, 0, 0,
       sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
       sizeof(HeapMetadataHeader) } },
   { &Global2, &Global1, &Global2 }
 };
-
-TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
-  auto metadataTemplate = &GenericSubclass.Header;
-
-  void *args[] = { &Global3 };
-
-  RaceTest_ExpectEqual<const ClassMetadata *>(
-    [&]() -> const ClassMetadata * {
-      auto inst = static_cast<const ClassMetadata*>(
-        swift_getGenericMetadata(metadataTemplate, args));
-      void * const *fields = reinterpret_cast<void * const *>(inst);
-
-      // Assert that we copied the extra prefix data from the superclass.
-      EXPECT_EQ(&Global1, fields[-6]);
-      EXPECT_EQ(&Global3, fields[-5]);
-      EXPECT_EQ(&Global2, fields[-4]);
-      EXPECT_EQ(&Global3, fields[-3]);
-
-      // Assert that we copied the shared prefix data from the subclass.
-      EXPECT_EQ((void*) &destroySubclass, fields[-2]);
-      EXPECT_EQ(&VALUE_WITNESS_SYM(Bo), fields[-1]);
-
-      // Assert that we set the superclass field.
-      EXPECT_EQ(SuperclassWithPrefix_AddressPoint, fields[1]);
-    
-      // Assert that we copied the subclass suffix data.
-      auto suffix = (void * const *) ((char*) inst + sizeof(ClassMetadata));
-      EXPECT_EQ(&Global2, suffix[0]);
-      EXPECT_EQ(&Global1, suffix[1]);
-
-      // This should have been overwritten by the creation function.
-      EXPECT_EQ(&Global3, suffix[2]);
-
-      EXPECT_EQ(7 * sizeof(void*) + sizeof(GenericSubclass.Pattern),
-                inst->getClassSize());
-      EXPECT_EQ(4 * sizeof(void*) + sizeof(HeapMetadataHeader),
-                inst->getClassAddressPoint());
-
-      // These are all expected to be equal.
-      return inst;
-    });
-}
 
 static ProtocolDescriptor OpaqueProto1 = { "OpaqueProto1", nullptr,
   ProtocolDescriptorFlags().withSwift(true)
@@ -1264,23 +1222,23 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_indirect) {
   Metadata *metadata2 = &testMetadata2.base;
 
   auto refAndObjectAddr = BoxPair(swift_allocBox(metadata));
-  swift_retain(refAndObjectAddr.first);
+  swift_retain(refAndObjectAddr.object);
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
-  } existBox{{{refAndObjectAddr.first, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+  } existBox{{{refAndObjectAddr.object, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1u);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.object), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_indirect) {
@@ -1300,23 +1258,23 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_indirect) {
   Metadata *metadata2 = &testMetadata2.base;
 
   auto refAndObjectAddr = BoxPair(swift_allocBox(metadata));
-  swift_retain(refAndObjectAddr.first);
+  swift_retain(refAndObjectAddr.object);
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
-  } existBox{{{refAndObjectAddr.first, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+  } existBox{{{refAndObjectAddr.object, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr.first), 1u);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr.object), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod_indirect) {
@@ -1341,15 +1299,15 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_pod_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_pod_indirect) {
@@ -1374,15 +1332,15 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_pod_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
@@ -1403,13 +1361,13 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
 
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   void *someAddr = &anyVWT;
-  swift_retain(refAndObjectAddr2.first);
+  swift_retain(refAndObjectAddr2.object);
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
   } existBox2{{{someAddr, nullptr, someAddr}}, metadata, 0x5A5A5A5AU},
-    existBox{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
@@ -1419,7 +1377,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithCopy_indirect_pod) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
   EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
   EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
@@ -1440,13 +1398,13 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
 
   auto refAndObjectAddr2 = BoxPair(swift_allocBox(metadata2));
   void *someAddr = &anyVWT;
-  swift_retain(refAndObjectAddr2.first);
+  swift_retain(refAndObjectAddr2.object);
   struct {
     ValueBuffer buffer;
     Metadata *type;
     uintptr_t canary;
   } existBox2{{{someAddr, nullptr, someAddr}}, metadata, 0x5A5A5A5AU},
-    existBox{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->assignWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                          reinterpret_cast<OpaqueValue *>(&existBox2), any);
@@ -1456,7 +1414,7 @@ TEST(TestOpaqueExistentialBox, test_assignWithTake_indirect_pod) {
   EXPECT_EQ(existBox.buffer.PrivateData[0], someAddr);
   EXPECT_EQ(existBox.buffer.PrivateData[1], nullptr);
   EXPECT_EQ(existBox.buffer.PrivateData[2], someAddr);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }
 
 TEST(TestOpaqueExistentialBox, test_initWithCopy_pod) {
@@ -1549,15 +1507,15 @@ TEST(TestOpaqueExistentialBox, test_initWithCopy_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->initializeWithCopy(reinterpret_cast<OpaqueValue *>(&existBox),
                              reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 2u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 2u);
 }
 
 TEST(TestOpaqueExistentialBox, test_initWithTake_indirect) {
@@ -1582,13 +1540,13 @@ TEST(TestOpaqueExistentialBox, test_initWithTake_indirect) {
     Metadata *type;
     uintptr_t canary;
   } existBox{{{nullptr, nullptr, nullptr}}, metadata, 0x5A5A5A5AU},
-    existBox2{{{refAndObjectAddr2.first, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
+    existBox2{{{refAndObjectAddr2.object, nullptr, nullptr}}, metadata2, 0xB5A5A5A5U};
 
   anyVWT->initializeWithTake(reinterpret_cast<OpaqueValue *>(&existBox),
                              reinterpret_cast<OpaqueValue *>(&existBox2), any);
 
   EXPECT_EQ(existBox.type, metadata2);
   EXPECT_EQ(existBox.canary, 0x5A5A5A5AU);
-  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.first);
-  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.first), 1u);
+  EXPECT_EQ(existBox.buffer.PrivateData[0], refAndObjectAddr2.object);
+  EXPECT_EQ(swift_retainCount(refAndObjectAddr2.object), 1u);
 }

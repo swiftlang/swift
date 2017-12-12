@@ -54,7 +54,7 @@ set(SWIFTLIB_ESSENTIAL
   Equatable.swift
   ErrorType.swift
   Existential.swift
-  Filter.swift.gyb
+  Filter.swift
   FixedArray.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb
@@ -82,7 +82,7 @@ set(SWIFTLIB_ESSENTIAL
   LazySequence.swift
   LifetimeManager.swift
   ManagedBuffer.swift
-  Map.swift.gyb
+  Map.swift
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
   Mirrors.swift.gyb

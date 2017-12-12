@@ -164,7 +164,9 @@ extension ReversedIndex : Hashable where Base.Index : Hashable {
 ///
 /// - See also: `ReversedRandomAccessCollection`
 @_fixed_layout
-public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCollection {
+public struct ReversedCollection<Base: BidirectionalCollection> {
+  public let _base: Base
+
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -174,14 +176,14 @@ public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCo
   internal init(_base: Base) {
     self._base = _base
   }
+}
 
+extension ReversedCollection: BidirectionalCollection {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ReversedIndex<Base>
-
-  public typealias IndexDistance = Base.IndexDistance
 
   @_fixed_layout
   public struct Iterator : IteratorProtocol, Sequence {
@@ -234,14 +236,14 @@ public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCo
   }
 
   @_inlineable
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     return ReversedIndex(_base.index(i.base, offsetBy: -n))
   }
 
   @_inlineable
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     return _base.index(i.base, offsetBy: -n, limitedBy: limit.base)
@@ -249,7 +251,7 @@ public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCo
   }
 
   @_inlineable
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     return _base.distance(from: end.base, to: start.base)
   }
 
@@ -262,8 +264,6 @@ public struct ReversedCollection<Base: BidirectionalCollection>: BidirectionalCo
   public subscript(bounds: Range<Index>) -> Slice<ReversedCollection> {
     return Slice(base: self, bounds: bounds)
   }
-
-  public let _base: Base
 }
 
 extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }
@@ -312,29 +312,7 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   @_inlineable
-  public func reversed() -> LazyBidirectionalCollection<
-    ReversedCollection<Elements>
-  > {
+  public func reversed() -> LazyCollection<ReversedCollection<Elements>> {
     return ReversedCollection(_base: elements).lazy
   }
 }
-
-extension LazyCollectionProtocol
-  where
-  Self : RandomAccessCollection,
-  Elements : RandomAccessCollection {
-
-  /// Returns the elements of the collection in reverse order.
-  ///
-  /// - Complexity: O(1)
-  @_inlineable
-  public func reversed() -> LazyRandomAccessCollection<
-    ReversedCollection<Elements>
-  > {
-    return ReversedCollection(_base: elements).lazy
-  }
-}
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:

@@ -17,9 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 @_fixed_layout
-public struct _ValidUTF8Buffer<
-  Storage: UnsignedInteger & FixedWidthInteger
-> {
+public struct _ValidUTF8Buffer<Storage: UnsignedInteger & FixedWidthInteger> {
   public typealias Element = Unicode.UTF8.CodeUnit
   internal typealias _Storage = Storage
   
@@ -67,7 +65,6 @@ extension _ValidUTF8Buffer : Sequence {
 }
 
 extension _ValidUTF8Buffer : Collection {  
-  public typealias IndexDistance = Int
   
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Index : Comparable {
@@ -99,7 +96,7 @@ extension _ValidUTF8Buffer : Collection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public var count : IndexDistance {
+  public var count : Int {
     return Storage.bitWidth &>> 3 &- _biasedBits.leadingZeroBitCount &>> 3
   }
   
@@ -129,7 +126,7 @@ extension _ValidUTF8Buffer : RandomAccessCollection {
 
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public func distance(from i: Index, to j: Index) -> IndexDistance {
+  public func distance(from i: Index, to j: Index) -> Int {
     _debugPrecondition(_isValid(i))
     _debugPrecondition(_isValid(j))
     return (
@@ -139,7 +136,7 @@ extension _ValidUTF8Buffer : RandomAccessCollection {
   
   @_inlineable // FIXME(sil-serialize-all)
   @inline(__always)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     let startOffset = distance(from: startIndex, to: i)
     let newOffset = startOffset + n
     _debugPrecondition(newOffset >= 0)
@@ -155,12 +152,12 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public var capacity: IndexDistance {
+  public var capacity: Int {
     return _ValidUTF8Buffer.capacity
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public static var capacity: IndexDistance {
+  public static var capacity: Int {
     return Storage.bitWidth / Element.bitWidth
   }
 

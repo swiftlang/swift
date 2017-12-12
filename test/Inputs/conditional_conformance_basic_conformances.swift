@@ -320,3 +320,6 @@ public func double_concrete_concrete() {
 // CHECK-NEXT:    unreachable
 // CHECK-NEXT:  }
 
+func dynamicCastToP1(_ value: Any) -> P1? {
+  return value as? P1
+}

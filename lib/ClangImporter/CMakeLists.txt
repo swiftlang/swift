@@ -16,7 +16,6 @@ add_swift_library(swiftClangImporter STATIC
   ImportName.cpp
   ImportType.cpp
   SwiftLookupTable.cpp
-  DEPENDS swift-syntax-generated-headers
   LINK_LIBRARIES
     swiftAST
     swiftParse

@@ -69,10 +69,10 @@ struct Memberwise1 {
 
 struct Memberwise2 {
   let m: Memberwise1
-  let n: Memberwise1
+  let n: Memberwise1; subscript(x: Int) -> Int { return x }
 }
 
-_ = Memberwise2(m: Memberwise1(x: 1), n: Memberwise1.init(x: 2))
+_ = Memberwise2(m: Memberwise1(x: 1), n: Memberwise1.init(x: 2))[1]
 
 protocol Layer {
   associatedtype Content

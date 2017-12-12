@@ -446,11 +446,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
   invocationArgStrs.insert(invocationArgStrs.end(), {
-      // Enable modules
-      "-fmodules",
-      "-Werror=non-modular-include-in-framework-module",
-      "-Xclang", "-fmodule-feature", "-Xclang", "swift",
-
       // Don't emit LLVM IR.
       "-fsyntax-only",
 
@@ -463,6 +458,18 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
   });
+
+  // Enable modules.
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-fmodules",
+      "-Xclang", "-fmodule-feature", "-Xclang", "swift"
+  });
+  // Don't enforce strict rules when inside the debugger to work around search
+  // path problems caused by a module existing in both the build/install
+  // directory and the source directory.
+  if (!importerOpts.DebuggerSupport)
+    invocationArgStrs.push_back(
+        "-Werror=non-modular-include-in-framework-module");
 
   if (LangOpts.EnableObjCInterop) {
     invocationArgStrs.insert(invocationArgStrs.end(),
@@ -533,6 +540,18 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
     }
   } else {
+    // Ideally we should turn this on for all Glibc targets that are actually
+    // using Glibc or a libc that respects that flag. This will cause some
+    // source breakage however (specifically with strerror_r()) on Linux
+    // without a workaround.
+    if (triple.isOSFuchsia()) {
+      // Many of the modern libc features are hidden behind feature macros like
+      // _GNU_SOURCE or _XOPEN_SOURCE.
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-D_GNU_SOURCE",
+      });
+    }
+
     // The module map used for Glibc depends on the target we're compiling for,
     // and is not included in the resource directory with the other implicit
     // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
@@ -3281,6 +3300,8 @@ ClangImporter::Implementation::loadNamedMembers(
   auto *CDC = cast<clang::DeclContext>(CD);
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 
+  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto effectiveClangContext = getEffectiveClangContext(nominal);
 
   // FIXME: The legacy of mirroring protocol members rears its ugly head,
   // and as a result we have to bail on any @interface or @category that
@@ -3294,6 +3315,15 @@ ClangImporter::Implementation::loadNamedMembers(
       return None;
   }
 
+  // Also bail out if there are any global-as-member mappings for this type; we
+  // can support some of them lazily but the full set of idioms seems
+  // prohibitively complex (also they're not stored in by-name lookup, for
+  // reasons unclear).
+  if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+        return (table.lookupGlobalsAsMembers(
+                  effectiveClangContext).size() > 0);
+      }))
+    return None;
 
   // There are 3 cases:
   //
@@ -3321,10 +3351,8 @@ ClangImporter::Implementation::loadNamedMembers(
   assert(isa<clang::ObjCContainerDecl>(CD));
 
   TinyPtrVector<ValueDecl *> Members;
-  auto *Nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  auto ClangContext = getEffectiveClangContext(Nominal);
   for (auto entry : table->lookup(SerializedSwiftName(N.getBaseName()),
-                                  ClangContext)) {
+                                  effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
     if (!isVisibleClangEntry(clangCtx, member)) continue;

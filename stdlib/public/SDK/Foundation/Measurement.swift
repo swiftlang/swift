@@ -10,8 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if DEPLOYMENT_RUNTIME_SWIFT
+import CoreFoundation
+#else
 @_exported import Foundation // Clang module
 import _SwiftCoreFoundationOverlayShims
+#endif
 
 /// A `Measurement` is a model type that holds a `Double` value associated with a `Unit`.
 ///
@@ -25,13 +29,13 @@ public struct Measurement<UnitType : Unit> : ReferenceConvertible, Comparable, E
 
     /// The value component of the `Measurement`.
     public var value: Double
-    
+
     /// Create a `Measurement` given a specified value and unit.
     public init(value: Double, unit: UnitType) {
         self.value = value
         self.unit = unit
     }
-    
+
     public var hashValue: Int {
         return Int(bitPattern: __CFHashDouble(value))
     }
@@ -42,11 +46,11 @@ extension Measurement : CustomStringConvertible, CustomDebugStringConvertible, C
     public var description: String {
         return "\(value) \(unit.symbol)"
     }
-    
+
     public var debugDescription: String {
         return "\(value) \(unit.symbol)"
     }
-    
+
     public var customMirror: Mirror {
         var c: [(label: String?, value: Any)] = []
         c.append((label: "value", value: value))
@@ -76,7 +80,7 @@ extension Measurement where UnitType : Dimension {
             }
         }
     }
-    
+
     /// Converts the measurement to the specified unit.
     ///
     /// - parameter otherUnit: A unit of the same `Dimension`.
@@ -85,7 +89,7 @@ extension Measurement where UnitType : Dimension {
     }
 
     /// Add two measurements of the same Dimension.
-    /// 
+    ///
     /// If the `unit` of the `lhs` and `rhs` are `isEqual`, then this returns the result of adding the `value` of each `Measurement`. If they are not equal, then this will convert both to the base unit of the `Dimension` and return the result as a `Measurement` of that base unit.
     /// - returns: The result of adding the two measurements.
     public static func +(lhs: Measurement<UnitType>, rhs: Measurement<UnitType>) -> Measurement<UnitType> {
@@ -170,7 +174,7 @@ extension Measurement {
             return lhs.value == rhs.value
         } else {
             if let lhsDimensionalUnit = lhs.unit as? Dimension,
-               let rhsDimensionalUnit = rhs.unit as? Dimension {
+                let rhsDimensionalUnit = rhs.unit as? Dimension {
                 if type(of: lhsDimensionalUnit).baseUnit() == type(of: rhsDimensionalUnit).baseUnit() {
                     let lhsValueInTermsOfBase = lhsDimensionalUnit.converter.baseUnitValue(fromValue: lhs.value)
                     let rhsValueInTermsOfBase = rhsDimensionalUnit.converter.baseUnitValue(fromValue: rhs.value)
@@ -188,7 +192,7 @@ extension Measurement {
             return lhs.value < rhs.value
         } else {
             if let lhsDimensionalUnit = lhs.unit as? Dimension,
-               let rhsDimensionalUnit = rhs.unit as? Dimension {
+                let rhsDimensionalUnit = rhs.unit as? Dimension {
                 if type(of: lhsDimensionalUnit).baseUnit() == type(of: rhsDimensionalUnit).baseUnit() {
                     let lhsValueInTermsOfBase = lhsDimensionalUnit.converter.baseUnitValue(fromValue: lhs.value)
                     let rhsValueInTermsOfBase = rhsDimensionalUnit.converter.baseUnitValue(fromValue: rhs.value)
@@ -202,17 +206,23 @@ extension Measurement {
 
 // Implementation note: similar to NSArray, NSDictionary, etc., NSMeasurement's import as an ObjC generic type is suppressed by the importer. Eventually we will need a more general purpose mechanism to correctly import generic types.
 
+#if DEPLOYMENT_RUNTIME_SWIFT
+internal typealias MeasurementBridgeType = _ObjectTypeBridgeable
+#else
+internal typealias MeasurementBridgeType = _ObjectiveCBridgeable
+#endif
+
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-extension Measurement : _ObjectiveCBridgeable {
+extension Measurement : MeasurementBridgeType {
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSMeasurement {
         return NSMeasurement(doubleValue: value, unit: unit)
     }
-    
+
     public static func _forceBridgeFromObjectiveC(_ source: NSMeasurement, result: inout Measurement?) {
         result = Measurement(value: source.doubleValue, unit: source.unit as! UnitType)
     }
-    
+
     public static func _conditionallyBridgeFromObjectiveC(_ source: NSMeasurement, result: inout Measurement?) -> Bool {
         if let u = source.unit as? UnitType {
             result = Measurement(value: source.doubleValue, unit: u)
@@ -221,7 +231,7 @@ extension Measurement : _ObjectiveCBridgeable {
             return false
         }
     }
-    
+
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSMeasurement?) -> Measurement {
         let u = source!.unit as! UnitType
         return Measurement(value: source!.doubleValue, unit: u)
@@ -233,7 +243,11 @@ extension NSMeasurement : _HasCustomAnyHashableRepresentation {
     // Must be @nonobjc to avoid infinite recursion during bridging.
     @nonobjc
     public func _toCustomAnyHashable() -> AnyHashable? {
+#if DEPLOYMENT_RUNTIME_SWIFT
+        return AnyHashable(Measurement._unconditionallyBridgeFromObjectiveC(self))
+#else
         return AnyHashable(self as Measurement)
+#endif
     }
 }
 

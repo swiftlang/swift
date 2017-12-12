@@ -147,7 +147,7 @@ extension BidirectionalCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
@@ -160,7 +160,7 @@ extension BidirectionalCollection {
 
   @_inlineable // FIXME(sil-serialize-all)
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
@@ -176,19 +176,19 @@ extension BidirectionalCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     var start = start
-    var count: IndexDistance = 0
+    var count = 0
 
     if start < end {
       while start != end {
-        count += 1 as IndexDistance
+        count += 1
         formIndex(after: &start)
       }
     }
     else if start > end {
       while start != end {
-        count -= 1 as IndexDistance
+        count -= 1
         formIndex(before: &start)
       }
     }

@@ -5,6 +5,9 @@
 // RUN: ! %target-run %t/InvalidStrideableCmp 2>&1 | %FileCheck %s --check-prefix=CHECK-COMPARABLE
 // REQUIRES: executable_test
 
+// FIXME: rdar://35780657
+// UNSUPPORTED: swift_test_mode_optimize_size
+
 //
 // Check that a circular Strideable inheriting witnesses from Stdlib crashes
 // with a rich error message.

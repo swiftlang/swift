@@ -79,8 +79,8 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
             return indexSetRange.lowerBound..<indexSetRange.upperBound
         }
         
-        public subscript(bounds: Range<Index>) -> BidirectionalSlice<RangeView> {
-            return BidirectionalSlice(base: self, bounds: bounds)
+        public subscript(bounds: Range<Index>) -> Slice<RangeView> {
+            return Slice(base: self, bounds: bounds)
         }
 
         public func index(after i: Index) -> Index {
@@ -237,8 +237,8 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         return index.value
     }
 
-    public subscript(bounds: Range<Index>) -> BidirectionalSlice<IndexSet> {
-        return BidirectionalSlice(base: self, bounds: bounds)
+    public subscript(bounds: Range<Index>) -> Slice<IndexSet> {
+        return Slice(base: self, bounds: bounds)
     }
 
     // We adopt the default implementation of subscript(range: Range<Index>) from MutableCollection
@@ -791,7 +791,7 @@ extension IndexSet {
 }
 
 private func _toNSRange(_ r: Range<IndexSet.Element>) -> NSRange {
-    return NSMakeRange(r.lowerBound, r.upperBound - r.lowerBound)
+    return NSRange(location: r.lowerBound, length: r.upperBound - r.lowerBound)
 }
 
 extension IndexSet : _ObjectiveCBridgeable {

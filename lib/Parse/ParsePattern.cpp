@@ -158,6 +158,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
   // Trivial case: empty parameter list.
   if (Tok.is(tok::r_paren)) {
+    {
+      SyntaxParsingContext EmptyPLContext(SyntaxContext,
+                                          SyntaxKind::FunctionParameterList);
+    }
     rightParenLoc = consumeToken(tok::r_paren);
     return ParserStatus();
   }
@@ -167,7 +171,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
                       /*AllowSepAfterLast=*/false,
                       diag::expected_rparen_parameter,
-                      SyntaxKind::Unknown,
+                      SyntaxKind::FunctionParameterList,
                       [&]() -> ParserStatus {
     ParsedParameter param;
     ParserStatus status;
@@ -669,6 +673,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
                                TypeRepr *&retType) {
+  SyntaxParsingContext SigContext(SyntaxContext, SyntaxKind::FunctionSignature);
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 

@@ -2512,7 +2512,7 @@ namespace {
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(fromExpr);
-      auto locator = CS.getConstraintLocator(fromExpr);
+      auto locator = CS.getConstraintLocator(expr);
 
       // The source type can be checked-cast to the destination type.
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
@@ -2560,7 +2560,7 @@ namespace {
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = CS.getType(fromExpr);
-      auto locator = CS.getConstraintLocator(fromExpr);
+      auto locator = CS.getConstraintLocator(expr);
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
       return OptionalType::get(toType);
     }

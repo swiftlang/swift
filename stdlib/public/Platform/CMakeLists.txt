@@ -2,7 +2,6 @@ set(swift_platform_name)
 set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
-    Misc.c
     TiocConstants.swift
     tgmath.swift.gyb)
 

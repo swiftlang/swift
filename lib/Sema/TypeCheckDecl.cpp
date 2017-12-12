@@ -3002,13 +3002,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     // primitive literal protocols.
     auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
         ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-        auto conformance =
-            TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
-        if (conformance)
-          assert(conformance->getConditionalRequirements().empty() &&
-                 "conditionally conforming to literal protocol not currently "
-                 "supported");
-        return conformance;
+        return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
     };
 
     static auto otherLiteralProtocolKinds = {
@@ -3974,6 +3968,10 @@ public:
       TC.checkUnsupportedProtocolType(decl);
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
         TC.checkDeclCircularity(nominal);
+      }
+      if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
+        if (!protocol->hasFixedLayout())
+          TC.inferDefaultWitnesses(protocol);
       }
     }
   }
@@ -6629,10 +6627,22 @@ public:
       
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
-        TC.diagnose(overrideASD, diag::override_with_stored_property,
+        bool downgradeToWarning = false;
+        if (!TC.Context.isSwiftVersionAtLeast(5) &&
+            overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
+          // Swift 4.0 had a bug where lazy properties were considered
+          // computed by the time of this check. Downgrade this diagnostic to
+          // a warning.
+          downgradeToWarning = true;
+        }
+        auto diagID = downgradeToWarning ?
+            diag::override_with_stored_property_warn :
+            diag::override_with_stored_property;
+        TC.diagnose(overrideASD, diagID,
                     overrideASD->getBaseName().getIdentifier());
         TC.diagnose(baseASD, diag::property_override_here);
-        return true;
+        if (!downgradeToWarning)
+          return true;
       }
 
       // Make sure that an observing property isn't observing something
@@ -7358,8 +7368,10 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
 /// Validate the underlying type of the given typealias.
 static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   TypeResolutionOptions options = TypeResolutionFlags::TypeAliasUnderlyingType;
-  if (typeAlias->getFormalAccess() <= AccessLevel::FilePrivate)
-    options |= TypeResolutionFlags::KnownNonCascadingDependency;
+  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
+        /*functionsAreNonCascading*/true)) {
+     options |= TypeResolutionFlags::KnownNonCascadingDependency;
+  }
 
   if (typeAlias->getDeclContext()->isModuleScopeContext() &&
       typeAlias->getGenericParams() == nullptr) {
@@ -7832,20 +7844,16 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     // Perform earlier validation of typealiases in protocols.
     if (isa<ProtocolDecl>(dc)) {
       if (!typealias->getGenericParams()) {
-        ProtocolRequirementTypeResolver resolver;
-        TypeResolutionOptions options;
-
         if (typealias->isBeingValidated()) return;
 
         typealias->setIsBeingValidated();
         SWIFT_DEFER { typealias->setIsBeingValidated(false); };
 
         validateAccessControl(typealias);
-        if (typealias->getFormalAccess() <= AccessLevel::FilePrivate)
-          options |= TypeResolutionFlags::KnownNonCascadingDependency;
 
+        ProtocolRequirementTypeResolver resolver;
         if (validateType(typealias->getUnderlyingTypeLoc(),
-                         typealias, options, &resolver)) {
+                         typealias, TypeResolutionOptions(), &resolver)) {
           typealias->setInvalid();
           typealias->getUnderlyingTypeLoc().setInvalidType(Context);
         }

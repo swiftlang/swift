@@ -295,7 +295,8 @@ SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
 
 SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional,
                  ImplicitlyUnwrappedOptional,
-                 OnFunc | OnVar | OnSubscript | OnConstructor | RejectByParser, 72)
+                 OnFunc | OnVar | OnParam | OnSubscript | OnConstructor
+                 | RejectByParser, 72)
 
 DECL_ATTR(_optimize, Optimize,
           OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar |

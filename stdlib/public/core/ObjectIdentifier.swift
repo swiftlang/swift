@@ -15,20 +15,9 @@
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
 @_fixed_layout // FIXME(sil-serialize-all)
-public struct ObjectIdentifier : Hashable {
+public struct ObjectIdentifier {
   @_versioned // FIXME(sil-serialize-all)
   internal let _value: Builtin.RawPointer
-
-  // FIXME: Better hashing algorithm
-  /// The identifier's hash value.
-  ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_value))
-  }
 
   /// Creates an instance that uniquely identifies the given class instance.
   ///
@@ -80,15 +69,30 @@ extension ObjectIdentifier : CustomDebugStringConvertible {
   }
 }
 
-extension ObjectIdentifier : Comparable {
+extension ObjectIdentifier: Equatable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public static func == (x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+  }
+}
+
+extension ObjectIdentifier: Comparable {
   @_inlineable // FIXME(sil-serialize-all)
   public static func < (lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
     return UInt(bitPattern: lhs) < UInt(bitPattern: rhs)
   }
+}
 
+extension ObjectIdentifier: Hashable {
+  // FIXME: Better hashing algorithm
+  /// The identifier's hash value.
+  ///
+  /// The hash value is not guaranteed to be stable across different
+  /// invocations of the same program.  Do not persist the hash value across
+  /// program runs.
   @_inlineable // FIXME(sil-serialize-all)
-  public static func == (x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
+  public var hashValue: Int {
+    return Int(Builtin.ptrtoint_Word(_value))
   }
 }
 

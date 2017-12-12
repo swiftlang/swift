@@ -318,10 +318,6 @@ public:
   /// Returns true if this function has qualified ownership instructions in it.
   bool hasQualifiedOwnership() const { return HasQualifiedOwnership; }
 
-  /// Returns true if this function has unqualified ownership instructions in
-  /// it.
-  bool hasUnqualifiedOwnership() const { return !HasQualifiedOwnership; }
-
   /// Sets the HasQualifiedOwnership flag to false. This signals to SIL that no
   /// ownership instructions should be in this function any more.
   void setUnqualifiedOwnership() {

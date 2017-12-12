@@ -587,6 +587,16 @@ public:
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
 
+  enum class ObjCLabelType {
+    ClassName,
+    MethodVarName,
+    MethodVarType,
+    PropertyName,
+  };
+
+  std::string GetObjCSectionName(StringRef Section, StringRef MachOAttributes);
+  void SetCStringLiteralSection(llvm::GlobalVariable *GV, ObjCLabelType Type);
+
 private:
   Size PtrSize;
   Size AtomicBoolSize;
@@ -1045,6 +1055,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
+  llvm::Constant *getAddrOfClassMetadataBaseOffset(ClassDecl *D,
+                                                 ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                                  ConstantInitFuture definition);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,

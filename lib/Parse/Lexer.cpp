@@ -34,6 +34,7 @@
 #include <limits>
 
 using namespace swift;
+using namespace swift::syntax;
 
 // clang::isIdentifierHead and clang::isIdentifierBody are deliberately not in
 // this list as a reminder that they are using C rules for identifiers.
@@ -242,7 +243,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
 
   Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
           CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   Token Result;
   L.lex(Result);
   return Result;
@@ -264,14 +265,9 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
-  if (!MultilineString)
-    lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
+  lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
 
   NextToken.setToken(Kind, TokenText, CommentLength, MultilineString);
-  if (!MultilineString)
-    if (!TrailingTrivia.empty() &&
-        TrailingTrivia.front().Kind == syntax::TriviaKind::Backtick)
-      ++CurPtr;
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -298,7 +294,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
     }
     break;
   }
-  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)), {}, {});
+  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)));
 }
 
 //===----------------------------------------------------------------------===//
@@ -2062,6 +2058,10 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+    LeadingTrivia.clear();
+    TrailingTrivia.clear();
+  }
   NextToken.setAtStartOfLine(CurPtr == BufferStart);
 
   // Remember where we started so that we can find the comment range.
@@ -2069,7 +2069,7 @@ void Lexer::lexImpl() {
   SeenComment = false;
 
 Restart:
-  lexTrivia(LeadingTrivia);
+  lexTrivia(LeadingTrivia, /* IsForTrailingTrivia */ false);
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -2309,158 +2309,105 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   return L.peekNextToken();
 }
 
-Optional<syntax::TriviaPiece> Lexer::lexWhitespace(bool StopAtFirstNewline) {
-
-  auto Start = CurPtr;
-  auto Last = *Start;
-
-  if (Start == BufferEnd)
-    return None;
-
-  while (CurPtr != BufferEnd) {
-    auto c = *CurPtr;
-    if (isWhitespace(c)) {
-      if (StopAtFirstNewline && (c == '\n' || c == '\r')) {
-        break;
-      }
-      // If this is a new kind of whitespace, pinch off
-      // a piece of trivia.
-      if (c != *Start)
-        break;
-
-      Last = c;
-      ++CurPtr;
-    } else {
-      break;
-    }
-  }
-
-  unsigned Length = CurPtr - Start;
-
-  if (Length == 0)
-    return None;
-
-  switch (Last) {
-    case '\n':
-    case '\r':
-      NextToken.setAtStartOfLine(true);
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Newline,
-        Length,
-        OwnedString(Start, Length),
-      };
-    case ' ':
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Space,
-        Length,
-        OwnedString(Start, Length),
-      };
-    case '\t':
-      return syntax::TriviaPiece {
-        syntax::TriviaKind::Tab,
-        Length,
-        OwnedString(Start, Length),
-      };
-    default:
-      return None;
-  }
-}
-
-Optional<syntax::TriviaPiece> Lexer::lexSingleLineComment(syntax::TriviaKind Kind) {
-  auto Start = CurPtr;
-  skipUpToEndOfLine();
-
-  unsigned Length = CurPtr - Start;
-
-  if (Length == 0)
-    return None;
-
-  return Optional<syntax::TriviaPiece>({
-    Kind,
-    Length,
-    OwnedString(Start, Length)
-  });
-}
-
-Optional<syntax::TriviaPiece>
-Lexer::lexBlockComment(syntax::TriviaKind Kind) {
-  auto Start = CurPtr++;
-  skipSlashStarComment();
-  unsigned Length = CurPtr - Start;
-  if (Length == 0)
-    return None;
-
-  return Optional<syntax::TriviaPiece>({
-    Kind,
-    Length,
-    OwnedString(Start, Length)
-  });
-}
-
-Optional<syntax::TriviaPiece> Lexer::lexComment() {
-  if (CurPtr >= BufferEnd)
-    return None;
-
-  if (BufferEnd - CurPtr < 2)
-    return None;
-
-  StringRef Prefix { CurPtr, 2 };
-
-  if (Prefix == "//")
-    return lexSingleLineComment(syntax::TriviaKind::LineComment);
-
-  if (Prefix == "/*")
-    return lexBlockComment(syntax::TriviaKind::BlockComment);
-
-  return None;
-}
-
-Optional<syntax::TriviaPiece> Lexer::lexDocComment() {
-  if (CurPtr >= BufferEnd)
-    return None;
-
-  if ((BufferEnd - CurPtr) < 3)
-    return None;
-
-  StringRef Prefix { CurPtr, 3 };
-
-  if (Prefix.startswith("///"))
-    return lexSingleLineComment(syntax::TriviaKind::DocLineComment);
-
-  if (Prefix.startswith("/**"))
-    return lexBlockComment(syntax::TriviaKind::DocBlockComment);
-
-  return None;
-}
-
-void Lexer::lexTrivia(syntax::TriviaList &Pieces,
-                      bool StopAtFirstNewline) {
+void Lexer::lexTrivia(syntax::TriviaList &Pieces, bool IsForTrailingTrivia) {
   if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
     return;
 
-  while (CurPtr != BufferEnd) {
-    if (auto Whitespace = lexWhitespace(StopAtFirstNewline)) {
-      Pieces.push_back(Whitespace.getValue());
-    } else if (isKeepingComments()) {
-      // Don't try to lex comments as trivias.
-      return;
-    } else if (StopAtFirstNewline && *CurPtr == '/') {
-      // Don't lex comments as trailing trivias (for now).
-      return;
-    } else if (auto DocComment = lexDocComment()) {
-      Pieces.push_back(DocComment.getValue());
-      SeenComment = true;
-    } else if (auto Comment = lexComment()) {
-      Pieces.push_back(Comment.getValue());
-      SeenComment = true;
-    } else {
-      return;
+Restart:
+  const char *TriviaStart = CurPtr;
+
+  // TODO: Handle random nul('\0') character in the middle of a buffer.
+  // TODO: Handle invalid UTF8 sequence which is skipped in lexImpl().
+  switch (*CurPtr++) {
+  case '\n':
+  case '\r':
+    if (IsForTrailingTrivia)
+      break;
+    NextToken.setAtStartOfLine(true);
+    LLVM_FALLTHROUGH;
+  case ' ':
+  case '\t':
+  case '\v':
+  case '\f': {
+    auto Char = CurPtr[-1];
+    // Consume consective same characters.
+    while (*CurPtr == Char)
+      ++CurPtr;
+
+    auto Length = CurPtr - TriviaStart;
+    switch (Char) {
+    case ' ':
+      Pieces.push_back(TriviaPiece::spaces(Length));
+      break;
+    case '\n':
+    case '\r':
+      // FIXME: Distinguish CR and LF
+      // FIXME: CR+LF shoud form one trivia piece
+      Pieces.push_back(TriviaPiece::newlines(Length));
+      break;
+    case '\t':
+      Pieces.push_back(TriviaPiece::tabs(Length));
+      break;
+    case '\v':
+      Pieces.push_back(TriviaPiece::verticalTabs(Length));
+      break;
+    case '\f':
+      Pieces.push_back(TriviaPiece::formfeeds(Length));
+      break;
+    default:
+      llvm_unreachable("Invalid character for whitespace trivia");
     }
+    goto Restart;
   }
+  case '/':
+    if (IsForTrailingTrivia || isKeepingComments()) {
+      // Don't lex comments as trailing trivias (for now).
+      // Don't try to lex comments here if we are lexing comments as Tokens.
+      break;
+    } else if (*CurPtr == '/') {
+      // '// ...' comment.
+      SeenComment = true;
+      bool isDocComment = CurPtr[1] == '/';
+      skipUpToEndOfLine(); // NOTE: Don't use skipSlashSlashComment() here
+                           // because it consumes trailing newline.
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(isDocComment
+                           ? TriviaPiece::docLineComment({TriviaStart, Length})
+                           : TriviaPiece::lineComment({TriviaStart, Length}));
+      goto Restart;
+    } else if (*CurPtr == '*') {
+      // '/* ... */' comment.
+      SeenComment = true;
+      bool isDocComment = CurPtr[1] == '*';
+      skipSlashStarComment();
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(isDocComment
+                           ? TriviaPiece::docBlockComment({TriviaStart, Length})
+                           : TriviaPiece::blockComment({TriviaStart, Length}));
+      goto Restart;
+    }
+    break;
+  case '#':
+    if (TriviaStart == BufferStart && *CurPtr == '!') {
+      // Hashbang '#!/path/to/swift'.
+      if (BufferID != SourceMgr.getHashbangBufferID())
+        diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
+      skipUpToEndOfLine(); // NOTE: Don't use skipHashbang() here because it
+                           // consumes trailing newline.
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      goto Restart;
+    }
+    break;
+  default:
+    break;
+  }
+  // Reset the cursor.
+  --CurPtr;
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
@@ -2608,7 +2555,7 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc, {}, {}));
+  L.restoreState(State(Loc));
   L.skipToEndOfLine();
   return getSourceLoc(L.CurPtr);
 }

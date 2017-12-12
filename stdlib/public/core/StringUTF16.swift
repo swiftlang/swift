@@ -105,7 +105,6 @@ extension String {
     CustomDebugStringConvertible {
 
     public typealias Index = String.Index
-    public typealias IndexDistance = Int
 
     /// The position of the first code unit if the `String` is
     /// nonempty; identical to `endIndex` otherwise.
@@ -164,7 +163,7 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @_inlineable // FIXME(sil-serialize-all)
-    public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    public func index(_ i: Index, offsetBy n: Int) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       return Index(encodedOffset: i.encodedOffset.advanced(by: n))
     }
@@ -172,7 +171,7 @@ extension String {
     // TODO: swift-3-indexing-model - add docs
     @_inlineable // FIXME(sil-serialize-all)
     public func index(
-      _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+      _ i: Index, offsetBy n: Int, limitedBy limit: Index
     ) -> Index? {
       // FIXME: swift-3-indexing-model: range check i?
       let d = i.encodedOffset.distance(to: limit.encodedOffset)
@@ -184,7 +183,7 @@ extension String {
 
     // TODO: swift-3-indexing-model - add docs
     @_inlineable // FIXME(sil-serialize-all)
-    public func distance(from start: Index, to end: Index) -> IndexDistance {
+    public func distance(from start: Index, to end: Index) -> Int {
       // FIXME: swift-3-indexing-model: range check start and end?
       return start.encodedOffset.distance(to: end.encodedOffset)
     }
@@ -448,7 +447,6 @@ extension String.UTF16View : CustomPlaygroundQuickLookable {
 
 extension String.UTF16View.Indices : BidirectionalCollection {
   public typealias Index = String.UTF16View.Index
-  public typealias IndexDistance = String.UTF16View.IndexDistance
   public typealias Indices = String.UTF16View.Indices
   public typealias SubSequence = String.UTF16View.Indices
 
@@ -519,14 +517,14 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     // FIXME: swift-3-indexing-model: range check i?
     return _elements.index(i, offsetBy: n)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: range check i?
     return _elements.index(i, offsetBy: n, limitedBy: limit)
@@ -534,7 +532,7 @@ extension String.UTF16View.Indices : BidirectionalCollection {
 
   // TODO: swift-3-indexing-model - add docs
   @_inlineable // FIXME(sil-serialize-all)
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  public func distance(from start: Index, to end: Index) -> Int {
     // FIXME: swift-3-indexing-model: range check start and end?
     return _elements.distance(from: start, to: end)
   }
@@ -554,14 +552,14 @@ extension String.UTF16View {
     swift, obsoleted: 4.0,
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
   public func index(
-    _ i: Index?, offsetBy n: IndexDistance) -> Index {
+    _ i: Index?, offsetBy n: Int) -> Index {
     return index(i!, offsetBy: n)
   }
   @_inlineable // FIXME(sil-serialize-all)
   @available(
     swift, obsoleted: 4.0,
     message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(from i: Index?, to j: Index?) -> IndexDistance {
+  public func distance(from i: Index?, to j: Index?) -> Int {
     return distance(from: i!, to: j!)
   }
   @_inlineable // FIXME(sil-serialize-all)

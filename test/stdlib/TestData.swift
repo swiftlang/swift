@@ -1,3 +1,4 @@
+
 // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
@@ -3721,6 +3722,25 @@ class TestData : TestDataSuper {
         }
         expectEqual(data[data.startIndex.advanced(by: 1)], 0xFF)
     }
+
+    func test_byte_access_of_discontiguousData() {
+        var d = DispatchData.empty
+        let bytes: [UInt8] = [0, 1, 2, 3, 4, 5]
+        for _ in 0..<3 {
+            bytes.withUnsafeBufferPointer {
+                d.append($0)
+            }
+        }
+        let ref = d as AnyObject
+        let data = ref as! Data
+
+        let cnt = data.count - 4
+        let t = data.dropFirst(4).withUnsafeBytes { (bytes: UnsafePointer<UInt8>) in
+            return Data(bytes: bytes, count: cnt)
+        }
+
+        expectEqual(Data(bytes: [4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]), t)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -4037,6 +4057,7 @@ DataTests.test("test_validateMutation_slice_immutableBacking_withUnsafeMutableBy
 DataTests.test("test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_mutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 DataTests.test("test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
+DataTests.test("test_byte_access_of_discontiguousData") { TestData().test_byte_access_of_discontiguousData() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

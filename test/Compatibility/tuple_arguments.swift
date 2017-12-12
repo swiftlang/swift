@@ -1493,3 +1493,17 @@ do {
   func bar() -> ((()) -> Void)? { return nil }
   foo(bar()) // OK in Swift 3 mode
 }
+
+// https://bugs.swift.org/browse/SR-6509
+public extension Optional {
+  public func apply<Result>(_ transform: ((Wrapped) -> Result)?) -> Result? {
+    return self.flatMap { value in
+      transform.map { $0(value) }
+    }
+  }
+
+  public func apply<Value, Result>(_ value: Value?) -> Result?
+    where Wrapped == (Value) -> Result {
+    return value.apply(self)
+  }
+} 

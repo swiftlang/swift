@@ -1354,6 +1354,11 @@ void Remangler::mangleNativePinningMutableAddressor(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "aP");
 }
 
+void Remangler::mangleClassMetadataBaseOffset(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mo";
+}
+
 void Remangler::mangleNominalTypeDescriptor(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mn";

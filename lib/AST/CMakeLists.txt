@@ -44,6 +44,7 @@ add_swift_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
+  RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
@@ -57,8 +58,6 @@ add_swift_library(swiftAST STATIC
   TypeRepr.cpp
   TypeWalker.cpp
   USRGeneration.cpp
-  DEPENDS
-    swift-syntax-generated-headers
 
   LINK_LIBRARIES
     swiftMarkup

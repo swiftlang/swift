@@ -39,8 +39,7 @@ extension DefaultIndices: Collection {
   public typealias Element = Elements.Index
   public typealias Indices = DefaultIndices<Elements>
   public typealias SubSequence = DefaultIndices<Elements>
-	public typealias IndexDistance = Elements.IndexDistance
-	public typealias Iterator = IndexingIterator<DefaultIndices<Elements>>
+  public typealias Iterator = IndexingIterator<DefaultIndices<Elements>>
 
   @_inlineable
   public var startIndex: Index {
@@ -130,5 +129,7 @@ extension Collection where Indices == DefaultIndices<Self> {
   }
 }
 
-public typealias DefaultBidirectionalIndices<T: BidirectionalCollection> = DefaultIndices<T>
-public typealias DefaultRandomAccessIndices<T: RandomAccessCollection> = DefaultIndices<T>
+@available(*, deprecated, renamed: "DefaultIndices")
+public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : BidirectionalCollection
+@available(*, deprecated, renamed: "DefaultIndices")
+public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection

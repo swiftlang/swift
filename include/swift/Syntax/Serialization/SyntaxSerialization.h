@@ -74,7 +74,8 @@ struct ObjectTraits<syntax::TriviaPiece> {
       case syntax::TriviaKind::LineComment:
       case syntax::TriviaKind::BlockComment:
       case syntax::TriviaKind::DocLineComment:
-      case syntax::TriviaKind::DocBlockComment: {
+      case syntax::TriviaKind::DocBlockComment:
+      case syntax::TriviaKind::GarbageText: {
         auto text = value.Text.str();
         out.mapRequired("value", text);
         break;
@@ -97,6 +98,7 @@ struct ScalarEnumerationTraits<syntax::TriviaKind> {
     out.enumCase(value, "DocLineComment", syntax::TriviaKind::DocLineComment);
     out.enumCase(value, "DocBlockComment", syntax::TriviaKind::DocBlockComment);
     out.enumCase(value, "Backtick", syntax::TriviaKind::Backtick);
+    out.enumCase(value, "GarbageText", syntax::TriviaKind::GarbageText);
   }
 };
 

@@ -252,6 +252,17 @@ class TestStorePathAction(TestCase):
         self.assertEqual(action.nargs, Nargs.SINGLE)
         self.assertIsInstance(action.type, PathType)
 
+    def test_exists(self):
+        action = actions.StorePathAction(['--foo'], dests=['foo'], exists=True)
+
+        self.assertTrue(action.type._assert_exists)
+
+    def test_executable(self):
+        action = actions.StorePathAction(['--foo'], dests=['foo'],
+                                         executable=True)
+
+        self.assertTrue(action.type._assert_executable)
+
 
 class TestToggleTrueAction(TestCase):
 

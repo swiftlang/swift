@@ -55,6 +55,7 @@ Globals
   global ::= type 'ML'                   // type metadata lazy cache variable
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= nominal-type 'Mo'           // class metadata immediate member base offset
   global ::= protocol 'Mp'               // protocol descriptor
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor
   global ::= type 'MB'                   // metadata for remote mirrors: builtin type descriptor
@@ -189,12 +190,10 @@ Entities
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
 
   entity-spec ::= decl-name function-signature generic-signature? 'F'    // function
-  entity-spec ::= storage-spec
+  entity-spec ::= type file-discriminator? 'i' ACCESSOR                  // subscript
+  entity-spec ::= decl-name type 'v' ACCESSOR                            // variable
   entity-spec ::= decl-name type 'fp'                // generic type parameter
   entity-spec ::= decl-name type 'fo'                // enum element (currently not used)
-
-  storage-spec ::= type file-discriminator? 'i' ACCESSOR
-  storage-spec ::= decl-name type 'v' ACCESSOR
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter

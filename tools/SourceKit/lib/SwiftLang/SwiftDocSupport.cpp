@@ -391,8 +391,10 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
       if (SynthesizedTarget)
-        SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(VD,
-          (NominalTypeDecl*)SynthesizedTarget, OS);
+        SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
+            VD, const_cast<NominalTypeDecl *>(
+                    static_cast<const NominalTypeDecl *>(SynthesizedTarget)),
+            OS);
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     }
@@ -769,13 +771,14 @@ private:
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
   Invocation.setModuleName("main");
   Invocation.setInputKind(InputFileKind::IFK_Swift);
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
-  Invocation.addInputBuffer(Buf.get());
+  Invocation.getFrontendOptions().Inputs.addInput(
+      InputFile(Buf.get()->getBufferIdentifier(), false, Buf.get()));
   if (CI.setup(Invocation))
     return true;
   CI.performParseOnly();
@@ -1089,8 +1092,8 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
 
   EditorDiagConsumer DiagConsumer;
   CI.addDiagnosticConsumer(&DiagConsumer);
-
-  Invocation.addInputBuffer(InputBuf);
+  Invocation.getFrontendOptions().Inputs.addInput(
+      InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
   if (CI.setup(Invocation))
     return true;
   DiagConsumer.setInputBufferIDs(CI.getInputBufferIDs());
@@ -1362,7 +1365,8 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     return nullptr;
   }
   Invocation.setInputKind(InputFileKind::IFK_Swift);
-  Invocation.addInputBuffer(InputBuf);
+  Invocation.getFrontendOptions().Inputs.addInput(
+      InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
 
   if (ParseCI.setup(Invocation)) {
     Error = "Compiler invocation set up failed";
@@ -1437,7 +1441,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
                                     StringRef Error)> Receiver) {
   CompilerInvocation Invocation;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
-  Invocation.clearInputs();
+  Invocation.getFrontendOptions().Inputs.clearInputs();
 
   CompilerInstance CI;
   // Display diagnostics to stderr.

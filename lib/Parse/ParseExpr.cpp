@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Syntax/SyntaxBuilders.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/SyntaxParsingContext.h"
@@ -1563,6 +1564,11 @@ Parser::parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic) {
   case tok::kw_Any: { // Any
     auto SynResult = parseAnyType();
     auto expr = new (Context) TypeExpr(TypeLoc(SynResult.getAST()));
+    if (SynResult.hasSyntax()) {
+      TypeExprSyntaxBuilder Builder;
+      Builder.useType(SynResult.getSyntax());
+      SyntaxContext->addSyntax(Builder.build());
+    }
     Result = makeParserResult(expr);
     break;
   }
@@ -1920,13 +1926,13 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       TmpContext.setDiscard();
 
       // Create a temporary lexer that lexes from the body of the string.
-      Lexer::State BeginState =
+      LexerState BeginState =
           L->getStateForBeginningOfTokenLoc(Segment.Loc);
       // We need to set the EOF at r_paren, to prevent the Lexer from eagerly
       // trying to lex the token beyond it. Parser::parseList() does a special
       // check for a tok::EOF that is spelled with a ')'.
       // FIXME: This seems like a hack, there must be a better way..
-      Lexer::State EndState = BeginState.advance(Segment.Length-1);
+      LexerState EndState = BeginState.advance(Segment.Length-1);
       Lexer LocalLex(*L, BeginState, EndState);
 
       // Temporarily swap out the parser's current lexer with our new one.
@@ -2229,8 +2235,8 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
       SourceLoc TypeStartLoc = PlaceholderTok.getLoc().getAdvancedLoc(Offset);
       SourceLoc TypeEndLoc = TypeStartLoc.getAdvancedLoc(TyStr.size());
 
-      Lexer::State StartState = L->getStateForBeginningOfTokenLoc(TypeStartLoc);
-      Lexer::State EndState = L->getStateForBeginningOfTokenLoc(TypeEndLoc);
+      LexerState StartState = L->getStateForBeginningOfTokenLoc(TypeStartLoc);
+      LexerState EndState = L->getStateForBeginningOfTokenLoc(TypeEndLoc);
 
       // Create a lexer for the type sub-string.
       Lexer LocalLex(*L, StartState, EndState);

@@ -14,7 +14,6 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    sliceTypeName
 )
 }%
 
@@ -157,7 +156,6 @@ extension LazySequenceProtocol where Element : Sequence {
 %   if traversal == 'Bidirectional':
 %     constraints = '%(Base)sIterator.Element : BidirectionalCollection'
 %   Index = Collection + 'Index'
-%   Slice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=False)
 /// A position in a `${Collection}`.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct ${Index}<BaseElements>
@@ -262,8 +260,6 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = ${Index}<Base>
-
-  public typealias IndexDistance = Base.IndexDistance
 
   /// Creates a flattened view of `base`.
   @_inlineable // FIXME(sil-serialize-all)

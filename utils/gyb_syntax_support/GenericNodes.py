@@ -35,6 +35,8 @@ GENERIC_NODES = [
     #                    | type-name : protocol-composition-type
     Node('GenericParameter', kind='Syntax',
          children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
              Child('Name', kind='IdentifierToken'),
              Child('Colon', kind='ColonToken',
                    is_optional=True),

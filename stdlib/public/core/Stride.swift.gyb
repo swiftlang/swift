@@ -163,7 +163,7 @@ extension Strideable where Self : FloatingPoint, Self == Stride {
 
 /// An iterator for `StrideTo<Element>`.
 @_fixed_layout
-public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
+public struct StrideToIterator<Element : Strideable> {
   @_versioned
   internal let _start: Element
 
@@ -184,12 +184,13 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
     _stride = stride
     _current = (0, _start)
   }
+}
 
+extension StrideToIterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
-
   @_inlineable
   public mutating func next() -> Element? {
     let result = _current.value
@@ -202,16 +203,49 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a half-open interval.
+// FIXME: should really be a Collection, as it is multipass
 @_fixed_layout
-public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
-  // FIXME: should really be a Collection, as it is multipass
+public struct StrideTo<Element : Strideable> {
+  @_versioned
+  internal let _start: Element
 
+  @_versioned
+  internal let _end: Element
+
+  @_versioned
+  internal let _stride: Element.Stride
+
+  @_inlineable
+  @_versioned
+  internal init(_start: Element, end: Element, stride: Element.Stride) {
+    _precondition(stride != 0, "Stride size must not be zero")
+    // At start, striding away from end is allowed; it just makes for an
+    // already-empty Sequence.
+    self._start = _start
+    self._end = end
+    self._stride = stride
+  }
+}
+
+extension StrideTo: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @_inlineable
   public func makeIterator() -> StrideToIterator<Element> {
     return StrideToIterator(_start: _start, end: _end, stride: _stride)
+  }
+
+  // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
+  // here until a proper Collection conformance is possible
+  @_inlineable
+  public var underestimatedCount: Int {
+    var it = self.makeIterator()
+    var count = 0
+    while it.next() != nil {
+      count += 1
+    }
+    return count
   }
 
   @_inlineable
@@ -230,42 +264,12 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
     }
     return nil
   }
+}
 
-  @_inlineable
-  @_versioned
-  internal init(_start: Element, end: Element, stride: Element.Stride) {
-    _precondition(stride != 0, "Stride size must not be zero")
-    // At start, striding away from end is allowed; it just makes for an
-    // already-empty Sequence.
-    self._start = _start
-    self._end = end
-    self._stride = stride
-  }
-
-  @_versioned
-  internal let _start: Element
-
-  @_versioned
-  internal let _end: Element
-
-  @_versioned
-  internal let _stride: Element.Stride
-
+extension StrideTo: CustomReflectable {
   @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, children: ["from": _start, "to": _end, "by": _stride])
-  }
-
-  // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
-  // here until a proper Collection conformance is possible
-  @_inlineable
-  public var underestimatedCount: Int {
-    var it = self.makeIterator()
-    var count = 0
-    while it.next() != nil {
-      count += 1
-    }
-    return count
   }
 }
 
@@ -326,7 +330,7 @@ public func stride<T>(
 
 /// An iterator for `StrideThrough<Element>`.
 @_fixed_layout
-public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
+public struct StrideThroughIterator<Element : Strideable> {
   @_versioned
   internal let _start: Element
 
@@ -350,7 +354,9 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
     _stride = stride
     _current = (0, _start)
   }
+}
 
+extension StrideThroughIterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -374,18 +380,45 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a closed interval.
+// FIXME: should really be a CollectionType, as it is multipass
 @_fixed_layout
-public struct StrideThrough<
-  Element : Strideable
-> : Sequence, CustomReflectable {
-  // FIXME: should really be a CollectionType, as it is multipass
+public struct StrideThrough<Element: Strideable> {
+  @_versioned
+  internal let _start: Element
+  @_versioned
+  internal let _end: Element
+  @_versioned
+  internal let _stride: Element.Stride
+  
+  @_inlineable
+  @_versioned
+  internal init(_start: Element, end: Element, stride: Element.Stride) {
+    _precondition(stride != 0, "Stride size must not be zero")
+    self._start = _start
+    self._end = end
+    self._stride = stride
+  }
+}
 
+extension StrideThrough: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
   @_inlineable
   public func makeIterator() -> StrideThroughIterator<Element> {
     return StrideThroughIterator(_start: _start, end: _end, stride: _stride)
+  }
+
+  // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
+  // here until a proper Collection conformance is possible
+  @_inlineable
+  public var underestimatedCount: Int {
+    var it = self.makeIterator()
+    var count = 0
+    while it.next() != nil {
+      count += 1
+    }
+    return count
   }
 
   @_inlineable
@@ -404,39 +437,13 @@ public struct StrideThrough<
     }
     return nil
   }
+}
 
-  @_inlineable
-  @_versioned
-  internal init(_start: Element, end: Element, stride: Element.Stride) {
-    _precondition(stride != 0, "Stride size must not be zero")
-    self._start = _start
-    self._end = end
-    self._stride = stride
-  }
-
-  @_versioned
-  internal let _start: Element
-  @_versioned
-  internal let _end: Element
-  @_versioned
-  internal let _stride: Element.Stride
-
+extension StrideThrough: CustomReflectable {
   @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self,
       children: ["from": _start, "through": _end, "by": _stride])
-  }
-
-  // FIXME(conditional-conformances): this is O(N) instead of O(1), leaving it
-  // here until a proper Collection conformance is possible
-  @_inlineable
-  public var underestimatedCount: Int {
-    var it = self.makeIterator()
-    var count = 0
-    while it.next() != nil {
-      count += 1
-    }
-    return count
   }
 }
 
@@ -445,7 +452,6 @@ public struct StrideThrough<
 extension StrideThrough : RandomAccessCollection
 where Element.Stride : BinaryInteger {
   public typealias Index = ClosedRangeIndex<Int>
-  public typealias IndexDistance = Int
   public typealias SubSequence = Slice<StrideThrough<Element>>
 
   @_inlineable

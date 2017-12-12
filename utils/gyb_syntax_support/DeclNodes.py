@@ -68,11 +68,6 @@ DECL_NODES = [
              Child('PoundEndif', kind='PoundEndifToken'),
          ]),
 
-    # struct-members -> struct-member struct-members?
-    # struct-member -> declaration | compiler-control-statement
-    Node('StructMembers', kind='SyntaxCollection',
-         element='Decl'),
-
     Node('DeclModifier', kind='Syntax',
          children=[
              Child('Name', kind='Token',
@@ -83,22 +78,23 @@ DECL_NODES = [
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating',
                    ]),
-             Child('LeftParen', kind='LeftParenToken',
-                   is_optional=True),
-             Child('Argument', kind='IdentifierToken',
-                   is_optional=True,
-                   text_choices=[
-                       'unowned', 'safe', 'unsafe', 'set',
-                   ]),
-             Child('RightParen', kind='RightParenToken',
-                   is_optional=True),
+             Child('Detail', kind='TokenList'),
          ]),
+
+    Node('InheritedType', kind='Syntax',
+         children=[
+            Child('TypeName', kind='Type'),
+            Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    Node('InheritedTypeList', kind='SyntaxCollection',
+         element='InheritedType'),
 
     # type-inheritance-clause -> ':' type
     Node('TypeInheritanceClause', kind='Syntax',
          children=[
              Child('Colon', kind='ColonToken'),
-             Child('InheritedType', kind='Type'),
+             Child('InheritedTypeCollection', kind='InheritedTypeList'),
          ]),
 
     # struct-declaration -> attributes? access-level-modifier?
@@ -112,7 +108,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='AccessLevelModifier',
+             Child('AccessLevelModifier', kind='DeclModifier',
                    is_optional=True),
              Child('StructKeyword', kind='StructToken'),
              Child('Identifier', kind='IdentifierToken'),
@@ -122,11 +118,31 @@ DECL_NODES = [
                    is_optional=True),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
+    Node('ProtocolDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ProtocolKeyword', kind='ProtocolToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
+    Node('MemberDeclBlock', kind='Syntax',
+         children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('Members', kind='StructMembers'),
+             Child('Members', kind='DeclList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
-    
+
     # decl-list = decl decl-list?
     Node('DeclList', kind='SyntaxCollection',
          element='Decl'),
@@ -149,11 +165,23 @@ DECL_NODES = [
     #   type '...'? '='? expression? ','?
     Node('FunctionParameter', kind='Syntax',
          children=[
-             Child('ExternalName', kind='IdentifierToken',
+             Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('LocalName', kind='IdentifierToken'),
+             Child('FirstName', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ]),
+             # One of these two names needs be optional, we choose the second
+             # name to avoid backtracking.
+             Child('SecondName', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken',
+                   ],
+                   is_optional=True),
              Child('Colon', kind='ColonToken'),
-             Child('TypeAnnotation', kind='TypeAnnotation'),
+             Child('TypeAnnotation', kind='Type'),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
              Child('DefaultEquals', kind='EqualToken',
@@ -194,13 +222,22 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList',
                    is_optional=True),
              Child('FuncKeyword', kind='FuncToken'),
-             Child('Identifier', kind='IdentifierToken'),
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'IdentifierToken',
+                       'OperatorToken',
+                       'UnspacedBinaryOperatorToken',
+                       'SpacedBinaryOperatorToken',
+                       'PrefixOperatorToken',
+                       'PostfixOperatorToken',
+                   ]),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
              Child('Signature', kind='FunctionSignature'),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
-             Child('Body', kind='CodeBlock'),
+             # the body is not necessary inside a protocol definition
+             Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
     # else-if-directive-clause-list -> else-if-directive-clause

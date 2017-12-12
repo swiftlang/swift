@@ -202,6 +202,11 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
     if (auto proto =
           concrete->getDeclContext()
             ->getAsProtocolOrProtocolExtensionContext()) {
+      // Fast path: if there are no type parameters in the concrete type, just
+      // return it.
+      if (!concrete->getInterfaceType()->hasTypeParameter())
+        return concrete->getInterfaceType();
+
       tc.validateDecl(proto);
       auto subMap = SubstitutionMap::getProtocolSubstitutions(
                       proto, baseTy, ProtocolConformanceRef(proto));

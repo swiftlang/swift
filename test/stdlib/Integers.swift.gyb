@@ -524,7 +524,7 @@ tests.test("words") {
   expectEqualSequence([(1 as UInt) << 63], Int64.min.words)
   expectEqualSequence([UInt.max], (-1 as Int64).words)
 % else:
-  expectEqualSequence([UInt.max, UInt.max], Int64.max.words)
+  expectEqualSequence([UInt.max, UInt.max], UInt64.max.words)
   expectEqualSequence([0 as UInt, 0], UInt64.min.words)
   expectEqualSequence([UInt.max, UInt.max >> 1], Int64.max.words)
   expectEqualSequence([0 as UInt, 1 << 31], Int64.min.words)

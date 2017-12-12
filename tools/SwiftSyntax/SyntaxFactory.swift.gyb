@@ -139,7 +139,7 @@ public enum SyntaxFactory {
 
   public static func makeGenericParameter(name: TokenSyntax,
       trailingComma: TokenSyntax) -> GenericParameterSyntax {
-    return makeGenericParameter(name: name, colon: nil,
+    return makeGenericParameter(attributes: nil, name: name, colon: nil,
                                 inheritedType: nil,
                                 trailingComma: trailingComma)
   }

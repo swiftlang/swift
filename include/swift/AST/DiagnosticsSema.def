@@ -1686,10 +1686,11 @@ ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
       (TypeLoc))
-ERROR(requires_no_same_type_archetype,none,
-      "neither type in same-type refers to a generic parameter or "
-      "associated type",
-      ())
+WARNING(requires_no_same_type_archetype,none,
+        "neither type in same-type constraint (%0 or %1) refers to a "
+        "generic parameter  or associated type",
+        (Type, Type))
+
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
       (Type, Type))
@@ -1876,6 +1877,8 @@ ERROR(override_property_type_mismatch,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))
 ERROR(override_with_stored_property,none,
+      "cannot override with a stored property %0", (Identifier))
+WARNING(override_with_stored_property_warn,none,
       "cannot override with a stored property %0", (Identifier))
 ERROR(observing_readonly_property,none,
       "cannot observe read-only property %0; it can't change", (Identifier))
@@ -3117,11 +3120,11 @@ WARNING(implicitly_unwrapped_optional_spelling_deprecated,none,
 WARNING(implicitly_unwrapped_optional_spelling_deprecated_with_fixit,none,
         "the spelling 'ImplicitlyUnwrappedOptional' is deprecated; use '!' after the type name", ())
 
-WARNING(implicitly_unwrapped_optional_spelling_decay_to_optional,none,
-        "'ImplicitlyUnwrappedOptional' is not allowed here; interpreting this as 'Optional' instead", ())
+WARNING(implicitly_unwrapped_optional_spelling_suggest_optional,none,
+        "using 'ImplicitlyUnwrappedOptional' in this location is deprecated and will be removed in a future release; consider changing this to 'Optional' instead", ())
 
-WARNING(implicitly_unwrapped_optional_in_illegal_position_decay_to_optional,none,
-        "'!' is not allowed here; interpreting this as '?' instead", ())
+WARNING(implicitly_unwrapped_optional_in_illegal_position_suggest_optional,none,
+        "using '!' in this location is deprecated and will be removed in a future release; consider changing this to '?' instead", ())
 
 ERROR(implicitly_unwrapped_optional_spelling_error,none,
         "the spelling 'ImplicitlyUnwrappedOptional' is unsupported; use an explicit type followed by '!'", ())
