@@ -2470,10 +2470,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_precedencegroup:
       DeclResult = parseDeclPrecedenceGroup(Flags, Attributes);
       break;
-    case tok::kw_protocol:
+    case tok::kw_protocol: {
+      DeclParsingContext.setCreateSyntax(SyntaxKind::ProtocolDecl);
       DeclResult = parseDeclProtocol(Flags, Attributes);
       break;
-
+    }
     case tok::kw_func:
       // Collect all modifiers into a modifier list.
       DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
@@ -5564,6 +5565,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the body.
   {
+    SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
     if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {

@@ -113,3 +113,10 @@ func rootView() -> Label {}
 static func ==() -> bool {}
 static func !=<a, b, c>() -> bool {}
 }
+
+@objc
+private protocol foo : bar where A==B {}
+protocol foo { func foo() }
+private protocol foo{}
+@objc
+public protocol foo where A:B {}
