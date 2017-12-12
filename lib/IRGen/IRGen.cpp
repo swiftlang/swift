@@ -722,7 +722,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
-                  ModuleName, Opts.singleOutput());
+                  ModuleName, Opts.getSingleOutputFilename());
 
   initLLVMModule(IGM);
 
