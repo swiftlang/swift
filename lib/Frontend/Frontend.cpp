@@ -61,14 +61,16 @@ void CompilerInstance::createSILModule() {
       Invocation.getFrontendOptions().Inputs.isWholeModule());
 }
 
-void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
-  assert(SF);
+void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
+  PrimaryBufferIDs.insert(BufID);
+}
+
+void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
   assert(MainModule && "main module not created yet");
-  assert(!PrimarySourceFile && "already has a primary source file");
-  assert(PrimaryBufferID == NO_SUCH_BUFFER || !SF->getBufferID().hasValue() ||
-         SF->getBufferID().getValue() == PrimaryBufferID);
-  PrimarySourceFile = SF;
-  PrimarySourceFile->setReferencedNameTracker(NameTracker);
+  PrimarySourceFiles.insert(SF);
+  SF->setReferencedNameTracker(NameTracker);
+  if (SF->getBufferID().hasValue())
+    recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
 
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -186,9 +188,9 @@ bool CompilerInstance::setUpInputs() {
 
   // Set the primary file to the code-completion point if one exists.
   if (codeCompletionBufferID.hasValue() &&
-      *codeCompletionBufferID != PrimaryBufferID) {
-    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
-    PrimaryBufferID = *codeCompletionBufferID;
+      !isPrimaryInput(*codeCompletionBufferID)) {
+    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
+    recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
 
   if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
@@ -214,8 +216,8 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
   }
 
   if (input.isPrimary()) {
-    assert(PrimaryBufferID == NO_SUCH_BUFFER && "re-setting PrimaryBufferID");
-    PrimaryBufferID = *bufferID;
+    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
+    recordPrimaryInputBuffer(*bufferID);
   }
   return false;
 }
@@ -587,7 +589,7 @@ void CompilerInstance::parseLibraryFile(
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
   auto *DelayedCB = SecondaryDelayedCB;
-  if (BufferID == PrimaryBufferID) {
+  if (isPrimaryInput(BufferID)) {
     DelayedCB = PrimaryDelayedCB;
   }
   if (isWholeModuleCompilation())
@@ -595,7 +597,7 @@ void CompilerInstance::parseLibraryFile(
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  auto IsPrimary = isWholeModuleCompilation() || BufferID == PrimaryBufferID;
+  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -661,7 +663,7 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   SharedTimer timer(
       "performSema-checkTypesWhileParsingMain-parseAndTypeCheckMainFile");
   bool mainIsPrimary =
-      (isWholeModuleCompilation() || MainBufferID == PrimaryBufferID);
+      (isWholeModuleCompilation() || isPrimaryInput(MainBufferID));
 
   SourceFile &MainFile =
       MainModule->getMainSourceFile(Invocation.getSourceFileKind());
@@ -724,7 +726,9 @@ void CompilerInstance::forEachFileToTypeCheck(
   if (isWholeModuleCompilation()) {
     forEachSourceFileIn(MainModule, [&](SourceFile &SF) { fn(SF); });
   } else {
-    fn(*PrimarySourceFile);
+    for (auto *SF : PrimarySourceFiles) {
+      fn(*SF);
+    }
   }
 }
 
@@ -746,8 +750,9 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
       SourceFile(*mainModule, fileKind, bufferID, importKind, keepSyntaxInfo);
   MainModule->addFile(*inputFile);
 
-  if (bufferID && *bufferID == PrimaryBufferID)
-    setPrimarySourceFile(inputFile);
+  if (bufferID && isPrimaryInput(*bufferID)) {
+    recordPrimarySourceFile(inputFile);
+  }
 
   return inputFile;
 }
@@ -813,6 +818,7 @@ void CompilerInstance::freeContextAndSIL() {
   TheSILModule.reset();
   MainModule = nullptr;
   SML = nullptr;
-  PrimarySourceFile = nullptr;
+  PrimaryBufferIDs.clear();
+  PrimarySourceFiles.clear();
 }
 
