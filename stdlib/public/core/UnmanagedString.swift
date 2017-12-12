@@ -15,6 +15,36 @@ import SwiftShims
 internal typealias _UnmanagedASCIIString = _UnmanagedString<UInt8>
 internal typealias _UnmanagedUTF16String = _UnmanagedString<UTF16.CodeUnit>
 
+@_versioned
+@_inlineable
+internal
+func memcpy_zext<
+  Target: FixedWidthInteger & UnsignedInteger,
+  Source: FixedWidthInteger & UnsignedInteger
+>(
+  dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
+) {
+  _sanityCheck(Source.bitWidth < Target.bitWidth)
+  for i in 0..<count {
+    dst[i] = Target(src[i])
+  }
+}
+
+@_versioned
+@_inlineable
+internal
+func memcpy_trunc<
+  Target: FixedWidthInteger & UnsignedInteger,
+  Source: FixedWidthInteger & UnsignedInteger
+>(
+  dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
+) {
+  _sanityCheck(Source.bitWidth > Target.bitWidth)
+  for i in 0..<count {
+    dst[i] = Target(truncatingIfNeeded: src[i])
+  }
+}
+
 @_fixed_layout
 @_versioned
 internal
@@ -182,19 +212,17 @@ extension _UnmanagedString {
         size: UInt(self.count * MemoryLayout<CodeUnit>.stride))
     } else if CodeUnit.bitWidth == 8 {
       _sanityCheck(TargetCodeUnit.bitWidth == 16)
-      var t = target.baseAddress!
-      for byte in self {
-        t.pointee = TargetCodeUnit(truncatingIfNeeded: byte)
-        t += 1
-      }
+      memcpy_zext(
+        dst: target.baseAddress._unsafelyUnwrappedUnchecked,
+        src: start,
+        count: self.count)
     } else {
       _sanityCheck(CodeUnit.bitWidth == 16 && TargetCodeUnit.bitWidth == 8)
-      var t = target.baseAddress!
-      for unit in self {
-        _sanityCheck(unit & ~0x7F == 0) // ASCII only
-        t.pointee = TargetCodeUnit(truncatingIfNeeded: unit)
-        t += 1
-      }
+      _sanityCheck(self.filter { $0 >= UInt8.max }.isEmpty, "ASCII only")
+      memcpy_trunc(
+        dst: target.baseAddress._unsafelyUnwrappedUnchecked,
+        src: start,
+        count: self.count)
     }
   }
 }
