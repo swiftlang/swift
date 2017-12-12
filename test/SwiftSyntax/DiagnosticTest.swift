@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift 2>&1 | %FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // REQUIRES: sdk_overlay
@@ -26,16 +26,32 @@ extension Diagnostic.Message {
     Diagnostic.Message(.note, "check for explicit equality to '0'")
 }
 
-try runSwiftTool(file: URL(fileURLWithPath: #file)) { file, engine in
+var Diagnostics = TestSuite("Diagnostics")
+
+Diagnostics.test("DiagnosticEmission") {
   let startLoc = loc()
   let fixLoc = loc()
 
-  // CHECK: error: cannot convert value of type 'Int' to 'Bool'
-  // CHECK-NEXT: note: check for explicit equality to '0'
+  let engine = DiagnosticEngine()
+
   engine.diagnose(.cannotConvert(fromType: "Int", toType: "Bool"),
                   location: startLoc) {
     $0.note(.checkEqualToZero, location: fixLoc,
             fixIts: [.insert(fixLoc, " != 0")])
   }
-  return 0
+
+  expectEqual(engine.diagnostics.count, 1)
+  guard let diag = engine.diagnostics.first else { return }
+  expectEqual(diag.message.text, 
+              "cannot convert value of type 'Int' to 'Bool'")
+  expectEqual(diag.message.severity, .error)
+  expectEqual(diag.notes.count, 1)
+
+  guard let note = diag.notes.first else { return }
+  expectEqual(note.message.text, "check for explicit equality to '0'")
+  expectEqual(note.message.severity, .note)
+  expectEqual(note.fixIts.count, 1)
+
+  guard let fixIt = note.fixIts.first else { return }
+  expectEqual(fixIt.text, " != 0")
 }

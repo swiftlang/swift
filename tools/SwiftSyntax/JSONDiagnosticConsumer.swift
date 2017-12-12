@@ -44,13 +44,13 @@ public final class JSONDiagnosticConsumer: DiagnosticConsumer {
   }
 
   /// Adds the diagnostic to the list of registered diagnostics.
-  func handle(_ diagnostic: Diagnostic) {
+  public func handle(_ diagnostic: Diagnostic) {
     self.diagnostics.append(diagnostic)
   }
 
   /// Writes the contents of the diagnostics as JSON out to the specified
   /// output location.
-  func finalize() {
+  public func finalize() {
     do {
       let encoder = JSONEncoder()
       encoder.outputFormatting = .prettyPrinted
@@ -74,6 +74,6 @@ public final class JSONDiagnosticConsumer: DiagnosticConsumer {
 }
 
 extension Diagnostic.Message {
-    static let couldNotOutputJSON = 
+    static let couldNotOutputJSON =
         Diagnostic.Message(.error, "failed emitting JSON diagnostics")
 }

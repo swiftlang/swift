@@ -14,7 +14,7 @@
 
 /// An object that intends to receive notifications when diagnostics are
 /// emitted.
-protocol DiagnosticConsumer {
+public protocol DiagnosticConsumer {
   /// Handle the provided diagnostic which has just been registered with the
   /// DiagnosticEngine.
   func handle(_ diagnostic: Diagnostic)

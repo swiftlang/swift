@@ -188,7 +188,8 @@ extension TriviaPiece: TextOutputStreamable {
       let length = text.utf8.count
       return (lines: 0, lastColumn: length, utf8Length: length)
     case .blockComment(let text),
-         .docBlockComment(let text):
+         .docBlockComment(let text),
+         .garbageText(let text):
       var lines = 0
       var col = 0
       var total = 0

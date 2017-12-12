@@ -17,12 +17,23 @@ import Foundation
 
 /// The DiagnosticEngine allows Swift tools to emit diagnostics.
 public class DiagnosticEngine {
+  /// Creates a new DiagnosticEngine with no diagnostics.
+  public init() {
+  }
+
   /// The list of consumers of the diagnostic passing through this engine.
   internal var consumers = [DiagnosticConsumer]()
+
+  public private(set) var diagnostics = [Diagnostic]()
 
   /// Adds the provided consumer to the consumers list.
   func addConsumer(_ consumer: DiagnosticConsumer) {
     consumers.append(consumer)
+
+    // Start the consumer with all previous diagnostics.
+    for diagnostic in diagnostics {
+      consumer.handle(diagnostic)
+    }
   }
 
   /// Registers a diagnostic with the diagnostic engine.
@@ -35,13 +46,14 @@ public class DiagnosticEngine {
                        actions: ((inout Diagnostic.Builder) -> Void)? = nil) {
     let diagnostic = Diagnostic(message: message, location: location, 
                                 actions: actions)
+    diagnostics.append(diagnostic)
     for consumer in consumers {
       consumer.handle(diagnostic)
     }
   }
 
   /// Tells each consumer to finalize their diagnostic output.
-  func finalize() {
+  deinit {
     for consumer in consumers {
       consumer.finalize()
     }
