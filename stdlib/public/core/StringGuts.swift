@@ -1256,6 +1256,9 @@ extension _UnmanagedString {
   //   return String.CharacterView(_StringGuts(self)).index(i, offsetBy: n)
   // }
 
+  @_specialize(where CodeUnit == UInt8)
+  @_specialize(where CodeUnit == UInt16)
+  @_specialize(where CodeUnit == UTF16.CodeUnit)
   @_versioned
   @_inlineable
   internal
