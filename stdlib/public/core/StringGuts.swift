@@ -188,6 +188,7 @@ extension _StringGuts {
   // HACK HACK HACK: Work around for ARC :-(
   //  @inline(never) // Hide CF dependency
   @_versioned
+  @effects(readonly)
   internal static func getCocoaLength(_unsafeBitPattern: UInt) -> Int {
     return _stdlib_binary_CFStringGetLength(
       Builtin.reinterpretCast(_unsafeBitPattern))

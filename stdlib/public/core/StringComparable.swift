@@ -77,6 +77,7 @@ extension _StringGuts {
   // HACK HACK HACK: Work around for ARC :-(
   //
   @inline(never)
+  @effects(readonly)
   public
   static func _compareDeterministicUnicodeCollation(
     _leftUnsafeStringGutsBitPattern leftBits: (UInt, UInt),
@@ -92,7 +93,7 @@ extension _StringGuts {
   }
 
   /// Compares two slices of strings with the Unicode Collation Algorithm.
-  @inline(never) // Hide the CF/ICU dependency
+  @_inlineable
   public  // @testable
   static func _compareDeterministicUnicodeCollation(
     _ left: _StringGuts, to right: _StringGuts) -> Int {
