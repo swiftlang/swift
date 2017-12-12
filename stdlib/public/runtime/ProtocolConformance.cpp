@@ -59,7 +59,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
       
     case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
     case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-      printf("unique nominal type descriptor %s", symbolName(getNominalTypeDescriptor()));
+      printf("unique nominal type descriptor %s", symbolName(getTypeContextDescriptor()));
       break;
   }
   
@@ -384,7 +384,7 @@ recur:
     // For generic and resilient types, nondependent conformances
     // are keyed by the nominal type descriptor rather than the
     // metadata, so try that.
-    const auto *description = type->getNominalTypeDescriptor();
+    const auto *description = type->getTypeContextDescriptor();
 
     // Hash and lookup the type-protocol pair in the cache.
     if (auto *Value = C.findCached(description, protocol)) {
@@ -432,10 +432,10 @@ bool isRelatedType(const Metadata *type, const void *candidate,
 
     // Check whether the nominal type descriptors match.
     if (!candidateIsMetadata) {
-      const auto *description = type->getNominalTypeDescriptor();
+      const auto *description = type->getTypeContextDescriptor();
       auto candidateDescription =
-      static_cast<const NominalTypeDescriptor *>(candidate);
-      if (description && description->isEqual(candidateDescription))
+      static_cast<const TypeContextDescriptor *>(candidate);
+      if (description && equalContexts(description, candidateDescription))
         return true;
     }
 
@@ -550,7 +550,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
                    == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
                  descriptor.getTypeKind()
                   == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
-        auto R = descriptor.getNominalTypeDescriptor();
+        auto R = descriptor.getTypeContextDescriptor();
         auto P = descriptor.getProtocol();
 
         // Look for an exact match.
@@ -567,7 +567,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         case ConformanceFlags::ConformanceKind::WitnessTable:
           // If the record provides a nondependent witness table for all
           // instances of a generic type, cache it for the generic pattern.
-          C.cacheSuccess(type->getNominalTypeDescriptor(), P,
+          C.cacheSuccess(type->getTypeContextDescriptor(), P,
                          descriptor.getStaticWitnessTable());
           break;
 
@@ -601,8 +601,8 @@ swift::swift_conformsToProtocol(const Metadata * const type,
   }
 }
 
-const NominalTypeDescriptor *
-swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
+const TypeContextDescriptor *
+swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
 
   ScopedLock guard(C.SectionsToScanLock);
@@ -613,23 +613,9 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = C.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      auto &descriptor = *record.get();
-
-      switch (descriptor.getTypeKind()) {
-      case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
-      case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
-        if (auto ntd = descriptor.getNominalTypeDescriptor()) {
-          if (ntd->Name.get() == typeName)
-            return ntd;
-        }
-        break;
-
-      case TypeMetadataRecordKind::IndirectObjCClass:
-        // Objective-C classes are found by the Objective-C runtime.
-        break;
-
-      case TypeMetadataRecordKind::Reserved:
-        break;
+      if (auto ntd = record->getTypeContextDescriptor()) {
+        if (_contextDescriptorMatchesMangling(ntd, node))
+          return ntd;
       }
     }
   }

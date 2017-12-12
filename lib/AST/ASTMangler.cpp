@@ -1184,9 +1184,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   appendOperator("I", StringRef(OpArgs.data(), OpArgs.size()));
 }
 
-/// Mangle the context of the given declaration as a <context.
-/// This is the top-level entrypoint for mangling <context>.
-void ASTMangler::appendContextOf(const ValueDecl *decl) {
+Optional<ASTMangler::SpecialContext>
+ASTMangler::getSpecialManglingContext(const ValueDecl *decl) {
   // Declarations provided by a C module have a special context mangling.
   //   known-context ::= 'So'
   //
@@ -1196,8 +1195,8 @@ void ASTMangler::appendContextOf(const ValueDecl *decl) {
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
     if (file->getKind() == FileUnitKind::ClangModule) {
       if (decl->getClangDecl())
-        return appendOperator("So");
-      return appendOperator("SC");
+        return ASTMangler::ObjCContext;
+      return ASTMangler::ClangImporterContext;
     }
   }
 
@@ -1214,8 +1213,24 @@ void ASTMangler::appendContextOf(const ValueDecl *decl) {
         assert(clangDC->getRedeclContext()->isTranslationUnit() &&
                "non-top-level Clang types not supported yet");
         (void)clangDC;
-        return appendOperator("So");
+        return ASTMangler::ObjCContext;
       }
+    }
+  }
+
+  return None;
+}
+
+/// Mangle the context of the given declaration as a <context.
+/// This is the top-level entrypoint for mangling <context>.
+void ASTMangler::appendContextOf(const ValueDecl *decl) {
+  // Check for a special mangling context.
+  if (auto context = getSpecialManglingContext(decl)) {
+    switch (*context) {
+    case ClangImporterContext:
+      return appendOperator("SC");
+    case ObjCContext:
+      return appendOperator("So");
     }
   }
 
@@ -1326,18 +1341,16 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
     auto decl = ExtTy->getAnyNominal();
     assert(decl && "extension of non-nominal type?");
-    // Mangle the module name if:
-    // - the extension is defined in a different module from the actual nominal
-    //   type decl,
+    if (!ExtD->isEquivalentToExtendedContext()) {
+    // Mangle the extension if:
+    // - the extension is defined in a different module from the original
+    //   nominal type decl,
     // - the extension is constrained, or
     // - the extension is to a protocol.
     // FIXME: In a world where protocol extensions are dynamically dispatched,
     // "extension is to a protocol" would no longer be a reason to use the
     // extension mangling, because an extension method implementation could be
     // resiliently moved into the original protocol itself.
-    if (ExtD->getParentModule() != decl->getParentModule()
-        || ExtD->isConstrainedExtension()
-        || ExtD->getDeclaredInterfaceType()->isExistentialType()) {
       auto sig = ExtD->getGenericSignature();
       // If the extension is constrained, mangle the generic signature that
       // constrains it.
@@ -1432,6 +1445,24 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol) {
     appendDeclName(protocol);
 }
 
+const clang::NamedDecl *ASTMangler::getClangDeclForMangling(const ValueDecl *vd) {
+  auto namedDecl =  dyn_cast_or_null<clang::NamedDecl>(vd->getClangDecl());
+  if (!namedDecl)
+    return nullptr;
+  
+  // Use an anonymous enum's enclosing typedef for the mangled name, if
+  // present. This matches C++'s rules for linkage names of tag declarations.
+  if (namedDecl->getDeclName().isEmpty())
+    if (auto *tagDecl = dyn_cast<clang::TagDecl>(namedDecl))
+      if (auto *typedefDecl = tagDecl->getTypedefNameForAnonDecl())
+        namedDecl = typedefDecl;
+
+  if (namedDecl->getDeclName().isEmpty())
+    return nullptr;
+
+  return namedDecl;
+}
+
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Check for certain standard types.
   if (tryAppendStandardSubstitution(decl))
@@ -1456,19 +1487,9 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
 
   // Always use Clang names for imported Clang declarations, unless they don't
   // have one.
-  auto tryAppendClangName = [this](const clang::Decl *clangDecl) -> bool {
-    auto *namedDecl = dyn_cast_or_null<clang::NamedDecl>(clangDecl);
+  auto tryAppendClangName = [this, decl]() -> bool {
+    auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl)
-      return false;
-
-    // Use an anonymous enum's enclosing typedef for the mangled name, if
-    // present. This matches C++'s rules for linkage names of tag declarations.
-    if (namedDecl->getDeclName().isEmpty())
-      if (auto *tagDecl = dyn_cast<clang::TagDecl>(namedDecl))
-        if (auto *typedefDecl = tagDecl->getTypedefNameForAnonDecl())
-          namedDecl = typedefDecl;
-
-    if (namedDecl->getDeclName().isEmpty())
       return false;
 
     appendIdentifier(namedDecl->getName());
@@ -1495,7 +1516,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     return true;
   };
 
-  if (!tryAppendClangName(decl->getClangDecl())) {
+  if (!tryAppendClangName()) {
     appendDeclName(decl);
 
     switch (decl->getKind()) {

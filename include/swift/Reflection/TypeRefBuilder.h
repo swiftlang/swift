@@ -208,7 +208,7 @@ public:
   Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
     return std::move(mangledName);
   }
-
+  
   const NominalTypeRef *createNominalType(
                                     const Optional<std::string> &mangledName) {
     return NominalTypeRef::create(*this, *mangledName, nullptr);

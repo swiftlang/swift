@@ -1285,8 +1285,58 @@ NodePointer Demangler::demangleMetatype() {
       return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
                              Ty->getChild(0));
     }
+    case 'X':
+      return demanglePrivateContextDescriptor();
     default:
       return nullptr;
+  }
+}
+  
+NodePointer Demangler::demanglePrivateContextDescriptor() {
+  switch (nextChar()) {
+  case 'E': {
+    auto Extension = popContext();
+    if (!Extension)
+      return nullptr;
+    return createWithChild(Node::Kind::ExtensionDescriptor, Extension);
+  }
+  case 'M': {
+    auto Module = popModule();
+    if (!Module)
+      return nullptr;
+    return createWithChild(Node::Kind::ModuleDescriptor, Module);
+  }
+  case 'Y': {
+    auto Discriminator = popNode();
+    if (!Discriminator)
+      return nullptr;
+    auto Context = popContext();
+    if (!Context)
+      return nullptr;
+    
+    auto node = createNode(Node::Kind::AnonymousDescriptor);
+    node->addChild(Context, *this);
+    node->addChild(Discriminator, *this);
+    return node;
+  }
+  case 'X': {
+    auto Context = popContext();
+    if (!Context)
+      return nullptr;
+    return createWithChild(Node::Kind::AnonymousDescriptor, Context);
+  }
+  case 'A': {
+    auto path = popAssocTypePath();
+    if (!path)
+      return nullptr;
+    auto base = popNode(Node::Kind::Type);
+    if (!base)
+      return nullptr;
+    return createWithChildren(Node::Kind::AssociatedTypeGenericParamRef,
+                              base, path);
+  }
+  default:
+    return nullptr;
   }
 }
 
@@ -1371,6 +1421,20 @@ NodePointer Demangler::popAssocTypeName() {
   NodePointer AssocTy = changeKind(Id, Node::Kind::DependentAssociatedTypeRef);
   addChild(AssocTy, Proto);
   return AssocTy;
+}
+  
+NodePointer Demangler::popAssocTypePath() {
+  NodePointer AssocTypePath = createNode(Node::Kind::AssocTypePath);
+  bool firstElem = false;
+  do {
+    firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
+    NodePointer AssocTyName = popNode(isDeclName);
+    if (!AssocTyName)
+      return nullptr;
+    AssocTypePath->addChild(AssocTyName, *this);
+  } while (!firstElem);
+  AssocTypePath->reverseChildren();
+  return AssocTypePath;
 }
 
 NodePointer Demangler::getDependentGenericParamType(int depth, int index) {
@@ -1842,16 +1906,7 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'T': {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
-      NodePointer AssocTypePath = createNode(Node::Kind::AssocTypePath);
-      bool firstElem = false;
-      do {
-        firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
-        NodePointer AssocTyName = popNode(isDeclName);
-        if (!AssocTyName)
-          return nullptr;
-        AssocTypePath->addChild(AssocTyName, *this);
-      } while (!firstElem);
-      AssocTypePath->reverseChildren();
+      auto AssocTypePath = popAssocTypePath();
 
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
@@ -1997,6 +2052,18 @@ NodePointer Demangler::demangleSpecialType() {
         boxTy->addChild(genericArgs, *this);
       }
       return createType(boxTy);
+    }
+    case 'Y':
+      return demangleAnyGenericType(Node::Kind::OtherNominalType);
+    case 'Z': {
+      auto types = popTypeList();
+      auto name = popNode(Node::Kind::Identifier);
+      auto parent = popContext();
+      auto anon = createNode(Node::Kind::AnonymousContext);
+      anon->addChild(name, *this);
+      anon->addChild(parent, *this);
+      anon->addChild(types, *this);
+      return anon;
     }
     case 'e':
       return createType(createNode(Node::Kind::ErrorType));

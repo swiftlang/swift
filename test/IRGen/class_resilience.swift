@@ -1,9 +1,10 @@
 // RUN: %empty-directory(%t)
+// RUN: %utils/chex.py < %s > %t/class_resilience.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O %t/class_resilience.swift
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -25,30 +26,20 @@
 // CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvpWvd" = hidden constant [[INT]] {{8|16}}
 // CHECK: @"$S16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|24}}
 
-// CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [36 x i8] c"16class_resilience14ResilientChildC\00"
+// CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [15 x i8] c"ResilientChild\00"
 // CHECK: [[RESILIENTCHILD_FIELDS:@.*]] = private constant [7 x i8] c"field\00\00"
 
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}constant <{{.*}}> <{
+// --       flags: class, unique, has vtable, has resilient superclass
+// CHECK-SAME:   <i32 0xC000_0050>
 // --       name:
-// CHECK-SAME:   [36 x i8]* [[RESILIENTCHILD_NAME]]
+// CHECK-SAME:   [15 x i8]* [[RESILIENTCHILD_NAME]]
 // --       num fields
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset
 // CHECK-SAME:   i32 3,
 // --       field names,
 // CHECK-SAME:   [7 x i8]* [[RESILIENTCHILD_FIELDS]]
-// --       kind 0 (class)
-// CHECK-SAME:   i32 0,
-// --       generic parameter vector offset
-// CHECK-SAME:   i32 0,
-// --       generic parameter count, primary count
-// CHECK-SAME:   i32 0, i32 0,
-// --       nesting depth
-// CHECK-SAME:   i16 1,
-// --       flags -- has vtable, has resilient superclass
-// CHECK-SAME:   i16 12,
-// --       generic parameters at depth 0
-// CHECK-SAME:   i32 0
 // CHECK-SAME: }>
 
 // CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}global [[INT]] 0

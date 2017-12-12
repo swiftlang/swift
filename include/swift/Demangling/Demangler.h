@@ -434,12 +434,14 @@ protected:
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
   NodePointer demangleImplFunctionType();
   NodePointer demangleMetatype();
+  NodePointer demanglePrivateContextDescriptor();
   NodePointer createArchetypeRef(int depth, int i);
   NodePointer demangleArchetype();
   NodePointer demangleAssociatedTypeSimple(NodePointer GenericParamIdx);
   NodePointer demangleAssociatedTypeCompound(NodePointer GenericParamIdx);
 
   NodePointer popAssocTypeName();
+  NodePointer popAssocTypePath();
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();
