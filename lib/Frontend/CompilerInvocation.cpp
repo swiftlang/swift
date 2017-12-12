@@ -951,9 +951,9 @@ void FrontendArgsToOptionsConverter::determineSupplementaryOutputFilenames(
           return;
 
         if (useMainOutput) {
-          auto lastOutputFilename = Opts.InputsAndOutputs.lastOutputFilename();
-          if (!lastOutputFilename.empty()) {
-            output = lastOutputFilename;
+          auto fn = Opts.InputsAndOutputs.singleOutputFilename();
+          if (!fn.empty()) {
+            output = fn;
             return;
           }
         }
@@ -1649,7 +1649,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.InputsAndOutputs.lastOutputFilename();
+    StringRef BaseName = FEOpts.InputsAndOutputs.singleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
@@ -1809,7 +1809,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.OutputsForBatchMode.push_back(input.outputs());
   } else {
     Opts.OutputForSingleThreadedWMO =
-        FrontendOpts.InputsAndOutputs.lastOutputFilename();
+        FrontendOpts.InputsAndOutputs.singleOutputFilename();
   }
 
   Opts.ModuleName = FrontendOpts.ModuleName;

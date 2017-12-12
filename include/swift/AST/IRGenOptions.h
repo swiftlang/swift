@@ -71,7 +71,6 @@ public:
   std::vector<OutputPaths> OutputsForBatchMode;
   std::string OutputForSingleThreadedWMO;
   
-  
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   /// I don't know why it needs the last one, but lldb needs this for now:
@@ -207,7 +206,6 @@ public:
         EnableReflectionNames(true), UseIncrementalLLVMCodeGen(true),
         UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
-
 
   // Get a hash of all options which influence the llvm compilation but are not
   // reflected in the llvm module itself.

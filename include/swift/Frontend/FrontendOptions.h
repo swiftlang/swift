@@ -111,8 +111,10 @@ public:
   }
 
   // FIXME: Why the *last* one?
-  
+  StringRef singleOutputFilename() const;
+  StringRef firstOutputFilename() const;
   StringRef lastOutputFilename() const;
+  StringRef outputFilenameForPrimary() const;
 
   // FIXME: iterator?
   std::vector<std::string> getInputFilenames() const {
@@ -267,7 +269,7 @@ public:
   void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
 
   bool isOutputFilenameStdout() {
-    return InputsAndOutputs.lastOutputFilename() == "-";
+    return InputsAndOutputs.singleOutputFilename() == "-";
   }
 
   /// A list of arbitrary modules to import and make implicitly visible.

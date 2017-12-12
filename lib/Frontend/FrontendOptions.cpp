@@ -108,18 +108,44 @@ bool FrontendInputsAndOutputs::doAllNonPrimariesEndWithSIB() const {
   return true;
 }
 
+StringRef FrontendInputsAndOutputs::firstOutputFilename() const {
+  if (AllFiles.empty())
+    return StringRef();
+  for (auto i : indices(AllFiles)) {
+    if (!AllFiles[i].outputs().OutputFilename.empty()) {
+      assert(i == 0);
+      return AllFiles[i].outputs().OutputFilename;
+    }
+  }
+  return StringRef();
+}
+
 StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
   if (AllFiles.empty()) return StringRef();
   // FIXME use reverse iterator?
   for (auto i = AllFiles.size() - 1; ; --i) {
     if (!AllFiles[i].outputs().OutputFilename.empty()) {
-//      assert(AllFiles[i].outputs().OutputFilename == AllFiles[0].outputs().OutputFilename);
+      // FIXME: try uncommenting and seeing what breaks:
+      //      assert(AllFiles[i].outputs().OutputFilename ==
+      //      AllFiles[0].outputs().OutputFilename);
       return AllFiles[i].outputs().OutputFilename;
     }
     if (i == 0)
       break;
   }
   return StringRef();
+}
+
+StringRef FrontendInputsAndOutputs::singleOutputFilename() const {
+  return lastOutputFilename();
+  // FIXME: Someday, try firstOutputFilename and see what breaks;
+}
+
+/// Do something better when >1 primary
+StringRef FrontendInputsAndOutputs::outputFilenameForPrimary() const {
+  assertMustNotBeMoreThanOnePrimaryInput();
+  assert(hasPrimaries());
+  return pathsForAtMostOnePrimary().OutputFilename;
 }
 
 bool FrontendOptions::needsProperModuleName(ActionType action) {
