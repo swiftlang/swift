@@ -146,6 +146,13 @@ ERROR(error_no_output_filename_specified,none,
   "an output filename was not specified for a mode which requires an output "
   "filename", ())
 
+ERROR(error_output_files_must_correspond_to_primaries,none,
+"the number of output filenames must equal the number of primaries", ())
+
+ERROR(error_output_files_must_correspond_to_inputs,none,
+"the number of output filenames must equal the number of inputs in threaded WMO mode", ())
+
+
 ERROR(error_implicit_output_file_is_directory,none,
   "the implicit output file '%0' is a directory; explicitly specify a filename "
   "using -o", (StringRef))
@@ -156,6 +163,14 @@ ERROR(error_primary_file_not_found,none,
 
 ERROR(error_cannot_have_input_files_with_file_list,none,
 "cannot have input files with file list", ())
+
+ERROR(error_cannot_have_input_files_with_primary_file_list,none,
+"cannot have input files with primary file list", ())
+
+ERROR(error_cannot_have_filelist_and_argument,none, "cannot have supplementary file list and argument", ())
+
+ERROR(error_duplicate_input_file,none,
+"duplicate input file '%0'", (StringRef))
 
 ERROR(repl_must_be_initialized,none,
       "variables currently must have an initial value when entered at the "
