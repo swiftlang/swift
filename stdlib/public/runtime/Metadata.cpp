@@ -1415,7 +1415,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     if (genericParams.Flags.hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
       for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
-        classWords[vtable->VTableOffset + i] = vtable->getMethod(i);
+        classWords[vtable->VTableOffset + i] = description->getMethod(i);
       }
     }
   }

@@ -76,7 +76,7 @@ _applyGenericArguments(const Metadata * const *genericArgs,
 
   // See if we have any generic arguments at this depth.
   unsigned numArgumentsAtDepth =
-      description->GenericParams.getContext(depth - 1).NumPrimaryParams;
+      description->getGenericContext(depth - 1).NumPrimaryParams;
   if (numArgumentsAtDepth == 0) {
     // No arguments here, just return the original node (except we may have
     // replaced its parent type above).
@@ -88,7 +88,7 @@ _applyGenericArguments(const Metadata * const *genericArgs,
   unsigned firstArgumentAtDepth = 0;
   for (unsigned i = 0; i < depth - 1; i++) {
     firstArgumentAtDepth +=
-        description->GenericParams.getContext(i).NumPrimaryParams;
+        description->getGenericContext(i).NumPrimaryParams;
   }
 
   // Demangle them.
