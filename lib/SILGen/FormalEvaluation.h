@@ -26,7 +26,7 @@ class LogicalPathComponent;
 
 class FormalAccess {
 public:
-  enum Kind { Shared, Exclusive, Owned };
+  enum Kind { Shared, Exclusive, Owned, Unenforced };
 
 private:
   unsigned allocatedSize;
