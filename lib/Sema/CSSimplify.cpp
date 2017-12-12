@@ -3180,13 +3180,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
     }
-    
-    // If the result's type contains delayed members, we need to force them now.
-    if (auto NT = dyn_cast<NominalType>(decl->getInterfaceType().getPointer())){
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(NT->getDecl())) {
-        TC.forceExternalDeclMembers(NTD);
-      }
-    }
 
     // Otherwise, we're good, add the candidate to the list.
     result.addViable(candidate);

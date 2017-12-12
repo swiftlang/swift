@@ -1086,10 +1086,6 @@ public:
   /// translation unit has been processed.
   void finalizeDecl(ValueDecl *D);
 
-  /// \brief Force all members of an external decl, and also add its
-  /// conformances.
-  void forceExternalDeclMembers(NominalTypeDecl *NTD);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///
