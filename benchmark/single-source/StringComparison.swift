@@ -71,15 +71,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_ascii(_ N: Int) {
-    var count = 0
     let workload = Workload.ascii
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -87,15 +85,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_latin1(_ N: Int) {
-    var count = 0
     let workload = Workload.latin1
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -103,15 +99,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_fastPrenormal(_ N: Int) {
-    var count = 0
     let workload = Workload.fastPrenormal
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -119,15 +113,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_slowerPrenormal(_ N: Int) {
-    var count = 0
     let workload = Workload.slowerPrenormal
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -135,15 +127,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_nonBMPSlowestPrenormal(_ N: Int) {
-    var count = 0
     let workload = Workload.nonBMPSlowestPrenormal
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -151,15 +141,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_emoji(_ N: Int) {
-    var count = 0
     let workload = Workload.emoji
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -167,15 +155,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_abnormal(_ N: Int) {
-    var count = 0
     let workload = Workload.abnormal
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -183,15 +169,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_zalgo(_ N: Int) {
-    var count = 0
     let workload = Workload.zalgo
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
@@ -199,15 +183,13 @@ public let StringComparison = [
     
   @inline(never)
   public func run_StringComparison_longSharedPrefix(_ N: Int) {
-    var count = 0
     let workload = Workload.longSharedPrefix
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }

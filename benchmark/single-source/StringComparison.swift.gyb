@@ -44,15 +44,13 @@ public let StringComparison = [
 % for Name in Names:
   @inline(never)
   public func run_StringComparison_${Name}(_ N: Int) {
-    var count = 0
     let workload = Workload.${Name}
     let tripCount = workload.tripCount
     let payload = workload.payload
     for _ in 1...tripCount*N {
       for s1 in payload {
         for s2 in payload {
-          let cmp = s1 < s2
-          count += cmp ? 1 : 0
+          blackHole(s1 < s2)
         }
       }
     }
