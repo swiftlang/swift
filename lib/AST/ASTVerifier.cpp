@@ -2314,7 +2314,9 @@ public:
       }
 
       if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        auto varTy = var->getInterfaceType()->getReferenceStorageReferent();
+        auto varTy = var->getInterfaceType()
+                         ->getReferenceStorageReferent()
+                         ->getWithoutSpecifierType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2907,7 +2909,7 @@ public:
           abort();
         }
 
-        auto resultTy = FD->getResultInterfaceType();
+        auto resultTy = FD->getResultInterfaceType()->getWithoutSpecifierType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
