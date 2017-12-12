@@ -3244,8 +3244,12 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    const ASTContext *context,
                                    RecursiveTypeProperties properties)
   : TypeBase(theKind, context, properties),
-    TheDecl(theDecl), Parent(parent), GenericArgs(genericArgs)
+    TheDecl(theDecl), Parent(parent)
 {
+  BoundGenericTypeBits.GenericArgCount = genericArgs.size();
+  // Subtypes are required to provide storage for the generic arguments
+  std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
+                          getTrailingObjectsPointer());
 }
 
 BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
@@ -3287,15 +3291,22 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 
   BoundGenericType *newType;
   if (auto theClass = dyn_cast<ClassDecl>(TheDecl)) {
-    newType = new (C, arena) BoundGenericClassType(
+    auto mem = C.Allocate(sizeof(BoundGenericClassType) + sizeof(Type) *
+                          GenericArgs.size(), alignof(Type), arena);
+    newType = new (mem) BoundGenericClassType(
         theClass, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
-    newType = new (C, arena) BoundGenericStructType(
+    auto mem = C.Allocate(sizeof(BoundGenericStructType) + sizeof(Type) *
+                          GenericArgs.size(), alignof(Type), arena);
+    newType = new (mem) BoundGenericStructType(
         theStruct, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
-  } else {
-    auto theEnum = cast<EnumDecl>(TheDecl);
-    newType = new (C, arena) BoundGenericEnumType(
+  } else if (auto theEnum = dyn_cast<EnumDecl>(TheDecl)) {
+    auto mem = C.Allocate(sizeof(BoundGenericEnumType) + sizeof(Type) *
+                          GenericArgs.size(), alignof(Type), arena);
+    newType = new (mem) BoundGenericEnumType(
         theEnum, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
+  } else {
+    llvm_unreachable("Unhandled NominalTypeDecl");
   }
   C.Impl.getArena(arena).BoundGenericTypes.InsertNode(newType, InsertPos);
 
