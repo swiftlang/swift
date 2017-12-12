@@ -83,7 +83,7 @@ public:
     for (InputFile input : other.getAllFiles())
       addInput(input);
   }
-  
+
   FrontendInputs &operator=(const FrontendInputs &other) {
     clearInputs();
     for (InputFile input : other.getAllFiles())
@@ -191,7 +191,7 @@ public:
   }
   void addPrimaryInputFile(StringRef file,
                            llvm::MemoryBuffer *buffer = nullptr) {
-    addInput(InputFile(file.str(), true, buffer));
+    addInput(InputFile(file, true, buffer));
   }
 
   void setBuffer(llvm::MemoryBuffer *buffer, unsigned index) {
@@ -203,6 +203,7 @@ public:
       PrimaryInputs.insert(std::make_pair(input.file(), AllFiles.size()));
     AllFiles.push_back(input);
   }
+  
   void clearInputs() {
     AllFiles.clear();
     PrimaryInputs.clear();
