@@ -237,7 +237,9 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
     return None;
   }
 
-  if (serialization::isSerializedAST(buffers.first.get()->getBuffer())) {
+  // FIXME: The fact that this test happens twice, for some cases,
+  // suggests that setupInputs could use another round of refactoring.
+  if (serialization::isSerializedAST(buffers.first->getBuffer())) {
     PartialModules.push_back(
         {std::move(buffers.first), std::move(buffers.second)});
     return None;
