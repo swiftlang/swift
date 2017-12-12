@@ -67,3 +67,24 @@ func nestedOptContext() -> Foo?? {
   return .none
 }
 
+// <rdar://problem/35945827>
+
+// This should diagnose instead of crashing in SILGen
+protocol Horse {
+  static var palomino: Horse { get }
+}
+
+func rideAHorse(_ horse: Horse?) {}
+
+rideAHorse(.palomino)
+// expected-error@-1 {{static member 'palomino' cannot be used on protocol metatype 'Horse.Protocol'}}
+
+// FIXME: This should work if the static member is part of a class though
+class Donkey {
+  static var mule: Donkey & Horse { while true {} }
+}
+
+func rideAMule(_ mule: (Horse & Donkey)?) {}
+
+rideAMule(.mule)
+// expected-error@-1 {{static member 'mule' cannot be used on protocol metatype '(Donkey & Horse).Protocol'}}

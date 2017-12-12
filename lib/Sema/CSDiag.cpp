@@ -1204,7 +1204,16 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   // to replace the metatype with 'Self'
   // error saying the lookup cannot be on a protocol metatype
   if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
-    assert(metatypeTy->getInstanceType()->isExistentialType());
+    auto instanceTy = metatypeTy->getInstanceType();
+
+    // This will only happen if we have an unresolved dot expression
+    // (.foo) where foo is a protocol member and the contextual type is
+    // an optional protocol metatype.
+    if (auto objectTy = instanceTy->getAnyOptionalObjectType()) {
+      instanceTy = objectTy;
+      baseObjTy = MetatypeType::get(objectTy);
+    }
+    assert(instanceTy->isExistentialType());
 
     // Give a customized message if we're accessing a member type
     // of a protocol -- otherwise a diagnostic talking about
@@ -1220,7 +1229,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
     } else if (isa<ConstructorDecl>(member)) {
       Diag.emplace(diagnose(loc,
                             diag::construct_protocol_by_name,
-                            metatypeTy->getInstanceType()));
+                            instanceTy));
     } else {
       Diag.emplace(diagnose(loc,
                             diag::could_not_use_type_member_on_protocol_metatype,
@@ -1234,8 +1243,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
       // If we are in a protocol extension of 'Proto' and we see
       // 'Proto.static', suggest 'Self.static'
       if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
-        if (extensionContext->getDeclaredType()->isEqual(
-                metatypeTy->getInstanceType())) {
+        if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
           Diag->fixItReplace(baseRange, "Self");
         }
       }
