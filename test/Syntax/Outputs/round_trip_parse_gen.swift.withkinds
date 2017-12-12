@@ -90,9 +90,9 @@ struct S<GenericParameterClause><<GenericParameter>A, </GenericParameter><Generi
 
 private </DeclModifier>struct S<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B</GenericParameter>></GenericParameterClause><TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Base </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>: <SimpleTypeIdentifier>B </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{<StructDecl><DeclModifier>
   private </DeclModifier>struct S<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>A</SimpleTypeIdentifier>, </InheritedType><InheritedType><SimpleTypeIdentifier>B </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></StructDecl>
-}</MemberDeclBlock></StructDecl>
+}</MemberDeclBlock></StructDecl><ProtocolDecl>
 
-protocol P<TypeInheritanceClause>: <InheritedType>class </InheritedType></TypeInheritanceClause>{}<FunctionDecl>
+protocol P<TypeInheritanceClause>: <InheritedType>class </InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><FunctionDecl>
 
 func foo<FunctionSignature>(<FunctionParameter>_ _: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>,</FunctionParameter><FunctionParameter>
          a b: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier>= <SequenceExpr><IntegerLiteralExpr>3 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr>,</FunctionParameter><FunctionParameter>
@@ -112,4 +112,11 @@ private </DeclModifier><DeclModifier>static </DeclModifier><DeclModifier>overrid
 func rootView<FunctionSignature>() -> <SimpleTypeIdentifier>Label </SimpleTypeIdentifier></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><DeclModifier>
 static </DeclModifier>func ==<FunctionSignature>() -> <SimpleTypeIdentifier>bool </SimpleTypeIdentifier></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><DeclModifier>
 static </DeclModifier>func !=<GenericParameterClause><<GenericParameter>a, </GenericParameter><GenericParameter>b, </GenericParameter><GenericParameter>c</GenericParameter>></GenericParameterClause><FunctionSignature>() -> <SimpleTypeIdentifier>bool </SimpleTypeIdentifier></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl>
-}</MemberDeclBlock></StructDecl>
+}</MemberDeclBlock></StructDecl><ProtocolDecl><Attribute>
+
+@objc</Attribute><DeclModifier>
+private </DeclModifier>protocol foo <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>bar </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><GenericWhereClause>where <SameTypeRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>==<SimpleTypeIdentifier>B </SimpleTypeIdentifier></SameTypeRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><ProtocolDecl>
+protocol foo <MemberDeclBlock>{ <FunctionDecl>func foo<FunctionSignature>() </FunctionSignature></FunctionDecl>}</MemberDeclBlock></ProtocolDecl><ProtocolDecl><DeclModifier>
+private </DeclModifier>protocol foo<MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><ProtocolDecl><Attribute>
+@objc</Attribute><DeclModifier>
+public </DeclModifier>protocol foo <GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl>
