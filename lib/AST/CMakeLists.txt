@@ -44,6 +44,7 @@ add_swift_library(swiftAST STATIC
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
   RawComment.cpp
+  RequirementEnvironment.cpp
   SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
