@@ -902,6 +902,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ParameterType = FuncType->getChild(1);
 
   assert(ParameterType->getKind() == Node::Kind::ArgumentTuple);
+  if (ParameterType->getIndex() == 0)
+    return nullptr;
 
   auto LabelList = createNode(Node::Kind::LabelList);
   for (unsigned i = 0, n = ParameterType->getIndex(); i != n; ++i) {
