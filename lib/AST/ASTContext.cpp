@@ -3278,7 +3278,6 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                                                      InsertPos))
     return BGT;
 
-  ArrayRef<Type> ArgsCopy = C.AllocateCopy(GenericArgs, arena);
   bool IsCanonical = !Parent || Parent->isCanonical();
   if (IsCanonical) {
     for (Type Arg : GenericArgs) {
@@ -3294,17 +3293,17 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
     auto mem = C.Allocate(sizeof(BoundGenericClassType) + sizeof(Type) *
                           GenericArgs.size(), alignof(Type), arena);
     newType = new (mem) BoundGenericClassType(
-        theClass, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
+        theClass, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theStruct = dyn_cast<StructDecl>(TheDecl)) {
     auto mem = C.Allocate(sizeof(BoundGenericStructType) + sizeof(Type) *
                           GenericArgs.size(), alignof(Type), arena);
     newType = new (mem) BoundGenericStructType(
-        theStruct, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
+        theStruct, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else if (auto theEnum = dyn_cast<EnumDecl>(TheDecl)) {
     auto mem = C.Allocate(sizeof(BoundGenericEnumType) + sizeof(Type) *
                           GenericArgs.size(), alignof(Type), arena);
     newType = new (mem) BoundGenericEnumType(
-        theEnum, Parent, ArgsCopy, IsCanonical ? &C : nullptr, properties);
+        theEnum, Parent, GenericArgs, IsCanonical ? &C : nullptr, properties);
   } else {
     llvm_unreachable("Unhandled NominalTypeDecl");
   }
@@ -3442,14 +3441,14 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
           .FindNodeOrInsertPos(ID, InsertPos))
     return compTy;
 
-  auto compTy
-    = new (C, arena)
-        ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                C.AllocateCopy(Members),
-                                HasExplicitAnyObject,
-                                properties);
-  C.Impl.getArena(arena).ProtocolCompositionTypes
-    .InsertNode(compTy, InsertPos);
+  // Use trailing objects for member type storage
+  auto mem = C.Allocate(sizeof(ProtocolCompositionType) + sizeof(Type) *
+                        Members.size(), alignof(Type), arena);
+  auto compTy = new (mem) ProtocolCompositionType(isCanonical ? &C : nullptr,
+                                                  Members,
+                                                  HasExplicitAnyObject,
+                                                  properties);
+  C.Impl.getArena(arena).ProtocolCompositionTypes.InsertNode(compTy, InsertPos);
   return compTy;
 }
 
