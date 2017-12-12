@@ -351,8 +351,9 @@ int main(int argc, char **argv) {
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      Invocation.setUpInputForSILTool(InputFilename, ModuleName, false,
-                                      extendedInfo);
+      Invocation.setUpInputForSILTool(InputFilename, ModuleName,
+                                      /*alwaysSetModuleToMain*/ false,
+                                      /*bePrimary*/ !PerformWMO, extendedInfo);
   if (!FileBufOrErr) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
@@ -361,11 +362,6 @@ int main(int argc, char **argv) {
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-
-  if (!PerformWMO) {
-    Invocation.getFrontendOptions().Inputs.setPrimaryInputForInputFilename(
-        InputFilename);
-  }
 
   if (CI.setup(Invocation))
     return 1;
