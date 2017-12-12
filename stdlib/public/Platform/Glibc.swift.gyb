@@ -10,7 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if os(Fuchsia)
+// Fuchsia now provides a "Libc" module.
+// We are going re-export it under Glibc namespace for source compatability.
+@_exported import Libc
+#else
 @_exported import SwiftGlibc // Clang module
+#endif
 
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
