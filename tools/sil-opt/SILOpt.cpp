@@ -444,7 +444,8 @@ int main(int argc, char **argv) {
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
 
-    serialize(CI.getMainModule(), serializationOpts, CI.getSILModule());
+    serialize(CI.getMainModule(), CI.getPrimarySourceFiles(),
+              serializationOpts, CI.getSILModule());
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";

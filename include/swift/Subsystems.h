@@ -24,6 +24,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Mutex.h"
 
 #include <memory>
@@ -242,10 +243,10 @@ namespace swift {
   performSILGeneration(FileUnit &SF, SILOptions &options,
                        Optional<unsigned> StartElem = None);
 
-  using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
-
-  /// Serializes a module or single source file to the given output file.
-  void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
+  /// Serializes a module and zero or more source files to the given output file.
+  void serialize(ModuleDecl *Module,
+                 const llvm::SetVector<SourceFile*> &SourceFiles,
+                 const SerializationOptions &options,
                  const SILModule *M = nullptr);
 
   /// Get the CPU and subtarget feature options to use when emitting code.

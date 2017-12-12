@@ -443,6 +443,12 @@ public:
     }
   }
 
+  /// Gets the set of primary input SourceFiles, which may be empty if
+  /// running in whole-module mode.
+  const llvm::SetVector<SourceFile*>& getPrimarySourceFiles() const {
+    return PrimarySourceFiles;
+  }
+
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 

@@ -44,11 +44,11 @@ class Serializer {
   /// The module currently being serialized.
   const ModuleDecl *M = nullptr;
 
-  /// The SourceFile currently being serialized, if any.
+  /// The SourceFiles currently being serialized, if any.
   ///
-  /// If this is non-null, only decls actually from this SourceFile will be
+  /// If this is non-empty, only decls actually from this SourceFile will be
   /// serialized. Any other decls will be cross-referenced instead.
-  const SourceFile *SF = nullptr;
+  const llvm::SetVector<SourceFile*> &SFS;
 
 public:
   /// Stores a declaration or a type to be written to the AST file.
@@ -406,22 +406,27 @@ private:
   void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeAST(ModuleOrSourceFile DC,
-                bool enableNestedTypeLookupTable);
+  void writeAST(bool enableNestedTypeLookupTable);
 
   void writeToStream(raw_ostream &os);
 
   template <size_t N>
-  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+  Serializer(const unsigned char (&signature)[N],
+             ModuleDecl *Module,
+             const llvm::SetVector<SourceFile*> &SourceFiles);
 
 public:
   /// Serialize a module to the given stream.
-  static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
+  static void writeToStream(raw_ostream &os,
+                            ModuleDecl *Module,
+                            const llvm::SetVector<SourceFile*> &SourceFiles,
                             const SILModule *M,
                             const SerializationOptions &options);
 
   /// Serialize module documentation to the given stream.
-  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+  static void writeDocToStream(raw_ostream &os,
+                               ModuleDecl *Module,
+                               const llvm::SetVector<SourceFile*> &SourceFiles,
                                StringRef GroupInfoPath, ASTContext &Ctx);
 
   /// Records the use of the given Type.

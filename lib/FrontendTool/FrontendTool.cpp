@@ -828,15 +828,15 @@ static bool performCompile(CompilerInstance &Instance,
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
 
-    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
-      serialize(DC, serializationOpts, SM.get());
+      serialize(Instance.getMainModule(),
+                Instance.getPrimarySourceFiles(),
+                serializationOpts, SM.get());
     }
     return Context.hadError();
   }
@@ -885,8 +885,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   auto SerializeSILModuleAction = [&]() {
     if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
-      auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile)
-                                  : Instance.getMainModule();
       if (!opts.ModuleOutputPath.empty()) {
         SerializationOptions serializationOpts;
         serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
@@ -908,7 +906,9 @@ static bool performCompile(CompilerInstance &Instance,
         serializationOpts.SerializeOptionsForDebugging =
             !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
 
-        serialize(DC, serializationOpts, SM.get());
+        serialize(Instance.getMainModule(),
+                  Instance.getPrimarySourceFiles(),
+                  serializationOpts, SM.get());
       }
     }
   };
@@ -969,15 +969,15 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIB) {
-    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
 
-      serialize(DC, serializationOpts, SM.get());
+      serialize(Instance.getMainModule(),
+                Instance.getPrimarySourceFiles(),
+                serializationOpts, SM.get());
     }
     return Context.hadError();
   }

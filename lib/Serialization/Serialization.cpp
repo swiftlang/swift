@@ -417,16 +417,6 @@ namespace llvm {
   };
 } // namespace llvm
 
-static ModuleDecl *getModule(ModuleOrSourceFile DC) {
-  if (auto M = DC.dyn_cast<ModuleDecl *>())
-    return M;
-  return DC.get<SourceFile *>()->getParentModule();
-}
-
-static ASTContext &getContext(ModuleOrSourceFile DC) {
-  return getModule(DC)->getASTContext();
-}
-
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
   return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
         !isa<SubscriptDecl>(DC);
@@ -2321,10 +2311,10 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 }
 
 bool Serializer::isDeclXRef(const Decl *D) const {
-  const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
+  DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
   if (topLevel->getParentModule() != M)
     return true;
-  if (!SF || topLevel == SF)
+  if (SFS.empty() || SFS.count(dyn_cast<SourceFile>(topLevel)) != 0)
     return false;
   // Special-case for SIL generic parameter decls, which don't have a real
   // DeclContext.
@@ -4428,6 +4418,20 @@ public:
   }
 };
 
+/// Return the list of FileUnits to serialize, either the set of SourceFiles
+/// described in SFS if it is nonempty, or else the set of FileUnits in the
+/// ModuleDecl M.
+static ArrayRef<const FileUnit*>
+getFiles(const ModuleDecl *M,
+         const llvm::SetVector<SourceFile *> &SFS) {
+  if (!SFS.empty()) {
+    return reinterpret_cast<const llvm::SetVector<const FileUnit*> &>(
+      SFS).getArrayRef();
+  } else {
+    return M->getFiles();
+  }
+}
+
 static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
                             ArrayRef<StringRef> Names) {
   llvm::SmallString<32> Blob;
@@ -4444,7 +4448,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
 
 static void writeDeclCommentTable(
     const comment_block::DeclCommentListLayout &DeclCommentList,
-    const SourceFile *SF, const ModuleDecl *M,
+    const llvm::SetVector<SourceFile *> &SFS, const ModuleDecl *M,
     DeclGroupNameContext &GroupContext) {
 
   struct DeclCommentTableWriter : public ASTWalker {
@@ -4535,15 +4539,7 @@ static void writeDeclCommentTable(
 
   DeclCommentTableWriter Writer(GroupContext);
 
-  ArrayRef<const FileUnit *> files;
-  SmallVector<const FileUnit *, 1> Scratch;
-  if (SF) {
-    Scratch.push_back(SF);
-    files = llvm::makeArrayRef(Scratch);
-  } else {
-    files = M->getFiles();
-  }
-  for (auto nextFile : files) {
+  for (auto nextFile : getFiles(M, SFS)) {
     Writer.resetSourceOrder();
     const_cast<FileUnit *>(nextFile)->walk(Writer);
   }
@@ -4718,8 +4714,7 @@ static void collectInterestingNestedDeclarations(
   }
 }
 
-void Serializer::writeAST(ModuleOrSourceFile DC,
-                          bool enableNestedTypeLookupTable) {
+void Serializer::writeAST(bool enableNestedTypeLookupTable) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
@@ -4730,15 +4725,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
 
   Optional<DeclID> entryPointClassID;
 
-  ArrayRef<const FileUnit *> files;
-  SmallVector<const FileUnit *, 1> Scratch;
-  if (SF) {
-    Scratch.push_back(SF);
-    files = llvm::makeArrayRef(Scratch);
-  } else {
-    files = M->getFiles();
-  }
-  for (auto nextFile : files) {
+  for (auto nextFile : getFiles(M, SFS)) {
     if (nextFile->hasEntryPoint())
       entryPointClassID = addDeclRef(nextFile->getMainClass());
 
@@ -4881,19 +4868,20 @@ void Serializer::writeToStream(raw_ostream &os) {
 
 template <size_t N>
 Serializer::Serializer(const unsigned char (&signature)[N],
-                       ModuleOrSourceFile DC) {
+                       ModuleDecl *Module,
+                       const llvm::SetVector<SourceFile*> &SourceFiles)
+  : M(Module), SFS(SourceFiles) {
   for (unsigned char byte : signature)
     Out.Emit(byte, 8);
-
-  this->M = getModule(DC);
-  this->SF = DC.dyn_cast<SourceFile *>();
 }
 
 
-void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
+void Serializer::writeToStream(raw_ostream &os,
+                               ModuleDecl *Module,
+                               const llvm::SetVector<SourceFile*> &SourceFiles,
                                const SILModule *SILMod,
                                const SerializationOptions &options) {
-  Serializer S{MODULE_SIGNATURE, DC};
+  Serializer S{MODULE_SIGNATURE, Module, SourceFiles};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeBlockInfoBlock();
@@ -4903,15 +4891,17 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeHeader(options);
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
-    S.writeAST(DC, options.EnableNestedTypeLookupTable);
+    S.writeAST(options.EnableNestedTypeLookupTable);
   }
 
   S.writeToStream(os);
 }
 
-void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+void Serializer::writeDocToStream(raw_ostream &os,
+                                  ModuleDecl *Module,
+                                  const llvm::SetVector<SourceFile*> &SourceFiles,
                                   StringRef GroupInfoPath, ASTContext &Ctx) {
-  Serializer S{MODULE_DOC_SIGNATURE, DC};
+  Serializer S{MODULE_DOC_SIGNATURE, Module, SourceFiles};
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
 
@@ -4922,7 +4912,7 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
       DeclGroupNameContext GroupContext(GroupInfoPath, Ctx);
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
-      writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
+      writeDeclCommentTable(DeclCommentList, S.SFS, S.M, GroupContext);
       comment_block::GroupNamesLayout GroupNames(S.Out);
 
       // FIXME: Multi-file compilation may cause group id collision.
@@ -4976,32 +4966,34 @@ withOutputFile(ASTContext &ctx, StringRef outputPath,
   return false;
 }
 
-void swift::serialize(ModuleOrSourceFile DC,
+void swift::serialize(ModuleDecl *Module,
+                      const llvm::SetVector<SourceFile*> &SourceFiles,
                       const SerializationOptions &options,
                       const SILModule *M) {
   assert(options.OutputPath && options.OutputPath[0] != '\0');
 
   if (strcmp("-", options.OutputPath) == 0) {
     // Special-case writing to stdout.
-    Serializer::writeToStream(llvm::outs(), DC, M, options);
+    Serializer::writeToStream(llvm::outs(), Module, SourceFiles, M, options);
     assert(!options.DocOutputPath || options.DocOutputPath[0] == '\0');
     return;
   }
 
-  bool hadError = withOutputFile(getContext(DC), options.OutputPath,
+  bool hadError = withOutputFile(Module->getASTContext(), options.OutputPath,
                                  [&](raw_ostream &out) {
     SharedTimer timer("Serialization, swiftmodule");
-    Serializer::writeToStream(out, DC, M, options);
+    Serializer::writeToStream(out, Module, SourceFiles, M, options);
   });
   if (hadError)
     return;
 
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
-    (void)withOutputFile(getContext(DC), options.DocOutputPath,
+    (void)withOutputFile(Module->getASTContext(), options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization, swiftdoc");
-      Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
-                                   getContext(DC));
+      Serializer::writeDocToStream(out, Module, SourceFiles,
+                                   options.GroupInfoPath,
+                                   Module->getASTContext());
     });
   }
 }
