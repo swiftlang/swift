@@ -329,17 +329,20 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @_inlineable // FIXME(sil-serialize-all)
   deinit {}
 
+  @_inlineable
   @objc(length)
   public func length() -> UInt {
-    return UInt(_guts.count)
+    return UInt(bitPattern: _guts.count)
   }
 
+  @_inlineable
   @objc(characterAtIndex:)
   public func character(at index: Int) -> UInt16 {
     defer { _fixLifetime(self) }
     return _guts[index]
   }
 
+  @_inlineable
   @objc(getCharacters:range:)
   public func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
@@ -358,6 +361,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
     _fixLifetime(self)
   }
 
+  @_inlineable
   @objc(_fastCharacterContents)
   public func _fastCharacterContents() -> UnsafePointer<UInt16>? {
     guard !_guts.isASCII else { return nil }
