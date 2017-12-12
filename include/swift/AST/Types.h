@@ -361,8 +361,13 @@ protected:
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
     unsigned HasExplicitAnyObject : 1;
+
+    unsigned : 32 - (NumTypeBaseBits + 1); // unused / padding
+
+    /// The number of protocols being composed.
+    unsigned Count : 32;
   };
-  NUMBITS(ProtocolCompositionType, NumTypeBaseBits + 1);
+  NUMBITS(ProtocolCompositionType, 64);
 
   struct TupleTypeBitfields {
     unsigned : NumTypeBaseBits;
@@ -4124,8 +4129,10 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// inheritance) protocol list. If the sorted, minimized list is a single
 /// protocol, then the canonical type is that protocol type. Otherwise, it is
 /// a composition of the protocols in that list.
-class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
-  ArrayRef<Type> Members;
+class ProtocolCompositionType final : public TypeBase,
+    public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<ProtocolCompositionType, Type> {
+  friend TrailingObjects;
   
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
@@ -4146,10 +4153,12 @@ public:
   /// Note that the list of members is not sufficient to uniquely identify
   /// a protocol composition type; you also have to look at
   /// hasExplicitAnyObject().
-  ArrayRef<Type> getMembers() const { return Members; }
+  ArrayRef<Type> getMembers() const {
+    return {getTrailingObjects<Type>(), ProtocolCompositionTypeBits.Count};
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Members, hasExplicitAnyObject());
+    Profile(ID, getMembers(), hasExplicitAnyObject());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<Type> Members,
@@ -4178,10 +4187,11 @@ private:
   ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> members,
                           bool hasExplicitAnyObject,
                           RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx,
-               properties),
-      Members(members) {
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx, properties) {
     ProtocolCompositionTypeBits.HasExplicitAnyObject = hasExplicitAnyObject;
+    ProtocolCompositionTypeBits.Count = members.size();
+    std::uninitialized_copy(members.begin(), members.end(),
+                            getTrailingObjects<Type>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
