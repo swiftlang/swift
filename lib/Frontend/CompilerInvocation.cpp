@@ -179,7 +179,8 @@ private:
         continue;
       hadDuplicates = addFile(A->getValue()) || hadDuplicates;
     }
-    return false; // Don't bail out for duplicates, too many tests depend on it.
+    return false; // FIXME: Don't bail out for duplicates, too many tests depend
+                  // on it.
   }
 
   bool doesCommandLineIncludeFilelist() { return FilelistPathArg; }
@@ -203,14 +204,13 @@ private:
     for (auto file : llvm::make_range(llvm::line_iterator(*FilelistBuffer),
                                       llvm::line_iterator()))
       hadDuplicates = addFile(file) || hadDuplicates;
-    return false; // Don't bail out for duplicates, too many tests depend on it.
+    return false; // FIXME: Don't bail out for duplicates, too many tests depend
+                  // on it.
   }
 
   bool addFile(StringRef file) {
-    if (Files.count(file) == 0) {
-      Files.insert(file);
+    if (Files.insert(file))
       return false;
-    }
     Diags.diagnose(SourceLoc(), diag::error_duplicate_input_file, file);
     return true;
   }

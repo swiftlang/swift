@@ -425,15 +425,15 @@ private:
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   Optional<unsigned> setUpCodeCompletionBuffer();
-  bool setupInputs(Optional<unsigned> codeCompletionBufferID);
+  bool setUpInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInputSwift() {
     return Invocation.getInputKind() == InputFileKind::IFK_Swift;
   }
   bool isInSILMode() {
     return Invocation.getInputKind() == InputFileKind::IFK_SIL;
   }
-  bool setupForInput(const InputFile &input);
-  void setupForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
+  bool setUpForInput(const InputFile &input);
+  void setUpForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
   bool setUpForFile(StringRef file, bool isPrimary);
 
 public:

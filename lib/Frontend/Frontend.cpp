@@ -102,7 +102,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
 
-  return setupInputs(codeCompletionBufferID);
+  return setUpInputs(codeCompletionBufferID);
 }
 
 void CompilerInstance::setUpLLVMArguments() {
@@ -129,6 +129,7 @@ void CompilerInstance::setUpDiagnosticOptions() {
     Diagnostics.setWarningsAsErrors(true);
   }
 }
+
 bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
     bool immediate = FrontendOptions::isActionImmediate(
@@ -175,10 +176,10 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
   return codeCompletionBufferID;
 }
 
-bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
+bool CompilerInstance::setUpInputs(Optional<unsigned> codeCompletionBufferID) {
   for (const InputFile &input :
        Invocation.getFrontendOptions().Inputs.getAllFiles())
-    if (setupForInput(input))
+    if (setUpForInput(input))
       return true;
 
   // Set the primary file to the code-completion point if one exists.
@@ -196,14 +197,14 @@ bool CompilerInstance::setupInputs(Optional<unsigned> codeCompletionBufferID) {
   return false;
 }
 
-bool CompilerInstance::setupForInput(const InputFile &input) {
+bool CompilerInstance::setUpForInput(const InputFile &input) {
   if (llvm::MemoryBuffer *inputBuffer = input.buffer()) {
-    setupForBuffer(inputBuffer, input.isPrimary());
+    setUpForBuffer(inputBuffer, input.isPrimary());
     return false;
   }
   return setUpForFile(input.file(), input.isPrimary());
 }
-void CompilerInstance::setupForBuffer(llvm::MemoryBuffer *buffer,
+void CompilerInstance::setUpForBuffer(llvm::MemoryBuffer *buffer,
                                       bool isPrimary) {
   auto copy = llvm::MemoryBuffer::getMemBufferCopy(
       buffer->getBuffer(), buffer->getBufferIdentifier());
