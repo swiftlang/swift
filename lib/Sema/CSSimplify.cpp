@@ -3121,17 +3121,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // the candidate should be favored.
     if (isa<ConstructorDecl>(decl) && favoredType &&
         result.FavoredChoice == ~0U) {
+      auto *ctor = cast<ConstructorDecl>(decl);
+
       // Only try and favor monomorphic initializers.
-      if (auto fnTypeWithSelf = decl->getInterfaceType()
-                                                     ->getAs<FunctionType>()) {
-        if (auto fnType = fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
-          auto argType = fnType->getInput()->getWithoutParens();
-          argType = decl->getInnermostDeclContext()
-                                                  ->mapTypeIntoContext(argType);
-          if (argType->isEqual(favoredType))
-            if (!decl->getAttrs().isUnavailable(getASTContext()))
-              result.FavoredChoice = result.ViableCandidates.size();
-        }
+      if (!ctor->isGenericContext()) {
+        auto argType = ctor->getArgumentInterfaceType();
+        if (argType->isEqual(favoredType))
+          if (!decl->getAttrs().isUnavailable(getASTContext()))
+            result.FavoredChoice = result.ViableCandidates.size();
       }
     }
 
