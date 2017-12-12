@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil -save-optimization-record-path %t.opt.yaml | %FileCheck %s
+// RUN: %FileCheck -check-prefix=YAML -input-file=%t.opt.yaml %s
 // RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil | %FileCheck %s --check-prefix=OSIZE
 //
 // Test speculative devirtualization.
@@ -41,6 +42,22 @@ class Sub7 : Base {
 // CHECK-NOT: checked_cast_br
 // CHECK: %[[CM:[0-9]+]] = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK: apply %[[CM]](%0) : $@convention(method) (@guaranteed Base) -> ()
+
+// YAML:      Pass:            sil-speculative-devirtualizer
+// YAML-NEXT: Name:            sil.PartialSpecDevirt
+// YAML-NEXT: DebugLoc:
+// YAML-NEXT:   File:            {{.*}}/devirt_speculate.swift
+// YAML-NEXT:   Line:            66
+// YAML-NEXT:   Column:          5
+// YAML-NEXT: Function:        'testMaxNumSpeculativeTargets(_:)'
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Partially devirtualized call with run-time checks for '
+// YAML-NEXT:   - NumSubTypesChecked: '6'
+// YAML-NEXT:   - String:          ' subclasses of '
+// YAML-NEXT:   - ClassType:       '$Base'
+// YAML-NEXT:   - String:          ', number of subclasses not devirtualized: '
+// YAML-NEXT:   - NotHandledSubsNum: '1'
+// YAML-NEXT: ...
 
 // OSIZE: @_T016devirt_speculate28testMaxNumSpeculativeTargetsyAA4BaseCF
 // OSIZE-NOT: checked_cast_br [exact] %0 : $Base to $Base
