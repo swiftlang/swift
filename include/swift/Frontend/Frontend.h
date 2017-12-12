@@ -424,17 +424,40 @@ private:
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
-  Optional<unsigned> setUpCodeCompletionBuffer();
-  bool setUpInputs(Optional<unsigned> codeCompletionBufferID);
   bool isInputSwift() {
     return Invocation.getInputKind() == InputFileKind::IFK_Swift;
   }
   bool isInSILMode() {
     return Invocation.getInputKind() == InputFileKind::IFK_SIL;
   }
+
+  bool setUpInputs();
+  Optional<unsigned> setUpCodeCompletionBuffer();
+
+  /// Set up all state in the CompilerInstance to process the given input file.
+  /// Return true on error.
   bool setUpForInput(const InputFile &input);
-  void setUpForBuffer(llvm::MemoryBuffer *buffer, bool isPrimary);
-  bool setUpForFile(StringRef file, bool isPrimary);
+
+  /// Find a buffer for a given input file and ensure it is recorded in
+  /// SourceMgr, PartialModules, or InputSourceCodeBufferIDs as appropriate.
+  /// Return the buffer ID if it is not already compiled, or None if so.
+  /// Set failed on failure.
+
+  Optional<unsigned> getRecordedBufferID(const InputFile &input, bool &failed);
+
+  /// Given an input file, return a buffer to use for its contents,
+  /// and a buffer for the corresponding module doc file if one exists.
+  /// On failure, return a null pointer for the first element of the returned
+  /// pair.
+  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
+            std::unique_ptr<llvm::MemoryBuffer>>
+  getInputBufferAndModuleDocBufferIfPresent(const InputFile &input);
+
+  /// Try to open the module doc file corresponding to the input parameter.
+  /// Return None for error, nullptr if no such file exists, or the buffer if
+  /// one was found.
+  Optional<std::unique_ptr<llvm::MemoryBuffer>>
+  openModuleDoc(const InputFile &input);
 
 public:
   /// Parses and type-checks all input files.
