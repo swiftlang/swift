@@ -4342,7 +4342,7 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
                                          object,
                                          object->getName() + ".Type");
   metadata->setDoesNotThrow();
-  metadata->setDoesNotAccessMemory();
+  metadata->setOnlyReadsMemory();
   return metadata;
 }
 
