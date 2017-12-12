@@ -121,6 +121,21 @@ DECL_NODES = [
              Child('Members', kind='MemberDeclBlock'),
          ]),
 
+    Node('ProtocolDecl', kind='Decl',
+         children=[
+             Child('Attributes', kind='AttributeList',
+                   is_optional=True),
+             Child('AccessLevelModifier', kind='DeclModifier',
+                   is_optional=True),
+             Child('ProtocolKeyword', kind='ProtocolToken'),
+             Child('Identifier', kind='IdentifierToken'),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True),
+             Child('Members', kind='MemberDeclBlock'),
+         ]),
+
     Node('MemberDeclBlock', kind='Syntax',
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
@@ -221,7 +236,8 @@ DECL_NODES = [
              Child('Signature', kind='FunctionSignature'),
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
-             Child('Body', kind='CodeBlock'),
+             # the body is not necessary inside a protocol definition
+             Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
     # else-if-directive-clause-list -> else-if-directive-clause
