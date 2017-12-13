@@ -266,11 +266,11 @@ EXPR_NODES = [
 
     Node('ClosureCaptureItem', kind='Syntax',
          children=[
-            Child("Specifier", kind='TokenList', is_optional=True),
-            Child("Name", kind='IdentifierToken', is_optional=True),
-            Child('AssignToken', kind='EqualToken', is_optional=True),
-            Child("Expression", kind='Expr'),
-            Child('TrailingComma', kind='CommaToken', is_optional=True),
+             Child("Specifier", kind='TokenList', is_optional=True),
+             Child("Name", kind='IdentifierToken', is_optional=True),
+             Child('AssignToken', kind='EqualToken', is_optional=True),
+             Child("Expression", kind='Expr'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     Node('ClosureCaptureItemList', kind='SyntaxCollection',
@@ -278,8 +278,8 @@ EXPR_NODES = [
 
     Node('ClosureCaptureSignature', kind='Syntax',
          children=[
-            Child('LeftSquare', kind='LeftSquareToken'),
-            Child('Items', kind='ClosureCaptureItemList', is_optional=True),
-            Child('RightSquare', kind='RightSquareToken'),
+             Child('LeftSquare', kind='LeftSquareToken'),
+             Child('Items', kind='ClosureCaptureItemList', is_optional=True),
+             Child('RightSquare', kind='RightSquareToken'),
          ]),
 ]
