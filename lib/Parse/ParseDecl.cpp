@@ -5622,21 +5622,37 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   ParserResult<ParameterList> Indices
     = parseSingleParameterClause(ParameterContextKind::Subscript,
                                  &argumentNames);
-  if (Indices.isNull() || Indices.hasCodeCompletion())
-    return ParserStatus(Indices);
+  Status |= Indices;
+
+  SignatureHasCodeCompletion |= Indices.hasCodeCompletion();
+  if (SignatureHasCodeCompletion && !CodeCompletion)
+    return makeParserCodeCompletionStatus();
   
   // '->'
-  if (!Tok.is(tok::arrow)) {
+  SourceLoc ArrowLoc;
+  if (!consumeIf(tok::arrow, ArrowLoc)) {
     if (!Indices.isParseError())
       diagnose(Tok, diag::expected_arrow_subscript);
-    return makeParserError();
+    Status.setIsParseError();
   }
-  SourceLoc ArrowLoc = consumeToken();
+
+  if (!ArrowLoc.isValid() && (Indices.isNull() || Indices.get()->size() == 0)) {
+    // This doesn't look much like a subscript, so let regular recovery take
+    // care of it.
+    return Status;
+  }
   
   // type
   ParserResult<TypeRepr> ElementTy = parseType(diag::expected_type_subscript);
-  if (ElementTy.isNull() || ElementTy.hasCodeCompletion())
-    return ParserStatus(ElementTy);
+  Status |= ElementTy;
+  SignatureHasCodeCompletion |= ElementTy.hasCodeCompletion();
+  if (SignatureHasCodeCompletion && !CodeCompletion) {
+    return makeParserCodeCompletionStatus();
+  }
+  if (ElementTy.isNull()) {
+    // Always set an element type.
+    ElementTy = makeParserResult(ElementTy, new (Context) ErrorTypeRepr());
+  }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
@@ -5665,8 +5681,9 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   Subscript->setGenericParams(GenericParams);
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (SignatureHasCodeCompletion && CodeCompletion) {
     CodeCompletion->setParsedDecl(Subscript);
+  }
 
   Decls.push_back(Subscript);
 
@@ -5676,12 +5693,15 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   if (Tok.isNot(tok::l_brace)) {
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
-    if (Flags.contains(PD_InProtocol))
-      diagnose(Tok, diag::expected_lbrace_subscript_protocol)
-        .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
-    else
-      diagnose(Tok, diag::expected_lbrace_subscript);
-    Status.setIsParseError();
+    if (!Status.isError()) {
+      if (Flags.contains(PD_InProtocol)) {
+        diagnose(Tok, diag::expected_lbrace_subscript_protocol)
+            .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
+      } else {
+        diagnose(Tok, diag::expected_lbrace_subscript);
+      }
+      Status.setIsParseError();
+    }
   } else {
     if (parseGetSet(Flags, GenericParams,
                     Indices.get(), ElementTy.get(),
@@ -5699,11 +5719,6 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()),
                    Flags, /*static*/ SourceLoc(), Attributes,
                    ElementTy.get(), Indices.get(), Decls);
-
-  if (Invalid) {
-    Subscript->setInterfaceType(ErrorType::get(Context));
-    Subscript->setInvalid();
-  }
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
