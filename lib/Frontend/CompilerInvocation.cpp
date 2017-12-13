@@ -226,7 +226,7 @@ private:
       // some-file-not-in-foo".
       assert(FilelistPathArg && "Missing primary with no filelist");
       Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
-                     PrimaryFilelistPathArg->getValue());
+                     FilelistPathArg->getValue());
     }
     return !PrimaryFiles.empty();
   }
