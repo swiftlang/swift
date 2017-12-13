@@ -1253,6 +1253,31 @@ sil [serialized] [thunk] @a_regular_thunk : $@convention(thin) () -> () {
   return %1 : $()
 }
 
+public class WeakUnownedTest {
+  @sil_stored public unowned var unownedVal: @sil_unowned AnyObject { get set }
+  @sil_stored public weak var weakVal: @sil_weak AnyObject? { get set }
+  public init(protoVal: AnyObject)
+  deinit
+}
+
+// CHECK-LABEL: sil public_external [serialized] @weak_unowned : $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
+sil [serialized] @weak_unowned : $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> () {
+bb0(%0 : $WeakUnownedTest, %1 : $AnyObject):
+  %2 = ref_element_addr %0 : $WeakUnownedTest, #WeakUnownedTest.unownedVal
+  // CHECK: store_unowned
+  store_unowned %1 to %2 : $*@sil_unowned AnyObject
+
+  %3 = enum $Optional<AnyObject>, #Optional.some!enumelt.1, %1 : $AnyObject
+  %4 = ref_element_addr %0 : $WeakUnownedTest, #WeakUnownedTest.weakVal
+  // CHECK: store_weak
+  store_weak %3 to %4 : $*@sil_weak AnyObject?
+
+  %r = tuple ()
+
+  // CHECK: return
+  return %r : $()
+}
+
 public class Foo {
   subscript (x: Int, y: Int) -> Int32 { get set }
   var x: Int
@@ -1467,6 +1492,7 @@ bb0:
   %150 = function_ref @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> ()
   %151 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
   %152 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
+  %153 = function_ref @weak_unowned: $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
 
   %r = tuple ()
   return %r : $()
