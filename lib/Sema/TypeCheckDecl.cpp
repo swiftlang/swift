@@ -4848,7 +4848,12 @@ public:
     return cast<VarDecl>(accessor)->getTypeLoc();
   }
 
-  static bool functionHasImplicitlyUnwrappedResult(FuncDecl *FD) {
+  static bool functionHasImplicitlyUnwrappedResult(AbstractFunctionDecl *AFD) {
+    if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
+      return CD->getFailability() == OTK_ImplicitlyUnwrappedOptional;
+    }
+
+    auto *FD = cast<FuncDecl>(AFD);
     if (FD->isAccessor() && !FD->isGetter())
       return false;
 
@@ -7195,6 +7200,12 @@ public:
     }
 
     inferDynamic(TC.Context, CD);
+
+    if (functionHasImplicitlyUnwrappedResult(CD)) {
+      auto &C = CD->getASTContext();
+      CD->getAttrs().add(
+          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    }
 
     TC.checkDeclAttributes(CD);
   }
