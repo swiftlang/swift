@@ -273,17 +273,15 @@ extension _UnmanagedOpaqueString {
 
     // Pull out some code units into a fixed array and try to perform grapheme
     // breaking on that.
-    var shortBuffer = _FixedArray16<UInt16>(allZeros:())
-    let maxShortCount = shortBuffer.count
-    let shortCount = Swift.min(maxShortCount, count)
+    typealias ShortBuffer = _FixedArray16<UInt16>
+    var shortBuffer = ShortBuffer(count: Swift.min(ShortBuffer.capacity, count))
     shortBuffer.withUnsafeMutableBufferPointer { buffer in
-      self.prefix(shortCount)._copy(into: buffer)
+      self.prefix(buffer.count)._copy(into: buffer)
     }
     let shortLength = shortBuffer.withUnsafeBufferPointer { buffer in
-      UTF16._measureFirstExtendedGraphemeCluster(
-        in: UnsafeBufferPointer(rebasing: buffer.prefix(shortCount)))
+      UTF16._measureFirstExtendedGraphemeCluster(in: buffer)
     }
-    if _fastPath(shortLength < maxShortCount) {
+    if _fastPath(shortLength < shortBuffer.capacity) {
       return shortLength
     }
 
@@ -302,17 +300,15 @@ extension _UnmanagedOpaqueString {
 
     // Pull out some code units into a fixed array and try to perform grapheme
     // breaking on that.
-    var shortBuffer = _FixedArray16<UInt16>(allZeros:())
-    let maxShortCount = shortBuffer.count
-    let shortCount = Swift.min(maxShortCount, count)
+    typealias ShortBuffer = _FixedArray16<UInt16>
+    var shortBuffer = ShortBuffer(count: Swift.min(ShortBuffer.capacity, count))
     shortBuffer.withUnsafeMutableBufferPointer { buffer in
-      self.suffix(shortCount)._copy(into: buffer)
+      self.suffix(buffer.count)._copy(into: buffer)
     }
     let shortLength = shortBuffer.withUnsafeBufferPointer { buffer in
-      UTF16._measureLastExtendedGraphemeCluster(
-        in: UnsafeBufferPointer(rebasing: buffer.prefix(shortCount)))
+      UTF16._measureLastExtendedGraphemeCluster(in: buffer)
     }
-    if _fastPath(shortLength < maxShortCount) {
+    if _fastPath(shortLength < shortBuffer.capacity) {
       return shortLength
     }
 
