@@ -180,13 +180,13 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       return true;
 
     // The condition here is a bit more fickle than
-    // `isProtocolExtensionUsable`. That check would prematurely reject
+    // `isExtensionApplied`. That check would prematurely reject
     // extensions like `P where AssocType == T` if we're relying on a
     // default implementation inside the extension to infer `AssocType == T`
     // in the first place. Only check conformances on the `Self` type,
     // because those have to be explicitly declared on the type somewhere
     // so won't be affected by whatever answer inference comes up with.
-    auto selfTy = GenericTypeParamType::get(0, 0, tc.Context);
+    auto selfTy = extension->getSelfInterfaceType();
     for (const Requirement &reqt
          : extension->getGenericSignature()->getRequirements()) {
       switch (reqt.getKind()) {

@@ -1338,11 +1338,6 @@ public:
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
-  /// Determine whether the given (potentially constrained) protocol extension
-  /// is usable for the given type.
-  bool isProtocolExtensionUsable(DeclContext *dc, Type type,
-                                 ExtensionDecl *protocolExtension) override;
- 
   /// Perform semantic checks on the given generic parameter list.
   void prepareGenericParamList(GenericParamList *genericParams,
                                DeclContext *dc);
