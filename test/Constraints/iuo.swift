@@ -18,6 +18,21 @@ struct S {
   var m: Int
 
   func fn() -> Int! { return i }
+  static func static_fn() -> Int! { return 0 }
+
+  init(i: Int!, j: Int!, k: Int, m: Int) {
+    self.i = i
+    self.j = j
+    self.k = k
+    self.m = m
+  }
+
+  init!() {
+    i = 0
+    j = 0
+    k = 0
+    m = 0
+  }
 }
 
 func takesStruct(s: S) {
@@ -36,6 +51,8 @@ let _: Int = s.j
 _ = s.k
 s.m = 7
 s.j = 3
+
+var s2: S = S()
 
 struct T {
   let i: Float!
@@ -91,6 +108,10 @@ func overloadedForcedResult() -> Int {
 
 func forceMemberResult(s: S) -> Int {
   return s.fn()
+}
+
+func forceStaticMemberResult() -> Int {
+  return S.static_fn()
 }
 
 func overloadedForceMemberResult() -> Int {
