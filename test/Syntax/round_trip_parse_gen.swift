@@ -120,3 +120,10 @@ protocol foo { func foo() }
 private protocol foo{}
 @objc
 public protocol foo where A:B {}
+
+func tryfoo() {
+  try foo()
+  try! foo()
+  try? foo()
+  try! foo().bar().foo().bar()
+}

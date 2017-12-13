@@ -119,4 +119,11 @@ private </DeclModifier>protocol foo <TypeInheritanceClause>: <InheritedType><Sim
 protocol foo <MemberDeclBlock>{ <FunctionDecl>func foo<FunctionSignature>() </FunctionSignature></FunctionDecl>}</MemberDeclBlock></ProtocolDecl><ProtocolDecl><DeclModifier>
 private </DeclModifier>protocol foo<MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><ProtocolDecl><Attribute>
 @objc</Attribute><DeclModifier>
-public </DeclModifier>protocol foo <GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl>
+public </DeclModifier>protocol foo <GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><FunctionDecl>
+
+func tryfoo<FunctionSignature>() </FunctionSignature><CodeBlock>{<TryExpr>
+  try <IdentifierExpr>foo</IdentifierExpr>()</TryExpr><TryExpr>
+  try! <IdentifierExpr>foo</IdentifierExpr>()</TryExpr><TryExpr>
+  try? <IdentifierExpr>foo</IdentifierExpr>()</TryExpr><TryExpr>
+  try! <MemberAccessExpr><IdentifierExpr>foo</IdentifierExpr>().bar</MemberAccessExpr>().foo().bar()</TryExpr>
+}</CodeBlock></FunctionDecl>
