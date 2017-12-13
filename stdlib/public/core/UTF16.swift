@@ -32,6 +32,11 @@ extension Unicode.UTF16 : Unicode.Encoding {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  public static func _isASCII(_ x: CodeUnit) -> Bool  {
+    return x <= 0x7f
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
   public static func _isScalar(_ x: CodeUnit) -> Bool  {
     return x & 0xf800 != 0xd800
   }
