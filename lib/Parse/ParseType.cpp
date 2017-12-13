@@ -843,17 +843,26 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;
 
-    // If this is a deprecated use of the inout marker in an argument list,
-    // consume the inout.
-    SourceLoc SpecifierLoc;
-    consumeIf(tok::kw_inout, SpecifierLoc);
+    // 'inout' here can be a obsoleted use of the marker in an argument list,
+    // consume it in backtracking context so we can determine it's really a
+    // deprecated use of it.
+    llvm::Optional<BacktrackingScope> Backtracking;
+    SourceLoc ObsoletedInOutLoc;
+    if (Tok.is(tok::kw_inout)) {
+      Backtracking.emplace(*this);
+      ObsoletedInOutLoc = consumeToken(tok::kw_inout);
+    }
 
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
     if (Tok.canBeArgumentLabel() &&
         (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
-      // Consume the name
+      if (Backtracking)
+        // Found obsoleted 'inout' use.
+        Backtracking->cancelBacktrack();
+
+      // Consume a name.
       if (!Tok.is(tok::kw__))
         element.Name = Context.getIdentifier(Tok.getText());
       element.NameLoc = consumeToken();
@@ -866,50 +875,52 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       }
 
       // Consume the ':'.
-      SourceLoc colonLoc;
-      if (Tok.is(tok::colon)) {
-        colonLoc = consumeToken();
-      } else {
+      if (!consumeIf(tok::colon, element.ColonLoc))
         diagnose(Tok, diag::expected_parameter_colon);
-      }
-
-      SourceLoc postColonLoc = Tok.getLoc();
-
-      // Parse the type annotation.
-      auto type = parseType(diag::expected_type);
-      if (type.hasCodeCompletion())
-        return makeParserCodeCompletionStatus();
-      if (type.isNull())
-        return makeParserError();
-      element.Type = type.get();
-
-      // Complain obsoleted 'inout' position; (inout name: Ty)
-      if (SpecifierLoc.isValid() && !isa<InOutTypeRepr>(element.Type))
-        diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed, "'inout'")
-          .fixItRemove(SpecifierLoc)
-          .fixItInsert(postColonLoc, "inout ");
-    } else {
-      // Otherwise, this has to be a type.
-      auto type = parseType();
-      if (type.hasCodeCompletion())
-        return makeParserCodeCompletionStatus();
-      if (type.isNull())
-        return makeParserError();
-      element.Type = type.get();
+    } else if (Backtracking) {
+      // If we don't have labels, 'inout' is not a deprecated use.
+      ObsoletedInOutLoc = SourceLoc();
     }
+    Backtracking.reset();
 
-    // If an 'inout' marker was specified, build inout type.
-    // Note that we bury the inout locator within the named locator.
-    // This is weird but required by Sema apparently.
-    if (SpecifierLoc.isValid()) {
-      if (isa<InOutTypeRepr>(element.Type) || isa<SharedTypeRepr>(element.Type))
+    // Parse the type annotation.
+    auto type = parseType(diag::expected_type);
+    if (type.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+    if (type.isNull())
+      return makeParserError();
+    element.Type = type.get();
+
+    // Complain obsoleted 'inout' position; (inout name: Ty)
+    if (ObsoletedInOutLoc.isValid()) {
+      if (isa<InOutTypeRepr>(element.Type) ||
+          isa<SharedTypeRepr>(element.Type)) {
+        // If the parsed type is already a inout type et al, just remove it.
         diagnose(Tok, diag::parameter_specifier_repeated)
-          .fixItRemove(SpecifierLoc);
-      else
-        element.Type = new (Context) InOutTypeRepr(element.Type, SpecifierLoc);
+            .fixItRemove(ObsoletedInOutLoc);
+      } else {
+        diagnose(ObsoletedInOutLoc, diag::inout_as_attr_disallowed, "'inout'")
+            .fixItRemove(ObsoletedInOutLoc)
+            .fixItInsert(element.Type->getStartLoc(), "inout ");
+        // Build inout type. Note that we bury the inout locator within the
+        // named locator. This is weird but required by Sema apparently.
+        element.Type =
+            new (Context) InOutTypeRepr(element.Type, ObsoletedInOutLoc);
+      }
     }
 
-    ElementsR.push_back(element);
+    // Parse optional '...'.
+    if (Tok.isEllipsis()) {
+      auto ElementEllipsisLoc = consumeToken();
+      if (EllipsisLoc.isInvalid()) {
+        EllipsisLoc = ElementEllipsisLoc;
+        EllipsisIdx = ElementsR.size();
+      } else {
+        diagnose(ElementEllipsisLoc, diag::multiple_ellipsis_in_tuple)
+          .highlight(EllipsisLoc)
+          .fixItRemove(ElementEllipsisLoc);
+      }
+    }
 
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
@@ -921,26 +932,13 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         inFlight.fixItRemove(SourceRange(equalLoc, init.get()->getEndLoc()));
     }
 
-    if (Tok.isEllipsis()) {
-      if (EllipsisLoc.isValid()) {
-        diagnose(Tok, diag::multiple_ellipsis_in_tuple)
-          .highlight(EllipsisLoc)
-          .fixItRemove(Tok.getLoc());
-        (void)consumeToken();
-      } else {
-        EllipsisLoc = consumeToken();
-        EllipsisIdx = ElementsR.size() - 1;
-      }
-    }
-    if (Tok.is(tok::comma)) {
+    // Record the ',' location.
+    if (Tok.is(tok::comma))
       element.TrailingCommaLoc = Tok.getLoc();
-    }
+
+    ElementsR.push_back(element);
     return makeParserSuccess();
   });
-
-  if (EllipsisLoc.isValid() && ElementsR.empty()) {
-    EllipsisLoc = SourceLoc();
-  }
 
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
