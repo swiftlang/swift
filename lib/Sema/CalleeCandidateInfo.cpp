@@ -629,7 +629,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       for (auto &C : candidates) {
         C.level += 1;
         
-        baseType = replaceTypeVariablesWithUnresolved(baseType);
+        baseType = replaceTypeVariablesIn(baseType,
+                                          CS.getASTContext().TheUnresolvedType);
         
         // Compute a new substituted type if we have a base type to apply.
         if (baseType && C.level == 1 && C.getDecl()) {
@@ -817,7 +818,8 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     // it to get a simpler and more concrete type.
     //
     if (baseType) {
-      auto substType = replaceTypeVariablesWithUnresolved(baseType);
+      auto &ctx = CS.getASTContext();
+      auto substType = replaceTypeVariablesIn(baseType, ctx.TheUnresolvedType);
       if (substType)
         substType = substType
         ->getWithoutSpecifierType()
