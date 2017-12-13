@@ -1080,3 +1080,71 @@ extension _StringGuts : Sequence {
     return Iterator(self, range: range)
   }
 }
+
+extension _StringGuts {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal
+  static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
+    _ input: Input,
+    encoding: Encoding.Type,
+    repairIllFormedSequences: Bool,
+    minimumCapacity: Int = 0
+  ) -> (_StringGuts?, hadError: Bool)
+  where Input.Element == Encoding.CodeUnit {
+    // Determine how many UTF-16 code units we'll need
+    guard let (utf16Count, isASCII) = UTF16.transcodedLength(
+      of: input.makeIterator(),
+      decodedAs: Encoding.self,
+      repairingIllFormedSequences: repairIllFormedSequences) else {
+      return (nil, true)
+    }
+    if isASCII {
+      let storage = _SwiftStringStorage<UTF8.CodeUnit>.create(
+        capacity: Swift.max(minimumCapacity, utf16Count),
+        count: utf16Count)
+      let hadError = storage._initialize(
+        fromCodeUnits: input,
+        encoding: Encoding.self)
+      return (_StringGuts(storage), hadError)
+    }
+    let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: Swift.max(minimumCapacity, utf16Count),
+      count: utf16Count)
+    let hadError = storage._initialize(
+      fromCodeUnits: input,
+      encoding: Encoding.self)
+    return (_StringGuts(storage), hadError)
+  }
+}
+
+extension _SwiftStringStorage {
+  /// Initialize a piece of freshly allocated storage instance from a sequence
+  /// of code units, which is assumed to contain exactly as many code units as
+  /// fits in the current storage count.
+  ///
+  /// Returns true iff `input` was found to contain invalid code units in the
+  /// specified encoding. If any invalid sequences are found, they are replaced
+  /// with REPLACEMENT CHARACTER (U+FFFD).
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal
+  func _initialize<Input : Sequence, Encoding: _UnicodeEncoding>(
+    fromCodeUnits input: Input,
+    encoding: Encoding.Type
+  ) -> Bool
+  where Input.Element == Encoding.CodeUnit {
+    var p = self.start
+    let hadError = transcode(
+      input.makeIterator(),
+      from: Encoding.self,
+      to: UTF16.self,
+      stoppingOnError: false) { cu in
+      _sanityCheck(p < end)
+      p.pointee = CodeUnit(cu)
+      p += 1
+    }
+    _sanityCheck(p == end)
+    return hadError
+  }
+}
