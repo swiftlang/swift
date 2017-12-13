@@ -175,9 +175,11 @@ private:
 
   bool readInputFilesFromFilelist() {
     bool hadDuplicates = false;
-    if (forAllFilesInFilelist(FilelistPathArg, [&](StringRef file) -> void {
+    bool hadError =
+        forAllFilesInFilelist(FilelistPathArg, [&](StringRef file) -> void {
           hadDuplicates = addFile(file) || hadDuplicates;
-        }))
+        });
+    if (hadError)
       return true;
     return false; // FIXME: Don't bail out for duplicates, too many tests depend on it.
   }
