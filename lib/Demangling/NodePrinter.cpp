@@ -590,6 +590,8 @@ private:
 
                  if (hasLabels)
                    Printer << getLabelFor(Param, ParamIndex) << ':';
+                 else if (!showTypes)
+                   Printer << "_:";
 
                  if (hasLabels && showTypes)
                    Printer << ' ';

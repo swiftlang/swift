@@ -6,7 +6,7 @@
 public func takesInout(_ i: inout Int) {
   i = 42
 }
-// CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection10takesInoutySizF
+// CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection10takesInoutyySizF
 // CHECK: Static Access: %{{.*}} = begin_access [modify] [static] %{{.*}} : $*Int
 
 // Helper taking a basic, no-escape closure.
