@@ -60,11 +60,11 @@ entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases13BigTempStructV
 // CHECK: call swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret [[ALLOC]], %swift.bridge* %1, %swift.type* %Element)
 // CHECK: ret void
-sil @testBigTempStruct : $@convention(method) <Element> (@guaranteed _ArrayBuffer<Element>) -> @owned BigTempStruct<Element> {
-bb0(%0 : $_ArrayBuffer<Element>):
+sil @testBigTempStruct : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> @owned BigTempStruct<Element> {
+bb0(%0 : $_ContiguousArrayBuffer<Element>):
   // function_ref specialized _ArrayBuffer.subscript.getter
-  %4 = function_ref @testBigTempStruct : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
-  %9 = apply %4<Element>(%0) : $@convention(method) <τ_0_0> (@guaranteed _ArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
+  %4 = function_ref @testBigTempStruct : $@convention(method) <τ_0_0> (@guaranteed _ContiguousArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
+  %9 = apply %4<Element>(%0) : $@convention(method) <τ_0_0> (@guaranteed _ContiguousArrayBuffer<τ_0_0>) -> @owned BigTempStruct<τ_0_0>
   return %9 : $BigTempStruct<Element>
 }
 
