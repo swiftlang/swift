@@ -843,6 +843,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
     return SyntaxKind::TupleElement;
   case SyntaxKind::FunctionParameterList:
     return SyntaxKind::FunctionParameter;
+  case SyntaxKind::TupleTypeElementList:
+    return SyntaxKind::TupleTypeElement;
   default:
     return SyntaxKind::Unknown;
   }
@@ -858,6 +860,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   SyntaxKind ElementKind = getListElementKind(Kind);
 
   if (Tok.is(RightK)) {
+    ListContext.reset();
     RightLoc = consumeToken(RightK);
     return makeParserSuccess();
   }

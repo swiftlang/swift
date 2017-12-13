@@ -60,11 +60,13 @@ class C {
 }
 
 typealias A = Any
-typealias B = (Array<Array<Any>>.Element)
+typealias B = (Array<Array<Any>>.Element, x: Int)
 typealias C = [Int]
 typealias D = [Int: String]
 typealias E = Int?.Protocol
 typealias F = [Int]!.Type
+typealias G = (a x: Int, _ y: Int ... = 1) -> () -> ()
+typealias H = ()
 
 struct foo {
   struct foo {

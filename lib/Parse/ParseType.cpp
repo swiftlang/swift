@@ -440,6 +440,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
       return nullptr;
+    SyntaxContext->setCreateSyntax(SyntaxKind::FunctionType);
     tyR = new (Context) FunctionTypeRepr(generics, tyR, throwsLoc, arrowLoc,
                                          SecondHalf.get());
   } else if (generics) {
@@ -719,7 +720,6 @@ Parser::parseAnyType() {
 ///     type-identifier
 ///     type-composition-list-deprecated ',' type-identifier
 ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
-  SyntaxParsingContext TypeContext(SyntaxContext, SyntaxContextKind::Type);
   assert(Tok.is(tok::kw_protocol) && startsWithLess(peekToken()));
 
   // Start a context for creating type syntax.
@@ -839,7 +839,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
-                                  SyntaxKind::Unknown,
+                                  SyntaxKind::TupleTypeElementList,
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;
 
@@ -877,8 +877,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       // Consume the ':'.
       if (!consumeIf(tok::colon, element.ColonLoc))
         diagnose(Tok, diag::expected_parameter_colon);
+
     } else if (Backtracking) {
-      // If we don't have labels, 'inout' is not a deprecated use.
+      // If we don't have labels, 'inout' is not a obsoleted use.
       ObsoletedInOutLoc = SourceLoc();
     }
     Backtracking.reset();
@@ -925,6 +926,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
     if (Tok.is(tok::equal)) {
+      SyntaxParsingContext InitContext(SyntaxContext, SyntaxKind::Initializer);
       SourceLoc equalLoc = consumeToken(tok::equal);
       auto init = parseExpr(diag::expected_init_value);
       auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
@@ -943,12 +945,11 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   if (EllipsisLoc.isInvalid())
     EllipsisIdx = ElementsR.size();
 
-  // If there were any labels, figure out which labels should go into the type
-  // representation.
-
   bool isFunctionType = Tok.isAny(tok::arrow, tok::kw_throws,
                                   tok::kw_rethrows);
 
+  // If there were any labels, figure out which labels should go into the type
+  // representation.
   for (auto &element : ElementsR) {
     // True tuples have labels.
     if (!isFunctionType) {
@@ -981,13 +982,18 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         diag.fixItReplace(SourceRange(element.NameLoc), "_");
     }
 
-    if (element.NameLoc.isValid() || element.SecondNameLoc.isValid()) {
+    if (element.SecondNameLoc.isValid()) {
       // Form the named parameter type representation.
+      element.UnderscoreLoc = element.NameLoc;
       element.Name = element.SecondName;
       element.NameLoc = element.SecondNameLoc;
-      element.UnderscoreLoc = element.NameLoc;
     }
   }
+
+  if (isFunctionType)
+    SyntaxContext->setTransparent();
+  else
+    SyntaxContext->setCreateSyntax(SyntaxKind::TupleType);
 
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,
