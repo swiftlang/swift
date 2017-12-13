@@ -26,25 +26,32 @@ DECL_NODES = [
     Node('FunctionParameterList', kind='SyntaxCollection',
          element='FunctionParameter'),
 
-    # function-signature ->
-    #   '(' parameter-list? ')' (throws | rethrows)? '->'? attributes? type?
-    Node('FunctionSignature', kind='Syntax',
+    Node('ParameterClause', kind='Syntax',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('ParameterList', kind='FunctionParameterList'),
              Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # -> Type
+    Node('ReturnClause', kind='Syntax',
+         children=[
+             Child('Arrow', kind='ArrowToken'),
+             Child('ReturnType', kind='Type'),
+         ]),
+
+    # function-signature ->
+    #   '(' parameter-list? ')' (throws | rethrows)? '->'? type?
+    Node('FunctionSignature', kind='Syntax',
+         children=[
+             Child('Parameter', kind='ParameterClause'),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('Arrow', kind='ArrowToken',
-                   is_optional=True),
-             Child('ReturnTypeAttributes', kind='AttributeList',
-                   is_optional=True),
-             Child('ReturnType', kind='Type',
-                   is_optional=True),
+             Child('Return', kind='ReturnClause', is_optional=True),
          ]),
 
     # else-if-directive-clause -> '#elseif' expr stmt-list

@@ -2375,7 +2375,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
     // No closure signature.
     return false;
   }
-
+  SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
@@ -2509,9 +2509,13 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       else
         invalid = true;
     } else {
+      SyntaxParsingContext ClParamListCtx(SyntaxContext,
+                                          SyntaxKind::ClosureParamList);
       // Parse identifier (',' identifier)*
       SmallVector<ParamDecl*, 4> elements;
+      bool HasNext;
       do {
+        SyntaxParsingContext ClParamCtx(SyntaxContext, SyntaxKind::ClosureParam);
         if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           invalid = true;
@@ -2525,9 +2529,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                                            Tok.getLoc(), name, Type(), nullptr);
         elements.push_back(var);
         consumeToken();
- 
+
         // Consume a comma to continue.
-      } while (consumeIf(tok::comma));
+        HasNext = consumeIf(tok::comma);
+      } while (HasNext);
 
       params = ParameterList::create(Context, elements);
     }
@@ -2542,6 +2547,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {
+      SyntaxParsingContext ReturnCtx(SyntaxContext, SyntaxKind::ReturnClause);
       // Consume the '->'.
       arrowLoc = consumeToken();
 
