@@ -37,7 +37,29 @@ internal struct _FixedArray${N}<T> {
   )
 
   @_versioned // FIXME(sil-serialize-all)
-  internal static var _arraySize : Int { return ${N} }
+  var _count: Int8
+}
+
+
+extension _FixedArray${N} {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal static var capacity: Int {
+    @inline(__always) get { return ${N} }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var capacity: Int {
+    @inline(__always) get { return ${N} }
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var count : Int {
+    @inline(__always) get { return Int(truncatingIfNeeded: _count) }
+    @inline(__always) set { _count = Int8(newValue) }
+  }
 }
 
 extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
@@ -52,11 +74,8 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var endIndex : Index {
-    return _FixedArray${N}._arraySize
+    return count
   }
-
-  @_versioned // FIXME(sil-serialize-all)
-  internal var count : Int { return _FixedArray${N}._arraySize }
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -64,6 +83,8 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     @_versioned
     @inline(__always)
     get {
+      let count = self.count // for exclusive access
+      _sanityCheck(i >= 0 && i < count)
       var copy = storage
       let res: T = withUnsafeBytes(of: &copy) {
         (rawPtr : UnsafeRawBufferPointer) -> T in
@@ -79,16 +100,9 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     @_versioned
     @inline(__always)
     set {
-      let count = self.count
-      withUnsafeBytes(of: &storage) {
-        (rawPtr : UnsafeRawBufferPointer) -> () in
-        let rawPtr = UnsafeMutableRawBufferPointer(mutating: rawPtr)
-        let stride = MemoryLayout<T>.stride
-        _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")
-        let bufPtr = UnsafeMutableBufferPointer(
-          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
-          count: count)
-        bufPtr[i] = newValue
+      _sanityCheck(i >= 0 && i < count)
+      self.withUnsafeMutableBufferPointer { buffer in
+        buffer[i] = newValue
       }
     }
   }
@@ -106,22 +120,45 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
   internal func index(before i: Index) -> Index {
     return i-1
   }
+}
 
-  // TODO: Any customization hooks it's profitable to override, e.g. append?
-
+extension _FixedArray${N} {
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned
+  internal mutating func append(_ newElement: T) {
+    _sanityCheck(count < capacity)
+    self[count] = newElement
+    _count += 1
+  }
 }
 
 extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   @inline(__always)
-  internal init(allZeros: ()) {
+  internal init(count: Int) {
+    _sanityCheck(count >= 0 && count <= _FixedArray${N}.capacity)
     self.storage = (
 % for i in range(0, N-1):
     0,
 % end
     0
     )
+    self._count = Int8(truncatingIfNeeded: count)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal init() {
+    self.init(count: 0)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal init(allZeros: ()) {
+    self.init(count: ${N})
   }
 }
 
@@ -131,8 +168,10 @@ extension _FixedArray${N} {
   internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    let count = self.count
+    let count = self.count // for exclusive access
     return try withUnsafeMutableBytes(of: &storage) { rawBuffer in
+      _sanityCheck(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
+        "layout mismatch?")
       let buffer = UnsafeMutableBufferPointer<Element>(
         start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked
           .assumingMemoryBound(to: Element.self),
@@ -146,8 +185,10 @@ extension _FixedArray${N} {
   internal mutating func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    let count = self.count
+    let count = self.count // for exclusive access
     return try withUnsafeBytes(of: &storage) { rawBuffer in
+      _sanityCheck(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
+        "layout mismatch?")
       let buffer = UnsafeBufferPointer<Element>(
         start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked
         .assumingMemoryBound(to: Element.self),
