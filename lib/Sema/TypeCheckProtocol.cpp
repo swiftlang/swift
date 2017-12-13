@@ -4708,48 +4708,6 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   }
 }
 
-bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
-                                            ExtensionDecl *protocolExtension) {
-  using namespace constraints;
-
-  assert(protocolExtension->getAsProtocolExtensionContext() &&
-         "Only intended for protocol extensions");
-
-  resolveExtension(protocolExtension);
-
-  // Dig down to the type we care about.
-  type = type->getInOutObjectType()->getRValueType();
-  if (auto metaTy = type->getAs<AnyMetatypeType>())
-    type = metaTy->getInstanceType();
-
-  // Unconstrained protocol extensions are always usable.
-  if (!protocolExtension->isConstrainedExtension())
-    return true;
-
-  // If the type still has parameters, the constrained extension is considered
-  // unusable.
-  if (type->hasTypeParameter() || type->hasTypeVariable())
-    return false;
-
-  // Set up a constraint system where we open the generic parameters of the
-  // protocol extension.
-  ConstraintSystem cs(*this, dc, None);
-  OpenedTypeMap replacements;
-  auto genericSig = protocolExtension->getGenericSignature();
-  
-  cs.openGeneric(protocolExtension, protocolExtension, genericSig, false,
-                 ConstraintLocatorBuilder(nullptr), replacements);
-
-  // Bind the 'Self' type variable to the provided type.
-  auto selfType = cast<GenericTypeParamType>(
-    genericSig->getGenericParams().back()->getCanonicalType());
-  auto selfTypeVar = replacements[selfType];
-  cs.addConstraint(ConstraintKind::Bind, selfTypeVar, type, nullptr);
-
-  // If we can solve the solution, the protocol extension is usable.
-  return cs.solveSingle().hasValue();
-}
-
 void TypeChecker::recordKnownWitness(NormalProtocolConformance *conformance,
                                      ValueDecl *req, ValueDecl *witness) {
   // Match the witness. This should never fail, but it does allow renaming
