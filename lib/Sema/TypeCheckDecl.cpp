@@ -6689,9 +6689,18 @@ public:
     if ((base->getDeclContext()->isExtensionContext() ||
          override->getDeclContext()->isExtensionContext()) &&
         !base->isObjC() && !isKnownObjC) {
-      TC.diagnose(override, diag::override_decl_extension,
-                  !override->getDeclContext()->isExtensionContext());
-      TC.diagnose(base, diag::overridden_here);
+      bool baseCanBeObjC = TC.canBeRepresentedInObjC(base);
+      TC.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
+                  !base->getDeclContext()->isExtensionContext());
+      if (baseCanBeObjC) {
+        SourceLoc insertionLoc =
+          override->getAttributeInsertionLoc(/*forModifier=*/false);
+        TC.diagnose(base, diag::overridden_here_can_be_objc)
+          .fixItInsert(insertionLoc, "@objc ");
+      } else {
+        TC.diagnose(base, diag::overridden_here);
+      }
+
       return true;
     }
     

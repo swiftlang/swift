@@ -2279,6 +2279,8 @@ public:
   bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
   bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 
+  bool canBeRepresentedInObjC(const ValueDecl *decl);
+
   void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                           Type T, SourceRange TypeRange);
 
