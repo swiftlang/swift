@@ -298,7 +298,8 @@ EXPR_NODES = [
 
     Node('ClosureSignature', kind='Syntax',
          children=[
-             Child('Capture', kind='ClosureCaptureSignature', is_optional=True),
+             Child('Capture', kind='ClosureCaptureSignature',
+                   is_optional=True),
              # FIXME: one and only one of these two children is required
              Child('SimpleInput', kind='ClosureParamList', is_optional=True),
              Child('Input', kind='ParameterClause', is_optional=True),
