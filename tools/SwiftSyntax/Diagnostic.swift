@@ -109,7 +109,8 @@ public enum FixIt: Codable {
   /// it is a range with the same start and end location.
   var range: SourceRange {
     switch self {
-    case .remove(let range), .replace(let range, _): return range
+    case .remove(let range): return range
+    case .replace(let range, _): return range
     case .insert(let loc, _): return SourceRange(start: loc, end: loc)
     }
   }
