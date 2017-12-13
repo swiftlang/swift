@@ -908,7 +908,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
       }
     }
     if (FoundSnapshot)
-      break;
+      continue;
 
     auto Content = MgrImpl.getFileContent(File, IsPrimary, Error);
     if (!Content.Buffer) {
