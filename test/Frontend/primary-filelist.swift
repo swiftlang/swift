@@ -19,6 +19,9 @@
 // RUN: not %target-swift-frontend -typecheck -filelist %t/input.txt -primary-filelist %t/primary.txt 2>&1 | %FileCheck -check-prefix=CHECK-PRIMARYNOTFOUND %s
 // CHECK-PRIMARYNOTFOUND: error: primary file '{{.*}}/../Inputs/empty.swift' was not found in file list '{{.*}}/input.txt'
 
+// RUN: not %target-swift-frontend -primary-file %s -primary-filelist nonexistent 2>&1 | %FileCheck -check-prefix=CHECK-BADFILEANDFILELIST %s
+// CHECK-BADFILEANDFILELIST: error: cannot have primary input files with primary file list
+
 
 func test() {
   #if !WORKING

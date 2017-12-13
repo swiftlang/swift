@@ -152,6 +152,14 @@ private:
                      diag::error_cannot_have_input_files_with_file_list);
       return true;
     }
+    // The following is not strictly necessary, but the restriction makes
+    // it easier to understand a given command line:
+    if (Args.hasArg(options::OPT_primary_file) && PrimaryFilelistPathArg) {
+      Diags.diagnose(
+          SourceLoc(),
+          diag::error_cannot_have_primary_files_with_primary_file_list);
+      return true;
+    }
     return false;
   }
 
