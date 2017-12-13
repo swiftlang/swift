@@ -453,11 +453,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     unsigned IsCompatibilityAlias : 1;
   BITFIELD_END;
 
-  BITFIELD_START(NominalTypeDecl, GenericTypeDecl, 4);
-    /// Whether or not the nominal type decl has delayed protocol or member
-    /// declarations.
-    unsigned HasDelayedMembers : 1;
-
+  BITFIELD_START(NominalTypeDecl, GenericTypeDecl, 3);
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
@@ -2802,7 +2798,6 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     setGenericParams(GenericParams);
-    NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     NominalTypeDeclBits.HasLazyConformances = false;
@@ -2831,17 +2826,6 @@ public:
   /// \brief Does this declaration expose a fixed layout to the given
   /// module?
   bool hasFixedLayout(ModuleDecl *M, ResilienceExpansion expansion) const;
-
-  /// \brief Returns true if this decl contains delayed value or protocol
-  /// declarations.
-  bool hasDelayedMembers() const {
-    return NominalTypeDeclBits.HasDelayedMembers;
-  }
-  
-  /// \brief Mark this declaration as having delayed members or not.
-  void setHasDelayedMembers(bool hasDelayedMembers = true) {
-    NominalTypeDeclBits.HasDelayedMembers = hasDelayedMembers;
-  }
 
   /// Determine whether we have already attempted to add any
   /// implicitly-defined initializers to this declaration.
