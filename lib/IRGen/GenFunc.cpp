@@ -967,7 +967,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto paramInfo = substType->getParameters()[paramI];
       auto &ti = IGM.getTypeInfoForLowered(paramInfo.getType());
       Explosion param;
-      param.add(subIGF.Builder.CreateBitCast(rawData, ti.getStorageType()));
+      param.add(subIGF.coerceValue(rawData, ti.getStorageType(), subIGF.IGM.DataLayout));
       bindPolymorphicParameter(subIGF, origType, substType, param, paramI);
       (void)param.claimAll();
     }
