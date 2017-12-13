@@ -123,7 +123,6 @@ class ArgsToFrontendInputsConverter {
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> BuffersToKeepAlive;
 
   llvm::SetVector<StringRef> Files;
-  std::set<StringRef> PrimaryFiles;
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &Diags, const ArgList &Args,
@@ -139,10 +138,12 @@ public:
     if (FilelistPathArg ? readInputFilesFromFilelist()
                         : readInputFilesFromCommandLine())
       return true;
-    if (readPrimaryFiles())
+    Optional<std::set<StringRef>> primaryFiles = readPrimaryFiles();
+    if (!primaryFiles)
       return true;
-    createInputFiles();
-    return checkForMissingPrimaryFiles();
+    std::set<StringRef> unusedPrimaryFiles =
+        createInputFilesConsumingPrimaries(*primaryFiles);
+    return checkForMissingPrimaryFiles(unusedPrimaryFiles);
   }
 
 private:
@@ -211,34 +212,37 @@ private:
     return true;
   }
 
-  bool readPrimaryFiles() {
+  Optional<std::set<StringRef>> readPrimaryFiles() {
+    std::set<StringRef> primaryFiles;
     for (const Arg *A : Args.filtered(options::OPT_primary_file))
-      PrimaryFiles.insert(A->getValue());
+      primaryFiles.insert(A->getValue());
     if (forAllFilesInFilelist(
             PrimaryFilelistPathArg,
-            [&](StringRef file) -> void { PrimaryFiles.insert(file); }))
-      return true;
-    return false;
+            [&](StringRef file) -> void { primaryFiles.insert(file); }))
+      return None;
+    return primaryFiles;
   }
 
-  void createInputFiles() {
+  std::set<StringRef>
+  createInputFilesConsumingPrimaries(std::set<StringRef> primaryFiles) {
     for (auto &file : Files) {
-      bool isPrimary = PrimaryFiles.count(file) > 0;
+      bool isPrimary = primaryFiles.count(file) > 0;
       Inputs.addInput(InputFile(file, isPrimary));
       if (isPrimary)
-        PrimaryFiles.erase(file);
+        primaryFiles.erase(file);
     }
+    return primaryFiles;
   }
 
-  bool checkForMissingPrimaryFiles() {
-    for (auto &file : PrimaryFiles) {
+  bool checkForMissingPrimaryFiles(std::set<StringRef> primaryFiles) {
+    for (auto &file : primaryFiles) {
       // Catch "swiftc -frontend -c -filelist foo -primary-file
       // some-file-not-in-foo".
       assert(FilelistPathArg && "Missing primary with no filelist");
       Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
                      FilelistPathArg->getValue());
     }
-    return !PrimaryFiles.empty();
+    return !primaryFiles.empty();
   }
 };
 class FrontendArgsToOptionsConverter {
