@@ -404,13 +404,13 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
     Throws,
     SyntaxFactory::makeReturnClause(Arrow, Int));
 
-  ASSERT_EQ(LParen.getRaw(), Sig.getParameter().getLeftParen().getRaw());
+  ASSERT_EQ(LParen.getRaw(), Sig.getInput().getLeftParen().getRaw());
 
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto GottenList1 = Sig.getParameter().getParameterList();
-    auto GottenList2 = Sig.getParameter().getParameterList();
+    auto GottenList1 = Sig.getInput().getParameterList();
+    auto GottenList2 = Sig.getInput().getParameterList();
     ASSERT_TRUE(GottenList1.hasSameIdentityAs(GottenList2));
     GottenList1.print(OS);
     ASSERT_EQ(OS.str().str(),
@@ -419,16 +419,16 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
               "with radius: Int = -1, ");
   }
 
-  ASSERT_EQ(RParen.getRaw(), Sig.getParameter().getRightParen().getRaw());
+  ASSERT_EQ(RParen.getRaw(), Sig.getInput().getRightParen().getRaw());
   ASSERT_EQ(Throws.getRaw(), Sig.getThrowsOrRethrowsKeyword()->getRaw());
   ASSERT_EQ(Sig.getThrowsOrRethrowsKeyword()->getTokenKind(), tok::kw_throws);
-  ASSERT_EQ(Arrow.getRaw(), Sig.getReturn()->getArrow().getRaw());
+  ASSERT_EQ(Arrow.getRaw(), Sig.getOutput()->getArrow().getRaw());
 
   {
     SmallString<3> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto GottenReturnType1 = Sig.getReturn()->getReturnType();
-    auto GottenReturnType2 = Sig.getReturn()->getReturnType();
+    auto GottenReturnType1 = Sig.getOutput()->getReturnType();
+    auto GottenReturnType2 = Sig.getOutput()->getReturnType();
     ASSERT_TRUE(GottenReturnType1.hasSameIdentityAs(GottenReturnType2));
     GottenReturnType1.print(OS);
     ASSERT_EQ(OS.str().str(), "Int");
@@ -453,9 +453,9 @@ TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
   SmallString<48> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   SyntaxFactory::makeBlankFunctionSignature()
-    .withParameter(Parameter)
+    .withInput(Parameter)
     .withThrowsOrRethrowsKeyword(Throws)
-    .withReturn(Return)
+    .withOutput(Return)
     .print(OS);
   ASSERT_EQ(OS.str().str(),
             "(with radius: Int = -1, "

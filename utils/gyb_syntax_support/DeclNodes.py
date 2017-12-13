@@ -44,14 +44,14 @@ DECL_NODES = [
     #   '(' parameter-list? ')' (throws | rethrows)? '->'? type?
     Node('FunctionSignature', kind='Syntax',
          children=[
-             Child('Parameter', kind='ParameterClause'),
+             Child('Input', kind='ParameterClause'),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
                    token_choices=[
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
-             Child('Return', kind='ReturnClause', is_optional=True),
+             Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
     # else-if-directive-clause -> '#elseif' expr stmt-list

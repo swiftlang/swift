@@ -300,10 +300,10 @@ EXPR_NODES = [
          children=[
              Child('Capture', kind='ClosureCaptureSignature', is_optional=True),
              # FIXME: one and only one of these two children is required
-             Child('SimpleParameter', kind='ClosureParamList', is_optional=True),
-             Child('Parameter', kind='ParameterClause', is_optional=True),
-             Child('Throws', kind='ThrowsToken', is_optional=True,),
-             Child('Return', kind='ReturnClause', is_optional=True),
-             Child('In', kind='InToken'),
+             Child('SimpleInput', kind='ClosureParamList', is_optional=True),
+             Child('Input', kind='ParameterClause', is_optional=True),
+             Child('ThrowsTok', kind='ThrowsToken', is_optional=True),
+             Child('Output', kind='ReturnClause', is_optional=True),
+             Child('InTok', kind='InToken'),
          ]),
 ]
