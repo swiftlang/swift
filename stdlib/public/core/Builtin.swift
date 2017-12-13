@@ -579,14 +579,6 @@ extension ManagedBufferPointer {
     self._nativeBuffer = buffer
   }
 }
-extension _StringBuffer {
-  @_inlineable
-  public // FIXME: String Guts
-  var _nativeObject: _BuiltinNativeObject {
-    @inline(__always)
-    get { return _storage._nativeBuffer }
-  }
-}
 
 /// Create a `BridgeObject` around the given `nativeObject` with the
 /// given spare bits.

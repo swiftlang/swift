@@ -1043,28 +1043,6 @@ extension String {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
-  public // SPI(Foundation)
-  init(_storage: _StringBuffer) { // FIXME: Replace with _SwiftStringStorage
-    if _storage.elementWidth == 1 {
-      let native = _SwiftStringStorage<UInt8>.create(
-        capacity: _storage.capacity,
-        count: _storage.usedCount)
-      native.start.initialize(
-        from: _storage.start.assumingMemoryBound(to: UInt8.self),
-        count: _storage.usedCount)
-      _guts = _StringGuts(native)
-    } else {
-      let native = _SwiftStringStorage<UInt16>.create(
-        capacity: _storage.capacity,
-        count: _storage.usedCount)
-      native.start.initialize(
-        from: _storage.start.assumingMemoryBound(to: UInt16.self),
-        count: _storage.usedCount)
-      _guts = _StringGuts(native)
-    }
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
   public
   init<CodeUnit>(_storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
@@ -1275,7 +1253,7 @@ internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
       dest, Int32(utf16.count), // FIXME: handle overflow case
       utf16.start, Int32(utf16.count))
   }
-  return String(_storage: buffer)
+  return String(_storage: storage)
 }
 #endif
 
