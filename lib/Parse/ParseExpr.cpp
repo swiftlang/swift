@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -2375,11 +2376,22 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
     return false;
   }
 
-  // At this point, we know we have a closure signature. Parse the capture list
-  // and parameters.
-  if (consumeIf(tok::l_square) &&
-      !consumeIf(tok::r_square)) {
+  if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
+    SyntaxParsingContext CaptureCtx(SyntaxContext,
+                                    SyntaxKind::ClosureCaptureSignature);
+    consumeToken(tok::l_square);
+    consumeToken(tok::r_square);
+  } else if (Tok.is(tok::l_square) && !peekToken().is(tok::r_square)) {
+    SyntaxParsingContext CaptureCtx(SyntaxContext,
+                                    SyntaxKind::ClosureCaptureSignature);
+    consumeToken(tok::l_square);
+    // At this point, we know we have a closure signature. Parse the capture list
+    // and parameters.
+    bool HasNext;
     do {
+      SyntaxParsingContext CapturedItemCtx(SyntaxContext,
+                                           SyntaxKind::ClosureCaptureItem);
+      SWIFT_DEFER { HasNext = consumeIf(tok::comma); };
       // Check for the strength specifier: "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
@@ -2418,6 +2430,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         skipUntil(tok::comma, tok::r_square);
         continue;
       }
+
+      // Squash all tokens, if any, as the specifier of the captured item.
+      CapturedItemCtx.collectNodesInPlace(SyntaxKind::TokenList);
 
       // The thing being capture specified is an identifier, or as an identifier
       // followed by an expression.
@@ -2472,8 +2487,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                                              CurDeclContext);
 
       captureList.push_back(CaptureListEntry(VD, PBD));
-    } while (consumeIf(tok::comma));
+    } while (HasNext);
 
+    SyntaxContext->collectNodesInPlace(SyntaxKind::ClosureCaptureItemList);
     // The capture list needs to be closed off with a ']'.
     if (!consumeIf(tok::r_square)) {
       diagnose(Tok, diag::expected_capture_list_end_rsquare);

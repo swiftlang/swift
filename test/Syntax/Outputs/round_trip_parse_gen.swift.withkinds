@@ -126,4 +126,13 @@ func tryfoo<FunctionSignature>() </FunctionSignature><CodeBlock>{<TryExpr>
   try! <IdentifierExpr>foo</IdentifierExpr>()</TryExpr><TryExpr>
   try? <IdentifierExpr>foo</IdentifierExpr>()</TryExpr><TryExpr>
   try! <MemberAccessExpr><IdentifierExpr>foo</IdentifierExpr>().bar</MemberAccessExpr>().foo().bar()</TryExpr>
+}</CodeBlock></FunctionDecl><FunctionDecl>
+
+func closure<FunctionSignature>() </FunctionSignature><CodeBlock>{
+  {<ClosureCaptureSignature>[<ClosureCaptureItem>weak <IdentifierExpr>a</IdentifierExpr>,</ClosureCaptureItem><ClosureCaptureItem>
+    unowned(safe) self,</ClosureCaptureItem><ClosureCaptureItem>
+    b = <IntegerLiteralExpr>3</IntegerLiteralExpr>,</ClosureCaptureItem><ClosureCaptureItem>
+    unowned(unsafe) c = <MemberAccessExpr><IdentifierExpr>foo</IdentifierExpr>().bar</MemberAccessExpr></ClosureCaptureItem>] </ClosureCaptureSignature>in
+  }
+  {<ClosureCaptureSignature>[] </ClosureCaptureSignature>in }
 }</CodeBlock></FunctionDecl>

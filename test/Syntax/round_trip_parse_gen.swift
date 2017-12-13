@@ -127,3 +127,12 @@ func tryfoo() {
   try? foo()
   try! foo().bar().foo().bar()
 }
+
+func closure() {
+  {[weak a,
+    unowned(safe) self,
+    b = 3,
+    unowned(unsafe) c = foo().bar] in
+  }
+  {[] in }
+}
