@@ -166,7 +166,7 @@ extension _StringVariant {
 
   @_inlineable
   @_versioned
-  func decodeUnicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
+  func unicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
     let u0 = self.codeUnit(atCheckedOffset: offset)
     if _fastPath(UTF16._isScalar(u0)) {
       return Unicode.Scalar(_unchecked: UInt32(u0))
@@ -174,6 +174,22 @@ extension _StringVariant {
     if UTF16.isLeadSurrogate(u0) && offset + 1 < count {
       let u1 = self[offset + 1]
       if UTF16.isTrailSurrogate(u1) {
+        return UTF16._decodeSurrogates(u0, u1)
+      }
+    }
+    return Unicode.Scalar._replacementCharacter
+  }
+
+  @_inlineable
+  @_versioned
+  func unicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
+    let u1 = self.codeUnit(atCheckedOffset: offset - 1)
+    if _fastPath(UTF16._isScalar(u1)) {
+      return Unicode.Scalar(_unchecked: UInt32(u1))
+    }
+    if UTF16.isTrailSurrogate(u1) && offset >= 2 {
+      let u0 = self[offset - 2]
+      if UTF16.isLeadSurrogate(u0) {
         return UTF16._decodeSurrogates(u0, u1)
       }
     }

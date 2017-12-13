@@ -175,17 +175,7 @@ extension String {
     @_inlineable // FIXME(sil-serialize-all)
     public subscript(position: Index) -> Unicode.Scalar {
       let offset = position.encodedOffset
-      if _slowPath(_guts._isOpaque) {
-        let opaque = _guts._asOpaque()
-        return opaque.decodeUnicodeScalar(startingAt: offset)
-      } else if _guts.isASCII {
-        let ascii = _guts._unmanagedASCIIView
-        let u = ascii.codeUnit(atCheckedOffset: offset)
-        return Unicode.Scalar(_unchecked: UInt32(u))
-      } else {
-        let utf16 = _guts._unmanagedUTF16View
-        return utf16.decodeUnicodeScalar(startingAt: offset)
-      }
+      return _guts.unicodeScalar(startingAt: offset)
     }
 
     /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
@@ -279,6 +269,34 @@ extension String {
 
   /// The index type for a string's `unicodeScalars` view.
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
+}
+
+extension _StringGuts {
+  @_inlineable
+  @_versioned
+  internal func unicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
+    if _slowPath(_isOpaque) {
+      return _asOpaque().unicodeScalar(startingAt: offset)
+    }
+    if isASCII {
+      let u = _unmanagedASCIIView.codeUnit(atCheckedOffset: offset)
+      return Unicode.Scalar(_unchecked: UInt32(u))
+    }
+    return _unmanagedUTF16View.unicodeScalar(startingAt: offset)
+  }
+
+  @_inlineable
+  @_versioned
+  internal func unicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
+    if _slowPath(_isOpaque) {
+      return _asOpaque().unicodeScalar(endingAt: offset)
+    }
+    if isASCII {
+      let u = _unmanagedASCIIView.codeUnit(atCheckedOffset: offset - 1)
+      return Unicode.Scalar(_unchecked: UInt32(u))
+    }
+    return _unmanagedUTF16View.unicodeScalar(endingAt: offset)
+  }
 }
 
 extension String.UnicodeScalarView : _SwiftStringView {
