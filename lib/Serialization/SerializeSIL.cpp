@@ -2339,18 +2339,19 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // Go through all SILVTables in SILMod and write them if we should
   // serialize everything.
   // FIXME: Resilience: could write out vtable for fragile classes.
-  const DeclContext *assocDC = SILMod->getAssociatedContext();
-  assert(assocDC && "cannot serialize SIL without an associated DeclContext");
+  auto assocDCs = SILMod->getAssociatedContexts();
+  assert(!assocDCs.empty() &&
+         "cannot serialize SIL without an associated DeclContext");
   for (const SILVTable &vt : SILMod->getVTables()) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
-        vt.getClass()->isChildContextOf(assocDC))
+        vt.getClass()->isChildContextOf(assocDCs))
       writeSILVTable(vt);
   }
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
     if ((ShouldSerializeAll || wt.isSerialized()) &&
-        wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
+        wt.getConformance()->getDeclContext()->isChildContextOf(assocDCs))
       writeSILWitnessTable(wt);
   }
 
@@ -2358,7 +2359,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   for (const SILDefaultWitnessTable &wt : SILMod->getDefaultWitnessTables()) {
     // FIXME: Don't need to serialize private and internal default witness
     // tables.
-    if (wt.getProtocol()->getDeclContext()->isChildContextOf(assocDC))
+    if (wt.getProtocol()->getDeclContext()->isChildContextOf(assocDCs))
       writeSILDefaultWitnessTable(wt);
   }
 

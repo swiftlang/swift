@@ -1392,32 +1392,36 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
+SILModule::constructSIL(ModuleDecl *mod, SILOptions &options,
+                        ArrayRef<FileUnit *> Files,
                         Optional<unsigned> startElem,
                         bool isWholeModule) {
   SharedTimer timer("SILGen");
-  const DeclContext *DC;
+  SmallVector<DeclContext *, 16> associatedDCs;
   if (startElem) {
-    assert(SF && "cannot have a start element without a source file");
+    assert(!Files.empty() && "cannot have a start element without source files");
     // Because more decls may be added to the SourceFile, we can't assume
     // anything about the compilation context.
-    DC = nullptr;
-  } else if (SF) {
-    DC = SF;
+  } else if (!Files.empty()) {
+    for (auto *F : Files) {
+      associatedDCs.push_back(F);
+    }
   } else {
-    DC = mod;
+    associatedDCs.push_back(mod);
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, isWholeModule));
+      new SILModule(mod, options, associatedDCs, isWholeModule));
   SILGenModule SGM(*M, mod);
 
-  if (SF) {
-    if (auto *file = dyn_cast<SourceFile>(SF)) {
-      SGM.emitSourceFile(file, startElem.getValueOr(0));
-    } else if (auto *file = dyn_cast<SerializedASTFile>(SF)) {
-      if (file->isSIB())
-        M->getSILLoader()->getAllForModule(mod->getName(), file);
+  if (!Files.empty()) {
+    for (auto *F : Files) {
+      if (auto *SF = dyn_cast<SourceFile>(F)) {
+        SGM.emitSourceFile(SF, startElem.getValueOr(0));
+      } else if (auto *SASTF = dyn_cast<SerializedASTFile>(F)) {
+        if (SASTF->isSIB())
+          M->getSILLoader()->getAllForModule(mod->getName(), SASTF);
+      }
     }
   } else {
     for (auto file : mod->getFiles()) {
@@ -1469,13 +1473,14 @@ std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod,
                             SILOptions &options,
                             bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, options, nullptr, None,
-                                 wholeModuleCompilation);
+  return SILModule::constructSIL(mod, options, ArrayRef<FileUnit *>(),
+                                 None, wholeModuleCompilation);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(FileUnit &sf, SILOptions &options,
+swift::performSILGeneration(ModuleDecl *mod,
+                            SILOptions &options,
+                            ArrayRef<FileUnit *> files,
                             Optional<unsigned> startElem) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,
-                                 false);
+  return SILModule::constructSIL(mod, options, files, startElem, false);
 }

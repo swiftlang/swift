@@ -2559,7 +2559,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
 
   // Print the declarations and types from the origin module, unless we're not
   // in whole-module mode.
-  if (M && AssociatedDeclContext == M && PrintASTDecls) {
+  if (M && AssociatedDeclContexts.count(M) != 0 && PrintASTDecls) {
     PrintOptions Options = PrintOptions::printSIL();
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;

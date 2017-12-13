@@ -235,12 +235,14 @@ namespace swift {
   performSILGeneration(ModuleDecl *M, SILOptions &options,
                        bool wholeModuleCompilation = false);
 
-  /// Turn a source file into SIL IR.
+  /// Turn a set of (source and/or serialized AST) files into SIL IR.
   ///
   /// If \p StartElem is provided, the module is assumed to be only part of the
-  /// SourceFile, and any optimizations should take that into account.
+  /// Files, and any optimizations should take that into account.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options,
+  performSILGeneration(ModuleDecl *Module,
+                       SILOptions &options,
+                       ArrayRef<FileUnit*> Files,
                        Optional<unsigned> StartElem = None);
 
   /// Serializes a module and zero or more source files to the given output file.

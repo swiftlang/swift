@@ -1314,7 +1314,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 static bool isAvailableExternally(IRGenModule &IGM, const DeclContext *dc) {
   dc = dc->getModuleScopeContext();
   if (isa<ClangModuleUnit>(dc) ||
-      dc == IGM.getSILModule().getAssociatedContext())
+      IGM.getSILModule().getAssociatedContexts().count(dc) != 0)
     return false;
   return true;
 }

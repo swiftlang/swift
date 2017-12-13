@@ -85,8 +85,10 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
-                     const DeclContext *associatedDC, bool wholeModule)
-    : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
+                     ArrayRef<DeclContext *> associatedDCs,
+                     bool wholeModule)
+  : TheSwiftModule(SwiftModule),
+      AssociatedDeclContexts(associatedDCs.begin(), associatedDCs.end()),
       Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
       wholeModule(wholeModule), Options(Options), serialized(false),
       SerializeSILAction(), Types(*this) {}

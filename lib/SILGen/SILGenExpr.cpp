@@ -4194,9 +4194,15 @@ static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
   }
 
   // Other types like UnsafePointer can also be nullable.
-  const DeclContext *DC = M.getAssociatedContext();
-  if (!DC)
-    DC = M.getSwiftModule();
+
+  // NB: This used to try to restrict DC to M's AssociatedContext
+  // when there was only one of those, but it is now falling back
+  // to only using the module. I believe this is correct (nothing
+  // in the callees of isTriviallyRepresentableIn seems to use
+  // the DC for anything where it would make a difference) but
+  // please be skeptical and thorough when reviewing this!
+  const DeclContext *DC = M.getSwiftModule();
+
   ty = OptionalType::get(ty);
   return ty->isTriviallyRepresentableIn(ForeignLanguage::C, DC);
 }

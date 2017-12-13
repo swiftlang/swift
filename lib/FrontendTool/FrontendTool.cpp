@@ -783,30 +783,37 @@ static bool performCompile(CompilerInstance &Instance,
       auto SASTF = dyn_cast<SerializedASTFile>(File);
       return SASTF && SASTF->isSIB();
     };
+    ModuleDecl *mod = Instance.getMainModule();
+    SILOptions &SILOpts = Invocation.getSILOptions();
     if (opts.Inputs.hasPrimaryInputs()) {
-      FileUnit *PrimaryFile = Instance.getPrimarySourceFile();
-      if (!PrimaryFile) {
-        for (FileUnit *fileUnit : Instance.getMainModule()->getFiles()) {
+      llvm::SmallVector<FileUnit *, 16> PrimaryInputs;
+      std::copy(Instance.getPrimarySourceFiles().begin(),
+                Instance.getPrimarySourceFiles().end(),
+                std::back_inserter(PrimaryInputs));
+      // FIXME: This looks somewhat redundant with the fact that we're
+      // getting inputs from the primary source files list already;
+      // possibly try to eliminate this block.
+      if (PrimaryInputs.empty()) {
+        for (FileUnit *fileUnit : mod->getFiles()) {
           if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit)) {
             if (Invocation.getFrontendOptions().Inputs.isFilePrimary(
                     InputFile::
                         convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
                             SASTF->getFilename()))) {
-              assert(!PrimaryFile && "Can only handle one primary so far");
-              PrimaryFile = fileUnit;
+              assert(PrimaryInputs.empty()
+                     && "Can only handle one primary so far");
+              PrimaryInputs.push_back(fileUnit);
             }
           }
         }
       }
-      astGuaranteedToCorrespondToSIL = !fileIsSIB(PrimaryFile);
-      SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
-                                None);
-    } else {
-      auto mod = Instance.getMainModule();
       astGuaranteedToCorrespondToSIL =
-          llvm::none_of(mod->getFiles(), fileIsSIB);
-      SM = performSILGeneration(mod, Invocation.getSILOptions(),
-                                true);
+        llvm::none_of(PrimaryInputs, fileIsSIB);
+      SM = performSILGeneration(mod, SILOpts, PrimaryInputs, None);
+    } else {
+      astGuaranteedToCorrespondToSIL =
+        llvm::none_of(mod->getFiles(), fileIsSIB);
+      SM = performSILGeneration(mod, Invocation.getSILOptions(), true);
     }
   }
 

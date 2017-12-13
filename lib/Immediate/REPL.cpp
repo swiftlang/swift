@@ -831,7 +831,9 @@ private:
     std::unique_ptr<SILModule> sil;
     
     if (!CI.getASTContext().hadError()) {
-      sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
+      sil = performSILGeneration(REPLInputFile.getParentModule(),
+                                 CI.getSILOptions(),
+                                 ArrayRef<FileUnit *>(&REPLInputFile),
                                  RC.CurIRGenElem);
       performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
