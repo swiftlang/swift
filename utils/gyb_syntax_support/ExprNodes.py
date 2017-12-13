@@ -32,7 +32,7 @@ EXPR_NODES = [
     # try foo()
     # try? foo()
     # try! foo()
-    Node('TryOperator', kind='Syntax',
+    Node('TryExpr', kind='Expr',
          children=[
              Child('TryKeyword', kind='TryToken'),
              Child('QuestionOrExclamationMark', kind='Token',
@@ -41,6 +41,7 @@ EXPR_NODES = [
                        'PostfixQuestionMarkToken',
                        'ExclamationMarkToken',
                    ]),
+             Child('Expression', kind='Expr'),
          ]),
 
     # An identifier expression.

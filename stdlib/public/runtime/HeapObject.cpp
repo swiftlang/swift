@@ -46,6 +46,22 @@
 
 using namespace swift;
 
+// Check to make sure the runtime is being built with a compiler that
+// supports the Swift calling convention.
+//
+// If the Swift calling convention is not in use, functions such as 
+// swift_allocBox and swift_makeBoxUnique that rely on their return value 
+// being passed in a register to be compatible with Swift may miscompile on
+// some platforms and silently fail.
+#if !__has_attribute(swiftcall)
+#error "The runtime must be built with a compiler that supports swiftcall."
+#endif
+
+// Check that the user isn't manually disabling SWIFTCALL.
+#if defined(SWIFT_USE_SWIFTCALL) && !SWIFT_USE_SWIFTCALL
+#error "SWIFT_USE_SWIFTCALL=0 is not supported; swiftcall must always be used."
+#endif
+
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {

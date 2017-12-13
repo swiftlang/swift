@@ -108,7 +108,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
 
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
   // TODO: use a custom CC that returns three scalars efficiently
-  return SWIFT_LLVM_CC(SwiftCC);
+  return IGM.SwiftCC;
 }
 
 /// Expand the requirements of the given abstract calling convention
@@ -146,8 +146,6 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
 
 void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
-  if (!UseSwiftCC)
-    return;
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::SwiftSelf);
   attrs = attrs.addAttributes(this->LLVMContext,
@@ -160,7 +158,7 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   // We create a shadow stack location of the swifterror parameter for the
   // debugger on such platforms and so we can't mark the parameter with a
   // swifterror attribute.
-  if (!UseSwiftCC || !this->IsSwiftErrorInRegister)
+  if (!this->IsSwiftErrorInRegister)
     return;
 
   llvm::AttrBuilder b;
