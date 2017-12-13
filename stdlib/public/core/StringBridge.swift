@@ -48,29 +48,6 @@ func _stdlib_binary_CFStringGetCharactersPtr(
 /// Loading Foundation initializes these function variables
 /// with useful values
 
-/// Produces a `_StringBuffer` from a given subrange of a source
-/// `_CocoaString`, having the given minimum capacity.
-@_versioned // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
-internal func _cocoaStringToContiguous(
-  source: _CocoaString, range: Range<Int>, minimumCapacity: Int
-) -> _StringBuffer {
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
-    "Known contiguously stored strings should already be converted to Swift")
-
-  let startIndex = range.lowerBound
-  let count = range.upperBound - startIndex
-
-  let buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
-                             initialSize: count, elementWidth: 2)
-
-  _swift_stdlib_CFStringGetCharacters(
-    source, _swift_shims_CFRange(location: startIndex, length: count), 
-    buffer.start.assumingMemoryBound(to: _swift_shims_UniChar.self))
-  
-  return buffer
-}
-
 /// Copies the entire contents of a _CocoaString into contiguous
 /// storage of sufficient capacity.
 @_versioned // FIXME(sil-serialize-all)

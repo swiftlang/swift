@@ -12,7 +12,6 @@
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
-    "StringBuffer.swift",
     "StringCharacterView.swift",
     "StringComparable.swift",
     "StringObject.swift",

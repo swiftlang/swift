@@ -18,7 +18,7 @@ func hexAddrVal<T>(_ x: T) -> String {
 
 func hexAddr(_ x: AnyObject?) -> String {
   if let owner = x {
-    if let y = owner as? _HeapBufferStorage<_StringBufferIVars, UInt16> {
+    if let y = owner as? _SwiftRawStringStorage {
       return ".native\(hexAddrVal(y))"
     }
     if let y = owner as? NSString {
