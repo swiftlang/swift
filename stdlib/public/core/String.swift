@@ -784,12 +784,6 @@ public struct String {
   init(_ _guts: _StringGuts) {
     self._guts = _guts
   }
-
-  public // @testable
-  var _core: _LegacyStringCore {
-    get { return _guts._legacyCore }
-    set { self._guts = _StringGuts(newValue) }
-  }
 }
 
 extension String {

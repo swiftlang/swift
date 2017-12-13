@@ -286,12 +286,6 @@ extension String {
 
     @_versioned
     internal var _guts: _StringGuts
-
-    @_versioned
-    internal var _core: _LegacyStringCore {
-      get { return _guts._legacyCore }
-      set { self._guts = _StringGuts(newValue) }
-    }
   }
 
   /// A UTF-16 encoding of `self`.
