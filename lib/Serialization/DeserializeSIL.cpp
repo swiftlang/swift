@@ -1558,7 +1558,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::StoreUnownedInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.castTo<WeakStorageType>();
+    auto refType = addrType.castTo<UnownedStorageType>();
     auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
     bool isInit = (Attr > 0);
     ResultVal = Builder.createStoreUnowned(Loc,
