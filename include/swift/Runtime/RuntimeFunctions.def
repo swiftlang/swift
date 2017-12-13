@@ -1049,14 +1049,10 @@ FUNCTION(LookUpClass, objc_lookUpClass, C_CC,
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getObjectType(id object);
-//
-// Since this is intended to look through dynamic subclasses, it's
-// invariant across reasonable isa-rewriting schemes and therefore can
-// be readnone.
 FUNCTION(GetObjectType, swift_getObjectType, DefaultCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(ObjCPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_getDynamicType(opaque_t *obj, Metadata *self);
 FUNCTION(GetDynamicType, swift_getDynamicType, DefaultCC,
