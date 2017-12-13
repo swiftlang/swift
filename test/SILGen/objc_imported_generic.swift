@@ -125,6 +125,11 @@ func configureWithoutOptions() {
   _ = GenericClass<NSObject>(options: nil)
 }
 
+// This gets emitted down here for some reason
+
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So12GenericClassCSQyAByxGGSayxG13arrayOfThings_tcfcTO
+// CHECK:         objc_method {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.1.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned Optional<GenericClass<τ_0_0>>
+
 // foreign to native thunk for init(options:), uses GenericOption : Hashable
 // conformance
 
@@ -132,11 +137,6 @@ func configureWithoutOptions() {
 // CHECK: [[FN:%.*]] = function_ref @_T0s10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: apply [[FN]]<GenericOption, Any>({{.*}}) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: return
-
-// This gets emitted down here for some reason
-
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So12GenericClassCSQyAByxGGSayxG13arrayOfThings_tcfcTO
-// CHECK:         objc_method {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.1.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned Optional<GenericClass<τ_0_0>>
 
 // Make sure we emitted the witness table for the above conformance
 

@@ -1086,10 +1086,6 @@ public:
   /// translation unit has been processed.
   void finalizeDecl(ValueDecl *D);
 
-  /// \brief Force all members of an external decl, and also add its
-  /// conformances.
-  void forceExternalDeclMembers(NominalTypeDecl *NTD);
-
   /// Resolve a reference to the given type declaration within a particular
   /// context.
   ///
@@ -1337,11 +1333,6 @@ public:
 
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
     synthesizeMemberForLookup(nominal, member);
-  }
-
-  virtual void
-  resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
-    handleExternalDecl(nominal);
   }
 
   /// Infer default value witnesses for all requirements in the given protocol.
