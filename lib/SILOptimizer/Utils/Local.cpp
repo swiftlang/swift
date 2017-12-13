@@ -1571,6 +1571,40 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   return (NewI) ? NewI : AI;
 }
 
+static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
+                            swift::SILModule &M,
+                            swift::SILFunctionConventions &substConv) {
+  // DestTy is the type which we want to convert to
+  SILType DestTy =
+      SILType::getPrimitiveObjectType(BridgedTargetTy->getCanonicalType());
+  // ConvTy  is the return type of the _bridgeToObjectiveCImpl()
+  auto ConvTy = substConv.getSILResultType().getObjectType();
+  if (ConvTy == DestTy) {
+    // Destination is the same type
+    return true;
+  }
+  // Check if a superclass/subclass of the source operand
+  if (DestTy.isExactSuperclassOf(ConvTy)) {
+    return true;
+  }
+  if (ConvTy.isExactSuperclassOf(DestTy)) {
+    return true;
+  }
+  // check if it is a bridgeable CF type
+  if (ConvTy.getSwiftRValueType() ==
+      getNSBridgedClassOfCFClass(M.getSwiftModule(),
+                                 DestTy.getSwiftRValueType())) {
+    return true;
+  }
+  if (DestTy.getSwiftRValueType() ==
+      getNSBridgedClassOfCFClass(M.getSwiftModule(),
+                                 ConvTy.getSwiftRValueType())) {
+    return true;
+  }
+  // All else failed - can't optimize this case
+  return false;
+}
+
 /// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
 /// instance into a bridged ObjC type.
 SILInstruction *
@@ -1646,7 +1680,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   if (ResultsRef.size() != 1)
     return nullptr;
 
-  auto MemberDeclRef = SILDeclRef(Results.front());
+  auto *resultDecl = Results.front();
+  auto MemberDeclRef = SILDeclRef(resultDecl);
   auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
                                             ForDefinition_t::NotForDefinition);
 
@@ -1676,6 +1711,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, SubMap);
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
+
+  // check that we can go through with the optimization
+  if (!canOptimizeCast(BridgedTargetTy, M, substConv)) {
+    return nullptr;
+  }
 
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
   if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
@@ -1811,6 +1851,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     // If it is addr cast then store the result.
     auto ConvTy = NewAI->getType();
     auto DestTy = Dest->getType().getObjectType();
+    assert(DestTy == SILType::getPrimitiveObjectType(
+                         BridgedTargetTy->getCanonicalType()) &&
+           "Expected Dest Type to be the same as BridgedTargetTy");
     SILValue CastedValue;
     if (ConvTy == DestTy) {
       CastedValue = NewAI;
@@ -1842,9 +1885,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       CastedValue =
           SILValue(Builder.createUncheckedRefCast(Loc, NewAI, DestTy));
     } else {
-      llvm_unreachable(
-          "Destination should have the same type, be bridgeable CF "
-          "type or be a superclass/subclass of the source operand");
+      llvm_unreachable("optimizeBridgedSwiftToObjCCast: should never reach "
+                       "this condition: if the Destination does not have the "
+                       "same type, is not a bridgeable CF type and isn't a "
+                       "superclass/subclass of the source operand we should "
+                       "have bailed earlier");
     }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
