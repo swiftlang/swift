@@ -1127,3 +1127,73 @@ extension _StringGuts {
     }
   }
 }
+
+extension _StringGuts : Sequence {
+  public typealias Element = UTF16.CodeUnit
+
+  @_fixed_layout
+  public struct Iterator : IteratorProtocol {
+    public typealias Element = UTF16.CodeUnit
+
+    @_versioned
+    internal let _guts: _StringGuts
+    @_versioned
+    internal let _endOffset: Int
+    @_versioned
+    internal var _nextOffset: Int
+    @_versioned
+    internal var _buffer = _FixedArray16<Element>()
+    @_versioned
+    internal var _bufferIndex: Int = 0
+
+    @_inlineable
+    @_versioned
+    internal init(_ guts: _StringGuts, range: Range<Int>) {
+      self._guts = guts
+      self._endOffset = range.upperBound
+      self._nextOffset = range.lowerBound
+      if _fastPath(!range.isEmpty) {
+        _fillBuffer()
+      }
+    }
+
+    @_inlineable
+    public mutating func next() -> Element? {
+      if _fastPath(_bufferIndex < _buffer.count) {
+        let result = _buffer[_bufferIndex]
+        _bufferIndex += 1
+        return result
+      }
+      if _nextOffset == _endOffset {
+        return nil
+      }
+      _fillBuffer()
+      _bufferIndex = 1
+      return _buffer[0]
+    }
+
+    @_versioned
+    @inline(never)
+    internal mutating func _fillBuffer() {
+      _sanityCheck(_buffer.count == 0)
+      _buffer.count = Swift.min(_buffer.capacity, _endOffset - _nextOffset)
+      _sanityCheck(_buffer.count > 0)
+      _buffer.withUnsafeMutableBufferPointer { buffer in
+        let range: Range<Int> = _nextOffset ..< _nextOffset + buffer.count
+        _guts._copy(range: range, into: buffer)
+      }
+      _nextOffset += _buffer.count
+    }
+  }
+
+  @_inlineable
+  public func makeIterator() -> Iterator {
+    return Iterator(self, range: 0..<count)
+  }
+
+  @_inlineable
+  @_versioned
+  internal func makeIterator(in range: Range<Int>) -> Iterator {
+    return Iterator(self, range: range)
+  }
+}
