@@ -15,7 +15,6 @@
     "StringBuffer.swift",
     "StringCharacterView.swift",
     "StringComparable.swift",
-    "StringCore.swift",
     "StringObject.swift",
     "StringGuts.swift",
     "StringGraphemeBreaking.swift",  
