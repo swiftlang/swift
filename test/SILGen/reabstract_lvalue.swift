@@ -5,7 +5,7 @@ struct MyMetatypeIsThin {}
 // CHECK-LABEL: sil hidden @_T017reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@inout T) -> ()
 func consumeGenericInOut<T>(_ x: inout T) {}
 
-// CHECK-LABEL: sil hidden @_T017reabstract_lvalue9transformSdSiF : $@convention(thin) (Int) -> Double
+// CHECK-LABEL: sil hidden @_T017reabstract_lvalue9transformySdSiF : $@convention(thin) (Int) -> Double
 func transform(_ i: Int) -> Double {
   return Double(i)
 }
@@ -14,7 +14,7 @@ func transform(_ i: Int) -> Double {
 func reabstractFunctionInOut() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed (Int) -> Double }
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
-  // CHECK: [[ARG:%.*]] = function_ref @_T017reabstract_lvalue9transformSdSiF
+  // CHECK: [[ARG:%.*]] = function_ref @_T017reabstract_lvalue9transformySdSiF
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
   // CHECK: store [[THICK_ARG:%.*]] to [init] [[PB]]
   // CHECK:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*@callee_guaranteed (Int) -> Double

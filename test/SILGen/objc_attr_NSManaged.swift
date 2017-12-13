@@ -68,7 +68,7 @@ extension FinalGizmo {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T019objc_attr_NSManaged9testFinalSSAA0E5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
+// CHECK-LABEL: sil hidden @_T019objc_attr_NSManaged9testFinalySSAA0E5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @owned $FinalGizmo):
 // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK: objc_method [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
@@ -105,7 +105,7 @@ extension ProtoAdopter {
 // CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC7modifyXyyF
 // CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC8testFuncyyF
 // CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoCSQyACGycfc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoCSQyACGSi7bellsOn_tcfc
+// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : _T019objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfc
 // CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: _T019objc_attr_NSManaged10SwiftGizmoCfD
 // CHECK-NEXT: }
 

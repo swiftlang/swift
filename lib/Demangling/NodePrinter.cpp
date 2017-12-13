@@ -562,7 +562,7 @@ private:
     if (Parameters->getKind() != Node::Kind::Tuple) {
       // only a single not-named parameter
       if (showTypes) {
-        Printer << "(_: ";
+        Printer << '(';
         print(Parameters);
         Printer << ')';
       } else {
@@ -596,11 +596,10 @@ private:
 
                  ++ParamIndex;
 
-                 if (showTypes) {
+                 if (showTypes)
                    print(Param);
-                 }
                },
-               [&]() { Printer << ", "; });
+               [&]() { Printer << (showTypes ? ", " : ""); });
     Printer << ')';
   }
 
@@ -1929,16 +1928,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
         TypePr = TypePrinting::WithColon;
       }
     }
-    if (TypePr == TypePrinting::WithColon) {
-      if (Options.DisplayEntityTypes) {
-        Printer << " : ";
-        print(type);
-      }
-    } else {
-      assert(TypePr == TypePrinting::FunctionStyle);
-      if (MultiWordName || needSpaceBeforeType(type))
-        Printer << ' ';
 
+    auto printEntityType = [&](NodePointer type) {
       if (auto labelList = getChildIf(Entity, Node::Kind::LabelList)) {
         if (type->getKind() == Node::Kind::DependentGenericType) {
           print(type->getChild(0)); // generic signature
@@ -1952,6 +1943,18 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       } else {
         print(type);
       }
+    };
+
+    if (TypePr == TypePrinting::WithColon) {
+      if (Options.DisplayEntityTypes) {
+        Printer << " : ";
+        printEntityType(type);
+      }
+    } else {
+      assert(TypePr == TypePrinting::FunctionStyle);
+      if (MultiWordName || needSpaceBeforeType(type))
+        Printer << ' ';
+      printEntityType(type);
     }
   }
   if (!asPrefixContext && PostfixContext) {

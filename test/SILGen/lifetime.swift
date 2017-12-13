@@ -129,7 +129,7 @@ func reftype_return() -> Ref {
     // CHECK: return [[RET]]
 }
 
-// CHECK-LABEL: sil hidden @_T08lifetime11reftype_argyAA3RefCF : $@convention(thin) (@owned Ref) -> () {
+// CHECK-LABEL: sil hidden @_T08lifetime11reftype_argyyAA3RefCF : $@convention(thin) (@owned Ref) -> () {
 // CHECK: bb0([[A:%[0-9]+]] : $Ref):
 // CHECK:   [[AADDR:%[0-9]+]] = alloc_box ${ var Ref }
 // CHECK:   [[PA:%[0-9]+]] = project_box [[AADDR]]
@@ -140,7 +140,7 @@ func reftype_return() -> Ref {
 // CHECK:   destroy_value [[AADDR]]
 // CHECK:   destroy_value [[A]]
 // CHECK:   return
-// CHECK: } // end sil function '_T08lifetime11reftype_argyAA3RefCF'
+// CHECK: } // end sil function '_T08lifetime11reftype_argyyAA3RefCF'
 func reftype_arg(_ a: Ref) {
     var a = a
 }
@@ -354,7 +354,7 @@ class RefWithProp {
   var aleph_prop: Aleph { get {} set {} }
 }
 
-// CHECK-LABEL: sil hidden @_T08lifetime015logical_lvalue_A0yAA11RefWithPropC_SiAA3ValVtF : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
+// CHECK-LABEL: sil hidden @_T08lifetime015logical_lvalue_A0yyAA11RefWithPropC_SiAA3ValVtF : $@convention(thin) (@owned RefWithProp, Int, Val) -> () {
 func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   var r = r
   var i = i
@@ -483,7 +483,7 @@ class Foo<T> {
     // CHECK: return [[INIT_THIS]]
 
   // -- initializing entry point
-  // CHECK-LABEL: sil hidden @_T08lifetime3FooCACyxGSi3chi_tcfc : $@convention(method) <T> (Int, @owned Foo<T>) -> @owned Foo<T> {
+  // CHECK-LABEL: sil hidden @_T08lifetime3FooC3chiACyxGSi_tcfc : $@convention(method) <T> (Int, @owned Foo<T>) -> @owned Foo<T> {
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[THISIN:%[0-9]+]] : $Foo<T>):
     // CHECK:   [[THIS:%[0-9]+]] = mark_uninitialized [rootself] [[THISIN]]
 
@@ -526,7 +526,7 @@ class Foo<T> {
     // CHECK: [[THIS_RETURN:%.*]] = copy_value [[THIS]]
     // CHECK: destroy_value [[THIS]]
     // CHECK: return [[THIS_RETURN]]
-  // CHECK: } // end sil function '_T08lifetime3FooCACyxGSi3chi_tcfc'
+  // CHECK: } // end sil function '_T08lifetime3FooC3chiACyxGSi_tcfc'
   }
 
   // -- allocating entry point
@@ -725,7 +725,7 @@ struct Bas<T> {
 
 class B { init(y:Int) {} }
 class D : B {
-  // CHECK-LABEL: sil hidden @_T08lifetime1DCACSi1x_Si1ytcfc
+  // CHECK-LABEL: sil hidden @_T08lifetime1DC1x1yACSi_Sitcfc
   // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $D):
   init(x: Int, y: Int) {
     var x = x
@@ -746,7 +746,7 @@ class D : B {
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
     // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PY]]
     // CHECK: [[Y:%[0-9]+]] = load [trivial] [[READ]]
-    // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_T08lifetime1BCACSi1y_tcfc : $@convention(method) (Int, @owned B) -> @owned B
+    // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_T08lifetime1BC1yACSi_tcfc : $@convention(method) (Int, @owned B) -> @owned B
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D
     // CHECK: [[THIS1:%[0-9]+]] = load [copy] [[PB_BOX]]

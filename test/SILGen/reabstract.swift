@@ -29,7 +29,7 @@ func test0() {
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil hidden @_T010reabstract10testThrowsyypF
+// CHECK-LABEL: sil hidden @_T010reabstract10testThrowsyyypF
 // CHECK:         function_ref @_T0ytytIegir_Ieg_TR
 // CHECK:         function_ref @_T0ytyts5Error_pIegirzo_sAA_pIegzo_TR
 func testThrows(_ x: Any) {
@@ -53,8 +53,8 @@ func testInoutOpaque(_ c: C, i: Int) {
   box.t(&c, i)
 }
 
-// CHECK-LABEL: sil hidden @_T010reabstract15testInoutOpaqueyAA1CC_Si1itF
-// CHECK:         function_ref @_T010reabstract6notFunyAA1CCz_Si1itF
+// CHECK-LABEL: sil hidden @_T010reabstract15testInoutOpaque_1iyAA1CC_SitF
+// CHECK:         function_ref @_T010reabstract6notFun_1iyAA1CCz_SitF
 // CHECK:         thin_to_thick_function {{%[0-9]+}}
 // CHECK:         function_ref @_T010reabstract1CCSiIegly_ACSiytIeglir_TR
 // CHECK:         partial_apply

@@ -206,7 +206,7 @@ func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> G
 func useInnerPointer(_ p: UnsafeMutableRawPointer) {}
 
 // Handle inner-pointer methods by autoreleasing self after the call.
-// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions18innerPointerMethodySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions18innerPointerMethodyySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
 // CHECK: bb0([[ARG:%.*]] : @owned $Gizmo):
 // CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:         [[METHOD:%.*]] = objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
@@ -222,7 +222,7 @@ func innerPointerMethod(_ g: Gizmo) {
   useInnerPointer(g.getBytes())
 }
 
-// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions20innerPointerPropertyySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions20innerPointerPropertyyySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
 // CHECK:       bb0([[ARG:%.*]] : @owned $Gizmo):
 // CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:         [[METHOD:%.*]] = objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
@@ -233,7 +233,7 @@ func innerPointerMethod(_ g: Gizmo) {
 // CHECK:         [[USE:%.*]] = function_ref @_T026objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[USE]]([[PTR]])
 // CHECK:         destroy_value [[ARG]]
-// CHECK: } // end sil function '_T026objc_ownership_conventions20innerPointerPropertyySo5GizmoCF'
+// CHECK: } // end sil function '_T026objc_ownership_conventions20innerPointerPropertyyySo5GizmoCF'
 func innerPointerProperty(_ g: Gizmo) {
   useInnerPointer(g.innerProperty)
 }

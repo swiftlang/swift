@@ -23,7 +23,7 @@ extension Bar {
   func zoom() {}
 }
 
-// CHECK-LABEL: sil hidden @_T010extensions19extensionReferencesyAA3FooCF
+// CHECK-LABEL: sil hidden @_T010extensions19extensionReferencesyyAA3FooCF
 func extensionReferences(_ x: Foo) {
   // Non-objc extension methods are statically dispatched.
   // CHECK: function_ref @_T010extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
@@ -45,7 +45,7 @@ func extensionMethodCurrying(_ x: Foo) {
 // CHECK-LABEL: sil hidden [transparent] @_T010extensions3BoxV1txSgvpfi : $@convention(thin) <T> () -> @out Optional<T>
 // CHECK:      bb0(%0 : @trivial $*Optional<T>):
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Optional<T>.Type
-// CHECK:      [[FN:%.*]] = function_ref @_T0SqxSgyt10nilLiteral_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+// CHECK:      [[FN:%.*]] = function_ref @_T0Sq10nilLiteralxSgyt_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 // CHECK-NEXT: apply [[FN]]<T>(%0, [[METATYPE]]) : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
@@ -54,7 +54,7 @@ struct Box<T> {
   let t: T? = nil
 }
 
-// CHECK-LABEL: sil hidden @_T010extensions3BoxVACyxGx1t_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T>
+// CHECK-LABEL: sil hidden @_T010extensions3BoxV1tACyxGx_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T>
 // CHECK:      [[SELF_BOX:%.*]] = alloc_box $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK-NEXT: [[UNINIT_SELF_BOX:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-NEXT: [[SELF_ADDR:%.*]] = project_box [[UNINIT_SELF_BOX]] : $<τ_0_0> { var Box<τ_0_0> } <T>

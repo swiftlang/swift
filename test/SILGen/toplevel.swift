@@ -78,7 +78,7 @@ print_y()
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : @owned $A):
 // CHECK: store [[VALUE]] to [init] [[BOX:%.+]] : $*A
 // CHECK-NOT: destroy_value
-// CHECK: [[SINK:%.+]] = function_ref @_T08toplevel8markUsedyxlF
+// CHECK: [[SINK:%.+]] = function_ref @_T08toplevel8markUsedyyxlF
 // CHECK-NOT: destroy_value
 // CHECK: apply [[SINK]]<A>({{%.+}})
 class A {}
