@@ -122,7 +122,7 @@ StringRef FrontendInputsAndOutputs::firstOutputFilename() const {
 
 StringRef FrontendInputsAndOutputs::lastOutputFilename() const {
   if (AllFiles.empty()) return StringRef();
-  // FIXME dmu use reverse iterator?
+  // FIXME: dmu use reverse iterator?
   for (auto i = AllFiles.size() - 1; ; --i) {
     if (!AllFiles[i].outputs().OutputFilename.empty()) {
       // FIXME: dmu try uncommenting and seeing what breaks:

@@ -31,7 +31,7 @@ def primary_filelist : Separate<["-"], "primary-filelist">,
 def output_filelist : Separate<["-"], "output-filelist">,
   HelpText<"Specify outputs in a file rather than on the command line">;
   
-  // FIXME: so many filelists!
+  // FIXME: dmu so many filelists!
 def objCHeaderOutput_filelist: Separate<["-"], " objCHeaderOutput-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
 def moduleOutput_filelist: Separate<["-"], " moduleOutput-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;
 def moduleDocOutput_filelist: Separate<["-"], " moduleDocOutput-filelist">, HelpText<"Specify supplemental outputs in a file rather than on the command line">;

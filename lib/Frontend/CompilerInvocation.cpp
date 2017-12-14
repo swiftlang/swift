@@ -307,7 +307,7 @@ private:
   /// Returns the output filenames on the command line or in the output
   /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
-  /// FIXME: dmuu merge output filename handling with supplementaries
+  /// FIXME: dmu merge output filename handling with supplementaries
   ArrayRef<std::string> getOutputFilenamesFromCommandLineOrFilelist();
 
   /// Read any filelists for suppliementary outputs that may be present on the

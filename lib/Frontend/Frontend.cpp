@@ -194,6 +194,7 @@ bool CompilerInstance::setUpInputs() {
     PrimaryBufferID = *codeCompletionBufferID;
   }
 
+  // Remove this check when batch mode is (starting to) work.
   if (PrimaryBufferID != NO_SUCH_BUFFER)
     Invocation.getFrontendOptions()
         .InputsAndOutputs
