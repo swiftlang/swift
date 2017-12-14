@@ -274,17 +274,17 @@ class M<T, S: A<T>> {
   }
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics14takes_metatypeyxmlF(%swift.type*, %swift.type* %T)
+// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics14takes_metatypeyyxmlF(%swift.type*, %swift.type* %T)
 func takes_metatype<T>(_: T.Type) {}
 
-// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics023archetype_with_generic_A11_constraintyx1t_tAA1ACyq_GRbzr0_lF(%T22class_bounded_generics1AC.2*, %swift.type* %T)
+// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics023archetype_with_generic_A11_constraint1tyx_tAA1ACyq_GRbzr0_lF(%T22class_bounded_generics1AC.2*, %swift.type* %T)
 // CHECK:      [[ISA_ADDR:%.*]] = bitcast %T22class_bounded_generics1AC.2* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
-// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics14takes_metatypeyxmlF(%swift.type* %T, %swift.type* %T)
+// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics14takes_metatypeyyxmlF(%swift.type* %T, %swift.type* %T)
 // CHECK-NEXT: [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
 // CHECK-NEXT: [[U_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10
 // CHECK-NEXT: [[U:%.*]] = load %swift.type*, %swift.type** [[U_ADDR]]
-// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics14takes_metatypeyxmlF(%swift.type* %U, %swift.type* %U)
+// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics14takes_metatypeyyxmlF(%swift.type* %U, %swift.type* %U)
 // CHECK:      ret void
 
 func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
@@ -292,7 +292,7 @@ func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
   takes_metatype(U.self)
 }
 
-// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics029calls_archetype_with_generic_A11_constraintyAA1ACyxG1a_tlF(%T22class_bounded_generics1AC*) #0 {
+// CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics029calls_archetype_with_generic_A11_constraint1ayAA1ACyxG_tlF(%T22class_bounded_generics1AC*) #0 {
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T22class_bounded_generics1AC, %T22class_bounded_generics1AC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK:      [[SELF:%.*]] = bitcast %T22class_bounded_generics1AC* %0 to %T22class_bounded_generics1AC.2*
@@ -300,7 +300,7 @@ func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
 // CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10
 // CHECK-NEXT: [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
 // CHECK-NEXT: [[A_OF_T:%.*]] = call %swift.type* @_T022class_bounded_generics1ACMa(%swift.type* [[T]])
-// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics023archetype_with_generic_A11_constraintyx1t_tAA1ACyq_GRbzr0_lF(%T22class_bounded_generics1AC.2* [[SELF]], %swift.type* [[A_OF_T]])
+// CHECK-NEXT: call swiftcc void @_T022class_bounded_generics023archetype_with_generic_A11_constraint1tyx_tAA1ACyq_GRbzr0_lF(%T22class_bounded_generics1AC.2* [[SELF]], %swift.type* [[A_OF_T]])
 // CHECK:      ret void
 
 func calls_archetype_with_generic_class_constraint<T>(a: A<T>) {
