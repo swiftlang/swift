@@ -215,6 +215,10 @@ SyntaxFactory::getUnknownKind(SyntaxKind Kind) {
 %     Result = 'SyntaxKind::UnknownDecl'
 %   elif node.syntax_kind.endswith('Token'):
 %     Result = 'SyntaxKind::UnknownToken'
+%   elif node.syntax_kind.endswith('Type'):
+%     Result = 'SyntaxKind::UnknownType'
+%   elif node.syntax_kind.endswith('Pattern'):
+%     Result = 'SyntaxKind::UnknownPattern'
 %   else:
 %     Result = 'SyntaxKind::Unknown'
 %   end
@@ -307,17 +311,20 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
                        makeRightParenToken({}, {}));
 }
 
-TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(
-    llvm::Optional<TokenSyntax> Label,
-    llvm::Optional<TokenSyntax> Colon, TypeSyntax Type,
-    llvm::Optional<TokenSyntax> TrailingComma) {
-  auto annotation = makeTypeAnnotation(makeBlankAttributeList(), None, Type);
-  return makeTupleTypeElement(Label, Colon, annotation, TrailingComma);
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
+                                    llvm::Optional<TokenSyntax> Colon,
+                                    TypeSyntax Type,
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeTupleTypeElement(None, Label, None, Colon, Type, None, None,
+                              TrailingComma);
 }
 
-TupleTypeElementSyntax SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
-    llvm::Optional<TokenSyntax> TrailingComma) {
-  return makeTupleTypeElement(None, None, Type, TrailingComma);
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeTupleTypeElement(None, None, None, None, Type, None, None,
+                              TrailingComma);
 }
 
 GenericParameterSyntax
