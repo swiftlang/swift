@@ -939,7 +939,8 @@ static bool hasNonCanonicalSelfProtocolRequirement(
     }
 
     // Check whether the given requirement is in the requirement signature.
-    if (!hasConformanceInSignature(inProto->getRequirementSignature(),
+    if (!source->usesRequirementSignature &&
+        !hasConformanceInSignature(inProto->getRequirementSignature(),
                                    source->getStoredType(), conformingProto))
       return true;
 
