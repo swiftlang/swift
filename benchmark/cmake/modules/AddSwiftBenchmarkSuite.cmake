@@ -99,11 +99,10 @@ endfunction()
 function(add_opt_view opt_view_main_dir, module_name, opt_view_dir_out)
   set(opt_view_dir "${opt_view_main_dir}/${module_name}")
   set(opt_record "${objdir}/${module_name}.opt.yaml")
-  set(opt_viewer "${LLVM_BUILD_MAIN_SRC_DIR}/tools/opt-viewer/opt-viewer.py")
   add_custom_command(
     OUTPUT ${opt_view_dir}
     DEPENDS "${objfile}"
-    COMMAND ${opt_viewer} ${opt_record} "-o" ${opt_view_dir})
+    COMMAND ${SWIFT_BENCHMARK_OPT_VIEWER} ${opt_record} "-o" ${opt_view_dir})
   set(${opt_view_dir_out} ${opt_view_dir} PARENT_SCOPE)
 endfunction()
 
@@ -214,9 +213,6 @@ function (swift_benchmark_compile_archopts)
 
   set(opt_view_main_dir)
   if(SWIFT_BENCHMARK_GENERATE_OPT_VIEW AND LLVM_HAVE_OPT_VIEWER_MODULES)
-    precondition(SWIFT_BENCHMARK_BUILT_STANDALONE NEGATE
-      "Opt-viewer is not supported when running the benchmarks outside the Swift tree")
-
     if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
       list(APPEND common_options "-save-optimization-record")
       set(opt_view_main_dir "${objdir}/opt-view")
