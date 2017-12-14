@@ -54,8 +54,8 @@ public:
   // Readers:
 
   ArrayRef<InputFile> getAllFiles() const { return AllFiles; }
-  std::vector<InputFile> &getAllFilesMalleably() { return AllFiles; }
-  std::vector<InputFile *> getAllFilePointersMalleably() {
+  std::vector<InputFile> &getAllFiles() { return AllFiles; }
+  std::vector<InputFile *> getPointersToAllFiles() {
     std::vector<InputFile *> pointers;
     for (InputFile &input : AllFiles) {
       pointers.push_back(&input);
@@ -64,14 +64,7 @@ public:
   }
   // FIXME: Can I use an iterator instead of making a new collection?
 
-  //  std::vector<const InputFile &> getAllPrimaries() const {
-  //    std::vector<const InputFile &> primaries;
-  //    forEachPrimary([&] (InputFile& input) -> void {
-  //      primaries.push_back(input);
-  //    });
-  //    return primaries;
-  //  }
-  std::vector<InputFile *> getAllPrimariesMalleably() {
+  std::vector<InputFile *> getPointersToAllPrimaries() {
     std::vector<InputFile *> primaries;
     forEachPrimaryMalleably(
         [&](InputFile &input) -> void { primaries.push_back(&input); });
@@ -91,12 +84,12 @@ public:
 
   void forEachPrimaryMalleably(llvm::function_ref<void(InputFile &input)> fn) {
     for (auto p : PrimaryInputs)
-      fn(getAllFilesMalleably()[p.second]);
+      fn(getAllFiles()[p.second]);
   }
 
   std::vector<InputFile *> filesWithOutputs() {
-    return hasPrimaries() ? getAllPrimariesMalleably()
-                          : getAllFilePointersMalleably();
+    return hasPrimaries() ? getPointersToAllPrimaries()
+                          : getPointersToAllFiles();
   }
 
   // FIXME: check all uses
